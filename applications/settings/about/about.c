@@ -72,12 +72,13 @@ static DialogMessageButton compliance_screen(DialogsApp* dialogs, DialogMessage*
     return result;
 }
 
-static DialogMessageButton unleashed_info_screen(DialogsApp* dialogs, DialogMessage* message) {
+static DialogMessageButton tumoflip_info_screen(DialogsApp* dialogs, DialogMessage* message) {
     DialogMessageButton result;
 
-    const char* screen_header = "Unleashed Firmware\n";
+    const char* screen_header = "tumoflip Firmware\n";
 
-    const char* screen_text = "Is for experimental purposes\nonly "
+    const char* screen_text = "Based on Unleashed.\n"
+                              "For experimental purposes\nonly "
                               "and is not meant for any\nillegal use! "
                               "We do not condone\nany illegal activity.";
 
@@ -190,7 +191,7 @@ static DialogMessageButton fw_version_screen(DialogsApp* dialogs, DialogMessage*
 }
 
 const AboutDialogScreen about_screens[] = {
-    unleashed_info_screen,
+    tumoflip_info_screen,
     unleashed_info_screen2,
     unleashed_info_screen3,
     product_screen,
