@@ -28,6 +28,8 @@ def generate(env):
                             "${TARGET_HW}",
                             "--fw-origin",
                             "${FIRMWARE_ORIGIN}",
+                            "--version",
+                            "${DIST_SUFFIX}",
                             "-o",
                             "${TARGET.dir.posix}",
                             "--dir",

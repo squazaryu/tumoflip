@@ -116,6 +116,13 @@ class Main(App):
             help="firmware origin",
             required=True,
         )
+        self.parser_generate.add_argument(
+            "--version",
+            dest="firmware_version",
+            type=str,
+            help="firmware version string",
+            required=False,
+        )
         self.parser_generate.add_argument("--dir", dest="sourcedir", required=True)
         self.parser_generate.set_defaults(func=self.generate)
 
@@ -135,6 +142,8 @@ class Main(App):
                 "FIRMWARE_ORIGIN": self.args.firmware_origin,
             }
         )
+        if self.args.firmware_version:
+            current_info["VERSION"] = self.args.firmware_version
 
         del current_info["GIT_COMMIT_DATE"]
 
