@@ -14,7 +14,7 @@ and is not affiliated with Flipper Devices or the Unleashed team.
 - Firmware API: `87.9`
 - Target: Flipper Zero F7
 - Release package:
-  [v0.1.0](https://github.com/squazaryu/tumoflip/releases/tag/v0.1.0)
+  [v0.1.1](https://github.com/squazaryu/tumoflip/releases/tag/v0.1.1)
 
 ## tumoflip Changes
 
