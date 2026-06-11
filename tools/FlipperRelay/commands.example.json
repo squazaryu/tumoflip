@@ -1,0 +1,34 @@
+{
+  "ble_target": "TUMOFLIP",
+  "scan_timeout": 5.0,
+  "default_timeout": 8.0,
+  "commands": [
+    {
+      "app_id": "sber_relay",
+      "command": "toggle",
+      "run": [
+        "/usr/bin/osascript",
+        "-e",
+        "display notification \"Toggle command received\" with title \"FlipperRelay\""
+      ]
+    },
+    {
+      "app_id": "sber_relay",
+      "command": "on",
+      "run": [
+        "/usr/bin/osascript",
+        "-e",
+        "display notification \"ON command received\" with title \"FlipperRelay\""
+      ]
+    },
+    {
+      "app_id": "sber_relay",
+      "command": "off",
+      "run": [
+        "/usr/bin/osascript",
+        "-e",
+        "display notification \"OFF command received\" with title \"FlipperRelay\""
+      ]
+    }
+  ]
+}

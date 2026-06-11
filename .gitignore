@@ -78,3 +78,6 @@ node_modules/
 # cli_perf script output in case of errors
 /block.bin
 /return_block.bin
+
+# Local FlipperRelay host bridge config can contain private commands or tokens
+/tools/FlipperRelay/commands.local.json
