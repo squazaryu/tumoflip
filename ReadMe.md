@@ -28,6 +28,39 @@ and is not affiliated with Flipper Devices or the Unleashed team.
 - Vendored local user applications into `applications_user` so the repository
   can be built without absolute local symlinks.
 
+## Differences from Unleashed
+
+tumoflip is based on Unleashed, but it intentionally changes the parts of the
+firmware that affect the Desktop, quick access flow, bundled apps, and build
+identity.
+
+| Area | Unleashed | tumoflip |
+| --- | --- | --- |
+| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tumoflip` and `firmware_origin_fork: tumoflip`. |
+| Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
+| Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
+| Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
+| Desktop OK menu | Uses the standard app/menu layout. | Adds an `8/1` folder immediately after Apps for Module One related apps. |
+| Module One access | Apps are reached through the normal Apps tree. | Provides a dedicated `8/1` launcher folder with a custom cross icon. |
+| Settings return flow | Standard Unleashed navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
+| BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication. |
+| User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `tumoflip` for distribution suffix, firmware origin, Git origin, and release artifacts. |
+
+## Notes on Custom UI
+
+The custom Desktop styles are focused on changing the main Desktop launcher
+experience, not replacing every nested app list in the firmware. Apps and
+system screens still mostly follow the underlying Unleashed UI behavior unless
+they were changed explicitly.
+
+Current custom Desktop modes:
+
+- Wii
+- Wii Vertical
+- DSi
+- Vertical
+
 ## Included User Applications
 
 - `ai_dashboard`
