@@ -1,0 +1,12 @@
+App(
+    appid="flipper_relay",
+    name="Flipper Relay",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="flipper_relay_main",
+    requires=["gui", "bt"],
+    stack_size=2 * 1024,
+    fap_category="Tools",
+    fap_version="0.2.0",
+    fap_description="BLE App Bridge remote that toggles a Home Assistant relay via a host bridge (Sber relay is one of the targets).",
+    fap_icon="icon_10px.png",
+)

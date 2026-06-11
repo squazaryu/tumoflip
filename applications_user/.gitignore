@@ -1,1 +1,9 @@
 *
+!.gitignore
+!README.md
+!ai_dashboard/
+!ai_dashboard/**
+!flipper_relay/
+!flipper_relay/**
+!quac/
+!quac/**

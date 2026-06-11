@@ -1,0 +1,14 @@
+App(
+    appid="ai_dashboard",
+    name="AI Radar",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="ai_dashboard_app",
+    requires=["gui", "bt"],
+    stack_size=8 * 1024,
+    fap_category="Tools",
+    fap_version="0.1",
+    fap_author="T-Damer",
+    fap_description="Track AI usage windows on Flipper Zero",
+    fap_icon="radar_ai_10px.png",
+    fap_icon_assets="images",
+)
