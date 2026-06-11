@@ -67,7 +67,9 @@ Current custom Desktop modes:
 - `ai_dashboard` / AI Radar:
   vendored modified version based on
   [T-Damer/flipper-ai-dashboard](https://github.com/T-Damer/flipper-ai-dashboard).
-- `FlipperRelay`
+- `FlipperRelay`:
+  vendored copy based on
+  [squazaryu/flipper_relay](https://github.com/squazaryu/flipper_relay).
 - `quac`:
   vendored modified version based on
   [rdefeo/quac](https://github.com/rdefeo/quac).
@@ -79,11 +81,9 @@ profile. Apps can send small framed events with `app_id`, `command`, and an
 optional payload. A paired Mac can listen for those events and run local
 commands that are configured on the Mac.
 
-The host-side bridge lives in:
-
-```text
-tools/FlipperRelay/
-```
+The standalone FlipperRelay repository lives at
+[squazaryu/flipper_relay](https://github.com/squazaryu/flipper_relay).
+This firmware keeps a vendored copy so tumoflip can build the app directly.
 
 Current supported senders:
 
@@ -94,7 +94,8 @@ Current supported senders:
 
 The Mac bridge uses an explicit JSON allowlist and does not execute arbitrary
 payload text from the Flipper. See
-[tools/FlipperRelay/README.md](tools/FlipperRelay/README.md).
+[squazaryu/flipper_relay](https://github.com/squazaryu/flipper_relay) for the
+Mac bridge and app source.
 
 ## Install
 
