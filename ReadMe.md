@@ -63,9 +63,13 @@ Current custom Desktop modes:
 
 ## Included User Applications
 
-- `ai_dashboard`
+- `ai_dashboard` / AI Radar:
+  vendored modified version based on
+  [T-Damer/flipper-ai-dashboard](https://github.com/T-Damer/flipper-ai-dashboard).
 - `flipper_relay`
-- `quac`
+- `quac`:
+  vendored modified version based on
+  [rdefeo/quac](https://github.com/rdefeo/quac).
 
 ## Install
 
