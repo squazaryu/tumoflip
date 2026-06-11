@@ -1,4 +1,5 @@
 #include "bt_api.h"
+#include <string.h>
 
 FuriHalBleProfileBase* bt_profile_start(
     Bt* bt,
@@ -46,6 +47,45 @@ void bt_set_status_changed_callback(Bt* bt, BtStatusChangedCallback callback, vo
 
     bt->status_changed_cb = callback;
     bt->status_changed_ctx = context;
+}
+
+bool bt_app_bridge_send(
+    Bt* bt,
+    const char* app_id,
+    const char* command,
+    const uint8_t* payload,
+    uint16_t payload_len) {
+    furi_check(bt);
+    furi_check(app_id);
+    furi_check(command);
+
+    bool result = false;
+    BtMessage message = {
+        .lock = api_lock_alloc_locked(),
+        .type = BtMessageTypeAppBridgeSend,
+        .result = &result,
+        .data.app_bridge = {
+            .app_id = app_id,
+            .command = command,
+            .payload = payload,
+            .payload_len = payload_len,
+        },
+    };
+    furi_check(
+        furi_message_queue_put(bt->message_queue, &message, FuriWaitForever) == FuriStatusOk);
+    api_lock_wait_unlock_and_free(message.lock);
+
+    return result;
+}
+
+bool bt_app_bridge_send_text(Bt* bt, const char* app_id, const char* command, const char* payload) {
+    furi_check(payload);
+    return bt_app_bridge_send(bt, app_id, command, (const uint8_t*)payload, strlen(payload));
+}
+
+FuriPubSub* bt_app_bridge_get_pubsub(Bt* bt) {
+    furi_check(bt);
+    return bt->app_bridge_pubsub;
 }
 
 void bt_forget_bonded_devices(Bt* bt) {

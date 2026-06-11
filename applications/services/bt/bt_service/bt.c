@@ -185,10 +185,83 @@ Bt* bt_alloc(void) {
 
     // API evnent
     bt->api_event = furi_event_flag_alloc();
+    bt->app_bridge_pubsub = furi_pubsub_alloc();
 
     bt->pin = 0;
 
     return bt;
+}
+
+static bool bt_app_bridge_decode_frame(
+    BtAppBridgeEvent* decoded,
+    const uint8_t* buffer,
+    uint16_t size) {
+    furi_check(decoded);
+    furi_check(buffer);
+
+    if(size < BLE_SVC_APP_BRIDGE_HEADER_LEN) {
+        return false;
+    }
+    if((buffer[0] != 'F') || (buffer[1] != 'A') || (buffer[2] != 'B') || (buffer[3] != '1')) {
+        return false;
+    }
+
+    const uint8_t app_id_len = buffer[4];
+    const uint8_t command_len = buffer[5];
+    const uint16_t payload_len = buffer[6] | (buffer[7] << 8);
+    if((app_id_len == 0) || (command_len == 0) ||
+       (app_id_len > BT_APP_BRIDGE_APP_ID_LEN_MAX) ||
+       (command_len > BT_APP_BRIDGE_COMMAND_LEN_MAX) ||
+       (payload_len > BT_APP_BRIDGE_PAYLOAD_LEN_MAX)) {
+        return false;
+    }
+
+    const uint16_t expected_len =
+        BLE_SVC_APP_BRIDGE_HEADER_LEN + app_id_len + command_len + payload_len;
+    if(size != expected_len) {
+        return false;
+    }
+
+    memset(decoded, 0, sizeof(BtAppBridgeEvent));
+    memcpy(decoded->app_id, &buffer[BLE_SVC_APP_BRIDGE_HEADER_LEN], app_id_len);
+    memcpy(
+        decoded->command,
+        &buffer[BLE_SVC_APP_BRIDGE_HEADER_LEN + app_id_len],
+        command_len);
+    if(payload_len) {
+        memcpy(
+            decoded->payload,
+            &buffer[BLE_SVC_APP_BRIDGE_HEADER_LEN + app_id_len + command_len],
+            payload_len);
+    }
+    decoded->payload_len = payload_len;
+    return true;
+}
+
+// Called from GAP thread from App Bridge service
+static void bt_app_bridge_event_callback(AppBridgeServiceEvent event, void* context) {
+    furi_assert(context);
+    Bt* bt = context;
+
+    if(event.event == AppBridgeServiceEventTypeCommandReceived) {
+        BtAppBridgeEvent decoded;
+        if(bt_app_bridge_decode_frame(&decoded, event.data.buffer, event.data.size)) {
+            furi_pubsub_publish(bt->app_bridge_pubsub, &decoded);
+        } else {
+            FURI_LOG_W(TAG, "Invalid app bridge command frame");
+        }
+    }
+}
+
+static void bt_app_bridge_bind(Bt* bt) {
+    furi_assert(bt);
+
+    if(furi_hal_bt_check_profile_type(bt->current_profile, ble_profile_serial)) {
+        ble_profile_serial_app_bridge_set_callback(
+            bt->current_profile,
+            bt->bt_settings.app_bridge_enabled ? bt_app_bridge_event_callback : NULL,
+            bt->bt_settings.app_bridge_enabled ? bt : NULL);
+    }
 }
 
 // Called from GAP thread from Serial service
@@ -389,6 +462,7 @@ void bt_open_rpc_connection(Bt* bt) {
                     bt->current_profile, RPC_BUFFER_SIZE, bt_serial_event_callback, bt);
                 ble_profile_serial_set_rpc_active(
                     bt->current_profile, FuriHalBtSerialRpcStatusActive);
+                bt_app_bridge_bind(bt);
             } else {
                 FURI_LOG_W(TAG, "RPC is busy, failed to open new session");
             }
@@ -423,6 +497,7 @@ static void bt_change_profile(Bt* bt, BtMessage* message) {
             bt);
         if(bt->current_profile) {
             FURI_LOG_I(TAG, "Bt App started");
+            bt_app_bridge_bind(bt);
             if(bt->bt_settings.enabled) {
                 furi_hal_bt_start_advertising();
             }
@@ -491,6 +566,8 @@ static void bt_start_application(Bt* bt) {
         if(!bt->current_profile) {
             FURI_LOG_E(TAG, "BLE App start failed");
             bt->status = BtStatusUnavailable;
+        } else {
+            bt_app_bridge_bind(bt);
         }
     }
 }
@@ -506,6 +583,7 @@ static void bt_handle_get_settings(Bt* bt, BtMessage* message) {
 
 static void bt_handle_set_settings(Bt* bt, BtMessage* message) {
     bt->bt_settings = *message->data.csettings;
+    bt_app_bridge_bind(bt);
     bt_apply_settings(bt);
     bt_settings_save(&bt->bt_settings);
 }
@@ -514,6 +592,29 @@ static void bt_handle_reload_keys_settings(Bt* bt) {
     bt_load_keys(bt);
     bt_start_application(bt);
     bt_load_settings(bt);
+}
+
+static void bt_handle_app_bridge_send(Bt* bt, BtMessage* message) {
+    furi_assert(bt);
+    furi_assert(message);
+
+    bool success = false;
+    if(!bt->bt_settings.app_bridge_enabled) {
+        FURI_LOG_W(TAG, "App bridge is disabled");
+    } else if(furi_hal_bt_check_profile_type(bt->current_profile, ble_profile_serial)) {
+        success = ble_profile_serial_app_bridge_tx(
+            bt->current_profile,
+            message->data.app_bridge.app_id,
+            message->data.app_bridge.command,
+            message->data.app_bridge.payload,
+            message->data.app_bridge.payload_len);
+    } else {
+        FURI_LOG_W(TAG, "App bridge unavailable for active BLE profile");
+    }
+
+    if(message->result) {
+        *message->result = success;
+    }
 }
 
 static void bt_init_keys_settings(Bt* bt) {
@@ -597,6 +698,8 @@ int32_t bt_srv(void* p) {
             bt_handle_set_settings(bt, &message);
         } else if(message.type == BtMessageTypeReloadKeysSettings) {
             bt_handle_reload_keys_settings(bt);
+        } else if(message.type == BtMessageTypeAppBridgeSend) {
+            bt_handle_app_bridge_send(bt, &message);
         }
 
         if(message.lock) api_lock_unlock(message.lock);

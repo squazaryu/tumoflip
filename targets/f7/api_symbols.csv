@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,87.8,,
+Version,+,87.9,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/services/applications.h,,
 Header,+,applications/services/bt/bt_service/bt.h,,
@@ -285,6 +285,7 @@ Header,+,targets/f7/ble_glue/furi_ble/event_dispatcher.h,,
 Header,+,targets/f7/ble_glue/furi_ble/gatt.h,,
 Header,+,targets/f7/ble_glue/furi_ble/profile_interface.h,,
 Header,+,targets/f7/ble_glue/profiles/serial_profile.h,,
+Header,-,targets/f7/ble_glue/services/app_bridge_service.h,,
 Header,+,targets/f7/ble_glue/services/battery_service.h,,
 Header,+,targets/f7/ble_glue/services/dev_info_service.h,,
 Header,+,targets/f7/ble_glue/services/serial_service.h,,
@@ -786,10 +787,16 @@ Function,-,ble_profile_hid_mouse_press,_Bool,"FuriHalBleProfileBase*, uint8_t"
 Function,-,ble_profile_hid_mouse_release,_Bool,"FuriHalBleProfileBase*, uint8_t"
 Function,-,ble_profile_hid_mouse_release_all,_Bool,FuriHalBleProfileBase*
 Function,-,ble_profile_hid_mouse_scroll,_Bool,"FuriHalBleProfileBase*, int8_t"
+Function,-,ble_profile_serial_app_bridge_set_callback,void,"FuriHalBleProfileBase*, FuriHalBtAppBridgeCallback, void*"
+Function,-,ble_profile_serial_app_bridge_tx,_Bool,"FuriHalBleProfileBase*, const char*, const char*, const uint8_t*, uint16_t"
 Function,+,ble_profile_serial_notify_buffer_is_empty,void,FuriHalBleProfileBase*
 Function,+,ble_profile_serial_set_event_callback,void,"FuriHalBleProfileBase*, uint16_t, FuriHalBtSerialCallback, void*"
 Function,+,ble_profile_serial_set_rpc_active,void,"FuriHalBleProfileBase*, _Bool"
 Function,+,ble_profile_serial_tx,_Bool,"FuriHalBleProfileBase*, uint8_t*, uint16_t"
+Function,-,ble_svc_app_bridge_send,_Bool,"BleServiceAppBridge*, const char*, const char*, const uint8_t*, uint16_t"
+Function,-,ble_svc_app_bridge_set_callback,void,"BleServiceAppBridge*, AppBridgeServiceEventCallback, void*"
+Function,-,ble_svc_app_bridge_start,BleServiceAppBridge*,
+Function,-,ble_svc_app_bridge_stop,void,BleServiceAppBridge*
 Function,+,ble_svc_battery_start,BleServiceBattery*,_Bool
 Function,+,ble_svc_battery_state_update,void,"uint8_t*, _Bool*"
 Function,+,ble_svc_battery_stop,void,BleServiceBattery*
@@ -809,6 +816,9 @@ Function,+,ble_svc_serial_start,BleServiceSerial*,
 Function,+,ble_svc_serial_stop,void,BleServiceSerial*
 Function,+,ble_svc_serial_update_tx,_Bool,"BleServiceSerial*, uint8_t*, uint16_t"
 Function,-,bsearch,void*,"const void*, const void*, size_t, size_t, __compar_fn_t"
+Function,+,bt_app_bridge_get_pubsub,FuriPubSub*,Bt*
+Function,+,bt_app_bridge_send,_Bool,"Bt*, const char*, const char*, const uint8_t*, uint16_t"
+Function,+,bt_app_bridge_send_text,_Bool,"Bt*, const char*, const char*, const char*"
 Function,+,bt_disconnect,void,Bt*
 Function,+,bt_forget_bonded_devices,void,Bt*
 Function,+,bt_get_settings,void,"Bt*, BtSettings*"

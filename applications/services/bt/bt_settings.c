@@ -9,7 +9,7 @@
 #define TAG "BtSettings"
 
 #define BT_SETTINGS_PATH    INT_PATH(BT_SETTINGS_FILE_NAME)
-#define BT_SETTINGS_VERSION (0)
+#define BT_SETTINGS_VERSION (1)
 #define BT_SETTINGS_MAGIC   (0x19)
 
 void bt_settings_load(BtSettings* bt_settings) {
@@ -22,6 +22,7 @@ void bt_settings_load(BtSettings* bt_settings) {
         FURI_LOG_W(TAG, "Failed to load settings, using defaults");
 
         bt_settings->enabled = false;
+        bt_settings->app_bridge_enabled = false;
         bt_settings_save(bt_settings);
     }
 }

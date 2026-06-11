@@ -5,6 +5,7 @@
 #include <services/dev_info_service.h>
 #include <services/battery_service.h>
 #include <services/serial_service.h>
+#include <services/app_bridge_service.h>
 #include <furi.h>
 #include <ble/core/ble_defs.h>
 
@@ -14,6 +15,7 @@ typedef struct {
     BleServiceDevInfo* dev_info_svc;
     BleServiceBattery* battery_svc;
     BleServiceSerial* serial_svc;
+    BleServiceAppBridge* app_bridge_svc;
 } BleProfileSerial;
 _Static_assert(offsetof(BleProfileSerial, base) == 0, "Wrong layout");
 
@@ -27,6 +29,7 @@ static FuriHalBleProfileBase* ble_profile_serial_start(FuriHalBleProfileParams p
     profile->dev_info_svc = ble_svc_dev_info_start();
     profile->battery_svc = ble_svc_battery_start(true);
     profile->serial_svc = ble_svc_serial_start();
+    profile->app_bridge_svc = ble_svc_app_bridge_start();
 
     return &profile->base;
 }
@@ -36,6 +39,7 @@ static void ble_profile_serial_stop(FuriHalBleProfileBase* profile) {
     furi_check(profile->config == ble_profile_serial);
 
     BleProfileSerial* serial_profile = (BleProfileSerial*)profile;
+    ble_svc_app_bridge_stop(serial_profile->app_bridge_svc);
     ble_svc_battery_stop(serial_profile->battery_svc);
     ble_svc_dev_info_stop(serial_profile->dev_info_svc);
     ble_svc_serial_stop(serial_profile->serial_svc);
@@ -123,4 +127,27 @@ bool ble_profile_serial_tx(FuriHalBleProfileBase* profile, uint8_t* data, uint16
     }
 
     return ble_svc_serial_update_tx(serial_profile->serial_svc, data, size);
+}
+
+bool ble_profile_serial_app_bridge_tx(
+    FuriHalBleProfileBase* profile,
+    const char* app_id,
+    const char* command,
+    const uint8_t* payload,
+    uint16_t payload_len) {
+    furi_check(profile && (profile->config == ble_profile_serial));
+
+    BleProfileSerial* serial_profile = (BleProfileSerial*)profile;
+    return ble_svc_app_bridge_send(
+        serial_profile->app_bridge_svc, app_id, command, payload, payload_len);
+}
+
+void ble_profile_serial_app_bridge_set_callback(
+    FuriHalBleProfileBase* profile,
+    FuriHalBtAppBridgeCallback callback,
+    void* context) {
+    furi_check(profile && (profile->config == ble_profile_serial));
+
+    BleProfileSerial* serial_profile = (BleProfileSerial*)profile;
+    ble_svc_app_bridge_set_callback(serial_profile->app_bridge_svc, callback, context);
 }

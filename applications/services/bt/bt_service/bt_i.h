@@ -35,7 +35,15 @@ typedef enum {
     BtMessageTypeGetSettings,
     BtMessageTypeSetSettings,
     BtMessageTypeReloadKeysSettings,
+    BtMessageTypeAppBridgeSend,
 } BtMessageType;
+
+typedef struct {
+    const char* app_id;
+    const char* command;
+    const uint8_t* payload;
+    uint16_t payload_len;
+} BtAppBridgeSendData;
 
 typedef struct {
     uint8_t* start_address;
@@ -54,6 +62,7 @@ typedef union {
     BtKeyStorageUpdateData key_storage_data;
     BtSettings* settings;
     const BtSettings* csettings;
+    BtAppBridgeSendData app_bridge;
 } BtMessageData;
 
 typedef struct {
@@ -86,6 +95,7 @@ struct Bt {
     RpcSession* rpc_session;
     FuriEventFlag* rpc_event;
     FuriEventFlag* api_event;
+    FuriPubSub* app_bridge_pubsub;
     BtStatusChangedCallback status_changed_cb;
     void* status_changed_ctx;
     uint32_t pin;

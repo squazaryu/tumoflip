@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <core/pubsub.h>
 #include <furi_ble/profile_interface.h>
 #include <core/common_defines.h>
 
@@ -26,6 +27,17 @@ typedef struct {
 } BtRssi;
 
 typedef void (*BtStatusChangedCallback)(BtStatus status, void* context);
+
+#define BT_APP_BRIDGE_APP_ID_LEN_MAX  32
+#define BT_APP_BRIDGE_COMMAND_LEN_MAX 32
+#define BT_APP_BRIDGE_PAYLOAD_LEN_MAX 172
+
+typedef struct {
+    char app_id[BT_APP_BRIDGE_APP_ID_LEN_MAX + 1];
+    char command[BT_APP_BRIDGE_COMMAND_LEN_MAX + 1];
+    uint8_t payload[BT_APP_BRIDGE_PAYLOAD_LEN_MAX];
+    uint16_t payload_len;
+} BtAppBridgeEvent;
 
 /** Change BLE Profile
  * @note Call of this function leads to 2nd core restart
@@ -63,6 +75,32 @@ void bt_disconnect(Bt* bt);
  * @param context   pointer to context
  */
 void bt_set_status_changed_callback(Bt* bt, BtStatusChangedCallback callback, void* context);
+
+/** Send a generic application event over BLE App Bridge
+ *
+ * The active BLE profile must be the default serial profile. The packet is
+ * exposed to a paired central through the Flipper App Bridge GATT service.
+ *
+ * @param bt            Bt instance
+ * @param app_id        stable app id, ASCII, up to 32 bytes
+ * @param command       command name, ASCII, up to 32 bytes
+ * @param payload       optional payload
+ * @param payload_len   payload length, up to 172 bytes
+ *
+ * @return true on success
+ */
+bool bt_app_bridge_send(
+    Bt* bt,
+    const char* app_id,
+    const char* command,
+    const uint8_t* payload,
+    uint16_t payload_len);
+
+/** Send a null-terminated text payload over BLE App Bridge */
+bool bt_app_bridge_send_text(Bt* bt, const char* app_id, const char* command, const char* payload);
+
+/** Subscribe to commands received from BLE App Bridge central */
+FuriPubSub* bt_app_bridge_get_pubsub(Bt* bt);
 
 /** Forget bonded devices
  * @note Leads to wipe ble key storage and deleting bt.keys

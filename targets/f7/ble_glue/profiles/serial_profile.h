@@ -3,6 +3,7 @@
 #include <furi_ble/profile_interface.h>
 
 #include <services/serial_service.h>
+#include <services/app_bridge_service.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,6 +19,9 @@ typedef enum {
 /** Serial service callback type */
 typedef SerialServiceEventCallback FuriHalBtSerialCallback;
 
+/** App bridge service callback type */
+typedef AppBridgeServiceEventCallback FuriHalBtAppBridgeCallback;
+
 /** Serial profile descriptor */
 extern const FuriHalBleProfileTemplate* const ble_profile_serial;
 
@@ -30,6 +34,34 @@ extern const FuriHalBleProfileTemplate* const ble_profile_serial;
  * @return      true on success
  */
 bool ble_profile_serial_tx(FuriHalBleProfileBase* profile, uint8_t* data, uint16_t size);
+
+/** Send generic app event through BLE App Bridge service
+ *
+ * @param profile       Profile instance
+ * @param app_id        Stable application id, ASCII, up to 32 bytes
+ * @param command       Command name, ASCII, up to 32 bytes
+ * @param payload       optional payload
+ * @param payload_len   payload length, up to 172 bytes
+ *
+ * @return      true on success
+ */
+bool ble_profile_serial_app_bridge_tx(
+    FuriHalBleProfileBase* profile,
+    const char* app_id,
+    const char* command,
+    const uint8_t* payload,
+    uint16_t payload_len);
+
+/** Set App Bridge service events callback
+ *
+ * @param profile       Profile instance
+ * @param callback      FuriHalBtAppBridgeCallback instance
+ * @param context       pointer to context
+ */
+void ble_profile_serial_app_bridge_set_callback(
+    FuriHalBleProfileBase* profile,
+    FuriHalBtAppBridgeCallback callback,
+    void* context);
 
 /** Set BLE RPC status
  *
