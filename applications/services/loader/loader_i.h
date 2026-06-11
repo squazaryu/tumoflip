@@ -40,6 +40,7 @@ typedef enum {
     LoaderMessageTypeStartByName,
     LoaderMessageTypeAppClosed,
     LoaderMessageTypeShowMenu,
+    LoaderMessageTypeShowSettingsMenu,
     LoaderMessageTypeMenuClosed,
     LoaderMessageTypeApplicationsClosed,
     LoaderMessageTypeLock,
@@ -100,3 +101,5 @@ typedef struct {
         LoaderMessageBoolResult* bool_value;
     };
 } LoaderMessage;
+
+void loader_show_settings_menu(Loader* instance);

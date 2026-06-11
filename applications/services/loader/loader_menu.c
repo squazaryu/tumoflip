@@ -1,6 +1,7 @@
 #include <gui/gui.h>
 #include <gui/view_dispatcher.h>
 #include <gui/modules/menu.h>
+#include <gui/modules/menu_style.h>
 #include <gui/modules/submenu.h>
 #include <assets_icons.h>
 #include <applications.h>
@@ -10,22 +11,37 @@
 #include "loader_menu.h"
 
 #define TAG "LoaderMenu"
+#define MODULE_ONE_MENU_NAME "8/1"
+#define MODULE_ONE_APPS_PATH EXT_PATH("apps/Module One")
 
 struct LoaderMenu {
     FuriThread* thread;
     void (*closed_cb)(void*);
     void* context;
+    bool start_in_settings;
 };
 
 static int32_t loader_menu_thread(void* p);
 
-LoaderMenu* loader_menu_alloc(void (*closed_cb)(void*), void* context) {
+static LoaderMenu* loader_menu_alloc_internal(
+    void (*closed_cb)(void*),
+    void* context,
+    bool start_in_settings) {
     LoaderMenu* loader_menu = malloc(sizeof(LoaderMenu));
     loader_menu->closed_cb = closed_cb;
     loader_menu->context = context;
+    loader_menu->start_in_settings = start_in_settings;
     loader_menu->thread = furi_thread_alloc_ex(TAG, 1024, loader_menu_thread, loader_menu);
     furi_thread_start(loader_menu->thread);
     return loader_menu;
+}
+
+LoaderMenu* loader_menu_alloc(void (*closed_cb)(void*), void* context) {
+    return loader_menu_alloc_internal(closed_cb, context, false);
+}
+
+LoaderMenu* loader_menu_alloc_settings(void (*closed_cb)(void*), void* context) {
+    return loader_menu_alloc_internal(closed_cb, context, true);
 }
 
 void loader_menu_free(LoaderMenu* loader_menu) {
@@ -47,10 +63,14 @@ typedef struct {
     Submenu* settings_menu;
 } LoaderMenuApp;
 
-static void loader_menu_start(const char* name) {
+static void loader_menu_start_with_args(const char* name, const char* args) {
     Loader* loader = furi_record_open(RECORD_LOADER);
-    loader_start_with_gui_error(loader, name, NULL);
+    loader_start_with_gui_error(loader, name, args);
     furi_record_close(RECORD_LOADER);
+}
+
+static void loader_menu_start(const char* name) {
+    loader_menu_start_with_args(name, NULL);
 }
 
 static void loader_menu_apps_callback(void* context, uint32_t index) {
@@ -70,6 +90,12 @@ static void loader_menu_applications_callback(void* context, uint32_t index) {
     UNUSED(context);
     const char* name = LOADER_APPLICATIONS_NAME;
     loader_menu_start(name);
+}
+
+static void loader_menu_module_one_callback(void* context, uint32_t index) {
+    UNUSED(index);
+    UNUSED(context);
+    loader_menu_start_with_args(LOADER_APPLICATIONS_NAME, MODULE_ONE_APPS_PATH);
 }
 
 static void
@@ -108,6 +134,13 @@ static void loader_menu_build_menu(LoaderMenuApp* app, LoaderMenu* menu) {
         i++,
         loader_menu_applications_callback,
         (void*)menu);
+    menu_add_item(
+        app->primary_menu,
+        MODULE_ONE_MENU_NAME,
+        &A_ModuleOne_14,
+        i++,
+        loader_menu_module_one_callback,
+        (void*)menu);
 
     for(i = 0; i < FLIPPER_APPS_COUNT; i++) {
         menu_add_item(
@@ -120,6 +153,10 @@ static void loader_menu_build_menu(LoaderMenuApp* app, LoaderMenu* menu) {
     }
 
     for(i = 0; i < FLIPPER_EXTERNAL_APPS_COUNT; i++) {
+        if(strcmp(FLIPPER_EXTERNAL_APPS[i].name, "Clock") == 0) {
+            continue;
+        }
+
         menu_add_item(
             app->primary_menu,
             FLIPPER_EXTERNAL_APPS[i].name,
@@ -170,10 +207,17 @@ static LoaderMenuApp* loader_menu_app_alloc(LoaderMenu* loader_menu) {
 
     // Settings menu
     View* settings_view = submenu_get_view(app->settings_menu);
+    if(menu_style_load() == MenuStyleVertical) {
+        submenu_set_orientation(app->settings_menu, ViewOrientationVertical);
+    }
     view_set_context(settings_view, app->settings_menu);
-    view_set_previous_callback(settings_view, loader_menu_switch_to_primary);
+    view_set_previous_callback(
+        settings_view,
+        loader_menu->start_in_settings ? loader_menu_exit : loader_menu_switch_to_primary);
     view_dispatcher_add_view(app->view_dispatcher, LoaderMenuViewSettings, settings_view);
-    view_dispatcher_switch_to_view(app->view_dispatcher, LoaderMenuViewPrimary);
+    view_dispatcher_switch_to_view(
+        app->view_dispatcher,
+        loader_menu->start_in_settings ? LoaderMenuViewSettings : LoaderMenuViewPrimary);
 
     return app;
 }

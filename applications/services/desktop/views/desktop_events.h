@@ -13,15 +13,6 @@ typedef enum {
     DesktopMainEventOpenDebug,
     DesktopMainEventOpenPowerOff,
 
-    DesktopDummyEventOpenLeft,
-    DesktopDummyEventOpenDown,
-    DesktopDummyEventOpenOk,
-    DesktopDummyEventOpenUpLong,
-    DesktopDummyEventOpenDownLong,
-    DesktopDummyEventOpenLeftLong,
-    DesktopDummyEventOpenRightLong,
-    DesktopDummyEventOpenOkLong,
-
     DesktopLockedEventUnlocked,
     DesktopLockedEventUpdate,
     DesktopLockedEventShowPinInput,
@@ -38,9 +29,8 @@ typedef enum {
     DesktopDebugEventExit,
 
     //DesktopLockMenuEventLock,
+    DesktopLockMenuEventSettings,
     DesktopLockMenuEventBt,
-    DesktopLockMenuEventDummyModeOn,
-    DesktopLockMenuEventDummyModeOff,
     DesktopLockMenuEventStealthModeOn,
     DesktopLockMenuEventStealthModeOff,
 

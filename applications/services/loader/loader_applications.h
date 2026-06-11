@@ -7,7 +7,10 @@ extern "C" {
 
 typedef struct LoaderApplications LoaderApplications;
 
-LoaderApplications* loader_applications_alloc(void (*closed_cb)(void*), void* context);
+LoaderApplications* loader_applications_alloc(
+    void (*closed_cb)(void*),
+    void* context,
+    const char* start_path);
 
 void loader_applications_free(LoaderApplications* loader_applications);
 

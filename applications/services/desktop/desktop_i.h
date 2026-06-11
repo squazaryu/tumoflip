@@ -61,7 +61,6 @@ struct Desktop {
     ViewStack* locked_view_stack;
 
     ViewPort* lock_icon_viewport;
-    ViewPort* dummy_mode_icon_viewport;
     ViewPort* clock_viewport;
     ViewPort* stealth_mode_icon_viewport;
 
@@ -89,5 +88,4 @@ struct Desktop {
 
 void desktop_lock(Desktop* desktop);
 void desktop_unlock(Desktop* desktop);
-void desktop_set_dummy_mode_state(Desktop* desktop, bool enabled);
 void desktop_set_stealth_mode_state(Desktop* desktop, bool enabled);

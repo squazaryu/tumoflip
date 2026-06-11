@@ -4,6 +4,7 @@
 #include <toolbox/saved_struct.h>
 #include <stdbool.h>
 #include <loader/loader.h>
+#include <loader/loader_i.h>
 
 #include "../desktop_i.h"
 #include <desktop/desktop_settings.h>
@@ -24,7 +25,6 @@ void desktop_scene_lock_menu_on_enter(void* context) {
 
     scene_manager_set_scene_state(desktop->scene_manager, DesktopSceneLockMenu, 0);
     desktop_lock_menu_set_callback(desktop->lock_menu, desktop_scene_lock_menu_callback, desktop);
-    desktop_lock_menu_set_dummy_mode_state(desktop->lock_menu, desktop->settings.dummy_mode);
     desktop_lock_menu_set_stealth_mode_state(
         desktop->lock_menu, furi_hal_rtc_is_flag_set(FuriHalRtcFlagStealthMode));
     desktop_lock_menu_set_bt_mode_state(desktop->lock_menu, furi_hal_bt_is_active());
@@ -54,19 +54,18 @@ bool desktop_scene_lock_menu_on_event(void* context, SceneManagerEvent event) {
         //     desktop_lock(desktop);
         //     consumed = true;
         //     break;
+        case DesktopLockMenuEventSettings: {
+            Loader* loader = furi_record_open(RECORD_LOADER);
+            loader_show_settings_menu(loader);
+            furi_record_close(RECORD_LOADER);
+            scene_manager_search_and_switch_to_previous_scene(
+                desktop->scene_manager, DesktopSceneMain);
+            consumed = true;
+            break;
+        }
         case DesktopLockMenuEventBt:
             bts.enabled = !bts.enabled;
             bt_set_settings(bt, &bts);
-            scene_manager_search_and_switch_to_previous_scene(
-                desktop->scene_manager, DesktopSceneMain);
-            break;
-        case DesktopLockMenuEventDummyModeOn:
-            desktop_set_dummy_mode_state(desktop, true);
-            scene_manager_search_and_switch_to_previous_scene(
-                desktop->scene_manager, DesktopSceneMain);
-            break;
-        case DesktopLockMenuEventDummyModeOff:
-            desktop_set_dummy_mode_state(desktop, false);
             scene_manager_search_and_switch_to_previous_scene(
                 desktop->scene_manager, DesktopSceneMain);
             break;

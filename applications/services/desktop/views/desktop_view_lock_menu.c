@@ -9,7 +9,7 @@ typedef enum {
     //DesktopLockMenuIndexLock,
     DesktopLockMenuIndexBt,
     DesktopLockMenuIndexStealth,
-    DesktopLockMenuIndexDummy,
+    DesktopLockMenuIndexSettings,
 
     DesktopLockMenuIndexTotalCount
 } DesktopLockMenuIndex;
@@ -22,14 +22,6 @@ void desktop_lock_menu_set_callback(
     furi_assert(callback);
     lock_menu->callback = callback;
     lock_menu->context = context;
-}
-
-void desktop_lock_menu_set_dummy_mode_state(DesktopLockMenuView* lock_menu, bool dummy_mode) {
-    with_view_model(
-        lock_menu->view,
-        DesktopLockMenuViewModel * model,
-        { model->dummy_mode = dummy_mode; },
-        true);
 }
 
 void desktop_lock_menu_set_stealth_mode_state(DesktopLockMenuView* lock_menu, bool stealth_mode) {
@@ -63,7 +55,9 @@ void desktop_lock_menu_draw_callback(Canvas* canvas, void* model) {
         const char* str = NULL;
 
         //if(i == DesktopLockMenuIndexLock) {
-        if(i == DesktopLockMenuIndexBt) {
+        if(i == DesktopLockMenuIndexSettings) {
+            str = "Settings";
+        } else if(i == DesktopLockMenuIndexBt) {
             if(m->bt_mode) {
                 str = "Turn Bluetooth Off";
             } else {
@@ -74,12 +68,6 @@ void desktop_lock_menu_draw_callback(Canvas* canvas, void* model) {
                 str = "Unmute";
             } else {
                 str = "Mute";
-            }
-        } else if(i == DesktopLockMenuIndexDummy) { //-V547
-            if(m->dummy_mode) {
-                str = "Default Mode";
-            } else {
-                str = "Dummy Mode";
             }
         }
 
@@ -103,7 +91,6 @@ bool desktop_lock_menu_input_callback(InputEvent* event, void* context) {
     DesktopLockMenuView* lock_menu = context;
     uint8_t idx = 0;
     bool consumed = false;
-    bool dummy_mode = false;
     bool stealth_mode = false;
     bool update = false;
 
@@ -131,13 +118,16 @@ bool desktop_lock_menu_input_callback(InputEvent* event, void* context) {
                 }
             }
             idx = model->idx;
-            dummy_mode = model->dummy_mode;
             stealth_mode = model->stealth_mode;
         },
         update);
 
     if(event->key == InputKeyOk) {
-        if(idx == DesktopLockMenuIndexBt) {
+        if(idx == DesktopLockMenuIndexSettings) {
+            if(event->type == InputTypeShort) {
+                lock_menu->callback(DesktopLockMenuEventSettings, lock_menu->context);
+            }
+        } else if(idx == DesktopLockMenuIndexBt) {
             if(event->type == InputTypeShort) {
                 lock_menu->callback(DesktopLockMenuEventBt, lock_menu->context);
             }
@@ -151,12 +141,6 @@ bool desktop_lock_menu_input_callback(InputEvent* event, void* context) {
                 lock_menu->callback(DesktopLockMenuEventStealthModeOn, lock_menu->context);
             } else if((stealth_mode == true) && (event->type == InputTypeShort)) {
                 lock_menu->callback(DesktopLockMenuEventStealthModeOff, lock_menu->context);
-            }
-        } else if(idx == DesktopLockMenuIndexDummy) {
-            if((dummy_mode == false) && (event->type == InputTypeShort)) {
-                lock_menu->callback(DesktopLockMenuEventDummyModeOn, lock_menu->context);
-            } else if((dummy_mode == true) && (event->type == InputTypeShort)) {
-                lock_menu->callback(DesktopLockMenuEventDummyModeOff, lock_menu->context);
             }
         }
         consumed = true;

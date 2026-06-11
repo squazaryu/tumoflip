@@ -17,12 +17,18 @@ struct LoaderApplications {
     FuriThread* thread;
     void (*closed_cb)(void*);
     void* context;
+    FuriString* start_path;
 };
 
 static int32_t loader_applications_thread(void* p);
 
-LoaderApplications* loader_applications_alloc(void (*closed_cb)(void*), void* context) {
+LoaderApplications* loader_applications_alloc(
+    void (*closed_cb)(void*),
+    void* context,
+    const char* start_path) {
     LoaderApplications* loader_applications = malloc(sizeof(LoaderApplications));
+    loader_applications->start_path =
+        furi_string_alloc_set(start_path ? start_path : EXT_PATH("apps"));
     loader_applications->thread =
         furi_thread_alloc_ex(TAG, 768, loader_applications_thread, (void*)loader_applications);
     loader_applications->closed_cb = closed_cb;
@@ -35,11 +41,13 @@ void loader_applications_free(LoaderApplications* loader_applications) {
     furi_assert(loader_applications);
     furi_thread_join(loader_applications->thread);
     furi_thread_free(loader_applications->thread);
+    furi_string_free(loader_applications->start_path);
     free(loader_applications);
 }
 
 typedef struct {
     FuriString* file_path;
+    FuriString* base_path;
     DialogsApp* dialogs;
     Storage* storage;
     Loader* loader;
@@ -49,9 +57,10 @@ typedef struct {
     Loading* loading;
 } LoaderApplicationsApp;
 
-static LoaderApplicationsApp* loader_applications_app_alloc(void) {
+static LoaderApplicationsApp* loader_applications_app_alloc(const char* start_path) {
     LoaderApplicationsApp* app = malloc(sizeof(LoaderApplicationsApp)); //-V799
-    app->file_path = furi_string_alloc_set(EXT_PATH("apps"));
+    app->file_path = furi_string_alloc_set(start_path);
+    app->base_path = furi_string_alloc_set(start_path);
     app->dialogs = furi_record_open(RECORD_DIALOGS);
     app->storage = furi_record_open(RECORD_STORAGE);
     app->loader = furi_record_open(RECORD_LOADER);
@@ -75,6 +84,7 @@ static void loader_applications_app_free(LoaderApplicationsApp* app) {
     furi_record_close(RECORD_LOADER);
     furi_record_close(RECORD_DIALOGS);
     furi_record_close(RECORD_STORAGE);
+    furi_string_free(app->base_path);
     furi_string_free(app->file_path);
     free(app);
 }
@@ -104,7 +114,7 @@ static bool loader_applications_select_app(LoaderApplicationsApp* loader_applica
         .hide_ext = true,
         .item_loader_callback = loader_applications_item_callback,
         .item_loader_context = loader_applications_app,
-        .base_path = EXT_PATH("apps"),
+        .base_path = furi_string_get_cstr(loader_applications_app->base_path),
     };
 
     return dialog_file_browser_show(
@@ -146,7 +156,8 @@ static void
 
 static int32_t loader_applications_thread(void* p) {
     LoaderApplications* loader_applications = p;
-    LoaderApplicationsApp* app = loader_applications_app_alloc();
+    LoaderApplicationsApp* app =
+        loader_applications_app_alloc(furi_string_get_cstr(loader_applications->start_path));
 
     // start loading animation
     view_holder_set_view(app->view_holder, loading_get_view(app->loading));

@@ -254,6 +254,15 @@ void loader_show_menu(Loader* loader) {
     furi_message_queue_put(loader->queue, &message, FuriWaitForever);
 }
 
+void loader_show_settings_menu(Loader* loader) {
+    furi_check(loader);
+
+    LoaderMessage message;
+    message.type = LoaderMessageTypeShowSettingsMenu;
+
+    furi_message_queue_put(loader->queue, &message, FuriWaitForever);
+}
+
 FuriPubSub* loader_get_pubsub(Loader* loader) {
     furi_check(loader);
     // it's safe to return pubsub without locking
@@ -627,6 +636,12 @@ static void loader_do_menu_show(Loader* loader) {
     }
 }
 
+static void loader_do_settings_menu_show(Loader* loader) {
+    if(!loader->loader_menu) {
+        loader->loader_menu = loader_menu_alloc_settings(loader_menu_closed_callback, loader);
+    }
+}
+
 static void loader_do_menu_closed(Loader* loader) {
     if(loader->loader_menu) {
         loader_menu_free(loader->loader_menu);
@@ -634,10 +649,10 @@ static void loader_do_menu_closed(Loader* loader) {
     }
 }
 
-static void loader_do_applications_show(Loader* loader) {
+static void loader_do_applications_show(Loader* loader, const char* start_path) {
     if(!loader->loader_applications) {
         loader->loader_applications =
-            loader_applications_alloc(loader_applications_closed_callback, loader);
+            loader_applications_alloc(loader_applications_closed_callback, loader, start_path);
     }
 }
 
@@ -684,7 +699,7 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
 
         // check Applications
         if(strcmp(name, LOADER_APPLICATIONS_NAME) == 0) {
-            loader_do_applications_show(loader);
+            loader_do_applications_show(loader, args);
             status.value = loader_make_success_status(error_message);
             break;
         }
@@ -916,6 +931,9 @@ int32_t loader_srv(void* p) {
             }
             case LoaderMessageTypeShowMenu:
                 loader_do_menu_show(loader);
+                break;
+            case LoaderMessageTypeShowSettingsMenu:
+                loader_do_settings_menu_show(loader);
                 break;
             case LoaderMessageTypeMenuClosed:
                 loader_do_menu_closed(loader);

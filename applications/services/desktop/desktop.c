@@ -50,12 +50,6 @@ static void desktop_lock_icon_draw_callback(Canvas* canvas, void* context) {
     canvas_draw_icon(canvas, 0, 0, &I_Lock_7x8);
 }
 
-static void desktop_dummy_mode_icon_draw_callback(Canvas* canvas, void* context) {
-    UNUSED(context);
-    furi_assert(canvas);
-    canvas_draw_icon(canvas, 0, 0, &I_GameMode_11x8);
-}
-
 static void desktop_clock_update(Desktop* desktop) {
     furi_assert(desktop);
 
@@ -241,11 +235,6 @@ static void desktop_apply_settings(Desktop* desktop) {
 
     desktop_clock_reconfigure(desktop);
 
-    view_port_enabled_set(desktop->dummy_mode_icon_viewport, desktop->settings.dummy_mode);
-    desktop_main_set_dummy_mode_state(desktop->main_view, desktop->settings.dummy_mode);
-    animation_manager_set_dummy_mode_state(
-        desktop->animation_manager, desktop->settings.dummy_mode);
-
     if(!desktop->app_running && !desktop->locked) {
         desktop_auto_lock_arm(desktop);
     }
@@ -346,14 +335,6 @@ static Desktop* desktop_alloc(void) {
     view_port_enabled_set(desktop->lock_icon_viewport, false);
     gui_add_view_port(desktop->gui, desktop->lock_icon_viewport, GuiLayerStatusBarLeft);
 
-    // Dummy mode icon
-    desktop->dummy_mode_icon_viewport = view_port_alloc();
-    view_port_set_width(desktop->dummy_mode_icon_viewport, icon_get_width(&I_GameMode_11x8));
-    view_port_draw_callback_set(
-        desktop->dummy_mode_icon_viewport, desktop_dummy_mode_icon_draw_callback, desktop);
-    view_port_enabled_set(desktop->dummy_mode_icon_viewport, false);
-    gui_add_view_port(desktop->gui, desktop->dummy_mode_icon_viewport, GuiLayerStatusBarLeft);
-
     // Clock
     desktop->clock_viewport = view_port_alloc();
     view_port_set_width(desktop->clock_viewport, 25);
@@ -445,19 +426,6 @@ void desktop_unlock(Desktop* desktop) {
     furi_pubsub_publish(desktop->status_pubsub, &status);
 
     desktop->locked = false;
-}
-
-void desktop_set_dummy_mode_state(Desktop* desktop, bool enabled) {
-    desktop->in_transition = true;
-
-    view_port_enabled_set(desktop->dummy_mode_icon_viewport, enabled);
-    desktop_main_set_dummy_mode_state(desktop->main_view, enabled);
-    animation_manager_set_dummy_mode_state(desktop->animation_manager, enabled);
-    desktop->settings.dummy_mode = enabled;
-
-    desktop->in_transition = false;
-
-    desktop_settings_save(&desktop->settings);
 }
 
 void desktop_set_stealth_mode_state(Desktop* desktop, bool enabled) {
