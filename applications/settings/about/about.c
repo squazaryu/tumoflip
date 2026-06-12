@@ -75,12 +75,12 @@ static DialogMessageButton compliance_screen(DialogsApp* dialogs, DialogMessage*
 static DialogMessageButton tumoflip_info_screen(DialogsApp* dialogs, DialogMessage* message) {
     DialogMessageButton result;
 
-    const char* screen_header = "tumoflip Firmware\n";
+    const char* screen_header = "tmwhflipper089-013\n";
 
-    const char* screen_text = "Based on Unleashed.\n"
-                              "For experimental purposes\nonly "
-                              "and is not meant for any\nillegal use! "
-                              "We do not condone\nany illegal activity.";
+    const char* screen_text = "tumoflip custom build\n"
+                              "Base: Unleashed 089\n"
+                              "github.com/DarkFlippers\n"
+                              "/unleashed-firmware";
 
     dialog_message_set_header(message, screen_header, 0, 0, AlignLeft, AlignTop);
     dialog_message_set_text(message, screen_text, 0, 11, AlignLeft, AlignTop);

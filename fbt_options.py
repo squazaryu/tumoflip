@@ -16,7 +16,10 @@ DEBUG = 1
 
 # Suffix to add to files when building distribution
 # If OS environment has DIST_SUFFIX set, it will be used instead
-DIST_SUFFIX = "tumoflip"
+DIST_SUFFIX = "tmwhflipper089-013"
+
+# Post-update slideshow shown by the updater package
+UPDATE_SPLASH = "tumoflip_update"
 
 # Coprocessor firmware
 COPRO_OB_DATA = "scripts/ob.data"
