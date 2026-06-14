@@ -1,0 +1,544 @@
+/*!
+ *  @file flipper-xremote/views/xremote_universal_view.c
+ *
+ * @brief Universal Remote style typed layouts for saved XRemote remotes.
+ */
+
+#include "xremote_universal_view.h"
+#include "../xremote_app.h"
+
+#include <gui/modules/button_panel.h>
+
+extern const Icon I_blue_19x20;
+extern const Icon I_blue_hover_19x20;
+extern const Icon I_brightness_text_40x5;
+extern const Icon I_celsius_24x23;
+extern const Icon I_celsius_hover_24x23;
+extern const Icon I_ch_down_24x21;
+extern const Icon I_ch_down_hover_24x21;
+extern const Icon I_ch_text_31x34;
+extern const Icon I_ch_up_24x21;
+extern const Icon I_ch_up_hover_24x21;
+extern const Icon I_color_text_24x5;
+extern const Icon I_cool_30x51;
+extern const Icon I_dry_19x20;
+extern const Icon I_dry_hover_19x20;
+extern const Icon I_dry_text_15x5;
+extern const Icon I_fahren_24x23;
+extern const Icon I_fahren_hover_24x23;
+extern const Icon I_green_19x20;
+extern const Icon I_green_hover_19x20;
+extern const Icon I_heat_30x51;
+extern const Icon I_max_24x23;
+extern const Icon I_max_hover_24x23;
+extern const Icon I_minus_19x20;
+extern const Icon I_minus_hover_19x20;
+extern const Icon I_mode_19x20;
+extern const Icon I_mode_hover_19x20;
+extern const Icon I_mode_text_20x5;
+extern const Icon I_mute_19x20;
+extern const Icon I_mute_hover_19x20;
+extern const Icon I_mute_text_19x5;
+extern const Icon I_next_19x20;
+extern const Icon I_next_hover_19x20;
+extern const Icon I_next_text_19x6;
+extern const Icon I_off_19x20;
+extern const Icon I_off_hover_19x20;
+extern const Icon I_off_text_12x5;
+extern const Icon I_on_text_9x5;
+extern const Icon I_pause_19x20;
+extern const Icon I_pause_hover_19x20;
+extern const Icon I_pause_text_23x5;
+extern const Icon I_play_19x20;
+extern const Icon I_play_hover_19x20;
+extern const Icon I_play_text_19x5;
+extern const Icon I_plus_19x20;
+extern const Icon I_plus_hover_19x20;
+extern const Icon I_power_19x20;
+extern const Icon I_power_hover_19x20;
+extern const Icon I_power_text_24x5;
+extern const Icon I_prev_19x20;
+extern const Icon I_prev_hover_19x20;
+extern const Icon I_prev_text_19x5;
+extern const Icon I_red_19x20;
+extern const Icon I_red_hover_19x20;
+extern const Icon I_rotate_19x20;
+extern const Icon I_rotate_hover_19x20;
+extern const Icon I_rotate_text_24x5;
+extern const Icon I_speed_text_30x30;
+extern const Icon I_timer_19x20;
+extern const Icon I_timer_hover_19x20;
+extern const Icon I_timer_text_23x5;
+extern const Icon I_vol_ac_text_30x30;
+extern const Icon I_vol_tv_text_29x34;
+extern const Icon I_voldown_24x21;
+extern const Icon I_voldown_hover_24x21;
+extern const Icon I_volup_24x21;
+extern const Icon I_volup_hover_24x21;
+extern const Icon I_white_19x20;
+extern const Icon I_white_hover_19x20;
+
+typedef struct {
+    ButtonPanel* button_panel;
+    XRemoteAppButtons* buttons;
+    uint8_t selected;
+    bool pressed;
+} XRemoteUniversalContext;
+
+typedef struct {
+    const char* command;
+    const char* label;
+    uint8_t col;
+    uint8_t row;
+} XRemoteAcButton;
+
+static const XRemoteAcButton g_hisense_ac_buttons[] = {
+    {XREMOTE_COMMAND_SMART, "Smt", 0, 0},
+    {XREMOTE_COMMAND_POWER, "Pwr", 1, 0},
+    {XREMOTE_COMMAND_MODE, "Mode", 2, 0},
+    {XREMOTE_COMMAND_SUPER, "Sup", 0, 1},
+    {XREMOTE_COMMAND_TEMP_UP, "T+", 1, 1},
+    {XREMOTE_COMMAND_FAN_SPEED, "Fan", 2, 1},
+    {XREMOTE_COMMAND_I_FEEL, "Feel", 0, 2},
+    {XREMOTE_COMMAND_TEMP_DOWN, "T-", 1, 2},
+    {XREMOTE_COMMAND_SLEEP, "Slp", 2, 2},
+    {XREMOTE_COMMAND_SWING_V, "SwV", 0, 3},
+    {XREMOTE_COMMAND_SWING_H, "SwH", 1, 3},
+    {XREMOTE_COMMAND_CLOCK, "Clk", 2, 3},
+    {XREMOTE_COMMAND_TIMER_ON, "TOn", 0, 4},
+    {XREMOTE_COMMAND_TIMER_OFF, "TOff", 1, 4},
+    {XREMOTE_COMMAND_QUIET, "Qiet", 2, 4},
+    {XREMOTE_COMMAND_DIMMER, "Dim", 0, 5},
+    {XREMOTE_COMMAND_ECONOMY, "Eco", 2, 5},
+};
+
+static void xremote_universal_item_callback(void* context, uint32_t index, InputType type) {
+    XRemoteUniversalContext* universal = context;
+    xremote_app_assert_void(universal);
+    xremote_app_assert_void(universal->buttons);
+
+    if(type != InputTypeShort) return;
+
+    const char* button_name = xremote_button_get_name(index);
+    xremote_app_assert_void(button_name);
+
+    InfraredRemoteButton* button =
+        infrared_remote_get_button_by_name(universal->buttons->remote, button_name);
+
+    if(button) {
+        InfraredSignal* signal = infrared_remote_button_get_signal(button);
+        xremote_app_send_signal(universal->buttons->app_ctx, signal);
+        dolphin_deed(DolphinDeedIrSend);
+    }
+}
+
+static void xremote_hisense_ac_send_selected(XRemoteUniversalContext* universal) {
+    xremote_app_assert_void(universal);
+    xremote_app_assert_void(universal->buttons);
+    if(universal->selected >= COUNT_OF(g_hisense_ac_buttons)) return;
+
+    const char* button_name = g_hisense_ac_buttons[universal->selected].command;
+    InfraredRemoteButton* button =
+        infrared_remote_get_button_by_name(universal->buttons->remote, button_name);
+
+    if(button) {
+        InfraredSignal* signal = infrared_remote_button_get_signal(button);
+        xremote_app_send_signal(universal->buttons->app_ctx, signal);
+        dolphin_deed(DolphinDeedIrSend);
+    }
+}
+
+static int8_t xremote_hisense_ac_find_button(uint8_t col, uint8_t row) {
+    for(uint8_t i = 0; i < COUNT_OF(g_hisense_ac_buttons); i++) {
+        if(g_hisense_ac_buttons[i].col == col && g_hisense_ac_buttons[i].row == row) return i;
+    }
+
+    return -1;
+}
+
+static void xremote_hisense_ac_move(XRemoteUniversalContext* universal, int8_t d_col, int8_t d_row) {
+    const XRemoteAcButton* current = &g_hisense_ac_buttons[universal->selected];
+    int8_t col = current->col;
+    int8_t row = current->row;
+
+    for(uint8_t step = 0; step < 6; step++) {
+        col += d_col;
+        row += d_row;
+
+        if(col < 0) col = 2;
+        if(col > 2) col = 0;
+        if(row < 0) row = 5;
+        if(row > 5) row = 0;
+
+        const int8_t next = xremote_hisense_ac_find_button(col, row);
+        if(next >= 0) {
+            universal->selected = next;
+            return;
+        }
+    }
+}
+
+static void xremote_hisense_ac_view_draw_callback(Canvas* canvas, void* context) {
+    furi_assert(context);
+    XRemoteViewModel* model = context;
+    XRemoteUniversalContext* universal = model->context;
+
+    canvas_clear(canvas);
+    canvas_set_color(canvas, ColorBlack);
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(canvas, 32, 1, AlignCenter, AlignTop, "Hisense A/C");
+
+    for(uint8_t i = 0; i < COUNT_OF(g_hisense_ac_buttons); i++) {
+        const XRemoteAcButton* button = &g_hisense_ac_buttons[i];
+        const uint8_t x = 1 + button->col * 21;
+        const uint8_t y = 14 + button->row * 18;
+        xremote_canvas_draw_frame(canvas, universal->pressed && universal->selected == i, x, y, 20, button->label);
+
+        if(universal->selected == i && !universal->pressed) {
+            elements_slightly_rounded_frame(canvas, x + 1, y + 1, 18, 13);
+        }
+    }
+
+    canvas_set_font(canvas, FontSecondary);
+    xremote_canvas_draw_icon(canvas, 6, 124, XRemoteIconBack);
+    elements_multiline_text_aligned(canvas, 12, 128, AlignLeft, AlignBottom, "Exit");
+}
+
+static bool xremote_hisense_ac_view_input_callback(InputEvent* event, void* context) {
+    furi_assert(context);
+    XRemoteView* view = context;
+    XRemoteUniversalContext* universal = xremote_view_get_context(view);
+    bool consumed = true;
+
+    if(event->key == InputKeyBack) {
+        return false;
+    }
+
+    if(event->type == InputTypeShort || event->type == InputTypeRepeat) {
+        if(event->key == InputKeyUp) {
+            xremote_hisense_ac_move(universal, 0, -1);
+        } else if(event->key == InputKeyDown) {
+            xremote_hisense_ac_move(universal, 0, 1);
+        } else if(event->key == InputKeyLeft) {
+            xremote_hisense_ac_move(universal, -1, 0);
+        } else if(event->key == InputKeyRight) {
+            xremote_hisense_ac_move(universal, 1, 0);
+        } else if(event->key == InputKeyOk && event->type == InputTypeShort) {
+            universal->pressed = true;
+            xremote_hisense_ac_send_selected(universal);
+        } else {
+            consumed = false;
+        }
+    } else if(event->type == InputTypeRelease && event->key == InputKeyOk) {
+        universal->pressed = false;
+    } else {
+        consumed = false;
+    }
+
+    if(consumed) {
+        with_view_model(
+            xremote_view_get_view(view),
+            XRemoteViewModel * model,
+            { model->context = universal; },
+            true);
+    }
+
+    return consumed;
+}
+
+static void xremote_universal_add_item(
+    XRemoteUniversalContext* universal,
+    const char* command_name,
+    uint16_t matrix_place_x,
+    uint16_t matrix_place_y,
+    uint16_t x,
+    uint16_t y,
+    const Icon* icon,
+    const Icon* icon_selected) {
+    const int button_index = xremote_button_get_index(command_name);
+    furi_check(button_index >= 0);
+
+    button_panel_add_item(
+        universal->button_panel,
+        (uint32_t)button_index,
+        matrix_place_x,
+        matrix_place_y,
+        x,
+        y,
+        icon,
+        icon_selected,
+        xremote_universal_item_callback,
+        universal);
+}
+
+static void xremote_universal_build_tv(XRemoteUniversalContext* universal) {
+    ButtonPanel* button_panel = universal->button_panel;
+    button_panel_reserve(button_panel, 2, 3);
+
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_POWER, 0, 0, 6, 16, &I_power_19x20, &I_power_hover_19x20);
+    button_panel_add_icon(button_panel, 4, 38, &I_power_text_24x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_MUTE, 1, 0, 39, 16, &I_mute_19x20, &I_mute_hover_19x20);
+    button_panel_add_icon(button_panel, 39, 38, &I_mute_text_19x5);
+
+    button_panel_add_icon(button_panel, 0, 66, &I_ch_text_31x34);
+    button_panel_add_icon(button_panel, 35, 66, &I_vol_tv_text_29x34);
+
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_VOL_UP, 1, 1, 38, 53, &I_volup_24x21, &I_volup_hover_24x21);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_NEXT_CHAN, 0, 1, 3, 53, &I_ch_up_24x21, &I_ch_up_hover_24x21);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_VOL_DOWN, 1, 2, 38, 91, &I_voldown_24x21, &I_voldown_hover_24x21);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_PREV_CHAN, 0, 2, 3, 91, &I_ch_down_24x21, &I_ch_down_hover_24x21);
+
+    button_panel_add_label(button_panel, 25, 10, FontPrimary, "TV");
+}
+
+static void xremote_universal_build_audio(XRemoteUniversalContext* universal) {
+    ButtonPanel* button_panel = universal->button_panel;
+    button_panel_reserve(button_panel, 2, 4);
+
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_POWER, 0, 0, 6, 13, &I_power_19x20, &I_power_hover_19x20);
+    button_panel_add_icon(button_panel, 4, 35, &I_power_text_24x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_MUTE, 1, 0, 39, 13, &I_mute_19x20, &I_mute_hover_19x20);
+    button_panel_add_icon(button_panel, 39, 35, &I_mute_text_19x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_PLAY, 0, 1, 6, 42, &I_play_19x20, &I_play_hover_19x20);
+    button_panel_add_icon(button_panel, 6, 64, &I_play_text_19x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_PAUSE, 0, 2, 6, 71, &I_pause_19x20, &I_pause_hover_19x20);
+    button_panel_add_icon(button_panel, 4, 93, &I_pause_text_23x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_JUMP_BACKWARD, 0, 3, 6, 101, &I_prev_19x20, &I_prev_hover_19x20);
+    button_panel_add_icon(button_panel, 6, 123, &I_prev_text_19x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_JUMP_FORWARD, 1, 3, 39, 101, &I_next_19x20, &I_next_hover_19x20);
+    button_panel_add_icon(button_panel, 39, 123, &I_next_text_19x6);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_VOL_DOWN, 1, 2, 37, 77, &I_voldown_24x21, &I_voldown_hover_24x21);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_VOL_UP, 1, 1, 37, 43, &I_volup_24x21, &I_volup_hover_24x21);
+
+    button_panel_add_label(button_panel, 1, 10, FontPrimary, "Audio player");
+    button_panel_add_icon(button_panel, 34, 56, &I_vol_ac_text_30x30);
+}
+
+static void xremote_universal_build_projector(XRemoteUniversalContext* universal) {
+    ButtonPanel* button_panel = universal->button_panel;
+    button_panel_reserve(button_panel, 2, 3);
+
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_POWER, 0, 0, 6, 24, &I_power_19x20, &I_power_hover_19x20);
+    button_panel_add_icon(button_panel, 4, 46, &I_power_text_24x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_MUTE, 1, 0, 39, 24, &I_mute_19x20, &I_mute_hover_19x20);
+    button_panel_add_icon(button_panel, 39, 46, &I_mute_text_19x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_VOL_UP, 1, 1, 37, 55, &I_volup_24x21, &I_volup_hover_24x21);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_VOL_DOWN, 1, 2, 37, 89, &I_voldown_24x21, &I_voldown_hover_24x21);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_PLAY, 0, 1, 6, 58, &I_play_19x20, &I_play_hover_19x20);
+    button_panel_add_icon(button_panel, 6, 80, &I_play_text_19x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_PAUSE, 0, 2, 6, 87, &I_pause_19x20, &I_pause_hover_19x20);
+    button_panel_add_icon(button_panel, 4, 109, &I_pause_text_23x5);
+
+    button_panel_add_label(button_panel, 10, 11, FontPrimary, "Projector");
+    button_panel_add_icon(button_panel, 34, 68, &I_vol_ac_text_30x30);
+}
+
+static void xremote_universal_build_leds(XRemoteUniversalContext* universal) {
+    ButtonPanel* button_panel = universal->button_panel;
+    button_panel_reserve(button_panel, 2, 4);
+
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_POWER_ON, 0, 0, 10, 12, &I_power_19x20, &I_power_hover_19x20);
+    button_panel_add_icon(button_panel, 15, 34, &I_on_text_9x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_POWER_OFF, 1, 0, 35, 12, &I_off_19x20, &I_off_hover_19x20);
+    button_panel_add_icon(button_panel, 38, 34, &I_off_text_12x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_BRIGHTNESS_UP, 0, 1, 10, 42, &I_plus_19x20, &I_plus_hover_19x20);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_BRIGHTNESS_DN, 1, 1, 35, 42, &I_minus_19x20, &I_minus_hover_19x20);
+    button_panel_add_icon(button_panel, 12, 64, &I_brightness_text_40x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_RED, 0, 2, 10, 74, &I_red_19x20, &I_red_hover_19x20);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_GREEN, 1, 2, 35, 74, &I_green_19x20, &I_green_hover_19x20);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_BLUE, 0, 3, 10, 99, &I_blue_19x20, &I_blue_hover_19x20);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_WHITE, 1, 3, 35, 99, &I_white_19x20, &I_white_hover_19x20);
+    button_panel_add_icon(button_panel, 19, 121, &I_color_text_24x5);
+
+    button_panel_add_label(button_panel, 20, 9, FontPrimary, "LEDs");
+}
+
+static void xremote_universal_build_fan(XRemoteUniversalContext* universal) {
+    ButtonPanel* button_panel = universal->button_panel;
+    button_panel_reserve(button_panel, 2, 3);
+
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_POWER, 0, 0, 6, 24, &I_power_19x20, &I_power_hover_19x20);
+    button_panel_add_icon(button_panel, 4, 46, &I_power_text_24x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_MODE, 1, 0, 39, 24, &I_mode_19x20, &I_mode_hover_19x20);
+    button_panel_add_icon(button_panel, 39, 46, &I_mode_text_20x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_SPEED_UP, 1, 1, 37, 55, &I_volup_24x21, &I_volup_hover_24x21);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_SPEED_DN, 1, 2, 37, 89, &I_voldown_24x21, &I_voldown_hover_24x21);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_ROTATE, 0, 1, 6, 58, &I_rotate_19x20, &I_rotate_hover_19x20);
+    button_panel_add_icon(button_panel, 4, 80, &I_rotate_text_24x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_TIMER, 0, 2, 6, 87, &I_timer_19x20, &I_timer_hover_19x20);
+    button_panel_add_icon(button_panel, 4, 109, &I_timer_text_23x5);
+
+    button_panel_add_label(button_panel, 5, 11, FontPrimary, "Fan remote");
+    button_panel_add_icon(button_panel, 34, 68, &I_speed_text_30x30);
+}
+
+static void xremote_universal_build_ac(XRemoteUniversalContext* universal) {
+    ButtonPanel* button_panel = universal->button_panel;
+    button_panel_reserve(button_panel, 2, 3);
+
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_OFF, 0, 0, 6, 15, &I_off_19x20, &I_off_hover_19x20);
+    button_panel_add_icon(button_panel, 10, 37, &I_off_text_12x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_DRY, 1, 0, 39, 15, &I_dry_19x20, &I_dry_hover_19x20);
+    button_panel_add_icon(button_panel, 41, 37, &I_dry_text_15x5);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_COOL_HI, 0, 1, 3, 49, &I_max_24x23, &I_max_hover_24x23);
+    xremote_universal_add_item(
+        universal, XREMOTE_COMMAND_HEAT_HI, 1, 1, 37, 49, &I_max_24x23, &I_max_hover_24x23);
+
+    if(furi_hal_rtc_get_locale_units() == FuriHalRtcLocaleUnitsMetric) {
+        xremote_universal_add_item(
+            universal,
+            XREMOTE_COMMAND_COOL_LO,
+            0,
+            2,
+            3,
+            100,
+            &I_celsius_24x23,
+            &I_celsius_hover_24x23);
+        xremote_universal_add_item(
+            universal,
+            XREMOTE_COMMAND_HEAT_LO,
+            1,
+            2,
+            37,
+            100,
+            &I_celsius_24x23,
+            &I_celsius_hover_24x23);
+    } else {
+        xremote_universal_add_item(
+            universal,
+            XREMOTE_COMMAND_COOL_LO,
+            0,
+            2,
+            3,
+            100,
+            &I_fahren_24x23,
+            &I_fahren_hover_24x23);
+        xremote_universal_add_item(
+            universal,
+            XREMOTE_COMMAND_HEAT_LO,
+            1,
+            2,
+            37,
+            100,
+            &I_fahren_24x23,
+            &I_fahren_hover_24x23);
+    }
+
+    button_panel_add_icon(button_panel, 0, 60, &I_cool_30x51);
+    button_panel_add_icon(button_panel, 34, 60, &I_heat_30x51);
+    button_panel_add_label(button_panel, 24, 10, FontPrimary, "AC");
+}
+
+static void xremote_universal_build_layout(XRemoteUniversalContext* universal) {
+    switch(universal->buttons->remote_type) {
+    case XRemoteRemoteTypeTV:
+        xremote_universal_build_tv(universal);
+        break;
+    case XRemoteRemoteTypeAudio:
+        xremote_universal_build_audio(universal);
+        break;
+    case XRemoteRemoteTypeProjector:
+        xremote_universal_build_projector(universal);
+        break;
+    case XRemoteRemoteTypeLEDs:
+        xremote_universal_build_leds(universal);
+        break;
+    case XRemoteRemoteTypeFan:
+        xremote_universal_build_fan(universal);
+        break;
+    case XRemoteRemoteTypeAC:
+        xremote_universal_build_ac(universal);
+        break;
+    case XRemoteRemoteTypeGeneric:
+    default:
+        break;
+    }
+}
+
+static void xremote_universal_context_free(void* context) {
+    XRemoteUniversalContext* universal = context;
+    xremote_app_assert_void(universal);
+    if(universal->button_panel) button_panel_free(universal->button_panel);
+    free(universal);
+}
+
+static XRemoteView* xremote_hisense_ac_view_alloc(XRemoteAppButtons* buttons) {
+    XRemoteUniversalContext* universal = malloc(sizeof(XRemoteUniversalContext));
+    universal->button_panel = NULL;
+    universal->buttons = buttons;
+    universal->selected = 1;
+    universal->pressed = false;
+
+    XRemoteView* remote_view = xremote_view_alloc(
+        buttons->app_ctx, xremote_hisense_ac_view_input_callback, xremote_hisense_ac_view_draw_callback);
+    View* view = xremote_view_get_view(remote_view);
+    view_set_orientation(view, ViewOrientationVertical);
+
+    xremote_view_set_context(remote_view, universal, xremote_universal_context_free);
+
+    with_view_model(
+        view, XRemoteViewModel * model, { model->context = universal; }, true);
+
+    return remote_view;
+}
+
+XRemoteView* xremote_universal_view_alloc(void* app_ctx, void* model_ctx) {
+    UNUSED(app_ctx);
+    XRemoteAppButtons* buttons = model_ctx;
+    xremote_app_assert(buttons, NULL);
+
+    if(buttons->remote_type == XRemoteRemoteTypeAC) {
+        return xremote_hisense_ac_view_alloc(buttons);
+    }
+
+    XRemoteUniversalContext* universal = malloc(sizeof(XRemoteUniversalContext));
+    universal->button_panel = button_panel_alloc();
+    universal->buttons = buttons;
+    universal->selected = 0;
+    universal->pressed = false;
+    xremote_universal_build_layout(universal);
+
+    XRemoteView* remote_view = xremote_view_alloc_empty();
+    xremote_view_set_app_context(remote_view, buttons->app_ctx);
+    xremote_view_set_view(remote_view, button_panel_get_view(universal->button_panel));
+    xremote_view_set_context(remote_view, universal, xremote_universal_context_free);
+
+    return remote_view;
+}

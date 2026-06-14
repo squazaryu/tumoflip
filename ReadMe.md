@@ -15,25 +15,25 @@ you find a tumoflip-specific issue, report it in this repository:
 ## Current Build
 
 - Base: Unleashed 089 with selected upstream dev updates
-- Firmware version: `tmwhflipper089-013`
+- Firmware version: `tmwhflipper089-014`
 - Firmware origin/fork: `tumoflip`
-- Firmware API: `87.9`
+- Firmware API: `87.10`
 - Target: Flipper Zero F7
 - Release package:
-  [v0.1.3](https://github.com/squazaryu/tumoflip/releases/tag/v0.1.3)
+  [v0.1.4](https://github.com/squazaryu/tumoflip/releases/tag/v0.1.4)
 
 ## Version Scheme
 
 Installed firmware versions use this format:
 
 ```text
-tmwhflipper089-013
+tmwhflipper089-014
 ```
 
 - `tmwhflipper`: tumoflip firmware name shown as the installed firmware
   version prefix.
 - `089`: upstream Unleashed base version.
-- `012`: tumoflip internal build version.
+- `014`: tumoflip internal build version.
 
 When the Unleashed base version or tumoflip internal version changes, update
 the firmware version suffix in `fbt_options.py`, release notes, README, and the
@@ -42,7 +42,7 @@ published update package name together.
 ## tumoflip Changes
 
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
-  `tmwhflipper089-013`.
+  `tmwhflipper089-014`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.
 - Added Module One icon based on the Rotten Mechanism cross mark.
@@ -61,7 +61,7 @@ identity.
 
 | Area | Unleashed | tumoflip |
 | --- | --- | --- |
-| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflipper089-013` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflipper089-014` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
@@ -70,7 +70,7 @@ identity.
 | Settings return flow | Standard Unleashed navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
 | BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication and Mac-side command routing. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflipper089-013` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflipper089-014` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -94,6 +94,9 @@ Current custom Desktop modes:
 - `FlipperRelay`:
   vendored copy based on
   [squazaryu/flipper_relay](https://github.com/squazaryu/flipper_relay).
+- `Authenticator` / TOTP:
+  vendored modified version based on
+  [akopachov/flipper-zero_authenticator](https://github.com/akopachov/flipper-zero_authenticator).
 - `quac`:
   vendored modified version based on
   [rdefeo/quac](https://github.com/rdefeo/quac).
@@ -126,7 +129,7 @@ Mac bridge and app source.
 Download the latest update package from
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases):
 
-- `flipper-z-f7-update-tmwhflipper089-013.tgz`
+- `flipper-z-f7-update-tmwhflipper089-014.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -147,7 +150,7 @@ device.
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-tmwhflipper089-013.tgz
+dist/f7-C/flipper-z-f7-update-tmwhflipper089-014.tgz
 ```
 
 ## Upstream

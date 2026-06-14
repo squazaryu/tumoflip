@@ -5,6 +5,8 @@
 !ai_dashboard/**
 !flipper_relay/
 !flipper_relay/**
+!flipper_xremote/
+!flipper_xremote/**
 !quac/
 !quac/**
 !totp/
