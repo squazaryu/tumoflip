@@ -17,7 +17,7 @@ you find a tumoflip-specific issue, report it in this repository:
 - Base: Unleashed 089 with selected upstream dev updates
 - Firmware version: `tmwhflipper089-014`
 - Firmware origin/fork: `tumoflip`
-- Firmware API: `87.10`
+- Firmware API: `87.11`
 - Target: Flipper Zero F7
 - Release package:
   [v0.1.4](https://github.com/squazaryu/tumoflip/releases/tag/v0.1.4)
@@ -50,6 +50,8 @@ published update package name together.
 - Added Settings entry to the Desktop short-Up quick menu.
 - Added BLE App Bridge support.
 - Added `FlipperRelay` host bridge tooling for Mac-side BLE automations.
+- Added an initial ARF Sub-GHz protocol layer from
+  [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF).
 - Vendored local user applications into `applications_user` so the repository
   can be built without absolute local symlinks.
 
@@ -69,6 +71,7 @@ identity.
 | Module One access | Apps are reached through the normal Apps tree. | Provides a dedicated `8/1` launcher folder with a custom cross icon. |
 | Settings return flow | Standard Unleashed navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
 | BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication and Mac-side command routing. |
+| ARF protocols | Not included. | Adds a size-limited initial ARF Sub-GHz protocol set while keeping Unleashed/tumoflip protocols intact. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
 | Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflipper089-014` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
@@ -85,6 +88,31 @@ Current custom Desktop modes:
 - Wii Vertical
 - DSi
 - Vertical
+
+## ARF Sub-GHz Layer
+
+tumoflip includes an initial merge of selected automotive Sub-GHz protocol code
+from [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF). This is
+a feature merge, not a replacement of the existing Unleashed/tumoflip Sub-GHz
+stack.
+
+Currently enabled ARF protocols:
+
+- `VAG`
+- `Fiat SPA`
+- `Kia v0`
+- `Kia v1`
+- `Kia v2`
+- `Suzuki`
+- `Mitsubishi`
+- `Toyota`
+
+Additional ARF protocol sources are present in the tree but are not registered
+in the firmware menu yet. A full ARF protocol registry exceeded the safe
+updater package size and triggered a C2/radio-region overlap warning during
+build. Deferred protocols include Ford variants, PSA, Porsche Cayenne,
+StarLine, Scher-Khan, Sheriff CFM, Land Rover, Subaru, Mazda variants, Chrysler,
+Fiat Marelli, and later Kia variants.
 
 ## Included User Applications
 
