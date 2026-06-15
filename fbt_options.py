@@ -16,7 +16,7 @@ DEBUG = 1
 
 # Suffix to add to files when building distribution
 # If OS environment has DIST_SUFFIX set, it will be used instead
-DIST_SUFFIX = "tmwhflipper089-014"
+DIST_SUFFIX = "tmwhflpprafr089-015"
 
 # Post-update slideshow shown by the updater package
 UPDATE_SPLASH = "tumoflip_update"

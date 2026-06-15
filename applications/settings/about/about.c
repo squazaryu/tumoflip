@@ -75,7 +75,7 @@ static DialogMessageButton compliance_screen(DialogsApp* dialogs, DialogMessage*
 static DialogMessageButton tumoflip_info_screen(DialogsApp* dialogs, DialogMessage* message) {
     DialogMessageButton result;
 
-    const char* screen_header = "tmwhflipper089-014\n";
+    const char* screen_header = "tmwhflpprafr089-015\n";
 
     const char* screen_text = "tumoflip custom build\n"
                               "Base: Unleashed 089\n"

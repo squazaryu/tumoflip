@@ -15,25 +15,24 @@ you find a tumoflip-specific issue, report it in this repository:
 ## Current Build
 
 - Base: Unleashed 089 with selected upstream dev updates
-- Firmware version: `tmwhflipper089-014`
+- Firmware version: `tmwhflpprafr089-015`
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `87.11`
 - Target: Flipper Zero F7
-- Release package:
-  [v0.1.4](https://github.com/squazaryu/tumoflip/releases/tag/v0.1.4)
+- Release package: not published yet
 
 ## Version Scheme
 
 Installed firmware versions use this format:
 
 ```text
-tmwhflipper089-014
+tmwhflpprafr089-015
 ```
 
-- `tmwhflipper`: tumoflip firmware name shown as the installed firmware
-  version prefix.
+- `tmwhflpprafr`: tumoflip firmware name shown as the installed firmware
+  version prefix for the ARF-enabled build line.
 - `089`: upstream Unleashed base version.
-- `014`: tumoflip internal build version.
+- `015`: tumoflip internal build version.
 
 When the Unleashed base version or tumoflip internal version changes, update
 the firmware version suffix in `fbt_options.py`, release notes, README, and the
@@ -42,7 +41,7 @@ published update package name together.
 ## tumoflip Changes
 
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
-  `tmwhflipper089-014`.
+  `tmwhflpprafr089-015`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.
 - Added Module One icon based on the Rotten Mechanism cross mark.
@@ -63,7 +62,7 @@ identity.
 
 | Area | Unleashed | tumoflip |
 | --- | --- | --- |
-| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflipper089-014` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprafr089-015` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
@@ -73,7 +72,7 @@ identity.
 | BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication and Mac-side command routing. |
 | ARF protocols | Not included. | Adds a size-limited initial ARF Sub-GHz protocol set while keeping Unleashed/tumoflip protocols intact. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflipper089-014` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprafr089-015` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -157,7 +156,7 @@ Mac bridge and app source.
 Download the latest update package from
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases):
 
-- `flipper-z-f7-update-tmwhflipper089-014.tgz`
+- `flipper-z-f7-update-tmwhflpprafr089-015.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -178,7 +177,7 @@ device.
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-tmwhflipper089-014.tgz
+dist/f7-C/flipper-z-f7-update-tmwhflpprafr089-015.tgz
 ```
 
 ## Upstream

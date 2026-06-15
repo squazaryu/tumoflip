@@ -1,5 +1,5 @@
 ## Main changes
-- Current API: 87.10
+- Current API: 87.11
 * SubGHz: **Fix endless TX causing RAW files to be transmitted and crash the system** (Fixes issue #1008)
 * SubGHz: **Add Telcoma/Cardin EDGE protocol** (32bit, Static) (by @half2me | PR #1001)
 * LFRFID: **Support of Hitag Micro chips** (8265/8210/H5.5) (by @mishamyte | PR #1002)
@@ -68,6 +68,5 @@ What build I should download and what this name means - `flipper-z-f7-update-(ve
 Firmware Self-update package (update from microSD) - `flipper-z-f7-update-(version).tgz` for mobile app / qFlipper / web<br>
 Archive of `scripts` folder (contains scripts for FW/plugins development) - `flipper-z-any-scripts-(version).tgz`<br>
 SDK files for plugins development and uFBT - `flipper-z-f7-sdk-(version).zip`
-
 
 
