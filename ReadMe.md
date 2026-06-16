@@ -52,7 +52,7 @@ published update package name together.
 - Added an initial ARF Sub-GHz protocol layer from
   [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF).
 - Added ARF Sub-GHz `setting_user` frequencies, hopper frequencies, and custom
-  presets to firmware resources for SD deployment.
+  presets as ProtoPirate-only assets, isolated from the normal Sub-GHz app.
 - Added ProtoPirate as an external app for Module One SD deployment.
 - Vendored local user applications into `applications_user` so the repository
   can be built without absolute local symlinks.
@@ -129,10 +129,15 @@ Its runtime plugin assets and keystore are deployed to:
 /ext/apps_assets/proto_pirate
 ```
 
-The app reads the Sub-GHz frequency list from `/ext/subghz/assets/setting_user`.
-tumoflip includes the ARF `setting_user` resource so the update package can
-install the ARF frequency list, hopper list, and custom presets onto the SD
-card.
+The app reads its ARF frequency list from:
+
+```text
+/ext/apps_assets/proto_pirate/setting_user
+```
+
+This keeps ARF frequencies, hopper frequencies, and custom presets isolated
+from the normal Sub-GHz app. The shared `/ext/subghz/assets/setting_user` file
+is intentionally not used for ARF.
 
 ## Included User Applications
 

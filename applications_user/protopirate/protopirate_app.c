@@ -222,7 +222,7 @@ ProtoPirateApp* protopirate_app_alloc() {
     app->setting = subghz_setting_alloc();
     app->loaded_file_path = NULL;
     app->start_tx_time = 0;
-    subghz_setting_load(app->setting, EXT_PATH("subghz/assets/setting_user"));
+    subghz_setting_load(app->setting, APP_ASSETS_PATH("setting_user"));
 
     // Apply loaded frequency and preset, with validation
     uint32_t frequency = settings.frequency;
