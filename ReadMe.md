@@ -43,7 +43,9 @@ published update package name together.
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
   `tmwhflpprarf089-015`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
-- Added `ARF Tools` folder after Apps in the Desktop OK menu.
+- Added `8/1` Module One folder after Apps in the Desktop OK menu.
+- Replaced the Desktop OK menu `Sub-GHz Remote` shortcut with an `ARF Tools`
+  folder shortcut.
 - Added Module One icon based on the Rotten Mechanism cross mark.
 - Removed Dummy Mode and related shortcuts.
 - Added Settings entry to the Desktop short-Up quick menu.
@@ -69,7 +71,7 @@ identity.
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
-| Desktop OK menu | Uses the standard app/menu layout. | Adds an `ARF Tools` folder immediately after Apps for ARF/ProtoPirate related apps. |
+| Desktop OK menu | Uses the standard app/menu layout. | Keeps the `8/1` Module One folder after Apps and replaces the `Sub-GHz Remote` shortcut with `ARF Tools`. |
 | ARF tools access | Apps are reached through the normal Apps tree. | Provides a dedicated `ARF Tools` launcher folder with SD-deployed ARF/ProtoPirate apps. |
 | Settings return flow | Standard Unleashed navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
 | BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication and Mac-side command routing. |

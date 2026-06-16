@@ -11,6 +11,8 @@
 #include "loader_menu.h"
 
 #define TAG "LoaderMenu"
+#define MODULE_ONE_MENU_NAME "8/1"
+#define MODULE_ONE_APPS_PATH EXT_PATH("apps/Module One")
 #define ARF_TOOLS_MENU_NAME "ARF Tools"
 #define ARF_TOOLS_APPS_PATH EXT_PATH("apps/ARF Tools")
 
@@ -92,6 +94,12 @@ static void loader_menu_applications_callback(void* context, uint32_t index) {
     loader_menu_start(name);
 }
 
+static void loader_menu_module_one_callback(void* context, uint32_t index) {
+    UNUSED(index);
+    UNUSED(context);
+    loader_menu_start_with_args(LOADER_APPLICATIONS_NAME, MODULE_ONE_APPS_PATH);
+}
+
 static void loader_menu_arf_tools_callback(void* context, uint32_t index) {
     UNUSED(index);
     UNUSED(context);
@@ -136,10 +144,10 @@ static void loader_menu_build_menu(LoaderMenuApp* app, LoaderMenu* menu) {
         (void*)menu);
     menu_add_item(
         app->primary_menu,
-        ARF_TOOLS_MENU_NAME,
+        MODULE_ONE_MENU_NAME,
         &A_ModuleOne_14,
         i++,
-        loader_menu_arf_tools_callback,
+        loader_menu_module_one_callback,
         (void*)menu);
 
     for(i = 0; i < FLIPPER_APPS_COUNT; i++) {
@@ -154,6 +162,17 @@ static void loader_menu_build_menu(LoaderMenuApp* app, LoaderMenu* menu) {
 
     for(i = 0; i < FLIPPER_EXTERNAL_APPS_COUNT; i++) {
         if(strcmp(FLIPPER_EXTERNAL_APPS[i].name, "Clock") == 0) {
+            continue;
+        }
+
+        if(strcmp(FLIPPER_EXTERNAL_APPS[i].name, "Sub-GHz Remote") == 0) {
+            menu_add_item(
+                app->primary_menu,
+                ARF_TOOLS_MENU_NAME,
+                &A_ModuleOne_14,
+                i,
+                loader_menu_arf_tools_callback,
+                (void*)menu);
             continue;
         }
 
