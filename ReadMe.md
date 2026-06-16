@@ -43,7 +43,7 @@ published update package name together.
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
   `tmwhflpprarf089-015`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
-- Added `8/1` Module One folder after Apps in the Desktop OK menu.
+- Added `ARF Tools` folder after Apps in the Desktop OK menu.
 - Added Module One icon based on the Rotten Mechanism cross mark.
 - Removed Dummy Mode and related shortcuts.
 - Added Settings entry to the Desktop short-Up quick menu.
@@ -53,7 +53,7 @@ published update package name together.
   [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF).
 - Added ARF Sub-GHz `setting_user` frequencies, hopper frequencies, and custom
   presets as ProtoPirate-only assets, isolated from the normal Sub-GHz app.
-- Added ProtoPirate as an external app for Module One SD deployment.
+- Added ProtoPirate and ARF Tools as external apps for isolated SD deployment.
 - Vendored local user applications into `applications_user` so the repository
   can be built without absolute local symlinks.
 
@@ -69,8 +69,8 @@ identity.
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
-| Desktop OK menu | Uses the standard app/menu layout. | Adds an `8/1` folder immediately after Apps for Module One related apps. |
-| Module One access | Apps are reached through the normal Apps tree. | Provides a dedicated `8/1` launcher folder with a custom cross icon and SD-deployed Module One apps. |
+| Desktop OK menu | Uses the standard app/menu layout. | Adds an `ARF Tools` folder immediately after Apps for ARF/ProtoPirate related apps. |
+| ARF tools access | Apps are reached through the normal Apps tree. | Provides a dedicated `ARF Tools` launcher folder with SD-deployed ARF/ProtoPirate apps. |
 | Settings return flow | Standard Unleashed navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
 | BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication and Mac-side command routing. |
 | ARF protocols | Not included. | Adds a size-limited initial ARF Sub-GHz protocol set while keeping Unleashed/tumoflip protocols intact. |
@@ -116,14 +116,16 @@ build. Deferred protocols include Ford variants, PSA, Porsche Cayenne,
 StarLine, Scher-Khan, Sheriff CFM, Land Rover, Subaru, Mazda variants, Chrysler,
 Fiat Marelli, and later Kia variants.
 
-ProtoPirate is built as an external `.fap` instead of being linked into the
-core firmware image. The intended SD location is:
+ProtoPirate and the lightweight ARF Tools helper app are built as external
+`.fap` apps instead of being linked into the core firmware image. Their
+intended SD locations are:
 
 ```text
-/ext/apps/module one/sub-ghz/ProtoPirate.fap
+/ext/apps/ARF Tools/ProtoPirate.fap
+/ext/apps/ARF Tools/ARF Tools.fap
 ```
 
-Its runtime plugin assets and keystore are deployed to:
+ProtoPirate runtime plugin assets and keystore are deployed to:
 
 ```text
 /ext/apps_assets/proto_pirate

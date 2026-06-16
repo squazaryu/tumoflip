@@ -10,7 +10,10 @@ def copy_file(src: Path, dst: Path) -> None:
     if not src.is_file():
         raise FileNotFoundError(f"Missing source file: {src}")
     dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst)
+    # FAT-formatted Flipper SD cards get noisy AppleDouble files when macOS
+    # metadata is preserved. Avoid the platform copyfile API and stream bytes.
+    with src.open("rb") as source, dst.open("wb") as target:
+        shutil.copyfileobj(source, target)
 
 
 def copy_tree(src: Path, dst: Path) -> None:
@@ -25,10 +28,22 @@ def copy_tree(src: Path, dst: Path) -> None:
             copy_file(item, target)
 
 
-def deploy_protopirate(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
+def remove_appledouble(path: Path) -> None:
+    if not path.exists():
+        return
+    for item in path.rglob("._*"):
+        if item.is_file():
+            item.unlink()
+
+
+def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
+    arf_tools_dir = sd_root / "apps" / "ARF Tools"
+
     fap_src = repo_root / build_dir / ".extapps" / "proto_pirate.fap"
-    fap_dst = sd_root / "apps" / "module one" / "sub-ghz" / "ProtoPirate.fap"
-    copy_file(fap_src, fap_dst)
+    copy_file(fap_src, arf_tools_dir / "ProtoPirate.fap")
+
+    arf_tools_src = repo_root / build_dir / ".extapps" / "arf_tools.fap"
+    copy_file(arf_tools_src, arf_tools_dir / "ARF Tools.fap")
 
     app_assets_dst = sd_root / "apps_assets" / "proto_pirate"
     plugins_dst = app_assets_dst / "plugins"
@@ -43,11 +58,13 @@ def deploy_protopirate(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
         copy_file(repo_root / build_dir / ".extapps" / plugin, plugins_dst / plugin)
 
     copy_tree(repo_root / "applications_user" / "protopirate" / "keystore", app_assets_dst)
+    remove_appledouble(arf_tools_dir)
+    remove_appledouble(app_assets_dst)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Deploy Module One SD applications and assets built by fbt."
+        description="Deploy tumoflip ARF Tools SD applications and assets built by fbt."
     )
     parser.add_argument(
         "--repo-root",
@@ -71,8 +88,8 @@ def main() -> None:
 
     repo_root = args.repo_root.resolve()
     sd_root = args.sd_root.resolve()
-    deploy_protopirate(repo_root, sd_root, args.build_dir)
-    print(f"Deployed ProtoPirate to {sd_root / 'apps' / 'module one' / 'sub-ghz'}")
+    deploy_arf_tools(repo_root, sd_root, args.build_dir)
+    print(f"Deployed ARF Tools to {sd_root / 'apps' / 'ARF Tools'}")
 
 
 if __name__ == "__main__":

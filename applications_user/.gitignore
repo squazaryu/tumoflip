@@ -7,6 +7,8 @@
 !flipper_relay/**
 !flipper_xremote/
 !flipper_xremote/**
+!arf_tools/
+!arf_tools/**
 !quac/
 !quac/**
 !totp/
