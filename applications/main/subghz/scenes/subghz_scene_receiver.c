@@ -207,8 +207,7 @@ void subghz_scene_receiver_on_enter(void* context) {
         subghz->state_notifications = SubGhzNotificationStateRx;
     }
 
-    // Check if hopping was enabled
-    if(subghz->last_settings->enable_hopping) {
+    if(subghz->last_settings->hopping_mode != SubGhzHoppingModeOff) {
         subghz_txrx_hopper_set_state(subghz->txrx, SubGhzHopperStateRunning);
     } else {
         subghz_txrx_hopper_set_state(subghz->txrx, SubGhzHopperStateOFF);
@@ -297,8 +296,13 @@ bool subghz_scene_receiver_on_event(void* context, SceneManagerEvent event) {
             break;
         }
     } else if(event.type == SceneManagerEventTypeTick) {
-        if(subghz_txrx_hopper_get_state(subghz->txrx) != SubGhzHopperStateOFF) {
-            subghz_txrx_hopper_update(subghz->txrx, subghz->last_settings->hopping_threshold);
+        SubGhzHoppingMode mode = subghz->last_settings->hopping_mode;
+        if(mode != SubGhzHoppingModeOff) {
+            subghz_txrx_hopper_update(
+                subghz->txrx,
+                subghz->last_settings->hopping_threshold,
+                mode == SubGhzHoppingModeFrequency || mode == SubGhzHoppingModeCombined,
+                mode == SubGhzHoppingModePreset || mode == SubGhzHoppingModeCombined);
             subghz_scene_receiver_update_statusbar(subghz);
         }
 

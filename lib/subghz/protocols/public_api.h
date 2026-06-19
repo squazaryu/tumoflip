@@ -2,9 +2,20 @@
 
 #include "../types.h"
 
+#define SUBGHZ_PROTOCOL_PUBLIC_API_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct SubGhzDevice SubGhzDevice;
+void subghz_device_registry_init(void);
+
+void subghz_device_registry_deinit(void);
+
+bool subghz_device_registry_is_valid(void);
+
+const SubGhzDevice* subghz_device_registry_get_by_name(const char* name);
 
 /**
  * Key generation from simple data.
@@ -88,6 +99,12 @@ bool subghz_protocol_faac_slh_create_data(
     uint32_t seed,
     const char* manufacture_name,
     SubGhzRadioPreset* preset);
+
+void faac_slh_reset_prog_mode(void);
+
+uint32_t subghz_protocol_keeloq_common_decrypt(const uint32_t data, const uint64_t key);
+
+uint8_t subghz_protocol_marantec_crc8(uint8_t* data, size_t len);
 
 /**
  * Key generation from simple data.

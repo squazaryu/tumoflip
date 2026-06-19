@@ -132,7 +132,11 @@ void subghz_txrx_sleep(SubGhzTxRx* instance);
  * @param instance Pointer to a SubGhzTxRx
  * @param stay_threshold RSSI theshold over which to stay before hopping
  */
-void subghz_txrx_hopper_update(SubGhzTxRx* instance, float stay_threshold);
+void subghz_txrx_hopper_update(
+    SubGhzTxRx* instance,
+    float stay_threshold,
+    bool hop_frequency,
+    bool hop_preset);
 
 /**
  * Get state hopper

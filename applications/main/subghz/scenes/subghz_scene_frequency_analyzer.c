@@ -60,10 +60,7 @@ bool subghz_scene_frequency_analyzer_on_event(void* context, SceneManagerEvent e
                 subghz_frequency_analyzer_get_frequency_to_save(subghz->subghz_frequency_analyzer);
             if(frequency > 0) {
                 subghz->last_settings->frequency = frequency;
-                // Disable Hopping before opening the receiver scene!
-                if(subghz->last_settings->enable_hopping) {
-                    subghz->last_settings->enable_hopping = false;
-                }
+                subghz->last_settings->hopping_mode = SubGhzHoppingModeOff;
                 subghz_last_settings_save(subghz->last_settings);
             }
 

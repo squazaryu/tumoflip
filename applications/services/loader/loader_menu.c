@@ -169,7 +169,7 @@ static void loader_menu_build_menu(LoaderMenuApp* app, LoaderMenu* menu) {
             menu_add_item(
                 app->primary_menu,
                 ARF_TOOLS_MENU_NAME,
-                &A_ModuleOne_14,
+                &A_ARFTools_14,
                 i,
                 loader_menu_arf_tools_callback,
                 (void*)menu);

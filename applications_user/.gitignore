@@ -9,6 +9,14 @@
 !flipper_xremote/**
 !arf_tools/
 !arf_tools/**
+!arf_subghz/
+!arf_subghz/**
+!arf_subghz_full/
+!arf_subghz_full/**
+!rolljam/
+!rolljam/**
+!subghz_bruteforcer/
+!subghz_bruteforcer/**
 !quac/
 !quac/**
 !totp/

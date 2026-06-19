@@ -178,8 +178,13 @@ bool subghz_scene_receiver_info_on_event(void* context, SceneManagerEvent event)
             return true;
         }
     } else if(event.type == SceneManagerEventTypeTick) {
-        if(subghz_txrx_hopper_get_state(subghz->txrx) != SubGhzHopperStateOFF) {
-            subghz_txrx_hopper_update(subghz->txrx, subghz->last_settings->hopping_threshold);
+        SubGhzHoppingMode mode = subghz->last_settings->hopping_mode;
+        if(mode != SubGhzHoppingModeOff) {
+            subghz_txrx_hopper_update(
+                subghz->txrx,
+                subghz->last_settings->hopping_threshold,
+                mode == SubGhzHoppingModeFrequency || mode == SubGhzHoppingModeCombined,
+                mode == SubGhzHoppingModePreset || mode == SubGhzHoppingModeCombined);
         }
         switch(subghz->state_notifications) {
         case SubGhzNotificationStateTx:

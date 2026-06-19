@@ -36,14 +36,68 @@ def remove_appledouble(path: Path) -> None:
             item.unlink()
 
 
+def ensure_subghz_hopping_presets(sd_root: Path) -> None:
+    settings_path = sd_root / "subghz" / "assets" / "setting_user"
+    presets = ("AM650", "FM476", "FM12K")
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if settings_path.exists():
+        content = settings_path.read_text(encoding="utf-8")
+        if any(
+            line.lstrip().startswith("Hopping_Preset:")
+            for line in content.splitlines()
+        ):
+            return
+        separator = "" if content.endswith("\n") else "\n"
+        addition = "\n# Presets used for preset and combined hopping\n" + "".join(
+            f"Hopping_Preset: {preset}\n" for preset in presets
+        )
+        settings_path.write_text(content + separator + addition, encoding="utf-8")
+        return
+
+    content = (
+        "Filetype: Flipper SubGhz Setting File\n"
+        "Version: 1\n"
+        "Add_standard_frequencies: true\n\n"
+        "# Presets used for preset and combined hopping\n"
+        + "".join(f"Hopping_Preset: {preset}\n" for preset in presets)
+    )
+    settings_path.write_text(content, encoding="utf-8")
+
+
 def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
     arf_tools_dir = sd_root / "apps" / "ARF Tools"
 
     fap_src = repo_root / build_dir / ".extapps" / "proto_pirate.fap"
     copy_file(fap_src, arf_tools_dir / "ProtoPirate.fap")
 
-    arf_tools_src = repo_root / build_dir / ".extapps" / "arf_tools.fap"
-    copy_file(arf_tools_src, arf_tools_dir / "ARF Tools.fap")
+    arf_subghz_src = repo_root / build_dir / ".extapps" / "arf_subghz.fap"
+    copy_file(arf_subghz_src, arf_tools_dir / "ARF Sub-GHz.fap")
+
+    arf_subghz_full_src = repo_root / build_dir / ".extapps" / "arf_subghz_full.fap"
+    copy_file(arf_subghz_full_src, arf_tools_dir / "ARF Sub-GHz Full.fap")
+
+    for appid, name in (
+        ("arf_keeloq", "ARF KeeLoq.fap"),
+        ("arf_counter_bf", "ARF Counter BF.fap"),
+        ("arf_car_emulate", "ARF Car Emulate.fap"),
+        ("arf_frequency_analyzer", "ARF Frequency Analyzer.fap"),
+        ("arf_psa_decrypt", "ARF PSA Decrypt.fap"),
+    ):
+        copy_file(repo_root / build_dir / ".extapps" / f"{appid}.fap", arf_tools_dir / name)
+
+    rolljam_src = repo_root / build_dir / ".extapps" / "rolljam.fap"
+    copy_file(rolljam_src, arf_tools_dir / "RollJam.fap")
+
+    subbrute_src = repo_root / build_dir / ".extapps" / "subghz_bruteforcer.fap"
+    copy_file(subbrute_src, arf_tools_dir / "Sub-GHz Bruteforcer.fap")
+
+    arf_status_src = repo_root / build_dir / ".extapps" / "arf_status.fap"
+    copy_file(arf_status_src, arf_tools_dir / "ARF Status.fap")
+
+    old_status_app = arf_tools_dir / "ARF Tools.fap"
+    if old_status_app.exists():
+        old_status_app.unlink()
 
     app_assets_dst = sd_root / "apps_assets" / "proto_pirate"
     plugins_dst = app_assets_dst / "plugins"
@@ -58,6 +112,7 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
         copy_file(repo_root / build_dir / ".extapps" / plugin, plugins_dst / plugin)
 
     copy_tree(repo_root / "applications_user" / "protopirate" / "keystore", app_assets_dst)
+    ensure_subghz_hopping_presets(sd_root)
     remove_appledouble(arf_tools_dir)
     remove_appledouble(app_assets_dst)
 

@@ -5,8 +5,9 @@
 
 enum SubGhzSettingIndex {
     SubGhzSettingIndexFrequency,
-    SubGhzSettingIndexHopping,
     SubGhzSettingIndexModulation,
+    SubGhzSettingIndexHoppingMode,
+    SubGhzSettingIndexHoppingRSSI,
     SubGhzSettingIndexBinRAW,
     SubGhzSettingIndexIgnoreReversRB2,
     SubGhzSettingIndexIgnoreAlarms,
@@ -49,35 +50,11 @@ const float raw_threshold_rssi_value[RAW_THRESHOLD_RSSI_COUNT] = {
     -40.0f,
 };
 
-#define HOPPING_MODE_COUNT 12
-const char* const hopping_mode_text[HOPPING_MODE_COUNT] = {
+static const char* const hopping_mode_text[SubGhzHoppingModeCount] = {
     "OFF",
-    "-90dBm",
-    "-85dBm",
-    "-80dBm",
-    "-75dBm",
-    "-70dBm",
-    "-65dBm",
-    "-60dBm",
-    "-55dBm",
-    "-50dBm",
-    "-45dBm",
-    "-40dBm",
-
-};
-const float hopping_mode_value[HOPPING_MODE_COUNT] = {
-    NAN,
-    -90.0f,
-    -85.0f,
-    -80.0f,
-    -75.0f,
-    -70.0f,
-    -65.0f,
-    -60.0f,
-    -55.0f,
-    -50.0f,
-    -45.0f,
-    -40.0f,
+    "Frequency",
+    "Preset",
+    "Combined",
 };
 
 #define COMBO_BOX_COUNT 2
@@ -152,20 +129,10 @@ uint8_t subghz_scene_receiver_config_next_preset(const char* preset_name, void* 
     return index;
 }
 
-uint8_t subghz_scene_receiver_config_hopper_value_index(void* context) {
+static SubGhzHoppingMode subghz_scene_receiver_config_get_hopping_mode(void* context) {
     furi_assert(context);
     SubGhz* subghz = context;
-
-    if(subghz_txrx_hopper_get_state(subghz->txrx) == SubGhzHopperStateOFF) {
-        return 0;
-    } else {
-        variable_item_set_current_value_text(
-            variable_item_list_get(subghz->variable_item_list, SubGhzSettingIndexFrequency),
-            " -----");
-        return value_index_float(
-            subghz->last_settings->hopping_threshold, hopping_mode_value, HOPPING_MODE_COUNT);
-        ;
-    }
+    return subghz->last_settings->hopping_mode;
 }
 
 static void subghz_scene_receiver_config_set_frequency(VariableItem* item) {
@@ -173,7 +140,8 @@ static void subghz_scene_receiver_config_set_frequency(VariableItem* item) {
     uint8_t index = variable_item_get_current_value_index(item);
     SubGhzSetting* setting = subghz_txrx_get_setting(subghz->txrx);
 
-    if(subghz_txrx_hopper_get_state(subghz->txrx) == SubGhzHopperStateOFF) {
+    if(subghz->last_settings->hopping_mode != SubGhzHoppingModeFrequency &&
+       subghz->last_settings->hopping_mode != SubGhzHoppingModeCombined) {
         char text_buf[10] = {0};
         uint32_t frequency = subghz_setting_get_frequency(setting, index);
         SubGhzRadioPreset preset = subghz_txrx_get_preset(subghz->txrx);
@@ -212,67 +180,59 @@ static void subghz_scene_receiver_config_set_preset(VariableItem* item) {
     uint8_t index = variable_item_get_current_value_index(item);
     SubGhzSetting* setting = subghz_txrx_get_setting(subghz->txrx);
 
-    const char* preset_name = subghz_setting_get_preset_name(setting, index);
-    variable_item_set_current_value_text(item, preset_name);
-    //subghz->last_settings->preset = index;
-    SubGhzRadioPreset preset = subghz_txrx_get_preset(subghz->txrx);
-    uint8_t* preset_data = subghz_setting_get_preset_data(setting, index);
-    size_t preset_data_size = subghz_setting_get_preset_data_size(setting, index);
+    if(subghz->last_settings->hopping_mode != SubGhzHoppingModePreset &&
+       subghz->last_settings->hopping_mode != SubGhzHoppingModeCombined) {
+        const char* preset_name = subghz_setting_get_preset_name(setting, index);
+        variable_item_set_current_value_text(item, preset_name);
+        SubGhzRadioPreset preset = subghz_txrx_get_preset(subghz->txrx);
+        uint8_t* preset_data = subghz_setting_get_preset_data(setting, index);
+        size_t preset_data_size = subghz_setting_get_preset_data_size(setting, index);
 
-    //Edit TX power, if necessary.
-    subghz_txrx_set_tx_power(preset_data, preset_data_size, subghz->tx_power);
+        subghz_txrx_set_tx_power(preset_data, preset_data_size, subghz->tx_power);
 
-    subghz_txrx_set_preset(
-        subghz->txrx, preset_name, preset.frequency, preset_data, preset_data_size);
-    subghz->last_settings->preset_index = index;
+        subghz_txrx_set_preset(
+            subghz->txrx, preset_name, preset.frequency, preset_data, preset_data_size);
+        subghz->last_settings->preset_index = index;
+    } else {
+        variable_item_set_current_value_index(item, subghz->last_settings->preset_index);
+    }
 }
 
-static void subghz_scene_receiver_config_set_hopping(VariableItem* item) {
+static void subghz_scene_receiver_config_set_hopping_mode(VariableItem* item) {
     SubGhz* subghz = variable_item_get_context(item);
-    uint8_t index = variable_item_get_current_value_index(item);
-    SubGhzSetting* setting = subghz_txrx_get_setting(subghz->txrx);
+    SubGhzHoppingMode mode = variable_item_get_current_value_index(item);
     VariableItem* frequency_item =
         variable_item_list_get(subghz->variable_item_list, SubGhzSettingIndexFrequency);
+    VariableItem* preset_item =
+        variable_item_list_get(subghz->variable_item_list, SubGhzSettingIndexModulation);
 
-    variable_item_set_current_value_text(item, hopping_mode_text[index]);
+    variable_item_set_current_value_text(item, hopping_mode_text[mode]);
+    subghz->last_settings->hopping_mode = mode;
 
-    if(index == 0) {
-        char text_buf[10] = {0};
-        uint32_t frequency = subghz_setting_get_default_frequency(setting);
-        SubGhzRadioPreset preset = subghz_txrx_get_preset(subghz->txrx);
-
-        snprintf(
-            text_buf,
-            sizeof(text_buf),
-            "%lu.%02lu",
-            frequency / 1000000,
-            (frequency % 1000000) / 10000);
-        variable_item_set_current_value_text(frequency_item, text_buf);
-
-        //Edit TX power, if necessary.
-        subghz_txrx_set_tx_power(preset.data, preset.data_size, subghz->tx_power);
-
-        // Maybe better add one more function with only with the frequency argument?
-        subghz_txrx_set_preset(
-            subghz->txrx,
-            furi_string_get_cstr(preset.name),
-            frequency,
-            preset.data,
-            preset.data_size);
-        variable_item_set_current_value_index(
-            frequency_item, subghz_setting_get_frequency_default_index(setting));
-        variable_item_set_item_label(item, "Hopping");
-    } else {
+    if(mode == SubGhzHoppingModeFrequency || mode == SubGhzHoppingModeCombined) {
         variable_item_set_current_value_text(frequency_item, " -----");
-        variable_item_set_current_value_index(
-            frequency_item, subghz_setting_get_frequency_default_index(setting));
-
-        variable_item_set_item_label(item, "Hopping RSSI");
+    } else {
+        subghz_scene_receiver_config_set_frequency(frequency_item);
     }
-    subghz->last_settings->enable_hopping = index != 0;
-    subghz->last_settings->hopping_threshold = hopping_mode_value[index];
-    subghz_txrx_hopper_set_state(
-        subghz->txrx, index != 0 ? SubGhzHopperStateRunning : SubGhzHopperStateOFF);
+    if(mode == SubGhzHoppingModePreset || mode == SubGhzHoppingModeCombined) {
+        variable_item_set_current_value_text(preset_item, " -----");
+    } else {
+        subghz_scene_receiver_config_set_preset(preset_item);
+    }
+
+    if(mode != SubGhzHoppingModeOff) {
+        subghz_txrx_hopper_set_state(subghz->txrx, SubGhzHopperStateRunning);
+    } else {
+        subghz_txrx_hopper_set_state(subghz->txrx, SubGhzHopperStateOFF);
+    }
+}
+
+static void subghz_scene_receiver_config_set_hopping_rssi(VariableItem* item) {
+    SubGhz* subghz = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+    float threshold = raw_threshold_rssi_value[index];
+    variable_item_set_current_value_text(item, raw_threshold_rssi_text[index]);
+    subghz->last_settings->hopping_threshold = threshold;
 }
 
 static void subghz_scene_receiver_config_set_speaker(VariableItem* item) {
@@ -374,7 +334,7 @@ static void subghz_scene_receiver_config_var_list_enter_callback(void* context, 
         subghz_txrx_speaker_set_state(subghz->txrx, speaker_value[default_index]);
 
         subghz_txrx_hopper_set_state(subghz->txrx, hopping_value[default_index]);
-        subghz->last_settings->enable_hopping = hopping_value[default_index];
+        subghz->last_settings->hopping_mode = SubGhzHoppingModeOff;
 
         variable_item_list_set_selected_item(subghz->variable_item_list, default_index);
         variable_item_list_reset(subghz->variable_item_list);
@@ -427,17 +387,45 @@ void subghz_scene_receiver_config_on_enter(void* context) {
 
     if(scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneReadRAW) !=
        SubGhzCustomEventManagerSet) {
-        // Hopping
-        value_index = subghz_scene_receiver_config_hopper_value_index(subghz);
+        value_index = subghz_scene_receiver_config_get_hopping_mode(subghz);
         item = variable_item_list_add(
             subghz->variable_item_list,
-            value_index ? "Hopping RSSI" : "Hopping",
-            HOPPING_MODE_COUNT,
-            subghz_scene_receiver_config_set_hopping,
+            "Hopping Mode",
+            SubGhzHoppingModeCount,
+            subghz_scene_receiver_config_set_hopping_mode,
             subghz);
-
         variable_item_set_current_value_index(item, value_index);
         variable_item_set_current_value_text(item, hopping_mode_text[value_index]);
+
+        item = variable_item_list_add(
+            subghz->variable_item_list,
+            "Hopping RSSI",
+            RAW_THRESHOLD_RSSI_COUNT,
+            subghz_scene_receiver_config_set_hopping_rssi,
+            subghz);
+        value_index = value_index_float(
+            subghz->last_settings->hopping_threshold,
+            raw_threshold_rssi_value,
+            RAW_THRESHOLD_RSSI_COUNT);
+        variable_item_set_current_value_index(item, value_index);
+        variable_item_set_current_value_text(item, raw_threshold_rssi_text[value_index]);
+
+        SubGhzHoppingMode hopping_mode =
+            subghz_scene_receiver_config_get_hopping_mode(subghz);
+        if(hopping_mode == SubGhzHoppingModeFrequency ||
+           hopping_mode == SubGhzHoppingModeCombined) {
+            variable_item_set_current_value_text(
+                variable_item_list_get(
+                    subghz->variable_item_list, SubGhzSettingIndexFrequency),
+                " -----");
+        }
+        if(hopping_mode == SubGhzHoppingModePreset ||
+           hopping_mode == SubGhzHoppingModeCombined) {
+            variable_item_set_current_value_text(
+                variable_item_list_get(
+                    subghz->variable_item_list, SubGhzSettingIndexModulation),
+                " -----");
+        }
     }
 
     if(scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneReadRAW) !=

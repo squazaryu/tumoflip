@@ -110,4 +110,6 @@ void subghz_protocol_decoder_faac_slh_get_string(void* context, FuriString* outp
 
 // Reset prog mode vars
 // TODO: Remake in proper way
+#ifndef SUBGHZ_PROTOCOL_PUBLIC_API_H
 void faac_slh_reset_prog_mode(void);
+#endif

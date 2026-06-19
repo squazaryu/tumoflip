@@ -1,11 +1,11 @@
 App(
-    appid="arf_tools",
-    name="ARF Tools",
+    appid="arf_status",
+    name="ARF Status",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="arf_tools_main",
-    requires=["gui", "dialogs"],
+    requires=["gui"],
     stack_size=4 * 1024,
     fap_category="Sub-GHz",
     fap_version="0.1.0",
-    fap_description="Isolated ARF helper tools for ProtoPirate assets and saved Sub-GHz files.",
+    fap_description="Deployment status for isolated ARF and ProtoPirate apps and assets.",
 )

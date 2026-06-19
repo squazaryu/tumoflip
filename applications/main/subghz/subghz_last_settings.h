@@ -13,18 +13,26 @@
 #define SUBGHZ_LAST_SETTING_DEFAULT_FREQUENCY                 433920000
 #define SUBGHZ_LAST_SETTING_FREQUENCY_ANALYZER_FEEDBACK_LEVEL 2
 
+typedef enum {
+    SubGhzHoppingModeOff,
+    SubGhzHoppingModeFrequency,
+    SubGhzHoppingModePreset,
+    SubGhzHoppingModeCombined,
+    SubGhzHoppingModeCount,
+} SubGhzHoppingMode;
+
 typedef struct {
     uint32_t frequency;
     uint32_t preset_index; // AKA Modulation
     uint32_t frequency_analyzer_feedback_level;
     float frequency_analyzer_trigger;
     bool protocol_file_names;
-    bool enable_hopping;
     uint32_t ignore_filter;
     uint32_t filter;
     float rssi;
     bool delete_old_signals;
     float hopping_threshold;
+    uint8_t hopping_mode;
     bool leds_and_amp;
     uint8_t tx_power;
 } SubGhzLastSettings;

@@ -34,6 +34,9 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
     instance->txrx_state = SubGhzTxRxStateSleep;
 
     subghz_txrx_hopper_set_state(instance, SubGhzHopperStateOFF);
+    instance->hopper_timeout = 0;
+    instance->hopper_idx_frequency = 0;
+    instance->preset_hopper_idx = 0;
     subghz_txrx_speaker_set_state(instance, SubGhzSpeakerStateDisable);
     subghz_txrx_set_debug_pin_state(instance, false);
 
@@ -420,7 +423,11 @@ void subghz_txrx_stop(SubGhzTxRx* instance) {
     }
 }
 
-void subghz_txrx_hopper_update(SubGhzTxRx* instance, float stay_threshold) {
+void subghz_txrx_hopper_update(
+    SubGhzTxRx* instance,
+    float stay_threshold,
+    bool hop_frequency,
+    bool hop_preset) {
     furi_assert(instance);
 
     switch(instance->hopper_state) {
@@ -436,14 +443,8 @@ void subghz_txrx_hopper_update(SubGhzTxRx* instance, float stay_threshold) {
     default:
         break;
     }
-    //    Init value isn't using
-    //    float rssi = -127.0f;
     if(instance->hopper_state != SubGhzHopperStateRSSITimeOut) {
-        // See RSSI Calculation timings in CC1101 17.3 RSSI
-        float rssi = subghz_devices_get_rssi(instance->radio_device);
-
-        // Stay if RSSI is high enough
-        if(rssi > stay_threshold) {
+        if(subghz_devices_get_rssi(instance->radio_device) > stay_threshold) {
             instance->hopper_timeout = 10;
             instance->hopper_state = SubGhzHopperStateRSSITimeOut;
             return;
@@ -451,22 +452,49 @@ void subghz_txrx_hopper_update(SubGhzTxRx* instance, float stay_threshold) {
     } else {
         instance->hopper_state = SubGhzHopperStateRunning;
     }
-    // Select next frequency
-    if(instance->hopper_idx_frequency <
-       subghz_setting_get_hopper_frequency_count(instance->setting) - 1) {
-        instance->hopper_idx_frequency++;
-    } else {
-        instance->hopper_idx_frequency = 0;
+    size_t frequency_count = subghz_setting_get_hopper_frequency_count(instance->setting);
+    size_t configured_preset_count =
+        subghz_setting_get_hopper_preset_count(instance->setting);
+    size_t preset_count = configured_preset_count > 0 ?
+                              configured_preset_count :
+                              subghz_setting_get_preset_count(instance->setting);
+    if((hop_frequency && frequency_count == 0) || (hop_preset && preset_count == 0)) return;
+
+    bool preset_wrapped = false;
+    if(hop_preset) {
+        instance->preset_hopper_idx++;
+        if(instance->preset_hopper_idx >= preset_count) {
+            instance->preset_hopper_idx = 0;
+            preset_wrapped = true;
+        }
     }
+    if(hop_frequency && (!hop_preset || preset_wrapped)) {
+        instance->hopper_idx_frequency =
+            (instance->hopper_idx_frequency + 1) % frequency_count;
+    }
+
+    uint32_t frequency = hop_frequency ?
+                             subghz_setting_get_hopper_frequency(
+                                 instance->setting, instance->hopper_idx_frequency) :
+                             instance->preset->frequency;
 
     if(instance->txrx_state == SubGhzTxRxStateRx) {
         subghz_txrx_rx_end(instance);
     }
     if(instance->txrx_state == SubGhzTxRxStateIDLE) {
         subghz_receiver_reset(instance->receiver);
-        instance->preset->frequency =
-            subghz_setting_get_hopper_frequency(instance->setting, instance->hopper_idx_frequency);
-        subghz_txrx_rx(instance, instance->preset->frequency);
+        if(hop_preset) {
+            size_t preset_index = configured_preset_count > 0 ?
+                                      subghz_setting_get_hopper_preset_index(
+                                          instance->setting, instance->preset_hopper_idx) :
+                                      instance->preset_hopper_idx;
+            subghz_txrx_set_preset_internal(instance, frequency, preset_index, 0);
+            subghz_devices_load_preset(
+                instance->radio_device, FuriHalSubGhzPresetCustom, instance->preset->data);
+        } else {
+            instance->preset->frequency = frequency;
+        }
+        subghz_txrx_rx(instance, frequency);
     }
 }
 

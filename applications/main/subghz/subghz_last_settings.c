@@ -12,7 +12,7 @@
 #define SUBGHZ_LAST_SETTING_FIELD_FREQUENCY_ANALYZER_FEEDBACK_LEVEL "FeedbackLevel"
 #define SUBGHZ_LAST_SETTING_FIELD_FREQUENCY_ANALYZER_TRIGGER        "FATrigger"
 #define SUBGHZ_LAST_SETTING_FIELD_PROTOCOL_FILE_NAMES               "ProtocolNames"
-#define SUBGHZ_LAST_SETTING_FIELD_HOPPING_ENABLE                    "Hopping"
+#define SUBGHZ_LAST_SETTING_FIELD_HOPPING_MODE                      "HoppingMode"
 #define SUBGHZ_LAST_SETTING_FIELD_IGNORE_FILTER                     "IgnoreFilter"
 #define SUBGHZ_LAST_SETTING_FIELD_FILTER                            "Filter"
 #define SUBGHZ_LAST_SETTING_FIELD_RSSI_THRESHOLD                    "RSSI"
@@ -45,6 +45,7 @@ void subghz_last_settings_load(SubGhzLastSettings* instance, size_t preset_count
     instance->filter = SubGhzProtocolFlag_Decodable;
     instance->rssi = SUBGHZ_RAW_THRESHOLD_MIN;
     instance->hopping_threshold = -90.0f;
+    instance->hopping_mode = SubGhzHoppingModeOff;
     instance->leds_and_amp = true;
 
     Storage* storage = furi_record_open(RECORD_STORAGE);
@@ -91,12 +92,16 @@ void subghz_last_settings_load(SubGhzLastSettings* instance, size_t preset_count
                    1)) {
                 flipper_format_rewind(fff_data_file);
             }
-            if(!flipper_format_read_bool(
+            uint32_t hopping_mode = SubGhzHoppingModeOff;
+            if(!flipper_format_read_uint32(
                    fff_data_file,
-                   SUBGHZ_LAST_SETTING_FIELD_HOPPING_ENABLE,
-                   &instance->enable_hopping,
+                   SUBGHZ_LAST_SETTING_FIELD_HOPPING_MODE,
+                   &hopping_mode,
                    1)) {
                 flipper_format_rewind(fff_data_file);
+            }
+            if(hopping_mode < SubGhzHoppingModeCount) {
+                instance->hopping_mode = hopping_mode;
             }
             if(!flipper_format_read_uint32(
                    fff_data_file,
@@ -209,8 +214,9 @@ bool subghz_last_settings_save(SubGhzLastSettings* instance) {
                1)) {
             break;
         }
-        if(!flipper_format_write_bool(
-               file, SUBGHZ_LAST_SETTING_FIELD_HOPPING_ENABLE, &instance->enable_hopping, 1)) {
+        uint32_t hopping_mode = instance->hopping_mode;
+        if(!flipper_format_write_uint32(
+               file, SUBGHZ_LAST_SETTING_FIELD_HOPPING_MODE, &hopping_mode, 1)) {
             break;
         }
         if(!flipper_format_write_uint32(

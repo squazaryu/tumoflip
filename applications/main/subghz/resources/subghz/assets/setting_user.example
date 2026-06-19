@@ -17,6 +17,11 @@ Version: 1
 #Hopper_frequency: 310000000
 #Hopper_frequency: 310000000
 
+# Presets used for preset and combined hopping modes
+#Hopping_Preset: AM650
+#Hopping_Preset: FM476
+#Hopping_Preset: FM12K
+
 # Custom preset
 # format for CC1101 "Custom_preset_data:" XX YY XX YY .. 00 00 ZZ ZZ ZZ ZZ ZZ ZZ ZZ ZZ, where: XX-register, YY - register data, 00 00 - end load register, ZZ - 8 byte Pa table register
 

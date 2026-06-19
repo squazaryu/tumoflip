@@ -5,6 +5,7 @@
 #include <core/pubsub.h>
 #include <furi_ble/profile_interface.h>
 #include <core/common_defines.h>
+#include <services/serial_service.h>
 
 #ifdef __cplusplus
 extern "C" {
