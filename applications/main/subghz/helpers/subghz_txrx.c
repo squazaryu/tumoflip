@@ -7,6 +7,10 @@
 
 #define TAG "SubGhzTxRx"
 
+#define SUBGHZ_HOPPER_DWELL_TICKS    2U
+#define SUBGHZ_HOPPER_RELEASE_TICKS  4U
+#define SUBGHZ_HOPPER_MAX_HOLD_TICKS 30U
+
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
     UNUSED(instance);
     uint8_t attempts = 0;
@@ -34,7 +38,6 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
     instance->txrx_state = SubGhzTxRxStateSleep;
 
     subghz_txrx_hopper_set_state(instance, SubGhzHopperStateOFF);
-    instance->hopper_timeout = 0;
     instance->hopper_idx_frequency = 0;
     instance->preset_hopper_idx = 0;
     subghz_txrx_speaker_set_state(instance, SubGhzSpeakerStateDisable);
@@ -434,24 +437,37 @@ void subghz_txrx_hopper_update(
     case SubGhzHopperStateOFF:
     case SubGhzHopperStatePause:
         return;
-    case SubGhzHopperStateRSSITimeOut:
-        if(instance->hopper_timeout != 0) {
-            instance->hopper_timeout--;
-            return;
-        }
-        break;
     default:
         break;
     }
-    if(instance->hopper_state != SubGhzHopperStateRSSITimeOut) {
-        if(subghz_devices_get_rssi(instance->radio_device) > stay_threshold) {
-            instance->hopper_timeout = 10;
+
+    bool signal_present = subghz_devices_get_rssi(instance->radio_device) > stay_threshold;
+    if(instance->hopper_state == SubGhzHopperStateRSSITimeOut) {
+        instance->hopper_hold_ticks++;
+        if(signal_present) {
+            instance->hopper_timeout = SUBGHZ_HOPPER_RELEASE_TICKS;
+        }
+        if(instance->hopper_hold_ticks < SUBGHZ_HOPPER_MAX_HOLD_TICKS &&
+           (signal_present || instance->hopper_timeout > 0)) {
+            if(!signal_present) instance->hopper_timeout--;
+            return;
+        }
+        instance->hopper_state = SubGhzHopperStateRunning;
+        instance->hopper_hold_ticks = 0;
+    } else {
+        if(signal_present) {
+            instance->hopper_timeout = SUBGHZ_HOPPER_RELEASE_TICKS;
+            instance->hopper_hold_ticks = 0;
             instance->hopper_state = SubGhzHopperStateRSSITimeOut;
             return;
         }
-    } else {
-        instance->hopper_state = SubGhzHopperStateRunning;
+        instance->hopper_hold_ticks = 0;
+        if(instance->hopper_timeout > 0) {
+            instance->hopper_timeout--;
+            return;
+        }
     }
+
     size_t frequency_count = subghz_setting_get_hopper_frequency_count(instance->setting);
     size_t configured_preset_count =
         subghz_setting_get_hopper_preset_count(instance->setting);
@@ -495,6 +511,7 @@ void subghz_txrx_hopper_update(
             instance->preset->frequency = frequency;
         }
         subghz_txrx_rx(instance, frequency);
+        instance->hopper_timeout = SUBGHZ_HOPPER_DWELL_TICKS;
     }
 }
 
@@ -506,6 +523,8 @@ SubGhzHopperState subghz_txrx_hopper_get_state(SubGhzTxRx* instance) {
 void subghz_txrx_hopper_set_state(SubGhzTxRx* instance, SubGhzHopperState state) {
     furi_assert(instance);
     instance->hopper_state = state;
+    instance->hopper_timeout = state == SubGhzHopperStateRunning ? SUBGHZ_HOPPER_DWELL_TICKS : 0;
+    instance->hopper_hold_ticks = 0;
 }
 
 void subghz_txrx_hopper_unpause(SubGhzTxRx* instance) {

@@ -15,6 +15,7 @@ struct SubGhzTxRx {
     SubGhzSetting* setting;
 
     uint8_t hopper_timeout;
+    uint8_t hopper_hold_ticks;
     uint8_t hopper_idx_frequency;
     bool is_database_loaded;
     SubGhzHopperState hopper_state;
