@@ -15,24 +15,24 @@ you find a tumoflip-specific issue, report it in this repository:
 ## Current Build
 
 - Base: Unleashed 089 with selected upstream dev updates
-- Firmware version: `tmwhflpprarf089-016`
+- Firmware version: `tmwhflpprarf089-017`
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `87.12`
 - Target: Flipper Zero F7
-- Release package: `flipper-z-f7-update-tmwhflpprarf089-016.tgz`
+- Release package: `flipper-z-f7-update-tmwhflpprarf089-017.tgz`
 
 ## Version Scheme
 
 Installed firmware versions use this format:
 
 ```text
-tmwhflpprarf089-016
+tmwhflpprarf089-017
 ```
 
 - `tmwhflpprarf`: tumoflip firmware name shown as the installed firmware
   version prefix for the ARF-enabled build line.
 - `089`: upstream Unleashed base version.
-- `016`: tumoflip internal build version.
+- `017`: tumoflip internal build version.
 
 When the Unleashed base version or tumoflip internal version changes, update
 the firmware version suffix in `fbt_options.py`, release notes, README, and the
@@ -41,7 +41,7 @@ published update package name together.
 ## tumoflip Changes
 
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
-  `tmwhflpprarf089-016`.
+  `tmwhflpprarf089-017`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.
 - Replaced the Desktop OK menu `Sub-GHz Remote` shortcut with an `ARF Tools`
@@ -56,6 +56,8 @@ published update package name together.
 - Added ARF Sub-GHz `setting_user` frequencies, hopper frequencies, and custom
   presets as ProtoPirate-only assets, isolated from the normal Sub-GHz app.
 - Added ProtoPirate and ARF Tools as external apps for isolated SD deployment.
+- Added MIFARE Ultralight/NTAG PWD and PACK to the NFC read-success screen.
+- Added the Bambu Lab filament spool NFC parser.
 - Vendored local user applications into `applications_user` so the repository
   can be built without absolute local symlinks.
 
@@ -67,7 +69,7 @@ identity.
 
 | Area | Unleashed | tumoflip |
 | --- | --- | --- |
-| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-016` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-017` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
@@ -77,8 +79,9 @@ identity.
 | BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication and Mac-side command routing. |
 | ARF protocols | Not included. | Adds a size-limited initial ARF Sub-GHz protocol set while keeping Unleashed/tumoflip protocols intact. |
 | Sub-GHz hopping | Frequency hopping only. | Adds preset hopping and coordinated combined frequency/preset hopping to both system Sub-GHz and ARF Sub-GHz Full. |
+| NFC additions | Uses the Unleashed 089 NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK and adds the Bambu Lab filament spool parser. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-016` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-017` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -198,7 +201,7 @@ Mac bridge and app source.
 Download the latest update package from
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases):
 
-- `flipper-z-f7-update-tmwhflpprarf089-016.tgz`
+- `flipper-z-f7-update-tmwhflpprarf089-017.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -219,7 +222,7 @@ device.
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-016.tgz
+dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-017.tgz
 ```
 
 ## Upstream
