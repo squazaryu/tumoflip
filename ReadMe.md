@@ -15,24 +15,24 @@ you find a tumoflip-specific issue, report it in this repository:
 ## Current Build
 
 - Base: Unleashed 089 with selected upstream dev updates
-- Firmware version: `tmwhflpprarf089-015`
+- Firmware version: `tmwhflpprarf089-016`
 - Firmware origin/fork: `tumoflip`
-- Firmware API: `87.11`
+- Firmware API: `87.12`
 - Target: Flipper Zero F7
-- Release package: `flipper-z-f7-update-tmwhflpprarf089-015.tgz`
+- Release package: `flipper-z-f7-update-tmwhflpprarf089-016.tgz`
 
 ## Version Scheme
 
 Installed firmware versions use this format:
 
 ```text
-tmwhflpprarf089-015
+tmwhflpprarf089-016
 ```
 
 - `tmwhflpprarf`: tumoflip firmware name shown as the installed firmware
   version prefix for the ARF-enabled build line.
 - `089`: upstream Unleashed base version.
-- `015`: tumoflip internal build version.
+- `016`: tumoflip internal build version.
 
 When the Unleashed base version or tumoflip internal version changes, update
 the firmware version suffix in `fbt_options.py`, release notes, README, and the
@@ -41,7 +41,7 @@ published update package name together.
 ## tumoflip Changes
 
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
-  `tmwhflpprarf089-015`.
+  `tmwhflpprarf089-016`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.
 - Replaced the Desktop OK menu `Sub-GHz Remote` shortcut with an `ARF Tools`
@@ -67,7 +67,7 @@ identity.
 
 | Area | Unleashed | tumoflip |
 | --- | --- | --- |
-| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-015` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-016` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
@@ -76,8 +76,9 @@ identity.
 | Settings return flow | Standard Unleashed navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
 | BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication and Mac-side command routing. |
 | ARF protocols | Not included. | Adds a size-limited initial ARF Sub-GHz protocol set while keeping Unleashed/tumoflip protocols intact. |
+| Sub-GHz hopping | Frequency hopping only. | Adds preset hopping and coordinated combined frequency/preset hopping to both system Sub-GHz and ARF Sub-GHz Full. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-015` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-016` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -118,13 +119,24 @@ build. Deferred protocols include Ford variants, PSA, Porsche Cayenne,
 StarLine, Scher-Khan, Sheriff CFM, Land Rover, Subaru, Mazda variants, Chrysler,
 Fiat Marelli, and later Kia variants.
 
-ProtoPirate and the lightweight ARF Tools helper app are built as external
-`.fap` apps instead of being linked into the core firmware image. Their
-intended SD locations are:
+ProtoPirate and the lightweight ARF Status diagnostic app are built as
+external `.fap` apps instead of being linked into the core firmware image.
+Functional ARF tools should stay as separate `.fap` apps in the same launcher
+folder rather than being hidden inside the status helper. Current intended SD
+locations are:
 
 ```text
 /ext/apps/ARF Tools/ProtoPirate.fap
-/ext/apps/ARF Tools/ARF Tools.fap
+/ext/apps/ARF Tools/ARF Sub-GHz.fap
+/ext/apps/ARF Tools/ARF Sub-GHz Full.fap
+/ext/apps/ARF Tools/ARF KeeLoq.fap
+/ext/apps/ARF Tools/ARF Counter BF.fap
+/ext/apps/ARF Tools/ARF Car Emulate.fap
+/ext/apps/ARF Tools/ARF Frequency Analyzer.fap
+/ext/apps/ARF Tools/ARF PSA Decrypt.fap
+/ext/apps/ARF Tools/RollJam.fap
+/ext/apps/ARF Tools/Sub-GHz Bruteforcer.fap
+/ext/apps/ARF Tools/ARF Status.fap
 ```
 
 ProtoPirate runtime plugin assets and keystore are deployed to:
@@ -186,7 +198,7 @@ Mac bridge and app source.
 Download the latest update package from
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases):
 
-- `flipper-z-f7-update-tmwhflpprarf089-015.tgz`
+- `flipper-z-f7-update-tmwhflpprarf089-016.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -201,13 +213,13 @@ device.
 ## Build
 
 ```sh
-./fbt COMPACT=1 DEBUG=0 COPRO_DISCLAIMER="--I-understand-what-I-am-doing=yes" updater_package
+./fbt COMPACT=1 DEBUG=0 updater_package
 ```
 
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-015.tgz
+dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-016.tgz
 ```
 
 ## Upstream
