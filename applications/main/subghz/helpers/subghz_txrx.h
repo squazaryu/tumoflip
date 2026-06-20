@@ -35,6 +35,17 @@ SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group);
 void subghz_txrx_free(SubGhzTxRx* instance);
 
 /**
+ * Replace the active external protocol group while preserving RX state.
+ *
+ * @param instance Pointer to a SubGhzTxRx
+ * @param protocol_pack_group Group to load
+ * @return true when the group was applied
+ */
+bool subghz_txrx_reload_protocol_pack(
+    SubGhzTxRx* instance,
+    SubGhzProtocolPackGroup protocol_pack_group);
+
+/**
  * Check if the database is loaded
  * 
  * @param instance Pointer to a SubGhzTxRx

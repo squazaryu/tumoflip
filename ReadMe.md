@@ -137,7 +137,8 @@ complete inventory.
 
 Because loading all packs at once would exhaust RAM, Receiver settings provide
 a `Protocol Pack` selector for Core, Legacy, Kia, Ford, Europe, Asia/US, and
-Alarm groups. The selected group is applied the next time Sub-GHz starts.
+Alarm groups. Changing the selection safely rebuilds the receiver and applies
+the new group without restarting Sub-GHz.
 
 This preserves the normal Sub-GHz receive workflow while recovering internal
 flash for Tumoflip Runtime. ProtoPirate can still provide its own isolated

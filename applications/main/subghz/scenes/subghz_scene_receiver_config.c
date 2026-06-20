@@ -249,9 +249,15 @@ static void subghz_scene_receiver_config_set_hopping_rssi(VariableItem* item) {
 static void subghz_scene_receiver_config_set_protocol_pack(VariableItem* item) {
     SubGhz* subghz = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
+    uint8_t previous = subghz->last_settings->protocol_pack_group;
 
+    if(subghz_txrx_reload_protocol_pack(subghz->txrx, index)) {
+        subghz->last_settings->protocol_pack_group = index;
+    } else {
+        index = previous;
+        variable_item_set_current_value_index(item, previous);
+    }
     variable_item_set_current_value_text(item, protocol_pack_group_text[index]);
-    subghz->last_settings->protocol_pack_group = index;
 }
 
 static void subghz_scene_receiver_config_set_speaker(VariableItem* item) {

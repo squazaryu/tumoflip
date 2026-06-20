@@ -12,6 +12,7 @@ struct SubGhzTxRx {
 
     SubGhzEnvironment* environment;
     SubGhzProtocolPackRegistry* protocol_pack_registry;
+    SubGhzProtocolPackGroup protocol_pack_group;
     SubGhzReceiver* receiver;
     SubGhzTransmitter* transmitter;
     SubGhzProtocolDecoderBase* decoder_result;
@@ -35,6 +36,9 @@ struct SubGhzTxRx {
 
     SubGhzTxRxNeedSaveCallback need_save_callback;
     void* need_save_context;
+    SubGhzReceiverCallback rx_callback;
+    void* rx_context;
+    SubGhzProtocolFlag receiver_filter;
 
     bool debug_pin_state;
 };
