@@ -15,18 +15,18 @@ you find a tumoflip-specific issue, report it in this repository:
 ## Current Build
 
 - Base: Unleashed 089 with selected upstream dev updates
-- Firmware version: `tmwhflpprarf089-018`
+- Firmware version: `tmwhflpprarf089-019`
 - Firmware origin/fork: `tumoflip`
-- Firmware API: `87.12`
+- Firmware API: `87.14`
 - Target: Flipper Zero F7
-- Release package: `flipper-z-f7-update-tmwhflpprarf089-018.tgz`
+- Release package: `flipper-z-f7-update-tmwhflpprarf089-019.tgz`
 
 ## Version Scheme
 
 Installed firmware versions use this format:
 
 ```text
-tmwhflpprarf089-018
+tmwhflpprarf089-019
 ```
 
 - `tmwhflpprarf`: tumoflip firmware name shown as the installed firmware
@@ -41,7 +41,7 @@ published update package name together.
 ## tumoflip Changes
 
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
-  `tmwhflpprarf089-018`.
+  `tmwhflpprarf089-019`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.
 - Replaced the Desktop OK menu `Sub-GHz Remote` shortcut with an `ARF Tools`
@@ -59,6 +59,13 @@ published update package name together.
 - Added MIFARE Ultralight/NTAG PWD and PACK to the NFC read-success screen.
 - Added the Bambu Lab filament spool NFC parser.
 - Added adaptive dwell and signal hold to hopping in the system Sub-GHz app.
+- Added external Sub-GHz Protocol Packs so selected decoders can be loaded from
+  SD without keeping a second copy in the core firmware image.
+- Added a Sub-GHz Radio Broker for exclusive radio ownership, external CC1101
+  power ownership, and internal-device fallback in system Sub-GHz and all
+  current ARF radio applications.
+- Added a release validator and versioned package manifest for reproducible SD
+  app layouts and independent C2/updater safety checks.
 - Vendored local user applications into `applications_user` so the repository
   can be built without absolute local symlinks.
 
@@ -70,7 +77,7 @@ identity.
 
 | Area | Unleashed | tumoflip |
 | --- | --- | --- |
-| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-018` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-019` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
@@ -78,11 +85,11 @@ identity.
 | ARF tools access | Apps are reached through the normal Apps tree. | Provides a dedicated `ARF Tools` launcher folder with SD-deployed ARF/ProtoPirate apps. |
 | Settings return flow | Standard Unleashed navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
 | BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication and Mac-side command routing. |
-| ARF protocols | Not included. | Adds a size-limited initial ARF Sub-GHz protocol set while keeping Unleashed/tumoflip protocols intact. |
+| ARF protocols | Not included. | Keeps the core set size-limited and loads selected automotive decoders from SD as Protocol Packs. |
 | Sub-GHz hopping | Frequency hopping only. | Adds preset and combined hopping plus an adaptive scan dwell, signal hold, post-signal grace period, and bounded hold time to system Sub-GHz. |
 | NFC additions | Uses the Unleashed 089 NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK and adds the Bambu Lab filament spool parser. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-018` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-019` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -105,16 +112,30 @@ from [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF). This is
 a feature merge, not a replacement of the existing Unleashed/tumoflip Sub-GHz
 stack.
 
-Currently enabled ARF protocols:
+ARF protocols currently enabled in the system Sub-GHz registry:
 
-- `VAG`
 - `Fiat SPA`
-- `Kia v0`
-- `Kia v1`
-- `Kia v2`
 - `Suzuki`
-- `Mitsubishi`
 - `Toyota`
+
+`VAG`, `Kia v0/v1/v2`, and `Mitsubishi` are no longer linked into the core
+registry. They are built from the canonical sources in `lib/subghz/protocols`
+as external Protocol Packs and loaded by the normal Sub-GHz app from:
+
+```text
+/ext/apps_data/subghz/plugins/protocol_vag.fal
+/ext/apps_data/subghz/plugins/protocol_kia_v0.fal
+/ext/apps_data/subghz/plugins/protocol_kia_v1.fal
+/ext/apps_data/subghz/plugins/protocol_kia_v2.fal
+/ext/apps_data/subghz/plugins/protocol_mitsubishi_v0.fal
+```
+
+This preserves the normal Sub-GHz receive workflow while recovering internal
+flash for Tumoflip Runtime. ProtoPirate can still provide its own isolated
+implementations. The Protocol Pack loader is currently used by the graphical
+system Sub-GHz app; the Sub-GHz CLI continues to use the built-in registry.
+See [Sub-GHz Protocol Packs](docs/subghz-protocol-packs.md) for the ABI and
+packaging rules.
 
 Additional ARF protocol sources are present in the tree but are not registered
 in the firmware menu yet. A full ARF protocol registry exceeded the safe
@@ -174,12 +195,35 @@ is intentionally not used for ARF.
   vendored modified version based on
   [rdefeo/quac](https://github.com/rdefeo/quac).
 
-## BLE App Bridge and FlipperRelay
+## BLE App Bridge and Tumoflip Runtime
 
 tumoflip includes a BLE App Bridge service in the default Flipper BLE serial
 profile. Apps can send small framed events with `app_id`, `command`, and an
-optional payload. A paired Mac can listen for those events and run local
-commands that are configured on the Mac.
+optional payload. The primary companion is now
+[squazaryu/unleashed-companion](https://github.com/squazaryu/unleashed-companion)
+for iPhone; Mac-side workers remain optional for features that need desktop
+data or compute.
+
+The background Tumoflip Runtime adds the backward-compatible `FAB2` protocol:
+request IDs, explicit response/error flags, ordered chunks, capability
+discovery, and Runtime commands that do not require opening a FAP. Legacy
+`FAB1` remains supported. See [the App Bridge v2 wire contract](docs/app-bridge-v2.md).
+
+The system Sub-GHz application and all current ARF radio applications acquire
+their radio through the [Radio Broker](docs/subghz-radio-broker.md). Custom
+ProtoPirate and Bruteforcer loaders receive the active lease explicitly;
+RollJam reports and preserves its dual-radio operation.
+
+Release builds can emit a SHA-256 package inventory and validate the updater:
+
+```sh
+python3 tools/tumoflip/validate_release.py --write-manifest
+```
+
+The schema v2 `tumoflip-packages.json` separates Base, ARF, Module One, and
+Protocol Pack files, provides a content-addressed release ID, and supports the
+host-side atomic installer with rollback. See
+[Tumoflip Packages](docs/tumoflip-packages.md).
 
 The standalone FlipperRelay repository lives at
 [squazaryu/flipper_relay](https://github.com/squazaryu/flipper_relay).
@@ -202,7 +246,7 @@ Mac bridge and app source.
 Download the latest update package from
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases):
 
-- `flipper-z-f7-update-tmwhflpprarf089-018.tgz`
+- `flipper-z-f7-update-tmwhflpprarf089-019.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -218,12 +262,13 @@ device.
 
 ```sh
 ./fbt COMPACT=1 DEBUG=0 updater_package
+python3 tools/tumoflip/validate_release.py --write-manifest
 ```
 
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-018.tgz
+dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-019.tgz
 ```
 
 ## Upstream
