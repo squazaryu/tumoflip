@@ -7,6 +7,7 @@
 ![base](https://img.shields.io/badge/base-Unleashed-black)
 ![target](https://img.shields.io/badge/target-Flipper%20Zero%20(f7)-orange)
 ![license](https://img.shields.io/badge/license-GPLv3-blue)
+[![release](https://img.shields.io/github/v/release/squazaryu/tumoflip?label=release&color=brightgreen)](https://github.com/squazaryu/tumoflip/releases/latest)
 
 📱 **Companion app:** [squazaryu/unleashed-companion](https://github.com/squazaryu/unleashed-companion) — native iOS (Feather / AltStore)
 
@@ -28,6 +29,7 @@ you find a tumoflip-specific issue, report it in this repository:
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `87.14`
 - Target: Flipper Zero F7
+- Release: [v0.2.1](https://github.com/squazaryu/tumoflip/releases/tag/v0.2.1)
 - Release package: `flipper-z-f7-update-tmwhflpprarf089-021.tgz`
 
 ## Version Scheme
@@ -70,6 +72,8 @@ published update package name together.
 - Added adaptive dwell and signal hold to hopping in the system Sub-GHz app.
 - Added external Sub-GHz Protocol Packs so selected decoders can be loaded from
   SD without keeping a second copy in the core firmware image.
+- Added runtime Protocol Pack switching: the receiver safely reloads the
+  selected decoders and resumes active reception without restarting Sub-GHz.
 - Added a Sub-GHz Radio Broker for exclusive radio ownership, external CC1101
   power ownership, and internal-device fallback in system Sub-GHz and all
   current ARF radio applications.
