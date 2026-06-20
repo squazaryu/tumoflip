@@ -36,6 +36,7 @@ typedef enum {
     BtMessageTypeSetSettings,
     BtMessageTypeReloadKeysSettings,
     BtMessageTypeAppBridgeSend,
+    BtMessageTypeAppBridgeSendV2,
 } BtMessageType;
 
 typedef struct {
@@ -44,6 +45,17 @@ typedef struct {
     const uint8_t* payload;
     uint16_t payload_len;
 } BtAppBridgeSendData;
+
+typedef struct {
+    const char* app_id;
+    const char* command;
+    uint32_t request_id;
+    uint8_t flags;
+    uint8_t chunk_index;
+    uint8_t chunk_count;
+    const uint8_t* payload;
+    uint16_t payload_len;
+} BtAppBridgeSendV2Data;
 
 typedef struct {
     uint8_t* start_address;
@@ -63,6 +75,7 @@ typedef union {
     BtSettings* settings;
     const BtSettings* csettings;
     BtAppBridgeSendData app_bridge;
+    BtAppBridgeSendV2Data app_bridge_v2;
 } BtMessageData;
 
 typedef struct {

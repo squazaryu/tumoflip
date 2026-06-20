@@ -52,6 +52,17 @@ bool ble_profile_serial_app_bridge_tx(
     const uint8_t* payload,
     uint16_t payload_len);
 
+bool ble_profile_serial_app_bridge_tx_v2(
+    FuriHalBleProfileBase* profile,
+    const char* app_id,
+    const char* command,
+    uint32_t request_id,
+    uint8_t flags,
+    uint8_t chunk_index,
+    uint8_t chunk_count,
+    const uint8_t* payload,
+    uint16_t payload_len);
+
 /** Set App Bridge service events callback
  *
  * @param profile       Profile instance

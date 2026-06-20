@@ -29,15 +29,30 @@ typedef struct {
 
 typedef void (*BtStatusChangedCallback)(BtStatus status, void* context);
 
-#define BT_APP_BRIDGE_APP_ID_LEN_MAX  32
-#define BT_APP_BRIDGE_COMMAND_LEN_MAX 32
-#define BT_APP_BRIDGE_PAYLOAD_LEN_MAX 172
+#define BT_APP_BRIDGE_APP_ID_LEN_MAX     32
+#define BT_APP_BRIDGE_COMMAND_LEN_MAX    32
+#define BT_APP_BRIDGE_PAYLOAD_LEN_MAX    172
+#define BT_APP_BRIDGE_V2_PAYLOAD_LEN_MAX 160
+
+typedef enum {
+    BtAppBridgeFlagAckRequested = 1U << 0,
+    BtAppBridgeFlagResponse = 1U << 1,
+    BtAppBridgeFlagError = 1U << 2,
+} BtAppBridgeFlag;
+
+#define BT_APP_BRIDGE_FLAGS_MASK \
+    (BtAppBridgeFlagAckRequested | BtAppBridgeFlagResponse | BtAppBridgeFlagError)
 
 typedef struct {
     char app_id[BT_APP_BRIDGE_APP_ID_LEN_MAX + 1];
     char command[BT_APP_BRIDGE_COMMAND_LEN_MAX + 1];
     uint8_t payload[BT_APP_BRIDGE_PAYLOAD_LEN_MAX];
     uint16_t payload_len;
+    uint32_t request_id;
+    uint8_t protocol_version;
+    uint8_t flags;
+    uint8_t chunk_index;
+    uint8_t chunk_count;
 } BtAppBridgeEvent;
 
 /** Change BLE Profile
@@ -99,6 +114,27 @@ bool bt_app_bridge_send(
 
 /** Send a null-terminated text payload over BLE App Bridge */
 bool bt_app_bridge_send_text(Bt* bt, const char* app_id, const char* command, const char* payload);
+
+/** Send an App Bridge v2 frame with request and chunk metadata. */
+bool bt_app_bridge_send_v2(
+    Bt* bt,
+    const char* app_id,
+    const char* command,
+    uint32_t request_id,
+    uint8_t flags,
+    uint8_t chunk_index,
+    uint8_t chunk_count,
+    const uint8_t* payload,
+    uint16_t payload_len);
+
+/** Send a single-frame App Bridge v2 UTF-8 response. */
+bool bt_app_bridge_send_text_v2(
+    Bt* bt,
+    const char* app_id,
+    const char* command,
+    uint32_t request_id,
+    uint8_t flags,
+    const char* payload);
 
 /** Subscribe to commands received from BLE App Bridge central */
 FuriPubSub* bt_app_bridge_get_pubsub(Bt* bt);

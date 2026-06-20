@@ -127,7 +127,8 @@ static void protopirate_radio_init_cleanup(ProtoPirateApp* app, bool devices_ini
         if(devices_initialized) {
             subghz_devices_idle(app->txrx->radio_device);
         }
-        radio_device_loader_end(app->txrx->radio_device);
+        radio_device_loader_end(
+            app->txrx->radio_device, app->radio_broker, &app->radio_lease);
         app->txrx->radio_device = NULL;
     }
 
@@ -148,6 +149,9 @@ static void protopirate_radio_init_cleanup(ProtoPirateApp* app, bool devices_ini
 
     if(devices_initialized) {
         subghz_devices_deinit();
+    }
+    if(app->radio_lease.token) {
+        subghz_radio_broker_release(app->radio_broker, &app->radio_lease);
     }
 
     app->txrx->protocol_registry = NULL;
@@ -193,6 +197,7 @@ ProtoPirateApp* protopirate_app_alloc() {
 
     // Open Dialogs record
     app->dialogs = furi_record_open(RECORD_DIALOGS);
+    app->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
 
     // SubMenu
     app->submenu = submenu_alloc();
@@ -313,6 +318,11 @@ bool protopirate_radio_init(ProtoPirateApp* app) {
 
     // Fresh radio init - nothing was initialized before
     FURI_LOG_I(TAG, "Fresh radio init - allocating all components");
+    if(!subghz_radio_broker_acquire(
+           app->radio_broker, "protopirate", FuriWaitForever, &app->radio_lease)) {
+        FURI_LOG_E(TAG, "Failed to acquire Sub-GHz radio");
+        return false;
+    }
 
     // Create environment with our custom protocols
     app->txrx->environment = subghz_environment_alloc();
@@ -342,12 +352,20 @@ bool protopirate_radio_init(ProtoPirateApp* app) {
     FURI_LOG_D(TAG, "SubGhz devices initialized");
 
     // Try external CC1101 first
-    app->txrx->radio_device = radio_device_loader_set(NULL, SubGhzRadioDeviceTypeExternalCC1101);
+    app->txrx->radio_device = radio_device_loader_set(
+        NULL,
+        SubGhzRadioDeviceTypeExternalCC1101,
+        app->radio_broker,
+        &app->radio_lease);
 
     // if not loading, fallback to internal
     if(!app->txrx->radio_device) {
         FURI_LOG_W(TAG, "External CC1101 not found, trying internal radio");
-        app->txrx->radio_device = radio_device_loader_set(NULL, SubGhzRadioDeviceTypeInternal);
+        app->txrx->radio_device = radio_device_loader_set(
+            NULL,
+            SubGhzRadioDeviceTypeInternal,
+            app->radio_broker,
+            &app->radio_lease);
     }
 
     if(!app->txrx->radio_device) {
@@ -366,6 +384,12 @@ bool protopirate_radio_init(ProtoPirateApp* app) {
 #endif
     subghz_devices_reset(app->txrx->radio_device);
     subghz_devices_idle(app->txrx->radio_device);
+    subghz_radio_broker_set_selected_device(
+        app->radio_broker,
+        &app->radio_lease,
+        radio_device_loader_is_external(app->txrx->radio_device) ?
+            SubGhzRadioBrokerDeviceExternalCC1101 :
+            SubGhzRadioBrokerDeviceInternal);
 
     app->radio_initialized = true;
 
@@ -387,7 +411,7 @@ void protopirate_radio_deinit(ProtoPirateApp* app) {
         app->txrx->history,
         app->txrx->radio_device);
 
-    bool has_radio_resources = app->radio_initialized || app->txrx->worker ||
+    bool has_radio_resources = app->radio_initialized || app->radio_lease.token || app->txrx->worker ||
                                app->txrx->environment || app->txrx->receiver ||
                                app->txrx->history || app->txrx->radio_device;
     if(!has_radio_resources) {
@@ -409,7 +433,8 @@ void protopirate_radio_deinit(ProtoPirateApp* app) {
     if(app->txrx->radio_device) {
         FURI_LOG_D(TAG, "Putting radio device to sleep and ending: %p", app->txrx->radio_device);
         subghz_devices_sleep(app->txrx->radio_device);
-        radio_device_loader_end(app->txrx->radio_device);
+        radio_device_loader_end(
+            app->txrx->radio_device, app->radio_broker, &app->radio_lease);
         app->txrx->radio_device = NULL;
     } else {
         FURI_LOG_D(TAG, "Radio device was NULL, skipping sleep/end");
@@ -418,6 +443,9 @@ void protopirate_radio_deinit(ProtoPirateApp* app) {
     if(devices_initialized) {
         FURI_LOG_D(TAG, "Calling subghz_devices_deinit");
         subghz_devices_deinit();
+    }
+    if(app->radio_lease.token) {
+        subghz_radio_broker_release(app->radio_broker, &app->radio_lease);
     }
 
     if(app->txrx->receiver) {
@@ -510,6 +538,7 @@ void protopirate_app_free(ProtoPirateApp* app) {
     // Deinitialize whichever is active - NULL checks inside handle all cases
     FURI_LOG_D(TAG, "Calling radio_deinit");
     protopirate_radio_deinit(app);
+    furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
 
     if(app->loaded_file_path) {
         FURI_LOG_D(TAG, "Freeing loaded_file_path");

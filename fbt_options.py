@@ -16,7 +16,7 @@ DEBUG = 1
 
 # Suffix to add to files when building distribution
 # If OS environment has DIST_SUFFIX set, it will be used instead
-DIST_SUFFIX = "tmwhflpprarf089-018"
+DIST_SUFFIX = "tmwhflpprarf089-019"
 
 # Post-update slideshow shown by the updater package
 UPDATE_SPLASH = "tumoflip_update"
@@ -85,6 +85,10 @@ FIRMWARE_APPS = {
 }
 
 FIRMWARE_APP_SET = "default"
+
+# Local experiments may have an application.fam under applications_user. Keep
+# unfinished apps out of reproducible updater packages until explicitly added.
+EXCLUDED_EXT_APPS = ("claude_buddy",)
 
 custom_options_fn = "fbt_options_local.py"
 

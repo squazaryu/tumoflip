@@ -105,7 +105,8 @@ PluginManagerError plugin_manager_load_single(PluginManager* manager, const char
     return error;
 }
 
-PluginManagerError plugin_manager_load_all(PluginManager* manager, const char* path) {
+static PluginManagerError
+    plugin_manager_load_all_internal(PluginManager* manager, const char* path, const char* prefix) {
     furi_check(manager);
     File* directory = storage_file_alloc(manager->storage);
     char file_name_buffer[256];
@@ -124,6 +125,9 @@ PluginManagerError plugin_manager_load_all(PluginManager* manager, const char* p
             if(!furi_string_end_with_str(file_name, ".fal")) {
                 continue;
             }
+            if(prefix && !furi_string_start_with_str(file_name, prefix)) {
+                continue;
+            }
 
             path_concat(path, file_name_buffer, file_name);
             FURI_LOG_D(TAG, "Loading %s", furi_string_get_cstr(file_name));
@@ -140,6 +144,18 @@ PluginManagerError plugin_manager_load_all(PluginManager* manager, const char* p
     storage_file_free(directory);
     furi_string_free(file_name);
     return PluginManagerErrorNone;
+}
+
+PluginManagerError plugin_manager_load_all(PluginManager* manager, const char* path) {
+    return plugin_manager_load_all_internal(manager, path, NULL);
+}
+
+PluginManagerError plugin_manager_load_all_with_prefix(
+    PluginManager* manager,
+    const char* path,
+    const char* prefix) {
+    furi_check(prefix);
+    return plugin_manager_load_all_internal(manager, path, prefix);
 }
 
 uint32_t plugin_manager_get_count(PluginManager* manager) {

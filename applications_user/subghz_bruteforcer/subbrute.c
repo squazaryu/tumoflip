@@ -1,5 +1,6 @@
 #include "subbrute_i.h"
 #include "scenes/subbrute_scene.h"
+#include <applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h>
 
 #define TAG "SubBruteApp"
 
@@ -45,12 +46,27 @@ SubBruteState* subbrute_alloc() {
 
     // Notifications
     instance->notifications = furi_record_open(RECORD_NOTIFICATION);
+    instance->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+    furi_check(subghz_radio_broker_acquire(
+        instance->radio_broker, "subghz_bruteforcer", FuriWaitForever, &instance->radio_lease));
 
     subghz_devices_init();
 
     // init radio device
+    instance->radio_device = NULL;
     instance->radio_device = subbrute_radio_device_loader_set(
-        instance->radio_device, SubGhzRadioDeviceTypeExternalCC1101);
+        instance->radio_device,
+        SubGhzRadioDeviceTypeExternalCC1101,
+        instance->radio_broker,
+        &instance->radio_lease);
+    furi_check(instance->radio_device);
+    subghz_radio_broker_set_selected_device(
+        instance->radio_broker,
+        &instance->radio_lease,
+        instance->radio_device ==
+                subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_EXT_NAME) ?
+            SubGhzRadioBrokerDeviceExternalCC1101 :
+            SubGhzRadioBrokerDeviceInternal);
 
     subghz_devices_reset(instance->radio_device);
     subghz_devices_idle(instance->radio_device);
@@ -122,10 +138,15 @@ void subbrute_free(SubBruteState* instance) {
     // SubBruteWorker
     subbrute_worker_stop(instance->worker);
     subbrute_worker_free(instance->worker);
+    subghz_devices_sleep(instance->radio_device);
+    subbrute_radio_device_loader_end(
+        instance->radio_device, instance->radio_broker, &instance->radio_lease);
 
     // SubBruteDevice
     subbrute_device_free(instance->device);
     subghz_devices_deinit();
+    subghz_radio_broker_release(instance->radio_broker, &instance->radio_lease);
+    furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
 
     //subbrute_settings_save(instance->settings);
     subbrute_settings_free(instance->settings);

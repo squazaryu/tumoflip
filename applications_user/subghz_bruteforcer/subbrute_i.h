@@ -20,6 +20,7 @@
 #include <subghz_bruteforcer_icons.h>
 
 #include <dialogs/dialogs.h>
+#include <subghz_radio_broker/subghz_radio_broker.h>
 
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
@@ -63,6 +64,8 @@ typedef enum {
  * This class contains the various elements and variables necessary for the functioning of a SubBrute application.
  */
 struct SubBruteState {
+    SubGhzRadioBroker* radio_broker;
+    SubGhzRadioBrokerLease radio_lease;
     /** GUI elements */
     NotificationApp* notifications;
     Gui* gui;

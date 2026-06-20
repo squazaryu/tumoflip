@@ -13,6 +13,7 @@
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
 #include <storage/storage.h>
+#include <subghz_radio_broker/subghz_radio_broker.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -126,6 +127,8 @@ typedef struct {
 // Main app struct
 // ============================================================
 typedef struct {
+    SubGhzRadioBroker* radio_broker;
+    SubGhzRadioBrokerLease radio_lease;
     Gui* gui;
     ViewDispatcher* view_dispatcher;
     SceneManager* scene_manager;

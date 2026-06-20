@@ -25,7 +25,8 @@ void subghz_device_registry_init(void) {
     //TODO FL-3556: fix path to plugins
     //if(plugin_manager_load_all(subghz_device->manager, APP_DATA_PATH("plugins")) !=
     //
-    if(plugin_manager_load_all(subghz_device->manager, EXT_PATH("apps_data/subghz/plugins")) !=
+    if(plugin_manager_load_all_with_prefix(
+           subghz_device->manager, EXT_PATH("apps_data/subghz/plugins"), "radio_device_") !=
        PluginManagerErrorNone) {
         FURI_LOG_E(TAG, "Failed to load all libs");
     }

@@ -1,0 +1,51 @@
+App(
+    appid="protocol_vag",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_vag_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "vag_plugin.c",
+        "../../lib/subghz/protocols/vag.c",
+        "../../lib/subghz/protocols/aut64.c",
+    ],
+)
+
+App(
+    appid="protocol_kia_v0",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_kia_v0_plugin_ep",
+    requires=["subghz"],
+    sources=["kia_v0_plugin.c", "../../lib/subghz/protocols/kia_v0.c"],
+)
+
+App(
+    appid="protocol_kia_v1",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_kia_v1_plugin_ep",
+    requires=["subghz"],
+    sources=["kia_v1_plugin.c", "../../lib/subghz/protocols/kia_v1.c"],
+)
+
+App(
+    appid="protocol_kia_v2",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_kia_v2_plugin_ep",
+    requires=["subghz"],
+    sources=["kia_v2_plugin.c", "../../lib/subghz/protocols/kia_v2.c"],
+)
+
+App(
+    appid="protocol_mitsubishi_v0",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_mitsubishi_v0_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "mitsubishi_v0_plugin.c",
+        "../../lib/subghz/protocols/mitsubishi_v0.c",
+    ],
+)

@@ -18,8 +18,8 @@ typedef enum {
 
 static const uint8_t empty_frame[BLE_SVC_APP_BRIDGE_FRAME_SIZE_MAX] = {0};
 
-static const BleGattCharacteristicParams ble_svc_app_bridge_chars
-    [AppBridgeSvcGattCharacteristicCount] = {
+static const BleGattCharacteristicParams
+    ble_svc_app_bridge_chars[AppBridgeSvcGattCharacteristicCount] = {
         [AppBridgeSvcGattCharacteristicEvents] =
             {.name = "App events",
              .data_prop_type = FlipperGattCharacteristicDataFixed,
@@ -31,17 +31,17 @@ static const BleGattCharacteristicParams ble_svc_app_bridge_chars
              .security_permissions = ATTR_PERMISSION_AUTHEN_READ,
              .gatt_evt_mask = GATT_DONT_NOTIFY_EVENTS,
              .is_variable = CHAR_VALUE_LEN_VARIABLE},
-        [AppBridgeSvcGattCharacteristicCommands] =
-            {.name = "App commands",
-             .data_prop_type = FlipperGattCharacteristicDataFixed,
-             .data.fixed.ptr = empty_frame,
-             .data.fixed.length = BLE_SVC_APP_BRIDGE_FRAME_SIZE_MAX,
-             .uuid.Char_UUID_128 = BLE_SVC_APP_BRIDGE_COMMANDS_CHAR_UUID,
-             .uuid_type = UUID_TYPE_128,
-             .char_properties = CHAR_PROP_READ | CHAR_PROP_WRITE | CHAR_PROP_WRITE_WITHOUT_RESP,
-             .security_permissions = ATTR_PERMISSION_AUTHEN_READ | ATTR_PERMISSION_AUTHEN_WRITE,
-             .gatt_evt_mask = GATT_NOTIFY_ATTRIBUTE_WRITE,
-             .is_variable = CHAR_VALUE_LEN_VARIABLE}};
+        [AppBridgeSvcGattCharacteristicCommands] = {
+            .name = "App commands",
+            .data_prop_type = FlipperGattCharacteristicDataFixed,
+            .data.fixed.ptr = empty_frame,
+            .data.fixed.length = BLE_SVC_APP_BRIDGE_FRAME_SIZE_MAX,
+            .uuid.Char_UUID_128 = BLE_SVC_APP_BRIDGE_COMMANDS_CHAR_UUID,
+            .uuid_type = UUID_TYPE_128,
+            .char_properties = CHAR_PROP_READ | CHAR_PROP_WRITE | CHAR_PROP_WRITE_WITHOUT_RESP,
+            .security_permissions = ATTR_PERMISSION_AUTHEN_READ | ATTR_PERMISSION_AUTHEN_WRITE,
+            .gatt_evt_mask = GATT_NOTIFY_ATTRIBUTE_WRITE,
+            .is_variable = CHAR_VALUE_LEN_VARIABLE}};
 
 struct BleServiceAppBridge {
     uint16_t svc_handle;
@@ -88,7 +88,8 @@ BleServiceAppBridge* ble_svc_app_bridge_start(void) {
     service->event_handler =
         ble_event_dispatcher_register_svc_handler(ble_svc_app_bridge_event_handler, service);
 
-    if(!ble_gatt_service_add(UUID_TYPE_128, &service_uuid, PRIMARY_SERVICE, 8, &service->svc_handle)) {
+    if(!ble_gatt_service_add(
+           UUID_TYPE_128, &service_uuid, PRIMARY_SERVICE, 8, &service->svc_handle)) {
         ble_event_dispatcher_unregister_svc_handler(service->event_handler);
         free(service);
         return NULL;
@@ -145,7 +146,8 @@ static bool ble_svc_app_bridge_encode_frame(
         return false;
     }
 
-    const size_t total_len = BLE_SVC_APP_BRIDGE_HEADER_LEN + app_id_len + command_len + payload_len;
+    const size_t total_len =
+        BLE_SVC_APP_BRIDGE_HEADER_LEN + app_id_len + command_len + payload_len;
     if(total_len > BLE_SVC_APP_BRIDGE_FRAME_SIZE_MAX) {
         return false;
     }
@@ -162,7 +164,10 @@ static bool ble_svc_app_bridge_encode_frame(
     memcpy(&frame[BLE_SVC_APP_BRIDGE_HEADER_LEN + app_id_len], command, command_len);
     if(payload_len) {
         furi_check(payload);
-        memcpy(&frame[BLE_SVC_APP_BRIDGE_HEADER_LEN + app_id_len + command_len], payload, payload_len);
+        memcpy(
+            &frame[BLE_SVC_APP_BRIDGE_HEADER_LEN + app_id_len + command_len],
+            payload,
+            payload_len);
     }
 
     *frame_len = total_len;
@@ -193,6 +198,110 @@ bool ble_svc_app_bridge_send(
 
     if(result != BLE_STATUS_SUCCESS) {
         FURI_LOG_E(TAG, "Failed updating app bridge events characteristic: %d", result);
+    }
+
+    return result == BLE_STATUS_SUCCESS;
+}
+
+static bool ble_svc_app_bridge_encode_frame_v2(
+    uint8_t* frame,
+    uint16_t* frame_len,
+    const char* app_id,
+    const char* command,
+    uint32_t request_id,
+    uint8_t flags,
+    uint8_t chunk_index,
+    uint8_t chunk_count,
+    const uint8_t* payload,
+    uint16_t payload_len) {
+    furi_check(frame);
+    furi_check(frame_len);
+    furi_check(app_id);
+    furi_check(command);
+
+    const size_t app_id_len = strlen(app_id);
+    const size_t command_len = strlen(command);
+    if((app_id_len == 0) || (command_len == 0) ||
+       (app_id_len > BLE_SVC_APP_BRIDGE_APP_ID_LEN_MAX) ||
+       (command_len > BLE_SVC_APP_BRIDGE_COMMAND_LEN_MAX) ||
+       (payload_len > BLE_SVC_APP_BRIDGE_V2_PAYLOAD_LEN_MAX) || (chunk_count == 0) ||
+       (chunk_index >= chunk_count) || (flags & ~0x07U)) {
+        return false;
+    }
+
+    const size_t total_len =
+        BLE_SVC_APP_BRIDGE_V2_HEADER_LEN + app_id_len + command_len + payload_len;
+    if(total_len > BLE_SVC_APP_BRIDGE_FRAME_SIZE_MAX) {
+        return false;
+    }
+
+    frame[0] = 'F';
+    frame[1] = 'A';
+    frame[2] = 'B';
+    frame[3] = '2';
+    frame[4] = flags;
+    frame[5] = app_id_len;
+    frame[6] = command_len;
+    frame[7] = chunk_index;
+    frame[8] = chunk_count;
+    frame[9] = 0;
+    frame[10] = payload_len & 0xFF;
+    frame[11] = payload_len >> 8;
+    frame[12] = request_id & 0xFF;
+    frame[13] = (request_id >> 8) & 0xFF;
+    frame[14] = (request_id >> 16) & 0xFF;
+    frame[15] = (request_id >> 24) & 0xFF;
+    memcpy(&frame[BLE_SVC_APP_BRIDGE_V2_HEADER_LEN], app_id, app_id_len);
+    memcpy(&frame[BLE_SVC_APP_BRIDGE_V2_HEADER_LEN + app_id_len], command, command_len);
+    if(payload_len) {
+        furi_check(payload);
+        memcpy(
+            &frame[BLE_SVC_APP_BRIDGE_V2_HEADER_LEN + app_id_len + command_len],
+            payload,
+            payload_len);
+    }
+
+    *frame_len = total_len;
+    return true;
+}
+
+bool ble_svc_app_bridge_send_v2(
+    BleServiceAppBridge* service,
+    const char* app_id,
+    const char* command,
+    uint32_t request_id,
+    uint8_t flags,
+    uint8_t chunk_index,
+    uint8_t chunk_count,
+    const uint8_t* payload,
+    uint16_t payload_len) {
+    furi_check(service);
+
+    uint8_t frame[BLE_SVC_APP_BRIDGE_FRAME_SIZE_MAX];
+    uint16_t frame_len = 0;
+    if(!ble_svc_app_bridge_encode_frame_v2(
+           frame,
+           &frame_len,
+           app_id,
+           command,
+           request_id,
+           flags,
+           chunk_index,
+           chunk_count,
+           payload,
+           payload_len)) {
+        FURI_LOG_W(TAG, "Invalid App Bridge v2 frame");
+        return false;
+    }
+
+    const tBleStatus result = aci_gatt_update_char_value(
+        service->svc_handle,
+        service->chars[AppBridgeSvcGattCharacteristicEvents].handle,
+        0,
+        frame_len,
+        frame);
+    if(result != BLE_STATUS_SUCCESS) {
+        FURI_LOG_E(TAG, "Failed updating App Bridge v2 event: %d", result);
     }
 
     return result == BLE_STATUS_SUCCESS;

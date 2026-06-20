@@ -3,10 +3,10 @@ App(
     name="Sub-GHz Bruteforcer",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="subbrute_app",
-    requires=["gui","dialogs"],
+    requires=["gui", "dialogs", "subghz_radio_broker"],
     stack_size=2 * 1024,
     order=11,
     fap_icon="icon.png",
-    fap_category="Sub-GHz",
+    fap_category="ARF Tools",
     fap_icon_assets="images",
 )

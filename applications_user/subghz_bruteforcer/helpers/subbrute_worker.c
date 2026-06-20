@@ -62,9 +62,6 @@ void subbrute_worker_free(SubBruteWorker* instance) {
 
     furi_thread_free(instance->thread);
 
-    subghz_devices_sleep(instance->radio_device);
-    subbrute_radio_device_loader_end(instance->radio_device);
-
     free(instance);
 }
 

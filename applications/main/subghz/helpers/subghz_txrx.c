@@ -10,24 +10,21 @@
 #define SUBGHZ_HOPPER_DWELL_TICKS    2U
 #define SUBGHZ_HOPPER_RELEASE_TICKS  4U
 #define SUBGHZ_HOPPER_MAX_HOLD_TICKS 30U
+#define SUBGHZ_PROTOCOL_PLUGIN_PATH  EXT_PATH("apps_data/subghz/plugins")
 
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
-    UNUSED(instance);
-    uint8_t attempts = 0;
-    while(!furi_hal_power_is_otg_enabled() && attempts++ < 5) {
-        furi_hal_power_enable_otg();
-        //CC1101 power-up time
-        furi_delay_ms(10);
-    }
+    subghz_radio_broker_external_power_on(instance->radio_broker, &instance->radio_lease);
 }
 
 static void subghz_txrx_radio_device_power_off(SubGhzTxRx* instance) {
-    UNUSED(instance);
-    if(furi_hal_power_is_otg_enabled()) furi_hal_power_disable_otg();
+    subghz_radio_broker_external_power_off(instance->radio_broker, &instance->radio_lease);
 }
 
 SubGhzTxRx* subghz_txrx_alloc(void) {
     SubGhzTxRx* instance = malloc(sizeof(SubGhzTxRx));
+    instance->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+    furi_check(subghz_radio_broker_acquire(
+        instance->radio_broker, "system_subghz", FuriWaitForever, &instance->radio_lease));
     instance->setting = subghz_setting_alloc();
     subghz_setting_load(instance->setting, EXT_PATH("subghz/assets/setting_user"));
 
@@ -54,8 +51,11 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
         instance->environment, SUBGHZ_ALUTECH_AT_4N_DIR_NAME);
     subghz_environment_set_nice_flor_s_rainbow_table_file_name(
         instance->environment, SUBGHZ_NICE_FLOR_S_DIR_NAME);
+    instance->protocol_pack_registry = subghz_protocol_pack_registry_alloc(
+        &subghz_protocol_registry, SUBGHZ_PROTOCOL_PLUGIN_PATH);
     subghz_environment_set_protocol_registry(
-        instance->environment, (void*)&subghz_protocol_registry);
+        instance->environment,
+        subghz_protocol_pack_registry_get(instance->protocol_pack_registry));
     instance->receiver = subghz_receiver_alloc_init(instance->environment);
 
     subghz_worker_set_overrun_callback(
@@ -82,9 +82,12 @@ void subghz_txrx_free(SubGhzTxRx* instance) {
     }
 
     subghz_devices_deinit();
+    subghz_radio_broker_release(instance->radio_broker, &instance->radio_lease);
+    furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
 
     subghz_worker_free(instance->worker);
     subghz_receiver_free(instance->receiver);
+    subghz_protocol_pack_registry_free(instance->protocol_pack_registry);
     subghz_environment_free(instance->environment);
     flipper_format_free(instance->fff_data);
     furi_string_free(instance->preset->name);
@@ -469,8 +472,7 @@ void subghz_txrx_hopper_update(
     }
 
     size_t frequency_count = subghz_setting_get_hopper_frequency_count(instance->setting);
-    size_t configured_preset_count =
-        subghz_setting_get_hopper_preset_count(instance->setting);
+    size_t configured_preset_count = subghz_setting_get_hopper_preset_count(instance->setting);
     size_t preset_count = configured_preset_count > 0 ?
                               configured_preset_count :
                               subghz_setting_get_preset_count(instance->setting);
@@ -485,14 +487,12 @@ void subghz_txrx_hopper_update(
         }
     }
     if(hop_frequency && (!hop_preset || preset_wrapped)) {
-        instance->hopper_idx_frequency =
-            (instance->hopper_idx_frequency + 1) % frequency_count;
+        instance->hopper_idx_frequency = (instance->hopper_idx_frequency + 1) % frequency_count;
     }
 
-    uint32_t frequency = hop_frequency ?
-                             subghz_setting_get_hopper_frequency(
-                                 instance->setting, instance->hopper_idx_frequency) :
-                             instance->preset->frequency;
+    uint32_t frequency = hop_frequency ? subghz_setting_get_hopper_frequency(
+                                             instance->setting, instance->hopper_idx_frequency) :
+                                         instance->preset->frequency;
 
     if(instance->txrx_state == SubGhzTxRxStateRx) {
         subghz_txrx_rx_end(instance);
@@ -700,6 +700,8 @@ SubGhzRadioDeviceType
         instance->radio_device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_EXT_NAME);
         subghz_devices_begin(instance->radio_device);
         instance->radio_device_type = SubGhzRadioDeviceTypeExternalCC1101;
+        subghz_radio_broker_set_selected_device(
+            instance->radio_broker, &instance->radio_lease, SubGhzRadioBrokerDeviceExternalCC1101);
     } else {
         subghz_txrx_radio_device_power_off(instance);
         if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
@@ -707,6 +709,8 @@ SubGhzRadioDeviceType
         }
         instance->radio_device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
         instance->radio_device_type = SubGhzRadioDeviceTypeInternal;
+        subghz_radio_broker_set_selected_device(
+            instance->radio_broker, &instance->radio_lease, SubGhzRadioBrokerDeviceInternal);
     }
 
     return instance->radio_device_type;

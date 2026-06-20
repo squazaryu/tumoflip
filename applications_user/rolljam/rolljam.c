@@ -130,6 +130,11 @@ static RollJamApp* rolljam_app_alloc(void) {
     app->gui = furi_record_open(RECORD_GUI);
     app->notification = furi_record_open(RECORD_NOTIFICATION);
     app->storage = furi_record_open(RECORD_STORAGE);
+    app->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+    furi_check(subghz_radio_broker_acquire(
+        app->radio_broker, "rolljam", FuriWaitForever, &app->radio_lease));
+    subghz_radio_broker_set_selected_device(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerDeviceDual);
 
     // Scene manager
     app->scene_manager = scene_manager_alloc(&rolljam_scene_handlers, app);
@@ -180,7 +185,7 @@ static RollJamApp* rolljam_app_alloc(void) {
 // ============================================================
 
 static void rolljam_app_free(RollJamApp* app) {
-    if(app->jamming_active) {
+    if(app->jam_thread) {
         rolljam_jammer_stop(app);
     }
     if(app->raw_capture_active) {
@@ -201,6 +206,9 @@ static void rolljam_app_free(RollJamApp* app) {
 
     scene_manager_free(app->scene_manager);
     view_dispatcher_free(app->view_dispatcher);
+
+    subghz_radio_broker_release(app->radio_broker, &app->radio_lease);
+    furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
 
     furi_record_close(RECORD_GUI);
     furi_record_close(RECORD_NOTIFICATION);

@@ -64,12 +64,13 @@ bool bt_app_bridge_send(
         .lock = api_lock_alloc_locked(),
         .type = BtMessageTypeAppBridgeSend,
         .result = &result,
-        .data.app_bridge = {
-            .app_id = app_id,
-            .command = command,
-            .payload = payload,
-            .payload_len = payload_len,
-        },
+        .data.app_bridge =
+            {
+                .app_id = app_id,
+                .command = command,
+                .payload = payload,
+                .payload_len = payload_len,
+            },
     };
     furi_check(
         furi_message_queue_put(bt->message_queue, &message, FuriWaitForever) == FuriStatusOk);
@@ -81,6 +82,56 @@ bool bt_app_bridge_send(
 bool bt_app_bridge_send_text(Bt* bt, const char* app_id, const char* command, const char* payload) {
     furi_check(payload);
     return bt_app_bridge_send(bt, app_id, command, (const uint8_t*)payload, strlen(payload));
+}
+
+bool bt_app_bridge_send_v2(
+    Bt* bt,
+    const char* app_id,
+    const char* command,
+    uint32_t request_id,
+    uint8_t flags,
+    uint8_t chunk_index,
+    uint8_t chunk_count,
+    const uint8_t* payload,
+    uint16_t payload_len) {
+    furi_check(bt);
+    furi_check(app_id);
+    furi_check(command);
+
+    bool result = false;
+    BtMessage message = {
+        .lock = api_lock_alloc_locked(),
+        .type = BtMessageTypeAppBridgeSendV2,
+        .result = &result,
+        .data.app_bridge_v2 =
+            {
+                .app_id = app_id,
+                .command = command,
+                .request_id = request_id,
+                .flags = flags,
+                .chunk_index = chunk_index,
+                .chunk_count = chunk_count,
+                .payload = payload,
+                .payload_len = payload_len,
+            },
+    };
+    furi_check(
+        furi_message_queue_put(bt->message_queue, &message, FuriWaitForever) == FuriStatusOk);
+    api_lock_wait_unlock_and_free(message.lock);
+
+    return result;
+}
+
+bool bt_app_bridge_send_text_v2(
+    Bt* bt,
+    const char* app_id,
+    const char* command,
+    uint32_t request_id,
+    uint8_t flags,
+    const char* payload) {
+    furi_check(payload);
+    return bt_app_bridge_send_v2(
+        bt, app_id, command, request_id, flags, 0, 1, (const uint8_t*)payload, strlen(payload));
 }
 
 FuriPubSub* bt_app_bridge_get_pubsub(Bt* bt) {

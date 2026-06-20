@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,87.12,,
+Version,+,87.14,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/services/applications.h,,
 Header,+,applications/services/bt/bt_service/bt.h,,
@@ -49,6 +49,7 @@ Header,+,applications/services/notification/notification_messages.h,,
 Header,+,applications/services/power/power_service/power.h,,
 Header,+,applications/services/rpc/rpc_app.h,,
 Header,+,applications/services/storage/storage.h,,
+Header,+,applications/services/subghz_radio_broker/subghz_radio_broker.h,,
 Header,+,lib/bit_lib/bit_lib.h,,
 Header,+,lib/ble_profile/extra_profiles/hid_profile.h,,
 Header,+,lib/ble_profile/extra_services/hid_service.h,,
@@ -236,6 +237,7 @@ Header,+,lib/subghz/blocks/math.h,,
 Header,+,lib/subghz/devices/cc1101_configs.h,,
 Header,+,lib/subghz/devices/cc1101_int/cc1101_int_interconnect.h,,
 Header,+,lib/subghz/environment.h,,
+Header,+,lib/subghz/protocols/plugin.h,,
 Header,+,lib/subghz/protocols/public_api.h,,
 Header,+,lib/subghz/protocols/raw.h,,
 Header,+,lib/subghz/receiver.h,,
@@ -789,11 +791,13 @@ Function,-,ble_profile_hid_mouse_release_all,_Bool,FuriHalBleProfileBase*
 Function,-,ble_profile_hid_mouse_scroll,_Bool,"FuriHalBleProfileBase*, int8_t"
 Function,-,ble_profile_serial_app_bridge_set_callback,void,"FuriHalBleProfileBase*, FuriHalBtAppBridgeCallback, void*"
 Function,-,ble_profile_serial_app_bridge_tx,_Bool,"FuriHalBleProfileBase*, const char*, const char*, const uint8_t*, uint16_t"
+Function,-,ble_profile_serial_app_bridge_tx_v2,_Bool,"FuriHalBleProfileBase*, const char*, const char*, uint32_t, uint8_t, uint8_t, uint8_t, const uint8_t*, uint16_t"
 Function,+,ble_profile_serial_notify_buffer_is_empty,void,FuriHalBleProfileBase*
 Function,+,ble_profile_serial_set_event_callback,void,"FuriHalBleProfileBase*, uint16_t, FuriHalBtSerialCallback, void*"
 Function,+,ble_profile_serial_set_rpc_active,void,"FuriHalBleProfileBase*, _Bool"
 Function,+,ble_profile_serial_tx,_Bool,"FuriHalBleProfileBase*, uint8_t*, uint16_t"
 Function,-,ble_svc_app_bridge_send,_Bool,"BleServiceAppBridge*, const char*, const char*, const uint8_t*, uint16_t"
+Function,-,ble_svc_app_bridge_send_v2,_Bool,"BleServiceAppBridge*, const char*, const char*, uint32_t, uint8_t, uint8_t, uint8_t, const uint8_t*, uint16_t"
 Function,-,ble_svc_app_bridge_set_callback,void,"BleServiceAppBridge*, AppBridgeServiceEventCallback, void*"
 Function,-,ble_svc_app_bridge_start,BleServiceAppBridge*,
 Function,-,ble_svc_app_bridge_stop,void,BleServiceAppBridge*
@@ -819,6 +823,8 @@ Function,-,bsearch,void*,"const void*, const void*, size_t, size_t, __compar_fn_
 Function,+,bt_app_bridge_get_pubsub,FuriPubSub*,Bt*
 Function,+,bt_app_bridge_send,_Bool,"Bt*, const char*, const char*, const uint8_t*, uint16_t"
 Function,+,bt_app_bridge_send_text,_Bool,"Bt*, const char*, const char*, const char*"
+Function,+,bt_app_bridge_send_text_v2,_Bool,"Bt*, const char*, const char*, uint32_t, uint8_t, const char*"
+Function,+,bt_app_bridge_send_v2,_Bool,"Bt*, const char*, const char*, uint32_t, uint8_t, uint8_t, uint8_t, const uint8_t*, uint16_t"
 Function,+,bt_disconnect,void,Bt*
 Function,+,bt_forget_bonded_devices,void,Bt*
 Function,+,bt_get_settings,void,"Bt*, BtSettings*"
@@ -3204,6 +3210,7 @@ Function,+,plugin_manager_get,const FlipperAppPluginDescriptor*,"PluginManager*,
 Function,+,plugin_manager_get_count,uint32_t,PluginManager*
 Function,+,plugin_manager_get_ep,const void*,"PluginManager*, uint32_t"
 Function,+,plugin_manager_load_all,PluginManagerError,"PluginManager*, const char*"
+Function,+,plugin_manager_load_all_with_prefix,PluginManagerError,"PluginManager*, const char*, const char*"
 Function,+,plugin_manager_load_single,PluginManagerError,"PluginManager*, const char*"
 Function,-,popen,FILE*,"const char*, const char*"
 Function,+,popup_alloc,Popup*,
@@ -3653,7 +3660,9 @@ Function,+,subghz_custom_btn_has_pages,_Bool,
 Function,+,subghz_custom_btn_is_allowed,_Bool,
 Function,+,subghz_custom_btn_set,_Bool,uint8_t
 Function,+,subghz_custom_btn_set_long,void,_Bool
+Function,+,subghz_custom_btn_set_max,void,uint8_t
 Function,+,subghz_custom_btn_set_max_pages,void,uint8_t
+Function,+,subghz_custom_btn_set_original,void,uint8_t
 Function,+,subghz_custom_btn_set_page,void,uint8_t
 Function,+,subghz_custom_btn_set_pages,void,_Bool
 Function,+,subghz_custom_btns_reset,void,
@@ -3786,6 +3795,12 @@ Function,+,subghz_protocol_secplus_v1_check_fixed,_Bool,uint32_t
 Function,+,subghz_protocol_secplus_v2_create_data,_Bool,"void*, FlipperFormat*, uint32_t, uint8_t, uint32_t, SubGhzRadioPreset*"
 Function,+,subghz_protocol_somfy_keytis_create_data,_Bool,"void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, SubGhzRadioPreset*"
 Function,+,subghz_protocol_somfy_telis_create_data,_Bool,"void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, SubGhzRadioPreset*"
+Function,+,subghz_radio_broker_acquire,_Bool,"SubGhzRadioBroker*, const char*, uint32_t, SubGhzRadioBrokerLease*"
+Function,+,subghz_radio_broker_external_power_off,void,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*"
+Function,+,subghz_radio_broker_external_power_on,_Bool,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*"
+Function,+,subghz_radio_broker_get_status,void,"SubGhzRadioBroker*, SubGhzRadioBrokerStatus*"
+Function,+,subghz_radio_broker_release,void,"SubGhzRadioBroker*, SubGhzRadioBrokerLease*"
+Function,+,subghz_radio_broker_set_selected_device,_Bool,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*, SubGhzRadioBrokerDevice"
 Function,+,subghz_receiver_alloc_init,SubGhzReceiver*,SubGhzEnvironment*
 Function,+,subghz_receiver_decode,void,"SubGhzReceiver*, _Bool, uint32_t"
 Function,+,subghz_receiver_free,void,SubGhzReceiver*

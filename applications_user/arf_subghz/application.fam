@@ -5,7 +5,7 @@ App(
     entry_point="arf_subghz_main",
     requires=["gui", "dialogs", "storage"],
     stack_size=4 * 1024,
-    fap_category="Sub-GHz",
+    fap_category="ARF Tools",
     fap_version="0.2.0",
     fap_description="Isolated ARF Sub-GHz workspace for saved signals and Keeloq keys.",
 )

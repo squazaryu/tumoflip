@@ -248,6 +248,11 @@ vars.AddVariables(
             ("applications_user", False),
         ],
     ),
+    (
+        "EXCLUDED_EXT_APPS",
+        "External app IDs excluded from firmware distribution builds",
+        (),
+    ),
     BoolVariable(
         "PVSNOBROWSER",
         help="Don't open browser after generating error repots",

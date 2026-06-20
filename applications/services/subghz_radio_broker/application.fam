@@ -1,0 +1,9 @@
+App(
+    appid="subghz_radio_broker",
+    name="Sub-GHz Radio Broker",
+    apptype=FlipperAppType.SERVICE,
+    entry_point="subghz_radio_broker_srv",
+    stack_size=1 * 1024,
+    order=25,
+    sdk_headers=["subghz_radio_broker.h"],
+)

@@ -5,6 +5,8 @@
 !ai_dashboard/**
 !flipper_relay/
 !flipper_relay/**
+!flipper_companion/
+!flipper_companion/**
 !flipper_xremote/
 !flipper_xremote/**
 !arf_tools/
@@ -17,6 +19,8 @@
 !rolljam/**
 !subghz_bruteforcer/
 !subghz_bruteforcer/**
+!subghz_protocols/
+!subghz_protocols/**
 !quac/
 !quac/**
 !totp/

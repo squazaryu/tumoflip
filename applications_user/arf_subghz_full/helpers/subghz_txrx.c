@@ -11,22 +11,18 @@
 #define TAG "SubGhzTxRx"
 
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
-    UNUSED(instance);
-    uint8_t attempts = 0;
-    while(!furi_hal_power_is_otg_enabled() && attempts++ < 5) {
-        furi_hal_power_enable_otg();
-        //CC1101 power-up time
-        furi_delay_ms(10);
-    }
+    subghz_radio_broker_external_power_on(instance->radio_broker, &instance->radio_lease);
 }
 
 static void subghz_txrx_radio_device_power_off(SubGhzTxRx* instance) {
-    UNUSED(instance);
-    if(furi_hal_power_is_otg_enabled()) furi_hal_power_disable_otg();
+    subghz_radio_broker_external_power_off(instance->radio_broker, &instance->radio_lease);
 }
 
 SubGhzTxRx* subghz_txrx_alloc(void) {
     SubGhzTxRx* instance = malloc(sizeof(SubGhzTxRx));
+    instance->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+    furi_check(subghz_radio_broker_acquire(
+        instance->radio_broker, "arf_subghz", FuriWaitForever, &instance->radio_lease));
     instance->setting = subghz_setting_alloc();
     subghz_setting_load(instance->setting, EXT_PATH("subghz/assets/setting_user"));
 
@@ -82,6 +78,8 @@ void subghz_txrx_free(SubGhzTxRx* instance) {
     }
 
     subghz_devices_deinit();
+    subghz_radio_broker_release(instance->radio_broker, &instance->radio_lease);
+    furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
 
     subghz_worker_free(instance->worker);
     subghz_receiver_free(instance->receiver);
@@ -864,6 +862,8 @@ SubGhzRadioDeviceType
         instance->radio_device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_EXT_NAME);
         subghz_devices_begin(instance->radio_device);
         instance->radio_device_type = SubGhzRadioDeviceTypeExternalCC1101;
+        subghz_radio_broker_set_selected_device(
+            instance->radio_broker, &instance->radio_lease, SubGhzRadioBrokerDeviceExternalCC1101);
     } else {
         subghz_txrx_radio_device_power_off(instance);
         if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
@@ -871,6 +871,8 @@ SubGhzRadioDeviceType
         }
         instance->radio_device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
         instance->radio_device_type = SubGhzRadioDeviceTypeInternal;
+        subghz_radio_broker_set_selected_device(
+            instance->radio_broker, &instance->radio_lease, SubGhzRadioBrokerDeviceInternal);
     }
 
     return instance->radio_device_type;

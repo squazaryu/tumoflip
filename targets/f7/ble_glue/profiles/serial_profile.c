@@ -142,6 +142,31 @@ bool ble_profile_serial_app_bridge_tx(
         serial_profile->app_bridge_svc, app_id, command, payload, payload_len);
 }
 
+bool ble_profile_serial_app_bridge_tx_v2(
+    FuriHalBleProfileBase* profile,
+    const char* app_id,
+    const char* command,
+    uint32_t request_id,
+    uint8_t flags,
+    uint8_t chunk_index,
+    uint8_t chunk_count,
+    const uint8_t* payload,
+    uint16_t payload_len) {
+    furi_check(profile && (profile->config == ble_profile_serial));
+
+    BleProfileSerial* serial_profile = (BleProfileSerial*)profile;
+    return ble_svc_app_bridge_send_v2(
+        serial_profile->app_bridge_svc,
+        app_id,
+        command,
+        request_id,
+        flags,
+        chunk_index,
+        chunk_count,
+        payload,
+        payload_len);
+}
+
 void ble_profile_serial_app_bridge_set_callback(
     FuriHalBleProfileBase* profile,
     FuriHalBtAppBridgeCallback callback,

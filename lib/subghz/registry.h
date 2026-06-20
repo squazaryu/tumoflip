@@ -13,7 +13,7 @@ typedef struct SubGhzProtocol SubGhzProtocol;
 
 struct SubGhzProtocolRegistry {
     const SubGhzProtocol* const* items;
-    const size_t size;
+    size_t size;
 };
 
 /**

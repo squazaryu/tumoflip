@@ -1,0 +1,9 @@
+App(
+    appid="tumoflip_runtime",
+    name="Tumoflip Runtime",
+    apptype=FlipperAppType.SERVICE,
+    entry_point="tumoflip_runtime_srv",
+    requires=["bt", "subghz_radio_broker"],
+    stack_size=2 * 1024,
+    order=30,
+)

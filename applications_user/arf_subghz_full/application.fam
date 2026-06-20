@@ -36,12 +36,13 @@ App(
     requires=[
         "gui",
         "dialogs",
+        "subghz_radio_broker",
     ],
     icon="A_Sub1ghz_14",
     stack_size=3 * 1024,
     fap_libs=["assets", "hwdrivers"],
     fap_icon="icon.png",
-    fap_category="Sub-GHz",
+    fap_category="ARF Tools",
 )
 
 App(
@@ -72,12 +73,13 @@ App(
     requires=[
         "gui",
         "dialogs",
+        "subghz_radio_broker",
     ],
     icon="A_Sub1ghz_14",
     stack_size=4 * 1024,
     fap_libs=["assets", "hwdrivers"],
     fap_icon="icon.png",
-    fap_category="Sub-GHz",
+    fap_category="ARF Tools",
 )
 
 App(
@@ -103,12 +105,13 @@ App(
     requires=[
         "gui",
         "dialogs",
+        "subghz_radio_broker",
     ],
     icon="A_Sub1ghz_14",
     stack_size=3 * 1024,
     fap_libs=["assets", "hwdrivers"],
     fap_icon="icon.png",
-    fap_category="Sub-GHz",
+    fap_category="ARF Tools",
 )
 
 App(
@@ -135,12 +138,13 @@ App(
     requires=[
         "gui",
         "dialogs",
+        "subghz_radio_broker",
     ],
     icon="A_Sub1ghz_14",
     stack_size=3 * 1024,
     fap_libs=["assets", "hwdrivers"],
     fap_icon="icon.png",
-    fap_category="Sub-GHz",
+    fap_category="ARF Tools",
 )
 
 App(
@@ -167,12 +171,13 @@ App(
     requires=[
         "gui",
         "dialogs",
+        "subghz_radio_broker",
     ],
     icon="A_Sub1ghz_14",
     stack_size=3 * 1024,
     fap_libs=["assets", "hwdrivers"],
     fap_icon="icon.png",
-    fap_category="Sub-GHz",
+    fap_category="ARF Tools",
 )
 
 App(
@@ -199,10 +204,11 @@ App(
     requires=[
         "gui",
         "dialogs",
+        "subghz_radio_broker",
     ],
     icon="A_Sub1ghz_14",
     stack_size=4 * 1024,
     fap_libs=["assets", "hwdrivers"],
     fap_icon="icon.png",
-    fap_category="Sub-GHz",
+    fap_category="ARF Tools",
 )

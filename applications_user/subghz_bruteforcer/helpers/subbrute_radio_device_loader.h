@@ -1,6 +1,7 @@
 #pragma once
 
 #include <lib/subghz/devices/devices.h>
+#include <subghz_radio_broker/subghz_radio_broker.h>
 
 /**
  * @file subghz_radio.h
@@ -30,7 +31,9 @@ typedef enum {
  */
 const SubGhzDevice* subbrute_radio_device_loader_set(
     const SubGhzDevice* current_radio_device,
-    SubGhzRadioDeviceType radio_device_type);
+    SubGhzRadioDeviceType radio_device_type,
+    SubGhzRadioBroker* broker,
+    const SubGhzRadioBrokerLease* lease);
 
 /**
  * @brief Unloads the radio device in the subbrute radio device loader.
@@ -45,4 +48,7 @@ const SubGhzDevice* subbrute_radio_device_loader_set(
  * @param[in] radio_device A pointer to the radio device to unload.
  *
  */
-void subbrute_radio_device_loader_end(const SubGhzDevice* radio_device);
+void subbrute_radio_device_loader_end(
+    const SubGhzDevice* radio_device,
+    SubGhzRadioBroker* broker,
+    const SubGhzRadioBrokerLease* lease);

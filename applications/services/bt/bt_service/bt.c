@@ -192,10 +192,8 @@ Bt* bt_alloc(void) {
     return bt;
 }
 
-static bool bt_app_bridge_decode_frame(
-    BtAppBridgeEvent* decoded,
-    const uint8_t* buffer,
-    uint16_t size) {
+static bool
+    bt_app_bridge_decode_frame(BtAppBridgeEvent* decoded, const uint8_t* buffer, uint16_t size) {
     furi_check(decoded);
     furi_check(buffer);
 
@@ -209,8 +207,7 @@ static bool bt_app_bridge_decode_frame(
     const uint8_t app_id_len = buffer[4];
     const uint8_t command_len = buffer[5];
     const uint16_t payload_len = buffer[6] | (buffer[7] << 8);
-    if((app_id_len == 0) || (command_len == 0) ||
-       (app_id_len > BT_APP_BRIDGE_APP_ID_LEN_MAX) ||
+    if((app_id_len == 0) || (command_len == 0) || (app_id_len > BT_APP_BRIDGE_APP_ID_LEN_MAX) ||
        (command_len > BT_APP_BRIDGE_COMMAND_LEN_MAX) ||
        (payload_len > BT_APP_BRIDGE_PAYLOAD_LEN_MAX)) {
         return false;
@@ -224,14 +221,59 @@ static bool bt_app_bridge_decode_frame(
 
     memset(decoded, 0, sizeof(BtAppBridgeEvent));
     memcpy(decoded->app_id, &buffer[BLE_SVC_APP_BRIDGE_HEADER_LEN], app_id_len);
-    memcpy(
-        decoded->command,
-        &buffer[BLE_SVC_APP_BRIDGE_HEADER_LEN + app_id_len],
-        command_len);
+    memcpy(decoded->command, &buffer[BLE_SVC_APP_BRIDGE_HEADER_LEN + app_id_len], command_len);
     if(payload_len) {
         memcpy(
             decoded->payload,
             &buffer[BLE_SVC_APP_BRIDGE_HEADER_LEN + app_id_len + command_len],
+            payload_len);
+    }
+    decoded->payload_len = payload_len;
+    decoded->protocol_version = 1;
+    decoded->chunk_count = 1;
+    return true;
+}
+
+static bool
+    bt_app_bridge_decode_frame_v2(BtAppBridgeEvent* decoded, const uint8_t* buffer, uint16_t size) {
+    furi_check(decoded);
+    furi_check(buffer);
+
+    if(size < BLE_SVC_APP_BRIDGE_V2_HEADER_LEN) return false;
+    if((buffer[0] != 'F') || (buffer[1] != 'A') || (buffer[2] != 'B') || (buffer[3] != '2')) {
+        return false;
+    }
+
+    const uint8_t app_id_len = buffer[5];
+    const uint8_t command_len = buffer[6];
+    const uint8_t chunk_index = buffer[7];
+    const uint8_t chunk_count = buffer[8];
+    const uint16_t payload_len = buffer[10] | (buffer[11] << 8);
+    if((app_id_len == 0) || (command_len == 0) || (app_id_len > BT_APP_BRIDGE_APP_ID_LEN_MAX) ||
+       (command_len > BT_APP_BRIDGE_COMMAND_LEN_MAX) ||
+       (payload_len > BT_APP_BRIDGE_V2_PAYLOAD_LEN_MAX) || (chunk_count == 0) ||
+       (chunk_index >= chunk_count) || (buffer[9] != 0) ||
+       (buffer[4] & ~BT_APP_BRIDGE_FLAGS_MASK)) {
+        return false;
+    }
+
+    const uint16_t expected_len =
+        BLE_SVC_APP_BRIDGE_V2_HEADER_LEN + app_id_len + command_len + payload_len;
+    if(size != expected_len) return false;
+
+    memset(decoded, 0, sizeof(BtAppBridgeEvent));
+    decoded->protocol_version = 2;
+    decoded->flags = buffer[4];
+    decoded->chunk_index = chunk_index;
+    decoded->chunk_count = chunk_count;
+    decoded->request_id = (uint32_t)buffer[12] | ((uint32_t)buffer[13] << 8) |
+                          ((uint32_t)buffer[14] << 16) | ((uint32_t)buffer[15] << 24);
+    memcpy(decoded->app_id, &buffer[BLE_SVC_APP_BRIDGE_V2_HEADER_LEN], app_id_len);
+    memcpy(decoded->command, &buffer[BLE_SVC_APP_BRIDGE_V2_HEADER_LEN + app_id_len], command_len);
+    if(payload_len) {
+        memcpy(
+            decoded->payload,
+            &buffer[BLE_SVC_APP_BRIDGE_V2_HEADER_LEN + app_id_len + command_len],
             payload_len);
     }
     decoded->payload_len = payload_len;
@@ -245,7 +287,11 @@ static void bt_app_bridge_event_callback(AppBridgeServiceEvent event, void* cont
 
     if(event.event == AppBridgeServiceEventTypeCommandReceived) {
         BtAppBridgeEvent decoded;
-        if(bt_app_bridge_decode_frame(&decoded, event.data.buffer, event.data.size)) {
+        const bool is_v2 = (event.data.size >= 4) && (memcmp(event.data.buffer, "FAB2", 4) == 0);
+        const bool decoded_ok =
+            is_v2 ? bt_app_bridge_decode_frame_v2(&decoded, event.data.buffer, event.data.size) :
+                    bt_app_bridge_decode_frame(&decoded, event.data.buffer, event.data.size);
+        if(decoded_ok) {
             furi_pubsub_publish(bt->app_bridge_pubsub, &decoded);
         } else {
             FURI_LOG_W(TAG, "Invalid app bridge command frame");
@@ -617,6 +663,31 @@ static void bt_handle_app_bridge_send(Bt* bt, BtMessage* message) {
     }
 }
 
+static void bt_handle_app_bridge_send_v2(Bt* bt, BtMessage* message) {
+    furi_assert(bt);
+    furi_assert(message);
+
+    bool success = false;
+    if(!bt->bt_settings.app_bridge_enabled) {
+        FURI_LOG_W(TAG, "App bridge is disabled");
+    } else if(furi_hal_bt_check_profile_type(bt->current_profile, ble_profile_serial)) {
+        success = ble_profile_serial_app_bridge_tx_v2(
+            bt->current_profile,
+            message->data.app_bridge_v2.app_id,
+            message->data.app_bridge_v2.command,
+            message->data.app_bridge_v2.request_id,
+            message->data.app_bridge_v2.flags,
+            message->data.app_bridge_v2.chunk_index,
+            message->data.app_bridge_v2.chunk_count,
+            message->data.app_bridge_v2.payload,
+            message->data.app_bridge_v2.payload_len);
+    } else {
+        FURI_LOG_W(TAG, "App bridge unavailable for active BLE profile");
+    }
+
+    if(message->result) *message->result = success;
+}
+
 static void bt_init_keys_settings(Bt* bt) {
     Storage* storage = furi_record_open(RECORD_STORAGE);
     furi_pubsub_subscribe(storage_get_pubsub(storage), bt_storage_callback, bt);
@@ -700,6 +771,8 @@ int32_t bt_srv(void* p) {
             bt_handle_reload_keys_settings(bt);
         } else if(message.type == BtMessageTypeAppBridgeSend) {
             bt_handle_app_bridge_send(bt, &message);
+        } else if(message.type == BtMessageTypeAppBridgeSendV2) {
+            bt_handle_app_bridge_send_v2(bt, &message);
         }
 
         if(message.lock) api_lock_unlock(message.lock);

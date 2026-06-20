@@ -21,6 +21,10 @@ uint8_t subghz_custom_btn_get(void);
 
 uint8_t subghz_custom_btn_get_original(void);
 
+/** Configure the original protocol button and the number of selectable buttons. */
+void subghz_custom_btn_set_original(uint8_t btn_code);
+void subghz_custom_btn_set_max(uint8_t max_button);
+
 void subghz_custom_btns_reset(void);
 
 bool subghz_custom_btn_is_allowed(void);

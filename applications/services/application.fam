@@ -8,6 +8,8 @@ App(
         "rpc_start",
         "expansion_start",
         "bt",
+        "subghz_radio_broker",
+        "tumoflip_runtime",
         "desktop",
         "loader",
         "power",

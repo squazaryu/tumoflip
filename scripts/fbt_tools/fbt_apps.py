@@ -144,6 +144,7 @@ def PrepareApplicationsBuild(env):
         appbuild = env["APPBUILD"] = env["APPMGR"].filter_apps(
             applist=env["APPS"],
             ext_applist=env["EXTRA_EXT_APPS"],
+            excluded_ext_applist=env["EXCLUDED_EXT_APPS"],
             hw_target=env.subst("f${TARGET_HW}"),
         )
     except Exception as e:

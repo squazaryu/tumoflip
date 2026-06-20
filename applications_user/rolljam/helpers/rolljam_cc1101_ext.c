@@ -2,34 +2,23 @@
 #include <furi_hal_gpio.h>
 #include <furi_hal_resources.h>
 #include <furi_hal_cortex.h>
-#include <furi_hal_power.h>
 
 // ============================================================
 // 5V OTG power
 // ============================================================
 
-static bool otg_was_enabled   = false;
 static bool use_flux_capacitor = false;
 
 void rolljam_ext_set_flux_capacitor(bool enabled) {
     use_flux_capacitor = enabled;
 }
 
-static void rolljam_ext_power_on(void) {
-    otg_was_enabled = furi_hal_power_is_otg_enabled();
-    if(!otg_was_enabled) {
-        uint8_t attempts = 0;
-        while(!furi_hal_power_is_otg_enabled() && attempts++ < 5) {
-            furi_hal_power_enable_otg();
-            furi_delay_ms(10);
-        }
-    }
+static void rolljam_ext_power_on(RollJamApp* app) {
+    subghz_radio_broker_external_power_on(app->radio_broker, &app->radio_lease);
 }
 
-static void rolljam_ext_power_off(void) {
-    if(!otg_was_enabled) {
-        furi_hal_power_disable_otg();
-    }
+static void rolljam_ext_power_off(RollJamApp* app) {
+    subghz_radio_broker_external_power_off(app->radio_broker, &app->radio_lease);
 }
 
 static const GpioPin* pin_mosi = &gpio_ext_pa7;
@@ -494,7 +483,7 @@ void rolljam_jammer_start(RollJamApp* app) {
     app->jam_thread_running = true;
     app->jamming_active     = true;
 
-    rolljam_ext_power_on();
+    rolljam_ext_power_on(app);
     furi_delay_ms(50);
 
     rolljam_ext_gpio_init();
@@ -506,7 +495,7 @@ void rolljam_jammer_start(RollJamApp* app) {
 }
 
 void rolljam_jammer_stop(RollJamApp* app) {
-    if(!app->jamming_active) return;
+    if(!app->jam_thread) return;
 
     app->jam_thread_running = false;
     furi_thread_join(app->jam_thread);
@@ -514,7 +503,7 @@ void rolljam_jammer_stop(RollJamApp* app) {
     app->jam_thread = NULL;
 
     rolljam_ext_gpio_deinit();
-    rolljam_ext_power_off();
+    rolljam_ext_power_off(app);
     app->jamming_active = false;
 
     FURI_LOG_I(TAG, ">>> JAMMER STOPPED <<<");

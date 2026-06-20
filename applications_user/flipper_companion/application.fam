@@ -1,0 +1,12 @@
+App(
+    appid="flipper_companion",
+    name="Flipper Companion",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="flipper_companion_app",
+    stack_size=4 * 1024,
+    fap_category="Bluetooth",
+    fap_version="0.1",
+    fap_icon="images/companion_10px.png",
+    fap_description="Receives BLE App Bridge commands (Sub-GHz TX, pager) from the UnleashedCompanion iOS app",
+    fap_author="tumoflip",
+)

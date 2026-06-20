@@ -231,6 +231,7 @@ class AppManager:
         *,
         applist: List[str],
         ext_applist: List[str],
+        excluded_ext_applist: List[str],
         hw_target: str,
     ):
         return AppBuildset(
@@ -238,6 +239,7 @@ class AppManager:
             hw_target=hw_target,
             appnames=applist,
             extra_ext_appnames=ext_applist,
+            excluded_ext_appnames=excluded_ext_applist,
         )
 
 
@@ -281,12 +283,14 @@ class AppBuildset:
         appnames: List[str],
         *,
         extra_ext_appnames: List[str],
+        excluded_ext_appnames: List[str],
         message_writer: Callable | None = None,
     ):
         self.appmgr = appmgr
         self.appnames = set(appnames)
         self.incompatible_extapps, self.extapps = [], []
         self._extra_ext_appnames = extra_ext_appnames
+        self._excluded_ext_appnames = set(excluded_ext_appnames)
         self._orig_appnames = appnames
         self.hw_target = hw_target
         self._writer = message_writer if message_writer else self.print_writer
@@ -347,6 +351,8 @@ class AppBuildset:
         extapps.extend(map(self.appmgr.get, self._extra_ext_appnames))
 
         for app in extapps:
+            if app.appid in self._excluded_ext_appnames:
+                continue
             (
                 self.extapps
                 if app.supports_hardware_target(self.hw_target)

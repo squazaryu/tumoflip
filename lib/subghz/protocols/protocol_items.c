@@ -32,11 +32,9 @@ const SubGhzProtocol* const subghz_protocol_registry_items[] = {
     &subghz_protocol_nord_ice,      &subghz_protocol_allstar_firefly,
     &subghz_protocol_telcoma_edge,
 
-    /* ARF protocols kept under the safe updater size limit. */
-    &subghz_protocol_vag,           &subghz_protocol_fiat_spa,
-    &subghz_protocol_kia_v0,        &subghz_protocol_kia_v1,
-    &subghz_protocol_kia_v2,
-    &subghz_protocol_suzuki,        &subghz_protocol_mitsubishi_v0,
+    /* ARF protocols without an external ProtoPirate replacement. */
+    &subghz_protocol_fiat_spa,
+    &subghz_protocol_suzuki,
     &subghz_protocol_toyota,
 };
 
