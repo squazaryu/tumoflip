@@ -1,7 +1,16 @@
+<div align="center">
+
 # tumoflip
 
-Custom Flipper Zero firmware based on
-[DarkFlippers/unleashed-firmware](https://github.com/DarkFlippers/unleashed-firmware).
+**Custom Flipper Zero firmware** based on [DarkFlippers/unleashed-firmware](https://github.com/DarkFlippers/unleashed-firmware).
+
+![base](https://img.shields.io/badge/base-Unleashed-black)
+![target](https://img.shields.io/badge/target-Flipper%20Zero%20(f7)-orange)
+![license](https://img.shields.io/badge/license-GPLv3-blue)
+
+📱 **Companion app:** [squazaryu/unleashed-companion](https://github.com/squazaryu/unleashed-companion) — native iOS (Feather / AltStore)
+
+</div>
 
 This repository keeps the Unleashed firmware history and adds a small set of
 personal firmware changes on top of it. It is not an official Unleashed release
