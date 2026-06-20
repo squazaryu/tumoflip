@@ -8,6 +8,7 @@ from pathlib import Path
 
 try:
     from .validate_release import (
+        PROTOCOL_PACKS,
         crc32,
         little_endian_hex,
         manifest_release_id,
@@ -15,6 +16,7 @@ try:
     )
 except ImportError:
     from validate_release import (
+        PROTOCOL_PACKS,
         crc32,
         little_endian_hex,
         manifest_release_id,
@@ -23,6 +25,12 @@ except ImportError:
 
 
 class ValidateReleaseTest(unittest.TestCase):
+    def test_protocol_pack_inventory_covers_active_arf_registry(self) -> None:
+        self.assertEqual(len(PROTOCOL_PACKS), 24)
+        self.assertIn("protocol_ford_v3.fal", PROTOCOL_PACKS)
+        self.assertIn("protocol_kia_v7.fal", PROTOCOL_PACKS)
+        self.assertIn("protocol_star_line.fal", PROTOCOL_PACKS)
+
     def test_parse_fuf(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "update.fuf"

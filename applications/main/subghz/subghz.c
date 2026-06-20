@@ -116,7 +116,9 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
 #if SUBGHZ_MEASURE_LOADING
     uint32_t load_ticks = furi_get_tick();
 #endif
-    subghz->txrx = subghz_txrx_alloc();
+    subghz->last_settings = subghz_last_settings_alloc();
+    subghz_last_settings_load(subghz->last_settings, 0);
+    subghz->txrx = subghz_txrx_alloc(subghz->last_settings->protocol_pack_group);
 
     if(!alloc_for_tx_only) {
         // SubMenu
@@ -196,11 +198,6 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
     //SubGhzSetting* setting = subghz_txrx_get_setting(subghz->txrx);
 
     //subghz_load_custom_presets(setting);
-
-    // Load last used values for Read, Read RAW, etc. or default
-    subghz->last_settings = subghz_last_settings_alloc();
-    //size_t preset_count = subghz_setting_get_preset_count(setting);
-    subghz_last_settings_load(subghz->last_settings, 0);
 
     // Set LED and Amp GPIO control state
     furi_hal_subghz_set_ext_leds_and_amp(subghz->last_settings->leds_and_amp);

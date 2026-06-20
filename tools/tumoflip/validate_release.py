@@ -17,10 +17,29 @@ FLASH_BASE = 0x08000000
 UPDATER_LIMIT = 128 * 1024
 DEFAULT_MIN_C2_GAP = 2 * 4096
 PROTOCOL_PACKS = {
+    "protocol_chrysler.fal",
+    "protocol_fiat_marelli.fal",
+    "protocol_ford_v0.fal",
+    "protocol_ford_v1.fal",
+    "protocol_ford_v2.fal",
+    "protocol_ford_v3.fal",
     "protocol_kia_v0.fal",
     "protocol_kia_v1.fal",
     "protocol_kia_v2.fal",
+    "protocol_kia_v3_v4.fal",
+    "protocol_kia_v5.fal",
+    "protocol_kia_v6.fal",
+    "protocol_kia_v7.fal",
+    "protocol_land_rover_v0.fal",
+    "protocol_mazda_siemens.fal",
+    "protocol_mazda_v0.fal",
     "protocol_mitsubishi_v0.fal",
+    "protocol_porsche_cayenne.fal",
+    "protocol_psa.fal",
+    "protocol_scher_khan.fal",
+    "protocol_sheriff_cfm.fal",
+    "protocol_star_line.fal",
+    "protocol_subaru.fal",
     "protocol_vag.fal",
 }
 ARF_APP_IDS = {

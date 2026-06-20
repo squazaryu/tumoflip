@@ -49,3 +49,197 @@ App(
         "../../lib/subghz/protocols/mitsubishi_v0.c",
     ],
 )
+
+App(
+    appid="protocol_porsche_cayenne",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_porsche_cayenne_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "porsche_cayenne_plugin.c",
+        "../../lib/subghz/protocols/porsche_cayenne.c",
+    ],
+)
+
+App(
+    appid="protocol_ford_v0",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_ford_v0_plugin_ep",
+    requires=["subghz"],
+    sources=["ford_v0_plugin.c", "../../lib/subghz/protocols/ford_v0.c"],
+)
+
+App(
+    appid="protocol_ford_v1",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_ford_v1_plugin_ep",
+    requires=["subghz"],
+    sources=["ford_v1_plugin.c", "../../lib/subghz/protocols/ford_v1.c"],
+)
+
+App(
+    appid="protocol_ford_v2",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_ford_v2_plugin_ep",
+    requires=["subghz"],
+    sources=["ford_v2_plugin.c", "../../lib/subghz/protocols/ford_v2.c"],
+)
+
+App(
+    appid="protocol_ford_v3",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_ford_v3_plugin_ep",
+    requires=["subghz"],
+    sources=["ford_v3_plugin.c", "../../lib/subghz/protocols/ford_v3.c"],
+)
+
+App(
+    appid="protocol_psa",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_psa_plugin_ep",
+    requires=["subghz"],
+    sources=["psa_plugin.c", "../../lib/subghz/protocols/psa.c"],
+)
+
+App(
+    appid="protocol_fiat_marelli",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_fiat_marelli_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "fiat_marelli_plugin.c",
+        "../../lib/subghz/protocols/fiat_marelli.c",
+    ],
+)
+
+App(
+    appid="protocol_subaru",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_subaru_plugin_ep",
+    requires=["subghz"],
+    sources=["subaru_plugin.c", "../../lib/subghz/protocols/subaru.c"],
+)
+
+App(
+    appid="protocol_mazda_siemens",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_mazda_siemens_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "mazda_siemens_plugin.c",
+        "../../lib/subghz/protocols/mazda_siemens.c",
+    ],
+)
+
+App(
+    appid="protocol_mazda_v0",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_mazda_v0_plugin_ep",
+    requires=["subghz"],
+    sources=["mazda_v0_plugin.c", "../../lib/subghz/protocols/mazda_v0.c"],
+)
+
+App(
+    appid="protocol_kia_v3_v4",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_kia_v3_v4_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "kia_v3_v4_plugin.c",
+        "../../lib/subghz/protocols/kia_v3_v4.c",
+    ],
+)
+
+App(
+    appid="protocol_kia_v5",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_kia_v5_plugin_ep",
+    requires=["subghz"],
+    sources=["kia_v5_plugin.c", "../../lib/subghz/protocols/kia_v5.c"],
+)
+
+App(
+    appid="protocol_kia_v6",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_kia_v6_plugin_ep",
+    requires=["subghz"],
+    sources=["kia_v6_plugin.c", "../../lib/subghz/protocols/kia_v6.c"],
+)
+
+App(
+    appid="protocol_kia_v7",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_kia_v7_plugin_ep",
+    requires=["subghz"],
+    sources=["kia_v7_plugin.c", "../../lib/subghz/protocols/kia_v7.c"],
+)
+
+App(
+    appid="protocol_star_line",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_star_line_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "star_line_plugin.c",
+        "../../lib/subghz/protocols/star_line.c",
+        "star_line_keeloq_common.c",
+    ],
+)
+
+App(
+    appid="protocol_scher_khan",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_scher_khan_plugin_ep",
+    requires=["subghz"],
+    sources=["scher_khan_plugin.c", "../../lib/subghz/protocols/scher_khan.c"],
+)
+
+App(
+    appid="protocol_sheriff_cfm",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_sheriff_cfm_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "sheriff_cfm_plugin.c",
+        "../../lib/subghz/protocols/sheriff_cfm.c",
+        "sheriff_cfm_keeloq_common.c",
+    ],
+)
+
+App(
+    appid="protocol_chrysler",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_chrysler_plugin_ep",
+    requires=["subghz"],
+    sources=["chrysler_plugin.c", "../../lib/subghz/protocols/chrysler.c"],
+)
+
+App(
+    appid="protocol_land_rover_v0",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_land_rover_v0_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "land_rover_v0_plugin.c",
+        "../../lib/subghz/protocols/land_rover_v0.c",
+    ],
+)

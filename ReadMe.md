@@ -32,7 +32,7 @@ tmwhflpprarf089-019
 - `tmwhflpprarf`: tumoflip firmware name shown as the installed firmware
   version prefix for the ARF-enabled build line.
 - `089`: upstream Unleashed base version.
-- `018`: tumoflip internal build version.
+- `019`: tumoflip internal build version.
 
 When the Unleashed base version or tumoflip internal version changes, update
 the firmware version suffix in `fbt_options.py`, release notes, README, and the
@@ -118,9 +118,9 @@ ARF protocols currently enabled in the system Sub-GHz registry:
 - `Suzuki`
 - `Toyota`
 
-`VAG`, `Kia v0/v1/v2`, and `Mitsubishi` are no longer linked into the core
-registry. They are built from the canonical sources in `lib/subghz/protocols`
-as external Protocol Packs and loaded by the normal Sub-GHz app from:
+The other 24 active ARF protocols are not linked into the core registry. They
+are built from the canonical sources in `lib/subghz/protocols` as external
+Protocol Packs and loaded by the normal Sub-GHz app from:
 
 ```text
 /ext/apps_data/subghz/plugins/protocol_vag.fal
@@ -130,6 +130,15 @@ as external Protocol Packs and loaded by the normal Sub-GHz app from:
 /ext/apps_data/subghz/plugins/protocol_mitsubishi_v0.fal
 ```
 
+The directory also contains packs for Chrysler, Fiat Marelli, Ford v0-v3,
+Kia v3-v7, Land Rover, Mazda, Porsche, PSA, Scher-Khan, Sheriff CFM, StarLine,
+and Subaru. See [Sub-GHz Protocol Packs](docs/subghz-protocol-packs.md) for the
+complete inventory.
+
+Because loading all packs at once would exhaust RAM, Receiver settings provide
+a `Protocol Pack` selector for Core, Legacy, Kia, Ford, Europe, Asia/US, and
+Alarm groups. The selected group is applied the next time Sub-GHz starts.
+
 This preserves the normal Sub-GHz receive workflow while recovering internal
 flash for Tumoflip Runtime. ProtoPirate can still provide its own isolated
 implementations. The Protocol Pack loader is currently used by the graphical
@@ -137,12 +146,9 @@ system Sub-GHz app; the Sub-GHz CLI continues to use the built-in registry.
 See [Sub-GHz Protocol Packs](docs/subghz-protocol-packs.md) for the ABI and
 packaging rules.
 
-Additional ARF protocol sources are present in the tree but are not registered
-in the firmware menu yet. A full ARF protocol registry exceeded the safe
-updater package size and triggered a C2/radio-region overlap warning during
-build. Deferred protocols include Ford variants, PSA, Porsche Cayenne,
-StarLine, Scher-Khan, Sheriff CFM, Land Rover, Subaru, Mazda variants, Chrysler,
-Fiat Marelli, and later Kia variants.
+Together with Fiat SPA, Suzuki, and Toyota in core, the Protocol Packs cover
+all protocols enabled in the upstream ARF registry. BMW CAS4 and Honda remain
+disabled because they are also disabled upstream.
 
 ProtoPirate and the lightweight ARF Status diagnostic app are built as
 external `.fap` apps instead of being linked into the core firmware image.
@@ -151,17 +157,17 @@ folder rather than being hidden inside the status helper. Current intended SD
 locations are:
 
 ```text
-/ext/apps/ARF Tools/ProtoPirate.fap
-/ext/apps/ARF Tools/ARF Sub-GHz.fap
-/ext/apps/ARF Tools/ARF Sub-GHz Full.fap
-/ext/apps/ARF Tools/ARF KeeLoq.fap
-/ext/apps/ARF Tools/ARF Counter BF.fap
-/ext/apps/ARF Tools/ARF Car Emulate.fap
-/ext/apps/ARF Tools/ARF Frequency Analyzer.fap
-/ext/apps/ARF Tools/ARF PSA Decrypt.fap
-/ext/apps/ARF Tools/RollJam.fap
-/ext/apps/ARF Tools/Sub-GHz Bruteforcer.fap
-/ext/apps/ARF Tools/ARF Status.fap
+/ext/apps/ARF Tools/proto_pirate.fap
+/ext/apps/ARF Tools/arf_subghz.fap
+/ext/apps/ARF Tools/arf_subghz_full.fap
+/ext/apps/ARF Tools/arf_keeloq.fap
+/ext/apps/ARF Tools/arf_counter_bf.fap
+/ext/apps/ARF Tools/arf_car_emulate.fap
+/ext/apps/ARF Tools/arf_frequency_analyzer.fap
+/ext/apps/ARF Tools/arf_psa_decrypt.fap
+/ext/apps/ARF Tools/rolljam.fap
+/ext/apps/ARF Tools/subghz_bruteforcer.fap
+/ext/apps/ARF Tools/arf_status.fap
 ```
 
 ProtoPirate runtime plugin assets and keystore are deployed to:

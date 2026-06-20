@@ -8,6 +8,7 @@ enum SubGhzSettingIndex {
     SubGhzSettingIndexModulation,
     SubGhzSettingIndexHoppingMode,
     SubGhzSettingIndexHoppingRSSI,
+    SubGhzSettingIndexProtocolPack,
     SubGhzSettingIndexBinRAW,
     SubGhzSettingIndexIgnoreReversRB2,
     SubGhzSettingIndexIgnoreAlarms,
@@ -55,6 +56,16 @@ static const char* const hopping_mode_text[SubGhzHoppingModeCount] = {
     "Frequency",
     "Preset",
     "Combined",
+};
+
+static const char* const protocol_pack_group_text[SubGhzProtocolPackGroupCount] = {
+    "Core",
+    "Legacy",
+    "Kia",
+    "Ford",
+    "Europe",
+    "Asia/US",
+    "Alarm",
 };
 
 #define COMBO_BOX_COUNT 2
@@ -235,6 +246,14 @@ static void subghz_scene_receiver_config_set_hopping_rssi(VariableItem* item) {
     subghz->last_settings->hopping_threshold = threshold;
 }
 
+static void subghz_scene_receiver_config_set_protocol_pack(VariableItem* item) {
+    SubGhz* subghz = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+
+    variable_item_set_current_value_text(item, protocol_pack_group_text[index]);
+    subghz->last_settings->protocol_pack_group = index;
+}
+
 static void subghz_scene_receiver_config_set_speaker(VariableItem* item) {
     SubGhz* subghz = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
@@ -335,6 +354,7 @@ static void subghz_scene_receiver_config_var_list_enter_callback(void* context, 
 
         subghz_txrx_hopper_set_state(subghz->txrx, hopping_value[default_index]);
         subghz->last_settings->hopping_mode = SubGhzHoppingModeOff;
+        subghz->last_settings->protocol_pack_group = SubGhzProtocolPackGroupLegacy;
 
         variable_item_list_set_selected_item(subghz->variable_item_list, default_index);
         variable_item_list_reset(subghz->variable_item_list);
@@ -410,20 +430,26 @@ void subghz_scene_receiver_config_on_enter(void* context) {
         variable_item_set_current_value_index(item, value_index);
         variable_item_set_current_value_text(item, raw_threshold_rssi_text[value_index]);
 
-        SubGhzHoppingMode hopping_mode =
-            subghz_scene_receiver_config_get_hopping_mode(subghz);
+        item = variable_item_list_add(
+            subghz->variable_item_list,
+            "Protocol Pack",
+            SubGhzProtocolPackGroupCount,
+            subghz_scene_receiver_config_set_protocol_pack,
+            subghz);
+        value_index = subghz->last_settings->protocol_pack_group;
+        variable_item_set_current_value_index(item, value_index);
+        variable_item_set_current_value_text(item, protocol_pack_group_text[value_index]);
+
+        SubGhzHoppingMode hopping_mode = subghz_scene_receiver_config_get_hopping_mode(subghz);
         if(hopping_mode == SubGhzHoppingModeFrequency ||
            hopping_mode == SubGhzHoppingModeCombined) {
             variable_item_set_current_value_text(
-                variable_item_list_get(
-                    subghz->variable_item_list, SubGhzSettingIndexFrequency),
+                variable_item_list_get(subghz->variable_item_list, SubGhzSettingIndexFrequency),
                 " -----");
         }
-        if(hopping_mode == SubGhzHoppingModePreset ||
-           hopping_mode == SubGhzHoppingModeCombined) {
+        if(hopping_mode == SubGhzHoppingModePreset || hopping_mode == SubGhzHoppingModeCombined) {
             variable_item_set_current_value_text(
-                variable_item_list_get(
-                    subghz->variable_item_list, SubGhzSettingIndexModulation),
+                variable_item_list_get(subghz->variable_item_list, SubGhzSettingIndexModulation),
                 " -----");
         }
     }

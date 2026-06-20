@@ -7,6 +7,7 @@
 #include <lib/subghz/receiver.h>
 #include <lib/subghz/transmitter.h>
 #include <lib/subghz/protocols/raw.h>
+#include <lib/subghz/protocols/plugin_registry.h>
 #include <lib/subghz/devices/devices.h>
 
 typedef struct SubGhzTxRx SubGhzTxRx;
@@ -24,7 +25,7 @@ typedef enum {
  * 
  * @return SubGhzTxRx* pointer to SubGhzTxRx
  */
-SubGhzTxRx* subghz_txrx_alloc(void);
+SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group);
 
 /**
  * Free SubGhzTxRx

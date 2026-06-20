@@ -20,7 +20,7 @@ static void subghz_txrx_radio_device_power_off(SubGhzTxRx* instance) {
     subghz_radio_broker_external_power_off(instance->radio_broker, &instance->radio_lease);
 }
 
-SubGhzTxRx* subghz_txrx_alloc(void) {
+SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group) {
     SubGhzTxRx* instance = malloc(sizeof(SubGhzTxRx));
     instance->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
     furi_check(subghz_radio_broker_acquire(
@@ -52,7 +52,7 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
     subghz_environment_set_nice_flor_s_rainbow_table_file_name(
         instance->environment, SUBGHZ_NICE_FLOR_S_DIR_NAME);
     instance->protocol_pack_registry = subghz_protocol_pack_registry_alloc(
-        &subghz_protocol_registry, SUBGHZ_PROTOCOL_PLUGIN_PATH);
+        &subghz_protocol_registry, SUBGHZ_PROTOCOL_PLUGIN_PATH, protocol_pack_group);
     subghz_environment_set_protocol_registry(
         instance->environment,
         subghz_protocol_pack_registry_get(instance->protocol_pack_registry));
