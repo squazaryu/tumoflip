@@ -317,6 +317,13 @@ def validate_release(
         output.write_text(
             json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
+        # Also publish the companion install archive (issue #8) from the SAME manifest
+        # and resources tree. Hardened + atomic; see make_packages_zip.py.
+        try:
+            from .make_packages_zip import build_packages_zip
+        except ImportError:
+            from make_packages_zip import build_packages_zip
+        build_packages_zip(manifest, resources, update_dir / "tumoflip-packages.zip")
     return manifest
 
 
