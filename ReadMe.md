@@ -74,6 +74,8 @@ published update package name together.
   SD without keeping a second copy in the core firmware image.
 - Added runtime Protocol Pack switching: the receiver safely reloads the
   selected decoders and resumes active reception without restarting Sub-GHz.
+- Added Protocol Pack Inspector to show the active group, loaded decoder count,
+  FW/plugin API, pack RAM cost, and per-`.fal` load errors.
 - Added a Sub-GHz Radio Broker for exclusive radio ownership, external CC1101
   power ownership, and internal-device fallback in system Sub-GHz and all
   current ARF radio applications.

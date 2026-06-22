@@ -321,6 +321,10 @@ const FlipperAppPluginDescriptor*
     furi_check(lib_ep);
 
     const FlipperAppPluginDescriptor* lib_descriptor = lib_ep();
+    if(!lib_descriptor) {
+        FURI_LOG_E(TAG, "Plugin returned an empty descriptor");
+        return NULL;
+    }
 
     FURI_LOG_D(
         TAG,

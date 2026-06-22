@@ -1,4 +1,4 @@
-#include "plugin_manager.h"
+#include "plugin_manager_i.h"
 
 #include <loader/firmware_api/firmware_api.h>
 #include <storage/storage.h>
@@ -47,30 +47,55 @@ void plugin_manager_free(PluginManager* manager) {
     free(manager);
 }
 
-PluginManagerError plugin_manager_load_single(PluginManager* manager, const char* path) {
+static PluginManagerLoadStatus
+    plugin_manager_preload_status_to_load_status(FlipperApplicationPreloadStatus status) {
+    switch(status) {
+    case FlipperApplicationPreloadStatusSuccess:
+        return PluginManagerLoadStatusSuccess;
+    case FlipperApplicationPreloadStatusInvalidFile:
+        return PluginManagerLoadStatusInvalidFile;
+    case FlipperApplicationPreloadStatusNotEnoughMemory:
+        return PluginManagerLoadStatusNotEnoughMemory;
+    case FlipperApplicationPreloadStatusInvalidManifest:
+        return PluginManagerLoadStatusInvalidManifest;
+    case FlipperApplicationPreloadStatusApiTooOld:
+        return PluginManagerLoadStatusApiTooOld;
+    case FlipperApplicationPreloadStatusApiTooNew:
+        return PluginManagerLoadStatusApiTooNew;
+    case FlipperApplicationPreloadStatusTargetMismatch:
+        return PluginManagerLoadStatusTargetMismatch;
+    default:
+        return PluginManagerLoadStatusLoadError;
+    }
+}
+
+PluginManagerLoadStatus
+    plugin_manager_load_single_detailed(PluginManager* manager, const char* path) {
     furi_check(manager);
     FlipperApplication* lib = flipper_application_alloc(manager->storage, manager->api_interface);
 
-    PluginManagerError error = PluginManagerErrorNone;
+    PluginManagerLoadStatus status = PluginManagerLoadStatusSuccess;
     do {
         FlipperApplicationPreloadStatus preload_res = flipper_application_preload(lib, path);
 
         if(preload_res != FlipperApplicationPreloadStatusSuccess) {
             FURI_LOG_E(TAG, "Failed to preload %s", path);
-            error = PluginManagerErrorLoaderError;
+            status = plugin_manager_preload_status_to_load_status(preload_res);
             break;
         }
 
         if(!flipper_application_is_plugin(lib)) {
             FURI_LOG_E(TAG, "Not a plugin %s", path);
-            error = PluginManagerErrorLoaderError;
+            status = PluginManagerLoadStatusNotPlugin;
             break;
         }
 
         FlipperApplicationLoadStatus load_status = flipper_application_map_to_memory(lib);
         if(load_status != FlipperApplicationLoadStatusSuccess) {
             FURI_LOG_E(TAG, "Failed to load %s", path);
-            error = PluginManagerErrorLoaderError;
+            status = load_status == FlipperApplicationLoadStatusMissingImports ?
+                         PluginManagerLoadStatusMissingImports :
+                         PluginManagerLoadStatusLoadError;
             break;
         }
 
@@ -79,30 +104,44 @@ PluginManagerError plugin_manager_load_single(PluginManager* manager, const char
 
         if(!app_descriptor) {
             FURI_LOG_E(TAG, "Failed to get descriptor %s", path);
-            error = PluginManagerErrorLoaderError;
+            status = PluginManagerLoadStatusMissingDescriptor;
             break;
         }
 
         if(strcmp(app_descriptor->appid, manager->application_id) != 0) {
             FURI_LOG_E(TAG, "Application id mismatch %s", path);
-            error = PluginManagerErrorApplicationIdMismatch;
+            status = PluginManagerLoadStatusApplicationIdMismatch;
             break;
         }
 
         if(app_descriptor->ep_api_version != manager->api_version) {
             FURI_LOG_E(TAG, "API version mismatch %s", path);
-            error = PluginManagerErrorAPIVersionMismatch;
+            status = PluginManagerLoadStatusAPIVersionMismatch;
             break;
         }
 
         FlipperApplicationList_push_back(manager->libs, lib);
     } while(false);
 
-    if(error != PluginManagerErrorNone) {
+    if(status != PluginManagerLoadStatusSuccess) {
         flipper_application_free(lib);
     }
 
-    return error;
+    return status;
+}
+
+PluginManagerError plugin_manager_load_single(PluginManager* manager, const char* path) {
+    const PluginManagerLoadStatus status = plugin_manager_load_single_detailed(manager, path);
+
+    if(status == PluginManagerLoadStatusSuccess) {
+        return PluginManagerErrorNone;
+    } else if(status == PluginManagerLoadStatusApplicationIdMismatch) {
+        return PluginManagerErrorApplicationIdMismatch;
+    } else if(status == PluginManagerLoadStatusAPIVersionMismatch) {
+        return PluginManagerErrorAPIVersionMismatch;
+    }
+
+    return PluginManagerErrorLoaderError;
 }
 
 static PluginManagerError

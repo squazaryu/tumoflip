@@ -62,6 +62,26 @@ resumes RX. The selection is also stored in the existing Sub-GHz settings.
 Every pack remains on SD; the selection only controls which files are mapped
 into RAM for the current session.
 
+## Protocol Pack Inspector
+
+Open `Sub-GHz` -> receiver configuration -> `Pack Status`, then press `OK`.
+The summary shows:
+
+- active group;
+- loaded versus expected external plugins;
+- total registered protocols and the built-in protocol count;
+- firmware API and Protocol Pack API versions;
+- approximate RAM occupied by the active registry and mapped plugins.
+
+The list below the summary reports every expected `.fal` and its loaded
+protocol name. Failures distinguish missing or invalid files, insufficient
+RAM, manifest and hardware-target problems, old/new firmware API, missing
+imports, application or Protocol Pack API mismatch, invalid protocol entries,
+and duplicate protocol names.
+
+The report is captured by the normal loader. Opening Inspector does not scan
+the SD card again or load a second copy of any plugin.
+
 ## Current packs
 
 The 24 packs cover every protocol enabled by the ARF registry that is not

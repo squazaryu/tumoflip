@@ -113,6 +113,11 @@ bool subghz_txrx_reload_protocol_pack(
     return true;
 }
 
+const SubGhzProtocolPackReport* subghz_txrx_get_protocol_pack_report(SubGhzTxRx* instance) {
+    furi_assert(instance);
+    return subghz_protocol_pack_registry_get_report(instance->protocol_pack_registry);
+}
+
 void subghz_txrx_free(SubGhzTxRx* instance) {
     furi_assert(instance);
 
