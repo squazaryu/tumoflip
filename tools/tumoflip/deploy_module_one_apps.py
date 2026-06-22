@@ -71,9 +71,6 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
     fap_src = repo_root / build_dir / ".extapps" / "proto_pirate.fap"
     copy_file(fap_src, arf_tools_dir / "ProtoPirate.fap")
 
-    arf_subghz_src = repo_root / build_dir / ".extapps" / "arf_subghz.fap"
-    copy_file(arf_subghz_src, arf_tools_dir / "ARF Sub-GHz.fap")
-
     arf_subghz_full_src = repo_root / build_dir / ".extapps" / "arf_subghz_full.fap"
     copy_file(arf_subghz_full_src, arf_tools_dir / "ARF Sub-GHz Full.fap")
 

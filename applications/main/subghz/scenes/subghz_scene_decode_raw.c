@@ -158,6 +158,9 @@ bool subghz_scene_decode_raw_next(SubGhz* subghz) {
 
 void subghz_scene_decode_raw_on_enter(void* context) {
     SubGhz* subghz = context;
+#ifdef ARF_EXTERNAL_FULL
+    subghz_external_ensure_receiver_view(subghz);
+#endif
 
     FuriString* item_name = furi_string_alloc();
     FuriString* item_time = furi_string_alloc();

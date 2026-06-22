@@ -25,25 +25,25 @@ you find a tumoflip-specific issue, report it in this repository:
 ## Current Build
 
 - Base: Unleashed 089 with selected upstream dev updates
-- Firmware version: `tmwhflpprarf089-022`
+- Firmware version: `tmwhflpprarf089-023`
 - Firmware origin/fork: `tumoflip`
-- Firmware API: `87.14`
+- Firmware API: `87.15`
 - Target: Flipper Zero F7
-- Release: [v0.2.2](https://github.com/squazaryu/tumoflip/releases/tag/v0.2.2)
-- Release package: `flipper-z-f7-update-tmwhflpprarf089-022.tgz`
+- Release: `v0.2.3` release candidate (hardware validation in progress)
+- Release package: `flipper-z-f7-update-tmwhflpprarf089-023.tgz`
 
 ## Version Scheme
 
 Installed firmware versions use this format:
 
 ```text
-tmwhflpprarf089-022
+tmwhflpprarf089-023
 ```
 
 - `tmwhflpprarf`: tumoflip firmware name shown as the installed firmware
   version prefix for the ARF-enabled build line.
 - `089`: upstream Unleashed base version.
-- `022`: tumoflip internal build version.
+- `023`: tumoflip internal build version.
 
 When the Unleashed base version or tumoflip internal version changes, update
 the firmware version suffix in `fbt_options.py`, release notes, README, and the
@@ -52,7 +52,7 @@ published update package name together.
 ## tumoflip Changes
 
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
-  `tmwhflpprarf089-022`.
+  `tmwhflpprarf089-023`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.
 - Replaced the Desktop OK menu `Sub-GHz Remote` shortcut with an `ARF Tools`
@@ -67,6 +67,12 @@ published update package name together.
 - Added ARF Sub-GHz `setting_user` frequencies, hopper frequencies, and custom
   presets as ProtoPirate-only assets, isolated from the normal Sub-GHz app.
 - Added ProtoPirate and ARF Tools as external apps for isolated SD deployment.
+- Rebuilt ARF Sub-GHz Full from the current system Sub-GHz sources so it has
+  the same saved-signal, RAW, generator, analyzer, radio, RPC, and Protocol Pack
+  workflows without maintaining a stale source copy.
+- Added lazy allocation of the heavy receive, RAW, transmit, analyzer, and
+  generator views in ARF Sub-GHz Full. Separate ARF tools are launched as child
+  FAPs so their RAM is released when returning to Full.
 - Added MIFARE Ultralight/NTAG PWD and PACK to the NFC read-success screen.
 - Added the Bambu Lab filament spool NFC parser.
 - Added adaptive dwell and signal hold to hopping in the system Sub-GHz app.
@@ -94,7 +100,7 @@ identity.
 
 | Area | Unleashed | tumoflip |
 | --- | --- | --- |
-| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-022` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-023` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
@@ -106,7 +112,7 @@ identity.
 | Sub-GHz hopping | Frequency hopping only. | Adds preset and combined hopping plus an adaptive scan dwell, signal hold, post-signal grace period, and bounded hold time to system Sub-GHz. |
 | NFC additions | Uses the Unleashed 089 NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK and adds the Bambu Lab filament spool parser. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-022` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-023` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -176,7 +182,6 @@ locations are:
 
 ```text
 /ext/apps/ARF Tools/proto_pirate.fap
-/ext/apps/ARF Tools/arf_subghz.fap
 /ext/apps/ARF Tools/arf_subghz_full.fap
 /ext/apps/ARF Tools/arf_keeloq.fap
 /ext/apps/ARF Tools/arf_counter_bf.fap
@@ -187,6 +192,14 @@ locations are:
 /ext/apps/ARF Tools/subghz_bruteforcer.fap
 /ext/apps/ARF Tools/arf_status.fap
 ```
+
+`ARF Sub-GHz Full` is now compiled from the same canonical sources as the
+system Sub-GHz app, which prevents feature drift. Its top-level heavy views are
+allocated only when opened. Selecting a dedicated ARF tool closes Full,
+launches that child FAP, and queues Full to reopen when the child exits. The
+system Sub-GHz app remains installed during hardware validation and is not yet
+replaced in Desktop. See [ARF Sub-GHz Full](docs/arf-subghz-full.md) for the
+parity and validation boundary.
 
 ProtoPirate runtime plugin assets and keystore are deployed to:
 
@@ -270,7 +283,7 @@ Mac bridge and app source.
 Download the latest update package from
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases):
 
-- `flipper-z-f7-update-tmwhflpprarf089-022.tgz`
+- `flipper-z-f7-update-tmwhflpprarf089-023.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -292,7 +305,7 @@ python3 tools/tumoflip/validate_release.py --write-manifest
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-022.tgz
+dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-023.tgz
 ```
 
 ## Upstream

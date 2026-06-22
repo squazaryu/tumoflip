@@ -18,6 +18,7 @@ env.Append(
         File("protocols/raw.h"),
         File("protocols/public_api.h"),
         File("protocols/plugin.h"),
+        File("protocols/plugin_registry.h"),
         File("blocks/const.h"),
         File("blocks/decoder.h"),
         File("blocks/encoder.h"),

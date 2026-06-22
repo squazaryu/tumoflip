@@ -22,6 +22,38 @@ App(
     fap_category="Sub-GHz",
 )
 
+# External full-featured variant. It intentionally shares the system Sub-GHz
+# sources so functional parity cannot drift while it is validated as the future
+# Desktop replacement.
+App(
+    appid="arf_subghz_full",
+    name="ARF Sub-GHz Full",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    cdefines=["APP_SUBGHZ", "ARF_EXTERNAL_FULL"],
+    entry_point="subghz_app",
+    sources=[
+        "subghz.c",
+        "subghz_i.c",
+        "subghz_last_settings.c",
+        "subghz_history.c",
+        "helpers/*.c",
+        "!helpers/subghz_chat.c",
+        "scenes/*.c",
+        "views/*.c",
+    ],
+    requires=[
+        "gui",
+        "dialogs",
+        "subghz_radio_broker",
+    ],
+    icon="A_Sub1ghz_14",
+    stack_size=3 * 1024,
+    fap_libs=["assets", "hwdrivers"],
+    fap_icon="icon.png",
+    fap_category="ARF Tools",
+)
+
 App(
     appid="cli_subghz",
     targets=["f7"],

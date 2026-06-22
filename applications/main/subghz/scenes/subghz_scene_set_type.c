@@ -113,6 +113,9 @@ static const char* submenu_names[SetTypeMAX] = {
 
 void subghz_scene_set_type_on_enter(void* context) {
     SubGhz* subghz = context;
+#ifdef ARF_EXTERNAL_FULL
+    subghz_external_ensure_gen_info(subghz);
+#endif
 
     for(SetType i = 0; i < SetTypeMAX; i++) {
         submenu_add_item(

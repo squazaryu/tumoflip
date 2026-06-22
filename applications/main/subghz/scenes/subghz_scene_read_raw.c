@@ -71,6 +71,9 @@ void subghz_scene_read_raw_callback_end_tx(void* context) {
 
 void subghz_scene_read_raw_on_enter(void* context) {
     SubGhz* subghz = context;
+#ifdef ARF_EXTERNAL_FULL
+    subghz_external_ensure_read_raw_view(subghz, subghz->raw_send_only);
+#endif
     FuriString* file_name = furi_string_alloc();
 
     float threshold_rssi = subghz_threshold_rssi_get(subghz->threshold_rssi);

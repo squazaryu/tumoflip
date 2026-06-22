@@ -52,6 +52,9 @@ bool subghz_scene_transmitter_update_data_show(void* context) {
 
 void subghz_scene_transmitter_on_enter(void* context) {
     SubGhz* subghz = context;
+#ifdef ARF_EXTERNAL_FULL
+    subghz_external_ensure_transmitter_view(subghz);
+#endif
 
     subghz_custom_btns_reset();
 

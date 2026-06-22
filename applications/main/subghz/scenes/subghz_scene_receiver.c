@@ -158,6 +158,9 @@ static void subghz_scene_add_to_history_callback(
 
 void subghz_scene_receiver_on_enter(void* context) {
     SubGhz* subghz = context;
+#ifdef ARF_EXTERNAL_FULL
+    subghz_external_ensure_receiver_view(subghz);
+#endif
     SubGhzHistory* history = subghz->history;
 
     FuriString* item_name = furi_string_alloc();
