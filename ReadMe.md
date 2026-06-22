@@ -67,12 +67,9 @@ published update package name together.
 - Added ARF Sub-GHz `setting_user` frequencies, hopper frequencies, and custom
   presets as ProtoPirate-only assets, isolated from the normal Sub-GHz app.
 - Added ProtoPirate and ARF Tools as external apps for isolated SD deployment.
-- Rebuilt ARF Sub-GHz Full from the current system Sub-GHz sources so it has
-  the same saved-signal, RAW, generator, analyzer, radio, RPC, and Protocol Pack
-  workflows without maintaining a stale source copy.
-- Added lazy allocation of the heavy receive, RAW, transmit, analyzer, and
-  generator views in ARF Sub-GHz Full. Separate ARF tools are launched as child
-  FAPs so their RAM is released when returning to Full.
+- Rebuilt ARF Sub-GHz Full as a lightweight launcher for the system Sub-GHz
+  implementation and separate ARF FAPs. Each child receives the full
+  application heap and returns to the launcher when it exits.
 - Added MIFARE Ultralight/NTAG PWD and PACK to the NFC read-success screen.
 - Added the Bambu Lab filament spool NFC parser.
 - Added adaptive dwell and signal hold to hopping in the system Sub-GHz app.
@@ -193,13 +190,12 @@ locations are:
 /ext/apps/ARF Tools/arf_status.fap
 ```
 
-`ARF Sub-GHz Full` is now compiled from the same canonical sources as the
-system Sub-GHz app, which prevents feature drift. Its top-level heavy views are
-allocated only when opened. Selecting a dedicated ARF tool closes Full,
-launches that child FAP, and queues Full to reopen when the child exits. The
-system Sub-GHz app remains installed during hardware validation and is not yet
-replaced in Desktop. See [ARF Sub-GHz Full](docs/arf-subghz-full.md) for the
-parity and validation boundary.
+`ARF Sub-GHz Full` is a lightweight launcher. Selecting normal Sub-GHz or a
+dedicated ARF tool closes Full, launches that child, and queues Full to reopen
+when the child exits. Loading all standard and ARF code into one FAP exceeded
+the device heap during hardware testing, so the system Sub-GHz implementation
+remains installed and is not yet replaced in Desktop. See
+[ARF Sub-GHz Full](docs/arf-subghz-full.md) for the validation boundary.
 
 ProtoPirate runtime plugin assets and keystore are deployed to:
 

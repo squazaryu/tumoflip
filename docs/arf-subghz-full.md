@@ -1,8 +1,8 @@
 # ARF Sub-GHz Full
 
-`ARF Sub-GHz Full` is an external FAP built from the same source files as the
-system Sub-GHz application. This guarantees parity for normal workflows while
-the FAP is evaluated as a future Desktop replacement.
+`ARF Sub-GHz Full` is a lightweight external launcher. It provides one entry
+point for the system Sub-GHz application and the isolated ARF tools without
+loading all their code into the same process.
 
 ## Included workflows
 
@@ -17,19 +17,15 @@ the FAP is evaluated as a future Desktop replacement.
 
 ## RAM model
 
-The receiver/history, RAW, transmitter, frequency analyzer, and generator
-state are allocated on demand in the external build. Returning to the start
-menu and opening another top-level tool releases the previous tool state.
-
-Dedicated ARF utilities remain separate FAPs. Full queues the selected child
-and then itself in Loader, exits, and is reopened after the child terminates.
-This gives each utility the available application heap instead of linking all
-ARF scenes and workers into one process.
+Full queues the selected child and then itself in Loader, exits, and is reopened
+after the child terminates. This gives each utility the available application
+heap instead of linking all Sub-GHz scenes and ARF workers into one FAP. The
+single-FAP parity build reached 159 KB and left only about 2 KB of free heap on
+hardware, so it was rejected after the first device test.
 
 ## Validation boundary
 
-The system Sub-GHz application stays in firmware and remains the Desktop entry
-until receive, RAW, saved transmit, generator, analyzer, external CC1101,
-Protocol Pack, and child-return workflows have passed hardware testing. Core
-Sub-GHz must not be removed solely because the external FAP builds or passes
-APPCHK.
+The system Sub-GHz application stays in firmware and remains the implementation
+for normal receive, RAW, saved transmit, generators, radio settings, external
+CC1101, RPC, and Protocol Packs. It must not be removed until these workflows
+have been extracted into smaller external modules and passed hardware testing.

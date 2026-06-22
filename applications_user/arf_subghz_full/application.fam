@@ -1,4 +1,18 @@
 App(
+    appid="arf_subghz_full",
+    name="ARF Sub-GHz Full",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="arf_subghz_hub_app",
+    sources=["arf_subghz_hub.c"],
+    requires=["gui"],
+    icon="A_Sub1ghz_14",
+    stack_size=2 * 1024,
+    fap_icon="icon.png",
+    fap_category="ARF Tools",
+)
+
+App(
     appid="arf_keeloq",
     name="ARF KeeLoq",
     apptype=FlipperAppType.EXTERNAL,

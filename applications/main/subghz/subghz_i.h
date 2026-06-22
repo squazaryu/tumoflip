@@ -127,12 +127,3 @@ SubGhzRxKeyState subghz_rx_key_state_get(SubGhz* subghz);
 
 extern const NotificationSequence subghz_sequence_rx;
 extern const NotificationSequence subghz_sequence_rx_locked;
-
-#ifdef ARF_EXTERNAL_FULL
-void subghz_external_release_tool_views(SubGhz* subghz);
-void subghz_external_ensure_receiver_view(SubGhz* subghz);
-void subghz_external_ensure_read_raw_view(SubGhz* subghz, bool raw_send_only);
-void subghz_external_ensure_transmitter_view(SubGhz* subghz);
-void subghz_external_ensure_frequency_analyzer_view(SubGhz* subghz);
-void subghz_external_ensure_gen_info(SubGhz* subghz);
-#endif

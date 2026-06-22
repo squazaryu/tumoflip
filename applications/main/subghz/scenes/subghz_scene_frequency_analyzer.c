@@ -22,9 +22,6 @@ void subghz_scene_frequency_analyzer_callback(SubGhzCustomEvent event, void* con
 
 void subghz_scene_frequency_analyzer_on_enter(void* context) {
     SubGhz* subghz = context;
-#ifdef ARF_EXTERNAL_FULL
-    subghz_external_ensure_frequency_analyzer_view(subghz);
-#endif
     subghz_frequency_analyzer_set_callback(
         subghz->subghz_frequency_analyzer, subghz_scene_frequency_analyzer_callback, subghz);
     subghz_frequency_analyzer_feedback_level(
