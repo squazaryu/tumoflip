@@ -16,18 +16,6 @@ def copy_file(src: Path, dst: Path) -> None:
         shutil.copyfileobj(source, target)
 
 
-def copy_tree(src: Path, dst: Path) -> None:
-    if not src.is_dir():
-        raise FileNotFoundError(f"Missing source directory: {src}")
-    dst.mkdir(parents=True, exist_ok=True)
-    for item in src.iterdir():
-        target = dst / item.name
-        if item.is_dir():
-            copy_tree(item, target)
-        else:
-            copy_file(item, target)
-
-
 def remove_appledouble(path: Path) -> None:
     if not path.exists():
         return
@@ -44,8 +32,7 @@ def ensure_subghz_hopping_presets(sd_root: Path) -> None:
     if settings_path.exists():
         content = settings_path.read_text(encoding="utf-8")
         if any(
-            line.lstrip().startswith("Hopping_Preset:")
-            for line in content.splitlines()
+            line.lstrip().startswith("Hopping_Preset:") for line in content.splitlines()
         ):
             return
         separator = "" if content.endswith("\n") else "\n"
@@ -67,51 +54,34 @@ def ensure_subghz_hopping_presets(sd_root: Path) -> None:
 
 def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
     arf_tools_dir = sd_root / "apps" / "ARF Tools"
-
-    fap_src = repo_root / build_dir / ".extapps" / "proto_pirate.fap"
-    copy_file(fap_src, arf_tools_dir / "ProtoPirate.fap")
+    modules_dir = sd_root / "apps_data" / "arf_subghz_full" / "modules"
 
     arf_subghz_full_src = repo_root / build_dir / ".extapps" / "arf_subghz_full.fap"
-    copy_file(arf_subghz_full_src, arf_tools_dir / "ARF Sub-GHz Full.fap")
+    copy_file(arf_subghz_full_src, arf_tools_dir / "arf_subghz_full.fap")
 
-    for appid, name in (
-        ("arf_keeloq", "ARF KeeLoq.fap"),
-        ("arf_counter_bf", "ARF Counter BF.fap"),
-        ("arf_car_emulate", "ARF Car Emulate.fap"),
-        ("arf_frequency_analyzer", "ARF Frequency Analyzer.fap"),
-        ("arf_psa_decrypt", "ARF PSA Decrypt.fap"),
+    for appid in (
+        "arf_keeloq",
+        "arf_counter_bf",
+        "arf_car_emulate",
+        "arf_frequency_analyzer",
+        "arf_psa_decrypt",
+        "arf_status",
+        "proto_pirate",
+        "rolljam",
+        "subghz_bruteforcer",
     ):
-        copy_file(repo_root / build_dir / ".extapps" / f"{appid}.fap", arf_tools_dir / name)
+        copy_file(
+            repo_root / build_dir / ".extapps" / f"{appid}.fap",
+            modules_dir / f"{appid}.fap",
+        )
 
-    rolljam_src = repo_root / build_dir / ".extapps" / "rolljam.fap"
-    copy_file(rolljam_src, arf_tools_dir / "RollJam.fap")
+    for old_app in arf_tools_dir.glob("*.fap"):
+        if old_app.name != "arf_subghz_full.fap":
+            old_app.unlink()
 
-    subbrute_src = repo_root / build_dir / ".extapps" / "subghz_bruteforcer.fap"
-    copy_file(subbrute_src, arf_tools_dir / "Sub-GHz Bruteforcer.fap")
-
-    arf_status_src = repo_root / build_dir / ".extapps" / "arf_status.fap"
-    copy_file(arf_status_src, arf_tools_dir / "ARF Status.fap")
-
-    old_status_app = arf_tools_dir / "ARF Tools.fap"
-    if old_status_app.exists():
-        old_status_app.unlink()
-
-    app_assets_dst = sd_root / "apps_assets" / "proto_pirate"
-    plugins_dst = app_assets_dst / "plugins"
-    plugins_dst.mkdir(parents=True, exist_ok=True)
-
-    for plugin in (
-        "protopirate_am_plugin.fal",
-        "protopirate_fm_plugin.fal",
-        "protopirate_emulate_plugin.fal",
-        "protopirate_psa_bf_plugin.fal",
-    ):
-        copy_file(repo_root / build_dir / ".extapps" / plugin, plugins_dst / plugin)
-
-    copy_tree(repo_root / "applications_user" / "protopirate" / "keystore", app_assets_dst)
     ensure_subghz_hopping_presets(sd_root)
     remove_appledouble(arf_tools_dir)
-    remove_appledouble(app_assets_dst)
+    remove_appledouble(modules_dir)
 
 
 def main() -> None:

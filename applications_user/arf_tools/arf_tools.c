@@ -8,14 +8,8 @@
 
 #define TAG "ArfStatus"
 
-#define ARF_TOOLS_ASSETS_FOLDER       EXT_PATH("apps_assets/proto_pirate")
-#define ARF_TOOLS_SETTING_USER_PATH   EXT_PATH("apps_assets/proto_pirate/setting_user")
-#define ARF_TOOLS_PROTO_PIRATE_PATH   EXT_PATH("apps/ARF Tools/ProtoPirate.fap")
-#define ARF_TOOLS_ARF_SUBGHZ_PATH     EXT_PATH("apps/ARF Tools/ARF Sub-GHz.fap")
-#define ARF_TOOLS_ARF_SUBGHZ_FULL_PATH EXT_PATH("apps/ARF Tools/ARF Sub-GHz Full.fap")
-#define ARF_TOOLS_ROLLJAM_PATH        EXT_PATH("apps/ARF Tools/RollJam.fap")
-#define ARF_TOOLS_SUBBRUTE_PATH       EXT_PATH("apps/ARF Tools/Sub-GHz Bruteforcer.fap")
-#define ARF_STATUS_APP_PATH           EXT_PATH("apps/ARF Tools/ARF Status.fap")
+#define ARF_FULL_PATH    EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")
+#define ARF_MODULES_PATH EXT_PATH("apps_data/arf_subghz_full/modules/")
 
 typedef enum {
     ArfToolsViewMain,
@@ -62,43 +56,29 @@ static void arf_tools_append_exists(ArfToolsApp* app, const char* label, const c
 }
 
 static void arf_tools_show_assets(ArfToolsApp* app) {
-    furi_string_set_str(app->text, "ARF / ProtoPirate status\n\n");
-    arf_tools_append_exists(app, "ARF Status app", ARF_STATUS_APP_PATH);
-    arf_tools_append_exists(app, "ProtoPirate app", ARF_TOOLS_PROTO_PIRATE_PATH);
-    arf_tools_append_exists(app, "ARF Sub-GHz app", ARF_TOOLS_ARF_SUBGHZ_PATH);
-    arf_tools_append_exists(app, "ARF Sub-GHz Full", ARF_TOOLS_ARF_SUBGHZ_FULL_PATH);
-    arf_tools_append_exists(app, "RollJam app", ARF_TOOLS_ROLLJAM_PATH);
-    arf_tools_append_exists(app, "SubBrute app", ARF_TOOLS_SUBBRUTE_PATH);
-    arf_tools_append_exists(app, "Assets folder", ARF_TOOLS_ASSETS_FOLDER);
-    arf_tools_append_exists(app, "ProtoPirate settings", ARF_TOOLS_SETTING_USER_PATH);
+    furi_string_set_str(app->text, "ARF Full status\n\n");
+    arf_tools_append_exists(app, "Full launcher", ARF_FULL_PATH);
+    arf_tools_append_exists(app, "Status", ARF_MODULES_PATH "arf_status.fap");
+    arf_tools_append_exists(app, "ProtoPirate", ARF_MODULES_PATH "proto_pirate.fap");
+    arf_tools_append_exists(app, "KeeLoq", ARF_MODULES_PATH "arf_keeloq.fap");
+    arf_tools_append_exists(app, "Counter BF", ARF_MODULES_PATH "arf_counter_bf.fap");
+    arf_tools_append_exists(app, "Car Emulate", ARF_MODULES_PATH "arf_car_emulate.fap");
+    arf_tools_append_exists(app, "PSA Decrypt", ARF_MODULES_PATH "arf_psa_decrypt.fap");
     arf_tools_append_exists(
-        app,
-        "AM plugin",
-        EXT_PATH("apps_assets/proto_pirate/plugins/protopirate_am_plugin.fal"));
+        app, "Analyzer", ARF_MODULES_PATH "arf_frequency_analyzer.fap");
+    arf_tools_append_exists(app, "RollJam", ARF_MODULES_PATH "rolljam.fap");
     arf_tools_append_exists(
-        app,
-        "FM plugin",
-        EXT_PATH("apps_assets/proto_pirate/plugins/protopirate_fm_plugin.fal"));
-    arf_tools_append_exists(
-        app,
-        "Emulate plugin",
-        EXT_PATH("apps_assets/proto_pirate/plugins/protopirate_emulate_plugin.fal"));
-    arf_tools_append_exists(
-        app,
-        "PSA BF plugin",
-        EXT_PATH("apps_assets/proto_pirate/plugins/protopirate_psa_bf_plugin.fal"));
-    furi_string_cat_str(
-        app->text,
-        "\nFull ARF screens are intentionally isolated from normal Sub-GHz.\n");
+        app, "SubBrute", ARF_MODULES_PATH "subghz_bruteforcer.fap");
+    arf_tools_append_exists(app, "Protocol packs", EXT_PATH("apps_data/subghz/plugins"));
     arf_tools_set_text_string(app);
 }
 
 static void arf_tools_show_about(ArfToolsApp* app) {
     arf_tools_set_text(
         app,
-        "ARF Status 0.1\n\n"
-        "Diagnostic helper for tumoflip ARF deployment.\n\n"
-        "Functional tools remain separate apps in /ext/apps/ARF Tools.");
+        "ARF Status 0.2\n\n"
+        "Checks the Full launcher and its isolated internal modules.\n\n"
+        "Only Full is exposed in /ext/apps/ARF Tools.");
 }
 
 static void arf_tools_menu_callback(void* context, uint32_t index) {

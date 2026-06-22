@@ -15,6 +15,7 @@
 #define MODULE_ONE_APPS_PATH EXT_PATH("apps/Module One")
 #define ARF_TOOLS_MENU_NAME "ARF Tools"
 #define ARF_TOOLS_APPS_PATH EXT_PATH("apps/ARF Tools")
+#define ARF_SUBGHZ_FULL_PATH EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")
 
 struct LoaderMenu {
     FuriThread* thread;
@@ -106,6 +107,12 @@ static void loader_menu_arf_tools_callback(void* context, uint32_t index) {
     loader_menu_start_with_args(LOADER_APPLICATIONS_NAME, ARF_TOOLS_APPS_PATH);
 }
 
+static void loader_menu_arf_subghz_full_callback(void* context, uint32_t index) {
+    UNUSED(index);
+    UNUSED(context);
+    loader_menu_start(ARF_SUBGHZ_FULL_PATH);
+}
+
 static void
     loader_menu_settings_menu_callback(void* context, InputType input_type, uint32_t index) {
     UNUSED(context);
@@ -151,6 +158,17 @@ static void loader_menu_build_menu(LoaderMenuApp* app, LoaderMenu* menu) {
         (void*)menu);
 
     for(i = 0; i < FLIPPER_APPS_COUNT; i++) {
+        if(strcmp(FLIPPER_APPS[i].name, "Sub-GHz") == 0) {
+            menu_add_item(
+                app->primary_menu,
+                FLIPPER_APPS[i].name,
+                FLIPPER_APPS[i].icon,
+                i,
+                loader_menu_arf_subghz_full_callback,
+                (void*)menu);
+            continue;
+        }
+
         menu_add_item(
             app->primary_menu,
             FLIPPER_APPS[i].name,

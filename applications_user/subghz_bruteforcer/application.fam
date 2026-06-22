@@ -8,5 +8,6 @@ App(
     order=11,
     fap_icon="icon.png",
     fap_category="ARF Tools",
+    fap_dist_path="apps_data/arf_subghz_full/modules/{filename}",
     fap_icon_assets="images",
 )

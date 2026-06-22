@@ -4,6 +4,10 @@
 point for the system Sub-GHz application and the isolated ARF tools without
 loading all their code into the same process.
 
+The Desktop `Sub-GHz` entry and the `ARF Tools` folder both open Full. Only the
+Full launcher is exposed under `/ext/apps/ARF Tools`; child FAPs are stored in
+`/ext/apps_data/arf_subghz_full/modules`.
+
 ## Included workflows
 
 - decoded and RAW receive;

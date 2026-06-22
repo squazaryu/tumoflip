@@ -207,7 +207,18 @@ class AppBuilder:
                             deployable = False
                     app_artifacts.dist_entries.append((deployable, fal_path))
         else:
-            fap_path = f"apps/{self.app.fap_category}/{app_artifacts.compact.name}"
+            if self.app.fap_dist_path:
+                fap_path = self.app.fap_dist_path.format(
+                    appid=self.app.appid,
+                    filename=app_artifacts.compact.name,
+                )
+                fap_path_parts = pathlib.PurePosixPath(fap_path)
+                if fap_path_parts.is_absolute() or ".." in fap_path_parts.parts:
+                    raise UserError(
+                        f"Invalid fap_dist_path for {self.app.appid}: {fap_path}"
+                    )
+            else:
+                fap_path = f"apps/{self.app.fap_category}/{app_artifacts.compact.name}"
             app_artifacts.dist_entries.append(
                 (self.app.is_default_deployable, fap_path)
             )

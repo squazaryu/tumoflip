@@ -44,28 +44,43 @@ PROTOCOL_PACKS = {
     "protocol_subaru.fal",
     "protocol_vag.fal",
 }
-ARF_APP_IDS = {
+ARF_VISIBLE_APP_IDS = {"arf_subghz_full"}
+ARF_MODULE_APP_IDS = {
     "arf_car_emulate",
     "arf_counter_bf",
     "arf_frequency_analyzer",
     "arf_keeloq",
     "arf_psa_decrypt",
     "arf_status",
-    "arf_subghz_full",
     "proto_pirate",
     "rolljam",
     "subghz_bruteforcer",
 }
+ARF_APP_IDS = ARF_VISIBLE_APP_IDS | ARF_MODULE_APP_IDS
+ARF_MODULE_ROOT = "/ext/apps_data/arf_subghz_full/modules"
+ARF_MODULE_PATHS = {
+    appid: f"{ARF_MODULE_ROOT}/{appid}.fap" for appid in ARF_MODULE_APP_IDS
+}
 ARF_LEGACY_PATHS = {
-    "/ext/apps/ARF Tools/ProtoPirate.fap": "/ext/apps/ARF Tools/proto_pirate.fap",
+    **{
+        f"/ext/apps/ARF Tools/{appid}.fap": canonical
+        for appid, canonical in ARF_MODULE_PATHS.items()
+    },
+    "/ext/apps/ARF Tools/ProtoPirate.fap": ARF_MODULE_PATHS["proto_pirate"],
     "/ext/apps/ARF Tools/ARF Sub-GHz Full.fap": "/ext/apps/ARF Tools/arf_subghz_full.fap",
-    "/ext/apps/ARF Tools/ARF Status.fap": "/ext/apps/ARF Tools/arf_status.fap",
-    "/ext/apps/ARF Tools/Sub-GHz Bruteforcer.fap": "/ext/apps/ARF Tools/subghz_bruteforcer.fap",
-    "/ext/apps/ARF Tools/ARF KeeLoq.fap": "/ext/apps/ARF Tools/arf_keeloq.fap",
-    "/ext/apps/ARF Tools/ARF Counter BF.fap": "/ext/apps/ARF Tools/arf_counter_bf.fap",
-    "/ext/apps/ARF Tools/ARF Car Emulate.fap": "/ext/apps/ARF Tools/arf_car_emulate.fap",
-    "/ext/apps/ARF Tools/ARF Frequency Analyzer.fap": "/ext/apps/ARF Tools/arf_frequency_analyzer.fap",
-    "/ext/apps/ARF Tools/ARF PSA Decrypt.fap": "/ext/apps/ARF Tools/arf_psa_decrypt.fap",
+    "/ext/apps/ARF Tools/ARF Status.fap": ARF_MODULE_PATHS["arf_status"],
+    "/ext/apps/ARF Tools/Sub-GHz Bruteforcer.fap": ARF_MODULE_PATHS[
+        "subghz_bruteforcer"
+    ],
+    "/ext/apps/ARF Tools/ARF KeeLoq.fap": ARF_MODULE_PATHS["arf_keeloq"],
+    "/ext/apps/ARF Tools/ARF Counter BF.fap": ARF_MODULE_PATHS["arf_counter_bf"],
+    "/ext/apps/ARF Tools/ARF Car Emulate.fap": ARF_MODULE_PATHS["arf_car_emulate"],
+    "/ext/apps/ARF Tools/ARF Frequency Analyzer.fap": ARF_MODULE_PATHS[
+        "arf_frequency_analyzer"
+    ],
+    "/ext/apps/ARF Tools/ARF PSA Decrypt.fap": ARF_MODULE_PATHS["arf_psa_decrypt"],
+    "/ext/apps/ARF Tools/ARF Sub-GHz.fap": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+    "/ext/apps/ARF Tools/arf_subghz.fap": "/ext/apps/ARF Tools/arf_subghz_full.fap",
 }
 
 
@@ -172,7 +187,8 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             resources / "apps/Tools/totp.fap",
         ],
         "module_one": [resources / "apps/Module One/IR Blaster/tumoflip_xremote.fap"],
-        "arf": sorted((resources / "apps/ARF Tools").glob("*.fap")),
+        "arf": sorted((resources / "apps/ARF Tools").glob("*.fap"))
+        + sorted((resources / "apps_data/arf_subghz_full/modules").glob("*.fap")),
         "protocol_packs": sorted(
             (resources / "apps_data/subghz/plugins").glob("protocol_*.fal")
         ),
@@ -222,11 +238,22 @@ def validate_layout(resources: Path) -> None:
             f"Duplicate ARF apps remain in apps/Sub-GHz: {sorted(misplaced)}"
         )
 
-    arf_dir = resources / "apps/ARF Tools"
-    actual_arf = {path.stem for path in arf_dir.glob("*.fap")}
-    missing_arf = sorted(ARF_APP_IDS - actual_arf)
-    if missing_arf:
-        raise ValidationError(f"ARF Tools package is incomplete: {missing_arf}")
+    visible_arf = {path.stem for path in (resources / "apps/ARF Tools").glob("*.fap")}
+    if visible_arf != ARF_VISIBLE_APP_IDS:
+        raise ValidationError(
+            "ARF Tools visible set mismatch; "
+            f"missing={sorted(ARF_VISIBLE_APP_IDS - visible_arf)}, "
+            f"extra={sorted(visible_arf - ARF_VISIBLE_APP_IDS)}"
+        )
+
+    module_dir = resources / "apps_data/arf_subghz_full/modules"
+    actual_modules = {path.stem for path in module_dir.glob("*.fap")}
+    if actual_modules != ARF_MODULE_APP_IDS:
+        raise ValidationError(
+            "ARF Full module set mismatch; "
+            f"missing={sorted(ARF_MODULE_APP_IDS - actual_modules)}, "
+            f"extra={sorted(actual_modules - ARF_MODULE_APP_IDS)}"
+        )
 
 
 def validate_release(

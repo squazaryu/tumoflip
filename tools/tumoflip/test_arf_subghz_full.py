@@ -23,7 +23,7 @@ class ArfSubGhzFullTest(unittest.TestCase):
         start_scene = (
             REPO_ROOT / "applications_user/arf_subghz_full/arf_subghz_hub.c"
         ).read_text(encoding="utf-8")
-        child_faps = set(re.findall(r'ARF_TOOLS_PATH "([^"/]+\.fap)', start_scene))
+        child_faps = set(re.findall(r'ARF_MODULES_PATH "([^"/]+\.fap)', start_scene))
         app_manifests = "\n".join(
             path.read_text(encoding="utf-8")
             for root in (REPO_ROOT / "applications", REPO_ROOT / "applications_user")
@@ -45,12 +45,25 @@ class ArfSubGhzFullTest(unittest.TestCase):
             },
         )
         self.assertIn('.target = "Sub-GHz"', start_scene)
+        self.assertGreaterEqual(
+            app_manifests.count(
+                'fap_dist_path="apps_data/arf_subghz_full/modules/{filename}"'
+            ),
+            len(child_faps),
+        )
         for filename in child_faps:
             appid = filename.removesuffix(".fap")
             self.assertIn(f'appid="{appid}"', app_manifests)
 
     def test_legacy_duplicate_is_removed(self) -> None:
         self.assertFalse((REPO_ROOT / "applications_user/arf_subghz").exists())
+
+    def test_desktop_subghz_opens_full(self) -> None:
+        loader_menu = (
+            REPO_ROOT / "applications/services/loader/loader_menu.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn('EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")', loader_menu)
+        self.assertIn("loader_menu_arf_subghz_full_callback", loader_menu)
 
 
 if __name__ == "__main__":

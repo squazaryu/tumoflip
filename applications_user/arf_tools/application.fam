@@ -6,6 +6,7 @@ App(
     requires=["gui"],
     stack_size=4 * 1024,
     fap_category="ARF Tools",
-    fap_version="0.1.0",
-    fap_description="Deployment status for isolated ARF and ProtoPirate apps and assets.",
+    fap_dist_path="apps_data/arf_subghz_full/modules/{filename}",
+    fap_version="0.2.0",
+    fap_description="Deployment status for ARF Sub-GHz Full and its internal modules.",
 )

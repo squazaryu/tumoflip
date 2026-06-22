@@ -73,6 +73,7 @@ class FlipperApplication:
     fap_icon: Optional[str] = None
     fap_libs: List[str] = field(default_factory=list)
     fap_category: str = ""
+    fap_dist_path: Optional[str] = None
     fap_description: str = ""
     fap_author: str = ""
     fap_weburl: str = ""

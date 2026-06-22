@@ -25,25 +25,25 @@ you find a tumoflip-specific issue, report it in this repository:
 ## Current Build
 
 - Base: Unleashed 089 with selected upstream dev updates
-- Firmware version: `tmwhflpprarf089-023`
+- Firmware version: `tmwhflpprarf089-024`
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `87.15`
 - Target: Flipper Zero F7
-- Release: `v0.2.3` release candidate (hardware validation in progress)
-- Release package: `flipper-z-f7-update-tmwhflpprarf089-023.tgz`
+- Release: `v0.2.4` release candidate (hardware validation in progress)
+- Release package: `flipper-z-f7-update-tmwhflpprarf089-024.tgz`
 
 ## Version Scheme
 
 Installed firmware versions use this format:
 
 ```text
-tmwhflpprarf089-023
+tmwhflpprarf089-024
 ```
 
 - `tmwhflpprarf`: tumoflip firmware name shown as the installed firmware
   version prefix for the ARF-enabled build line.
 - `089`: upstream Unleashed base version.
-- `023`: tumoflip internal build version.
+- `024`: tumoflip internal build version.
 
 When the Unleashed base version or tumoflip internal version changes, update
 the firmware version suffix in `fbt_options.py`, release notes, README, and the
@@ -52,7 +52,7 @@ published update package name together.
 ## tumoflip Changes
 
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
-  `tmwhflpprarf089-023`.
+  `tmwhflpprarf089-024`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.
 - Replaced the Desktop OK menu `Sub-GHz Remote` shortcut with an `ARF Tools`
@@ -70,6 +70,10 @@ published update package name together.
 - Rebuilt ARF Sub-GHz Full as a lightweight launcher for the system Sub-GHz
   implementation and separate ARF FAPs. Each child receives the full
   application heap and returns to the launcher when it exits.
+- Exposes only ARF Sub-GHz Full in `/ext/apps/ARF Tools`; its isolated child
+  FAPs are packaged under `/ext/apps_data/arf_subghz_full/modules`.
+- Routes the Desktop `Sub-GHz` entry through ARF Sub-GHz Full while retaining
+  core Sub-GHz as the internal backend for standard workflows.
 - Added MIFARE Ultralight/NTAG PWD and PACK to the NFC read-success screen.
 - Added the Bambu Lab filament spool NFC parser.
 - Added adaptive dwell and signal hold to hopping in the system Sub-GHz app.
@@ -97,19 +101,19 @@ identity.
 
 | Area | Unleashed | tumoflip |
 | --- | --- | --- |
-| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-023` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-024` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
-| Desktop OK menu | Uses the standard app/menu layout. | Keeps the `8/1` Module One folder after Apps and replaces the `Sub-GHz Remote` shortcut with `ARF Tools`. |
-| ARF tools access | Apps are reached through the normal Apps tree. | Provides a dedicated `ARF Tools` launcher folder with SD-deployed ARF/ProtoPirate apps. |
+| Desktop OK menu | Uses the standard app/menu layout. | Keeps the `8/1` Module One folder after Apps, replaces `Sub-GHz Remote` with `ARF Tools`, and routes `Sub-GHz` through ARF Sub-GHz Full. |
+| ARF tools access | Apps are reached through the normal Apps tree. | Exposes one Full launcher; child ARF/ProtoPirate FAPs are internal modules under `apps_data`. |
 | Settings return flow | Standard Unleashed navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
 | BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication and Mac-side command routing. |
 | ARF protocols | Not included. | Keeps the core set size-limited and loads selected automotive decoders from SD as Protocol Packs. |
 | Sub-GHz hopping | Frequency hopping only. | Adds preset and combined hopping plus an adaptive scan dwell, signal hold, post-signal grace period, and bounded hold time to system Sub-GHz. |
 | NFC additions | Uses the Unleashed 089 NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK and adds the Bambu Lab filament spool parser. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-023` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-024` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -171,47 +175,25 @@ Together with Fiat SPA, Suzuki, and Toyota in core, the Protocol Packs cover
 all protocols enabled in the upstream ARF registry. BMW CAS4 and Honda remain
 disabled because they are also disabled upstream.
 
-ProtoPirate and the lightweight ARF Status diagnostic app are built as
-external `.fap` apps instead of being linked into the core firmware image.
-Functional ARF tools should stay as separate `.fap` apps in the same launcher
-folder rather than being hidden inside the status helper. Current intended SD
-locations are:
+Full and its tools are external `.fap` apps instead of being linked into the
+core firmware image. Only the launcher is exposed in the normal Apps tree;
+functional modules remain separate processes in a private data directory:
 
 ```text
-/ext/apps/ARF Tools/proto_pirate.fap
 /ext/apps/ARF Tools/arf_subghz_full.fap
-/ext/apps/ARF Tools/arf_keeloq.fap
-/ext/apps/ARF Tools/arf_counter_bf.fap
-/ext/apps/ARF Tools/arf_car_emulate.fap
-/ext/apps/ARF Tools/arf_frequency_analyzer.fap
-/ext/apps/ARF Tools/arf_psa_decrypt.fap
-/ext/apps/ARF Tools/rolljam.fap
-/ext/apps/ARF Tools/subghz_bruteforcer.fap
-/ext/apps/ARF Tools/arf_status.fap
+/ext/apps_data/arf_subghz_full/modules/*.fap
 ```
 
 `ARF Sub-GHz Full` is a lightweight launcher. Selecting normal Sub-GHz or a
 dedicated ARF tool closes Full, launches that child, and queues Full to reopen
 when the child exits. Loading all standard and ARF code into one FAP exceeded
 the device heap during hardware testing, so the system Sub-GHz implementation
-remains installed and is not yet replaced in Desktop. See
+remains installed as an internal backend. Desktop now opens Full instead of
+launching that backend directly. See
 [ARF Sub-GHz Full](docs/arf-subghz-full.md) for the validation boundary.
 
-ProtoPirate runtime plugin assets and keystore are deployed to:
-
-```text
-/ext/apps_assets/proto_pirate
-```
-
-The app reads its ARF frequency list from:
-
-```text
-/ext/apps_assets/proto_pirate/setting_user
-```
-
-This keeps ARF frequencies, hopper frequencies, and custom presets isolated
-from the normal Sub-GHz app. The shared `/ext/subghz/assets/setting_user` file
-is intentionally not used for ARF.
+ProtoPirate protocol plugins and its keystore are embedded in the internal
+ProtoPirate FAP, so ARF Status no longer checks obsolete `apps_assets` paths.
 
 ## Included User Applications
 
@@ -279,7 +261,7 @@ Mac bridge and app source.
 Download the latest update package from
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases):
 
-- `flipper-z-f7-update-tmwhflpprarf089-023.tgz`
+- `flipper-z-f7-update-tmwhflpprarf089-024.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -301,7 +283,7 @@ python3 tools/tumoflip/validate_release.py --write-manifest
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-023.tgz
+dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-024.tgz
 ```
 
 ## Upstream

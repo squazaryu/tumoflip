@@ -5,6 +5,7 @@ App(
     entry_point="rolljam_app",
     stack_size=4 * 1024,
     fap_category="ARF Tools",
+    fap_dist_path="apps_data/arf_subghz_full/modules/{filename}",
     fap_icon="rolljam.png",
     fap_icon_assets="images",
     fap_libs=["assets"],
