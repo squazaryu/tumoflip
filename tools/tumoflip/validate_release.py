@@ -15,7 +15,9 @@ from pathlib import Path
 
 FLASH_BASE = 0x08000000
 UPDATER_LIMIT = 128 * 1024
-DEFAULT_MIN_C2_GAP = 2 * 4096
+# Keep at least one complete STM32WB55 flash erase page between the C1 image
+# and the C2/radio region. This prevents a C1 erase operation from touching C2.
+DEFAULT_MIN_C2_GAP = 4096
 PROTOCOL_PACKS = {
     "protocol_chrysler.fal",
     "protocol_fiat_marelli.fal",

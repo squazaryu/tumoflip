@@ -46,7 +46,7 @@ Validation fails when:
 - updater or radio CRC differs from `update.fuf`;
 - target or firmware version is inconsistent;
 - updater exceeds 128 KiB;
-- firmware leaves less than 8 KiB before the C2/radio region;
+- firmware leaves less than one 4 KiB erase page before the C2/radio region;
 - the Protocol Pack set is incomplete or unexpected;
 - an ARF app is duplicated under `apps/Sub-GHz`;
 - the canonical `apps/ARF Tools` package is incomplete.
