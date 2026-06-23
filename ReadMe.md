@@ -92,6 +92,8 @@ published update package name together.
   current ARF radio applications.
 - Added a release validator and versioned package manifest for reproducible SD
   app layouts and independent C2/updater safety checks.
+- Added a hardware regression checklist and release-note warning for checks
+  that require a physical Flipper Zero.
 - Added a verified `tumoflip-packages.zip` release artifact for transactional SD
   package installation from the iOS companion app.
 - Bundled the Module One `ESP32 Marauder` FAP into the SD package so it is
@@ -250,6 +252,12 @@ workflow, builds the updater package, runs the tumoflip release tests, validates
 the manifest, generates `tumoflip-packages.json` and `tumoflip-packages.zip`,
 and uploads the firmware, package manifest, package zip, SDK archive, and
 SHA-256 sums to the GitHub Release.
+
+CI release notes explicitly mark hardware validation as `not run by CI`. Before
+calling a release hardware-validated, run
+[Hardware Regression Checklist](docs/hardware-regression-checklist.md) on a
+physical Flipper Zero and update the release notes with the cases run,
+unverified cases, and any failures.
 
 The schema v2 `tumoflip-packages.json` separates Base, ARF, Module One, and
 Protocol Pack files, provides a content-addressed release ID, and supports the

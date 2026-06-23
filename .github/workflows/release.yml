@@ -154,6 +154,15 @@ jobs:
           - C2 section gap: `{manifest["safety"]["section_gap_bytes"]}` bytes
           - updater: `{manifest["safety"]["updater_bytes"]}` / `{manifest["safety"]["updater_limit_bytes"]}` bytes
 
+          ### Hardware validation
+
+          - status: `not run by CI`
+          - checklist: `docs/hardware-regression-checklist.md`
+          - cases run by CI: `none`
+          - unverified until manual testing: RF, external CC1101, Protocol Pack runtime behavior, hopping, ARF FAP launch/exit, BLE App Bridge, NFC tags, sleep/wake, repeated app launch
+
+          CI must not mark hardware-only checks as passed. Update these release notes after executing the hardware checklist on a physical Flipper Zero for this exact commit.
+
           Before flashing, back up `/int` and important SD files. `tumoflip-packages.zip` is for Unleashed Companion SD package installation; firmware is installed separately through the standard updater package.
           """
           Path("release-notes.md").write_text(

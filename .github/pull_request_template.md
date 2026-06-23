@@ -5,6 +5,7 @@
 # Verification 
 
 - [ Describe how to verify changes ]
+- [ For release-sensitive firmware changes, note whether docs/hardware-regression-checklist.md was run or which cases remain unverified ]
 
 # Author Checklist (Fill this out):
 

@@ -39,6 +39,28 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("Sub-GHz` opens the core firmware app", doc)
         self.assertIn("Protocol Packs", doc)
 
+    def test_hardware_validation_is_documented_as_manual(self) -> None:
+        workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text(
+            encoding="utf-8"
+        )
+        doc = (REPO_ROOT / "docs/hardware-regression-checklist.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("### Hardware validation", workflow)
+        self.assertIn("not run by CI", workflow)
+        self.assertIn("CI must not mark hardware-only checks as passed", workflow)
+        self.assertIn("docs/hardware-regression-checklist.md", workflow)
+
+        self.assertIn("Checklist version: 1", doc)
+        self.assertIn("Do not mark a hardware-only item as passed", doc)
+        self.assertIn("Install And Identity", doc)
+        self.assertIn("System Sub-GHz Internal CC1101", doc)
+        self.assertIn("External CC1101 And Module One", doc)
+        self.assertIn("Protocol Packs", doc)
+        self.assertIn("BLE App Bridge And Runtime", doc)
+        self.assertIn("Failure Report", doc)
+
 
 if __name__ == "__main__":
     unittest.main()
