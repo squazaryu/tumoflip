@@ -72,6 +72,7 @@ jobs:
             tools/tumoflip/test_release_workflow.py \
             tools/tumoflip/test_subghz_drift.py \
             tools/tumoflip/test_subghz_protocol_packs.py \
+            tools/tumoflip/test_update_splash.py \
             tools/tumoflip/test_validate_release.py \
             tools/tumoflip/test_apply_packages.py \
             tools/tumoflip/test_make_packages_zip.py

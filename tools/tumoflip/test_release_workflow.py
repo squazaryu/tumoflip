@@ -21,6 +21,8 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("validate_release.py", workflow)
         self.assertIn("--write-manifest", workflow)
         self.assertIn("test_subghz_drift.py", workflow)
+        self.assertIn("test_subghz_protocol_packs.py", workflow)
+        self.assertIn("test_update_splash.py", workflow)
         self.assertIn("tumoflip-packages.json", workflow)
         self.assertIn("tumoflip-packages.zip", workflow)
         self.assertIn("sha256sum", workflow)
