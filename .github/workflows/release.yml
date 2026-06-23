@@ -56,6 +56,12 @@ jobs:
           git rev-parse --verify "refs/tags/$TAG" >/dev/null
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
+      - name: Install Python release dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user Pillow
+
       - name: Build firmware
         shell: bash
         run: |
