@@ -21,9 +21,6 @@ struct LoaderMenu {
     void (*closed_cb)(void*);
     void* context;
     bool start_in_settings;
-    ViewDispatcher* view_dispatcher;
-    FuriString* pending_launch_name;
-    FuriString* pending_launch_args;
 };
 
 static int32_t loader_menu_thread(void* p);
@@ -36,9 +33,6 @@ static LoaderMenu* loader_menu_alloc_internal(
     loader_menu->closed_cb = closed_cb;
     loader_menu->context = context;
     loader_menu->start_in_settings = start_in_settings;
-    loader_menu->view_dispatcher = NULL;
-    loader_menu->pending_launch_name = furi_string_alloc();
-    loader_menu->pending_launch_args = furi_string_alloc();
     loader_menu->thread = furi_thread_alloc_ex(TAG, 1024, loader_menu_thread, loader_menu);
     furi_thread_start(loader_menu->thread);
     return loader_menu;
@@ -56,26 +50,7 @@ void loader_menu_free(LoaderMenu* loader_menu) {
     furi_assert(loader_menu);
     furi_thread_join(loader_menu->thread);
     furi_thread_free(loader_menu->thread);
-    furi_string_free(loader_menu->pending_launch_name);
-    furi_string_free(loader_menu->pending_launch_args);
     free(loader_menu);
-}
-
-bool loader_menu_has_pending_launch(LoaderMenu* loader_menu) {
-    furi_assert(loader_menu);
-    return !furi_string_empty(loader_menu->pending_launch_name);
-}
-
-const char* loader_menu_get_pending_launch_name(LoaderMenu* loader_menu) {
-    furi_assert(loader_menu);
-    return furi_string_get_cstr(loader_menu->pending_launch_name);
-}
-
-const char* loader_menu_get_pending_launch_args(LoaderMenu* loader_menu) {
-    furi_assert(loader_menu);
-    return furi_string_empty(loader_menu->pending_launch_args) ?
-               NULL :
-               furi_string_get_cstr(loader_menu->pending_launch_args);
 }
 
 typedef enum {
@@ -90,58 +65,52 @@ typedef struct {
     Submenu* settings_menu;
 } LoaderMenuApp;
 
-static void loader_menu_start_with_args(LoaderMenu* loader_menu, const char* name, const char* args) {
-    furi_string_set(loader_menu->pending_launch_name, name);
-    if(args) {
-        furi_string_set(loader_menu->pending_launch_args, args);
-    } else {
-        furi_string_reset(loader_menu->pending_launch_args);
-    }
-    if(loader_menu->view_dispatcher) {
-        view_dispatcher_stop(loader_menu->view_dispatcher);
-    }
+static void loader_menu_start_with_args(const char* name, const char* args) {
+    Loader* loader = furi_record_open(RECORD_LOADER);
+    loader_start_with_gui_error(loader, name, args);
+    furi_record_close(RECORD_LOADER);
 }
 
-static void loader_menu_start(LoaderMenu* loader_menu, const char* name) {
-    loader_menu_start_with_args(loader_menu, name, NULL);
+static void loader_menu_start(const char* name) {
+    loader_menu_start_with_args(name, NULL);
 }
 
 static void loader_menu_apps_callback(void* context, uint32_t index) {
-    LoaderMenu* menu = context;
+    UNUSED(context);
     const char* name = FLIPPER_APPS[index].name;
-    loader_menu_start(menu, name);
+    loader_menu_start(name);
 }
 
 static void loader_menu_external_apps_callback(void* context, uint32_t index) {
-    LoaderMenu* menu = context;
+    UNUSED(context);
     const char* path = FLIPPER_EXTERNAL_APPS[index].name;
-    loader_menu_start(menu, path);
+    loader_menu_start(path);
 }
 
 static void loader_menu_applications_callback(void* context, uint32_t index) {
     UNUSED(index);
-    LoaderMenu* menu = context;
+    UNUSED(context);
     const char* name = LOADER_APPLICATIONS_NAME;
-    loader_menu_start(menu, name);
+    loader_menu_start(name);
 }
 
 static void loader_menu_module_one_callback(void* context, uint32_t index) {
     UNUSED(index);
-    LoaderMenu* menu = context;
-    loader_menu_start_with_args(menu, LOADER_APPLICATIONS_NAME, MODULE_ONE_APPS_PATH);
+    UNUSED(context);
+    loader_menu_start_with_args(LOADER_APPLICATIONS_NAME, MODULE_ONE_APPS_PATH);
 }
 
 static void loader_menu_arf_tools_callback(void* context, uint32_t index) {
     UNUSED(index);
-    LoaderMenu* menu = context;
-    loader_menu_start_with_args(menu, LOADER_APPLICATIONS_NAME, ARF_TOOLS_APPS_PATH);
+    UNUSED(context);
+    loader_menu_start_with_args(LOADER_APPLICATIONS_NAME, ARF_TOOLS_APPS_PATH);
 }
 
 static void
     loader_menu_settings_menu_callback(void* context, InputType input_type, uint32_t index) {
-    LoaderMenu* loader_menu = context;
+    UNUSED(context);
     if(input_type == InputTypeShort) {
-        loader_menu_start(loader_menu, (const char*)index);
+        loader_menu_start((const char*)index);
     } else if(input_type == InputTypeLong) {
         archive_favorites_handle_setting_pin_unpin((const char*)index, NULL);
     }
@@ -245,7 +214,6 @@ static LoaderMenuApp* loader_menu_app_alloc(LoaderMenu* loader_menu) {
     app->view_dispatcher = view_dispatcher_alloc();
     app->primary_menu = menu_alloc();
     app->settings_menu = submenu_alloc();
-    loader_menu->view_dispatcher = app->view_dispatcher;
 
     loader_menu_build_menu(app, loader_menu);
     loader_menu_build_submenu(app, loader_menu);

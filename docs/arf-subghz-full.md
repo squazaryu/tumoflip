@@ -5,9 +5,9 @@ point for the system Sub-GHz application and the isolated ARF tools without
 loading all their code into the same process.
 
 The Desktop `Sub-GHz` entry opens the standard core Sub-GHz app. The former
-Desktop `Sub-GHz Remote` slot opens the `ARF Tools` folder, where only the Full
-launcher is visible. Child FAPs are stored in
-`/ext/apps_data/arf_subghz_full/modules`.
+Desktop `Sub-GHz Remote` slot opens the `ARF Tools` folder, where the Full
+launcher and ARF Frequency Analyzer are visible. The remaining child FAPs are
+stored in `/ext/apps_data/arf_subghz_full/modules`.
 
 ## Included workflows
 

@@ -44,11 +44,10 @@ PROTOCOL_PACKS = {
     "protocol_subaru.fal",
     "protocol_vag.fal",
 }
-ARF_VISIBLE_APP_IDS = {"arf_subghz_full"}
+ARF_VISIBLE_APP_IDS = {"arf_frequency_analyzer", "arf_subghz_full"}
 ARF_MODULE_APP_IDS = {
     "arf_car_emulate",
     "arf_counter_bf",
-    "arf_frequency_analyzer",
     "arf_keeloq",
     "arf_psa_decrypt",
     "arf_status",
@@ -60,6 +59,9 @@ ARF_APP_IDS = ARF_VISIBLE_APP_IDS | ARF_MODULE_APP_IDS
 ARF_MODULE_ROOT = "/ext/apps_data/arf_subghz_full/modules"
 ARF_MODULE_PATHS = {
     appid: f"{ARF_MODULE_ROOT}/{appid}.fap" for appid in ARF_MODULE_APP_IDS
+}
+ARF_VISIBLE_PATHS = {
+    appid: f"/ext/apps/ARF Tools/{appid}.fap" for appid in ARF_VISIBLE_APP_IDS
 }
 STATIC_SD_RESOURCES = Path("tools/tumoflip/sd_resources")
 MODULE_ONE_PACKAGE_FILES = (
@@ -80,7 +82,10 @@ ARF_LEGACY_PATHS = {
     "/ext/apps/ARF Tools/ARF KeeLoq.fap": ARF_MODULE_PATHS["arf_keeloq"],
     "/ext/apps/ARF Tools/ARF Counter BF.fap": ARF_MODULE_PATHS["arf_counter_bf"],
     "/ext/apps/ARF Tools/ARF Car Emulate.fap": ARF_MODULE_PATHS["arf_car_emulate"],
-    "/ext/apps/ARF Tools/ARF Frequency Analyzer.fap": ARF_MODULE_PATHS[
+    "/ext/apps/ARF Tools/ARF Frequency Analyzer.fap": ARF_VISIBLE_PATHS[
+        "arf_frequency_analyzer"
+    ],
+    f"{ARF_MODULE_ROOT}/arf_frequency_analyzer.fap": ARF_VISIBLE_PATHS[
         "arf_frequency_analyzer"
     ],
     "/ext/apps/ARF Tools/ARF PSA Decrypt.fap": ARF_MODULE_PATHS["arf_psa_decrypt"],

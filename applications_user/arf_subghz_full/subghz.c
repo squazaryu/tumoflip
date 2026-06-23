@@ -1,6 +1,7 @@
 /* Abandon hope, all ye who enter here. */
 
 #include <furi/core/log.h>
+#include <dolphin/dolphin.h>
 #include <subghz/types.h>
 #include <lib/toolbox/path.h>
 #include <float_tools.h>
@@ -497,7 +498,12 @@ int32_t subghz_app(void* p) {
             subghz->view_dispatcher, subghz->gui, ViewDispatcherTypeFullscreen);
         furi_string_set(subghz->file_path, SUBGHZ_APP_FOLDER);
         if(subghz_txrx_is_database_loaded(subghz->txrx)) {
+#if defined(ARF_PROFILE_FA)
+            scene_manager_next_scene(subghz->scene_manager, SubGhzSceneFrequencyAnalyzer);
+            dolphin_deed(DolphinDeedSubGhzFrequencyAnalyzer);
+#else
             scene_manager_next_scene(subghz->scene_manager, SubGhzSceneStart);
+#endif
         } else {
             scene_manager_set_scene_state(
                 subghz->scene_manager, SubGhzSceneShowError, SubGhzCustomEventManagerSet);

@@ -6,6 +6,7 @@
 #include <storage/storage.h>
 #include <stdlib.h>
 
+#define ARF_TOOLS_PATH   EXT_PATH("apps/ARF Tools/")
 #define ARF_MODULES_PATH EXT_PATH("apps_data/arf_subghz_full/modules/")
 
 typedef struct {
@@ -26,7 +27,7 @@ static const ArfSubGhzHubItem arf_subghz_hub_items[] = {
     {.label = "ARF Counter BF", .target = ARF_MODULES_PATH "arf_counter_bf.fap"},
     {.label = "ARF Car Emulate", .target = ARF_MODULES_PATH "arf_car_emulate.fap"},
     {.label = "ARF PSA Decrypt", .target = ARF_MODULES_PATH "arf_psa_decrypt.fap"},
-    {.label = "Frequency Analyzer", .target = ARF_MODULES_PATH "arf_frequency_analyzer.fap"},
+    {.label = "Frequency Analyzer", .target = ARF_TOOLS_PATH "arf_frequency_analyzer.fap"},
     {.label = "ProtoPirate", .target = ARF_MODULES_PATH "proto_pirate.fap"},
     {.label = "RollJam", .target = ARF_MODULES_PATH "rolljam.fap"},
     {.label = "Sub-GHz Bruteforcer", .target = ARF_MODULES_PATH "subghz_bruteforcer.fap"},

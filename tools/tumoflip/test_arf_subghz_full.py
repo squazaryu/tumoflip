@@ -35,7 +35,6 @@ class ArfSubGhzFullTest(unittest.TestCase):
             {
                 "arf_car_emulate.fap",
                 "arf_counter_bf.fap",
-                "arf_frequency_analyzer.fap",
                 "arf_keeloq.fap",
                 "arf_psa_decrypt.fap",
                 "arf_status.fap",
@@ -72,19 +71,18 @@ class ArfSubGhzFullTest(unittest.TestCase):
             loader_menu,
         )
 
-    def test_loader_menu_launch_shows_loading_before_menu_teardown(self) -> None:
+    def test_desktop_menu_uses_direct_loader_launches(self) -> None:
+        loader_menu = (
+            REPO_ROOT / "applications/services/loader/loader_menu.c"
+        ).read_text(encoding="utf-8")
         loader = (REPO_ROOT / "applications/services/loader/loader.c").read_text(
             encoding="utf-8"
         )
 
-        self.assertIn(
-            "loader_menu_has_pending_launch(loader->loader_menu)", loader
-        )
-        self.assertIn("loader_do_show_loading(loader);", loader)
-        self.assertLess(
-            loader.index("loader_do_show_loading(loader);"),
-            loader.index("message.type = LoaderMessageTypeMenuClosed;"),
-        )
+        self.assertIn("loader_start_with_gui_error(loader, name, args)", loader_menu)
+        self.assertNotIn("pending_launch", loader_menu)
+        self.assertNotIn("view_dispatcher_stop(loader_menu->view_dispatcher)", loader_menu)
+        self.assertNotIn("loader_menu_has_pending_launch", loader)
 
     def test_full_launches_children_without_reopening_itself(self) -> None:
         start_scene = (
@@ -95,6 +93,33 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertNotIn("ARF Analyzer", start_scene)
         self.assertEqual(start_scene.count("loader_enqueue_launch("), 1)
         self.assertNotIn("loader_get_application_launch_path", start_scene)
+
+    def test_frequency_analyzer_fap_starts_directly(self) -> None:
+        manifest = (
+            REPO_ROOT / "applications_user/arf_subghz_full/application.fam"
+        ).read_text(encoding="utf-8")
+        app = (
+            REPO_ROOT / "applications_user/arf_subghz_full/subghz.c"
+        ).read_text(encoding="utf-8")
+        hub = (
+            REPO_ROOT / "applications_user/arf_subghz_full/arf_subghz_hub.c"
+        ).read_text(encoding="utf-8")
+
+        frequency_app = re.search(
+            r'App\(\s+appid="arf_frequency_analyzer".*?\n\)', manifest, re.S
+        )
+        self.assertIsNotNone(frequency_app)
+        self.assertNotIn("fap_dist_path", frequency_app.group(0))
+        self.assertIn('fap_category="ARF Tools"', frequency_app.group(0))
+        self.assertIn(
+            "scene_manager_next_scene(subghz->scene_manager, SubGhzSceneFrequencyAnalyzer);",
+            app,
+        )
+        self.assertIn('EXT_PATH("apps/ARF Tools/")', hub)
+        self.assertIn(
+            'ARF_TOOLS_PATH "arf_frequency_analyzer.fap"',
+            hub,
+        )
 
 
 if __name__ == "__main__":

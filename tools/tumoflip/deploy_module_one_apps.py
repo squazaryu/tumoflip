@@ -58,12 +58,15 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
 
     arf_subghz_full_src = repo_root / build_dir / ".extapps" / "arf_subghz_full.fap"
     copy_file(arf_subghz_full_src, arf_tools_dir / "arf_subghz_full.fap")
+    copy_file(
+        repo_root / build_dir / ".extapps" / "arf_frequency_analyzer.fap",
+        arf_tools_dir / "arf_frequency_analyzer.fap",
+    )
 
     for appid in (
         "arf_keeloq",
         "arf_counter_bf",
         "arf_car_emulate",
-        "arf_frequency_analyzer",
         "arf_psa_decrypt",
         "arf_status",
         "proto_pirate",
@@ -76,8 +79,11 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
         )
 
     for old_app in arf_tools_dir.glob("*.fap"):
-        if old_app.name != "arf_subghz_full.fap":
+        if old_app.name not in {"arf_frequency_analyzer.fap", "arf_subghz_full.fap"}:
             old_app.unlink()
+    stale_analyzer = modules_dir / "arf_frequency_analyzer.fap"
+    if stale_analyzer.exists():
+        stale_analyzer.unlink()
 
     ensure_subghz_hopping_presets(sd_root)
     remove_appledouble(arf_tools_dir)

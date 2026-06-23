@@ -331,14 +331,8 @@ void loader_clear_launch_queue(Loader* loader) {
 
 // callbacks
 
-static void loader_do_show_loading(Loader* loader);
-
 static void loader_menu_closed_callback(void* context) {
     Loader* loader = context;
-    if(loader->loader_menu && loader_menu_has_pending_launch(loader->loader_menu)) {
-        loader_do_show_loading(loader);
-    }
-
     LoaderMessage message;
     message.type = LoaderMessageTypeMenuClosed;
     furi_message_queue_put(loader->queue, &message, FuriWaitForever);
@@ -636,8 +630,6 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
 
 // process messages
 
-static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord* record);
-
 static void loader_do_menu_show(Loader* loader) {
     if(!loader->loader_menu) {
         loader->loader_menu = loader_menu_alloc(loader_menu_closed_callback, loader);
@@ -652,31 +644,8 @@ static void loader_do_settings_menu_show(Loader* loader) {
 
 static void loader_do_menu_closed(Loader* loader) {
     if(loader->loader_menu) {
-        FuriString* pending_name = NULL;
-        FuriString* pending_args = NULL;
-        if(loader_menu_has_pending_launch(loader->loader_menu)) {
-            pending_name =
-                furi_string_alloc_set_str(loader_menu_get_pending_launch_name(loader->loader_menu));
-            const char* args = loader_menu_get_pending_launch_args(loader->loader_menu);
-            if(args) {
-                pending_args = furi_string_alloc_set_str(args);
-            }
-        }
-
         loader_menu_free(loader->loader_menu);
         loader->loader_menu = NULL;
-
-        if(pending_name) {
-            LoaderDeferredLaunchRecord record = {
-                .name_or_path = strdup(furi_string_get_cstr(pending_name)),
-                .args = pending_args ? strdup(furi_string_get_cstr(pending_args)) : NULL,
-                .flags = LoaderDeferredLaunchFlagGui,
-            };
-            loader_do_deferred_launch(loader, &record);
-            loader_queue_item_clear(&record);
-            furi_string_free(pending_name);
-            if(pending_args) furi_string_free(pending_args);
-        }
     }
 }
 
@@ -806,6 +775,8 @@ static void loader_do_emit_queue_empty_event(Loader* loader) {
     furi_pubsub_publish(loader->pubsub, &event);
 }
 
+static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord* record);
+
 static void loader_do_next_deferred_launch_if_available(Loader* loader) {
     LoaderDeferredLaunchRecord record;
     if(loader_queue_pop(&loader->launch_queue, &record)) {
@@ -816,18 +787,14 @@ static void loader_do_next_deferred_launch_if_available(Loader* loader) {
     }
 }
 
-static void loader_do_show_loading(Loader* loader) {
-    view_holder_set_view(loader->view_holder, loading_get_view(loader->loading));
-    view_holder_send_to_front(loader->view_holder);
-}
-
 static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord* record) {
     furi_assert(loader);
     furi_assert(record);
 
     bool is_successful = false;
     FuriString* error_message = furi_string_alloc();
-    loader_do_show_loading(loader);
+    view_holder_set_view(loader->view_holder, loading_get_view(loader->loading));
+    view_holder_send_to_front(loader->view_holder);
 
     do {
         const char* app_name_str = record->name_or_path;
@@ -854,10 +821,6 @@ static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord
 
 static void loader_do_app_closed(Loader* loader) {
     furi_assert(loader->app.thread);
-
-    if(loader->launch_queue.item_cnt) {
-        loader_do_show_loading(loader);
-    }
 
     furi_thread_join(loader->app.thread);
     FURI_LOG_I(TAG, "App returned: %li", furi_thread_get_return_code(loader->app.thread));
