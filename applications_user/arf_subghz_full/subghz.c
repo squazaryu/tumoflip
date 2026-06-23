@@ -6,6 +6,7 @@
 #include <lib/toolbox/path.h>
 #include <float_tools.h>
 #include "subghz_i.h"
+#include "scenes/subghz_scene_start.h"
 
 #define TAG "SubGhzApp"
 
@@ -160,7 +161,9 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
 #if SUBGHZ_MEASURE_LOADING
     uint32_t load_ticks = furi_get_tick();
 #endif
-    subghz->txrx = subghz_txrx_alloc();
+    subghz->last_settings = subghz_last_settings_alloc();
+    subghz_last_settings_load(subghz->last_settings, 0);
+    subghz->txrx = subghz_txrx_alloc(subghz->last_settings->protocol_pack_group);
 
     // SubMenu
     subghz->submenu = submenu_alloc();
@@ -231,6 +234,34 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
         subghz->view_dispatcher,
         SubGhzViewIdFrequencyAnalyzer,
         subghz_frequency_analyzer_get_view(subghz->subghz_frequency_analyzer));
+#elif !ARF_PROFILE_TOOL
+    subghz->subghz_transmitter = subghz_view_transmitter_alloc();
+    view_dispatcher_add_view(
+        subghz->view_dispatcher,
+        SubGhzViewIdTransmitter,
+        subghz_view_transmitter_get_view(subghz->subghz_transmitter));
+
+    subghz->subghz_frequency_analyzer = subghz_frequency_analyzer_alloc(subghz->txrx);
+    view_dispatcher_add_view(
+        subghz->view_dispatcher,
+        SubGhzViewIdFrequencyAnalyzer,
+        subghz_frequency_analyzer_get_view(subghz->subghz_frequency_analyzer));
+
+#if !defined(ARF_PROFILE_STANDARD)
+    subghz->subghz_psa_decrypt = subghz_view_psa_decrypt_alloc();
+    view_dispatcher_add_view(
+        subghz->view_dispatcher,
+        SubGhzViewIdPsaDecrypt,
+        subghz_view_psa_decrypt_get_view(subghz->subghz_psa_decrypt));
+
+    subghz->car_emulate_view = subghz_car_emulate_view_alloc();
+    view_dispatcher_add_view(
+        subghz->view_dispatcher,
+        SubGhzViewIdCarEmulate,
+        subghz_car_emulate_view_get_view(subghz->car_emulate_view));
+#endif
+
+    subghz->gen_info = calloc(1, sizeof(GenInfo));
 #endif
 
     //init threshold rssi
@@ -242,11 +273,6 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
     //SubGhzSetting* setting = subghz_txrx_get_setting(subghz->txrx);
 
     //subghz_load_custom_presets(setting);
-
-    // Load last used values for Read, Read RAW, etc. or default
-    subghz->last_settings = subghz_last_settings_alloc();
-    //size_t preset_count = subghz_setting_get_preset_count(setting);
-    subghz_last_settings_load(subghz->last_settings, 0);
 
     // Set LED and Amp GPIO control state
     furi_hal_subghz_set_ext_leds_and_amp(subghz->last_settings->leds_and_amp);
@@ -358,6 +384,32 @@ void subghz_free(SubGhz* subghz, bool alloc_for_tx_only) {
         view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdFrequencyAnalyzer);
         subghz_frequency_analyzer_free(subghz->subghz_frequency_analyzer);
     }
+#elif !ARF_PROFILE_TOOL
+    if(subghz->subghz_frequency_analyzer) {
+        view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdFrequencyAnalyzer);
+        subghz_frequency_analyzer_free(subghz->subghz_frequency_analyzer);
+    }
+
+    if(subghz->subghz_transmitter) {
+        view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdTransmitter);
+        subghz_view_transmitter_free(subghz->subghz_transmitter);
+    }
+
+#if !defined(ARF_PROFILE_STANDARD)
+    if(subghz->subghz_psa_decrypt) {
+        view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdPsaDecrypt);
+        subghz_view_psa_decrypt_free(subghz->subghz_psa_decrypt);
+    }
+
+    if(subghz->car_emulate_view) {
+        view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdCarEmulate);
+        subghz_car_emulate_view_free(subghz->car_emulate_view);
+    }
+#endif
+
+    if(subghz->gen_info) {
+        free(subghz->gen_info);
+    }
 #endif
 
 #if !ARF_PROFILE_TOOL
@@ -430,8 +482,17 @@ int32_t subghz_app(void* p) {
     bool alloc_for_tx = false;
 #else
     bool open_receiver = (p && strcmp(p, "read") == 0);
+    bool open_read_raw = (p && strcmp(p, "read_raw") == 0);
+    bool open_saved = (p && strcmp(p, "saved") == 0);
+    bool open_add = (p && strcmp(p, "add") == 0);
+    bool open_add_advanced = (p && strcmp(p, "add_advanced") == 0);
+    bool open_radio_settings = (p && strcmp(p, "radio_settings") == 0);
+    bool open_frequency_analyzer = (p && strcmp(p, "frequency_analyzer") == 0);
+    bool open_scene_arg =
+        open_receiver || open_read_raw || open_saved || open_add || open_add_advanced ||
+        open_radio_settings || open_frequency_analyzer;
     bool alloc_for_tx;
-    if(p && strlen(p) && !open_receiver) {
+    if(p && strlen(p) && !open_scene_arg) {
         alloc_for_tx = true;
     } else {
         alloc_for_tx = false;
@@ -448,14 +509,35 @@ int32_t subghz_app(void* p) {
 
 #if !ARF_PROFILE_TOOL
     // Check argument and run corresponding scene
-    if(open_receiver) {
+    if(open_scene_arg) {
         view_dispatcher_attach_to_gui(
             subghz->view_dispatcher, subghz->gui, ViewDispatcherTypeFullscreen);
         furi_string_set(subghz->file_path, SUBGHZ_APP_FOLDER);
         if(subghz_txrx_is_database_loaded(subghz->txrx)) {
             scene_manager_next_scene(subghz->scene_manager, SubGhzSceneStart);
-            subghz_ensure_receiver_view(subghz);
-            scene_manager_next_scene(subghz->scene_manager, SubGhzSceneReceiver);
+            if(open_receiver) {
+                subghz_ensure_receiver_view(subghz);
+                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneReceiver);
+            } else if(open_read_raw) {
+                subghz_rx_key_state_set(subghz, SubGhzRxKeyStateIDLE);
+                subghz_ensure_read_raw_view(subghz, false);
+                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneReadRAW);
+            } else if(open_saved) {
+                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSaved);
+            } else if(open_add) {
+                scene_manager_set_scene_state(
+                    subghz->scene_manager, SubGhzSceneStart, SubmenuIndexAddManually);
+                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSetType);
+            } else if(open_add_advanced) {
+                scene_manager_set_scene_state(
+                    subghz->scene_manager, SubGhzSceneStart, SubmenuIndexAddManuallyAdvanced);
+                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSetType);
+            } else if(open_radio_settings) {
+                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneExtModuleSettings);
+            } else if(open_frequency_analyzer) {
+                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneFrequencyAnalyzer);
+                dolphin_deed(DolphinDeedSubGhzFrequencyAnalyzer);
+            }
         } else {
             scene_manager_set_scene_state(
                 subghz->scene_manager, SubGhzSceneShowError, SubGhzCustomEventManagerSet);

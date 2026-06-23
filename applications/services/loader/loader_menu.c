@@ -6,6 +6,7 @@
 #include <assets_icons.h>
 #include <applications.h>
 #include <archive/helpers/archive_favorites.h>
+#include <storage/storage.h>
 
 #include "loader.h"
 #include "loader_menu.h"
@@ -15,6 +16,7 @@
 #define MODULE_ONE_APPS_PATH EXT_PATH("apps/Module One")
 #define ARF_TOOLS_MENU_NAME "ARF Tools"
 #define ARF_TOOLS_APPS_PATH EXT_PATH("apps/ARF Tools")
+#define ARF_SUBGHZ_FULL_APP_PATH EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")
 
 struct LoaderMenu {
     FuriThread* thread;
@@ -75,9 +77,20 @@ static void loader_menu_start(const char* name) {
     loader_menu_start_with_args(name, NULL);
 }
 
+static bool loader_menu_external_app_available(const char* path) {
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    bool available = storage_common_stat(storage, path, NULL) == FSE_OK;
+    furi_record_close(RECORD_STORAGE);
+    return available;
+}
+
 static void loader_menu_apps_callback(void* context, uint32_t index) {
     UNUSED(context);
     const char* name = FLIPPER_APPS[index].name;
+    if(strcmp(name, "Sub-GHz") == 0 && loader_menu_external_app_available(ARF_SUBGHZ_FULL_APP_PATH)) {
+        loader_menu_start(ARF_SUBGHZ_FULL_APP_PATH);
+        return;
+    }
     loader_menu_start(name);
 }
 

@@ -50,6 +50,7 @@ ARF_MODULE_APP_IDS = {
     "arf_counter_bf",
     "arf_keeloq",
     "arf_psa_decrypt",
+    "arf_subghz_standard",
     "arf_status",
     "proto_pirate",
     "rolljam",

@@ -8,6 +8,7 @@
 
 #define ARF_TOOLS_PATH   EXT_PATH("apps/ARF Tools/")
 #define ARF_MODULES_PATH EXT_PATH("apps_data/arf_subghz_full/modules/")
+#define ARF_STANDARD_PATH ARF_MODULES_PATH "arf_subghz_standard.fap"
 
 typedef struct {
     Gui* gui;
@@ -19,15 +20,20 @@ typedef struct {
 typedef struct {
     const char* label;
     const char* target;
+    const char* args;
 } ArfSubGhzHubItem;
 
 static const ArfSubGhzHubItem arf_subghz_hub_items[] = {
-    {.label = "Standard Sub-GHz", .target = "Sub-GHz"},
+    {.label = "Read", .target = ARF_STANDARD_PATH, .args = "read"},
+    {.label = "Read RAW", .target = ARF_STANDARD_PATH, .args = "read_raw"},
+    {.label = "Saved", .target = ARF_STANDARD_PATH, .args = "saved"},
+    {.label = "Add Manually", .target = ARF_STANDARD_PATH, .args = "add"},
+    {.label = "Frequency Analyzer", .target = ARF_TOOLS_PATH "arf_frequency_analyzer.fap"},
+    {.label = "Radio Settings", .target = ARF_STANDARD_PATH, .args = "radio_settings"},
     {.label = "ARF KeeLoq", .target = ARF_MODULES_PATH "arf_keeloq.fap"},
     {.label = "ARF Counter BF", .target = ARF_MODULES_PATH "arf_counter_bf.fap"},
     {.label = "ARF Car Emulate", .target = ARF_MODULES_PATH "arf_car_emulate.fap"},
     {.label = "ARF PSA Decrypt", .target = ARF_MODULES_PATH "arf_psa_decrypt.fap"},
-    {.label = "Frequency Analyzer", .target = ARF_TOOLS_PATH "arf_frequency_analyzer.fap"},
     {.label = "ProtoPirate", .target = ARF_MODULES_PATH "proto_pirate.fap"},
     {.label = "RollJam", .target = ARF_MODULES_PATH "rolljam.fap"},
     {.label = "Sub-GHz Bruteforcer", .target = ARF_MODULES_PATH "subghz_bruteforcer.fap"},
@@ -47,7 +53,7 @@ static void arf_subghz_hub_launch_callback(void* context, uint32_t index) {
     loader_enqueue_launch(
         app->loader,
         arf_subghz_hub_items[index].target,
-        NULL,
+        arf_subghz_hub_items[index].args,
         LoaderDeferredLaunchFlagGui);
 
     view_dispatcher_stop(app->view_dispatcher);

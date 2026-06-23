@@ -10,6 +10,8 @@
 
 #define TAG "SubGhzTxRx"
 
+#define SUBGHZ_PROTOCOL_PLUGIN_PATH EXT_PATH("apps_data/subghz/plugins")
+
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
     subghz_radio_broker_external_power_on(instance->radio_broker, &instance->radio_lease);
 }
@@ -18,7 +20,7 @@ static void subghz_txrx_radio_device_power_off(SubGhzTxRx* instance) {
     subghz_radio_broker_external_power_off(instance->radio_broker, &instance->radio_lease);
 }
 
-SubGhzTxRx* subghz_txrx_alloc(void) {
+SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group) {
     SubGhzTxRx* instance = malloc(sizeof(SubGhzTxRx));
     instance->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
     furi_check(subghz_radio_broker_acquire(
@@ -41,6 +43,9 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
 
     instance->worker = subghz_worker_alloc();
     instance->fff_data = flipper_format_string_alloc();
+    instance->rx_callback = NULL;
+    instance->rx_context = NULL;
+    instance->receiver_filter = SubGhzProtocolFlag_Decodable;
 
     instance->environment = subghz_environment_alloc();
     instance->is_database_loaded =
@@ -50,9 +55,14 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
         instance->environment, SUBGHZ_ALUTECH_AT_4N_DIR_NAME);
     subghz_environment_set_nice_flor_s_rainbow_table_file_name(
         instance->environment, SUBGHZ_NICE_FLOR_S_DIR_NAME);
+    instance->protocol_pack_registry = subghz_protocol_pack_registry_alloc(
+        &subghz_protocol_registry, SUBGHZ_PROTOCOL_PLUGIN_PATH, protocol_pack_group);
+    instance->protocol_pack_group = protocol_pack_group;
     subghz_environment_set_protocol_registry(
-        instance->environment, (void*)&subghz_protocol_registry);
+        instance->environment,
+        subghz_protocol_pack_registry_get(instance->protocol_pack_registry));
     instance->receiver = subghz_receiver_alloc_init(instance->environment);
+    subghz_receiver_set_filter(instance->receiver, instance->receiver_filter);
 
     subghz_worker_set_overrun_callback(
         instance->worker, (SubGhzWorkerOverrunCallback)subghz_receiver_reset);
@@ -69,6 +79,46 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
     return instance;
 }
 
+bool subghz_txrx_reload_protocol_pack(
+    SubGhzTxRx* instance,
+    SubGhzProtocolPackGroup protocol_pack_group) {
+    furi_assert(instance);
+
+    if(protocol_pack_group >= SubGhzProtocolPackGroupCount) return false;
+    if(protocol_pack_group == instance->protocol_pack_group) return true;
+    if(instance->txrx_state == SubGhzTxRxStateTx) return false;
+
+    const bool resume_rx = instance->txrx_state == SubGhzTxRxStateRx;
+    subghz_txrx_stop(instance);
+
+    subghz_worker_set_context(instance->worker, NULL);
+    subghz_receiver_free(instance->receiver);
+    subghz_protocol_pack_registry_free(instance->protocol_pack_registry);
+
+    instance->protocol_pack_registry = subghz_protocol_pack_registry_alloc(
+        &subghz_protocol_registry, SUBGHZ_PROTOCOL_PLUGIN_PATH, protocol_pack_group);
+    instance->protocol_pack_group = protocol_pack_group;
+    subghz_environment_set_protocol_registry(
+        instance->environment,
+        subghz_protocol_pack_registry_get(instance->protocol_pack_registry));
+
+    instance->receiver = subghz_receiver_alloc_init(instance->environment);
+    subghz_receiver_set_filter(instance->receiver, instance->receiver_filter);
+    subghz_receiver_set_rx_callback(
+        instance->receiver, instance->rx_callback, instance->rx_context);
+    subghz_worker_set_context(instance->worker, instance->receiver);
+    instance->decoder_result = subghz_receiver_search_decoder_base_by_name(
+        instance->receiver, SUBGHZ_PROTOCOL_BIN_RAW_NAME);
+
+    if(resume_rx) subghz_txrx_rx_start(instance);
+    return true;
+}
+
+const SubGhzProtocolPackReport* subghz_txrx_get_protocol_pack_report(SubGhzTxRx* instance) {
+    furi_assert(instance);
+    return subghz_protocol_pack_registry_get_report(instance->protocol_pack_registry);
+}
+
 void subghz_txrx_free(SubGhzTxRx* instance) {
     furi_assert(instance);
 
@@ -83,6 +133,7 @@ void subghz_txrx_free(SubGhzTxRx* instance) {
 
     subghz_worker_free(instance->worker);
     subghz_receiver_free(instance->receiver);
+    subghz_protocol_pack_registry_free(instance->protocol_pack_registry);
     subghz_environment_free(instance->environment);
     flipper_format_free(instance->fff_data);
     furi_string_free(instance->preset->name);
@@ -811,6 +862,7 @@ bool subghz_txrx_protocol_is_transmittable(SubGhzTxRx* instance, bool check_type
 
 void subghz_txrx_receiver_set_filter(SubGhzTxRx* instance, SubGhzProtocolFlag filter) {
     furi_assert(instance);
+    instance->receiver_filter = filter;
     subghz_receiver_set_filter(instance->receiver, filter);
 }
 
@@ -818,6 +870,8 @@ void subghz_txrx_set_rx_callback(
     SubGhzTxRx* instance,
     SubGhzReceiverCallback callback,
     void* context) {
+    instance->rx_callback = callback;
+    instance->rx_context = context;
     subghz_receiver_set_rx_callback(instance->receiver, callback, context);
 }
 

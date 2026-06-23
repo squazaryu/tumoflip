@@ -24,6 +24,7 @@
 #define SUBGHZ_LAST_SETTING_FIELD_HOPPING_THRESHOLD                 "HoppingThreshold"
 #define SUBGHZ_LAST_SETTING_FIELD_LED_AND_POWER_AMP                 "LedAndPowerAmp"
 #define SUBGHZ_LAST_SETTING_FIELD_TX_POWER                          "TXPower"
+#define SUBGHZ_LAST_SETTING_FIELD_PROTOCOL_PACK_GROUP               "ProtocolPackGroup"
 #define SUBGHZ_LAST_SETTING_FIELD_CUSTOM_CAR_EMULATE                "CustomCarEmulate"
 #define SUBGHZ_LAST_SETTING_FIELD_PROTOCOL_FILTER                   "ProtocolFilter"
 
@@ -56,6 +57,7 @@ void subghz_last_settings_load(SubGhzLastSettings* instance, size_t preset_count
     instance->enable_combined_hopping = false;
     instance->combined_hopping_threshold = SUBGHZ_LAST_SETTING_DEFAULT_COMBINED_HOPPING_THRESHOLD;
     instance->leds_and_amp = true;
+    instance->protocol_pack_group = SubGhzProtocolPackGroupLegacy;
     instance->protocol_filter[0] = '\0';
 
     Storage* storage = furi_record_open(RECORD_STORAGE);
@@ -173,6 +175,17 @@ void subghz_last_settings_load(SubGhzLastSettings* instance, size_t preset_count
                 flipper_format_rewind(fff_data_file);
             }
             instance->tx_power = (uint8_t)(tx_power & 0xFF);
+            uint32_t protocol_pack_group = SubGhzProtocolPackGroupLegacy;
+            if(!flipper_format_read_uint32(
+                   fff_data_file,
+                   SUBGHZ_LAST_SETTING_FIELD_PROTOCOL_PACK_GROUP,
+                   &protocol_pack_group,
+                   1)) {
+                flipper_format_rewind(fff_data_file);
+            }
+            if(protocol_pack_group < SubGhzProtocolPackGroupCount) {
+                instance->protocol_pack_group = protocol_pack_group;
+            }
             if(!flipper_format_read_float(
                    fff_data_file,
                    SUBGHZ_LAST_SETTING_FIELD_HOPPING_THRESHOLD,
@@ -327,6 +340,11 @@ bool subghz_last_settings_save(SubGhzLastSettings* instance) {
         }
         uint32_t tx_power = instance->tx_power;
         if(!flipper_format_write_uint32(file, SUBGHZ_LAST_SETTING_FIELD_TX_POWER, &tx_power, 1)) {
+            break;
+        }
+        uint32_t protocol_pack_group = instance->protocol_pack_group;
+        if(!flipper_format_write_uint32(
+               file, SUBGHZ_LAST_SETTING_FIELD_PROTOCOL_PACK_GROUP, &protocol_pack_group, 1)) {
             break;
         }
         if(!flipper_format_write_float(

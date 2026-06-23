@@ -68,6 +68,7 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
         "arf_counter_bf",
         "arf_car_emulate",
         "arf_psa_decrypt",
+        "arf_subghz_standard",
         "arf_status",
         "proto_pirate",
         "rolljam",

@@ -18,8 +18,9 @@ void subghz_scene_saved_menu_submenu_callback(void* context, uint32_t index) {
 void subghz_scene_saved_menu_on_enter(void* context) {
     SubGhz* subghz = context;
 
-    FlipperFormat* fff = subghz_txrx_get_fff_data(subghz->txrx);
     bool is_psa_encrypted = false;
+#if !defined(ARF_PROFILE_STANDARD)
+    FlipperFormat* fff = subghz_txrx_get_fff_data(subghz->txrx);
     bool has_counter = false;
     if(fff) {
         FuriString* proto = furi_string_alloc();
@@ -45,6 +46,7 @@ void subghz_scene_saved_menu_on_enter(void* context) {
             has_counter = true;
         }
     }
+#endif
 
     if(!is_psa_encrypted) {
         submenu_add_item(
@@ -55,6 +57,7 @@ void subghz_scene_saved_menu_on_enter(void* context) {
             subghz);
     }
 
+#if !defined(ARF_PROFILE_STANDARD)
     if(is_psa_encrypted) {
         submenu_add_item(
             subghz->submenu,
@@ -63,6 +66,7 @@ void subghz_scene_saved_menu_on_enter(void* context) {
             subghz_scene_saved_menu_submenu_callback,
             subghz);
     }
+#endif
 
     submenu_add_item(
         subghz->submenu,
@@ -78,12 +82,14 @@ void subghz_scene_saved_menu_on_enter(void* context) {
         subghz_scene_saved_menu_submenu_callback,
         subghz);
 
+#if !defined(ARF_PROFILE_STANDARD)
     submenu_add_item(
         subghz->submenu,
         "Custom Emulate Settings",
         SubmenuIndexCarEmulateSettings,
         subghz_scene_saved_menu_submenu_callback,
         subghz);
+#endif
 
     if(furi_hal_rtc_is_flag_set(FuriHalRtcFlagDebug)) {
         submenu_add_item(
@@ -94,6 +100,7 @@ void subghz_scene_saved_menu_on_enter(void* context) {
             subghz);
     }
 
+#if !defined(ARF_PROFILE_STANDARD)
     if(has_counter) {
         submenu_add_item(
             subghz->submenu,
@@ -102,6 +109,7 @@ void subghz_scene_saved_menu_on_enter(void* context) {
             subghz_scene_saved_menu_submenu_callback,
             subghz);
     }
+#endif
 
     submenu_set_selected_item(
         subghz->submenu,
@@ -118,6 +126,7 @@ bool subghz_scene_saved_menu_on_event(void* context, SceneManagerEvent event) {
             scene_manager_set_scene_state(
                 subghz->scene_manager, SubGhzSceneSavedMenu, SubmenuIndexEmulate);
 
+#if !defined(ARF_PROFILE_STANDARD)
             bool use_custom = subghz->last_settings->custom_car_emulate;
             if(use_custom) {
                 FlipperFormat* fff = subghz_txrx_get_fff_data(subghz->txrx);
@@ -133,12 +142,17 @@ bool subghz_scene_saved_menu_on_event(void* context, SceneManagerEvent event) {
             } else {
                 scene_manager_next_scene(subghz->scene_manager, SubGhzSceneTransmitter);
             }
+#else
+            scene_manager_next_scene(subghz->scene_manager, SubGhzSceneTransmitter);
+#endif
             return true;
+#if !defined(ARF_PROFILE_STANDARD)
         } else if(event.event == SubmenuIndexPsaDecrypt) {
             scene_manager_set_scene_state(
                 subghz->scene_manager, SubGhzSceneSavedMenu, SubmenuIndexPsaDecrypt);
             scene_manager_next_scene(subghz->scene_manager, SubGhzScenePsaDecrypt);
             return true;
+#endif
         } else if(event.event == SubmenuIndexDelete) {
             scene_manager_set_scene_state(
                 subghz->scene_manager, SubGhzSceneSavedMenu, SubmenuIndexDelete);
@@ -154,7 +168,9 @@ bool subghz_scene_saved_menu_on_event(void* context, SceneManagerEvent event) {
                 subghz->scene_manager, SubGhzSceneSavedMenu, SubmenuIndexSignalSettings);
             scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSignalSettings);
             return true;
-        } else if(event.event == SubmenuIndexCounterBf) {
+        }
+#if !defined(ARF_PROFILE_STANDARD)
+        else if(event.event == SubmenuIndexCounterBf) {
             scene_manager_set_scene_state(
                 subghz->scene_manager, SubGhzSceneSavedMenu, SubmenuIndexCounterBf);
             scene_manager_next_scene(subghz->scene_manager, SubGhzSceneCounterBf);
@@ -168,6 +184,7 @@ bool subghz_scene_saved_menu_on_event(void* context, SceneManagerEvent event) {
             scene_manager_next_scene(subghz->scene_manager, SubGhzSceneCarEmulateSettings);
             return true;
         }
+#endif
     }
     return false;
 }

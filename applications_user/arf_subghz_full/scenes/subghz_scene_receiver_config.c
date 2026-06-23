@@ -1,4 +1,5 @@
 #include "../subghz_i.h"
+#include "../helpers/subghz_txrx_i.h"
 #include <lib/toolbox/value_index.h>
 #include <math.h>
 
@@ -10,6 +11,8 @@ enum SubGhzSettingIndex {
     SubGhzSettingIndexHopping,
     SubGhzSettingIndexPresetHopping,
     SubGhzSettingIndexCombinedHopping,
+    SubGhzSettingIndexProtocolPack,
+    SubGhzSettingIndexProtocolPackInfo,
     SubGhzSettingIndexBinRAW,
     SubGhzSettingIndexIgnoreReversRB2,
     SubGhzSettingIndexIgnoreAlarms,
@@ -443,6 +446,42 @@ static void subghz_scene_receiver_config_set_combined_hopping(VariableItem* item
         preset_hopping_item, enabled, "Turn off\nCombined\nHopping\nfirst!");
 }
 
+static void
+    subghz_scene_receiver_config_update_protocol_pack_status(VariableItem* item, SubGhz* subghz) {
+    const SubGhzProtocolPackReport* report = subghz_txrx_get_protocol_pack_report(subghz->txrx);
+    char status_text[32];
+    if(report->expected_plugin_count == 0) {
+        snprintf(status_text, sizeof(status_text), "Core only");
+    } else {
+        snprintf(
+            status_text,
+            sizeof(status_text),
+            "%zu/%zu %s",
+            report->loaded_plugin_count,
+            report->expected_plugin_count,
+            report->loaded_plugin_count == report->expected_plugin_count ? "OK" : "ERR");
+    }
+    variable_item_set_current_value_text(item, status_text);
+}
+
+static void subghz_scene_receiver_config_set_protocol_pack(VariableItem* item) {
+    SubGhz* subghz = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+    uint8_t previous = subghz->last_settings->protocol_pack_group;
+
+    if(subghz_txrx_reload_protocol_pack(subghz->txrx, index)) {
+        subghz->last_settings->protocol_pack_group = index;
+    } else {
+        index = previous;
+        variable_item_set_current_value_index(item, previous);
+    }
+    variable_item_set_current_value_text(item, subghz_protocol_pack_group_get_name(index));
+
+    subghz_scene_receiver_config_update_protocol_pack_status(
+        variable_item_list_get(subghz->variable_item_list, SubGhzSettingIndexProtocolPackInfo),
+        subghz);
+}
+
 static void subghz_scene_receiver_config_set_speaker(VariableItem* item) {
     SubGhz* subghz = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
@@ -513,6 +552,8 @@ static void subghz_scene_receiver_config_var_list_enter_callback(void* context, 
     SubGhz* subghz = context;
     if(index == SubGhzSettingIndexProtoFilter) {
         scene_manager_next_scene(subghz->scene_manager, SubGhzSceneProtocolList);
+    } else if(index == SubGhzSettingIndexProtocolPackInfo) {
+        scene_manager_next_scene(subghz->scene_manager, SubGhzSceneProtocolPackInfo);
     } else if(index == SubGhzSettingIndexLock) {
         view_dispatcher_send_custom_event(
             subghz->view_dispatcher, SubGhzCustomEventSceneSettingLock);
@@ -550,6 +591,9 @@ static void subghz_scene_receiver_config_var_list_enter_callback(void* context, 
         subghz->last_settings->preset_hopping_threshold = SUBGHZ_LAST_SETTING_DEFAULT_PRESET_HOPPING_THRESHOLD;
         subghz_txrx_preset_hopper_set_state(subghz->txrx, SubGhzPresetHopperStateOFF);
         subghz->last_settings->enable_combined_hopping = false;
+        if(subghz_txrx_reload_protocol_pack(subghz->txrx, SubGhzProtocolPackGroupLegacy)) {
+            subghz->last_settings->protocol_pack_group = SubGhzProtocolPackGroupLegacy;
+        }
 
         variable_item_list_set_selected_item(subghz->variable_item_list, default_index);
         variable_item_list_reset(subghz->variable_item_list);
@@ -662,6 +706,20 @@ void subghz_scene_receiver_config_on_enter(void* context) {
                     subghz->variable_item_list, SubGhzSettingIndexModulation),
                 " -----");
         }
+
+        item = variable_item_list_add(
+            subghz->variable_item_list,
+            "Protocol Pack",
+            SubGhzProtocolPackGroupCount,
+            subghz_scene_receiver_config_set_protocol_pack,
+            subghz);
+        value_index = subghz->last_settings->protocol_pack_group;
+        variable_item_set_current_value_index(item, value_index);
+        variable_item_set_current_value_text(
+            item, subghz_protocol_pack_group_get_name(value_index));
+
+        item = variable_item_list_add(subghz->variable_item_list, "Pack Status", 1, NULL, NULL);
+        subghz_scene_receiver_config_update_protocol_pack_status(item, subghz);
     }
 
     if(scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneReadRAW) !=
