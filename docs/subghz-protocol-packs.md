@@ -38,10 +38,9 @@ The merged registry is owned by the graphical Sub-GHz application and remains
 valid until that application exits. Receivers are destroyed before plugins are
 unloaded.
 
-Protocol Packs currently extend the graphical system Sub-GHz application and
-the ARF Standard Sub-GHz external backend used by ARF Sub-GHz Full. The Sub-GHz
-CLI and external applications such as ProtoPirate keep their own registries and
-do not automatically inherit these packs.
+Protocol Packs currently extend the graphical system Sub-GHz application. The
+Sub-GHz CLI and external applications such as ProtoPirate keep their own
+registries and do not automatically inherit these packs.
 
 ## Runtime groups
 
@@ -66,8 +65,7 @@ into RAM for the current session.
 ## Protocol Pack Inspector
 
 Open `Sub-GHz` -> `Read` -> receiver configuration -> `Pack Status`, then
-press `OK`. The same status view is available from the stock system Sub-GHz
-fallback and the ARF Standard Sub-GHz backend.
+press `OK`.
 The summary shows:
 
 - active group;

@@ -70,14 +70,14 @@ published update package name together.
 - Added ARF Sub-GHz `setting_user` frequencies, hopper frequencies, and custom
   presets as ProtoPirate-only assets, isolated from the normal Sub-GHz app.
 - Added ProtoPirate and ARF Tools as external apps for isolated SD deployment.
-- Rebuilt ARF Sub-GHz Full as a lightweight launcher for an external standard
-  Sub-GHz backend and separate ARF FAPs. Each child receives the full
+- Rebuilt ARF Sub-GHz Full as a lightweight launcher for the stable core
+  Sub-GHz app and separate ARF FAPs. Each ARF child receives the full
   application heap instead of being linked into one large process.
 - Exposes ARF Sub-GHz Full and ARF Frequency Analyzer in `/ext/apps/ARF Tools`;
   the remaining isolated child FAPs are packaged under
   `/ext/apps_data/arf_subghz_full/modules`.
-- Routes the Desktop `Sub-GHz` shortcut to ARF Sub-GHz Full when the SD backend
-  is present, with a fallback to the stock core app if the SD app is missing.
+- Keeps the Desktop `Sub-GHz` shortcut on the stable core app; ARF Tools stays
+  as a separate Desktop folder/launcher.
 - Added MIFARE Ultralight/NTAG PWD and PACK to the NFC read-success screen.
 - Added the Bambu Lab filament spool NFC parser.
 - Added adaptive dwell and signal hold to hopping in the system Sub-GHz app.
@@ -111,7 +111,7 @@ identity.
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
-| Desktop OK menu | Uses the standard app/menu layout. | Keeps the `8/1` Module One folder after Apps, redirects `Sub-GHz` to ARF Sub-GHz Full when available, and replaces `Sub-GHz Remote` with the `ARF Tools` folder. |
+| Desktop OK menu | Uses the standard app/menu layout. | Keeps the `8/1` Module One folder after Apps, keeps `Sub-GHz` on the core app, and replaces `Sub-GHz Remote` with the `ARF Tools` folder. |
 | ARF tools access | Apps are reached through the normal Apps tree. | Exposes one Full launcher; child ARF/ProtoPirate FAPs are internal modules under `apps_data`. |
 | Settings return flow | Standard Unleashed navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
 | BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication and Mac-side command routing. |
@@ -173,8 +173,8 @@ the new group without restarting Sub-GHz.
 This preserves the normal Sub-GHz receive workflow while recovering internal
 flash for Tumoflip Runtime. ProtoPirate can still provide its own isolated
 implementations. The Protocol Pack loader is currently used by the graphical
-system Sub-GHz app and the ARF Standard Sub-GHz external backend; the Sub-GHz
-CLI continues to use the built-in registry.
+system Sub-GHz app; the Sub-GHz CLI and external applications such as
+ProtoPirate keep their own registries.
 See [Sub-GHz Protocol Packs](docs/subghz-protocol-packs.md) for the ABI and
 packaging rules.
 
@@ -192,13 +192,11 @@ functional modules remain separate processes in a private data directory:
 /ext/apps_data/arf_subghz_full/modules/*.fap
 ```
 
-`ARF Sub-GHz Full` is a lightweight launcher. Selecting normal Sub-GHz or a
-dedicated ARF tool closes Full and launches that child. Standard workflows are
-served by `/ext/apps_data/arf_subghz_full/modules/arf_subghz_standard.fap`,
-while ARF-specific tools stay in separate FAPs. Loading all standard and ARF
-code into one process exceeded the device heap during hardware testing, so the
-stock core Sub-GHz app remains installed as a fallback. Desktop redirects
-`Sub-GHz` to Full when `/ext/apps/ARF Tools/arf_subghz_full.fap` is present.
+`ARF Sub-GHz Full` is a lightweight launcher. Selecting normal Sub-GHz opens
+the stable core app; dedicated ARF tools stay in separate FAPs. Loading all
+standard and ARF code into one external process exceeded the device heap during
+hardware testing, so the stock core Sub-GHz app remains the primary receiver
+and transmitter surface.
 See [ARF Sub-GHz Full](docs/arf-subghz-full.md) for the validation boundary.
 
 ProtoPirate protocol plugins and its keystore are embedded in the internal

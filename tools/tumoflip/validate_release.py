@@ -50,7 +50,6 @@ ARF_MODULE_APP_IDS = {
     "arf_counter_bf",
     "arf_keeloq",
     "arf_psa_decrypt",
-    "arf_subghz_standard",
     "arf_status",
     "proto_pirate",
     "rolljam",
@@ -89,6 +88,8 @@ ARF_LEGACY_PATHS = {
     f"{ARF_MODULE_ROOT}/arf_frequency_analyzer.fap": ARF_VISIBLE_PATHS[
         "arf_frequency_analyzer"
     ],
+    f"{ARF_MODULE_ROOT}/arf_subghz_standard.fap": ARF_VISIBLE_PATHS["arf_subghz_full"],
+    "/ext/apps/ARF Tools/arf_subghz_standard.fap": ARF_VISIBLE_PATHS["arf_subghz_full"],
     "/ext/apps/ARF Tools/ARF PSA Decrypt.fap": ARF_MODULE_PATHS["arf_psa_decrypt"],
     "/ext/apps/ARF Tools/ARF Sub-GHz.fap": "/ext/apps/ARF Tools/arf_subghz_full.fap",
     "/ext/apps/ARF Tools/arf_subghz.fap": "/ext/apps/ARF Tools/arf_subghz_full.fap",

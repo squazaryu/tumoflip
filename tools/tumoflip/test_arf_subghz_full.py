@@ -37,19 +37,15 @@ class ArfSubGhzFullTest(unittest.TestCase):
                 "arf_counter_bf.fap",
                 "arf_keeloq.fap",
                 "arf_psa_decrypt.fap",
-                "arf_subghz_standard.fap",
                 "arf_status.fap",
                 "proto_pirate.fap",
                 "rolljam.fap",
                 "subghz_bruteforcer.fap",
             },
         )
-        self.assertNotIn('.target = "Sub-GHz"', start_scene)
-        self.assertIn('#define ARF_STANDARD_PATH', start_scene)
-        self.assertIn('.args = "read"', start_scene)
-        self.assertIn('.args = "read_raw"', start_scene)
-        self.assertIn('.args = "saved"', start_scene)
-        self.assertIn('.args = "radio_settings"', start_scene)
+        self.assertIn('.target = "Sub-GHz"', start_scene)
+        self.assertNotIn("#define ARF_STANDARD_PATH", start_scene)
+        self.assertNotIn("arf_subghz_standard.fap", start_scene)
         self.assertGreaterEqual(
             app_manifests.count(
                 'fap_dist_path="apps_data/arf_subghz_full/modules/{filename}"'
@@ -63,20 +59,17 @@ class ArfSubGhzFullTest(unittest.TestCase):
     def test_legacy_duplicate_is_removed(self) -> None:
         self.assertFalse((REPO_ROOT / "applications_user/arf_subghz").exists())
 
-    def test_desktop_replaces_subghz_when_arf_full_is_available(self) -> None:
+    def test_desktop_keeps_core_subghz_and_exposes_arf_tools_folder(self) -> None:
         loader_menu = (
             REPO_ROOT / "applications/services/loader/loader_menu.c"
         ).read_text(encoding="utf-8")
         self.assertIn('EXT_PATH("apps/ARF Tools")', loader_menu)
-        self.assertIn(
-            'EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")',
-            loader_menu,
-        )
-        self.assertIn("loader_menu_external_app_available", loader_menu)
         self.assertIn("loader_menu_arf_tools_callback", loader_menu)
         self.assertNotIn("loader_menu_arf_subghz_full_callback", loader_menu)
         self.assertNotIn("loader_menu_esp32_marauder_callback", loader_menu)
-        self.assertIn('strcmp(name, "Sub-GHz") == 0', loader_menu)
+        self.assertNotIn("loader_menu_external_app_available", loader_menu)
+        self.assertNotIn("ARF_SUBGHZ_FULL_APP_PATH", loader_menu)
+        self.assertNotIn('strcmp(name, "Sub-GHz") == 0', loader_menu)
         self.assertNotIn(
             'EXT_PATH("apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap")',
             loader_menu,
