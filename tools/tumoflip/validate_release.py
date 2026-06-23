@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 import zlib
@@ -141,14 +142,23 @@ def manifest_release_id(manifest: dict[str, object]) -> str:
 
 def find_objdump(repo_root: Path) -> Path:
     candidates = (
+        repo_root / "toolchain/current/bin/arm-none-eabi-objdump",
+        repo_root / "toolchain/x86_64-linux/bin/arm-none-eabi-objdump",
+        repo_root / "toolchain/arm64-linux/bin/arm-none-eabi-objdump",
         repo_root / "toolchain/arm64-darwin/bin/arm-none-eabi-objdump",
         repo_root / "toolchain/x86_64-darwin/bin/arm-none-eabi-objdump",
+        repo_root / "toolchain/x86_64-windows/bin/arm-none-eabi-objdump.exe",
     )
     for candidate in candidates:
         if candidate.is_file():
             return candidate
+
+    path_candidate = shutil.which("arm-none-eabi-objdump")
+    if path_candidate:
+        return Path(path_candidate)
+
     raise ValidationError(
-        "arm-none-eabi-objdump was not found in the workspace toolchain"
+        "arm-none-eabi-objdump was not found in the workspace toolchain or PATH"
     )
 
 

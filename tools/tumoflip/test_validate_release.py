@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import copy
+import os
 import tempfile
 import unittest
 import zlib
@@ -12,6 +13,7 @@ try:
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
         crc32,
+        find_objdump,
         little_endian_hex,
         manifest_release_id,
         parse_fuf,
@@ -22,6 +24,7 @@ except ImportError:
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
         crc32,
+        find_objdump,
         little_endian_hex,
         manifest_release_id,
         parse_fuf,
@@ -56,6 +59,23 @@ class ValidateReleaseTest(unittest.TestCase):
             path = Path(directory) / "data.bin"
             path.write_bytes(b"tumoflip")
             self.assertEqual(crc32(path), zlib.crc32(b"tumoflip") & 0xFFFFFFFF)
+
+    def test_find_objdump_falls_back_to_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "repo"
+            root.mkdir()
+            bin_dir = Path(directory) / "bin"
+            bin_dir.mkdir()
+            objdump = bin_dir / "arm-none-eabi-objdump"
+            objdump.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            objdump.chmod(0o755)
+
+            old_path = os.environ.get("PATH", "")
+            try:
+                os.environ["PATH"] = f"{bin_dir}{os.pathsep}{old_path}"
+                self.assertEqual(find_objdump(root), objdump)
+            finally:
+                os.environ["PATH"] = old_path
 
     def test_manifest_release_id_is_stable_and_content_addressed(self) -> None:
         manifest = {"schema": 2, "packages": {"base": [{"sha256": "abc"}]}}
