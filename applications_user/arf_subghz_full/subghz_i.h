@@ -159,5 +159,7 @@ SubGhzRxKeyState subghz_rx_key_state_get(SubGhz* subghz);
 extern const NotificationSequence subghz_sequence_rx;
 extern const NotificationSequence subghz_sequence_rx_locked;
 
+void subghz_ensure_transmitter_view(SubGhz* subghz);
+void subghz_ensure_frequency_analyzer_view(SubGhz* subghz);
 void subghz_ensure_receiver_view(SubGhz* subghz);
 void subghz_ensure_read_raw_view(SubGhz* subghz, bool raw_send_only);

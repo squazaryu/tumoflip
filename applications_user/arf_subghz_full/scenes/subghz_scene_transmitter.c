@@ -54,6 +54,7 @@ void subghz_scene_transmitter_on_enter(void* context) {
     SubGhz* subghz = context;
 
     subghz_custom_btns_reset();
+    subghz_ensure_transmitter_view(subghz);
 
     if(!subghz_scene_transmitter_update_data_show(subghz)) {
         view_dispatcher_send_custom_event(

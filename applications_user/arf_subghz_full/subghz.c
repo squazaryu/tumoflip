@@ -68,6 +68,30 @@ static void __attribute__((unused))
 }
 
 #if !ARF_PROFILE_TOOL
+void subghz_ensure_transmitter_view(SubGhz* subghz) {
+    furi_assert(subghz);
+
+    if(!subghz->subghz_transmitter) {
+        subghz->subghz_transmitter = subghz_view_transmitter_alloc();
+        view_dispatcher_add_view(
+            subghz->view_dispatcher,
+            SubGhzViewIdTransmitter,
+            subghz_view_transmitter_get_view(subghz->subghz_transmitter));
+    }
+}
+
+void subghz_ensure_frequency_analyzer_view(SubGhz* subghz) {
+    furi_assert(subghz);
+
+    if(!subghz->subghz_frequency_analyzer) {
+        subghz->subghz_frequency_analyzer = subghz_frequency_analyzer_alloc(subghz->txrx);
+        view_dispatcher_add_view(
+            subghz->view_dispatcher,
+            SubGhzViewIdFrequencyAnalyzer,
+            subghz_frequency_analyzer_get_view(subghz->subghz_frequency_analyzer));
+    }
+}
+
 void subghz_ensure_receiver_view(SubGhz* subghz) {
     furi_assert(subghz);
 
@@ -235,6 +259,7 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
         SubGhzViewIdFrequencyAnalyzer,
         subghz_frequency_analyzer_get_view(subghz->subghz_frequency_analyzer));
 #elif !ARF_PROFILE_TOOL
+#if !defined(ARF_PROFILE_STANDARD)
     subghz->subghz_transmitter = subghz_view_transmitter_alloc();
     view_dispatcher_add_view(
         subghz->view_dispatcher,
@@ -247,7 +272,6 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
         SubGhzViewIdFrequencyAnalyzer,
         subghz_frequency_analyzer_get_view(subghz->subghz_frequency_analyzer));
 
-#if !defined(ARF_PROFILE_STANDARD)
     subghz->subghz_psa_decrypt = subghz_view_psa_decrypt_alloc();
     view_dispatcher_add_view(
         subghz->view_dispatcher,
@@ -488,6 +512,11 @@ int32_t subghz_app(void* p) {
     bool open_add_advanced = (p && strcmp(p, "add_advanced") == 0);
     bool open_radio_settings = (p && strcmp(p, "radio_settings") == 0);
     bool open_frequency_analyzer = (p && strcmp(p, "frequency_analyzer") == 0);
+#if defined(ARF_PROFILE_STANDARD)
+    if(!p || !strlen(p)) {
+        open_receiver = true;
+    }
+#endif
     bool open_scene_arg =
         open_receiver || open_read_raw || open_saved || open_add || open_add_advanced ||
         open_radio_settings || open_frequency_analyzer;
