@@ -61,6 +61,11 @@ ARF_MODULE_ROOT = "/ext/apps_data/arf_subghz_full/modules"
 ARF_MODULE_PATHS = {
     appid: f"{ARF_MODULE_ROOT}/{appid}.fap" for appid in ARF_MODULE_APP_IDS
 }
+STATIC_SD_RESOURCES = Path("tools/tumoflip/sd_resources")
+MODULE_ONE_PACKAGE_FILES = (
+    "apps/Module One/IR Blaster/tumoflip_xremote.fap",
+    "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
+)
 ARF_LEGACY_PATHS = {
     **{
         f"/ext/apps/ARF Tools/{appid}.fap": canonical
@@ -177,6 +182,20 @@ def require_file(path: Path, label: str) -> Path:
     return path
 
 
+def install_static_sd_resources(repo_root: Path, resources: Path) -> None:
+    source_root = repo_root / STATIC_SD_RESOURCES
+    if not source_root.is_dir():
+        return
+
+    for source in source_root.rglob("*"):
+        if not source.is_file():
+            continue
+        relative = source.relative_to(source_root)
+        target = resources / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+
+
 def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
     groups: dict[str, list[Path]] = {
         "base": [
@@ -186,7 +205,9 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             resources / "apps/Tools/quac.fap",
             resources / "apps/Tools/totp.fap",
         ],
-        "module_one": [resources / "apps/Module One/IR Blaster/tumoflip_xremote.fap"],
+        "module_one": [
+            resources / relative for relative in MODULE_ONE_PACKAGE_FILES
+        ],
         "arf": sorted((resources / "apps/ARF Tools").glob("*.fap"))
         + sorted((resources / "apps_data/arf_subghz_full/modules").glob("*.fap")),
         "protocol_packs": sorted(
@@ -309,6 +330,7 @@ def validate_release(
     resources = require_file(
         build_dir / "resources/Manifest", "resource manifest"
     ).parent
+    install_static_sd_resources(repo_root, resources)
     validate_layout(resources)
     packages = package_entries(resources)
     api = api_version(repo_root / "targets/f7/api_symbols.csv")

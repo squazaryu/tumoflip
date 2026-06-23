@@ -26,7 +26,7 @@ static const ArfSubGhzHubItem arf_subghz_hub_items[] = {
     {.label = "ARF Counter BF", .target = ARF_MODULES_PATH "arf_counter_bf.fap"},
     {.label = "ARF Car Emulate", .target = ARF_MODULES_PATH "arf_car_emulate.fap"},
     {.label = "ARF PSA Decrypt", .target = ARF_MODULES_PATH "arf_psa_decrypt.fap"},
-    {.label = "ARF Analyzer", .target = ARF_MODULES_PATH "arf_frequency_analyzer.fap"},
+    {.label = "Frequency Analyzer", .target = ARF_MODULES_PATH "arf_frequency_analyzer.fap"},
     {.label = "ProtoPirate", .target = ARF_MODULES_PATH "proto_pirate.fap"},
     {.label = "RollJam", .target = ARF_MODULES_PATH "rolljam.fap"},
     {.label = "Sub-GHz Bruteforcer", .target = ARF_MODULES_PATH "subghz_bruteforcer.fap"},
@@ -43,23 +43,12 @@ static void arf_subghz_hub_launch_callback(void* context, uint32_t index) {
     ArfSubGhzHub* app = context;
     furi_check(index < COUNT_OF(arf_subghz_hub_items));
 
-    FuriString* self_path = furi_string_alloc();
-    FuriString* self_args = furi_string_alloc_printf("%lu", (unsigned long)index);
-    furi_check(loader_get_application_launch_path(app->loader, self_path));
-
     loader_enqueue_launch(
         app->loader,
         arf_subghz_hub_items[index].target,
         NULL,
         LoaderDeferredLaunchFlagGui);
-    loader_enqueue_launch(
-        app->loader,
-        furi_string_get_cstr(self_path),
-        furi_string_get_cstr(self_args),
-        LoaderDeferredLaunchFlagGui);
 
-    furi_string_free(self_args);
-    furi_string_free(self_path);
     view_dispatcher_stop(app->view_dispatcher);
 }
 

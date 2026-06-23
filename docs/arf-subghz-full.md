@@ -4,9 +4,10 @@
 point for the system Sub-GHz application and the isolated ARF tools without
 loading all their code into the same process.
 
-The Desktop `Sub-GHz` entry and the `ARF Tools` folder both open Full. Only the
-Full launcher is exposed under `/ext/apps/ARF Tools`; child FAPs are stored in
-`/ext/apps_data/arf_subghz_full/modules`.
+The Desktop `Sub-GHz` entry opens Full. Only the Full launcher is exposed under
+`/ext/apps/ARF Tools`; child FAPs are stored in
+`/ext/apps_data/arf_subghz_full/modules`. The former Desktop `Sub-GHz Remote`
+slot is reserved for the Module One `ESP32 Marauder` FAP.
 
 ## Included workflows
 
@@ -21,11 +22,10 @@ Full launcher is exposed under `/ext/apps/ARF Tools`; child FAPs are stored in
 
 ## RAM model
 
-Full queues the selected child and then itself in Loader, exits, and is reopened
-after the child terminates. This gives each utility the available application
-heap instead of linking all Sub-GHz scenes and ARF workers into one FAP. The
-single-FAP parity build reached 159 KB and left only about 2 KB of free heap on
-hardware, so it was rejected after the first device test.
+Full queues the selected child in Loader and exits. This gives each utility the
+available application heap instead of linking all Sub-GHz scenes and ARF workers
+into one FAP. The single-FAP parity build reached 159 KB and left only about
+2 KB of free heap on hardware, so it was rejected after the first device test.
 
 ## Validation boundary
 

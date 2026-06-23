@@ -64,6 +64,22 @@ class ArfSubGhzFullTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")', loader_menu)
         self.assertIn("loader_menu_arf_subghz_full_callback", loader_menu)
+        self.assertIn(
+            'EXT_PATH("apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap")',
+            loader_menu,
+        )
+        self.assertIn("loader_menu_esp32_marauder_callback", loader_menu)
+        self.assertNotIn("loader_menu_arf_tools_callback", loader_menu)
+
+    def test_full_launches_children_without_reopening_itself(self) -> None:
+        start_scene = (
+            REPO_ROOT / "applications_user/arf_subghz_full/arf_subghz_hub.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("Frequency Analyzer", start_scene)
+        self.assertNotIn("ARF Analyzer", start_scene)
+        self.assertEqual(start_scene.count("loader_enqueue_launch("), 1)
+        self.assertNotIn("loader_get_application_launch_path", start_scene)
 
 
 if __name__ == "__main__":

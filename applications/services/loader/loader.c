@@ -630,6 +630,8 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
 
 // process messages
 
+static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord* record);
+
 static void loader_do_menu_show(Loader* loader) {
     if(!loader->loader_menu) {
         loader->loader_menu = loader_menu_alloc(loader_menu_closed_callback, loader);
@@ -644,8 +646,31 @@ static void loader_do_settings_menu_show(Loader* loader) {
 
 static void loader_do_menu_closed(Loader* loader) {
     if(loader->loader_menu) {
+        FuriString* pending_name = NULL;
+        FuriString* pending_args = NULL;
+        if(loader_menu_has_pending_launch(loader->loader_menu)) {
+            pending_name =
+                furi_string_alloc_set_str(loader_menu_get_pending_launch_name(loader->loader_menu));
+            const char* args = loader_menu_get_pending_launch_args(loader->loader_menu);
+            if(args) {
+                pending_args = furi_string_alloc_set_str(args);
+            }
+        }
+
         loader_menu_free(loader->loader_menu);
         loader->loader_menu = NULL;
+
+        if(pending_name) {
+            LoaderDeferredLaunchRecord record = {
+                .name_or_path = strdup(furi_string_get_cstr(pending_name)),
+                .args = pending_args ? strdup(furi_string_get_cstr(pending_args)) : NULL,
+                .flags = LoaderDeferredLaunchFlagGui,
+            };
+            loader_do_deferred_launch(loader, &record);
+            loader_queue_item_clear(&record);
+            furi_string_free(pending_name);
+            if(pending_args) furi_string_free(pending_args);
+        }
     }
 }
 
@@ -774,8 +799,6 @@ static void loader_do_emit_queue_empty_event(Loader* loader) {
     event.type = LoaderEventTypeNoMoreAppsInQueue;
     furi_pubsub_publish(loader->pubsub, &event);
 }
-
-static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord* record);
 
 static void loader_do_next_deferred_launch_if_available(Loader* loader) {
     LoaderDeferredLaunchRecord record;

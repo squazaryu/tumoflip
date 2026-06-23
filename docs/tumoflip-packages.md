@@ -7,7 +7,7 @@ artifact hashes, and SD files grouped as:
 
 - `base`
 - `arf`
-- `module_one`
+- `module_one` (`tumoflip_xremote.fap` and `ESP32 Marauder`)
 - `protocol_packs`
 
 Every SD entry contains its source path, `/ext` target path, byte size, and

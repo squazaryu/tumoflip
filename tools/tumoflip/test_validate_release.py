@@ -8,7 +8,9 @@ from pathlib import Path
 
 try:
     from .validate_release import (
+        MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
+        STATIC_SD_RESOURCES,
         crc32,
         little_endian_hex,
         manifest_release_id,
@@ -16,12 +18,17 @@ try:
     )
 except ImportError:
     from validate_release import (
+        MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
+        STATIC_SD_RESOURCES,
         crc32,
         little_endian_hex,
         manifest_release_id,
         parse_fuf,
     )
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class ValidateReleaseTest(unittest.TestCase):
@@ -58,6 +65,17 @@ class ValidateReleaseTest(unittest.TestCase):
 
         self.assertEqual(manifest_release_id(manifest), manifest_release_id(reordered))
         self.assertNotEqual(manifest_release_id(manifest), manifest_release_id(changed))
+
+    def test_static_module_one_package_files_are_vendored(self) -> None:
+        self.assertIn(
+            "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        for relative in MODULE_ONE_PACKAGE_FILES:
+            if relative.endswith("esp32_wifi_marauder.fap"):
+                path = REPO_ROOT / STATIC_SD_RESOURCES / relative
+                self.assertTrue(path.is_file(), str(path))
+                self.assertGreater(path.stat().st_size, 100 * 1024)
 
 
 if __name__ == "__main__":
