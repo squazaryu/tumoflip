@@ -33,4 +33,6 @@ Emulate, ProtoPirate, RollJam, and Bruteforcer stay in separate child FAPs.
 The system Sub-GHz application stays in firmware as the primary receiver and
 transmitter surface. It should not be replaced by an external FAP unless the
 Sub-GHz app is first split into a smaller service/client architecture that can
-be validated without heap exhaustion or navigation regressions.
+be validated without heap exhaustion or navigation regressions. The repository
+tracks this as a deliberate architecture boundary in
+[Sub-GHz Architecture](subghz-architecture.md).

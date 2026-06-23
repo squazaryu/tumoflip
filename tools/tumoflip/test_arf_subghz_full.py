@@ -16,6 +16,7 @@ class ArfSubGhzFullTest(unittest.TestCase):
 
         self.assertIn('appid="arf_subghz_full"', manifest)
         self.assertIn('sources=["arf_subghz_hub.c"]', manifest)
+        self.assertNotIn('appid="arf_subghz_standard"', manifest)
         self.assertNotIn('"scenes/*.c"', manifest)
         self.assertNotIn('"views/*.c"', manifest)
 
@@ -46,6 +47,7 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertIn('.target = "Sub-GHz"', start_scene)
         self.assertNotIn("#define ARF_STANDARD_PATH", start_scene)
         self.assertNotIn("arf_subghz_standard.fap", start_scene)
+        self.assertNotIn('appid="arf_subghz_standard"', app_manifests)
         self.assertGreaterEqual(
             app_manifests.count(
                 'fap_dist_path="apps_data/arf_subghz_full/modules/{filename}"'

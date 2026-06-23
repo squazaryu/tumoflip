@@ -140,7 +140,10 @@ Current custom Desktop modes:
 tumoflip includes an initial merge of selected automotive Sub-GHz protocol code
 from [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF). This is
 a feature merge, not a replacement of the existing Unleashed/tumoflip Sub-GHz
-stack.
+stack. The supported boundary is documented in
+[Sub-GHz Architecture](docs/subghz-architecture.md): core Sub-GHz stays in
+firmware, optional decoders are loaded as `.fal` Protocol Packs, and heavy ARF
+utilities stay as separate `.fap` tools on SD.
 
 ARF protocols currently enabled in the system Sub-GHz registry:
 
@@ -241,6 +244,12 @@ Release builds can emit a SHA-256 package inventory and validate the updater:
 ```sh
 python3 tools/tumoflip/validate_release.py --write-manifest
 ```
+
+GitHub release tags use the `v*` format. Pushing a release tag runs the Release
+workflow, builds the updater package, runs the tumoflip release tests, validates
+the manifest, generates `tumoflip-packages.json` and `tumoflip-packages.zip`,
+and uploads the firmware, package manifest, package zip, SDK archive, and
+SHA-256 sums to the GitHub Release.
 
 The schema v2 `tumoflip-packages.json` separates Base, ARF, Module One, and
 Protocol Pack files, provides a content-addressed release ID, and supports the

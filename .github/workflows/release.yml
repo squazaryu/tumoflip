@@ -1,0 +1,200 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing v* tag to publish"
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.inputs.release_tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  FBT_NO_SYNC: 0
+  FORCE_NO_DIRTY: "yes"
+  FBT_GIT_SUBMODULE_SHALLOW: 1
+  WORKFLOW_BRANCH_OR_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+
+jobs:
+  release:
+    name: build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout release ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.release_tag || github.ref }}
+          submodules: recursive
+          fetch-depth: 0
+          clean: "true"
+
+      - name: Resolve release tag
+        id: ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.release_tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          if [[ ! "$TAG" =~ ^v[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.]+)?$ ]]; then
+            echo "Release tag must look like v0.2.8; got: $TAG" >&2
+            exit 1
+          fi
+          git rev-parse --verify "refs/tags/$TAG" >/dev/null
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf applications/main/clock_app/resources/apps/ || true
+          ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" updater_package
+
+      - name: Run release tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest \
+            tools/tumoflip/test_arf_subghz_full.py \
+            tools/tumoflip/test_release_workflow.py \
+            tools/tumoflip/test_validate_release.py \
+            tools/tumoflip/test_apply_packages.py \
+            tools/tumoflip/test_make_packages_zip.py
+
+      - name: Validate updater and package manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/tumoflip/validate_release.py \
+            --build-dir build/f7-firmware-C \
+            --write-manifest
+
+      - name: Prepare release assets
+        id: assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(python3 - <<'PY'
+          import json
+          with open("build/f7-firmware-C/firmware.json", encoding="utf-8") as stream:
+              print(json.load(stream)["firmware_version"])
+          PY
+          )"
+          UPDATE_DIR="dist/f7-C/f7-update-${VERSION}"
+          SHA_FILE="dist/f7-C/${VERSION}-SHA256SUMS"
+
+          assets=(
+            "dist/f7-C/flipper-z-f7-full-${VERSION}.dfu"
+            "dist/f7-C/flipper-z-f7-sdk-${VERSION}.zip"
+            "dist/f7-C/flipper-z-f7-update-${VERSION}.tgz"
+            "${UPDATE_DIR}/tumoflip-packages.json"
+            "${UPDATE_DIR}/tumoflip-packages.zip"
+          )
+
+          for asset in "${assets[@]}"; do
+            test -f "$asset"
+          done
+
+          (
+            cd dist/f7-C
+            sha256sum \
+              "flipper-z-f7-full-${VERSION}.dfu" \
+              "flipper-z-f7-sdk-${VERSION}.zip" \
+              "flipper-z-f7-update-${VERSION}.tgz" \
+              "f7-update-${VERSION}/tumoflip-packages.json" \
+              "f7-update-${VERSION}/tumoflip-packages.zip" \
+              | sed "s#f7-update-${VERSION}/##"
+          ) > "$SHA_FILE"
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          version = json.loads(Path("build/f7-firmware-C/firmware.json").read_text())[
+              "firmware_version"
+          ]
+          manifest_path = Path(f"dist/f7-C/f7-update-{version}/tumoflip-packages.json")
+          manifest = json.loads(manifest_path.read_text())
+          packages = ", ".join(
+              f"{name}={len(entries)}"
+              for name, entries in sorted(manifest["packages"].items())
+          )
+
+          notes = f"""## {version}
+
+          Experimental Tumoflip build based on Unleashed 089. Some features may be unstable; report regressions in Issues.
+
+          ### Automated release assets
+
+          This release was built by the release workflow from the tagged source. The workflow ran the firmware build, release tests, `validate_release.py --write-manifest`, and published the firmware plus SD package assets from the same build.
+
+          ### Package manifest
+
+          - firmware version: `{manifest["firmware"]["version"]}`
+          - firmware API: `{manifest["firmware"]["api"]}`
+          - release ID: `{manifest["release_id"]}`
+          - package groups: `{packages}`
+          - cleanup entries: `{len(manifest.get("cleanup", []))}`
+
+          ### Safety checks
+
+          - C2 section gap: `{manifest["safety"]["section_gap_bytes"]}` bytes
+          - updater: `{manifest["safety"]["updater_bytes"]}` / `{manifest["safety"]["updater_limit_bytes"]}` bytes
+
+          Before flashing, back up `/int` and important SD files. `tumoflip-packages.zip` is for Unleashed Companion SD package installation; firmware is installed separately through the standard updater package.
+          """
+          Path("release-notes.md").write_text(
+              "\n".join(line.strip() for line in notes.splitlines()) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha_file=${SHA_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ref.outputs.tag }}
+          VERSION: ${{ steps.assets.outputs.version }}
+          SHA_FILE: ${{ steps.assets.outputs.sha_file }}
+        run: |
+          set -euo pipefail
+          assets=(
+            "dist/f7-C/flipper-z-f7-full-${VERSION}.dfu"
+            "dist/f7-C/flipper-z-f7-sdk-${VERSION}.zip"
+            "dist/f7-C/flipper-z-f7-update-${VERSION}.tgz"
+            "${SHA_FILE}"
+            "dist/f7-C/f7-update-${VERSION}/tumoflip-packages.json"
+            "dist/f7-C/f7-update-${VERSION}/tumoflip-packages.zip"
+          )
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" \
+              --title "$VERSION" \
+              --notes-file release-notes.md \
+              --latest \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "${assets[@]}" \
+              --verify-tag \
+              --title "$VERSION" \
+              --notes-file release-notes.md \
+              --latest \
+              --repo "$GITHUB_REPOSITORY"
+          fi

@@ -3,6 +3,8 @@
 Tumoflip can load selected Sub-GHz protocols from SD as `.fal` plugins. This
 keeps optional protocol code out of the internal firmware image while exposing
 the protocols through the normal graphical Sub-GHz application.
+This is the supported extension path for Sub-GHz; see
+[Sub-GHz Architecture](subghz-architecture.md) for the firmware/SD boundary.
 
 ## Location
 
