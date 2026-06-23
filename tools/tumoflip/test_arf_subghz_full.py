@@ -72,6 +72,20 @@ class ArfSubGhzFullTest(unittest.TestCase):
             loader_menu,
         )
 
+    def test_loader_menu_launch_shows_loading_before_menu_teardown(self) -> None:
+        loader = (REPO_ROOT / "applications/services/loader/loader.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn(
+            "loader_menu_has_pending_launch(loader->loader_menu)", loader
+        )
+        self.assertIn("loader_do_show_loading(loader);", loader)
+        self.assertLess(
+            loader.index("loader_do_show_loading(loader);"),
+            loader.index("message.type = LoaderMessageTypeMenuClosed;"),
+        )
+
     def test_full_launches_children_without_reopening_itself(self) -> None:
         start_scene = (
             REPO_ROOT / "applications_user/arf_subghz_full/arf_subghz_hub.c"
