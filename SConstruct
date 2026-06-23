@@ -95,6 +95,26 @@ if GetOption("fullenv") or any(
         else []
     )
 
+    if distenv["UPDATE_SPLASH"] == "tumoflip_update":
+        update_splash = distenv.Command(
+            "#/assets/slideshow/tumoflip_update/frame_00.png",
+            [
+                "#/tools/tumoflip/sync_update_splash.py",
+                "#/tools/tumoflip/generate_update_splash.py",
+                "#/fbt_options.py",
+            ],
+            [
+                [
+                    "${PYTHON3}",
+                    "${SOURCE}",
+                    "--dist-suffix",
+                    "${DIST_SUFFIX}",
+                ]
+            ],
+        )
+    else:
+        update_splash = []
+
     selfupdate_dist = distenv.DistCommand(
         "updater_package",
         (distenv["DIST_DEPENDS"], firmware_env["FW_RESOURCES_MANIFEST"]),
@@ -105,6 +125,7 @@ if GetOption("fullenv") or any(
             *dist_splash_arguments,
         ],
     )
+    Depends(selfupdate_dist, update_splash)
 
     selfupdate_min_dist = distenv.DistCommand(
         "updater_minpackage",

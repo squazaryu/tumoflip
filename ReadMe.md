@@ -48,6 +48,8 @@ tmwhflpprarf089-028
 When the Unleashed base version or tumoflip internal version changes, update
 the firmware version suffix in `fbt_options.py`, release notes, README, and the
 published update package name together.
+The post-update splash screen is generated automatically from `DIST_SUFFIX`
+when `updater_package` is built.
 
 ## tumoflip Changes
 
