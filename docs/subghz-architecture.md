@@ -30,3 +30,12 @@ Desktop follows the same boundary:
 Release validation and unit tests enforce this layout by rejecting stale
 `arf_subghz_standard.fap` package entries and by checking that Desktop no longer
 redirects `Sub-GHz` to ARF Full.
+
+The ARF FAPs still share some source files with the core Sub-GHz app. Files
+listed in `tools/tumoflip/subghz_drift_manifest.txt` are expected to remain
+byte-identical between `applications/main/subghz` and
+`applications_user/arf_subghz_full`. The release test
+`tools/tumoflip/test_subghz_drift.py` runs `check_subghz_drift.py` and fails if
+one of those shared files changes in only one copy. Files outside that manifest
+are treated as intentional ARF profile forks until they are extracted behind a
+smaller shared API.

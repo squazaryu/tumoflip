@@ -1,0 +1,37 @@
+# Files that are intentionally shared byte-for-byte between:
+# - applications/main/subghz
+# - applications_user/arf_subghz_full
+#
+# If a future change needs to fork one of these files, remove it from this list
+# in the same commit and document why in docs/subghz-architecture.md or the
+# relevant issue. Files not listed here are intentionally forked ARF profile
+# code or have already diverged from the core app.
+helpers/subghz_chat.h
+helpers/subghz_threshold_rssi.c
+icon.png
+resources/subghz/assets/alutech_at_4n
+resources/subghz/assets/dangerous_settings
+resources/subghz/assets/nice_flor_s
+resources/subghz/assets/vag
+scenes/subghz_scene.c
+scenes/subghz_scene.h
+scenes/subghz_scene_decode_raw.c
+scenes/subghz_scene_delete.c
+scenes/subghz_scene_delete_raw.c
+scenes/subghz_scene_more_raw.c
+scenes/subghz_scene_protocol_pack_info.c
+scenes/subghz_scene_radio_settings.c
+scenes/subghz_scene_saved.c
+scenes/subghz_scene_set_key.c
+scenes/subghz_scene_show_error.c
+scenes/subghz_scene_signal_settings.c
+subghz.h
+subghz_cli.c
+subghz_cli.h
+subghz_dangerous_freq.c
+views/receiver.h
+views/subghz_frequency_analyzer.c
+views/subghz_frequency_analyzer.h
+views/subghz_read_raw.c
+views/subghz_read_raw.h
+views/transmitter.h

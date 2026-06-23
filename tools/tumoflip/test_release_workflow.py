@@ -20,6 +20,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("./fbt COMPACT=1 DEBUG=0", workflow)
         self.assertIn("validate_release.py", workflow)
         self.assertIn("--write-manifest", workflow)
+        self.assertIn("test_subghz_drift.py", workflow)
         self.assertIn("tumoflip-packages.json", workflow)
         self.assertIn("tumoflip-packages.zip", workflow)
         self.assertIn("sha256sum", workflow)
@@ -38,6 +39,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("must not be reintroduced", doc)
         self.assertIn("Sub-GHz` opens the core firmware app", doc)
         self.assertIn("Protocol Packs", doc)
+        self.assertIn("subghz_drift_manifest.txt", doc)
 
     def test_hardware_validation_is_documented_as_manual(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text(
