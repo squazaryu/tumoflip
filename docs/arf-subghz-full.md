@@ -4,10 +4,10 @@
 point for the system Sub-GHz application and the isolated ARF tools without
 loading all their code into the same process.
 
-The Desktop `Sub-GHz` entry opens Full. Only the Full launcher is exposed under
-`/ext/apps/ARF Tools`; child FAPs are stored in
-`/ext/apps_data/arf_subghz_full/modules`. The former Desktop `Sub-GHz Remote`
-slot is reserved for the Module One `ESP32 Marauder` FAP.
+The Desktop `Sub-GHz` entry opens the standard core Sub-GHz app. The former
+Desktop `Sub-GHz Remote` slot opens the `ARF Tools` folder, where only the Full
+launcher is visible. Child FAPs are stored in
+`/ext/apps_data/arf_subghz_full/modules`.
 
 ## Included workflows
 

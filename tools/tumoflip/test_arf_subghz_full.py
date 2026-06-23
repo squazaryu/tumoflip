@@ -58,18 +58,19 @@ class ArfSubGhzFullTest(unittest.TestCase):
     def test_legacy_duplicate_is_removed(self) -> None:
         self.assertFalse((REPO_ROOT / "applications_user/arf_subghz").exists())
 
-    def test_desktop_subghz_opens_full(self) -> None:
+    def test_desktop_keeps_standard_subghz_and_exposes_arf_tools(self) -> None:
         loader_menu = (
             REPO_ROOT / "applications/services/loader/loader_menu.c"
         ).read_text(encoding="utf-8")
-        self.assertIn('EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")', loader_menu)
-        self.assertIn("loader_menu_arf_subghz_full_callback", loader_menu)
-        self.assertIn(
+        self.assertIn('EXT_PATH("apps/ARF Tools")', loader_menu)
+        self.assertIn("loader_menu_arf_tools_callback", loader_menu)
+        self.assertNotIn("loader_menu_arf_subghz_full_callback", loader_menu)
+        self.assertNotIn("loader_menu_esp32_marauder_callback", loader_menu)
+        self.assertNotIn('strcmp(FLIPPER_APPS[i].name, "Sub-GHz")', loader_menu)
+        self.assertNotIn(
             'EXT_PATH("apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap")',
             loader_menu,
         )
-        self.assertIn("loader_menu_esp32_marauder_callback", loader_menu)
-        self.assertNotIn("loader_menu_arf_tools_callback", loader_menu)
 
     def test_full_launches_children_without_reopening_itself(self) -> None:
         start_scene = (

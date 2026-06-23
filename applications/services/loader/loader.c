@@ -845,6 +845,11 @@ static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord
 static void loader_do_app_closed(Loader* loader) {
     furi_assert(loader->app.thread);
 
+    if(loader->launch_queue.item_cnt) {
+        view_holder_set_view(loader->view_holder, loading_get_view(loader->loading));
+        view_holder_send_to_front(loader->view_holder);
+    }
+
     furi_thread_join(loader->app.thread);
     FURI_LOG_I(TAG, "App returned: %li", furi_thread_get_return_code(loader->app.thread));
 

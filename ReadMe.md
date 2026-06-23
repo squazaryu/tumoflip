@@ -25,25 +25,25 @@ you find a tumoflip-specific issue, report it in this repository:
 ## Current Build
 
 - Base: Unleashed 089 with selected upstream dev updates
-- Firmware version: `tmwhflpprarf089-025`
+- Firmware version: `tmwhflpprarf089-026`
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `87.15`
 - Target: Flipper Zero F7
-- Release: `v0.2.5` release candidate (hardware validation in progress)
-- Release package: `flipper-z-f7-update-tmwhflpprarf089-025.tgz`
+- Release: `v0.2.6` release candidate (hardware validation in progress)
+- Release package: `flipper-z-f7-update-tmwhflpprarf089-026.tgz`
 
 ## Version Scheme
 
 Installed firmware versions use this format:
 
 ```text
-tmwhflpprarf089-025
+tmwhflpprarf089-026
 ```
 
 - `tmwhflpprarf`: tumoflip firmware name shown as the installed firmware
   version prefix for the ARF-enabled build line.
 - `089`: upstream Unleashed base version.
-- `024`: tumoflip internal build version.
+- `026`: tumoflip internal build version.
 
 When the Unleashed base version or tumoflip internal version changes, update
 the firmware version suffix in `fbt_options.py`, release notes, README, and the
@@ -52,13 +52,15 @@ published update package name together.
 ## tumoflip Changes
 
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
-  `tmwhflpprarf089-025`.
+  `tmwhflpprarf089-026`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.
-- Replaced the Desktop OK menu `Sub-GHz Remote` shortcut with a direct
-  `ESP32 Marauder` launcher for the Module One Wi-Fi app.
+- Replaced the Desktop OK menu `Sub-GHz Remote` shortcut with the `ARF Tools`
+  folder while keeping the normal `Sub-GHz` entry on the standard core app.
 - Fixed Desktop OK menu launches so external FAPs are started after the menu
   closes through Loader, without using Desktop as an intermediate screen.
+- Improved queued external app handoffs by showing Loader's loading screen
+  before the current app is torn down.
 - Added Module One icon based on the Rotten Mechanism cross mark.
 - Removed Dummy Mode and related shortcuts.
 - Added Settings entry to the Desktop short-Up quick menu.
@@ -74,8 +76,8 @@ published update package name together.
   application heap instead of being linked into one large process.
 - Exposes only ARF Sub-GHz Full in `/ext/apps/ARF Tools`; its isolated child
   FAPs are packaged under `/ext/apps_data/arf_subghz_full/modules`.
-- Routes the Desktop `Sub-GHz` entry through ARF Sub-GHz Full while retaining
-  core Sub-GHz as the internal backend for standard workflows.
+- Keeps ARF Sub-GHz Full separate from the Desktop `Sub-GHz` shortcut so
+  standard workflows still start through the stock Sub-GHz entry.
 - Added MIFARE Ultralight/NTAG PWD and PACK to the NFC read-success screen.
 - Added the Bambu Lab filament spool NFC parser.
 - Added adaptive dwell and signal hold to hopping in the system Sub-GHz app.
@@ -92,8 +94,8 @@ published update package name together.
   app layouts and independent C2/updater safety checks.
 - Added a verified `tumoflip-packages.zip` release artifact for transactional SD
   package installation from the iOS companion app.
-- Bundled the Module One `ESP32 Marauder` FAP into the SD package so the
-  Desktop shortcut works after a clean install.
+- Bundled the Module One `ESP32 Marauder` FAP into the SD package so it is
+  available from the `8/1` Module One folder after a clean install.
 - Vendored local user applications into `applications_user` so the repository
   can be built without absolute local symlinks.
 
@@ -105,11 +107,11 @@ identity.
 
 | Area | Unleashed | tumoflip |
 | --- | --- | --- |
-| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-025` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-026` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
-| Desktop OK menu | Uses the standard app/menu layout. | Keeps the `8/1` Module One folder after Apps, replaces `Sub-GHz Remote` with `ESP32 Marauder`, and routes `Sub-GHz` through ARF Sub-GHz Full. |
+| Desktop OK menu | Uses the standard app/menu layout. | Keeps the `8/1` Module One folder after Apps, keeps `Sub-GHz` on the standard core app, and replaces `Sub-GHz Remote` with the `ARF Tools` folder. |
 | ARF tools access | Apps are reached through the normal Apps tree. | Exposes one Full launcher; child ARF/ProtoPirate FAPs are internal modules under `apps_data`. |
 | Settings return flow | Standard Unleashed navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
 | BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication and Mac-side command routing. |
@@ -117,7 +119,7 @@ identity.
 | Sub-GHz hopping | Frequency hopping only. | Adds preset and combined hopping plus an adaptive scan dwell, signal hold, post-signal grace period, and bounded hold time to system Sub-GHz. |
 | NFC additions | Uses the Unleashed 089 NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK and adds the Bambu Lab filament spool parser. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-025` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-026` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -192,8 +194,8 @@ functional modules remain separate processes in a private data directory:
 dedicated ARF tool closes Full, launches that child, and queues Full to reopen
 when the child exits. Loading all standard and ARF code into one FAP exceeded
 the device heap during hardware testing, so the system Sub-GHz implementation
-remains installed as an internal backend. Desktop now opens Full instead of
-launching that backend directly. See
+remains installed as an internal backend. Desktop keeps the normal `Sub-GHz`
+entry on that backend and exposes Full through the `ARF Tools` folder. See
 [ARF Sub-GHz Full](docs/arf-subghz-full.md) for the validation boundary.
 
 ProtoPirate protocol plugins and its keystore are embedded in the internal
@@ -265,7 +267,7 @@ Mac bridge and app source.
 Download the latest update package from
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases):
 
-- `flipper-z-f7-update-tmwhflpprarf089-025.tgz`
+- `flipper-z-f7-update-tmwhflpprarf089-026.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -287,7 +289,7 @@ python3 tools/tumoflip/validate_release.py --write-manifest
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-025.tgz
+dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-026.tgz
 ```
 
 ## Upstream
