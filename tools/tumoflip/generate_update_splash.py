@@ -7,6 +7,11 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_STATIC_FRAMES_DIR = REPO_ROOT / "assets/slideshow/tumoflip_update"
+STATIC_FRAME_NAMES = ("frame_01.png", "frame_02.png", "frame_03.png")
+
+
 SMALL_GLYPHS = {
     "E": (
         "#####",
@@ -24,24 +29,6 @@ SMALL_GLYPHS = {
         "#..##",
         "#...#",
         "#...#",
-        "#...#",
-    ),
-    "O": (
-        ".###.",
-        "#...#",
-        "#...#",
-        "#...#",
-        "#...#",
-        "#...#",
-        ".###.",
-    ),
-    "K": (
-        "#...#",
-        "#..#.",
-        "#.#..",
-        "##...",
-        "#.#..",
-        "#..#.",
         "#...#",
     ),
     "T": (
@@ -264,38 +251,12 @@ def draw_button(draw: ImageDraw.ImageDraw, text: str, button: tuple[int, int, in
     draw_pixel_text(draw, SMALL_GLYPHS, text, text_x, 48)
 
 
-def draw_text_page(
+def generate_slideshow(
     title: str,
-    lines: list[str],
-    output: Path,
-    button_text: str = "NEXT",
-) -> None:
-    image = Image.new("1", (128, 64), 1)
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default()
-
-    title_bbox = draw.textbbox((0, 0), title, font=font)
-    title_width = title_bbox[2] - title_bbox[0]
-    draw.text(((128 - title_width) // 2, 10), title, font=font, fill=0)
-
-    y = 27
-    for line in lines:
-        line_bbox = draw.textbbox((0, 0), line, font=font)
-        line_width = line_bbox[2] - line_bbox[0]
-        draw.text(((128 - line_width) // 2, y), line, font=font, fill=0)
-        y += 11
-
-    if button_text == "OK":
-        draw_button(draw, "OK", (105, 45, 125, 57))
-    else:
-        draw_next_button(draw)
-
-    output.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output)
-
-
-def generate_slideshow(title: str, version: str, output_dir: Path) -> list[Path]:
-    base_version = version.split("-", maxsplit=1)[0]
+    version: str,
+    output_dir: Path,
+    static_frames_dir: Path = DEFAULT_STATIC_FRAMES_DIR,
+) -> list[Path]:
     frames = [
         output_dir / "frame_00.png",
         output_dir / "frame_01.png",
@@ -304,9 +265,17 @@ def generate_slideshow(title: str, version: str, output_dir: Path) -> list[Path]
     ]
 
     generate(title, version, frames[0])
-    draw_text_page("UNLEASHED " + base_version, ["TUMOFLIP FORK"], frames[1])
-    draw_text_page("EXPERIMENTAL", ["MAY BE UNSTABLE"], frames[2])
-    draw_text_page("ISSUES", ["SQUAZARYU", "TUMOFLIP"], frames[3], button_text="OK")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for name in STATIC_FRAME_NAMES:
+        source = static_frames_dir / name
+        target = output_dir / name
+        if source.resolve() == target.resolve():
+            if not target.exists():
+                raise FileNotFoundError(f"Missing static update splash frame: {target}")
+            continue
+        target.write_bytes(source.read_bytes())
+
     return frames
 
 

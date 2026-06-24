@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
+from hashlib import sha256
+from pathlib import Path
 import tempfile
 import unittest
-from pathlib import Path
 
 import fbt_options
 
@@ -12,6 +13,11 @@ from tools.tumoflip.sync_update_splash import sync_update_splash, version_from_d
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SPLASH_DIR = REPO_ROOT / "assets/slideshow/tumoflip_update"
+STATIC_FRAME_SHA256 = {
+    "frame_01.png": "9b42c3774f389f168c2b072705dc7c516087009b15f66b4c6b8745bdfd615bd0",
+    "frame_02.png": "fe93ce94fda74729938823e9896878fafc70098ebeb2b1919b33388a11645c56",
+    "frame_03.png": "71cd8aba43d2f63b02343282e0896a01f0cc0fa43b25872c48a32ec3a248f94a",
+}
 
 
 class UpdateSplashTest(unittest.TestCase):
@@ -30,7 +36,17 @@ class UpdateSplashTest(unittest.TestCase):
 
     def test_update_splash_has_expected_pages(self) -> None:
         frames = sorted(path.name for path in SPLASH_DIR.glob("frame_*.png"))
-        self.assertEqual(frames, ["frame_00.png", "frame_01.png", "frame_02.png", "frame_03.png"])
+        self.assertEqual(
+            frames,
+            ["frame_00.png", "frame_01.png", "frame_02.png", "frame_03.png"],
+        )
+
+    def test_static_pages_match_089_015_layout(self) -> None:
+        for name, expected_hash in STATIC_FRAME_SHA256.items():
+            self.assertEqual(
+                sha256((SPLASH_DIR / name).read_bytes()).hexdigest(),
+                expected_hash,
+            )
 
     def test_sync_update_splash_removes_stale_frames(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
