@@ -6,7 +6,7 @@ from pathlib import Path
 
 import fbt_options
 
-from tools.tumoflip.generate_update_splash import generate
+from tools.tumoflip.generate_update_splash import generate_slideshow
 from tools.tumoflip.sync_update_splash import sync_update_splash, version_from_dist_suffix
 
 
@@ -21,20 +21,21 @@ class UpdateSplashTest(unittest.TestCase):
         version = fbt_options.DIST_SUFFIX.removeprefix(prefix)
 
         with tempfile.TemporaryDirectory() as directory:
-            expected = Path(directory) / "frame_00.png"
-            generate("TMWHFLPPRARF", version, expected)
-            actual = SPLASH_DIR / "frame_00.png"
+            expected_dir = Path(directory)
+            expected_frames = generate_slideshow("TMWHFLPPRARF", version, expected_dir)
 
-            self.assertEqual(actual.read_bytes(), expected.read_bytes())
+            for expected in expected_frames:
+                actual = SPLASH_DIR / expected.name
+                self.assertEqual(actual.read_bytes(), expected.read_bytes())
 
-    def test_update_splash_is_a_single_page_screen(self) -> None:
+    def test_update_splash_has_expected_pages(self) -> None:
         frames = sorted(path.name for path in SPLASH_DIR.glob("frame_*.png"))
-        self.assertEqual(frames, ["frame_00.png"])
+        self.assertEqual(frames, ["frame_00.png", "frame_01.png", "frame_02.png", "frame_03.png"])
 
     def test_sync_update_splash_removes_stale_frames(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             splash_dir = Path(directory)
-            (splash_dir / "frame_01.png").write_bytes(b"stale")
+            (splash_dir / "frame_04.png").write_bytes(b"stale")
 
             self.assertTrue(
                 sync_update_splash(
@@ -44,7 +45,7 @@ class UpdateSplashTest(unittest.TestCase):
             )
             self.assertEqual(
                 sorted(path.name for path in splash_dir.glob("frame_*.png")),
-                ["frame_00.png"],
+                ["frame_00.png", "frame_01.png", "frame_02.png", "frame_03.png"],
             )
             self.assertTrue(sync_update_splash(splash_dir, check=True))
 

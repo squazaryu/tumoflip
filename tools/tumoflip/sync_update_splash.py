@@ -15,9 +15,9 @@ if str(REPO_ROOT) not in sys.path:
 import fbt_options
 
 try:
-    from tools.tumoflip.generate_update_splash import generate
+    from tools.tumoflip.generate_update_splash import generate_slideshow
 except ModuleNotFoundError:
-    from generate_update_splash import generate
+    from generate_update_splash import generate_slideshow
 
 
 DEFAULT_TITLE = "TMWHFLPPRARF"
@@ -60,22 +60,29 @@ def sync_update_splash(
     version = current_version(dist_suffix)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    frame = output_dir / "frame_00.png"
-    stale_frames = sorted(path for path in output_dir.glob("frame_*.png") if path.name != frame.name)
-
     import tempfile
 
     with tempfile.TemporaryDirectory() as directory:
-        expected = Path(directory) / "frame_00.png"
-        generate(title, version, expected)
-        expected_bytes = expected.read_bytes()
+        expected_dir = Path(directory)
+        expected_paths = generate_slideshow(title, version, expected_dir)
+        expected_frames = {path.name: path.read_bytes() for path in expected_paths}
 
-    actual_bytes = frame.read_bytes() if frame.exists() else None
-    in_sync = actual_bytes == expected_bytes and not stale_frames
+    actual_paths = sorted(output_dir.glob("frame_*.png"))
+    actual_names = {path.name for path in actual_paths}
+    expected_names = set(expected_frames)
+    stale_frames = sorted(path for path in actual_paths if path.name not in expected_names)
+    missing_frames = expected_names - actual_names
+    changed_frames = [
+        path
+        for path in actual_paths
+        if path.name in expected_frames and path.read_bytes() != expected_frames[path.name]
+    ]
+    in_sync = not stale_frames and not missing_frames and not changed_frames
     if check:
         return in_sync
 
-    frame.write_bytes(expected_bytes)
+    for name, content in expected_frames.items():
+        (output_dir / name).write_bytes(content)
     for stale_frame in stale_frames:
         stale_frame.unlink()
     return True
