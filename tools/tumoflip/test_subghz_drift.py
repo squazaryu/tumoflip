@@ -10,8 +10,17 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = REPO_ROOT / "tools/tumoflip/subghz_drift_manifest.txt"
 
 
+def manifest_entries() -> set[str]:
+    return {
+        line.strip()
+        for line in MANIFEST.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    }
+
+
 class SubGhzDriftTest(unittest.TestCase):
     def test_tracked_core_and_arf_files_are_synchronized(self) -> None:
+        tracked_count = len(manifest_entries())
         result = subprocess.run(
             [
                 sys.executable,
@@ -26,16 +35,16 @@ class SubGhzDriftTest(unittest.TestCase):
         )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("tracked=29", result.stdout)
-        self.assertIn("OK: 29 tracked Sub-GHz duplicate files match", result.stdout)
+        self.assertIn(f"tracked={tracked_count}", result.stdout)
+        self.assertIn(
+            f"OK: {tracked_count} tracked Sub-GHz duplicate files match", result.stdout
+        )
 
     def test_manifest_tracks_shared_surfaces_not_profile_forks(self) -> None:
-        entries = {
-            line.strip()
-            for line in MANIFEST.read_text(encoding="utf-8").splitlines()
-            if line.strip() and not line.startswith("#")
-        }
+        entries = manifest_entries()
 
+        self.assertIn("helpers/subghz_chat.c", entries)
+        self.assertIn("helpers/subghz_frequency_analyzer_worker.c", entries)
         self.assertIn("subghz_cli.c", entries)
         self.assertIn("scenes/subghz_scene_protocol_pack_info.c", entries)
         self.assertIn("views/subghz_read_raw.c", entries)

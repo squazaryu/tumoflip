@@ -19,23 +19,23 @@ typedef struct {
 } FrequencyRSSI;
 
 /** Allocate SubGhzFrequencyAnalyzerWorker
- * 
+ *
  * @param context SubGhz* context
- * @return SubGhzFrequencyAnalyzerWorker* 
+ * @return SubGhzFrequencyAnalyzerWorker*
  */
 SubGhzFrequencyAnalyzerWorker* subghz_frequency_analyzer_worker_alloc(void* context);
 
 /** Free SubGhzFrequencyAnalyzerWorker
- * 
+ *
  * @param instance SubGhzFrequencyAnalyzerWorker instance
  */
 void subghz_frequency_analyzer_worker_free(SubGhzFrequencyAnalyzerWorker* instance);
 
 /** Pair callback SubGhzFrequencyAnalyzerWorker
- * 
+ *
  * @param instance SubGhzFrequencyAnalyzerWorker instance
  * @param callback SubGhzFrequencyAnalyzerWorkerOverrunCallback callback
- * @param context 
+ * @param context
  */
 void subghz_frequency_analyzer_worker_set_pair_callback(
     SubGhzFrequencyAnalyzerWorker* instance,
@@ -43,14 +43,14 @@ void subghz_frequency_analyzer_worker_set_pair_callback(
     void* context);
 
 /** Start SubGhzFrequencyAnalyzerWorker
- * 
+ *
  * @param instance SubGhzFrequencyAnalyzerWorker instance
  * @param txrx pointer to SubGhzTxRx
  */
 void subghz_frequency_analyzer_worker_start(SubGhzFrequencyAnalyzerWorker* instance);
 
 /** Stop SubGhzFrequencyAnalyzerWorker
- * 
+ *
  * @param instance SubGhzFrequencyAnalyzerWorker instance
  */
 void subghz_frequency_analyzer_worker_stop(SubGhzFrequencyAnalyzerWorker* instance);
@@ -62,7 +62,7 @@ void subghz_frequency_analyzer_worker_stop(SubGhzFrequencyAnalyzerWorker* instan
 bool subghz_frequency_analyzer_worker_is_running(SubGhzFrequencyAnalyzerWorker* instance);
 
 /** Set RSSI trigger level
- * 
+ *
  * @param instance SubGhzFrequencyAnalyzerWorker instance
  * @param value RSSI level
  */
@@ -71,7 +71,7 @@ void subghz_frequency_analyzer_worker_set_trigger_level(
     float value);
 
 /** Get RSSI trigger level
- * 
+ *
  * @param instance SubGhzFrequencyAnalyzerWorker instance
  * @return RSSI trigger level
  */

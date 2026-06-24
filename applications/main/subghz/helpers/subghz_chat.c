@@ -19,9 +19,9 @@ struct SubGhzChatWorker {
 };
 
 /** Worker thread
- * 
- * @param context 
- * @return exit code 
+ *
+ * @param context
+ * @return exit code
  */
 static int32_t subghz_chat_worker_thread(void* context) {
     SubGhzChatWorker* instance = context;

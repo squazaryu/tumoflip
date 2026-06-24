@@ -62,9 +62,9 @@ static uint32_t subghz_frequency_analyzer_worker_expRunningAverageAdaptive(
 }
 
 /** Worker thread
- * 
- * @param context 
- * @return exit code 
+ *
+ * @param context
+ * @return exit code
  */
 static int32_t subghz_frequency_analyzer_worker_thread(void* context) {
     SubGhzFrequencyAnalyzerWorker* instance = context;

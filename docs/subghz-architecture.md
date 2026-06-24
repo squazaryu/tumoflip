@@ -39,3 +39,19 @@ byte-identical between `applications/main/subghz` and
 one of those shared files changes in only one copy. Files outside that manifest
 are treated as intentional ARF profile forks until they are extracted behind a
 smaller shared API.
+
+## Current Shared Boundary
+
+The first cleanup pass keeps behavior unchanged and removes false divergence:
+files that differed only by comment whitespace were synchronized and added to
+the drift manifest. The current checked surface is:
+
+- 75 common paths between core Sub-GHz and ARF FAP sources;
+- 35 byte-identical shared files tracked by
+  `tools/tumoflip/subghz_drift_manifest.txt`;
+- 40 intentionally diverged files.
+
+The remaining diverged files include ARF profile adapters, app entry points,
+radio lifecycle/state code, and ARF-only UI scenes. Those files must not be
+shared mechanically. Extracting them requires a small explicit API first, plus
+FAP size, heap, and launch/exit validation.

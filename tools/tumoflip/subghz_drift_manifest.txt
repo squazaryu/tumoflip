@@ -6,11 +6,16 @@
 # in the same commit and document why in docs/subghz-architecture.md or the
 # relevant issue. Files not listed here are intentionally forked ARF profile
 # code or have already diverged from the core app.
+helpers/subghz_chat.c
 helpers/subghz_chat.h
+helpers/subghz_frequency_analyzer_worker.c
+helpers/subghz_frequency_analyzer_worker.h
 helpers/subghz_threshold_rssi.c
+helpers/subghz_threshold_rssi.h
 icon.png
 resources/subghz/assets/alutech_at_4n
 resources/subghz/assets/dangerous_settings
+resources/subghz/assets/keeloq_mfcodes_user.example
 resources/subghz/assets/nice_flor_s
 resources/subghz/assets/vag
 scenes/subghz_scene.c
@@ -29,6 +34,7 @@ subghz.h
 subghz_cli.c
 subghz_cli.h
 subghz_dangerous_freq.c
+subghz_history.h
 views/receiver.h
 views/subghz_frequency_analyzer.c
 views/subghz_frequency_analyzer.h
