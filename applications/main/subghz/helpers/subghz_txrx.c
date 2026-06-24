@@ -4,6 +4,7 @@
 #include <applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h>
 #include <lib/subghz/devices/cc1101_int/cc1101_int_interconnect.h>
 #include <lib/subghz/blocks/custom_btn.h>
+#include <lib/subghz/subghz_hopper_plan.h>
 
 #define TAG "SubGhzTxRx"
 
@@ -521,22 +522,24 @@ void subghz_txrx_hopper_update(
     size_t preset_count = configured_preset_count > 0 ?
                               configured_preset_count :
                               subghz_setting_get_preset_count(instance->setting);
-    if((hop_frequency && frequency_count == 0) || (hop_preset && preset_count == 0)) return;
-
-    bool preset_wrapped = false;
-    if(hop_preset) {
-        instance->preset_hopper_idx++;
-        if(instance->preset_hopper_idx >= preset_count) {
-            instance->preset_hopper_idx = 0;
-            preset_wrapped = true;
-        }
+    size_t frequency_index = instance->hopper_idx_frequency;
+    size_t preset_hopper_index = instance->preset_hopper_idx;
+    SubGhzHopperPlan hopper_plan;
+    if(!subghz_hopper_plan_next(
+           &frequency_index,
+           &preset_hopper_index,
+           hop_frequency,
+           hop_preset,
+           frequency_count,
+           preset_count,
+           &hopper_plan)) {
+        return;
     }
-    if(hop_frequency && (!hop_preset || preset_wrapped)) {
-        instance->hopper_idx_frequency = (instance->hopper_idx_frequency + 1) % frequency_count;
-    }
+    instance->hopper_idx_frequency = (uint8_t)frequency_index;
+    instance->preset_hopper_idx = preset_hopper_index;
 
     uint32_t frequency = hop_frequency ? subghz_setting_get_hopper_frequency(
-                                             instance->setting, instance->hopper_idx_frequency) :
+                                             instance->setting, hopper_plan.frequency_index) :
                                          instance->preset->frequency;
 
     if(instance->txrx_state == SubGhzTxRxStateRx) {
@@ -547,8 +550,8 @@ void subghz_txrx_hopper_update(
         if(hop_preset) {
             size_t preset_index = configured_preset_count > 0 ?
                                       subghz_setting_get_hopper_preset_index(
-                                          instance->setting, instance->preset_hopper_idx) :
-                                      instance->preset_hopper_idx;
+                                          instance->setting, hopper_plan.preset_hopper_index) :
+                                      hopper_plan.preset_hopper_index;
             subghz_txrx_set_preset_internal(instance, frequency, preset_index, 0);
             subghz_devices_load_preset(
                 instance->radio_device, FuriHalSubGhzPresetCustom, instance->preset->data);

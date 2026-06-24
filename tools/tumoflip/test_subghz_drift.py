@@ -52,6 +52,25 @@ class SubGhzDriftTest(unittest.TestCase):
         self.assertNotIn("subghz.c", entries)
         self.assertNotIn("helpers/subghz_txrx.c", entries)
 
+    def test_hopper_plan_is_the_explicit_shared_api(self) -> None:
+        helper = (REPO_ROOT / "lib/subghz/subghz_hopper_plan.h").read_text(
+            encoding="utf-8"
+        )
+        core_txrx = (
+            REPO_ROOT / "applications/main/subghz/helpers/subghz_txrx.c"
+        ).read_text(encoding="utf-8")
+        arf_txrx = (
+            REPO_ROOT / "applications_user/arf_subghz_full/helpers/subghz_txrx.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("subghz_hopper_plan_next", helper)
+        self.assertNotIn("furi_", helper)
+        self.assertNotIn("subghz_devices_", helper)
+        self.assertIn("<lib/subghz/subghz_hopper_plan.h>", core_txrx)
+        self.assertIn("<lib/subghz/subghz_hopper_plan.h>", arf_txrx)
+        self.assertIn("subghz_hopper_plan_next(", core_txrx)
+        self.assertIn("subghz_hopper_plan_next(", arf_txrx)
+
 
 if __name__ == "__main__":
     unittest.main()

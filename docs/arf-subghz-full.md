@@ -28,6 +28,14 @@ into one FAP. A full standard Sub-GHz external backend exceeded available heap
 on hardware, so standard workflows stay in the core app. PSA, Counter, Car
 Emulate, ProtoPirate, RollJam, and Bruteforcer stay in separate child FAPs.
 
+## Shared Sub-GHz helpers
+
+ARF child apps may reuse pure helpers from `lib/subghz` when they do not import
+firmware-only state or radio lifecycle assumptions. The combined hopper uses the
+shared `subghz_hopper_plan_next()` helper only to calculate the next
+frequency/preset indexes; ARF still owns its RSSI timeout, preset reload, and
+child-FAP profile behavior.
+
 ## Validation boundary
 
 The system Sub-GHz application stays in firmware as the primary receiver and

@@ -55,3 +55,16 @@ The remaining diverged files include ARF profile adapters, app entry points,
 radio lifecycle/state code, and ARF-only UI scenes. Those files must not be
 shared mechanically. Extracting them requires a small explicit API first, plus
 FAP size, heap, and launch/exit validation.
+
+## Shared APIs
+
+`lib/subghz/subghz_hopper_plan.h` is the first explicit shared helper extracted
+after the drift guard. It is a header-only, radio-free planner for the next
+frequency/preset hopping indexes. The helper is used by the core Sub-GHz
+combined hopper and by the ARF combined hopper, while each app keeps its own RSSI
+dwell timing, radio reset/reload sequence, settings UI, and profile-specific
+state.
+
+This boundary is deliberate: pure index calculation can be shared safely, but
+radio lifecycle code and scene navigation stay local until they have a smaller
+service/client API and hardware validation.

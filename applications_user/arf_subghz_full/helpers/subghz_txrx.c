@@ -7,6 +7,7 @@
 #include <lib/subghz/devices/cc1101_int/cc1101_int_interconnect.h>
 #include "subghz_preset_delta.h"
 #include <lib/subghz/blocks/custom_btn.h>
+#include <lib/subghz/subghz_hopper_plan.h>
 
 #define TAG "SubGhzTxRx"
 
@@ -687,21 +688,28 @@ void subghz_txrx_combined_hopper_update(SubGhzTxRx* instance, float stay_thresho
     size_t preset_count = configured_preset_count > 0 ?
                               configured_preset_count :
                               subghz_setting_get_preset_count(instance->setting);
-    if(frequency_count == 0 || preset_count == 0) return;
-
-    instance->preset_hopper_idx++;
-    if(instance->preset_hopper_idx >= preset_count) {
-        instance->preset_hopper_idx = 0;
-        instance->hopper_idx_frequency =
-            (instance->hopper_idx_frequency + 1) % frequency_count;
+    size_t frequency_index = instance->hopper_idx_frequency;
+    size_t preset_hopper_index = instance->preset_hopper_idx;
+    SubGhzHopperPlan hopper_plan;
+    if(!subghz_hopper_plan_next(
+           &frequency_index,
+           &preset_hopper_index,
+           true,
+           true,
+           frequency_count,
+           preset_count,
+           &hopper_plan)) {
+        return;
     }
+    instance->hopper_idx_frequency = (uint8_t)frequency_index;
+    instance->preset_hopper_idx = preset_hopper_index;
 
     size_t actual_preset_idx = configured_preset_count > 0 ?
                                    subghz_setting_get_hopper_preset_index(
-                                       instance->setting, instance->preset_hopper_idx) :
-                                   instance->preset_hopper_idx;
+                                       instance->setting, hopper_plan.preset_hopper_index) :
+                                   hopper_plan.preset_hopper_index;
     uint32_t frequency = subghz_setting_get_hopper_frequency(
-        instance->setting, instance->hopper_idx_frequency);
+        instance->setting, hopper_plan.frequency_index);
 
     if(instance->txrx_state == SubGhzTxRxStateRx) {
         subghz_txrx_rx_end(instance);
