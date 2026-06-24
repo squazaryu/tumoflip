@@ -62,6 +62,8 @@ when `updater_package` is built.
 - Preserves the original Desktop OK menu launch stack so returning from Apps,
   core apps, and folders goes back to the Desktop layout instead of the Dolphin
   home screen.
+- Extends Desktop favorite shortcuts to launch selected `.fap` apps, `.js`
+  scripts, the `8/1` Module One folder, and the `ARF Tools` folder.
 - Added Module One icon based on the Rotten Mechanism cross mark.
 - Removed Dummy Mode and related shortcuts.
 - Added Settings entry to the Desktop short-Up quick menu.
@@ -116,6 +118,7 @@ identity.
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
 | Desktop OK menu | Uses the standard app/menu layout. | Keeps the `8/1` Module One folder after Apps, keeps `Sub-GHz` on the core app, and replaces `Sub-GHz Remote` with the `ARF Tools` folder. |
+| Desktop favorites | Can launch built-in apps or selected `.fap` apps. | Also supports `.js` scripts and direct folder targets for `8/1` Module One and `ARF Tools`. |
 | ARF tools access | Apps are reached through the normal Apps tree. | Exposes one Full launcher; child ARF/ProtoPirate FAPs are internal modules under `apps_data`. |
 | Settings return flow | Standard Unleashed navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
 | BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support for local app communication and Mac-side command routing. |

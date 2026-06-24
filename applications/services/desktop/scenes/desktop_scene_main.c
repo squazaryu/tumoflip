@@ -3,6 +3,7 @@
 #include <applications.h>
 #include <assets_icons.h>
 #include <loader/loader.h>
+#include <storage/storage.h>
 
 #include "../desktop_i.h"
 #include "../views/desktop_events.h"
@@ -10,6 +11,7 @@
 #include "desktop_scene.h"
 
 #define TAG "DesktopSrv"
+#define JS_RUNNER_APP "JS Runner"
 
 static void desktop_scene_main_new_idle_animation_callback(void* context) {
     furi_assert(context);
@@ -64,12 +66,37 @@ static inline bool desktop_scene_main_check_none(const char* str) {
     return (str[1] == '\0' && str[0] == '?');
 }
 
+static bool desktop_scene_main_path_ends_with(const char* path, const char* suffix) {
+    const size_t path_len = strlen(path);
+    const size_t suffix_len = strlen(suffix);
+    return path_len >= suffix_len && !strcmp(path + path_len - suffix_len, suffix);
+}
+
+static bool desktop_scene_main_is_apps_folder_target(const char* path) {
+    const char apps_path[] = EXT_PATH("apps");
+    const size_t apps_path_len = strlen(apps_path);
+
+    if(strcmp(path, apps_path) == 0) return true;
+    return strncmp(path, apps_path, apps_path_len) == 0 && path[apps_path_len] == '/' &&
+           !desktop_scene_main_path_ends_with(path, ".fap") &&
+           !desktop_scene_main_path_ends_with(path, ".js");
+}
+
+static void desktop_scene_main_launch_target(Desktop* desktop, const char* target) {
+    if(desktop_scene_main_path_ends_with(target, ".js")) {
+        loader_start_detached_with_gui_error(desktop->loader, JS_RUNNER_APP, target);
+    } else if(desktop_scene_main_is_apps_folder_target(target)) {
+        loader_start_detached_with_gui_error(desktop->loader, LOADER_APPLICATIONS_NAME, target);
+    } else {
+        loader_start_detached_with_gui_error(desktop->loader, target, NULL);
+    }
+}
+
 static void desktop_scene_main_open_app_or_profile(Desktop* desktop, FavoriteApp* application) {
     bool load_ok = false;
     if(strlen(application->name_or_path) > 0) {
         if(!desktop_scene_main_check_none(application->name_or_path)) {
-            // Load app
-            loader_start_detached_with_gui_error(desktop->loader, application->name_or_path, NULL);
+            desktop_scene_main_launch_target(desktop, application->name_or_path);
         }
         load_ok = true;
     }
@@ -82,7 +109,7 @@ static void desktop_scene_main_open_app_or_profile(Desktop* desktop, FavoriteApp
 static void desktop_scene_main_start_favorite(Desktop* desktop, FavoriteApp* application) {
     if(strlen(application->name_or_path) > 0) {
         if(!desktop_scene_main_check_none(application->name_or_path)) {
-            loader_start_detached_with_gui_error(desktop->loader, application->name_or_path, NULL);
+            desktop_scene_main_launch_target(desktop, application->name_or_path);
         }
     } else {
         loader_start_detached_with_gui_error(desktop->loader, LOADER_APPLICATIONS_NAME, NULL);

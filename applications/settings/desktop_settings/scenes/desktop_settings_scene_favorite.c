@@ -5,6 +5,7 @@
 #include <flipper_application/flipper_application.h>
 #include <storage/storage.h>
 #include <dialogs/dialogs.h>
+#include <lib/toolbox/path.h>
 
 #define APPS_COUNT (FLIPPER_APPS_COUNT + FLIPPER_EXTERNAL_APPS_COUNT)
 
@@ -17,9 +18,17 @@
 #define LOCK_APPLICATION_NAME  "Lock Flipper"
 
 #define EXTERNAL_APPLICATION_INDEX (2)
-#define EXTERNAL_APPLICATION_NAME  ("[Select App]")
+#define EXTERNAL_APPLICATION_NAME  ("[Select App/Script]")
 
-#define MAIN_LIST_APPLICATION_OFFSET (3)
+#define MODULE_ONE_FOLDER_INDEX (3)
+#define MODULE_ONE_FOLDER_NAME  "8/1 Folder"
+#define MODULE_ONE_FOLDER_PATH  EXT_PATH("apps/Module One")
+
+#define ARF_TOOLS_FOLDER_INDEX (4)
+#define ARF_TOOLS_FOLDER_NAME  "ARF Tools Folder"
+#define ARF_TOOLS_FOLDER_PATH  EXT_PATH("apps/ARF Tools")
+
+#define MAIN_LIST_APPLICATION_OFFSET (5)
 
 #define PRESELECTED_SPECIAL 0xffffffff
 
@@ -40,13 +49,20 @@ static bool favorite_fap_selector_item_callback(
     uint8_t** icon_ptr,
     FuriString* item_name) {
     UNUSED(context);
-    Storage* storage = furi_record_open(RECORD_STORAGE);
-    bool success = flipper_application_load_name_and_icon(file_path, storage, icon_ptr, item_name);
-    furi_record_close(RECORD_STORAGE);
-    return success;
+    if(furi_string_end_with(file_path, ".js")) {
+        path_extract_filename(file_path, item_name, false);
+        memcpy(*icon_ptr, icon_get_frame_data(&I_js_script_10px, 0), FAP_MANIFEST_MAX_ICON_SIZE);
+        return true;
+    } else {
+        Storage* storage = furi_record_open(RECORD_STORAGE);
+        bool success =
+            flipper_application_load_name_and_icon(file_path, storage, icon_ptr, item_name);
+        furi_record_close(RECORD_STORAGE);
+        return success;
+    }
 }
 
-static bool favorite_fap_selector_file_exists(char* file_path) {
+static bool favorite_target_file_exists(const char* file_path) {
     Storage* storage = furi_record_open(RECORD_STORAGE);
     bool exists = storage_file_exists(storage, file_path);
     furi_record_close(RECORD_STORAGE);
@@ -91,11 +107,25 @@ void desktop_settings_scene_favorite_on_enter(void* context) {
         desktop_settings_scene_favorite_submenu_callback,
         app);
 
-    // Special case: Specific application
+    // Special case: Specific application/script
     submenu_add_item(
         submenu,
         EXTERNAL_APPLICATION_NAME,
         EXTERNAL_APPLICATION_INDEX,
+        desktop_settings_scene_favorite_submenu_callback,
+        app);
+
+    submenu_add_item(
+        submenu,
+        MODULE_ONE_FOLDER_NAME,
+        MODULE_ONE_FOLDER_INDEX,
+        desktop_settings_scene_favorite_submenu_callback,
+        app);
+
+    submenu_add_item(
+        submenu,
+        ARF_TOOLS_FOLDER_NAME,
+        ARF_TOOLS_FOLDER_INDEX,
         desktop_settings_scene_favorite_submenu_callback,
         app);
 
@@ -115,7 +145,11 @@ void desktop_settings_scene_favorite_on_enter(void* context) {
         }
     }
 
-    if(pre_select_item == PRESELECTED_SPECIAL) {
+    if(!strcmp(curr_favorite_app->name_or_path, MODULE_ONE_FOLDER_PATH)) {
+        pre_select_item = MODULE_ONE_FOLDER_INDEX;
+    } else if(!strcmp(curr_favorite_app->name_or_path, ARF_TOOLS_FOLDER_PATH)) {
+        pre_select_item = ARF_TOOLS_FOLDER_INDEX;
+    } else if(pre_select_item == PRESELECTED_SPECIAL) {
         if(curr_favorite_app->name_or_path[0] == '\0') {
             pre_select_item = DEFAULT_INDEX;
         } else if(
@@ -154,7 +188,7 @@ bool desktop_settings_scene_favorite_on_event(void* context, SceneManagerEvent e
             consumed = true;
         } else if(event.event == EXTERNAL_APPLICATION_INDEX) {
             const DialogsFileBrowserOptions browser_options = {
-                .extension = ".fap",
+                .extension = ".fap|.js",
                 .icon = &I_unknown_10px,
                 .skip_assets = true,
                 .hide_ext = true,
@@ -163,8 +197,8 @@ bool desktop_settings_scene_favorite_on_event(void* context, SceneManagerEvent e
                 .base_path = EXT_PATH("apps"),
             };
 
-            // Select favorite fap in file browser
-            if(favorite_fap_selector_file_exists(curr_favorite_app->name_or_path)) {
+            // Select favorite app/script in file browser
+            if(favorite_target_file_exists(curr_favorite_app->name_or_path)) {
                 furi_string_set_str(temp_path, curr_favorite_app->name_or_path);
             }
 
@@ -176,6 +210,18 @@ bool desktop_settings_scene_favorite_on_event(void* context, SceneManagerEvent e
                     sizeof(curr_favorite_app->name_or_path));
                 consumed = true;
             }
+        } else if(event.event == MODULE_ONE_FOLDER_INDEX) {
+            strlcpy(
+                curr_favorite_app->name_or_path,
+                MODULE_ONE_FOLDER_PATH,
+                sizeof(curr_favorite_app->name_or_path));
+            consumed = true;
+        } else if(event.event == ARF_TOOLS_FOLDER_INDEX) {
+            strlcpy(
+                curr_favorite_app->name_or_path,
+                ARF_TOOLS_FOLDER_PATH,
+                sizeof(curr_favorite_app->name_or_path));
+            consumed = true;
         } else {
             size_t app_index = event.event - MAIN_LIST_APPLICATION_OFFSET;
             const char* name = favorite_fap_get_app_name(app_index);
