@@ -29,7 +29,7 @@ you find a tumoflip-specific issue, report it in this repository:
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `87.15`
 - Target: Flipper Zero F7
-- Release: `v0.3.0` release candidate (hardware validation in progress)
+- Release: `v0.3.0` published release (hardware validation in progress)
 - Release package: `flipper-z-f7-update-tmwhflpprarf089-030.tgz`
 
 ## Version Scheme
