@@ -68,6 +68,7 @@ STATIC_SD_RESOURCES = Path("tools/tumoflip/sd_resources")
 MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/IR Blaster/tumoflip_xremote.fap",
     "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
+    "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
 )
 ARF_LEGACY_PATHS = {
     **{

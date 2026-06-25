@@ -105,6 +105,9 @@ The four-page post-update splash screen is generated automatically from
   package installation from the iOS companion app.
 - Bundled the Module One `ESP32 Marauder` FAP into the SD package so it is
   available from the `8/1` Module One folder after a clean install.
+- Added `WiFi Mapper`, a passive Module One ESP32 UART logger that starts
+  Marauder AP scanning and stores scan output under
+  `/ext/apps_data/wifi_mapper/sessions`.
 - Vendored local user applications into `applications_user` so the repository
   can be built without absolute local symlinks.
 
@@ -233,6 +236,9 @@ ProtoPirate FAP, so ARF Status no longer checks obsolete `apps_assets` paths.
 - `quac`:
   vendored modified version based on
   [rdefeo/quac](https://github.com/rdefeo/quac).
+- `WiFi Mapper`:
+  tumoflip Module One ESP32 Wi-Fi scan logger. See
+  [WiFi Mapper](docs/wifi-mapper.md).
 
 ## BLE App Bridge and Tumoflip Runtime
 

@@ -23,3 +23,5 @@
 !quac/**
 !totp/
 !totp/**
+!wifi_mapper/
+!wifi_mapper/**

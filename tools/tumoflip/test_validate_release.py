@@ -91,6 +91,10 @@ class ValidateReleaseTest(unittest.TestCase):
             "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
+        self.assertIn(
+            "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
         for relative in MODULE_ONE_PACKAGE_FILES:
             if relative.endswith("esp32_wifi_marauder.fap"):
                 path = REPO_ROOT / STATIC_SD_RESOURCES / relative

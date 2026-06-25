@@ -1,0 +1,14 @@
+App(
+    appid="wifi_mapper",
+    name="WiFi Mapper",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="wifi_mapper_app",
+    requires=["gui", "storage", "notification"],
+    stack_size=4 * 1024,
+    fap_category="Module One/ESP32 Wi-Fi",
+    fap_version="0.1",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip",
+    fap_description="Passive ESP32 Wi-Fi scan logger for Module One.",
+    fap_icon="wifi_mapper_10px.png",
+)
