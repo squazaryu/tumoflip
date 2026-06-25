@@ -233,6 +233,8 @@ static void desktop_clock_timer_callback(void* context) {
 static void desktop_apply_settings(Desktop* desktop) {
     desktop->in_transition = true;
 
+    desktop_view_locked_set_skip_animation(
+        desktop->locked_view, desktop->settings.lockscreen_skip_animation);
     desktop_clock_reconfigure(desktop);
 
     if(!desktop->app_running && !desktop->locked) {

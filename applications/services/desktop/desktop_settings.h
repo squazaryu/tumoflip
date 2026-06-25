@@ -32,6 +32,7 @@ typedef struct {
     uint8_t usb_inhibit_auto_lock;
     uint8_t displayBatteryPercentage;
     uint8_t display_clock;
+    uint8_t lockscreen_skip_animation;
     FavoriteApp favorite_apps[FavoriteAppNumber];
 } DesktopSettings;
 

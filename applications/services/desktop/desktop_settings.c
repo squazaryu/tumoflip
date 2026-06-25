@@ -8,7 +8,8 @@
 
 #define DESKTOP_SETTINGS_VER_14 (14)
 #define DESKTOP_SETTINGS_VER_17 (17)
-#define DESKTOP_SETTINGS_VER    (18)
+#define DESKTOP_SETTINGS_VER_18 (18)
+#define DESKTOP_SETTINGS_VER    (19)
 
 #define DESKTOP_SETTINGS_PATH  INT_PATH(DESKTOP_SETTINGS_FILE_NAME)
 #define DESKTOP_SETTINGS_MAGIC (0x17)
@@ -32,6 +33,14 @@ typedef struct {
     FavoriteApp dummy_apps[9];
 } DesktopSettingsV17;
 
+typedef struct {
+    uint32_t auto_lock_delay_ms;
+    uint8_t usb_inhibit_auto_lock;
+    uint8_t displayBatteryPercentage;
+    uint8_t display_clock;
+    FavoriteApp favorite_apps[FavoriteAppNumber];
+} DesktopSettingsV18;
+
 static void desktop_settings_migrate_from_v14(
     DesktopSettings* settings,
     const DesktopSettingsV14* settings_v14) {
@@ -39,6 +48,7 @@ static void desktop_settings_migrate_from_v14(
     settings->usb_inhibit_auto_lock = 0;
     settings->displayBatteryPercentage = settings_v14->displayBatteryPercentage;
     settings->display_clock = settings_v14->display_clock;
+    settings->lockscreen_skip_animation = 0;
     memcpy(settings->favorite_apps, settings_v14->favorite_apps, sizeof(settings->favorite_apps));
 }
 
@@ -49,7 +59,19 @@ static void desktop_settings_migrate_from_v17(
     settings->usb_inhibit_auto_lock = settings_v17->usb_inhibit_auto_lock;
     settings->displayBatteryPercentage = settings_v17->displayBatteryPercentage;
     settings->display_clock = settings_v17->display_clock;
+    settings->lockscreen_skip_animation = 0;
     memcpy(settings->favorite_apps, settings_v17->favorite_apps, sizeof(settings->favorite_apps));
+}
+
+static void desktop_settings_migrate_from_v18(
+    DesktopSettings* settings,
+    const DesktopSettingsV18* settings_v18) {
+    settings->auto_lock_delay_ms = settings_v18->auto_lock_delay_ms;
+    settings->usb_inhibit_auto_lock = settings_v18->usb_inhibit_auto_lock;
+    settings->displayBatteryPercentage = settings_v18->displayBatteryPercentage;
+    settings->display_clock = settings_v18->display_clock;
+    settings->lockscreen_skip_animation = 0;
+    memcpy(settings->favorite_apps, settings_v18->favorite_apps, sizeof(settings->favorite_apps));
 }
 
 void desktop_settings_load(DesktopSettings* settings) {
@@ -68,6 +90,23 @@ void desktop_settings_load(DesktopSettings* settings) {
                 sizeof(DesktopSettings),
                 DESKTOP_SETTINGS_MAGIC,
                 DESKTOP_SETTINGS_VER);
+
+        } else if(version == DESKTOP_SETTINGS_VER_18) {
+            DesktopSettingsV18* settings_v18 = malloc(sizeof(DesktopSettingsV18));
+
+            success = saved_struct_load(
+                DESKTOP_SETTINGS_PATH,
+                settings_v18,
+                sizeof(DesktopSettingsV18),
+                DESKTOP_SETTINGS_MAGIC,
+                DESKTOP_SETTINGS_VER_18);
+
+            if(success) {
+                desktop_settings_migrate_from_v18(settings, settings_v18);
+                desktop_settings_save(settings);
+            }
+
+            free(settings_v18);
 
         } else if(version == DESKTOP_SETTINGS_VER_17) {
             DesktopSettingsV17* settings_v17 = malloc(sizeof(DesktopSettingsV17));

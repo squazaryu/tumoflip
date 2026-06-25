@@ -68,6 +68,7 @@ The four-page post-update splash screen is generated automatically from
 - Added optional SD asset-pack overrides for custom Desktop OK-menu icons.
 - Removed Dummy Mode and related shortcuts.
 - Added Settings entry to the Desktop short-Up quick menu.
+- Added an optional Desktop setting to skip the lockscreen door animation.
 - Added BLE App Bridge support.
 - Added `FlipperRelay` host bridge tooling for Mac-side BLE automations.
 - Added an initial ARF Sub-GHz protocol layer from

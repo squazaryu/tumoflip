@@ -12,6 +12,7 @@ typedef enum {
     DesktopSettingsPinSetup = 0,
     DesktopSettingsAutoLockDelay,
     DesktopSettingsAutoPowerOff,
+    DesktopSettingsLockAnimation,
     DesktopSettingsBatteryDisplay,
     DesktopSettingsClockDisplay,
     DesktopSettingsMainMenuStyle,
@@ -48,6 +49,14 @@ const char* const usb_inhibit_auto_lock_delay_text[USB_INHIBIT_AUTO_LOCK_DELAY_C
 };
 
 const uint32_t usb_inhibit_auto_lock_delay_value[USB_INHIBIT_AUTO_LOCK_DELAY_COUNT] = {0, 1};
+
+#define LOCK_ANIMATION_COUNT 2
+const char* const lock_animation_text[LOCK_ANIMATION_COUNT] = {
+    "ON",
+    "OFF",
+};
+
+const uint32_t lockscreen_skip_animation_value[LOCK_ANIMATION_COUNT] = {0, 1};
 
 #define CLOCK_ENABLE_COUNT 2
 const char* const clock_enable_text[CLOCK_ENABLE_COUNT] = {
@@ -113,6 +122,14 @@ static void desktop_settings_scene_start_usb_inhibit_auto_lock_delay_changed(Var
     app->settings.usb_inhibit_auto_lock = usb_inhibit_auto_lock_delay_value[index];
 }
 
+static void desktop_settings_scene_start_lock_animation_changed(VariableItem* item) {
+    DesktopSettingsApp* app = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+
+    variable_item_set_current_value_text(item, lock_animation_text[index]);
+    app->settings.lockscreen_skip_animation = lockscreen_skip_animation_value[index];
+}
+
 void desktop_settings_scene_start_on_enter(void* context) {
     DesktopSettingsApp* app = context;
     VariableItemList* variable_item_list = app->variable_item_list;
@@ -148,6 +165,20 @@ void desktop_settings_scene_start_on_enter(void* context) {
         USB_INHIBIT_AUTO_LOCK_DELAY_COUNT);
     variable_item_set_current_value_index(item, value_index);
     variable_item_set_current_value_text(item, usb_inhibit_auto_lock_delay_text[value_index]);
+
+    item = variable_item_list_add(
+        variable_item_list,
+        "Lock Animation",
+        LOCK_ANIMATION_COUNT,
+        desktop_settings_scene_start_lock_animation_changed,
+        app);
+
+    value_index = value_index_uint32(
+        app->settings.lockscreen_skip_animation,
+        lockscreen_skip_animation_value,
+        LOCK_ANIMATION_COUNT);
+    variable_item_set_current_value_index(item, value_index);
+    variable_item_set_current_value_text(item, lock_animation_text[value_index]);
 
     item = variable_item_list_add(
         variable_item_list,
@@ -212,6 +243,7 @@ bool desktop_settings_scene_start_on_event(void* context, SceneManagerEvent even
             break;
 
             // case DesktopSettingsAutoLockDelay:
+            // case DesktopSettingsLockAnimation:
             // case DesktopSettingsBatteryDisplay:
             // case DesktopSettingsClockDisplay:
             // Proces in default

@@ -30,6 +30,7 @@ struct DesktopViewLocked {
     FuriTimer* timer;
     uint8_t lock_count;
     uint32_t lock_lastpress;
+    bool skip_animation;
 };
 
 typedef enum {
@@ -193,6 +194,7 @@ static bool desktop_view_locked_input(InputEvent* event, void* context) {
 DesktopViewLocked* desktop_view_locked_alloc(void) {
     DesktopViewLocked* locked_view = malloc(sizeof(DesktopViewLocked));
     locked_view->view = view_alloc();
+    locked_view->skip_animation = false;
     locked_view->timer =
         furi_timer_alloc(locked_view_timer_callback, FuriTimerTypePeriodic, locked_view);
 
@@ -211,9 +213,22 @@ void desktop_view_locked_free(DesktopViewLocked* locked_view) {
     free(locked_view);
 }
 
+void desktop_view_locked_set_skip_animation(DesktopViewLocked* locked_view, bool skip_animation) {
+    furi_assert(locked_view);
+    locked_view->skip_animation = skip_animation;
+}
+
 void desktop_view_locked_close_doors(DesktopViewLocked* locked_view) {
     DesktopViewLockedModel* model = view_get_model(locked_view->view);
     furi_assert(model->view_state == DesktopViewLockedStateLocked);
+
+    if(locked_view->skip_animation) {
+        model->door_offset = DOOR_OFFSET_END;
+        view_commit_model(locked_view->view, true);
+        locked_view->callback(DesktopLockedEventDoorsClosed, locked_view->context);
+        return;
+    }
+
     model->view_state = DesktopViewLockedStateDoorsClosing;
     model->door_offset = DOOR_OFFSET_START;
     view_commit_model(locked_view->view, true);
