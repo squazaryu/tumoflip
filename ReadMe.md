@@ -138,7 +138,7 @@ they were changed explicitly.
 
 Custom `8/1` and `ARF Tools` OK-menu icons can be overridden from SD without a
 firmware rebuild. See [Tumoflip Asset Packs](docs/tumoflip-asset-packs.md) for
-the supported path, file format, and fallback rules.
+the supported path, file format, generator script, and fallback rules.
 
 Current custom Desktop modes:
 

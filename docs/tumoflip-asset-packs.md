@@ -61,3 +61,34 @@ Fallback rules:
 
 The layer does not run during boot and does not change Desktop, Loader, Apps,
 or Settings behavior unless a valid active pack provides a supported icon.
+
+## Build a Pack
+
+Use the helper script to generate a valid SD layout from 14x14 PNG icons:
+
+```bash
+python3 tools/tumoflip/make_asset_pack.py tumo-default
+```
+
+By default this writes:
+
+```text
+build/tumoflip-asset-packs/active.txt
+build/tumoflip-asset-packs/tumo-default/Icons/ModuleOne_14.bmx
+build/tumoflip-asset-packs/tumo-default/Icons/ARFTools_14.bmx
+```
+
+If the SD card is mounted on macOS, the script can write directly into the
+Flipper SD root:
+
+```bash
+python3 tools/tumoflip/make_asset_pack.py tumo-default --ext-root /Volumes/FLIPPER
+```
+
+Custom PNG sources are also supported:
+
+```bash
+python3 tools/tumoflip/make_asset_pack.py tumo-custom \
+  --module-one path/to/module_one_14.png \
+  --arf-tools path/to/arf_tools_14.png
+```
