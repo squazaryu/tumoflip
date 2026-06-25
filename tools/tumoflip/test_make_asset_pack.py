@@ -11,6 +11,7 @@ try:
     from .make_asset_pack import (
         AssetPackError,
         DEFAULT_ICON_SOURCES,
+        build_manifest,
         ext_asset_pack_root,
         build_asset_pack,
     )
@@ -19,6 +20,7 @@ except ImportError:
         AssetPackError,
         DEFAULT_ICON_SOURCES,
         REPO_ROOT,
+        build_manifest,
         ext_asset_pack_root,
         build_asset_pack,
     )
@@ -38,9 +40,24 @@ class MakeAssetPackTest(unittest.TestCase):
                     "active.txt",
                     "test_pack/Icons/ARFTools_14.bmx",
                     "test_pack/Icons/ModuleOne_14.bmx",
+                    "test_pack/manifest.txt",
                 ],
             )
             self.assertEqual((root / "active.txt").read_text(encoding="utf-8"), "test_pack\n")
+            self.assertEqual(
+                (root / "test_pack/manifest.txt").read_text(encoding="utf-8"),
+                "\n".join(
+                    [
+                        "Filetype: Tumoflip Asset Pack",
+                        "Version: 1",
+                        "Name: test_pack",
+                        "Target: desktop-ok-menu",
+                        "ModuleOneIcon: ModuleOne_14.bmx",
+                        "ARFToolsIcon: ARFTools_14.bmx",
+                        "",
+                    ]
+                ),
+            )
 
             for filename in ("ModuleOne_14.bmx", "ARFTools_14.bmx"):
                 data = (root / "test_pack/Icons" / filename).read_bytes()
@@ -55,6 +72,13 @@ class MakeAssetPackTest(unittest.TestCase):
             for pack_name in ("", "../bad", "bad.name", "bad/name", "bad name"):
                 with self.assertRaises(AssetPackError, msg=pack_name):
                     build_asset_pack(pack_name, root, DEFAULT_ICON_SOURCES)
+
+    def test_manifest_rejects_incomplete_icon_set(self) -> None:
+        with self.assertRaises(AssetPackError):
+            build_manifest(
+                "test_pack",
+                {"ModuleOne_14.bmx": DEFAULT_ICON_SOURCES["ModuleOne_14.bmx"]},
+            )
 
     def test_ext_root_maps_to_expected_sd_path(self) -> None:
         self.assertEqual(

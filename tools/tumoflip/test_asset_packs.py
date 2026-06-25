@@ -24,6 +24,10 @@ class AssetPacksTest(unittest.TestCase):
             source,
         )
         self.assertIn(
+            'EXT_PATH("apps_data/tumoflip/asset_packs/%s/manifest.txt")',
+            source,
+        )
+        self.assertIn(
             'EXT_PATH("apps_data/tumoflip/asset_packs/%s/Icons/%s")',
             source,
         )
@@ -43,6 +47,13 @@ class AssetPacksTest(unittest.TestCase):
 
         self.assertIn("LOADER_ASSET_PACK_NAME_MAX", source)
         self.assertIn("LOADER_ASSET_PACK_MAX_ICON_FRAME_SIZE", source)
+        self.assertIn("LOADER_ASSET_PACK_MANIFEST_HEADER", source)
+        self.assertIn("LOADER_ASSET_PACK_MANIFEST_VERSION", source)
+        self.assertIn("loader_asset_pack_validate_manifest", source)
+        self.assertIn("flipper_format_read_header", source)
+        self.assertIn('"Target"', source)
+        self.assertIn('"ModuleOneIcon"', source)
+        self.assertIn('"ARFToolsIcon"', source)
         self.assertIn("header.width != LOADER_ASSET_PACK_ICON_WIDTH", source)
         self.assertIn("header.height != LOADER_ASSET_PACK_ICON_HEIGHT", source)
         self.assertIn("loader_asset_pack_validate_name", source)
@@ -56,10 +67,14 @@ class AssetPacksTest(unittest.TestCase):
         )
 
         self.assertIn("/ext/apps_data/tumoflip/asset_packs/active.txt", docs)
+        self.assertIn("/ext/apps_data/tumoflip/asset_packs/<pack>/manifest.txt", docs)
         self.assertIn("/ext/apps_data/tumoflip/asset_packs/<pack>/Icons/", docs)
+        self.assertIn("Filetype: Tumoflip Asset Pack", docs)
+        self.assertIn("Target: desktop-ok-menu", docs)
         self.assertIn("ModuleOne_14.bmx", docs)
         self.assertIn("ARFTools_14.bmx", docs)
         self.assertIn("no SD card: built-in icons", docs)
+        self.assertIn("missing or invalid manifest", docs)
         self.assertIn("Loaded", docs)
         self.assertIn("icons live only while that menu is open", docs)
 

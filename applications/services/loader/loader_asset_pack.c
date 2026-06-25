@@ -1,6 +1,7 @@
 #include "loader_asset_pack.h"
 
 #include <core/dangerous_defines.h>
+#include <flipper_format/flipper_format.h>
 #include <furi.h>
 #include <gui/icon_i.h>
 #include <storage/storage.h>
@@ -8,6 +9,8 @@
 #include <string.h>
 
 #define TUMOFLIP_ASSET_PACK_ACTIVE_PATH EXT_PATH("apps_data/tumoflip/asset_packs/active.txt")
+#define TUMOFLIP_ASSET_PACK_MANIFEST_PATH_FMT \
+    EXT_PATH("apps_data/tumoflip/asset_packs/%s/manifest.txt")
 #define TUMOFLIP_ASSET_PACK_ICON_PATH_FMT \
     EXT_PATH("apps_data/tumoflip/asset_packs/%s/Icons/%s")
 
@@ -16,6 +19,11 @@
 #define LOADER_ASSET_PACK_ICON_WIDTH          14U
 #define LOADER_ASSET_PACK_ICON_HEIGHT         14U
 #define LOADER_ASSET_PACK_MAX_ICON_FRAME_SIZE 256U
+#define LOADER_ASSET_PACK_MANIFEST_HEADER     "Tumoflip Asset Pack"
+#define LOADER_ASSET_PACK_MANIFEST_VERSION    1U
+#define LOADER_ASSET_PACK_MANIFEST_TARGET     "desktop-ok-menu"
+#define LOADER_ASSET_PACK_MODULE_ONE_ICON     "ModuleOne_14.bmx"
+#define LOADER_ASSET_PACK_ARF_TOOLS_ICON      "ARFTools_14.bmx"
 
 typedef struct FURI_PACKED {
     uint32_t width;
@@ -102,6 +110,71 @@ static bool loader_asset_pack_read_active_name(Storage* storage, char* name, siz
     return loaded;
 }
 
+static bool loader_asset_pack_read_string_equals(
+    FlipperFormat* manifest,
+    const char* key,
+    const char* expected) {
+    FuriString* value = furi_string_alloc();
+    const bool loaded = flipper_format_read_string(manifest, key, value);
+    const bool matches = loaded && (furi_string_cmp_str(value, expected) == 0);
+    furi_string_free(value);
+    return matches;
+}
+
+static bool loader_asset_pack_validate_manifest(Storage* storage, const char* pack_name) {
+    char path[LOADER_ASSET_PACK_PATH_MAX];
+    const int written =
+        snprintf(path, sizeof(path), TUMOFLIP_ASSET_PACK_MANIFEST_PATH_FMT, pack_name);
+    if((written < 0) || ((size_t)written >= sizeof(path))) {
+        return false;
+    }
+
+    bool valid = false;
+    FlipperFormat* manifest = flipper_format_file_alloc(storage);
+    FuriString* file_type = furi_string_alloc();
+
+    do {
+        if(!flipper_format_file_open_existing(manifest, path)) {
+            break;
+        }
+
+        uint32_t version = 0;
+        if(!flipper_format_read_header(manifest, file_type, &version)) {
+            break;
+        }
+
+        if((furi_string_cmp_str(file_type, LOADER_ASSET_PACK_MANIFEST_HEADER) != 0) ||
+           (version != LOADER_ASSET_PACK_MANIFEST_VERSION)) {
+            break;
+        }
+
+        if(!loader_asset_pack_read_string_equals(manifest, "Name", pack_name)) {
+            break;
+        }
+
+        if(!loader_asset_pack_read_string_equals(
+               manifest, "Target", LOADER_ASSET_PACK_MANIFEST_TARGET)) {
+            break;
+        }
+
+        if(!loader_asset_pack_read_string_equals(
+               manifest, "ModuleOneIcon", LOADER_ASSET_PACK_MODULE_ONE_ICON)) {
+            break;
+        }
+
+        if(!loader_asset_pack_read_string_equals(
+               manifest, "ARFToolsIcon", LOADER_ASSET_PACK_ARF_TOOLS_ICON)) {
+            break;
+        }
+
+        valid = true;
+    } while(false);
+
+    furi_string_free(file_type);
+    flipper_format_free(manifest);
+    return valid;
+}
+
 static LoaderAssetPackStaticIcon*
     loader_asset_pack_load_icon(Storage* storage, const char* pack_name, const char* icon_name) {
     char path[LOADER_ASSET_PACK_PATH_MAX];
@@ -172,10 +245,12 @@ LoaderAssetPack* loader_asset_pack_alloc(void) {
     char pack_name[LOADER_ASSET_PACK_NAME_MAX + 1U];
 
     if(loader_asset_pack_read_active_name(storage, pack_name, sizeof(pack_name))) {
-        pack->module_one_icon =
-            loader_asset_pack_load_icon(storage, pack_name, "ModuleOne_14.bmx");
-        pack->arf_tools_icon =
-            loader_asset_pack_load_icon(storage, pack_name, "ARFTools_14.bmx");
+        if(loader_asset_pack_validate_manifest(storage, pack_name)) {
+            pack->module_one_icon =
+                loader_asset_pack_load_icon(storage, pack_name, LOADER_ASSET_PACK_MODULE_ONE_ICON);
+            pack->arf_tools_icon =
+                loader_asset_pack_load_icon(storage, pack_name, LOADER_ASSET_PACK_ARF_TOOLS_ICON);
+        }
     }
 
     furi_record_close(RECORD_STORAGE);

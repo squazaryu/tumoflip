@@ -21,8 +21,25 @@ traversal and keeps the loader deterministic.
 A pack stores icons under:
 
 ```text
+/ext/apps_data/tumoflip/asset_packs/<pack>/manifest.txt
 /ext/apps_data/tumoflip/asset_packs/<pack>/Icons/
 ```
+
+The manifest is mandatory. It uses FlipperFormat:
+
+```text
+Filetype: Tumoflip Asset Pack
+Version: 1
+Name: <pack>
+Target: desktop-ok-menu
+ModuleOneIcon: ModuleOne_14.bmx
+ARFToolsIcon: ARFTools_14.bmx
+```
+
+The loader accepts only `Version: 1` and `Target: desktop-ok-menu`. The manifest
+`Name` must match the selected directory from `active.txt`. This keeps the
+current implementation scoped to Desktop OK-menu icons and prevents accidental
+loading of unrelated asset directories.
 
 Currently supported files:
 
@@ -56,6 +73,7 @@ Fallback rules:
 - no SD card: built-in icons
 - no `active.txt`: built-in icons
 - invalid pack name: built-in icons
+- missing or invalid manifest: built-in icons
 - missing icon in a valid pack: built-in icon for that menu item
 - broken icon file: built-in icon for that menu item
 
@@ -74,6 +92,7 @@ By default this writes:
 
 ```text
 build/tumoflip-asset-packs/active.txt
+build/tumoflip-asset-packs/tumo-default/manifest.txt
 build/tumoflip-asset-packs/tumo-default/Icons/ModuleOne_14.bmx
 build/tumoflip-asset-packs/tumo-default/Icons/ARFTools_14.bmx
 ```

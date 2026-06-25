@@ -16,6 +16,10 @@ ICON_WIDTH = 14
 ICON_HEIGHT = 14
 MAX_FRAME_SIZE = 256
 ASSET_PACK_EXT_PATH = Path("apps_data/tumoflip/asset_packs")
+MANIFEST_FILENAME = "manifest.txt"
+MANIFEST_FILETYPE = "Tumoflip Asset Pack"
+MANIFEST_VERSION = 1
+MANIFEST_TARGET = "desktop-ok-menu"
 
 DEFAULT_ICON_SOURCES = {
     "ModuleOne_14.bmx": REPO_ROOT / "assets/icons/MainMenu/ModuleOne_14/frame_01.png",
@@ -71,6 +75,27 @@ def png_to_bmx(source: Path) -> bytes:
     return struct.pack("<II", width, height) + frame
 
 
+def build_manifest(pack_name: str, icon_sources: dict[str, Path]) -> str:
+    expected_icons = {"ModuleOne_14.bmx", "ARFTools_14.bmx"}
+    actual_icons = set(icon_sources)
+    if actual_icons != expected_icons:
+        raise AssetPackError(
+            f"icon set mismatch; expected {sorted(expected_icons)}, got {sorted(actual_icons)}"
+        )
+
+    return "\n".join(
+        [
+            f"Filetype: {MANIFEST_FILETYPE}",
+            f"Version: {MANIFEST_VERSION}",
+            f"Name: {pack_name}",
+            f"Target: {MANIFEST_TARGET}",
+            "ModuleOneIcon: ModuleOne_14.bmx",
+            "ARFToolsIcon: ARFTools_14.bmx",
+            "",
+        ]
+    )
+
+
 def build_asset_pack(
     pack_name: str,
     output_root: Path,
@@ -83,6 +108,10 @@ def build_asset_pack(
     icons_root.mkdir(parents=True, exist_ok=True)
 
     written: list[Path] = []
+    manifest = output_root / pack_name / MANIFEST_FILENAME
+    manifest.write_text(build_manifest(pack_name, icon_sources), encoding="utf-8")
+    written.append(manifest)
+
     for filename, source in sorted(icon_sources.items()):
         target = icons_root / filename
         target.write_bytes(png_to_bmx(source))

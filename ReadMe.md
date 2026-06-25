@@ -65,7 +65,8 @@ The four-page post-update splash screen is generated automatically from
 - Extends Desktop favorite shortcuts to launch selected `.fap` apps, `.js`
   scripts, the `8/1` Module One folder, and the `ARF Tools` folder.
 - Added Module One icon based on the Rotten Mechanism cross mark.
-- Added optional SD asset-pack overrides for custom Desktop OK-menu icons.
+- Added optional manifest-validated SD asset-pack overrides for custom Desktop
+  OK-menu icons.
 - Removed Dummy Mode and related shortcuts.
 - Added Settings entry to the Desktop short-Up quick menu.
 - Added an optional Desktop setting to skip the lockscreen door animation.
