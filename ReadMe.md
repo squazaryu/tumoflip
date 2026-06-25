@@ -65,6 +65,7 @@ The four-page post-update splash screen is generated automatically from
 - Extends Desktop favorite shortcuts to launch selected `.fap` apps, `.js`
   scripts, the `8/1` Module One folder, and the `ARF Tools` folder.
 - Added Module One icon based on the Rotten Mechanism cross mark.
+- Added optional SD asset-pack overrides for custom Desktop OK-menu icons.
 - Removed Dummy Mode and related shortcuts.
 - Added Settings entry to the Desktop short-Up quick menu.
 - Added BLE App Bridge support.
@@ -134,6 +135,10 @@ The custom Desktop styles are focused on changing the main Desktop launcher
 experience, not replacing every nested app list in the firmware. Apps and
 system screens still mostly follow the underlying Unleashed UI behavior unless
 they were changed explicitly.
+
+Custom `8/1` and `ARF Tools` OK-menu icons can be overridden from SD without a
+firmware rebuild. See [Tumoflip Asset Packs](docs/tumoflip-asset-packs.md) for
+the supported path, file format, and fallback rules.
 
 Current custom Desktop modes:
 

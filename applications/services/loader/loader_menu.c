@@ -8,6 +8,7 @@
 #include <archive/helpers/archive_favorites.h>
 
 #include "loader.h"
+#include "loader_asset_pack.h"
 #include "loader_menu.h"
 
 #define TAG "LoaderMenu"
@@ -63,6 +64,7 @@ typedef struct {
     ViewDispatcher* view_dispatcher;
     Menu* primary_menu;
     Submenu* settings_menu;
+    LoaderAssetPack* asset_pack;
 } LoaderMenuApp;
 
 static void loader_menu_start_with_args(const char* name, const char* args) {
@@ -145,7 +147,8 @@ static void loader_menu_build_menu(LoaderMenuApp* app, LoaderMenu* menu) {
     menu_add_item(
         app->primary_menu,
         MODULE_ONE_MENU_NAME,
-        &A_ModuleOne_14,
+        loader_asset_pack_get_icon(
+            app->asset_pack, LoaderAssetPackIconModuleOne, &A_ModuleOne_14),
         i++,
         loader_menu_module_one_callback,
         (void*)menu);
@@ -169,7 +172,8 @@ static void loader_menu_build_menu(LoaderMenuApp* app, LoaderMenu* menu) {
             menu_add_item(
                 app->primary_menu,
                 ARF_TOOLS_MENU_NAME,
-                &A_ARFTools_14,
+                loader_asset_pack_get_icon(
+                    app->asset_pack, LoaderAssetPackIconArfTools, &A_ARFTools_14),
                 i,
                 loader_menu_arf_tools_callback,
                 (void*)menu);
@@ -214,6 +218,7 @@ static LoaderMenuApp* loader_menu_app_alloc(LoaderMenu* loader_menu) {
     app->view_dispatcher = view_dispatcher_alloc();
     app->primary_menu = menu_alloc();
     app->settings_menu = submenu_alloc();
+    app->asset_pack = loader_asset_pack_alloc();
 
     loader_menu_build_menu(app, loader_menu);
     loader_menu_build_submenu(app, loader_menu);
@@ -248,6 +253,7 @@ static void loader_menu_app_free(LoaderMenuApp* app) {
 
     menu_free(app->primary_menu);
     submenu_free(app->settings_menu);
+    loader_asset_pack_free(app->asset_pack);
     furi_record_close(RECORD_GUI);
     free(app);
 }

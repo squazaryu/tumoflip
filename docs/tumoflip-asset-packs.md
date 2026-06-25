@@ -1,0 +1,63 @@
+# Tumoflip Asset Packs
+
+Tumoflip has a narrow SD-based asset-pack layer for visual overrides that do
+not need to be linked into the firmware image. The first supported slice is
+limited to icons used by custom Desktop OK-menu entries.
+
+This is intentionally smaller than Momentum asset packs. It does not replace
+fonts, animations, or global UI resources.
+
+## Layout
+
+Select the active pack by writing its directory name to:
+
+```text
+/ext/apps_data/tumoflip/asset_packs/active.txt
+```
+
+The name may contain only letters, digits, `_`, and `-`. This prevents path
+traversal and keeps the loader deterministic.
+
+A pack stores icons under:
+
+```text
+/ext/apps_data/tumoflip/asset_packs/<pack>/Icons/
+```
+
+Currently supported files:
+
+```text
+ModuleOne_14.bmx
+ARFTools_14.bmx
+```
+
+## Icon Format
+
+The `.bmx` file is a small tumoflip wrapper around a single firmware icon
+frame:
+
+```text
+uint32_t width
+uint32_t height
+uint8_t  frame_payload[]
+```
+
+For this first slice, `width` and `height` must both be `14`. The frame payload
+must be no larger than 256 bytes. Invalid, missing, oversized, or incomplete
+files are ignored and the built-in firmware icon is used instead.
+
+## Runtime Behavior
+
+The loader reads the active pack lazily when the Desktop OK menu opens. Loaded
+icons live only while that menu is open and are freed when it closes.
+
+Fallback rules:
+
+- no SD card: built-in icons
+- no `active.txt`: built-in icons
+- invalid pack name: built-in icons
+- missing icon in a valid pack: built-in icon for that menu item
+- broken icon file: built-in icon for that menu item
+
+The layer does not run during boot and does not change Desktop, Loader, Apps,
+or Settings behavior unless a valid active pack provides a supported icon.
