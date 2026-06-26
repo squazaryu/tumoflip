@@ -26,14 +26,19 @@
 #define WIFI_MAPPER_LAST_LINE_SIZE 48U
 #define WIFI_MAPPER_BSSID_SIZE     18U
 #define WIFI_MAPPER_SSID_SIZE      64U
+#define WIFI_MAPPER_AUTH_SIZE      24U
+#define WIFI_MAPPER_GEO_SIZE       16U
 #define WIFI_MAPPER_FILE_NAME_SIZE 32U
 #define WIFI_MAPPER_MAX_UNIQUE     64U
 #define WIFI_MAPPER_CHANNEL_BUCKETS 15U
+#define WIFI_MAPPER_CSV_FIELDS     12U
+#define WIFI_MAPPER_CSV_FIELD_SIZE 64U
 
 #define WIFI_MAPPER_DATA_DIR     EXT_PATH("apps_data/wifi_mapper")
 #define WIFI_MAPPER_SESSIONS_DIR EXT_PATH("apps_data/wifi_mapper/sessions")
 #define WIFI_MAPPER_SCAN_ALL_COMMAND "scanall\r\n"
 #define WIFI_MAPPER_SCAN_AP_COMMAND  "scanap\r\n"
+#define WIFI_MAPPER_WARDRIVE_COMMAND "wardrive -serial\r\n"
 #define WIFI_MAPPER_STOP_COMMAND "stopscan\r\n"
 
 typedef enum {
@@ -50,6 +55,7 @@ typedef enum {
 typedef enum {
     WiFiMapperScanModeAll,
     WiFiMapperScanModeAp,
+    WiFiMapperScanModeWardrive,
     WiFiMapperScanModeCount,
 } WiFiMapperScanMode;
 
@@ -71,6 +77,12 @@ typedef struct {
     uint8_t channel;
     char bssid[WIFI_MAPPER_BSSID_SIZE];
     char ssid[WIFI_MAPPER_SSID_SIZE];
+    char auth[WIFI_MAPPER_AUTH_SIZE];
+    char latitude[WIFI_MAPPER_GEO_SIZE];
+    char longitude[WIFI_MAPPER_GEO_SIZE];
+    char altitude[WIFI_MAPPER_GEO_SIZE];
+    char accuracy[WIFI_MAPPER_GEO_SIZE];
+    bool has_location;
 } WiFiMapperRecord;
 
 typedef struct {
@@ -80,6 +92,7 @@ typedef struct {
     uint32_t rows;
     uint32_t aps;
     uint32_t unique;
+    uint32_t located;
     int32_t best_rssi;
     int32_t avg_rssi;
     uint8_t top_channel;
@@ -96,6 +109,11 @@ static const WiFiMapperScanModeConfig wifi_mapper_scan_modes[WiFiMapperScanModeC
         .label = "Scan AP",
         .command = WIFI_MAPPER_SCAN_AP_COMMAND,
         .sent_status = "scanap sent",
+    },
+    [WiFiMapperScanModeWardrive] = {
+        .label = "Wardrive",
+        .command = WIFI_MAPPER_WARDRIVE_COMMAND,
+        .sent_status = "wardrive sent",
     },
 };
 
@@ -324,7 +342,7 @@ static bool wifi_mapper_open_log(WiFiMapperApp* app) {
         return false;
     }
 
-    const char* header = "tick_ms,type,rssi,channel,bssid,ssid,raw\n";
+    const char* header = "tick_ms,type,rssi,channel,bssid,ssid,auth,lat,lon,alt,accuracy,raw\n";
     storage_file_write(app->log_file, header, strlen(header));
     return true;
 }
@@ -372,6 +390,73 @@ static bool wifi_mapper_is_mac(const char* cursor) {
     return true;
 }
 
+static const char* wifi_mapper_find_mac(const char* text) {
+    for(const char* cursor = text; *cursor; cursor++) {
+        if(wifi_mapper_is_mac(cursor)) {
+            return cursor;
+        }
+    }
+
+    return NULL;
+}
+
+static bool wifi_mapper_csv_read_field(
+    const char** cursor,
+    char* value,
+    size_t value_size) {
+    size_t offset = 0;
+    bool quoted = false;
+
+    if(**cursor == '"') {
+        quoted = true;
+        (*cursor)++;
+    }
+
+    while(**cursor) {
+        if(quoted) {
+            if(**cursor == '"') {
+                if((*cursor)[1] == '"') {
+                    if(offset < (value_size - 1U)) {
+                        value[offset++] = '"';
+                    }
+                    *cursor += 2;
+                    continue;
+                }
+
+                (*cursor)++;
+                if(**cursor == ',') {
+                    (*cursor)++;
+                }
+                break;
+            }
+        } else if(**cursor == ',') {
+            (*cursor)++;
+            break;
+        }
+
+        if(offset < (value_size - 1U)) {
+            value[offset++] = **cursor;
+        }
+        (*cursor)++;
+    }
+
+    value[offset] = '\0';
+    return true;
+}
+
+static size_t wifi_mapper_csv_split(
+    const char* line,
+    char fields[WIFI_MAPPER_CSV_FIELDS][WIFI_MAPPER_CSV_FIELD_SIZE]) {
+    const char* cursor = line;
+    size_t count = 0;
+    while(*cursor && (count < WIFI_MAPPER_CSV_FIELDS)) {
+        wifi_mapper_csv_read_field(&cursor, fields[count], WIFI_MAPPER_CSV_FIELD_SIZE);
+        count++;
+    }
+
+    return count;
+}
+
 static bool wifi_mapper_parse_marauder_ap_line(
     const char* line,
     WiFiMapperRecord* record) {
@@ -415,6 +500,52 @@ static bool wifi_mapper_parse_marauder_ap_line(
     return true;
 }
 
+static bool wifi_mapper_parse_marauder_wardrive_line(
+    const char* line,
+    WiFiMapperRecord* record) {
+    char fields[WIFI_MAPPER_CSV_FIELDS][WIFI_MAPPER_CSV_FIELD_SIZE] = {};
+    const size_t field_count = wifi_mapper_csv_split(line, fields);
+    if(field_count < 11U) {
+        return false;
+    }
+
+    if((strcmp(fields[1], "SSID") == 0) || (strcmp(fields[10], "WIFI") != 0)) {
+        return false;
+    }
+
+    const char* bssid = wifi_mapper_find_mac(fields[0]);
+    if(!bssid) {
+        return false;
+    }
+
+    const char* channel_cursor = fields[4];
+    int32_t channel = 0;
+    if(!wifi_mapper_parse_i32(&channel_cursor, &channel) || (channel < 0) ||
+       (channel > UINT8_MAX)) {
+        return false;
+    }
+
+    const char* rssi_cursor = fields[5];
+    int32_t rssi = 0;
+    if(!wifi_mapper_parse_i32(&rssi_cursor, &rssi)) {
+        return false;
+    }
+
+    record->is_wifi = true;
+    record->type = "wardrive";
+    record->rssi = rssi;
+    record->channel = (uint8_t)channel;
+    strlcpy(record->bssid, bssid, sizeof(record->bssid));
+    strlcpy(record->ssid, fields[1], sizeof(record->ssid));
+    strlcpy(record->auth, fields[2], sizeof(record->auth));
+    strlcpy(record->latitude, fields[6], sizeof(record->latitude));
+    strlcpy(record->longitude, fields[7], sizeof(record->longitude));
+    strlcpy(record->altitude, fields[8], sizeof(record->altitude));
+    strlcpy(record->accuracy, fields[9], sizeof(record->accuracy));
+    record->has_location = fields[6][0] && fields[7][0];
+    return true;
+}
+
 static WiFiMapperRecord wifi_mapper_parse_record(const char* line) {
     WiFiMapperRecord record = {
         .is_wifi = false,
@@ -427,7 +558,9 @@ static WiFiMapperRecord wifi_mapper_parse_record(const char* line) {
         return record;
     }
 
-    wifi_mapper_parse_marauder_ap_line(line, &record);
+    if(!wifi_mapper_parse_marauder_wardrive_line(line, &record)) {
+        wifi_mapper_parse_marauder_ap_line(line, &record);
+    }
     return record;
 }
 
@@ -465,74 +598,42 @@ static bool wifi_mapper_find_latest_session(WiFiMapperApp* app, char* name, size
     return found;
 }
 
-static bool wifi_mapper_csv_read_quoted(
-    const char** cursor,
-    char* value,
-    size_t value_size) {
-    size_t offset = 0;
-    if(**cursor != '"') {
-        return false;
-    }
-    (*cursor)++;
-
-    while(**cursor) {
-        if(**cursor == '"') {
-            if((*cursor)[1] == '"') {
-                if(offset < (value_size - 1U)) {
-                    value[offset++] = '"';
-                }
-                *cursor += 2;
-                continue;
-            }
-
-            (*cursor)++;
-            break;
-        }
-
-        if(offset < (value_size - 1U)) {
-            value[offset++] = **cursor;
-        }
-        (*cursor)++;
-    }
-    value[offset] = '\0';
-    return true;
-}
-
 static bool wifi_mapper_parse_csv_ap_row(
     const char* line,
     int32_t* rssi,
     uint8_t* channel,
     char* bssid,
-    size_t bssid_size) {
-    const char* cursor = strchr(line, ',');
-    if(!cursor) {
+    size_t bssid_size,
+    bool* has_location) {
+    char fields[WIFI_MAPPER_CSV_FIELDS][WIFI_MAPPER_CSV_FIELD_SIZE] = {};
+    const size_t field_count = wifi_mapper_csv_split(line, fields);
+    if(field_count < 6U) {
         return false;
     }
-    cursor++;
 
-    if(strncmp(cursor, "ap,", 3) != 0) {
+    if((strcmp(fields[1], "ap") != 0) && (strcmp(fields[1], "wardrive") != 0)) {
         return false;
     }
-    cursor += 3;
 
-    if(!wifi_mapper_parse_i32(&cursor, rssi) || (*cursor != ',')) {
+    const char* rssi_cursor = fields[2];
+    if(!wifi_mapper_parse_i32(&rssi_cursor, rssi)) {
         return false;
     }
-    cursor++;
 
+    const char* channel_cursor = fields[3];
     int32_t channel_value = 0;
-    if(!wifi_mapper_parse_i32(&cursor, &channel_value) || (*cursor != ',') ||
-       (channel_value < 0) || (channel_value > UINT8_MAX)) {
-        return false;
-    }
-    cursor++;
-
-    if(!wifi_mapper_csv_read_quoted(&cursor, bssid, bssid_size) ||
-       !wifi_mapper_is_mac(bssid)) {
+    if(!wifi_mapper_parse_i32(&channel_cursor, &channel_value) || (channel_value < 0) ||
+       (channel_value > UINT8_MAX)) {
         return false;
     }
 
+    if(!wifi_mapper_is_mac(fields[4])) {
+        return false;
+    }
+
+    strlcpy(bssid, fields[4], bssid_size);
     *channel = (uint8_t)channel_value;
+    *has_location = (field_count > 8U) && fields[7][0] && fields[8][0];
     return true;
 }
 
@@ -564,11 +665,16 @@ static void wifi_mapper_parse_session_line(
     int32_t rssi = 0;
     uint8_t channel = 0;
     char bssid[WIFI_MAPPER_BSSID_SIZE];
-    if(!wifi_mapper_parse_csv_ap_row(line, &rssi, &channel, bssid, sizeof(bssid))) {
+    bool has_location = false;
+    if(!wifi_mapper_parse_csv_ap_row(
+           line, &rssi, &channel, bssid, sizeof(bssid), &has_location)) {
         return;
     }
 
     stats->aps++;
+    if(has_location) {
+        stats->located++;
+    }
     *rssi_sum += rssi;
     if((stats->aps == 1U) || (rssi > stats->best_rssi)) {
         stats->best_rssi = rssi;
@@ -685,7 +791,8 @@ static void wifi_mapper_write_log_record(
     const WiFiMapperRecord* record,
     const char* line) {
     char prefix[48];
-    if(record->is_wifi && (strcmp(record->type, "ap") == 0)) {
+    if(record->is_wifi &&
+       ((strcmp(record->type, "ap") == 0) || (strcmp(record->type, "wardrive") == 0))) {
         snprintf(
             prefix,
             sizeof(prefix),
@@ -699,11 +806,21 @@ static void wifi_mapper_write_log_record(
         storage_file_write(file, ",", 1);
         wifi_mapper_write_escaped_csv(file, record->ssid);
         storage_file_write(file, ",", 1);
+        wifi_mapper_write_escaped_csv(file, record->auth);
+        storage_file_write(file, ",", 1);
+        wifi_mapper_write_escaped_csv(file, record->latitude);
+        storage_file_write(file, ",", 1);
+        wifi_mapper_write_escaped_csv(file, record->longitude);
+        storage_file_write(file, ",", 1);
+        wifi_mapper_write_escaped_csv(file, record->altitude);
+        storage_file_write(file, ",", 1);
+        wifi_mapper_write_escaped_csv(file, record->accuracy);
+        storage_file_write(file, ",", 1);
     } else {
         snprintf(
             prefix,
             sizeof(prefix),
-            "%lu,%s,,,,,",
+            "%lu,%s,,,,,,,,,,",
             (unsigned long)tick_ms,
             record->type);
         storage_file_write(file, prefix, strlen(prefix));
@@ -831,9 +948,10 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
         snprintf(
             line,
             sizeof(line),
-            "AP:%lu Unique:%lu",
+            "AP:%lu U:%lu GPS:%lu",
             (unsigned long)model->session.aps,
-            (unsigned long)model->session.unique);
+            (unsigned long)model->session.unique,
+            (unsigned long)model->session.located);
         canvas_draw_str(canvas, 0, 46, line);
 
         snprintf(
