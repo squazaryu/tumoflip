@@ -70,6 +70,10 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
         repo_root / build_dir / ".extapps" / "keeloq_keystore_decryptor.fap",
         arf_tools_dir / "keeloq_keystore_decryptor.fap",
     )
+    copy_file(
+        repo_root / build_dir / ".extapps" / "ble_killer.fap",
+        arf_tools_dir / "ble_killer.fap",
+    )
 
     module_appids = (
         "arf_keeloq",
@@ -90,6 +94,7 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
     expected_visible = {
         "arf_frequency_analyzer.fap",
         "arf_subghz_full.fap",
+        "ble_killer.fap",
         "keeloq_keystore_decryptor.fap",
         "subghz_raw_edit.fap",
     }

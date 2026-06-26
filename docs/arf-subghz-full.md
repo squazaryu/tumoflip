@@ -7,7 +7,8 @@ their code into the same process.
 The Desktop `Sub-GHz` entry opens the standard core Sub-GHz app. The former
 Desktop `Sub-GHz Remote` slot opens the `ARF Tools` folder, where the Full
 launcher, ARF Frequency Analyzer, Sub-GHz RAW Edit, and KeeLoq Keystore
-Decryptor are visible. The remaining child FAPs are stored in
+Decryptor are visible. BLE Killer is also visible as an opt-in UART BLE
+research controller. The remaining child FAPs are stored in
 `/ext/apps_data/arf_subghz_full/modules`.
 
 ## Included workflows
@@ -18,6 +19,7 @@ Decryptor are visible. The remaining child FAPs are stored in
 - frequency analyzer through a dedicated visible FAP;
 - RAW `.sub` trimming and cleanup through Sub-GHz RAW Edit;
 - KeeLoq keystore decrypt/export through KeeLoq Keystore Decryptor;
+- external UART BLE controller testing through BLE Killer;
 - radio and external CC1101 settings through the core Sub-GHz app;
 - receiver settings and live Protocol Pack switching;
 - Protocol Pack Inspector;
