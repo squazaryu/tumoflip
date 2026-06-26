@@ -115,6 +115,8 @@ are legally allowed to test.
   confirm it exits cleanly and do not share `/ext/keystore_decrypted.txt`.
 - Launch `BLE Killer` without an external UART BLE device attached; confirm it
   opens, backs out cleanly, and does not affect Bluetooth App Bridge pairing.
+- Launch `Garage Door Remote`, enter/exit its receive views, and confirm core
+  `Sub-GHz` can still receive afterward.
 - Launch and exit every packaged ARF child FAP:
   `arf_keeloq`, `arf_counter_bf`, `arf_car_emulate`, `arf_psa_decrypt`,
   `proto_pirate`, `rolljam`, `subghz_bruteforcer`, and `arf_status`.

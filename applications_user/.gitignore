@@ -9,6 +9,8 @@
 !flipper_companion/**
 !flipper_xremote/
 !flipper_xremote/**
+!garage_door_remote/
+!garage_door_remote/**
 !arf_tools/
 !arf_tools/**
 !arf_subghz_full/

@@ -50,6 +50,7 @@ class ValidateReleaseTest(unittest.TestCase):
                 "arf_frequency_analyzer",
                 "arf_subghz_full",
                 "ble_killer",
+                "garage_door_remote",
                 "keeloq_keystore_decryptor",
                 "subghz_raw_edit",
             },
