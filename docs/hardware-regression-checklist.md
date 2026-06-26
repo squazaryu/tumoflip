@@ -111,6 +111,8 @@ are legally allowed to test.
 - Launch and exit `Frequency Analyzer`.
 - Launch `Sub-GHz RAW Edit`, open a known `/ext/subghz/*.sub` RAW capture,
   exit without saving, and confirm no radio broker lock remains.
+- Launch `KeeLoq Keystore Decryptor` only on your own test SD/firmware setup;
+  confirm it exits cleanly and do not share `/ext/keystore_decrypted.txt`.
 - Launch and exit every packaged ARF child FAP:
   `arf_keeloq`, `arf_counter_bf`, `arf_car_emulate`, `arf_psa_decrypt`,
   `proto_pirate`, `rolljam`, `subghz_bruteforcer`, and `arf_status`.

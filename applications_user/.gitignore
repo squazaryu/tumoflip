@@ -19,6 +19,8 @@
 !subghz_bruteforcer/**
 !subghz_raw_edit/
 !subghz_raw_edit/**
+!keeloq_keystore_decryptor/
+!keeloq_keystore_decryptor/**
 !subghz_protocols/
 !subghz_protocols/**
 !quac/

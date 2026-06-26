@@ -46,7 +46,12 @@ class ValidateReleaseTest(unittest.TestCase):
     def test_visible_arf_tools_inventory(self) -> None:
         self.assertEqual(
             ARF_VISIBLE_APP_IDS,
-            {"arf_frequency_analyzer", "arf_subghz_full", "subghz_raw_edit"},
+            {
+                "arf_frequency_analyzer",
+                "arf_subghz_full",
+                "keeloq_keystore_decryptor",
+                "subghz_raw_edit",
+            },
         )
 
     def test_parse_fuf(self) -> None:
