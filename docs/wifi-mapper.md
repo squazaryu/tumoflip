@@ -28,10 +28,24 @@ Session logs are written to:
 ## Controls
 
 - `OK`: start or stop logging with the selected scan mode.
+- Hold `OK`: open the latest session summary.
 - `Left` / `Right`: switch between `Scan All` and `Scan AP`.
 - `Up`: send the selected scan command.
 - `Down`: send `stopscan`.
 - `Back`: exit.
+
+## Session Summary
+
+Hold `OK` on the live screen to open `Last Session`. The app reads the newest
+`wifi_*.csv` file from the sessions directory and shows:
+
+- total parsed AP rows;
+- unique BSSID count, capped in-app to the first 64 unique BSSIDs;
+- best and average RSSI;
+- busiest detected channel.
+
+Press `OK` on that screen to refresh the summary. `Back` returns to the live
+logger screen.
 
 ## Log Format
 

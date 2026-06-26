@@ -22,9 +22,13 @@
 #define WIFI_MAPPER_RX_BUFFER_SIZE 2048U
 #define WIFI_MAPPER_LINE_SIZE      160U
 #define WIFI_MAPPER_PATH_SIZE      128U
+#define WIFI_MAPPER_SESSION_LINE_SIZE 256U
 #define WIFI_MAPPER_LAST_LINE_SIZE 48U
 #define WIFI_MAPPER_BSSID_SIZE     18U
 #define WIFI_MAPPER_SSID_SIZE      64U
+#define WIFI_MAPPER_FILE_NAME_SIZE 32U
+#define WIFI_MAPPER_MAX_UNIQUE     64U
+#define WIFI_MAPPER_CHANNEL_BUCKETS 15U
 
 #define WIFI_MAPPER_DATA_DIR     EXT_PATH("apps_data/wifi_mapper")
 #define WIFI_MAPPER_SESSIONS_DIR EXT_PATH("apps_data/wifi_mapper/sessions")
@@ -49,6 +53,11 @@ typedef enum {
     WiFiMapperScanModeCount,
 } WiFiMapperScanMode;
 
+typedef enum {
+    WiFiMapperScreenLive,
+    WiFiMapperScreenSession,
+} WiFiMapperScreen;
+
 typedef struct {
     const char* label;
     const char* command;
@@ -64,6 +73,19 @@ typedef struct {
     char ssid[WIFI_MAPPER_SSID_SIZE];
 } WiFiMapperRecord;
 
+typedef struct {
+    bool loaded;
+    char status[24];
+    char file_name[WIFI_MAPPER_FILE_NAME_SIZE];
+    uint32_t rows;
+    uint32_t aps;
+    uint32_t unique;
+    int32_t best_rssi;
+    int32_t avg_rssi;
+    uint8_t top_channel;
+    uint32_t top_channel_count;
+} WiFiMapperSessionStats;
+
 static const WiFiMapperScanModeConfig wifi_mapper_scan_modes[WiFiMapperScanModeCount] = {
     [WiFiMapperScanModeAll] = {
         .label = "Scan All",
@@ -78,14 +100,16 @@ static const WiFiMapperScanModeConfig wifi_mapper_scan_modes[WiFiMapperScanModeC
 };
 
 typedef struct {
+    WiFiMapperScreen screen;
     bool logging;
     bool uart_ready;
     WiFiMapperScanMode scan_mode;
+    WiFiMapperSessionStats session;
     uint32_t lines;
     uint32_t wifi_records;
     uint32_t errors;
     char status[24];
-    char file_name[32];
+    char file_name[WIFI_MAPPER_FILE_NAME_SIZE];
     char last_line[WIFI_MAPPER_LAST_LINE_SIZE];
 } WiFiMapperModel;
 
@@ -103,14 +127,16 @@ typedef struct {
     char log_path[WIFI_MAPPER_PATH_SIZE];
     char line[WIFI_MAPPER_LINE_SIZE];
     size_t line_len;
+    WiFiMapperScreen screen;
     bool logging;
     bool uart_ready;
     WiFiMapperScanMode scan_mode;
+    WiFiMapperSessionStats session;
     uint32_t lines;
     uint32_t wifi_records;
     uint32_t errors;
     char status[24];
-    char file_name[32];
+    char file_name[WIFI_MAPPER_FILE_NAME_SIZE];
     char last_line[WIFI_MAPPER_LAST_LINE_SIZE];
 } WiFiMapperApp;
 
@@ -128,16 +154,15 @@ static const NotificationSequence sequence_wifi_mapper_error = {
     NULL,
 };
 
-static uint32_t wifi_mapper_exit(void* context) {
-    UNUSED(context);
-    return VIEW_NONE;
-}
+static void wifi_mapper_update_model(WiFiMapperApp* app);
 
 static void wifi_mapper_update_model(WiFiMapperApp* app) {
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    const WiFiMapperScreen screen = app->screen;
     const bool logging = app->logging;
     const bool uart_ready = app->uart_ready;
     const WiFiMapperScanMode scan_mode = app->scan_mode;
+    const WiFiMapperSessionStats session = app->session;
     const uint32_t lines = app->lines;
     const uint32_t wifi_records = app->wifi_records;
     const uint32_t errors = app->errors;
@@ -153,9 +178,11 @@ static void wifi_mapper_update_model(WiFiMapperApp* app) {
         app->view,
         WiFiMapperModel * model,
         {
+            model->screen = screen;
             model->logging = logging;
             model->uart_ready = uart_ready;
             model->scan_mode = scan_mode;
+            model->session = session;
             model->lines = lines;
             model->wifi_records = wifi_records;
             model->errors = errors;
@@ -164,6 +191,30 @@ static void wifi_mapper_update_model(WiFiMapperApp* app) {
             strlcpy(model->last_line, last_line, sizeof(model->last_line));
         },
         true);
+}
+
+static void wifi_mapper_switch_screen(WiFiMapperApp* app, WiFiMapperScreen screen) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    app->screen = screen;
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+    wifi_mapper_update_model(app);
+}
+
+static uint32_t wifi_mapper_exit(void* context) {
+    WiFiMapperApp* app = context;
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    const bool return_to_live = app->screen == WiFiMapperScreenSession;
+    if(return_to_live) {
+        app->screen = WiFiMapperScreenLive;
+    }
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    if(return_to_live) {
+        wifi_mapper_update_model(app);
+        return 0;
+    }
+
+    return VIEW_NONE;
 }
 
 static void wifi_mapper_send_command(WiFiMapperApp* app, const char* command) {
@@ -380,6 +431,241 @@ static WiFiMapperRecord wifi_mapper_parse_record(const char* line) {
     return record;
 }
 
+static bool wifi_mapper_name_ends_with(const char* name, const char* suffix) {
+    const size_t name_len = strlen(name);
+    const size_t suffix_len = strlen(suffix);
+    return (name_len >= suffix_len) &&
+           (strcmp(name + name_len - suffix_len, suffix) == 0);
+}
+
+static bool wifi_mapper_is_session_file_name(const char* name) {
+    return (strncmp(name, "wifi_", 5) == 0) && wifi_mapper_name_ends_with(name, ".csv");
+}
+
+static bool wifi_mapper_find_latest_session(WiFiMapperApp* app, char* name, size_t name_size) {
+    bool found = false;
+    File* directory = storage_file_alloc(app->storage);
+    if(storage_dir_open(directory, WIFI_MAPPER_SESSIONS_DIR)) {
+        FileInfo file_info;
+        char current_name[WIFI_MAPPER_FILE_NAME_SIZE];
+        while(storage_dir_read(directory, &file_info, current_name, sizeof(current_name))) {
+            if(file_info_is_dir(&file_info) || !wifi_mapper_is_session_file_name(current_name)) {
+                continue;
+            }
+
+            if(!found || (strcmp(current_name, name) > 0)) {
+                strlcpy(name, current_name, name_size);
+                found = true;
+            }
+        }
+    }
+
+    storage_dir_close(directory);
+    storage_file_free(directory);
+    return found;
+}
+
+static bool wifi_mapper_csv_read_quoted(
+    const char** cursor,
+    char* value,
+    size_t value_size) {
+    size_t offset = 0;
+    if(**cursor != '"') {
+        return false;
+    }
+    (*cursor)++;
+
+    while(**cursor) {
+        if(**cursor == '"') {
+            if((*cursor)[1] == '"') {
+                if(offset < (value_size - 1U)) {
+                    value[offset++] = '"';
+                }
+                *cursor += 2;
+                continue;
+            }
+
+            (*cursor)++;
+            break;
+        }
+
+        if(offset < (value_size - 1U)) {
+            value[offset++] = **cursor;
+        }
+        (*cursor)++;
+    }
+    value[offset] = '\0';
+    return true;
+}
+
+static bool wifi_mapper_parse_csv_ap_row(
+    const char* line,
+    int32_t* rssi,
+    uint8_t* channel,
+    char* bssid,
+    size_t bssid_size) {
+    const char* cursor = strchr(line, ',');
+    if(!cursor) {
+        return false;
+    }
+    cursor++;
+
+    if(strncmp(cursor, "ap,", 3) != 0) {
+        return false;
+    }
+    cursor += 3;
+
+    if(!wifi_mapper_parse_i32(&cursor, rssi) || (*cursor != ',')) {
+        return false;
+    }
+    cursor++;
+
+    int32_t channel_value = 0;
+    if(!wifi_mapper_parse_i32(&cursor, &channel_value) || (*cursor != ',') ||
+       (channel_value < 0) || (channel_value > UINT8_MAX)) {
+        return false;
+    }
+    cursor++;
+
+    if(!wifi_mapper_csv_read_quoted(&cursor, bssid, bssid_size) ||
+       !wifi_mapper_is_mac(bssid)) {
+        return false;
+    }
+
+    *channel = (uint8_t)channel_value;
+    return true;
+}
+
+static bool wifi_mapper_bssid_seen(
+    char unique_bssids[WIFI_MAPPER_MAX_UNIQUE][WIFI_MAPPER_BSSID_SIZE],
+    uint32_t unique_count,
+    const char* bssid) {
+    for(uint32_t i = 0; i < unique_count; i++) {
+        if(strcmp(unique_bssids[i], bssid) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void wifi_mapper_parse_session_line(
+    WiFiMapperSessionStats* stats,
+    char unique_bssids[WIFI_MAPPER_MAX_UNIQUE][WIFI_MAPPER_BSSID_SIZE],
+    uint32_t channel_counts[WIFI_MAPPER_CHANNEL_BUCKETS],
+    int32_t* rssi_sum,
+    const char* line) {
+    if(strncmp(line, "tick_ms,", 8) == 0) {
+        return;
+    }
+
+    stats->rows++;
+
+    int32_t rssi = 0;
+    uint8_t channel = 0;
+    char bssid[WIFI_MAPPER_BSSID_SIZE];
+    if(!wifi_mapper_parse_csv_ap_row(line, &rssi, &channel, bssid, sizeof(bssid))) {
+        return;
+    }
+
+    stats->aps++;
+    *rssi_sum += rssi;
+    if((stats->aps == 1U) || (rssi > stats->best_rssi)) {
+        stats->best_rssi = rssi;
+    }
+
+    if(channel < WIFI_MAPPER_CHANNEL_BUCKETS) {
+        channel_counts[channel]++;
+    }
+
+    if((stats->unique < WIFI_MAPPER_MAX_UNIQUE) &&
+       !wifi_mapper_bssid_seen(unique_bssids, stats->unique, bssid)) {
+        strlcpy(unique_bssids[stats->unique], bssid, WIFI_MAPPER_BSSID_SIZE);
+        stats->unique++;
+    }
+}
+
+static void wifi_mapper_store_session_stats(
+    WiFiMapperApp* app,
+    const WiFiMapperSessionStats* stats) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    app->session = *stats;
+    app->screen = WiFiMapperScreenSession;
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+    wifi_mapper_update_model(app);
+}
+
+static void wifi_mapper_analyze_latest_session(WiFiMapperApp* app) {
+    WiFiMapperSessionStats stats = {
+        .loaded = false,
+    };
+    strlcpy(stats.status, "No sessions", sizeof(stats.status));
+
+    char file_name[WIFI_MAPPER_FILE_NAME_SIZE] = "";
+    if(!wifi_mapper_find_latest_session(app, file_name, sizeof(file_name))) {
+        wifi_mapper_store_session_stats(app, &stats);
+        return;
+    }
+
+    strlcpy(stats.file_name, file_name, sizeof(stats.file_name));
+    char path[WIFI_MAPPER_PATH_SIZE];
+    snprintf(path, sizeof(path), WIFI_MAPPER_SESSIONS_DIR "/%s", file_name);
+
+    File* file = storage_file_alloc(app->storage);
+    if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        strlcpy(stats.status, "Read error", sizeof(stats.status));
+        storage_file_free(file);
+        wifi_mapper_store_session_stats(app, &stats);
+        return;
+    }
+
+    char unique_bssids[WIFI_MAPPER_MAX_UNIQUE][WIFI_MAPPER_BSSID_SIZE] = {};
+    uint32_t channel_counts[WIFI_MAPPER_CHANNEL_BUCKETS] = {};
+    int32_t rssi_sum = 0;
+    char line[WIFI_MAPPER_SESSION_LINE_SIZE];
+    size_t line_len = 0;
+    uint8_t buffer[64];
+    size_t bytes_read = 0;
+    while((bytes_read = storage_file_read(file, buffer, sizeof(buffer))) > 0U) {
+        for(size_t i = 0; i < bytes_read; i++) {
+            const char data = (char)buffer[i];
+            if((data == '\r') || (data == '\n')) {
+                if(line_len > 0U) {
+                    line[line_len] = '\0';
+                    wifi_mapper_parse_session_line(
+                        &stats, unique_bssids, channel_counts, &rssi_sum, line);
+                    line_len = 0U;
+                }
+            } else if(line_len < (sizeof(line) - 1U)) {
+                line[line_len++] = data;
+            }
+        }
+    }
+    if(line_len > 0U) {
+        line[line_len] = '\0';
+        wifi_mapper_parse_session_line(&stats, unique_bssids, channel_counts, &rssi_sum, line);
+    }
+
+    storage_file_close(file);
+    storage_file_free(file);
+
+    if(stats.aps > 0U) {
+        stats.loaded = true;
+        stats.avg_rssi = rssi_sum / (int32_t)stats.aps;
+        strlcpy(stats.status, "Last session", sizeof(stats.status));
+        for(uint8_t channel = 1; channel < WIFI_MAPPER_CHANNEL_BUCKETS; channel++) {
+            if(channel_counts[channel] > stats.top_channel_count) {
+                stats.top_channel = channel;
+                stats.top_channel_count = channel_counts[channel];
+            }
+        }
+    } else {
+        strlcpy(stats.status, "No AP rows", sizeof(stats.status));
+    }
+
+    wifi_mapper_store_session_stats(app, &stats);
+}
+
 static void wifi_mapper_write_escaped_csv(File* file, const char* line) {
     const char quote = '"';
     storage_file_write(file, &quote, 1);
@@ -432,7 +718,8 @@ static void wifi_mapper_log_line(WiFiMapperApp* app, const char* line) {
 
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
     if(app->logging && app->log_file) {
-        const uint32_t tick_ms = (furi_get_tick() * 1000U) / furi_kernel_get_tick_frequency();
+        const uint32_t tick_ms = (furi_get_tick() * 1000U) /
+                                 furi_kernel_get_tick_frequency();
         wifi_mapper_write_log_record(app->log_file, tick_ms, &record, line);
     }
 
@@ -486,15 +773,15 @@ static void wifi_mapper_stop_logging(WiFiMapperApp* app) {
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
     wifi_mapper_close_log(app);
     app->logging = false;
-    strlcpy(app->status, app->uart_ready ? "Idle" : "UART not ready", sizeof(app->status));
+    strlcpy(
+        app->status,
+        app->uart_ready ? "Idle" : "UART not ready",
+        sizeof(app->status));
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
     wifi_mapper_update_model(app);
 }
 
-static void wifi_mapper_draw_callback(Canvas* canvas, void* context) {
-    WiFiMapperModel* model = context;
-    canvas_clear(canvas);
-    canvas_set_color(canvas, ColorBlack);
+static void wifi_mapper_draw_live(Canvas* canvas, WiFiMapperModel* model) {
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 0, 10, "WiFi Mapper");
 
@@ -520,21 +807,103 @@ static void wifi_mapper_draw_callback(Canvas* canvas, void* context) {
     snprintf(line, sizeof(line), "Err:%lu", (unsigned long)model->errors);
     canvas_draw_str(canvas, 86, 46, line);
 
-    canvas_draw_str(canvas, 0, 58, model->file_name[0] ? model->file_name : "OK start Up scan");
+    canvas_draw_str(
+        canvas,
+        0,
+        58,
+        model->file_name[0] ? model->file_name : "OK start Hold stats");
 
     elements_button_center(canvas, model->logging ? "Stop" : "Start");
 }
 
+static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
+    canvas_set_font(canvas, FontPrimary);
+    canvas_draw_str(canvas, 0, 10, "Last Session");
+
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str(canvas, 0, 22, model->session.status);
+    if(model->session.file_name[0]) {
+        canvas_draw_str(canvas, 0, 34, model->session.file_name);
+    }
+
+    char line[48];
+    if(model->session.loaded) {
+        snprintf(
+            line,
+            sizeof(line),
+            "AP:%lu Unique:%lu",
+            (unsigned long)model->session.aps,
+            (unsigned long)model->session.unique);
+        canvas_draw_str(canvas, 0, 46, line);
+
+        snprintf(
+            line,
+            sizeof(line),
+            "RSSI best:%ld avg:%ld",
+            (long)model->session.best_rssi,
+            (long)model->session.avg_rssi);
+        canvas_draw_str(canvas, 0, 58, line);
+
+        if(model->session.top_channel_count > 0U) {
+            snprintf(
+                line,
+                sizeof(line),
+                "Ch%u:%lu",
+                model->session.top_channel,
+                (unsigned long)model->session.top_channel_count);
+            canvas_draw_str(canvas, 90, 34, line);
+        }
+    } else {
+        canvas_draw_str(canvas, 0, 46, "OK refresh");
+        canvas_draw_str(canvas, 0, 58, "Back live");
+    }
+}
+
+static void wifi_mapper_draw_callback(Canvas* canvas, void* context) {
+    WiFiMapperModel* model = context;
+    canvas_clear(canvas);
+    canvas_set_color(canvas, ColorBlack);
+
+    if(model->screen == WiFiMapperScreenSession) {
+        wifi_mapper_draw_session(canvas, model);
+    } else {
+        wifi_mapper_draw_live(canvas, model);
+    }
+}
+
 static bool wifi_mapper_input_callback(InputEvent* event, void* context) {
     WiFiMapperApp* app = context;
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    const WiFiMapperScreen screen = app->screen;
+    const bool logging = app->logging;
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    if(screen == WiFiMapperScreenSession) {
+        if((event->type == InputTypeShort) && (event->key == InputKeyOk)) {
+            wifi_mapper_analyze_latest_session(app);
+            return true;
+        } else if((event->type == InputTypeShort) && (event->key == InputKeyBack)) {
+            wifi_mapper_switch_screen(app, WiFiMapperScreenLive);
+            return true;
+        }
+
+        return false;
+    }
+
+    if((event->type == InputTypeLong) && (event->key == InputKeyOk)) {
+        if(logging) {
+            wifi_mapper_set_status(app, "Stop first");
+        } else {
+            wifi_mapper_analyze_latest_session(app);
+        }
+        return true;
+    }
+
     if(event->type != InputTypeShort) {
         return false;
     }
 
     if(event->key == InputKeyOk) {
-        furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
-        const bool logging = app->logging;
-        furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
         if(logging) {
             wifi_mapper_stop_logging(app);
         } else {
