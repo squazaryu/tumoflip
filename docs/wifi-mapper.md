@@ -26,6 +26,12 @@ Session logs are written to:
 /ext/apps_data/wifi_mapper/sessions/wifi_YYYYMMDD_HHMMSS.csv
 ```
 
+GeoJSON exports are written to:
+
+```text
+/ext/apps_data/wifi_mapper/exports/wifi_YYYYMMDD_HHMMSS.geojson
+```
+
 ## Controls
 
 - `OK`: start or stop logging with the selected scan mode.
@@ -47,7 +53,9 @@ Hold `OK` on the live screen to open `Last Session`. The app reads the newest
 - busiest detected channel.
 
 Press `OK` on that screen to refresh the summary. `Back` returns to the live
-logger screen.
+logger screen. Press `Right` to export the newest session as GeoJSON. Exported
+features include only AP rows that have latitude and longitude, so normal
+`Scan All` sessions without GPS data can produce `No GPS rows`.
 
 ## Log Format
 

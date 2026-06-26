@@ -30,13 +30,19 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn("WiFiMapperScreenSession", source)
         self.assertIn("WiFiMapperSessionStats", source)
         self.assertIn("wifi_mapper_analyze_latest_session", source)
+        self.assertIn("wifi_mapper_export_latest_session", source)
+        self.assertIn("wifi_mapper_export_csv_to_geojson", source)
+        self.assertIn("wifi_mapper_write_geojson_feature", source)
+        self.assertIn("wifi_mapper_write_escaped_json", source)
         self.assertIn("wifi_mapper_find_latest_session", source)
         self.assertIn("wifi_mapper_parse_marauder_ap_line", source)
         self.assertIn("wifi_mapper_parse_marauder_wardrive_line", source)
         self.assertIn("wifi_mapper_parse_csv_ap_row", source)
+        self.assertIn("wifi_mapper_parse_export_row", source)
         self.assertIn('"ESSID:"', source)
         self.assertIn('"Ch:"', source)
         self.assertIn('"wardrive"', source)
+        self.assertIn("FeatureCollection", source)
         self.assertIn("storage_dir_open", source)
         self.assertIn("storage_file_read", source)
         self.assertIn("WIFI_MAPPER_MAX_UNIQUE", source)
@@ -49,6 +55,8 @@ class WiFiMapperTest(unittest.TestCase):
             '"tick_ms,type,rssi,channel,bssid,ssid,auth,lat,lon,alt,accuracy,raw\\n"',
             source,
         )
+        self.assertIn('EXT_PATH("apps_data/wifi_mapper/exports")', source)
+        self.assertIn('elements_button_right(canvas, "Export")', source)
         self.assertIn("FuriHalSerialIdUsart", source)
         self.assertIn("FSOM_CREATE_ALWAYS", source)
 
