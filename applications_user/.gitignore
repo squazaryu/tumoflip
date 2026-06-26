@@ -19,6 +19,8 @@
 !ble_killer/**
 !rolljam/
 !rolljam/**
+!rolljam_standalone/
+!rolljam_standalone/**
 !subghz_bruteforcer/
 !subghz_bruteforcer/**
 !subghz_raw_edit/

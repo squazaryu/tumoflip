@@ -9,7 +9,8 @@ Desktop `Sub-GHz Remote` slot opens the `ARF Tools` folder, where the Full
 launcher, ARF Frequency Analyzer, Sub-GHz RAW Edit, and KeeLoq Keystore
 Decryptor are visible. BLE Killer is also visible as an opt-in UART BLE
 research controller, and Garage Door Remote is visible as a separate
-ProtoPirate-derived garage/gate tool. The remaining child FAPs are stored in
+ProtoPirate-derived garage/gate tool. RollJam Standalone is visible as a
+separate opt-in RollJam 2.0 test app. The remaining child FAPs are stored in
 `/ext/apps_data/arf_subghz_full/modules`.
 
 ## Included workflows
@@ -22,6 +23,7 @@ ProtoPirate-derived garage/gate tool. The remaining child FAPs are stored in
 - KeeLoq keystore decrypt/export through KeeLoq Keystore Decryptor;
 - external UART BLE controller testing through BLE Killer;
 - garage/gate capture and emulate workflows through Garage Door Remote;
+- standalone RollJam 2.0 testing through RollJam Standalone;
 - radio and external CC1101 settings through the core Sub-GHz app;
 - receiver settings and live Protocol Pack switching;
 - Protocol Pack Inspector;
@@ -33,7 +35,9 @@ Full queues the selected child in Loader and exits. This gives each utility the
 available application heap instead of linking all Sub-GHz scenes and ARF workers
 into one FAP. A full standard Sub-GHz external backend exceeded available heap
 on hardware, so standard workflows stay in the core app. PSA, Counter, Car
-Emulate, ProtoPirate, RollJam, and Bruteforcer stay in separate child FAPs.
+Emulate, ProtoPirate, the original RollJam child module, and Bruteforcer stay in
+separate child FAPs. RollJam Standalone is a visible opt-in test app and does
+not replace the original child module yet.
 
 ## Shared Sub-GHz helpers
 

@@ -81,7 +81,7 @@ The four-page post-update splash screen is generated automatically from
   Sub-GHz app and separate ARF FAPs. Each ARF child receives the full
   application heap instead of being linked into one large process.
 - Exposes ARF Sub-GHz Full, ARF Frequency Analyzer, Sub-GHz RAW Edit, KeeLoq
-  Keystore Decryptor, BLE Killer, and Garage Door Remote in
+  Keystore Decryptor, BLE Killer, Garage Door Remote, and RollJam Standalone in
   `/ext/apps/ARF Tools`; the remaining isolated child FAPs are packaged under
   `/ext/apps_data/arf_subghz_full/modules`.
 - Keeps the Desktop `Sub-GHz` shortcut on the stable core app; ARF Tools stays
@@ -214,6 +214,7 @@ functional modules remain separate processes in a private data directory:
 /ext/apps/ARF Tools/keeloq_keystore_decryptor.fap
 /ext/apps/ARF Tools/ble_killer.fap
 /ext/apps/ARF Tools/garage_door_remote.fap
+/ext/apps/ARF Tools/rolljam_standalone.fap
 /ext/apps_data/arf_subghz_full/modules/*.fap
 ```
 

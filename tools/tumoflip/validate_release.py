@@ -51,6 +51,7 @@ ARF_VISIBLE_APP_IDS = {
     "ble_killer",
     "garage_door_remote",
     "keeloq_keystore_decryptor",
+    "rolljam_standalone",
     "subghz_raw_edit",
 }
 ARF_MODULE_APP_IDS = {
