@@ -66,7 +66,7 @@ class UpdateSplashTest(unittest.TestCase):
             self.assertTrue(sync_update_splash(splash_dir, check=True))
 
     def test_dist_suffix_version_parser(self) -> None:
-        self.assertEqual(version_from_dist_suffix("tmwhflpprarf089-030"), "089-030")
+        self.assertEqual(version_from_dist_suffix("tmwhflpprarf089-031"), "089-031")
         self.assertIsNone(version_from_dist_suffix("abcdef12"))
 
     def test_fbt_autogenerates_tumoflip_update_splash(self) -> None:

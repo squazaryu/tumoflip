@@ -28,8 +28,9 @@
 #define WIFI_MAPPER_SSID_SIZE      64U
 #define WIFI_MAPPER_AUTH_SIZE      24U
 #define WIFI_MAPPER_GEO_SIZE       16U
-#define WIFI_MAPPER_FILE_NAME_SIZE 32U
+#define WIFI_MAPPER_FILE_NAME_SIZE 48U
 #define WIFI_MAPPER_MAX_UNIQUE     64U
+#define WIFI_MAPPER_MAX_EXPORT_FEATURES WIFI_MAPPER_MAX_UNIQUE
 #define WIFI_MAPPER_CHANNEL_BUCKETS 15U
 #define WIFI_MAPPER_CSV_FIELD_SIZE 64U
 
@@ -64,6 +65,12 @@ typedef enum {
     WiFiMapperScreenSession,
 } WiFiMapperScreen;
 
+typedef enum {
+    WiFiMapperExportModeClean,
+    WiFiMapperExportModeRaw,
+    WiFiMapperExportModeCount,
+} WiFiMapperExportMode;
+
 typedef struct {
     const char* label;
     const char* command;
@@ -87,6 +94,7 @@ typedef struct {
 
 typedef struct {
     bool valid;
+    uint32_t tick_ms;
     int32_t rssi;
     uint8_t channel;
     char bssid[WIFI_MAPPER_BSSID_SIZE];
@@ -99,6 +107,16 @@ typedef struct {
 } WiFiMapperExportRow;
 
 typedef struct {
+    WiFiMapperExportRow row;
+    uint32_t samples;
+    uint32_t first_tick_ms;
+    uint32_t last_tick_ms;
+    int32_t best_rssi;
+    int32_t last_rssi;
+    int32_t rssi_sum;
+} WiFiMapperExportAggregate;
+
+typedef struct {
     bool loaded;
     char status[24];
     char file_name[WIFI_MAPPER_FILE_NAME_SIZE];
@@ -107,6 +125,8 @@ typedef struct {
     uint32_t aps;
     uint32_t unique;
     uint32_t located;
+    uint32_t mapped;
+    uint32_t duplicates;
     uint32_t exported;
     int32_t best_rssi;
     int32_t avg_rssi;
@@ -116,10 +136,18 @@ typedef struct {
 
 typedef struct {
     char unique_bssids[WIFI_MAPPER_MAX_UNIQUE][WIFI_MAPPER_BSSID_SIZE];
+    char mapped_bssids[WIFI_MAPPER_MAX_UNIQUE][WIFI_MAPPER_BSSID_SIZE];
     uint32_t channel_counts[WIFI_MAPPER_CHANNEL_BUCKETS];
     char line[WIFI_MAPPER_SESSION_LINE_SIZE];
     uint8_t buffer[64];
 } WiFiMapperSessionScratch;
+
+typedef struct {
+    WiFiMapperExportAggregate aggregates[WIFI_MAPPER_MAX_EXPORT_FEATURES];
+    uint32_t aggregate_count;
+    char line[WIFI_MAPPER_SESSION_LINE_SIZE];
+    uint8_t buffer[64];
+} WiFiMapperExportScratch;
 
 static const WiFiMapperScanModeConfig wifi_mapper_scan_modes[WiFiMapperScanModeCount] = {
     [WiFiMapperScanModeAll] = {
@@ -144,6 +172,7 @@ typedef struct {
     bool logging;
     bool uart_ready;
     WiFiMapperScanMode scan_mode;
+    WiFiMapperExportMode export_mode;
     WiFiMapperSessionStats session;
     uint32_t lines;
     uint32_t wifi_records;
@@ -171,6 +200,7 @@ typedef struct {
     bool logging;
     bool uart_ready;
     WiFiMapperScanMode scan_mode;
+    WiFiMapperExportMode export_mode;
     WiFiMapperSessionStats session;
     uint32_t lines;
     uint32_t wifi_records;
@@ -200,6 +230,10 @@ static void wifi_mapper_write_geojson_feature(
     File* file,
     const WiFiMapperExportRow* row,
     bool first_feature);
+static void wifi_mapper_write_clean_geojson_feature(
+    File* file,
+    const WiFiMapperExportAggregate* aggregate,
+    bool first_feature);
 
 static void wifi_mapper_update_model(WiFiMapperApp* app) {
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
@@ -207,6 +241,7 @@ static void wifi_mapper_update_model(WiFiMapperApp* app) {
     const bool logging = app->logging;
     const bool uart_ready = app->uart_ready;
     const WiFiMapperScanMode scan_mode = app->scan_mode;
+    const WiFiMapperExportMode export_mode = app->export_mode;
     const WiFiMapperSessionStats session = app->session;
     const uint32_t lines = app->lines;
     const uint32_t wifi_records = app->wifi_records;
@@ -227,6 +262,7 @@ static void wifi_mapper_update_model(WiFiMapperApp* app) {
             model->logging = logging;
             model->uart_ready = uart_ready;
             model->scan_mode = scan_mode;
+            model->export_mode = export_mode;
             model->session = session;
             model->lines = lines;
             model->wifi_records = wifi_records;
@@ -280,10 +316,28 @@ static const WiFiMapperScanModeConfig* wifi_mapper_get_scan_mode_config(
     return &wifi_mapper_scan_modes[scan_mode];
 }
 
+static const char* wifi_mapper_get_export_mode_label(WiFiMapperExportMode export_mode) {
+    return export_mode == WiFiMapperExportModeRaw ? "Raw" : "Clean";
+}
+
 static void wifi_mapper_set_status(WiFiMapperApp* app, const char* status) {
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
     strlcpy(app->status, status, sizeof(app->status));
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+    wifi_mapper_update_model(app);
+}
+
+static void wifi_mapper_toggle_export_mode(WiFiMapperApp* app) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    app->export_mode = app->export_mode == WiFiMapperExportModeClean ?
+                           WiFiMapperExportModeRaw :
+                           WiFiMapperExportModeClean;
+    strlcpy(
+        app->session.status,
+        wifi_mapper_get_export_mode_label(app->export_mode),
+        sizeof(app->session.status));
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
     wifi_mapper_update_model(app);
 }
 
@@ -403,6 +457,50 @@ static bool wifi_mapper_parse_i32(const char** cursor, int32_t* value) {
     return true;
 }
 
+static bool wifi_mapper_parse_u32_field(const char* field, uint32_t* value) {
+    const char* cursor = field;
+    int32_t parsed = 0;
+    if(!wifi_mapper_parse_i32(&cursor, &parsed) || (parsed < 0)) {
+        return false;
+    }
+
+    *value = (uint32_t)parsed;
+    return true;
+}
+
+static bool wifi_mapper_starts_with_nocase(const char* text, const char* prefix) {
+    while(*prefix) {
+        if(tolower((unsigned char)*text) != tolower((unsigned char)*prefix)) {
+            return false;
+        }
+        text++;
+        prefix++;
+    }
+
+    return true;
+}
+
+static bool wifi_mapper_geo_number_valid(const char* value) {
+    bool has_digit = false;
+    bool has_dot = false;
+    if((*value == '-') || (*value == '+')) {
+        value++;
+    }
+
+    while(*value) {
+        if(isdigit((unsigned char)*value)) {
+            has_digit = true;
+        } else if((*value == '.') && !has_dot) {
+            has_dot = true;
+        } else {
+            return false;
+        }
+        value++;
+    }
+
+    return has_digit;
+}
+
 static bool wifi_mapper_is_mac(const char* cursor) {
     for(size_t i = 0; i < 17U; i++) {
         if((i % 3U) == 2U) {
@@ -483,10 +581,13 @@ static bool wifi_mapper_parse_marauder_ap_line(
     }
 
     cursor = wifi_mapper_skip_spaces(cursor);
-    if(strncmp(cursor, "Ch:", 3) != 0) {
+    if(!wifi_mapper_starts_with_nocase(cursor, "Ch")) {
         return false;
     }
-    cursor += 3;
+    cursor += 2;
+    if(*cursor == ':') {
+        cursor++;
+    }
 
     if(!wifi_mapper_parse_i32(&cursor, &channel) || (channel < 0) ||
        (channel > UINT8_MAX)) {
@@ -501,10 +602,16 @@ static bool wifi_mapper_parse_marauder_ap_line(
     cursor += 17;
 
     cursor = wifi_mapper_skip_spaces(cursor);
-    if(strncmp(cursor, "ESSID:", 6) != 0) {
+    if(wifi_mapper_starts_with_nocase(cursor, "ESSID")) {
+        cursor += 5;
+    } else if(wifi_mapper_starts_with_nocase(cursor, "SSID")) {
+        cursor += 4;
+    } else {
         return false;
     }
-    cursor += 6;
+    if(*cursor == ':') {
+        cursor++;
+    }
 
     record->is_wifi = true;
     record->type = "ap";
@@ -535,7 +642,7 @@ static bool wifi_mapper_parse_marauder_wardrive_line(
     strlcpy(bssid_copy, bssid, sizeof(bssid_copy));
 
     wifi_mapper_csv_read_field(&cursor, ssid, sizeof(ssid));
-    if(strcmp(ssid, "SSID") == 0) {
+    if(wifi_mapper_starts_with_nocase(ssid, "SSID")) {
         return false;
     }
     wifi_mapper_csv_read_field(&cursor, auth, sizeof(auth));
@@ -560,8 +667,8 @@ static bool wifi_mapper_parse_marauder_wardrive_line(
     wifi_mapper_csv_read_field(&cursor, longitude, sizeof(longitude));
     wifi_mapper_csv_read_field(&cursor, altitude, sizeof(altitude));
     wifi_mapper_csv_read_field(&cursor, accuracy, sizeof(accuracy));
-    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
-    if(strcmp(field, "WIFI") != 0) {
+    const bool has_type = wifi_mapper_csv_read_field(&cursor, field, sizeof(field)) && field[0];
+    if(has_type && !wifi_mapper_starts_with_nocase(field, "WIFI")) {
         return false;
     }
 
@@ -576,7 +683,54 @@ static bool wifi_mapper_parse_marauder_wardrive_line(
     strlcpy(record->longitude, longitude, sizeof(record->longitude));
     strlcpy(record->altitude, altitude, sizeof(record->altitude));
     strlcpy(record->accuracy, accuracy, sizeof(record->accuracy));
-    record->has_location = latitude[0] && longitude[0];
+    record->has_location = wifi_mapper_geo_number_valid(latitude) &&
+                           wifi_mapper_geo_number_valid(longitude);
+    return true;
+}
+
+static bool wifi_mapper_parse_structured_wifi_line(
+    const char* line,
+    WiFiMapperRecord* record) {
+    const char* cursor = line;
+    char field[WIFI_MAPPER_CSV_FIELD_SIZE];
+
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    if(!wifi_mapper_starts_with_nocase(field, "WIFI")) {
+        return false;
+    }
+
+    wifi_mapper_csv_read_field(&cursor, record->bssid, sizeof(record->bssid));
+    if(!wifi_mapper_is_mac(record->bssid)) {
+        return false;
+    }
+
+    wifi_mapper_csv_read_field(&cursor, record->ssid, sizeof(record->ssid));
+    wifi_mapper_csv_read_field(&cursor, record->auth, sizeof(record->auth));
+
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    const char* rssi_cursor = field;
+    if(!wifi_mapper_parse_i32(&rssi_cursor, &record->rssi)) {
+        return false;
+    }
+
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    const char* channel_cursor = field;
+    int32_t channel = 0;
+    if(!wifi_mapper_parse_i32(&channel_cursor, &channel) || (channel < 0) ||
+       (channel > UINT8_MAX)) {
+        return false;
+    }
+
+    wifi_mapper_csv_read_field(&cursor, record->latitude, sizeof(record->latitude));
+    wifi_mapper_csv_read_field(&cursor, record->longitude, sizeof(record->longitude));
+    wifi_mapper_csv_read_field(&cursor, record->altitude, sizeof(record->altitude));
+    wifi_mapper_csv_read_field(&cursor, record->accuracy, sizeof(record->accuracy));
+
+    record->is_wifi = true;
+    record->type = "wifi";
+    record->channel = (uint8_t)channel;
+    record->has_location = wifi_mapper_geo_number_valid(record->latitude) &&
+                           wifi_mapper_geo_number_valid(record->longitude);
     return true;
 }
 
@@ -586,9 +740,11 @@ static WiFiMapperRecord wifi_mapper_parse_record(const char* line) {
         .type = "raw",
     };
 
-    if(strncmp(line, "WIFI,", 5) == 0) {
-        record.is_wifi = true;
-        record.type = "wifi";
+    if(wifi_mapper_starts_with_nocase(line, "WIFI,")) {
+        if(!wifi_mapper_parse_structured_wifi_line(line, &record)) {
+            record.is_wifi = true;
+            record.type = "wifi";
+        }
         return record;
     }
 
@@ -644,7 +800,8 @@ static bool wifi_mapper_parse_csv_ap_row(
 
     wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
     wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
-    if((strcmp(field, "ap") != 0) && (strcmp(field, "wardrive") != 0)) {
+    if((strcmp(field, "ap") != 0) && (strcmp(field, "wardrive") != 0) &&
+       (strcmp(field, "wifi") != 0)) {
         return false;
     }
 
@@ -671,9 +828,9 @@ static bool wifi_mapper_parse_csv_ap_row(
     wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
     wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
     wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
-    const bool has_latitude = field[0] != '\0';
+    const bool has_latitude = wifi_mapper_geo_number_valid(field);
     wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
-    const bool has_longitude = field[0] != '\0';
+    const bool has_longitude = wifi_mapper_geo_number_valid(field);
 
     *channel = (uint8_t)channel_value;
     *has_location = has_latitude && has_longitude;
@@ -716,6 +873,13 @@ static void wifi_mapper_parse_session_line(
     stats->aps++;
     if(has_location) {
         stats->located++;
+        if((stats->mapped < WIFI_MAPPER_MAX_UNIQUE) &&
+           !wifi_mapper_bssid_seen(scratch->mapped_bssids, stats->mapped, bssid)) {
+            strlcpy(scratch->mapped_bssids[stats->mapped], bssid, WIFI_MAPPER_BSSID_SIZE);
+            stats->mapped++;
+        } else {
+            stats->duplicates++;
+        }
     }
     *rssi_sum += rssi;
     if((stats->aps == 1U) || (rssi > stats->best_rssi)) {
@@ -821,6 +985,7 @@ static void wifi_mapper_analyze_latest_session(WiFiMapperApp* app) {
 
 static bool wifi_mapper_make_export_name(
     const char* session_name,
+    WiFiMapperExportMode export_mode,
     char* export_name,
     size_t export_name_size) {
     if(!wifi_mapper_is_session_file_name(session_name)) {
@@ -833,14 +998,83 @@ static bool wifi_mapper_make_export_name(
         return false;
     }
 
-    strlcpy(extension, ".geojson", export_name_size - (size_t)(extension - export_name));
+    snprintf(
+        extension,
+        export_name_size - (size_t)(extension - export_name),
+        "_%s.geojson",
+        export_mode == WiFiMapperExportModeRaw ? "raw" : "clean");
     return true;
+}
+
+static WiFiMapperExportAggregate* wifi_mapper_find_export_aggregate(
+    WiFiMapperExportScratch* scratch,
+    const char* bssid) {
+    for(uint32_t i = 0; i < scratch->aggregate_count; i++) {
+        if(strcmp(scratch->aggregates[i].row.bssid, bssid) == 0) {
+            return &scratch->aggregates[i];
+        }
+    }
+
+    return NULL;
+}
+
+static void wifi_mapper_add_clean_export_row(
+    WiFiMapperExportScratch* scratch,
+    const WiFiMapperExportRow* row) {
+    WiFiMapperExportAggregate* aggregate =
+        wifi_mapper_find_export_aggregate(scratch, row->bssid);
+
+    if(!aggregate) {
+        if(scratch->aggregate_count >= WIFI_MAPPER_MAX_EXPORT_FEATURES) {
+            return;
+        }
+
+        aggregate = &scratch->aggregates[scratch->aggregate_count++];
+        memset(aggregate, 0, sizeof(WiFiMapperExportAggregate));
+        aggregate->row = *row;
+        aggregate->samples = 1;
+        aggregate->first_tick_ms = row->tick_ms;
+        aggregate->last_tick_ms = row->tick_ms;
+        aggregate->best_rssi = row->rssi;
+        aggregate->last_rssi = row->rssi;
+        aggregate->rssi_sum = row->rssi;
+        return;
+    }
+
+    aggregate->samples++;
+    aggregate->last_tick_ms = row->tick_ms;
+    aggregate->last_rssi = row->rssi;
+    aggregate->rssi_sum += row->rssi;
+    if(row->rssi > aggregate->best_rssi) {
+        aggregate->best_rssi = row->rssi;
+        aggregate->row = *row;
+    }
+}
+
+static void wifi_mapper_process_export_line(
+    File* geojson_file,
+    WiFiMapperExportScratch* scratch,
+    WiFiMapperExportMode export_mode,
+    const char* line,
+    uint32_t* exported) {
+    WiFiMapperExportRow row;
+    if(!wifi_mapper_parse_export_row(line, &row)) {
+        return;
+    }
+
+    if(export_mode == WiFiMapperExportModeRaw) {
+        wifi_mapper_write_geojson_feature(geojson_file, &row, *exported == 0U);
+        (*exported)++;
+    } else {
+        wifi_mapper_add_clean_export_row(scratch, &row);
+    }
 }
 
 static uint32_t wifi_mapper_export_csv_to_geojson(
     WiFiMapperApp* app,
     const char* session_name,
-    const char* export_name) {
+    const char* export_name,
+    WiFiMapperExportMode export_mode) {
     char csv_path[WIFI_MAPPER_PATH_SIZE];
     char geojson_path[WIFI_MAPPER_PATH_SIZE];
     snprintf(csv_path, sizeof(csv_path), WIFI_MAPPER_SESSIONS_DIR "/%s", session_name);
@@ -849,11 +1083,11 @@ static uint32_t wifi_mapper_export_csv_to_geojson(
     storage_common_mkdir(app->storage, WIFI_MAPPER_DATA_DIR);
     storage_common_mkdir(app->storage, WIFI_MAPPER_EXPORTS_DIR);
 
-    WiFiMapperSessionScratch* scratch = malloc(sizeof(WiFiMapperSessionScratch));
+    WiFiMapperExportScratch* scratch = malloc(sizeof(WiFiMapperExportScratch));
     if(!scratch) {
         return 0;
     }
-    memset(scratch, 0, sizeof(WiFiMapperSessionScratch));
+    memset(scratch, 0, sizeof(WiFiMapperExportScratch));
 
     File* csv_file = storage_file_alloc(app->storage);
     File* geojson_file = storage_file_alloc(app->storage);
@@ -880,12 +1114,8 @@ static uint32_t wifi_mapper_export_csv_to_geojson(
                 if((data == '\r') || (data == '\n')) {
                     if(line_len > 0U) {
                         scratch->line[line_len] = '\0';
-                        WiFiMapperExportRow row;
-                        if(wifi_mapper_parse_export_row(scratch->line, &row)) {
-                            wifi_mapper_write_geojson_feature(
-                                geojson_file, &row, exported == 0U);
-                            exported++;
-                        }
+                        wifi_mapper_process_export_line(
+                            geojson_file, scratch, export_mode, scratch->line, &exported);
                         line_len = 0U;
                     }
                 } else if(line_len < (sizeof(scratch->line) - 1U)) {
@@ -895,9 +1125,14 @@ static uint32_t wifi_mapper_export_csv_to_geojson(
         }
         if(line_len > 0U) {
             scratch->line[line_len] = '\0';
-            WiFiMapperExportRow row;
-            if(wifi_mapper_parse_export_row(scratch->line, &row)) {
-                wifi_mapper_write_geojson_feature(geojson_file, &row, exported == 0U);
+            wifi_mapper_process_export_line(
+                geojson_file, scratch, export_mode, scratch->line, &exported);
+        }
+
+        if(export_mode == WiFiMapperExportModeClean) {
+            for(uint32_t i = 0; i < scratch->aggregate_count; i++) {
+                wifi_mapper_write_clean_geojson_feature(
+                    geojson_file, &scratch->aggregates[i], exported == 0U);
                 exported++;
             }
         }
@@ -924,14 +1159,20 @@ static void wifi_mapper_export_latest_session(WiFiMapperApp* app) {
 
     char session_name[WIFI_MAPPER_FILE_NAME_SIZE] = "";
     char export_name[WIFI_MAPPER_FILE_NAME_SIZE] = "";
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    const WiFiMapperExportMode export_mode = app->export_mode;
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
     if(!wifi_mapper_find_latest_session(app, session_name, sizeof(session_name)) ||
-       !wifi_mapper_make_export_name(session_name, export_name, sizeof(export_name))) {
+       !wifi_mapper_make_export_name(
+           session_name, export_mode, export_name, sizeof(export_name))) {
         strlcpy(stats.status, "No sessions", sizeof(stats.status));
         wifi_mapper_store_session_stats(app, &stats);
         return;
     }
 
-    const uint32_t exported = wifi_mapper_export_csv_to_geojson(app, session_name, export_name);
+    const uint32_t exported =
+        wifi_mapper_export_csv_to_geojson(app, session_name, export_name, export_mode);
     wifi_mapper_analyze_latest_session(app);
 
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
@@ -939,7 +1180,8 @@ static void wifi_mapper_export_latest_session(WiFiMapperApp* app) {
     strlcpy(app->session.export_name, export_name, sizeof(app->session.export_name));
     strlcpy(
         app->session.status,
-        exported > 0U ? "GeoJSON saved" : "No GPS rows",
+        exported > 0U ? (export_mode == WiFiMapperExportModeRaw ? "Raw saved" : "Clean saved") :
+                         "No GPS rows",
         sizeof(app->session.status));
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
     wifi_mapper_update_model(app);
@@ -1000,8 +1242,11 @@ static bool wifi_mapper_parse_export_row(const char* line, WiFiMapperExportRow* 
     char field[WIFI_MAPPER_CSV_FIELD_SIZE];
 
     wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    wifi_mapper_parse_u32_field(field, &row->tick_ms);
+
     wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
-    if((strcmp(field, "ap") != 0) && (strcmp(field, "wardrive") != 0)) {
+    if((strcmp(field, "ap") != 0) && (strcmp(field, "wardrive") != 0) &&
+       (strcmp(field, "wifi") != 0)) {
         return false;
     }
 
@@ -1032,7 +1277,8 @@ static bool wifi_mapper_parse_export_row(const char* line, WiFiMapperExportRow* 
     wifi_mapper_csv_read_field(&cursor, row->altitude, sizeof(row->altitude));
     wifi_mapper_csv_read_field(&cursor, row->accuracy, sizeof(row->accuracy));
 
-    row->valid = row->latitude[0] && row->longitude[0];
+    row->valid = wifi_mapper_geo_number_valid(row->latitude) &&
+                 wifi_mapper_geo_number_valid(row->longitude);
     return row->valid;
 }
 
@@ -1069,9 +1315,64 @@ static void wifi_mapper_write_geojson_feature(
     snprintf(
         buffer,
         sizeof(buffer),
-        ",\"rssi\":%ld,\"channel\":%u",
+        ",\"rssi\":%ld,\"channel\":%u,\"tick_ms\":%lu",
         (long)row->rssi,
-        row->channel);
+        row->channel,
+        (unsigned long)row->tick_ms);
+    storage_file_write(file, buffer, strlen(buffer));
+
+    if(row->accuracy[0]) {
+        storage_file_write(file, ",\"accuracy\":", 12);
+        storage_file_write(file, row->accuracy, strlen(row->accuracy));
+    }
+    storage_file_write(file, "}}", 2);
+}
+
+static void wifi_mapper_write_clean_geojson_feature(
+    File* file,
+    const WiFiMapperExportAggregate* aggregate,
+    bool first_feature) {
+    const WiFiMapperExportRow* row = &aggregate->row;
+    if(!first_feature) {
+        storage_file_write(file, ",\n", 2);
+    }
+
+    char buffer[256];
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[%s,%s",
+        row->longitude,
+        row->latitude);
+    storage_file_write(file, buffer, strlen(buffer));
+    if(row->altitude[0]) {
+        storage_file_write(file, ",", 1);
+        storage_file_write(file, row->altitude, strlen(row->altitude));
+    }
+    const char* properties = "]},\"properties\":{";
+    storage_file_write(file, properties, strlen(properties));
+
+    storage_file_write(file, "\"ssid\":", 7);
+    wifi_mapper_write_escaped_json(file, row->ssid);
+    storage_file_write(file, ",\"bssid\":", 9);
+    wifi_mapper_write_escaped_json(file, row->bssid);
+    storage_file_write(file, ",\"auth\":", 8);
+    wifi_mapper_write_escaped_json(file, row->auth);
+
+    const int32_t avg_rssi = aggregate->samples ?
+                                 (aggregate->rssi_sum / (int32_t)aggregate->samples) :
+                                 row->rssi;
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        ",\"channel\":%u,\"samples\":%lu,\"best_rssi\":%ld,\"last_rssi\":%ld,\"avg_rssi\":%ld,\"first_tick_ms\":%lu,\"last_tick_ms\":%lu",
+        row->channel,
+        (unsigned long)aggregate->samples,
+        (long)aggregate->best_rssi,
+        (long)aggregate->last_rssi,
+        (long)avg_rssi,
+        (unsigned long)aggregate->first_tick_ms,
+        (unsigned long)aggregate->last_tick_ms);
     storage_file_write(file, buffer, strlen(buffer));
 
     if(row->accuracy[0]) {
@@ -1088,7 +1389,8 @@ static void wifi_mapper_write_log_record(
     const char* line) {
     char prefix[48];
     if(record->is_wifi &&
-       ((strcmp(record->type, "ap") == 0) || (strcmp(record->type, "wardrive") == 0))) {
+       ((strcmp(record->type, "ap") == 0) || (strcmp(record->type, "wardrive") == 0) ||
+        record->has_location)) {
         snprintf(
             prefix,
             sizeof(prefix),
@@ -1230,30 +1532,40 @@ static void wifi_mapper_draw_live(Canvas* canvas, WiFiMapperModel* model) {
 }
 
 static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
+    char line[48];
+
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 0, 10, "Last Session");
 
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, 0, 22, model->session.status);
+    snprintf(
+        line,
+        sizeof(line),
+        "[%c]",
+        model->export_mode == WiFiMapperExportModeClean ? 'C' : 'R');
+    canvas_draw_str(canvas, 112, 22, line);
+
     if(model->session.file_name[0]) {
         canvas_draw_str(canvas, 0, 34, model->session.file_name);
     }
 
-    char line[48];
     if(model->session.loaded) {
         snprintf(
             line,
             sizeof(line),
-            "AP:%lu U:%lu GPS:%lu",
+            "AP:%lu GPS:%lu Map:%lu",
             (unsigned long)model->session.aps,
-            (unsigned long)model->session.unique,
-            (unsigned long)model->session.located);
+            (unsigned long)model->session.located,
+            (unsigned long)model->session.mapped);
         canvas_draw_str(canvas, 0, 46, line);
 
         snprintf(
             line,
             sizeof(line),
-            "RSSI best:%ld avg:%ld",
+            "U:%lu D:%lu R:%ld/%ld",
+            (unsigned long)model->session.unique,
+            (unsigned long)model->session.duplicates,
             (long)model->session.best_rssi,
             (long)model->session.avg_rssi);
         canvas_draw_str(canvas, 0, 58, line);
@@ -1272,16 +1584,17 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
             snprintf(
                 line,
                 sizeof(line),
-                "Export:%lu",
+                "E:%lu",
                 (unsigned long)model->session.exported);
-            canvas_draw_str(canvas, 82, 22, line);
+            canvas_draw_str(canvas, 78, 22, line);
         }
     } else {
-        canvas_draw_str(canvas, 0, 46, "OK refresh");
+        canvas_draw_str(canvas, 0, 46, "Up refresh");
         canvas_draw_str(canvas, 0, 58, "Back live");
     }
 
-    elements_button_right(canvas, "Export");
+    elements_button_center(canvas, "Export");
+    elements_button_right(canvas, "Mode");
 }
 
 static void wifi_mapper_draw_callback(Canvas* canvas, void* context) {
@@ -1304,11 +1617,14 @@ static bool wifi_mapper_input_callback(InputEvent* event, void* context) {
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
 
     if(screen == WiFiMapperScreenSession) {
-        if((event->type == InputTypeShort) && (event->key == InputKeyOk)) {
+        if((event->type == InputTypeShort) && (event->key == InputKeyUp)) {
             wifi_mapper_analyze_latest_session(app);
             return true;
-        } else if((event->type == InputTypeShort) && (event->key == InputKeyRight)) {
+        } else if((event->type == InputTypeShort) && (event->key == InputKeyOk)) {
             wifi_mapper_export_latest_session(app);
+            return true;
+        } else if((event->type == InputTypeShort) && (event->key == InputKeyRight)) {
+            wifi_mapper_toggle_export_mode(app);
             return true;
         } else if((event->type == InputTypeShort) && (event->key == InputKeyBack)) {
             wifi_mapper_switch_screen(app, WiFiMapperScreenLive);

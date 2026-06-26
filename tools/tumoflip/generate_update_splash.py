@@ -304,7 +304,7 @@ def generate(title: str, version: str, output: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--title", default="TMWHFLPPRARF")
-    parser.add_argument("--version", default="089-030")
+    parser.add_argument("--version", default="089-031")
     parser.add_argument(
         "--output",
         type=Path,

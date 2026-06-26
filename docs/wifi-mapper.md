@@ -29,7 +29,8 @@ Session logs are written to:
 GeoJSON exports are written to:
 
 ```text
-/ext/apps_data/wifi_mapper/exports/wifi_YYYYMMDD_HHMMSS.geojson
+/ext/apps_data/wifi_mapper/exports/wifi_YYYYMMDD_HHMMSS_clean.geojson
+/ext/apps_data/wifi_mapper/exports/wifi_YYYYMMDD_HHMMSS_raw.geojson
 ```
 
 ## Controls
@@ -49,13 +50,37 @@ Hold `OK` on the live screen to open `Last Session`. The app reads the newest
 - total parsed AP rows;
 - unique BSSID count, capped in-app to the first 64 unique BSSIDs;
 - GPS-tagged row count;
+- mapped unique BSSID count for clean exports;
+- duplicate GPS sample count;
 - best and average RSSI;
 - busiest detected channel.
 
-Press `OK` on that screen to refresh the summary. `Back` returns to the live
-logger screen. Press `Right` to export the newest session as GeoJSON. Exported
-features include only AP rows that have latitude and longitude, so normal
+On the session screen:
+
+- `OK`: export the newest session as GeoJSON.
+- `Right`: switch export mode between `Clean` and `Raw`.
+- `Up`: refresh the summary.
+- `Back`: return to the live logger.
+
+`Clean` export groups GPS rows by BSSID and writes one point per detected
+network using the best RSSI sample as the map location. It includes `samples`,
+`best_rssi`, `last_rssi`, `avg_rssi`, `first_tick_ms`, and `last_tick_ms`.
+`Raw` export writes every GPS-tagged AP row as a separate feature. Exported
+features include only AP rows that have valid latitude and longitude, so normal
 `Scan All` sessions without GPS data can produce `No GPS rows`.
+
+## Companion Map
+
+The iOS companion can read GeoJSON exports from:
+
+```text
+/ext/apps_data/wifi_mapper/exports
+```
+
+Open the `WiFi` tab and use `WiFi Mapper` to view clean or raw exports on a map.
+The companion parser keeps the Flipper export format simple: coordinates come
+from GeoJSON `Point` geometry, while `ssid`, `bssid`, `auth`, `channel`, RSSI,
+`samples`, and tick metadata stay in feature properties.
 
 ## Log Format
 
@@ -75,13 +100,20 @@ tick_ms,type,rssi,channel,bssid,ssid,raw
 
 For `Scan All`, the geo fields are empty. For `Wardrive`, rows parsed from
 Marauder `wardrive -serial` output use `type=wardrive` and include auth,
-latitude, longitude, altitude, and accuracy when present.
+latitude, longitude, altitude, and accuracy when present. The parser tolerates
+minor Marauder formatting differences such as `Ch`/`ch`, `ESSID`/`SSID`, and
+wardrive rows without the final `WIFI` field when the coordinate fields are
+present.
 
 The on-screen `WiFi` counter increments for Marauder AP lines and for future
-lines starting with `WIFI,`. A future ESP32 firmware profile can emit
-structured `WIFI,...` records with BSSID, SSID, RSSI, channel, security, and
-optional GPS fields; the Flipper-side logger can then render those into a map
-or hand them to the iOS companion without changing the basic SD storage layout.
+lines starting with `WIFI,`. A structured ESP32 firmware profile can emit:
+
+```csv
+WIFI,00:11:22:33:44:55,example,WPA2,-59,3,55.751244,37.618423,120,5
+```
+
+Those records are stored with `type=wifi` and can feed the same summary and
+GeoJSON export path.
 
 ## Existing WiFi Mapping FAP
 
