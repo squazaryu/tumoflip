@@ -28,6 +28,28 @@ Run after building the updater. This writes both the manifest and package ZIP:
 python3 tools/tumoflip/validate_release.py --write-manifest
 ```
 
+Package-only updates are used when only SD content changes: external `.fap`
+apps, `.fal` Protocol Packs, assets, or other `/ext` resources. They keep the
+installed firmware version unchanged and emit a manifest with
+`package_release.type = "package-only"`:
+
+```sh
+python3 tools/tumoflip/package_release.py \
+  --build-dir build/f7-firmware-C \
+  --target-release-tag v0.3.1
+```
+
+Before writing the package manifest, the package-only builder syncs current
+`build/f7-firmware-C/.extapps/*.fap` exports into the release resources tree.
+This makes targeted FAP fixes, such as WiFi Mapper, publishable through FW
+Packages without rebuilding or reinstalling flash firmware.
+
+Use the `Package Release` GitHub Actions workflow to publish updated
+`tumoflip-packages.json`, `tumoflip-packages.zip`, and refreshed SHA-256 sums to
+an existing firmware release. The workflow downloads the already-published
+firmware assets for that tag, hashes those unchanged files together with the new
+package assets, and does not create or upload new firmware artifacts.
+
 Apply all package groups to a directly mounted SD card:
 
 ```sh

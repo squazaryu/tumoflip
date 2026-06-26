@@ -1,0 +1,147 @@
+name: Package Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_release_tag:
+        description: "Existing firmware release tag to update, for example v0.3.1"
+        required: true
+        type: string
+      package_ref:
+        description: "Branch, tag, or commit containing package-only changes"
+        required: true
+        default: "main"
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.inputs.target_release_tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  FBT_NO_SYNC: 0
+  FORCE_NO_DIRTY: "yes"
+  FBT_GIT_SUBMODULE_SHALLOW: 1
+
+jobs:
+  package-release:
+    name: build and publish SD packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout package ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.package_ref }}
+          submodules: recursive
+          fetch-depth: 0
+          clean: "true"
+
+      - name: Resolve target release
+        id: target
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.target_release_tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^v[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.]+)?$ ]]; then
+            echo "Target release tag must look like v0.3.1; got: $TAG" >&2
+            exit 1
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Install Python package dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user Pillow
+
+      - name: Build firmware resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf applications/main/clock_app/resources/apps/ || true
+          ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" updater_package
+
+      - name: Run package release tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest \
+            tools/tumoflip/test_package_release.py \
+            tools/tumoflip/test_validate_release.py \
+            tools/tumoflip/test_apply_packages.py \
+            tools/tumoflip/test_make_packages_zip.py \
+            tools/tumoflip/test_wifi_mapper.py
+
+      - name: Build package-only assets
+        id: packages
+        shell: bash
+        env:
+          TAG: ${{ steps.target.outputs.tag }}
+        run: |
+          set -euo pipefail
+          python3 tools/tumoflip/package_release.py \
+            --build-dir build/f7-firmware-C \
+            --target-release-tag "$TAG"
+          VERSION="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path("build/f7-firmware-C/firmware.json").read_text())["firmware_version"])
+          PY
+          )"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "update_dir=dist/f7-C/f7-update-${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare mixed firmware/package SHA-256 sums
+        id: checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.target.outputs.tag }}
+          VERSION: ${{ steps.packages.outputs.version }}
+          UPDATE_DIR: ${{ steps.packages.outputs.update_dir }}
+        run: |
+          set -euo pipefail
+          WORK="dist/f7-C/package-release-existing-assets"
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir "$WORK" \
+            --pattern "flipper-z-f7-full-${VERSION}.dfu" \
+            --pattern "flipper-z-f7-sdk-${VERSION}.zip" \
+            --pattern "flipper-z-f7-update-${VERSION}.tgz"
+          SHA_FILE="dist/f7-C/${VERSION}-SHA256SUMS"
+          (
+            cd dist/f7-C
+            sha256sum \
+              "package-release-existing-assets/flipper-z-f7-full-${VERSION}.dfu" \
+              "package-release-existing-assets/flipper-z-f7-sdk-${VERSION}.zip" \
+              "package-release-existing-assets/flipper-z-f7-update-${VERSION}.tgz" \
+              "f7-update-${VERSION}/tumoflip-packages.json" \
+              "f7-update-${VERSION}/tumoflip-packages.zip" \
+              | sed "s#package-release-existing-assets/##; s#f7-update-${VERSION}/##"
+          ) > "$SHA_FILE"
+          echo "sha_file=${SHA_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish package-only assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.target.outputs.tag }}
+          UPDATE_DIR: ${{ steps.packages.outputs.update_dir }}
+          SHA_FILE: ${{ steps.checksums.outputs.sha_file }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" \
+            "${UPDATE_DIR}/tumoflip-packages.json" \
+            "${UPDATE_DIR}/tumoflip-packages.zip" \
+            "${SHA_FILE}" \
+            --clobber \
+            --repo "$GITHUB_REPOSITORY"

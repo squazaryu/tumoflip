@@ -104,11 +104,14 @@ The four-page post-update splash screen is generated automatically from
   that require a physical Flipper Zero.
 - Added a verified `tumoflip-packages.zip` release artifact for transactional SD
   package installation from the iOS companion app.
+- Added package-only FW Packages releases for external `.fap`, `.fal`, and
+  `/ext` resource updates that do not require a firmware version bump.
 - Bundled the Module One `ESP32 Marauder` FAP into the SD package so it is
   available from the `8/1` Module One folder after a clean install.
 - Added `WiFi Mapper`, a passive Module One ESP32 UART logger that starts
   Marauder AP scanning and stores scan output under
-  `/ext/apps_data/wifi_mapper/sessions`.
+  `/ext/apps_data/wifi_mapper/sessions`; current packages include the GPS
+  no-fix handling and GeoJSON export fixes.
 - Vendored local user applications into `applications_user` so the repository
   can be built without absolute local symlinks.
 
@@ -287,6 +290,12 @@ The schema v2 `tumoflip-packages.json` separates Base, ARF, Module One, and
 Protocol Pack files, provides a content-addressed release ID, and supports the
 host-side atomic installer with rollback. See
 [Tumoflip Packages](docs/tumoflip-packages.md).
+
+For package-only changes, such as a fixed external FAP, use the `Package
+Release` workflow instead of creating a new firmware tag. It rebuilds package
+resources from the selected ref, keeps the firmware version unchanged, and
+replaces only `tumoflip-packages.json`, `tumoflip-packages.zip`, and the release
+SHA-256 sums in the existing GitHub Release.
 
 The standalone FlipperRelay repository lives at
 [squazaryu/flipper_relay](https://github.com/squazaryu/flipper_relay).

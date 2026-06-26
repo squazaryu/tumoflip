@@ -110,6 +110,20 @@ class ValidationError(RuntimeError):
     pass
 
 
+def resource_path_from_ext_target(path: str) -> str:
+    if not path.startswith("/ext/"):
+        raise ValidationError(f"Package target is outside /ext: {path}")
+    return path.removeprefix("/ext/")
+
+
+def package_extapp_exports() -> dict[str, str]:
+    exports = {Path(relative).name: relative for relative in MODULE_ONE_PACKAGE_FILES}
+    for target in {**ARF_VISIBLE_PATHS, **ARF_MODULE_PATHS}.values():
+        relative = resource_path_from_ext_target(target)
+        exports[Path(relative).name] = relative
+    return exports
+
+
 def parse_fuf(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -220,6 +234,30 @@ def install_static_sd_resources(repo_root: Path, resources: Path) -> None:
         target = resources / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(source.read_bytes())
+
+
+def sync_extapp_package_exports(build_dir: Path, resources: Path) -> list[dict[str, object]]:
+    extapps = build_dir / ".extapps"
+    if not extapps.is_dir():
+        return []
+
+    synced: list[dict[str, object]] = []
+    for filename, relative in sorted(package_extapp_exports().items()):
+        source = extapps / filename
+        if not source.is_file():
+            continue
+        target = resources / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        synced.append(
+            {
+                "source": source.relative_to(build_dir).as_posix(),
+                "target": relative,
+                "bytes": target.stat().st_size,
+                "sha256": sha256(target),
+            }
+        )
+    return synced
 
 
 def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
@@ -357,6 +395,7 @@ def validate_release(
         build_dir / "resources/Manifest", "resource manifest"
     ).parent
     install_static_sd_resources(repo_root, resources)
+    sync_extapp_package_exports(build_dir, resources)
     validate_layout(resources)
     packages = package_entries(resources)
     api = api_version(repo_root / "targets/f7/api_symbols.csv")

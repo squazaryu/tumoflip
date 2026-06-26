@@ -31,6 +31,24 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("--clobber", workflow)
         self.assertIn('--repo "$GITHUB_REPOSITORY"', workflow)
 
+    def test_package_release_workflow_updates_only_sd_package_assets(self) -> None:
+        workflow = (REPO_ROOT / ".github/workflows/package-release.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("target_release_tag:", workflow)
+        self.assertIn("package_ref:", workflow)
+        self.assertIn("package_release.py", workflow)
+        self.assertIn("--target-release-tag", workflow)
+        self.assertIn("tumoflip-packages.json", workflow)
+        self.assertIn("tumoflip-packages.zip", workflow)
+        self.assertIn("gh release download", workflow)
+        self.assertIn("gh release upload", workflow)
+        self.assertIn("--clobber", workflow)
+        self.assertIn("flipper-z-f7-full-${VERSION}.dfu", workflow)
+        self.assertNotIn("gh release create", workflow)
+
     def test_subghz_architecture_is_documented_as_core_first(self) -> None:
         doc = (REPO_ROOT / "docs/subghz-architecture.md").read_text(
             encoding="utf-8"
