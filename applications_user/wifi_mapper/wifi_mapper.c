@@ -23,7 +23,8 @@
 
 #define WIFI_MAPPER_DATA_DIR     EXT_PATH("apps_data/wifi_mapper")
 #define WIFI_MAPPER_SESSIONS_DIR EXT_PATH("apps_data/wifi_mapper/sessions")
-#define WIFI_MAPPER_SCAN_COMMAND "scanap\r\n"
+#define WIFI_MAPPER_SCAN_ALL_COMMAND "scanall\r\n"
+#define WIFI_MAPPER_SCAN_AP_COMMAND  "scanap\r\n"
 #define WIFI_MAPPER_STOP_COMMAND "stopscan\r\n"
 
 typedef enum {
@@ -37,9 +38,35 @@ typedef enum {
 #define WIFI_MAPPER_WORKER_EVENTS \
     (WiFiMapperEventStop | WiFiMapperEventRxData | WiFiMapperEventRxIdle | WiFiMapperEventRxError)
 
+typedef enum {
+    WiFiMapperScanModeAll,
+    WiFiMapperScanModeAp,
+    WiFiMapperScanModeCount,
+} WiFiMapperScanMode;
+
+typedef struct {
+    const char* label;
+    const char* command;
+    const char* sent_status;
+} WiFiMapperScanModeConfig;
+
+static const WiFiMapperScanModeConfig wifi_mapper_scan_modes[WiFiMapperScanModeCount] = {
+    [WiFiMapperScanModeAll] = {
+        .label = "Scan All",
+        .command = WIFI_MAPPER_SCAN_ALL_COMMAND,
+        .sent_status = "scanall sent",
+    },
+    [WiFiMapperScanModeAp] = {
+        .label = "Scan AP",
+        .command = WIFI_MAPPER_SCAN_AP_COMMAND,
+        .sent_status = "scanap sent",
+    },
+};
+
 typedef struct {
     bool logging;
     bool uart_ready;
+    WiFiMapperScanMode scan_mode;
     uint32_t lines;
     uint32_t wifi_records;
     uint32_t errors;
@@ -64,6 +91,7 @@ typedef struct {
     size_t line_len;
     bool logging;
     bool uart_ready;
+    WiFiMapperScanMode scan_mode;
     uint32_t lines;
     uint32_t wifi_records;
     uint32_t errors;
@@ -95,6 +123,7 @@ static void wifi_mapper_update_model(WiFiMapperApp* app) {
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
     const bool logging = app->logging;
     const bool uart_ready = app->uart_ready;
+    const WiFiMapperScanMode scan_mode = app->scan_mode;
     const uint32_t lines = app->lines;
     const uint32_t wifi_records = app->wifi_records;
     const uint32_t errors = app->errors;
@@ -112,6 +141,7 @@ static void wifi_mapper_update_model(WiFiMapperApp* app) {
         {
             model->logging = logging;
             model->uart_ready = uart_ready;
+            model->scan_mode = scan_mode;
             model->lines = lines;
             model->wifi_records = wifi_records;
             model->errors = errors;
@@ -131,11 +161,65 @@ static void wifi_mapper_send_command(WiFiMapperApp* app, const char* command) {
     furi_hal_serial_tx_wait_complete(app->serial_handle);
 }
 
+static const WiFiMapperScanModeConfig* wifi_mapper_get_scan_mode_config(
+    WiFiMapperScanMode scan_mode) {
+    if(scan_mode >= WiFiMapperScanModeCount) {
+        scan_mode = WiFiMapperScanModeAll;
+    }
+
+    return &wifi_mapper_scan_modes[scan_mode];
+}
+
 static void wifi_mapper_set_status(WiFiMapperApp* app, const char* status) {
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
     strlcpy(app->status, status, sizeof(app->status));
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
     wifi_mapper_update_model(app);
+}
+
+static void wifi_mapper_send_active_scan_command(WiFiMapperApp* app) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    const WiFiMapperScanMode scan_mode = app->scan_mode;
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    const WiFiMapperScanModeConfig* config = wifi_mapper_get_scan_mode_config(scan_mode);
+    wifi_mapper_send_command(app, config->command);
+    wifi_mapper_set_status(app, config->sent_status);
+}
+
+static void wifi_mapper_set_scan_mode(WiFiMapperApp* app, WiFiMapperScanMode scan_mode) {
+    const WiFiMapperScanModeConfig* config = wifi_mapper_get_scan_mode_config(scan_mode);
+
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    app->scan_mode = scan_mode;
+    strlcpy(app->status, config->label, sizeof(app->status));
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    wifi_mapper_update_model(app);
+}
+
+static void wifi_mapper_next_scan_mode(WiFiMapperApp* app) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    WiFiMapperScanMode scan_mode = (WiFiMapperScanMode)(app->scan_mode + 1);
+    if(scan_mode >= WiFiMapperScanModeCount) {
+        scan_mode = WiFiMapperScanModeAll;
+    }
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    wifi_mapper_set_scan_mode(app, scan_mode);
+}
+
+static void wifi_mapper_previous_scan_mode(WiFiMapperApp* app) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    WiFiMapperScanMode scan_mode = app->scan_mode;
+    if(scan_mode == WiFiMapperScanModeAll) {
+        scan_mode = (WiFiMapperScanMode)(WiFiMapperScanModeCount - 1);
+    } else {
+        scan_mode--;
+    }
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    wifi_mapper_set_scan_mode(app, scan_mode);
 }
 
 static bool wifi_mapper_make_log_path(WiFiMapperApp* app) {
@@ -246,7 +330,7 @@ static void wifi_mapper_start_logging(WiFiMapperApp* app) {
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
 
     if(opened) {
-        wifi_mapper_send_command(app, WIFI_MAPPER_SCAN_COMMAND);
+        wifi_mapper_send_active_scan_command(app);
         notification_message(app->notification, &sequence_wifi_mapper_rx);
     } else {
         notification_message(app->notification, &sequence_wifi_mapper_error);
@@ -282,15 +366,21 @@ static void wifi_mapper_draw_callback(Canvas* canvas, void* context) {
     snprintf(
         line,
         sizeof(line),
+        "< %s >",
+        wifi_mapper_get_scan_mode_config(model->scan_mode)->label);
+    canvas_draw_str(canvas, 0, 34, line);
+
+    snprintf(
+        line,
+        sizeof(line),
         "Lines:%lu WiFi:%lu",
         (unsigned long)model->lines,
         (unsigned long)model->wifi_records);
-    canvas_draw_str(canvas, 0, 34, line);
+    canvas_draw_str(canvas, 0, 46, line);
     snprintf(line, sizeof(line), "Err:%lu", (unsigned long)model->errors);
-    canvas_draw_str(canvas, 86, 34, line);
+    canvas_draw_str(canvas, 86, 46, line);
 
-    canvas_draw_str(canvas, 0, 46, model->file_name[0] ? model->file_name : "No log file");
-    canvas_draw_str(canvas, 0, 58, model->last_line[0] ? model->last_line : "OK start  Up scan");
+    canvas_draw_str(canvas, 0, 58, model->file_name[0] ? model->file_name : "OK start Up scan");
 
     elements_button_center(canvas, model->logging ? "Stop" : "Start");
 }
@@ -312,12 +402,17 @@ static bool wifi_mapper_input_callback(InputEvent* event, void* context) {
         }
         return true;
     } else if(event->key == InputKeyUp) {
-        wifi_mapper_send_command(app, WIFI_MAPPER_SCAN_COMMAND);
-        wifi_mapper_set_status(app, "scanap sent");
+        wifi_mapper_send_active_scan_command(app);
         return true;
     } else if(event->key == InputKeyDown) {
         wifi_mapper_send_command(app, WIFI_MAPPER_STOP_COMMAND);
         wifi_mapper_set_status(app, "stopscan sent");
+        return true;
+    } else if(event->key == InputKeyRight) {
+        wifi_mapper_next_scan_mode(app);
+        return true;
+    } else if(event->key == InputKeyLeft) {
+        wifi_mapper_previous_scan_mode(app);
         return true;
     }
 
@@ -409,7 +504,8 @@ static int32_t wifi_mapper_worker(void* context) {
 static WiFiMapperApp* wifi_mapper_alloc(void) {
     WiFiMapperApp* app = malloc(sizeof(WiFiMapperApp));
     memset(app, 0, sizeof(WiFiMapperApp));
-    strlcpy(app->status, "Idle", sizeof(app->status));
+    app->scan_mode = WiFiMapperScanModeAll;
+    strlcpy(app->status, "Scan All", sizeof(app->status));
 
     app->mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     app->rx_stream = furi_stream_buffer_alloc(WIFI_MAPPER_RX_BUFFER_SIZE, 1);

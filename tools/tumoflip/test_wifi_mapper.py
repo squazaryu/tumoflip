@@ -21,8 +21,11 @@ class WiFiMapperTest(unittest.TestCase):
     def test_uart_logger_uses_passive_scan_commands(self) -> None:
         source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
 
-        self.assertIn("#define WIFI_MAPPER_SCAN_COMMAND \"scanap\\r\\n\"", source)
+        self.assertIn("#define WIFI_MAPPER_SCAN_ALL_COMMAND \"scanall\\r\\n\"", source)
+        self.assertIn("#define WIFI_MAPPER_SCAN_AP_COMMAND  \"scanap\\r\\n\"", source)
         self.assertIn("#define WIFI_MAPPER_STOP_COMMAND \"stopscan\\r\\n\"", source)
+        self.assertIn("WiFiMapperScanModeAll", source)
+        self.assertIn("wifi_mapper_send_active_scan_command", source)
         self.assertIn('EXT_PATH("apps_data/wifi_mapper/sessions")', source)
         self.assertIn('"tick_ms,raw\\n"', source)
         self.assertIn("FuriHalSerialIdUsart", source)

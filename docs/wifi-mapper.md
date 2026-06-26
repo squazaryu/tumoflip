@@ -1,9 +1,11 @@
 # WiFi Mapper
 
 `WiFi Mapper` is a Module One ESP32 Wi-Fi external app. It is intentionally a
-small passive UART logger: the Flipper sends the ESP32 Marauder-compatible
-`scanap` command, records UART output, and stores each received printable line
-as CSV on SD.
+small passive UART logger: the Flipper sends ESP32 Marauder-compatible scan
+commands, records UART output, and stores each received printable line as CSV
+on SD. `Scan All` is the default mode because it is supported by the current
+Module One ESP32 Wi-Fi app set; `Scan AP` remains available for Marauder builds
+that expose `scanap`.
 
 It does not send deauth, beacon spam, PMKID sniffing, evil portal, or packet
 capture commands. Those stay out of this app so the first mapping layer is safe
@@ -25,8 +27,9 @@ Session logs are written to:
 
 ## Controls
 
-- `OK`: start or stop logging.
-- `Up`: send `scanap`.
+- `OK`: start or stop logging with the selected scan mode.
+- `Left` / `Right`: switch between `Scan All` and `Scan AP`.
+- `Up`: send the selected scan command.
 - `Down`: send `stopscan`.
 - `Back`: exit.
 
