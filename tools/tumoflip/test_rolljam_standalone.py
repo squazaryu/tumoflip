@@ -41,6 +41,35 @@ class RollJamStandaloneIntegrationTest(unittest.TestCase):
         self.assertNotIn("extern const SubGhzProtocolRegistry rolljam_protocol_registry_am", source)
         self.assertNotIn("extern const SubGhzProtocolRegistry rolljam_protocol_registry_fm", source)
 
+    def test_rolljam_protocol_plugin_appids_match_loaded_filters(self) -> None:
+        app_i = (REPO_ROOT / "applications_user/rolljam_standalone/rolljam_app_i.c").read_text(
+            encoding="utf-8"
+        )
+        rx_chain = (
+            REPO_ROOT / "applications_user/rolljam_standalone/helpers/rolljam_rx_chain.c"
+        ).read_text(encoding="utf-8")
+        am_plugin = (
+            REPO_ROOT
+            / "applications_user/rolljam_standalone/protocols/plugins/rolljam_am_plugin.c"
+        ).read_text(encoding="utf-8")
+        fm_plugin = (
+            REPO_ROOT
+            / "applications_user/rolljam_standalone/protocols/plugins/rolljam_fm_plugin.c"
+        ).read_text(encoding="utf-8")
+        fm_extra_plugin = (
+            REPO_ROOT
+            / "applications_user/rolljam_standalone/protocols/plugins/rolljam_fm_plugin_extra.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("rolljam_protocol_plugin_app_id_for_filter(filter)", app_i)
+        self.assertIn("rolljam_protocol_plugin_app_id_for_filter(chain->filter)", rx_chain)
+        self.assertIn(".appid = ROLLJAM_PROTOCOL_AM_PLUGIN_APP_ID", am_plugin)
+        self.assertIn(".appid = ROLLJAM_PROTOCOL_FM_PLUGIN_APP_ID", fm_plugin)
+        self.assertIn(
+            ".appid = ROLLJAM_PROTOCOL_FM_EXTRA_PLUGIN_APP_ID",
+            fm_extra_plugin,
+        )
+
     def test_release_and_deploy_include_rolljam_standalone(self) -> None:
         validate = (REPO_ROOT / "tools/tumoflip/validate_release.py").read_text(
             encoding="utf-8"

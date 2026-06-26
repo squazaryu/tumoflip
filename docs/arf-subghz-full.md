@@ -7,8 +7,8 @@ their code into the same process.
 The Desktop `Sub-GHz` entry opens the standard core Sub-GHz app. The former
 Desktop `Sub-GHz Remote` slot opens the `ARF Tools` folder, where the Full
 launcher, ARF Frequency Analyzer, Sub-GHz RAW Edit, and KeeLoq Keystore
-Decryptor are visible. BLE Killer is also visible as an opt-in UART BLE
-research controller, and Garage Door Remote is visible as a separate
+Decryptor are visible. BLE Killer is also visible as an opt-in Module One
+ESP32 UART controller, and Garage Door Remote is visible as a separate
 ProtoPirate-derived garage/gate tool. RollJam Standalone is visible as a
 separate opt-in RollJam 2.0 test app. The remaining child FAPs are stored in
 `/ext/apps_data/arf_subghz_full/modules`.
@@ -21,7 +21,7 @@ separate opt-in RollJam 2.0 test app. The remaining child FAPs are stored in
 - frequency analyzer through a dedicated visible FAP;
 - RAW `.sub` trimming and cleanup through Sub-GHz RAW Edit;
 - KeeLoq keystore decrypt/export through KeeLoq Keystore Decryptor;
-- external UART BLE controller testing through BLE Killer;
+- external Module One ESP32 BLE UART control through BLE Killer;
 - garage/gate capture and emulate workflows through Garage Door Remote;
 - standalone RollJam 2.0 testing through RollJam Standalone;
 - radio and external CC1101 settings through the core Sub-GHz app;

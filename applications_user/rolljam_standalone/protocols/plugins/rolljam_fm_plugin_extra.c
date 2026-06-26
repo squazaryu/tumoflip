@@ -25,7 +25,7 @@ const RollJamProtocolPlugin rolljam_fm_plugin_extra = {
 };
 
 static const FlipperAppPluginDescriptor rolljam_fm_plugin_extra_descriptor = {
-    .appid = "rolljam_fm_plugin_extra",
+    .appid = ROLLJAM_PROTOCOL_FM_EXTRA_PLUGIN_APP_ID,
     .ep_api_version = ROLLJAM_PROTOCOL_PLUGIN_API_VERSION,
     .entry_point = &rolljam_fm_plugin_extra,
 };

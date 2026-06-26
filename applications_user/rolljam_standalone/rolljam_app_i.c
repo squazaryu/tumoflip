@@ -91,7 +91,7 @@ static bool rolljam_ensure_protocol_registry_plugin(
     composite_api_resolver_add(resolver, firmware_api_interface);
 
     PluginManager* manager = plugin_manager_alloc(
-        ROLLJAM_PROTOCOL_PLUGIN_APP_ID,
+        rolljam_protocol_plugin_app_id_for_filter(filter),
         ROLLJAM_PROTOCOL_PLUGIN_API_VERSION,
         composite_api_resolver_get(resolver));
     if(!manager) {
