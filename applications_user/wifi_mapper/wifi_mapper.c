@@ -501,6 +501,36 @@ static bool wifi_mapper_geo_number_valid(const char* value) {
     return has_digit;
 }
 
+static bool wifi_mapper_geo_parse(const char* value, float* parsed) {
+    if(!wifi_mapper_geo_number_valid(value)) {
+        return false;
+    }
+
+    char* end = NULL;
+    *parsed = strtof(value, &end);
+    return end && (*end == '\0');
+}
+
+static bool wifi_mapper_geo_coordinates_valid(const char* latitude, const char* longitude) {
+    float lat = 0.0f;
+    float lon = 0.0f;
+    if(!wifi_mapper_geo_parse(latitude, &lat) || !wifi_mapper_geo_parse(longitude, &lon)) {
+        return false;
+    }
+
+    if((lat < -90.0f) || (lat > 90.0f) || (lon < -180.0f) || (lon > 180.0f)) {
+        return false;
+    }
+
+    // Marauder reports 0/0 while the GPS has no fix. Do not map that as a real point.
+    if((lat > -0.000001f) && (lat < 0.000001f) && (lon > -0.000001f) &&
+       (lon < 0.000001f)) {
+        return false;
+    }
+
+    return true;
+}
+
 static bool wifi_mapper_is_mac(const char* cursor) {
     for(size_t i = 0; i < 17U; i++) {
         if((i % 3U) == 2U) {
@@ -683,8 +713,7 @@ static bool wifi_mapper_parse_marauder_wardrive_line(
     strlcpy(record->longitude, longitude, sizeof(record->longitude));
     strlcpy(record->altitude, altitude, sizeof(record->altitude));
     strlcpy(record->accuracy, accuracy, sizeof(record->accuracy));
-    record->has_location = wifi_mapper_geo_number_valid(latitude) &&
-                           wifi_mapper_geo_number_valid(longitude);
+    record->has_location = wifi_mapper_geo_coordinates_valid(latitude, longitude);
     return true;
 }
 
@@ -729,8 +758,8 @@ static bool wifi_mapper_parse_structured_wifi_line(
     record->is_wifi = true;
     record->type = "wifi";
     record->channel = (uint8_t)channel;
-    record->has_location = wifi_mapper_geo_number_valid(record->latitude) &&
-                           wifi_mapper_geo_number_valid(record->longitude);
+    record->has_location =
+        wifi_mapper_geo_coordinates_valid(record->latitude, record->longitude);
     return true;
 }
 
@@ -827,13 +856,13 @@ static bool wifi_mapper_parse_csv_ap_row(
 
     wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
     wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
-    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
-    const bool has_latitude = wifi_mapper_geo_number_valid(field);
-    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
-    const bool has_longitude = wifi_mapper_geo_number_valid(field);
+    char latitude[WIFI_MAPPER_GEO_SIZE];
+    char longitude[WIFI_MAPPER_GEO_SIZE];
+    wifi_mapper_csv_read_field(&cursor, latitude, sizeof(latitude));
+    wifi_mapper_csv_read_field(&cursor, longitude, sizeof(longitude));
 
     *channel = (uint8_t)channel_value;
-    *has_location = has_latitude && has_longitude;
+    *has_location = wifi_mapper_geo_coordinates_valid(latitude, longitude);
     return true;
 }
 
@@ -1277,8 +1306,7 @@ static bool wifi_mapper_parse_export_row(const char* line, WiFiMapperExportRow* 
     wifi_mapper_csv_read_field(&cursor, row->altitude, sizeof(row->altitude));
     wifi_mapper_csv_read_field(&cursor, row->accuracy, sizeof(row->accuracy));
 
-    row->valid = wifi_mapper_geo_number_valid(row->latitude) &&
-                 wifi_mapper_geo_number_valid(row->longitude);
+    row->valid = wifi_mapper_geo_coordinates_valid(row->latitude, row->longitude);
     return row->valid;
 }
 

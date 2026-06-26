@@ -68,6 +68,8 @@ network using the best RSSI sample as the map location. It includes `samples`,
 `Raw` export writes every GPS-tagged AP row as a separate feature. Exported
 features include only AP rows that have valid latitude and longitude, so normal
 `Scan All` sessions without GPS data can produce `No GPS rows`.
+Marauder/ESP32 rows with `0,0` coordinates are treated as "GPS has no fix" and
+are not exported as map points.
 
 ## Companion Map
 
