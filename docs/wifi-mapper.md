@@ -35,15 +35,24 @@ Session logs are written to:
 
 ## Log Format
 
-The current log format is deliberately raw:
+The log keeps the raw UART line and also extracts AP rows from the current
+Marauder `scanall` format:
 
 ```csv
-tick_ms,raw
-12345,"example uart line"
+tick_ms,type,rssi,channel,bssid,ssid,raw
+12345,ap,-59,3,"00:11:22:33:44:55","example","-59 Ch: 3 00:11:22:33:44:55 ESSID: example"
 ```
 
-Lines starting with `WIFI,` are counted separately by the app. A future ESP32
-firmware profile can emit structured `WIFI,...` records with BSSID, SSID,
-RSSI, channel, security, and optional GPS fields; the Flipper-side logger can
-then render those into a map or hand them to the iOS companion without changing
-the basic SD storage layout.
+The on-screen `WiFi` counter increments for Marauder AP lines and for future
+lines starting with `WIFI,`. A future ESP32 firmware profile can emit
+structured `WIFI,...` records with BSSID, SSID, RSSI, channel, security, and
+optional GPS fields; the Flipper-side logger can then render those into a map
+or hand them to the iOS companion without changing the basic SD storage layout.
+
+## Existing WiFi Mapping FAP
+
+Some SD app bundles include a separate `WiFi Mapping` FAP. The current bundled
+binary appears to be a raw USB/UART logger based on an echo worker and writes to
+`/ext/apps_data/wifi_map/wifi_map_data.csv`. It does not expose enough metadata
+to be treated as the canonical tumoflip mapper, so tumoflip keeps `WiFi Mapper`
+as its own small, auditable logger.

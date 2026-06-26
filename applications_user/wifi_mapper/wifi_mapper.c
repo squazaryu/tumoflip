@@ -10,7 +10,10 @@
 #include <notification/notification_messages.h>
 #include <storage/storage.h>
 
+#include <ctype.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define TAG "WiFiMapper"
@@ -20,6 +23,8 @@
 #define WIFI_MAPPER_LINE_SIZE      160U
 #define WIFI_MAPPER_PATH_SIZE      128U
 #define WIFI_MAPPER_LAST_LINE_SIZE 48U
+#define WIFI_MAPPER_BSSID_SIZE     18U
+#define WIFI_MAPPER_SSID_SIZE      64U
 
 #define WIFI_MAPPER_DATA_DIR     EXT_PATH("apps_data/wifi_mapper")
 #define WIFI_MAPPER_SESSIONS_DIR EXT_PATH("apps_data/wifi_mapper/sessions")
@@ -49,6 +54,15 @@ typedef struct {
     const char* command;
     const char* sent_status;
 } WiFiMapperScanModeConfig;
+
+typedef struct {
+    bool is_wifi;
+    const char* type;
+    int32_t rssi;
+    uint8_t channel;
+    char bssid[WIFI_MAPPER_BSSID_SIZE];
+    char ssid[WIFI_MAPPER_SSID_SIZE];
+} WiFiMapperRecord;
 
 static const WiFiMapperScanModeConfig wifi_mapper_scan_modes[WiFiMapperScanModeCount] = {
     [WiFiMapperScanModeAll] = {
@@ -259,7 +273,7 @@ static bool wifi_mapper_open_log(WiFiMapperApp* app) {
         return false;
     }
 
-    const char* header = "tick_ms,raw\n";
+    const char* header = "tick_ms,type,rssi,channel,bssid,ssid,raw\n";
     storage_file_write(app->log_file, header, strlen(header));
     return true;
 }
@@ -270,6 +284,100 @@ static void wifi_mapper_close_log(WiFiMapperApp* app) {
         storage_file_free(app->log_file);
         app->log_file = NULL;
     }
+}
+
+static const char* wifi_mapper_skip_spaces(const char* cursor) {
+    while(*cursor && isspace((unsigned char)*cursor)) {
+        cursor++;
+    }
+
+    return cursor;
+}
+
+static bool wifi_mapper_parse_i32(const char** cursor, int32_t* value) {
+    const char* start = wifi_mapper_skip_spaces(*cursor);
+    char* end = NULL;
+    const long parsed = strtol(start, &end, 10);
+    if(end == start) {
+        return false;
+    }
+
+    *cursor = end;
+    *value = parsed;
+    return true;
+}
+
+static bool wifi_mapper_is_mac(const char* cursor) {
+    for(size_t i = 0; i < 17U; i++) {
+        if((i % 3U) == 2U) {
+            if(cursor[i] != ':') {
+                return false;
+            }
+        } else if(!isxdigit((unsigned char)cursor[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool wifi_mapper_parse_marauder_ap_line(
+    const char* line,
+    WiFiMapperRecord* record) {
+    const char* cursor = line;
+    int32_t rssi = 0;
+    int32_t channel = 0;
+
+    if(!wifi_mapper_parse_i32(&cursor, &rssi)) {
+        return false;
+    }
+
+    cursor = wifi_mapper_skip_spaces(cursor);
+    if(strncmp(cursor, "Ch:", 3) != 0) {
+        return false;
+    }
+    cursor += 3;
+
+    if(!wifi_mapper_parse_i32(&cursor, &channel) || (channel < 0) ||
+       (channel > UINT8_MAX)) {
+        return false;
+    }
+
+    cursor = wifi_mapper_skip_spaces(cursor);
+    if(!wifi_mapper_is_mac(cursor)) {
+        return false;
+    }
+    strlcpy(record->bssid, cursor, sizeof(record->bssid));
+    cursor += 17;
+
+    cursor = wifi_mapper_skip_spaces(cursor);
+    if(strncmp(cursor, "ESSID:", 6) != 0) {
+        return false;
+    }
+    cursor += 6;
+
+    record->is_wifi = true;
+    record->type = "ap";
+    record->rssi = rssi;
+    record->channel = (uint8_t)channel;
+    strlcpy(record->ssid, wifi_mapper_skip_spaces(cursor), sizeof(record->ssid));
+    return true;
+}
+
+static WiFiMapperRecord wifi_mapper_parse_record(const char* line) {
+    WiFiMapperRecord record = {
+        .is_wifi = false,
+        .type = "raw",
+    };
+
+    if(strncmp(line, "WIFI,", 5) == 0) {
+        record.is_wifi = true;
+        record.type = "wifi";
+        return record;
+    }
+
+    wifi_mapper_parse_marauder_ap_line(line, &record);
+    return record;
 }
 
 static void wifi_mapper_write_escaped_csv(File* file, const char* line) {
@@ -285,19 +393,51 @@ static void wifi_mapper_write_escaped_csv(File* file, const char* line) {
     storage_file_write(file, &quote, 1);
 }
 
+static void wifi_mapper_write_log_record(
+    File* file,
+    uint32_t tick_ms,
+    const WiFiMapperRecord* record,
+    const char* line) {
+    char prefix[48];
+    if(record->is_wifi && (strcmp(record->type, "ap") == 0)) {
+        snprintf(
+            prefix,
+            sizeof(prefix),
+            "%lu,%s,%ld,%u,",
+            (unsigned long)tick_ms,
+            record->type,
+            (long)record->rssi,
+            record->channel);
+        storage_file_write(file, prefix, strlen(prefix));
+        wifi_mapper_write_escaped_csv(file, record->bssid);
+        storage_file_write(file, ",", 1);
+        wifi_mapper_write_escaped_csv(file, record->ssid);
+        storage_file_write(file, ",", 1);
+    } else {
+        snprintf(
+            prefix,
+            sizeof(prefix),
+            "%lu,%s,,,,,",
+            (unsigned long)tick_ms,
+            record->type);
+        storage_file_write(file, prefix, strlen(prefix));
+    }
+
+    wifi_mapper_write_escaped_csv(file, line);
+    storage_file_write(file, "\n", 1);
+}
+
 static void wifi_mapper_log_line(WiFiMapperApp* app, const char* line) {
+    const WiFiMapperRecord record = wifi_mapper_parse_record(line);
+
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
     if(app->logging && app->log_file) {
-        char prefix[32];
         const uint32_t tick_ms = (furi_get_tick() * 1000U) / furi_kernel_get_tick_frequency();
-        snprintf(prefix, sizeof(prefix), "%lu,", (unsigned long)tick_ms);
-        storage_file_write(app->log_file, prefix, strlen(prefix));
-        wifi_mapper_write_escaped_csv(app->log_file, line);
-        storage_file_write(app->log_file, "\n", 1);
+        wifi_mapper_write_log_record(app->log_file, tick_ms, &record, line);
     }
 
     app->lines++;
-    if(strncmp(line, "WIFI,", 5) == 0) {
+    if(record.is_wifi) {
         app->wifi_records++;
     }
     strlcpy(app->last_line, line, sizeof(app->last_line));

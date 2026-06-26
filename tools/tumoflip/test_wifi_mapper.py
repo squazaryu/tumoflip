@@ -25,9 +25,12 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn("#define WIFI_MAPPER_SCAN_AP_COMMAND  \"scanap\\r\\n\"", source)
         self.assertIn("#define WIFI_MAPPER_STOP_COMMAND \"stopscan\\r\\n\"", source)
         self.assertIn("WiFiMapperScanModeAll", source)
+        self.assertIn("wifi_mapper_parse_marauder_ap_line", source)
+        self.assertIn('"ESSID:"', source)
+        self.assertIn('"Ch:"', source)
         self.assertIn("wifi_mapper_send_active_scan_command", source)
         self.assertIn('EXT_PATH("apps_data/wifi_mapper/sessions")', source)
-        self.assertIn('"tick_ms,raw\\n"', source)
+        self.assertIn('"tick_ms,type,rssi,channel,bssid,ssid,raw\\n"', source)
         self.assertIn("FuriHalSerialIdUsart", source)
         self.assertIn("FSOM_CREATE_ALWAYS", source)
 
