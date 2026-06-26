@@ -109,6 +109,8 @@ are legally allowed to test.
 - Open Desktop `ARF Tools`.
 - Launch `ARF Sub-GHz Full`; confirm it is only a launcher.
 - Launch and exit `Frequency Analyzer`.
+- Launch `Sub-GHz RAW Edit`, open a known `/ext/subghz/*.sub` RAW capture,
+  exit without saving, and confirm no radio broker lock remains.
 - Launch and exit every packaged ARF child FAP:
   `arf_keeloq`, `arf_counter_bf`, `arf_car_emulate`, `arf_psa_decrypt`,
   `proto_pirate`, `rolljam`, `subghz_bruteforcer`, and `arf_status`.

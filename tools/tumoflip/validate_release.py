@@ -45,7 +45,7 @@ PROTOCOL_PACKS = {
     "protocol_subaru.fal",
     "protocol_vag.fal",
 }
-ARF_VISIBLE_APP_IDS = {"arf_frequency_analyzer", "arf_subghz_full"}
+ARF_VISIBLE_APP_IDS = {"arf_frequency_analyzer", "arf_subghz_full", "subghz_raw_edit"}
 ARF_MODULE_APP_IDS = {
     "arf_car_emulate",
     "arf_counter_bf",

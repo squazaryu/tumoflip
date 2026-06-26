@@ -62,6 +62,10 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
         repo_root / build_dir / ".extapps" / "arf_frequency_analyzer.fap",
         arf_tools_dir / "arf_frequency_analyzer.fap",
     )
+    copy_file(
+        repo_root / build_dir / ".extapps" / "subghz_raw_edit.fap",
+        arf_tools_dir / "subghz_raw_edit.fap",
+    )
 
     module_appids = (
         "arf_keeloq",
@@ -79,8 +83,13 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
             modules_dir / f"{appid}.fap",
         )
 
+    expected_visible = {
+        "arf_frequency_analyzer.fap",
+        "arf_subghz_full.fap",
+        "subghz_raw_edit.fap",
+    }
     for old_app in arf_tools_dir.glob("*.fap"):
-        if old_app.name not in {"arf_frequency_analyzer.fap", "arf_subghz_full.fap"}:
+        if old_app.name not in expected_visible:
             old_app.unlink()
     stale_analyzer = modules_dir / "arf_frequency_analyzer.fap"
     if stale_analyzer.exists():

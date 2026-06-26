@@ -80,8 +80,8 @@ The four-page post-update splash screen is generated automatically from
 - Rebuilt ARF Sub-GHz Full as a lightweight launcher for the stable core
   Sub-GHz app and separate ARF FAPs. Each ARF child receives the full
   application heap instead of being linked into one large process.
-- Exposes ARF Sub-GHz Full and ARF Frequency Analyzer in `/ext/apps/ARF Tools`;
-  the remaining isolated child FAPs are packaged under
+- Exposes ARF Sub-GHz Full, ARF Frequency Analyzer, and Sub-GHz RAW Edit in
+  `/ext/apps/ARF Tools`; the remaining isolated child FAPs are packaged under
   `/ext/apps_data/arf_subghz_full/modules`.
 - Keeps the Desktop `Sub-GHz` shortcut on the stable core app; ARF Tools stays
   as a separate Desktop folder/launcher.
@@ -209,6 +209,7 @@ functional modules remain separate processes in a private data directory:
 ```text
 /ext/apps/ARF Tools/arf_subghz_full.fap
 /ext/apps/ARF Tools/arf_frequency_analyzer.fap
+/ext/apps/ARF Tools/subghz_raw_edit.fap
 /ext/apps_data/arf_subghz_full/modules/*.fap
 ```
 

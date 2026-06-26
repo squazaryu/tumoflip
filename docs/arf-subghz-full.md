@@ -6,8 +6,8 @@ their code into the same process.
 
 The Desktop `Sub-GHz` entry opens the standard core Sub-GHz app. The former
 Desktop `Sub-GHz Remote` slot opens the `ARF Tools` folder, where the Full
-launcher and ARF Frequency Analyzer are visible. The remaining child FAPs are stored in
-`/ext/apps_data/arf_subghz_full/modules`.
+launcher, ARF Frequency Analyzer, and Sub-GHz RAW Edit are visible. The
+remaining child FAPs are stored in `/ext/apps_data/arf_subghz_full/modules`.
 
 ## Included workflows
 
@@ -15,6 +15,7 @@ launcher and ARF Frequency Analyzer are visible. The remaining child FAPs are st
 - saved-signal browsing and transmit through the core Sub-GHz app;
 - manual signal generators through the core Sub-GHz app;
 - frequency analyzer through a dedicated visible FAP;
+- RAW `.sub` trimming and cleanup through Sub-GHz RAW Edit;
 - radio and external CC1101 settings through the core Sub-GHz app;
 - receiver settings and live Protocol Pack switching;
 - Protocol Pack Inspector;

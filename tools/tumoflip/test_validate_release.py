@@ -9,6 +9,7 @@ from pathlib import Path
 
 try:
     from .validate_release import (
+        ARF_VISIBLE_APP_IDS,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
@@ -20,6 +21,7 @@ try:
     )
 except ImportError:
     from validate_release import (
+        ARF_VISIBLE_APP_IDS,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
@@ -40,6 +42,12 @@ class ValidateReleaseTest(unittest.TestCase):
         self.assertIn("protocol_ford_v3.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_kia_v7.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_star_line.fal", PROTOCOL_PACKS)
+
+    def test_visible_arf_tools_inventory(self) -> None:
+        self.assertEqual(
+            ARF_VISIBLE_APP_IDS,
+            {"arf_frequency_analyzer", "arf_subghz_full", "subghz_raw_edit"},
+        )
 
     def test_parse_fuf(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
