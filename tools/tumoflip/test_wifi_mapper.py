@@ -40,6 +40,9 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn("storage_dir_open", source)
         self.assertIn("storage_file_read", source)
         self.assertIn("WIFI_MAPPER_MAX_UNIQUE", source)
+        self.assertIn("WiFiMapperSessionScratch* scratch = malloc", source)
+        self.assertIn('furi_thread_alloc_ex("WiFiMapperRx", 2048', source)
+        self.assertNotIn("char fields[WIFI_MAPPER_CSV_FIELDS]", source)
         self.assertIn("wifi_mapper_send_active_scan_command", source)
         self.assertIn('EXT_PATH("apps_data/wifi_mapper/sessions")', source)
         self.assertIn(

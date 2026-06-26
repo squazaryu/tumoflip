@@ -31,7 +31,6 @@
 #define WIFI_MAPPER_FILE_NAME_SIZE 32U
 #define WIFI_MAPPER_MAX_UNIQUE     64U
 #define WIFI_MAPPER_CHANNEL_BUCKETS 15U
-#define WIFI_MAPPER_CSV_FIELDS     12U
 #define WIFI_MAPPER_CSV_FIELD_SIZE 64U
 
 #define WIFI_MAPPER_DATA_DIR     EXT_PATH("apps_data/wifi_mapper")
@@ -98,6 +97,13 @@ typedef struct {
     uint8_t top_channel;
     uint32_t top_channel_count;
 } WiFiMapperSessionStats;
+
+typedef struct {
+    char unique_bssids[WIFI_MAPPER_MAX_UNIQUE][WIFI_MAPPER_BSSID_SIZE];
+    uint32_t channel_counts[WIFI_MAPPER_CHANNEL_BUCKETS];
+    char line[WIFI_MAPPER_SESSION_LINE_SIZE];
+    uint8_t buffer[64];
+} WiFiMapperSessionScratch;
 
 static const WiFiMapperScanModeConfig wifi_mapper_scan_modes[WiFiMapperScanModeCount] = {
     [WiFiMapperScanModeAll] = {
@@ -444,19 +450,6 @@ static bool wifi_mapper_csv_read_field(
     return true;
 }
 
-static size_t wifi_mapper_csv_split(
-    const char* line,
-    char fields[WIFI_MAPPER_CSV_FIELDS][WIFI_MAPPER_CSV_FIELD_SIZE]) {
-    const char* cursor = line;
-    size_t count = 0;
-    while(*cursor && (count < WIFI_MAPPER_CSV_FIELDS)) {
-        wifi_mapper_csv_read_field(&cursor, fields[count], WIFI_MAPPER_CSV_FIELD_SIZE);
-        count++;
-    }
-
-    return count;
-}
-
 static bool wifi_mapper_parse_marauder_ap_line(
     const char* line,
     WiFiMapperRecord* record) {
@@ -503,31 +496,51 @@ static bool wifi_mapper_parse_marauder_ap_line(
 static bool wifi_mapper_parse_marauder_wardrive_line(
     const char* line,
     WiFiMapperRecord* record) {
-    char fields[WIFI_MAPPER_CSV_FIELDS][WIFI_MAPPER_CSV_FIELD_SIZE] = {};
-    const size_t field_count = wifi_mapper_csv_split(line, fields);
-    if(field_count < 11U) {
-        return false;
-    }
+    const char* cursor = line;
+    char field[WIFI_MAPPER_CSV_FIELD_SIZE];
+    char bssid_copy[WIFI_MAPPER_BSSID_SIZE];
+    char ssid[WIFI_MAPPER_SSID_SIZE];
+    char auth[WIFI_MAPPER_AUTH_SIZE];
+    char latitude[WIFI_MAPPER_GEO_SIZE];
+    char longitude[WIFI_MAPPER_GEO_SIZE];
+    char altitude[WIFI_MAPPER_GEO_SIZE];
+    char accuracy[WIFI_MAPPER_GEO_SIZE];
 
-    if((strcmp(fields[1], "SSID") == 0) || (strcmp(fields[10], "WIFI") != 0)) {
-        return false;
-    }
-
-    const char* bssid = wifi_mapper_find_mac(fields[0]);
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    const char* bssid = wifi_mapper_find_mac(field);
     if(!bssid) {
         return false;
     }
+    strlcpy(bssid_copy, bssid, sizeof(bssid_copy));
 
-    const char* channel_cursor = fields[4];
+    wifi_mapper_csv_read_field(&cursor, ssid, sizeof(ssid));
+    if(strcmp(ssid, "SSID") == 0) {
+        return false;
+    }
+    wifi_mapper_csv_read_field(&cursor, auth, sizeof(auth));
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    const char* channel_cursor = field;
     int32_t channel = 0;
     if(!wifi_mapper_parse_i32(&channel_cursor, &channel) || (channel < 0) ||
        (channel > UINT8_MAX)) {
         return false;
     }
 
-    const char* rssi_cursor = fields[5];
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    const char* rssi_cursor = field;
     int32_t rssi = 0;
     if(!wifi_mapper_parse_i32(&rssi_cursor, &rssi)) {
+        return false;
+    }
+
+    wifi_mapper_csv_read_field(&cursor, latitude, sizeof(latitude));
+    wifi_mapper_csv_read_field(&cursor, longitude, sizeof(longitude));
+    wifi_mapper_csv_read_field(&cursor, altitude, sizeof(altitude));
+    wifi_mapper_csv_read_field(&cursor, accuracy, sizeof(accuracy));
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    if(strcmp(field, "WIFI") != 0) {
         return false;
     }
 
@@ -535,14 +548,14 @@ static bool wifi_mapper_parse_marauder_wardrive_line(
     record->type = "wardrive";
     record->rssi = rssi;
     record->channel = (uint8_t)channel;
-    strlcpy(record->bssid, bssid, sizeof(record->bssid));
-    strlcpy(record->ssid, fields[1], sizeof(record->ssid));
-    strlcpy(record->auth, fields[2], sizeof(record->auth));
-    strlcpy(record->latitude, fields[6], sizeof(record->latitude));
-    strlcpy(record->longitude, fields[7], sizeof(record->longitude));
-    strlcpy(record->altitude, fields[8], sizeof(record->altitude));
-    strlcpy(record->accuracy, fields[9], sizeof(record->accuracy));
-    record->has_location = fields[6][0] && fields[7][0];
+    strlcpy(record->bssid, bssid_copy, sizeof(record->bssid));
+    strlcpy(record->ssid, ssid, sizeof(record->ssid));
+    strlcpy(record->auth, auth, sizeof(record->auth));
+    strlcpy(record->latitude, latitude, sizeof(record->latitude));
+    strlcpy(record->longitude, longitude, sizeof(record->longitude));
+    strlcpy(record->altitude, altitude, sizeof(record->altitude));
+    strlcpy(record->accuracy, accuracy, sizeof(record->accuracy));
+    record->has_location = latitude[0] && longitude[0];
     return true;
 }
 
@@ -605,35 +618,44 @@ static bool wifi_mapper_parse_csv_ap_row(
     char* bssid,
     size_t bssid_size,
     bool* has_location) {
-    char fields[WIFI_MAPPER_CSV_FIELDS][WIFI_MAPPER_CSV_FIELD_SIZE] = {};
-    const size_t field_count = wifi_mapper_csv_split(line, fields);
-    if(field_count < 6U) {
+    const char* cursor = line;
+    char field[WIFI_MAPPER_CSV_FIELD_SIZE];
+
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    if((strcmp(field, "ap") != 0) && (strcmp(field, "wardrive") != 0)) {
         return false;
     }
 
-    if((strcmp(fields[1], "ap") != 0) && (strcmp(fields[1], "wardrive") != 0)) {
-        return false;
-    }
-
-    const char* rssi_cursor = fields[2];
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    const char* rssi_cursor = field;
     if(!wifi_mapper_parse_i32(&rssi_cursor, rssi)) {
         return false;
     }
 
-    const char* channel_cursor = fields[3];
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    const char* channel_cursor = field;
     int32_t channel_value = 0;
     if(!wifi_mapper_parse_i32(&channel_cursor, &channel_value) || (channel_value < 0) ||
        (channel_value > UINT8_MAX)) {
         return false;
     }
 
-    if(!wifi_mapper_is_mac(fields[4])) {
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    if(!wifi_mapper_is_mac(field)) {
         return false;
     }
+    strlcpy(bssid, field, bssid_size);
 
-    strlcpy(bssid, fields[4], bssid_size);
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    const bool has_latitude = field[0] != '\0';
+    wifi_mapper_csv_read_field(&cursor, field, sizeof(field));
+    const bool has_longitude = field[0] != '\0';
+
     *channel = (uint8_t)channel_value;
-    *has_location = (field_count > 8U) && fields[7][0] && fields[8][0];
+    *has_location = has_latitude && has_longitude;
     return true;
 }
 
@@ -652,8 +674,7 @@ static bool wifi_mapper_bssid_seen(
 
 static void wifi_mapper_parse_session_line(
     WiFiMapperSessionStats* stats,
-    char unique_bssids[WIFI_MAPPER_MAX_UNIQUE][WIFI_MAPPER_BSSID_SIZE],
-    uint32_t channel_counts[WIFI_MAPPER_CHANNEL_BUCKETS],
+    WiFiMapperSessionScratch* scratch,
     int32_t* rssi_sum,
     const char* line) {
     if(strncmp(line, "tick_ms,", 8) == 0) {
@@ -681,12 +702,12 @@ static void wifi_mapper_parse_session_line(
     }
 
     if(channel < WIFI_MAPPER_CHANNEL_BUCKETS) {
-        channel_counts[channel]++;
+        scratch->channel_counts[channel]++;
     }
 
     if((stats->unique < WIFI_MAPPER_MAX_UNIQUE) &&
-       !wifi_mapper_bssid_seen(unique_bssids, stats->unique, bssid)) {
-        strlcpy(unique_bssids[stats->unique], bssid, WIFI_MAPPER_BSSID_SIZE);
+       !wifi_mapper_bssid_seen(scratch->unique_bssids, stats->unique, bssid)) {
+        strlcpy(scratch->unique_bssids[stats->unique], bssid, WIFI_MAPPER_BSSID_SIZE);
         stats->unique++;
     }
 }
@@ -713,6 +734,14 @@ static void wifi_mapper_analyze_latest_session(WiFiMapperApp* app) {
         return;
     }
 
+    WiFiMapperSessionScratch* scratch = malloc(sizeof(WiFiMapperSessionScratch));
+    if(!scratch) {
+        strlcpy(stats.status, "No memory", sizeof(stats.status));
+        wifi_mapper_store_session_stats(app, &stats);
+        return;
+    }
+    memset(scratch, 0, sizeof(WiFiMapperSessionScratch));
+
     strlcpy(stats.file_name, file_name, sizeof(stats.file_name));
     char path[WIFI_MAPPER_PATH_SIZE];
     snprintf(path, sizeof(path), WIFI_MAPPER_SESSIONS_DIR "/%s", file_name);
@@ -721,35 +750,31 @@ static void wifi_mapper_analyze_latest_session(WiFiMapperApp* app) {
     if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         strlcpy(stats.status, "Read error", sizeof(stats.status));
         storage_file_free(file);
+        free(scratch);
         wifi_mapper_store_session_stats(app, &stats);
         return;
     }
 
-    char unique_bssids[WIFI_MAPPER_MAX_UNIQUE][WIFI_MAPPER_BSSID_SIZE] = {};
-    uint32_t channel_counts[WIFI_MAPPER_CHANNEL_BUCKETS] = {};
     int32_t rssi_sum = 0;
-    char line[WIFI_MAPPER_SESSION_LINE_SIZE];
     size_t line_len = 0;
-    uint8_t buffer[64];
     size_t bytes_read = 0;
-    while((bytes_read = storage_file_read(file, buffer, sizeof(buffer))) > 0U) {
+    while((bytes_read = storage_file_read(file, scratch->buffer, sizeof(scratch->buffer))) > 0U) {
         for(size_t i = 0; i < bytes_read; i++) {
-            const char data = (char)buffer[i];
+            const char data = (char)scratch->buffer[i];
             if((data == '\r') || (data == '\n')) {
                 if(line_len > 0U) {
-                    line[line_len] = '\0';
-                    wifi_mapper_parse_session_line(
-                        &stats, unique_bssids, channel_counts, &rssi_sum, line);
+                    scratch->line[line_len] = '\0';
+                    wifi_mapper_parse_session_line(&stats, scratch, &rssi_sum, scratch->line);
                     line_len = 0U;
                 }
-            } else if(line_len < (sizeof(line) - 1U)) {
-                line[line_len++] = data;
+            } else if(line_len < (sizeof(scratch->line) - 1U)) {
+                scratch->line[line_len++] = data;
             }
         }
     }
     if(line_len > 0U) {
-        line[line_len] = '\0';
-        wifi_mapper_parse_session_line(&stats, unique_bssids, channel_counts, &rssi_sum, line);
+        scratch->line[line_len] = '\0';
+        wifi_mapper_parse_session_line(&stats, scratch, &rssi_sum, scratch->line);
     }
 
     storage_file_close(file);
@@ -760,15 +785,16 @@ static void wifi_mapper_analyze_latest_session(WiFiMapperApp* app) {
         stats.avg_rssi = rssi_sum / (int32_t)stats.aps;
         strlcpy(stats.status, "Last session", sizeof(stats.status));
         for(uint8_t channel = 1; channel < WIFI_MAPPER_CHANNEL_BUCKETS; channel++) {
-            if(channel_counts[channel] > stats.top_channel_count) {
+            if(scratch->channel_counts[channel] > stats.top_channel_count) {
                 stats.top_channel = channel;
-                stats.top_channel_count = channel_counts[channel];
+                stats.top_channel_count = scratch->channel_counts[channel];
             }
         }
     } else {
         strlcpy(stats.status, "No AP rows", sizeof(stats.status));
     }
 
+    free(scratch);
     wifi_mapper_store_session_stats(app, &stats);
 }
 
@@ -1152,7 +1178,7 @@ static WiFiMapperApp* wifi_mapper_alloc(void) {
     view_dispatcher_add_view(app->view_dispatcher, 0, app->view);
     view_dispatcher_switch_to_view(app->view_dispatcher, 0);
 
-    app->worker_thread = furi_thread_alloc_ex("WiFiMapperRx", 1536, wifi_mapper_worker, app);
+    app->worker_thread = furi_thread_alloc_ex("WiFiMapperRx", 2048, wifi_mapper_worker, app);
     furi_thread_start(app->worker_thread);
 
     app->serial_handle = furi_hal_serial_control_acquire(FuriHalSerialIdUsart);
