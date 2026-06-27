@@ -62,6 +62,14 @@ jobs:
           set -euo pipefail
           python3 -m pip install --user Pillow
 
+      - name: Check README release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/tumoflip/sync_readme_version.py \
+            --release-tag "${{ steps.ref.outputs.tag }}" \
+            --check
+
       - name: Build firmware
         shell: bash
         run: |
@@ -76,6 +84,7 @@ jobs:
           python3 -m unittest \
             tools/tumoflip/test_arf_subghz_full.py \
             tools/tumoflip/test_release_workflow.py \
+            tools/tumoflip/test_readme_version_sync.py \
             tools/tumoflip/test_subghz_drift.py \
             tools/tumoflip/test_subghz_protocol_packs.py \
             tools/tumoflip/test_update_splash.py \

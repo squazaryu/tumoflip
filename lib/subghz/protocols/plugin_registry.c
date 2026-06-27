@@ -53,6 +53,12 @@ static const SubGhzProtocolPackEntry subghz_protocol_pack_entries[] = {
     {PACK_GROUP(SubGhzProtocolPackGroupAlarm), "protocol_scher_khan.fal"},
     {PACK_GROUP(SubGhzProtocolPackGroupAlarm), "protocol_sheriff_cfm.fal"},
     {PACK_GROUP(SubGhzProtocolPackGroupAlarm), "protocol_star_line.fal"},
+    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_gm_rolling.fal"},
+    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_honda_acura.fal"},
+    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_hyundai_new.fal"},
+    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_nissan.fal"},
+    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_renault.fal"},
+    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_toyota_lexus.fal"},
 };
 
 const char* subghz_protocol_pack_group_get_name(SubGhzProtocolPackGroup group) {
@@ -64,6 +70,7 @@ const char* subghz_protocol_pack_group_get_name(SubGhzProtocolPackGroup group) {
         "Europe",
         "Asia/US",
         "Alarm",
+        "Shuka Auto",
     };
 
     return group < SubGhzProtocolPackGroupCount ? names[group] : "Unknown";

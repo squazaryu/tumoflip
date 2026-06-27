@@ -46,7 +46,7 @@ registries and do not automatically inherit these packs.
 
 ## Runtime groups
 
-Flipper RAM cannot safely map all 24 packs and allocate every decoder at the
+Flipper RAM cannot safely map all 30 packs and allocate every decoder at the
 same time. The Receiver configuration therefore exposes one active group:
 
 - `Core`: no external packs;
@@ -55,7 +55,9 @@ same time. The Receiver configuration therefore exposes one active group:
 - `Ford`: Ford v0-v3;
 - `Europe`: Fiat Marelli, Land Rover, Porsche, PSA, and VAG;
 - `Asia/US`: Chrysler, Mazda, Mitsubishi, and Subaru;
-- `Alarm`: Scher-Khan, Sheriff CFM, and StarLine.
+- `Alarm`: Scher-Khan, Sheriff CFM, and StarLine;
+- `Shuka Auto`: decode-only GM Rolling, Honda/Acura, Hyundai New, Nissan,
+  Renault, and Toyota/Lexus.
 
 `Legacy` is the default and preserves the pack set shipped before v0.2.0. A
 group change is applied immediately: the application stops RX, replaces the
@@ -87,24 +89,31 @@ the SD card again or load a second copy of any plugin.
 
 ## Current packs
 
-The 24 packs cover every protocol enabled by the ARF registry that is not
-already built into tumoflip:
+The 30 packs cover every protocol enabled by the ARF registry that is not
+already built into tumoflip, plus the Shuka Auto additions credited to
+[shuka0158/ARF-Shuka-Edition](https://github.com/shuka0158/ARF-Shuka-Edition):
 
 - Chrysler
 - Fiat Marelli
 - Ford v0, v1, v2, and v3
+- GM Rolling
+- Honda/Acura
+- Hyundai New
 - Kia v0, v1, v2, v3/v4, v5, v6, and v7
 - Land Rover v0
 - Mazda Siemens and Mazda v0
 - Mitsubishi v0
+- Nissan
 - Porsche Cayenne
 - PSA
+- Renault
 - Scher-Khan
 - Sheriff CFM
 - StarLine
 - Subaru
+- Toyota/Lexus
 - VAG
 
 Fiat SPA, Suzuki, and Toyota remain in the built-in registry because no
-isolated ProtoPirate replacement exists for them. BMW CAS4 and Honda remain
-disabled, matching the upstream ARF registry.
+isolated ProtoPirate replacement exists for them. BMW CAS4 and Honda Static
+remain disabled, matching the upstream ARF registry.

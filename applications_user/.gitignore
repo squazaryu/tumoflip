@@ -25,6 +25,8 @@
 !subghz_bruteforcer/**
 !subghz_raw_edit/
 !subghz_raw_edit/**
+!usb_sd_mode/
+!usb_sd_mode/**
 !keeloq_keystore_decryptor/
 !keeloq_keystore_decryptor/**
 !subghz_protocols/

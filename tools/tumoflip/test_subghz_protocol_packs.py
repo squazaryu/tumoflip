@@ -55,6 +55,18 @@ class SubGhzProtocolPackTest(unittest.TestCase):
         self.assertIn("loaded versus expected external plugins", docs)
         self.assertIn("Failures distinguish missing or invalid files", docs)
 
+    def test_shuka_toyota_protocol_name_does_not_shadow_core_toyota(self) -> None:
+        core_toyota = (REPO_ROOT / "lib/subghz/protocols/toyota.h").read_text(
+            encoding="utf-8"
+        )
+        shuka_toyota = (
+            REPO_ROOT / "lib/subghz/protocols/toyota_lexus.h"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('#define SUBGHZ_PROTOCOL_TOYOTA_NAME "Toyota"', core_toyota)
+        self.assertIn('#define TOYOTA_LEXUS_PROTOCOL_NAME "Toyota/Lexus"', shuka_toyota)
+        self.assertNotIn('#define TOYOTA_LEXUS_PROTOCOL_NAME "Toyota"', shuka_toyota)
+
 
 if __name__ == "__main__":
     unittest.main()

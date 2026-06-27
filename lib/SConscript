@@ -47,6 +47,7 @@ libs = env.BuildModules(
         "bit_lib",
         "datetime",
         "ieee754_parse_wrap",
+        "usb_mass_storage",
     ],
 )
 

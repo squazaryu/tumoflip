@@ -1,7 +1,7 @@
 #include "../../js_modules.h"
 #include <furi_hal_usb.h>
 #include <toolbox/path.h>
-#include "mass_storage_usb.h"
+#include <mass_storage_usb.h>
 
 #define TAG "JsUsbdisk"
 

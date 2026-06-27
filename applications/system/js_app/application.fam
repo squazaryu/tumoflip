@@ -261,7 +261,8 @@ App(
     apptype=FlipperAppType.PLUGIN,
     entry_point="js_usbdisk_ep",
     requires=["js_app"],
-    sources=["modules/js_usbdisk/*.c"],
+    sources=["modules/js_usbdisk/js_usbdisk.c"],
+    fap_libs=["usb_mass_storage"],
 )
 
 App(

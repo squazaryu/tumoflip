@@ -1,0 +1,15 @@
+App(
+    appid="usb_sd_mode",
+    name="USB SD Mode",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="usb_sd_mode_app",
+    requires=["gui", "storage", "notification"],
+    stack_size=3 * 1024,
+    fap_category="Tools",
+    fap_libs=["usb_mass_storage"],
+    fap_version="0.1",
+    fap_icon="images/usb_sd_10px.png",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip",
+    fap_description="Expose the Flipper SD card as a USB mass storage device.",
+)

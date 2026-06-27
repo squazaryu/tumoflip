@@ -29,7 +29,7 @@ you find a tumoflip-specific issue, report it in this repository:
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `87.15`
 - Target: Flipper Zero F7
-- Release: `v0.3.0` published release (hardware validation in progress)
+- Release: `v0.3.1` published release (hardware validation in progress)
 - Release package: `flipper-z-f7-update-tmwhflpprarf089-031.tgz`
 
 ## Version Scheme
@@ -43,7 +43,7 @@ tmwhflpprarf089-031
 - `tmwhflpprarf`: tumoflip firmware name shown as the installed firmware
   version prefix for the ARF-enabled build line.
 - `089`: upstream Unleashed base version.
-- `030`: tumoflip internal build version.
+- `031`: tumoflip internal build version.
 
 When the Unleashed base version or tumoflip internal version changes, update
 the firmware version suffix in `fbt_options.py`, release notes, README, and the
@@ -91,6 +91,9 @@ The four-page post-update splash screen is generated automatically from
 - Added adaptive dwell and signal hold to hopping in the system Sub-GHz app.
 - Added external Sub-GHz Protocol Packs so selected decoders can be loaded from
   SD without keeping a second copy in the core firmware image.
+- Added the decode-only `Shuka Auto` Protocol Pack group from
+  [shuka0158/ARF-Shuka-Edition](https://github.com/shuka0158/ARF-Shuka-Edition):
+  GM Rolling, Honda/Acura, Hyundai New, Nissan, Renault, and Toyota/Lexus.
 - Added runtime Protocol Pack switching: the receiver safely reloads the
   selected decoders and resumes active reception without restarting Sub-GHz.
 - Added Protocol Pack Inspector to show the active group, loaded decoder count,
@@ -159,9 +162,11 @@ Current custom Desktop modes:
 ## ARF Sub-GHz Layer
 
 tumoflip includes an initial merge of selected automotive Sub-GHz protocol code
-from [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF). This is
-a feature merge, not a replacement of the existing Unleashed/tumoflip Sub-GHz
-stack. The supported boundary is documented in
+from [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF).
+Additional Shuka Auto protocol packs are credited to
+[shuka0158/ARF-Shuka-Edition](https://github.com/shuka0158/ARF-Shuka-Edition).
+This is a feature merge, not a replacement of the existing Unleashed/tumoflip
+Sub-GHz stack. The supported boundary is documented in
 [Sub-GHz Architecture](docs/subghz-architecture.md): core Sub-GHz stays in
 firmware, optional decoders are loaded as `.fal` Protocol Packs, and heavy ARF
 utilities stay as separate `.fap` tools on SD.
@@ -172,9 +177,9 @@ ARF protocols currently enabled in the system Sub-GHz registry:
 - `Suzuki`
 - `Toyota`
 
-The other 24 active ARF protocols are not linked into the core registry. They
-are built from the canonical sources in `lib/subghz/protocols` as external
-Protocol Packs and loaded by the normal Sub-GHz app from:
+The remaining active ARF and Shuka protocols are not linked into the core
+registry. They are built from the canonical sources in `lib/subghz/protocols`
+as external Protocol Packs and loaded by the normal Sub-GHz app from:
 
 ```text
 /ext/apps_data/subghz/plugins/protocol_vag.fal
@@ -186,13 +191,14 @@ Protocol Packs and loaded by the normal Sub-GHz app from:
 
 The directory also contains packs for Chrysler, Fiat Marelli, Ford v0-v3,
 Kia v3-v7, Land Rover, Mazda, Porsche, PSA, Scher-Khan, Sheriff CFM, StarLine,
-and Subaru. See [Sub-GHz Protocol Packs](docs/subghz-protocol-packs.md) for the
-complete inventory.
+Subaru, and the Shuka Auto protocols. See
+[Sub-GHz Protocol Packs](docs/subghz-protocol-packs.md) for the complete
+inventory and source attribution.
 
 Because loading all packs at once would exhaust RAM, Receiver settings provide
 a `Protocol Pack` selector for Core, Legacy, Kia, Ford, Europe, Asia/US, and
-Alarm groups. Changing the selection safely rebuilds the receiver and applies
-the new group without restarting Sub-GHz.
+Alarm, and Shuka Auto groups. Changing the selection safely rebuilds the
+receiver and applies the new group without restarting Sub-GHz.
 
 This preserves the normal Sub-GHz receive workflow while recovering internal
 flash for Tumoflip Runtime. ProtoPirate can still provide its own isolated
@@ -203,8 +209,9 @@ See [Sub-GHz Protocol Packs](docs/subghz-protocol-packs.md) for the ABI and
 packaging rules.
 
 Together with Fiat SPA, Suzuki, and Toyota in core, the Protocol Packs cover
-all protocols enabled in the upstream ARF registry. BMW CAS4 and Honda remain
-disabled because they are also disabled upstream.
+the enabled upstream ARF registry plus the Shuka Auto decode-only additions.
+BMW CAS4 and Honda Static remain disabled because they are also disabled
+upstream.
 
 Full and its tools are external `.fap` apps instead of being linked into the
 core firmware image. Only the launcher is exposed in the normal Apps tree;
@@ -353,6 +360,13 @@ This firmware is based on Unleashed:
   [documentation/](documentation/)
 - Original license:
   [LICENSE](LICENSE)
+
+Additional Sub-GHz research sources used by tumoflip:
+
+- ARF protocol layer:
+  [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF)
+- Shuka Auto protocol additions:
+  [shuka0158/ARF-Shuka-Edition](https://github.com/shuka0158/ARF-Shuka-Edition)
 
 When updating tumoflip, pull/rebase from Unleashed carefully and review conflicts
 around Desktop, Loader, BLE, API symbols, and bundled user applications.

@@ -243,3 +243,57 @@ App(
         "../../lib/subghz/protocols/land_rover_v0.c",
     ],
 )
+
+App(
+    appid="protocol_gm_rolling",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_gm_rolling_plugin_ep",
+    requires=["subghz"],
+    sources=["gm_rolling_plugin.c", "../../lib/subghz/protocols/gm_rolling.c"],
+)
+
+App(
+    appid="protocol_honda_acura",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_honda_acura_plugin_ep",
+    requires=["subghz"],
+    sources=["honda_acura_plugin.c", "../../lib/subghz/protocols/honda_acura.c"],
+)
+
+App(
+    appid="protocol_hyundai_new",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_hyundai_new_plugin_ep",
+    requires=["subghz"],
+    sources=["hyundai_new_plugin.c", "../../lib/subghz/protocols/hyundai_new.c"],
+)
+
+App(
+    appid="protocol_nissan",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_nissan_plugin_ep",
+    requires=["subghz"],
+    sources=["nissan_plugin.c", "../../lib/subghz/protocols/nissan.c"],
+)
+
+App(
+    appid="protocol_renault",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_renault_plugin_ep",
+    requires=["subghz"],
+    sources=["renault_plugin.c", "../../lib/subghz/protocols/renault.c"],
+)
+
+App(
+    appid="protocol_toyota_lexus",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_toyota_lexus_plugin_ep",
+    requires=["subghz"],
+    sources=["toyota_lexus_plugin.c", "../../lib/subghz/protocols/toyota_lexus.c"],
+)

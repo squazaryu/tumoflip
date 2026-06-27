@@ -16,6 +16,7 @@ typedef enum {
     SubGhzProtocolPackGroupEurope,
     SubGhzProtocolPackGroupAsiaUs,
     SubGhzProtocolPackGroupAlarm,
+    SubGhzProtocolPackGroupShuka,
     SubGhzProtocolPackGroupCount,
 } SubGhzProtocolPackGroup;
 

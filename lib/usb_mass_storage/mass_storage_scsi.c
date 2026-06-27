@@ -14,6 +14,7 @@
 #define SCSI_PREVENT_MEDIUM_REMOVAL (0x1E)
 #define SCSI_START_STOP_UNIT        (0x1B)
 #define SCSI_WRITE_10               (0x2A)
+#define SCSI_SYNCHRONIZE_CACHE_10   (0x35)
 
 bool scsi_cmd_start(SCSISession* scsi, uint8_t* cmd, uint8_t len) {
     if(!len) {
@@ -236,6 +237,10 @@ bool scsi_cmd_end(SCSISession* scsi) {
     case SCSI_READ_10:
         return scsi->tx_done;
 
+    case SCSI_SYNCHRONIZE_CACHE_10: {
+        FURI_LOG_D(TAG, "SCSI_SYNCHRONIZE_CACHE_10");
+        return true;
+    }; break;
     case SCSI_TEST_UNIT_READY: {
         FURI_LOG_D(TAG, "SCSI_TEST_UNIT_READY");
         return true;
@@ -244,12 +249,14 @@ bool scsi_cmd_end(SCSISession* scsi) {
         if(len < 6) return false;
         bool prevent = cmd[5];
         FURI_LOG_D(TAG, "SCSI_PREVENT_MEDIUM_REMOVAL prevent=%d", prevent);
-        return !prevent;
+        UNUSED(prevent);
+        return true;
     }; break;
     case SCSI_START_STOP_UNIT: {
         if(len < 6) return false;
         bool eject = (cmd[4] & 2) != 0;
         bool start = (cmd[4] & 1) != 0;
+        UNUSED(start);
         FURI_LOG_D(TAG, "SCSI_START_STOP_UNIT eject=%d start=%d", eject, start);
         if(eject) {
             scsi->fn.eject(scsi->fn.ctx);
