@@ -6,6 +6,7 @@
 #include <services/battery_service.h>
 #include <services/serial_service.h>
 #include <services/app_bridge_service.h>
+#include <services/gatt_service_changed_service_i.h>
 #include <furi.h>
 #include <ble/core/ble_defs.h>
 
@@ -16,6 +17,7 @@ typedef struct {
     BleServiceBattery* battery_svc;
     BleServiceSerial* serial_svc;
     BleServiceAppBridge* app_bridge_svc;
+    BleServiceGattServiceChanged* gatt_changed_svc;
 } BleProfileSerial;
 _Static_assert(offsetof(BleProfileSerial, base) == 0, "Wrong layout");
 
@@ -26,10 +28,12 @@ static FuriHalBleProfileBase* ble_profile_serial_start(FuriHalBleProfileParams p
 
     profile->base.config = ble_profile_serial;
 
+    profile->gatt_changed_svc = ble_svc_gatt_service_changed_start();
     profile->dev_info_svc = ble_svc_dev_info_start();
     profile->battery_svc = ble_svc_battery_start(true);
     profile->serial_svc = ble_svc_serial_start();
     profile->app_bridge_svc = ble_svc_app_bridge_start();
+    ble_svc_gatt_service_changed_mark_dirty(profile->gatt_changed_svc);
 
     return &profile->base;
 }
@@ -43,6 +47,7 @@ static void ble_profile_serial_stop(FuriHalBleProfileBase* profile) {
     ble_svc_battery_stop(serial_profile->battery_svc);
     ble_svc_dev_info_stop(serial_profile->dev_info_svc);
     ble_svc_serial_stop(serial_profile->serial_svc);
+    ble_svc_gatt_service_changed_stop(serial_profile->gatt_changed_svc);
 }
 
 // AN5289: 4.7, in order to use flash controller interval must be at least 25ms + advertisement, which is 30 ms
