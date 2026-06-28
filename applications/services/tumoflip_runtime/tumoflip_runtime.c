@@ -1,4 +1,4 @@
-#include <bt/bt_service/bt.h>
+#include <bt/bt_service/bt_i.h>
 #include <furi.h>
 #include <subghz_radio_broker/subghz_radio_broker.h>
 #include <string.h>
@@ -10,7 +10,7 @@
 #define TUMOFLIP_RUNTIME_REASSEMBLY_MAX 512U
 #define TUMOFLIP_RUNTIME_CAPABILITIES                                            \
     "runtime=1;fab=2;packages=2;legacy=1;payload=160;chunks=255;reassembly=512;" \
-    "features=request_id,chunking,error,capabilities,radio_status"
+    "features=request_id,chunking,error,capabilities,radio_status,transfer_activity"
 
 typedef struct {
     BtAppBridgeEvent event;
@@ -60,6 +60,18 @@ static void tumoflip_runtime_reply(
            runtime->bt, TUMOFLIP_RUNTIME_APP_ID, command, request_id, flags, payload)) {
         FURI_LOG_W(TAG, "Failed to send %s response", command);
     }
+}
+
+static void tumoflip_runtime_transfer_activity(TumoflipRuntime* runtime, bool active) {
+    BtMessage message = {
+        .lock = api_lock_alloc_locked(),
+        .type = BtMessageTypeTransferActivity,
+        .data.transfer_active = active,
+    };
+    furi_check(
+        furi_message_queue_put(runtime->bt->message_queue, &message, FuriWaitForever) ==
+        FuriStatusOk);
+    api_lock_wait_unlock_and_free(message.lock);
 }
 
 static void tumoflip_runtime_assembly_reset(TumoflipRuntimeAssembly* assembly) {
@@ -127,6 +139,15 @@ static void
             device,
             status.owner);
         tumoflip_runtime_reply(runtime, event->request_id, "radio_status", payload, false);
+    } else if(strcmp(runtime->assembly.command, "transfer_begin") == 0) {
+        tumoflip_runtime_transfer_activity(runtime, true);
+        tumoflip_runtime_reply(runtime, event->request_id, "transfer_begin", "ok", false);
+    } else if(strcmp(runtime->assembly.command, "transfer_progress") == 0) {
+        tumoflip_runtime_transfer_activity(runtime, true);
+        tumoflip_runtime_reply(runtime, event->request_id, "transfer_progress", "ok", false);
+    } else if(strcmp(runtime->assembly.command, "transfer_end") == 0) {
+        tumoflip_runtime_transfer_activity(runtime, false);
+        tumoflip_runtime_reply(runtime, event->request_id, "transfer_end", "ok", false);
     } else {
         tumoflip_runtime_reply(runtime, event->request_id, "error", "unsupported_command", true);
     }

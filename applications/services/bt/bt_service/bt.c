@@ -16,6 +16,68 @@
 #define BT_RPC_EVENT_ALL          (BT_RPC_EVENT_BUFF_SENT | BT_RPC_EVENT_DISCONNECTED)
 
 #define ICON_SPACER 2
+#define BT_TRANSFER_SPINNER_WIDTH 8
+#define BT_TRANSFER_SPINNER_PERIOD_MS 125
+#define BT_TRANSFER_ACTIVITY_TIMEOUT_MS 30000
+
+static void bt_statusbar_update(Bt* bt);
+
+static void bt_transfer_timer_callback(void* context) {
+    furi_assert(context);
+    Bt* bt = context;
+    const BtMessage message = {.type = BtMessageTypeTransferTick};
+    furi_message_queue_put(bt->message_queue, &message, 0);
+}
+
+static void bt_draw_transfer_spinner(Canvas* canvas, uint8_t x, uint8_t frame) {
+    const uint8_t phase = frame & 0x03;
+    canvas_draw_circle(canvas, x + 3, 3, 3);
+    if(phase == 0) {
+        canvas_draw_line(canvas, x + 3, 0, x + 3, 2);
+    } else if(phase == 1) {
+        canvas_draw_line(canvas, x + 5, 1, x + 4, 2);
+    } else if(phase == 2) {
+        canvas_draw_line(canvas, x + 6, 3, x + 4, 3);
+    } else {
+        canvas_draw_line(canvas, x + 5, 5, x + 4, 4);
+    }
+}
+
+static void bt_transfer_activity_set(Bt* bt, bool active) {
+    furi_assert(bt);
+
+    if(active) {
+        bt->transfer_last_tick = furi_get_tick();
+        if(!bt->transfer_active) {
+            bt->transfer_active = true;
+            bt->transfer_spinner_frame = 0;
+            furi_check(
+                furi_timer_start(
+                    bt->transfer_timer, furi_ms_to_ticks(BT_TRANSFER_SPINNER_PERIOD_MS)) ==
+                FuriStatusOk);
+            bt_statusbar_update(bt);
+        }
+    } else if(bt->transfer_active) {
+        bt->transfer_active = false;
+        bt->transfer_spinner_frame = 0;
+        furi_check(furi_timer_stop(bt->transfer_timer) == FuriStatusOk);
+        bt_statusbar_update(bt);
+    }
+}
+
+static void bt_transfer_activity_tick(Bt* bt) {
+    furi_assert(bt);
+    if(!bt->transfer_active) return;
+
+    if((furi_get_tick() - bt->transfer_last_tick) >
+       furi_ms_to_ticks(BT_TRANSFER_ACTIVITY_TIMEOUT_MS)) {
+        bt_transfer_activity_set(bt, false);
+        return;
+    }
+
+    bt->transfer_spinner_frame++;
+    view_port_update(bt->statusbar_view_port);
+}
 
 static void bt_draw_statusbar_callback(Canvas* canvas, void* context) {
     furi_assert(context);
@@ -28,8 +90,14 @@ static void bt_draw_statusbar_callback(Canvas* canvas, void* context) {
     }
     if(bt->status == BtStatusAdvertising) {
         canvas_draw_icon(canvas, draw_offset, 0, &I_Bluetooth_Idle_5x8);
+        draw_offset += icon_get_width(&I_Bluetooth_Idle_5x8);
     } else if(bt->status == BtStatusConnected) {
         canvas_draw_icon(canvas, draw_offset, 0, &I_Bluetooth_Connected_16x8);
+        draw_offset += icon_get_width(&I_Bluetooth_Connected_16x8);
+    }
+    if(bt->transfer_active) {
+        if(draw_offset > 0) draw_offset += ICON_SPACER;
+        bt_draw_transfer_spinner(canvas, draw_offset, bt->transfer_spinner_frame);
     }
 }
 
@@ -165,6 +233,8 @@ Bt* bt_alloc(void) {
 
     // Setup statusbar view port
     bt->statusbar_view_port = bt_statusbar_view_port_alloc(bt);
+    bt->transfer_timer =
+        furi_timer_alloc(bt_transfer_timer_callback, FuriTimerTypePeriodic, bt);
     // Notification
     bt->notification = furi_record_open(RECORD_NOTIFICATION);
     // Gui
@@ -188,6 +258,9 @@ Bt* bt_alloc(void) {
     bt->app_bridge_pubsub = furi_pubsub_alloc();
 
     bt->pin = 0;
+    bt->transfer_active = false;
+    bt->transfer_spinner_frame = 0;
+    bt->transfer_last_tick = 0;
 
     return bt;
 }
@@ -472,6 +545,10 @@ static void bt_statusbar_update(Bt* bt) {
         active_icon_width += icon_get_width(&I_Bluetooth_Idle_5x8);
     } else if(bt->status == BtStatusConnected) {
         active_icon_width += icon_get_width(&I_Bluetooth_Connected_16x8);
+    }
+    if(bt->transfer_active) {
+        if(active_icon_width > 0) active_icon_width += ICON_SPACER;
+        active_icon_width += BT_TRANSFER_SPINNER_WIDTH;
     }
 
     if(active_icon_width > 0) {
@@ -773,6 +850,10 @@ int32_t bt_srv(void* p) {
             bt_handle_app_bridge_send(bt, &message);
         } else if(message.type == BtMessageTypeAppBridgeSendV2) {
             bt_handle_app_bridge_send_v2(bt, &message);
+        } else if(message.type == BtMessageTypeTransferActivity) {
+            bt_transfer_activity_set(bt, message.data.transfer_active);
+        } else if(message.type == BtMessageTypeTransferTick) {
+            bt_transfer_activity_tick(bt);
         }
 
         if(message.lock) api_lock_unlock(message.lock);

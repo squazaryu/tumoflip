@@ -37,6 +37,8 @@ typedef enum {
     BtMessageTypeReloadKeysSettings,
     BtMessageTypeAppBridgeSend,
     BtMessageTypeAppBridgeSendV2,
+    BtMessageTypeTransferActivity,
+    BtMessageTypeTransferTick,
 } BtMessageType;
 
 typedef struct {
@@ -76,6 +78,7 @@ typedef union {
     const BtSettings* csettings;
     BtAppBridgeSendData app_bridge;
     BtAppBridgeSendV2Data app_bridge_v2;
+    bool transfer_active;
 } BtMessageData;
 
 typedef struct {
@@ -99,6 +102,7 @@ struct Bt {
     NotificationApp* notification;
     Gui* gui;
     ViewPort* statusbar_view_port;
+    FuriTimer* transfer_timer;
     ViewPort* pin_code_view_port;
     uint32_t pin_code;
     DialogsApp* dialogs;
@@ -113,6 +117,9 @@ struct Bt {
     void* status_changed_ctx;
     uint32_t pin;
     bool suppress_pin_screen;
+    bool transfer_active;
+    uint8_t transfer_spinner_frame;
+    uint32_t transfer_last_tick;
 };
 
 /** Open a new RPC connection
