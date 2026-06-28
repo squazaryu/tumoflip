@@ -74,19 +74,23 @@ static DialogMessageButton compliance_screen(DialogsApp* dialogs, DialogMessage*
 
 static DialogMessageButton tumoflip_info_screen(DialogsApp* dialogs, DialogMessage* message) {
     DialogMessageButton result;
-
-    const char* screen_header = "tmwhflpprarf089-031\n";
+    const Version* ver = furi_hal_version_get_firmware_version();
+    FuriString* screen_header = furi_string_alloc_printf(
+        "%s\n",
+        ver ? version_get_version(ver) : "tmwhflpprarf");
 
     const char* screen_text = "tumoflip custom build\n"
                               "Base: Unleashed 089\n"
                               "github.com/DarkFlippers\n"
                               "/unleashed-firmware";
 
-    dialog_message_set_header(message, screen_header, 0, 0, AlignLeft, AlignTop);
+    dialog_message_set_header(
+        message, furi_string_get_cstr(screen_header), 0, 0, AlignLeft, AlignTop);
     dialog_message_set_text(message, screen_text, 0, 11, AlignLeft, AlignTop);
     result = dialog_message_show(dialogs, message);
     dialog_message_set_header(message, NULL, 0, 0, AlignLeft, AlignTop);
     dialog_message_set_text(message, NULL, 0, 0, AlignLeft, AlignTop);
+    furi_string_free(screen_header);
 
     return result;
 }

@@ -25,25 +25,25 @@ you find a tumoflip-specific issue, report it in this repository:
 ## Current Build
 
 - Base: Unleashed 089 with selected upstream dev updates
-- Firmware version: `tmwhflpprarf089-032`
+- Firmware version: `tmwhflpprarf089-033`
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `87.15`
 - Target: Flipper Zero F7
-- Release: `v0.3.2` published release (hardware validation in progress)
-- Release package: `flipper-z-f7-update-tmwhflpprarf089-032.tgz`
+- Release: `v0.3.3` published release (hardware validation in progress)
+- Release package: `flipper-z-f7-update-tmwhflpprarf089-033.tgz`
 
 ## Version Scheme
 
 Installed firmware versions use this format:
 
 ```text
-tmwhflpprarf089-032
+tmwhflpprarf089-033
 ```
 
 - `tmwhflpprarf`: tumoflip firmware name shown as the installed firmware
   version prefix for the ARF-enabled build line.
 - `089`: upstream Unleashed base version.
-- `032`: tumoflip internal build version.
+- `033`: tumoflip internal build version.
 
 When the Unleashed base version or tumoflip internal version changes, update
 the firmware version suffix in `fbt_options.py`, release notes, README, and the
@@ -54,7 +54,7 @@ The four-page post-update splash screen is generated automatically from
 ## tumoflip Changes
 
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
-  `tmwhflpprarf089-032`.
+  `tmwhflpprarf089-033`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.
 - Replaced the Desktop OK menu `Sub-GHz Remote` shortcut with the `ARF Tools`
@@ -73,6 +73,9 @@ The four-page post-update splash screen is generated automatically from
 - Added BLE App Bridge support.
 - Added BLE GATT Service Changed handling so bonded iOS clients can refresh
   stale App Bridge handles after firmware updates or BLE profile rebuilds.
+- Added a Tumoflip Runtime transfer-activity command that shows a small BLE
+  statusbar activity indicator while the iOS companion transfers plugins,
+  firmware packages, or ESP32 firmware files.
 - Added `FlipperRelay` host bridge tooling for Mac-side BLE automations.
 - Added an initial ARF Sub-GHz protocol layer from
   [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF).
@@ -117,6 +120,9 @@ The four-page post-update splash screen is generated automatically from
   Marauder AP scanning and stores scan output under
   `/ext/apps_data/wifi_mapper/sessions`; current packages include the GPS
   no-fix handling and GeoJSON export fixes.
+- Ported safe all-the-plugins fixes into local apps: `Sub-GHz RAW Edit` 1.6
+  raises its stack to avoid firmware-specific MPU faults, and `Quac` now guards
+  OTG power changes and recognizes the `FM12K` Sub-GHz preset label.
 - Vendored local user applications into `applications_user` so the repository
   can be built without absolute local symlinks.
 
@@ -128,7 +134,7 @@ identity.
 
 | Area | Unleashed | tumoflip |
 | --- | --- | --- |
-| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-032` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: tmwhflpprarf089-033` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
@@ -141,7 +147,7 @@ identity.
 | Sub-GHz hopping | Frequency hopping only. | Adds preset and combined hopping plus an adaptive scan dwell, signal hold, post-signal grace period, and bounded hold time to system Sub-GHz. |
 | NFC additions | Uses the Unleashed 089 NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK and adds the Bambu Lab filament spool parser. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-032` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `tmwhflpprarf089-033` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -327,7 +333,7 @@ Mac bridge and app source.
 Download the latest update package from
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases):
 
-- `flipper-z-f7-update-tmwhflpprarf089-032.tgz`
+- `flipper-z-f7-update-tmwhflpprarf089-033.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -349,7 +355,7 @@ python3 tools/tumoflip/validate_release.py --write-manifest
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-032.tgz
+dist/f7-C/flipper-z-f7-update-tmwhflpprarf089-033.tgz
 ```
 
 ## Upstream
