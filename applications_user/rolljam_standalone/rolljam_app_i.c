@@ -81,6 +81,7 @@ static bool rolljam_ensure_protocol_registry_plugin(
     if(app->txrx->protocol_plugin || app->txrx->protocol_plugin_manager ||
        app->txrx->plugin_resolver) {
         rolljam_unload_protocol_plugin(app->txrx);
+        furi_delay_ms(10);
     }
 
     CompositeApiResolver* resolver = composite_api_resolver_alloc();

@@ -992,7 +992,9 @@ static bool plugin_on_event(void* context, SceneManagerEvent event) {
                     if(app->txrx->radio_device) {
                         subghz_devices_stop_async_tx(app->txrx->radio_device);
                     }
-                    subghz_transmitter_stop(ctx->transmitter);
+                    if(ctx->transmitter) {
+                        subghz_transmitter_stop(ctx->transmitter);
+                    }
                     furi_delay_ms(10);
                     if(app->txrx->radio_device) {
                         subghz_devices_idle(app->txrx->radio_device);

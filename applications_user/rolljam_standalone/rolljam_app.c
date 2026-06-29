@@ -448,6 +448,9 @@ bool rolljam_radio_init(RollJamApp* app) {
             app->txrx->environment,
             app->txrx->radio_device);
         rolljam_radio_deinit(app);
+    } else if(app->txrx->environment || app->txrx->radio_device || app->txrx->worker) {
+        FURI_LOG_W(TAG, "Radio resources exist without initialized flag, cleaning up first");
+        rolljam_radio_deinit(app);
     }
 
     // Fresh radio init - nothing was initialized before

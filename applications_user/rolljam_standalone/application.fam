@@ -93,6 +93,7 @@ App(
     entry_point="rolljam_am_plugin_ep",
     requires=["rolljam_standalone"],
     fap_file_assets="keystore",
+    cdefines=["ENABLE_EMULATE_FEATURE=1"],
     sources=[
         "protocols/plugins/rolljam_am_plugin.c",
         "protocols/protocols_common.c",
@@ -121,6 +122,7 @@ App(
     entry_point="rolljam_fm_plugin_extra_ep",
     requires=["rolljam_standalone"],
     fap_file_assets="keystore",
+    cdefines=["ENABLE_EMULATE_FEATURE=1"],
     sources=[
         "protocols/plugins/rolljam_fm_plugin_extra.c",
         "protocols/protocols_common.c",
@@ -140,6 +142,7 @@ App(
     entry_point="rolljam_fm_plugin_ep",
     requires=["rolljam_standalone"],
     fap_file_assets="keystore",
+    cdefines=["ENABLE_EMULATE_FEATURE=1"],
     sources=[
         "protocols/plugins/rolljam_fm_plugin.c",
         "protocols/protocols_common.c",
