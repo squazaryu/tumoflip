@@ -16,8 +16,9 @@
 #define BT_RPC_EVENT_ALL          (BT_RPC_EVENT_BUFF_SENT | BT_RPC_EVENT_DISCONNECTED)
 
 #define ICON_SPACER 2
-#define BT_TRANSFER_SPINNER_WIDTH 8
-#define BT_TRANSFER_SPINNER_PERIOD_MS 125
+#define BT_TRANSFER_ICON_WIDTH          11
+#define BT_TRANSFER_ANIMATION_FRAMES    10
+#define BT_TRANSFER_ANIMATION_PERIOD_MS 100
 #define BT_TRANSFER_ACTIVITY_TIMEOUT_MS 30000
 
 static void bt_statusbar_update(Bt* bt);
@@ -29,17 +30,18 @@ static void bt_transfer_timer_callback(void* context) {
     furi_message_queue_put(bt->message_queue, &message, 0);
 }
 
-static void bt_draw_transfer_spinner(Canvas* canvas, uint8_t x, uint8_t frame) {
-    const uint8_t phase = frame & 0x03;
-    canvas_draw_circle(canvas, x + 3, 3, 3);
-    if(phase == 0) {
-        canvas_draw_line(canvas, x + 3, 0, x + 3, 2);
-    } else if(phase == 1) {
-        canvas_draw_line(canvas, x + 5, 1, x + 4, 2);
-    } else if(phase == 2) {
-        canvas_draw_line(canvas, x + 6, 3, x + 4, 3);
-    } else {
-        canvas_draw_line(canvas, x + 5, 5, x + 4, 4);
+static void bt_draw_transfer_activity(Canvas* canvas, uint8_t x, uint8_t frame) {
+    const uint8_t active = frame % BT_TRANSFER_ANIMATION_FRAMES;
+    const uint8_t bars[] = {0, 4, 8};
+    const uint8_t heights[] = {6, 6, 5, 4, 3, 2, 2, 3, 4, 5};
+
+    for(uint8_t i = 0; i < COUNT_OF(bars); i++) {
+        const uint8_t phase = (active + BT_TRANSFER_ANIMATION_FRAMES - i * 3) %
+                              BT_TRANSFER_ANIMATION_FRAMES;
+        const uint8_t h = heights[phase];
+        const uint8_t y = 4 - h / 2;
+
+        canvas_draw_box(canvas, x + bars[i], y, 3, h);
     }
 }
 
@@ -53,7 +55,7 @@ static void bt_transfer_activity_set(Bt* bt, bool active) {
             bt->transfer_spinner_frame = 0;
             furi_check(
                 furi_timer_start(
-                    bt->transfer_timer, furi_ms_to_ticks(BT_TRANSFER_SPINNER_PERIOD_MS)) ==
+                    bt->transfer_timer, furi_ms_to_ticks(BT_TRANSFER_ANIMATION_PERIOD_MS)) ==
                 FuriStatusOk);
             bt_statusbar_update(bt);
         }
@@ -97,7 +99,7 @@ static void bt_draw_statusbar_callback(Canvas* canvas, void* context) {
     }
     if(bt->transfer_active) {
         if(draw_offset > 0) draw_offset += ICON_SPACER;
-        bt_draw_transfer_spinner(canvas, draw_offset, bt->transfer_spinner_frame);
+        bt_draw_transfer_activity(canvas, draw_offset, bt->transfer_spinner_frame);
     }
 }
 
@@ -548,7 +550,7 @@ static void bt_statusbar_update(Bt* bt) {
     }
     if(bt->transfer_active) {
         if(active_icon_width > 0) active_icon_width += ICON_SPACER;
-        active_icon_width += BT_TRANSFER_SPINNER_WIDTH;
+        active_icon_width += BT_TRANSFER_ICON_WIDTH;
     }
 
     if(active_icon_width > 0) {
