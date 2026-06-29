@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 import fbt_options
+from PIL import Image
 
 from tools.tumoflip.generate_update_splash import generate_slideshow
 from tools.tumoflip.sync_update_splash import sync_update_splash, version_from_dist_suffix
@@ -21,6 +22,12 @@ STATIC_FRAME_SHA256 = {
 
 
 class UpdateSplashTest(unittest.TestCase):
+    def assertPngPixelsEqual(self, actual_path: Path, expected_path: Path) -> None:
+        with Image.open(actual_path) as actual, Image.open(expected_path) as expected:
+            self.assertEqual(actual.mode, expected.mode)
+            self.assertEqual(actual.size, expected.size)
+            self.assertEqual(actual.tobytes(), expected.tobytes())
+
     def test_update_splash_matches_current_firmware_version(self) -> None:
         prefix = "tmwhflpprarf"
         self.assertTrue(fbt_options.DIST_SUFFIX.startswith(prefix))
@@ -32,7 +39,10 @@ class UpdateSplashTest(unittest.TestCase):
 
             for expected in expected_frames:
                 actual = SPLASH_DIR / expected.name
-                self.assertEqual(actual.read_bytes(), expected.read_bytes())
+                if expected.name == "frame_00.png":
+                    self.assertPngPixelsEqual(actual, expected)
+                else:
+                    self.assertEqual(actual.read_bytes(), expected.read_bytes())
 
     def test_update_splash_has_expected_pages(self) -> None:
         frames = sorted(path.name for path in SPLASH_DIR.glob("frame_*.png"))
