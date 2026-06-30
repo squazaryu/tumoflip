@@ -9,7 +9,11 @@ import fbt_options
 from PIL import Image
 
 from tools.tumoflip.generate_update_splash import generate_slideshow
-from tools.tumoflip.sync_update_splash import sync_update_splash, version_from_dist_suffix
+from tools.tumoflip.sync_update_splash import (
+    current_splash_metadata,
+    sync_update_splash,
+    version_from_dist_suffix,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -29,12 +33,11 @@ class UpdateSplashTest(unittest.TestCase):
             self.assertEqual(actual.tobytes(), expected.tobytes())
 
     def test_update_splash_matches_current_firmware_version(self) -> None:
-        version = version_from_dist_suffix(fbt_options.DIST_SUFFIX)
-        self.assertIsNotNone(version)
+        title, version = current_splash_metadata(fbt_options.DIST_SUFFIX)
 
         with tempfile.TemporaryDirectory() as directory:
             expected_dir = Path(directory)
-            expected_frames = generate_slideshow("TMWHFLPPRARF", version, expected_dir)
+            expected_frames = generate_slideshow(title, version, expected_dir)
 
             for expected in expected_frames:
                 actual = SPLASH_DIR / expected.name
@@ -78,6 +81,16 @@ class UpdateSplashTest(unittest.TestCase):
         self.assertEqual(version_from_dist_suffix("tmwhflpprarf089-031"), "089-031")
         self.assertEqual(version_from_dist_suffix("t-dev-089-035-001"), "089-035-001")
         self.assertIsNone(version_from_dist_suffix("abcdef12"))
+
+    def test_dev_splash_uses_dev_title(self) -> None:
+        self.assertEqual(
+            current_splash_metadata("t-dev-089-035-001"),
+            ("T-DEV", "089-035-001"),
+        )
+        self.assertEqual(
+            current_splash_metadata("tmwhflpprarf089-031"),
+            ("TMWHFLPPRARF", "089-031"),
+        )
 
     def test_fbt_autogenerates_tumoflip_update_splash(self) -> None:
         sconstruct = (REPO_ROOT / "SConstruct").read_text(encoding="utf-8")

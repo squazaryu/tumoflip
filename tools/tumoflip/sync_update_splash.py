@@ -22,6 +22,7 @@ except ModuleNotFoundError:
 
 
 DEFAULT_TITLE = "TMWHFLPPRARF"
+DEV_TITLE = "T-DEV"
 DEFAULT_PREFIX = "tmwhflpprarf"
 DEV_SUFFIX_RE = re.compile(r"^t-dev-(?P<version>\d{3}-\d{3}-\d{3})$")
 DEFAULT_OUTPUT_DIR = Path("assets/slideshow/tumoflip_update")
@@ -40,6 +41,15 @@ def version_from_dist_suffix(dist_suffix: str, prefix: str = DEFAULT_PREFIX) -> 
 
 
 def current_version(dist_suffix: str | None = None, prefix: str = DEFAULT_PREFIX) -> str:
+    _, version = current_splash_metadata(dist_suffix, prefix=prefix)
+    return version
+
+
+def current_splash_metadata(
+    dist_suffix: str | None = None,
+    prefix: str = DEFAULT_PREFIX,
+    title: str = DEFAULT_TITLE,
+) -> tuple[str, str]:
     candidates = []
     if dist_suffix:
         candidates.append(dist_suffix)
@@ -51,7 +61,9 @@ def current_version(dist_suffix: str | None = None, prefix: str = DEFAULT_PREFIX
     for candidate in candidates:
         version = version_from_dist_suffix(candidate, prefix)
         if version:
-            return version
+            if title == DEFAULT_TITLE and DEV_SUFFIX_RE.match(candidate):
+                return DEV_TITLE, version
+            return title, version
 
     raise ValueError(
         f"cannot derive update splash version from DIST_SUFFIX candidates: {candidates}"
@@ -64,7 +76,7 @@ def sync_update_splash(
     dist_suffix: str | None = None,
     check: bool = False,
 ) -> bool:
-    version = current_version(dist_suffix)
+    title, version = current_splash_metadata(dist_suffix, title=title)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     import tempfile
