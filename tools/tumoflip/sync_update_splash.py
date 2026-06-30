@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -22,14 +23,20 @@ except ModuleNotFoundError:
 
 DEFAULT_TITLE = "TMWHFLPPRARF"
 DEFAULT_PREFIX = "tmwhflpprarf"
+DEV_SUFFIX_RE = re.compile(r"^t-dev-(?P<version>\d{3}-\d{3}-\d{3})$")
 DEFAULT_OUTPUT_DIR = Path("assets/slideshow/tumoflip_update")
 
 
 def version_from_dist_suffix(dist_suffix: str, prefix: str = DEFAULT_PREFIX) -> str | None:
-    if not dist_suffix.startswith(prefix):
-        return None
-    version = dist_suffix.removeprefix(prefix)
-    return version or None
+    if dist_suffix.startswith(prefix):
+        version = dist_suffix.removeprefix(prefix)
+        return version or None
+
+    dev_match = DEV_SUFFIX_RE.match(dist_suffix)
+    if dev_match:
+        return dev_match.group("version")
+
+    return None
 
 
 def current_version(dist_suffix: str | None = None, prefix: str = DEFAULT_PREFIX) -> str:

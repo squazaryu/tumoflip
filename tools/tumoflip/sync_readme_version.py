@@ -12,9 +12,12 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-README_VERSION_RE = re.compile(r"tmwhflpprarf\d{3}-\d{3}")
+README_VERSION_RE = re.compile(r"(?:tmwhflpprarf\d{3}-\d{3}|(?:t-)?dev-\d{3}-\d{3}-\d{3})")
 DIST_SUFFIX_RE = re.compile(r'DIST_SUFFIX\s*=\s*"([^"]+)"')
-VERSION_RE = re.compile(r"^(?P<prefix>tmwhflpprarf)(?P<base>\d{3})-(?P<build>\d{3})$")
+STABLE_VERSION_RE = re.compile(r"^(?P<prefix>tmwhflpprarf)(?P<base>\d{3})-(?P<build>\d{3})$")
+DEV_VERSION_RE = re.compile(
+    r"^(?P<prefix>t-dev)-(?P<base>\d{3})-(?P<build>\d{3})-(?P<iteration>\d{3})$"
+)
 
 
 def read_dist_suffix(repo_root: Path = REPO_ROOT) -> str:
@@ -29,15 +32,30 @@ def read_dist_suffix(repo_root: Path = REPO_ROOT) -> str:
     return match.group(1)
 
 
-def parse_dist_suffix(dist_suffix: str) -> tuple[str, str, str]:
-    match = VERSION_RE.match(dist_suffix)
-    if not match:
-        raise ValueError(f"unsupported tumoflip DIST_SUFFIX: {dist_suffix}")
-    return match.group("prefix"), match.group("base"), match.group("build")
+def parse_dist_suffix(dist_suffix: str) -> tuple[str, str, str, str | None]:
+    stable_match = STABLE_VERSION_RE.match(dist_suffix)
+    if stable_match:
+        return (
+            stable_match.group("prefix"),
+            stable_match.group("base"),
+            stable_match.group("build"),
+            None,
+        )
+
+    dev_match = DEV_VERSION_RE.match(dist_suffix)
+    if dev_match:
+        return (
+            dev_match.group("prefix"),
+            dev_match.group("base"),
+            dev_match.group("build"),
+            dev_match.group("iteration"),
+        )
+
+    raise ValueError(f"unsupported tumoflip DIST_SUFFIX: {dist_suffix}")
 
 
 def sync_readme_text(text: str, dist_suffix: str, release_tag: str | None = None) -> str:
-    prefix, base, build = parse_dist_suffix(dist_suffix)
+    prefix, base, build, iteration = parse_dist_suffix(dist_suffix)
     updated = README_VERSION_RE.sub(dist_suffix, text)
 
     updated = re.sub(
@@ -46,6 +64,13 @@ def sync_readme_text(text: str, dist_suffix: str, release_tag: str | None = None
         updated,
         count=1,
     )
+    if iteration:
+        updated = re.sub(
+            r"- `\d{3}`: development iteration inside the tumoflip internal build version\.",
+            f"- `{iteration}`: development iteration inside the tumoflip internal build version.",
+            updated,
+            count=1,
+        )
 
     if release_tag:
         if not release_tag.startswith("v"):
@@ -57,15 +82,23 @@ def sync_readme_text(text: str, dist_suffix: str, release_tag: str | None = None
             count=1,
         )
 
-    expected_prefix_line = (
-        f"- `{prefix}`: tumoflip firmware name shown as the installed firmware"
-    )
+    if prefix == "tmwhflpprarf":
+        expected_prefix_line = (
+            f"- `{prefix}`: tumoflip firmware name shown as the installed firmware"
+        )
+    else:
+        expected_prefix_line = "- `t-dev`: Tumoflip development build prefix for unstable builds."
     if expected_prefix_line not in updated:
         raise ValueError("ReadMe.md version scheme prefix line was not updated as expected")
     if f"- `{base}`: upstream Unleashed base version." not in updated:
         raise ValueError("ReadMe.md base version line was not updated as expected")
     if f"- `{build}`: tumoflip internal build version." not in updated:
         raise ValueError("ReadMe.md internal build version line was not updated as expected")
+    if iteration and (
+        f"- `{iteration}`: development iteration inside the tumoflip internal build version."
+        not in updated
+    ):
+        raise ValueError("ReadMe.md development iteration line was not updated as expected")
 
     return updated
 
