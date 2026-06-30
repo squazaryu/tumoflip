@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,87.15,,
+Version,+,87.16,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/services/applications.h,,
 Header,+,applications/services/bt/bt_service/bt.h,,
@@ -3806,6 +3806,7 @@ Function,+,subghz_radio_broker_acquire,_Bool,"SubGhzRadioBroker*, const char*, u
 Function,+,subghz_radio_broker_external_power_off,void,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*"
 Function,+,subghz_radio_broker_external_power_on,_Bool,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*"
 Function,+,subghz_radio_broker_get_status,void,"SubGhzRadioBroker*, SubGhzRadioBrokerStatus*"
+Function,+,subghz_radio_broker_get_status_v2,void,"SubGhzRadioBroker*, SubGhzRadioBrokerStatusV2*"
 Function,+,subghz_radio_broker_release,void,"SubGhzRadioBroker*, SubGhzRadioBrokerLease*"
 Function,+,subghz_radio_broker_set_selected_device,_Bool,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*, SubGhzRadioBrokerDevice"
 Function,+,subghz_receiver_alloc_init,SubGhzReceiver*,SubGhzEnvironment*

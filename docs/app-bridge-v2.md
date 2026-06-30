@@ -38,7 +38,8 @@ The system app ID is `runtime`.
 - `capabilities` returns `runtime/capabilities` with a semicolon-separated
   `key=value` payload.
 - `radio_status` reports whether the Sub-GHz Broker is busy, its owner,
-  selected device, and external-power state. It does not acquire the radio.
+  selected device, external-power state, lifecycle state, lease age in ticks,
+  transition tick, and last error. It does not acquire the radio.
 - An unknown command returns `runtime/error`, sets response and error flags,
   and carries `unsupported_command`.
 - Invalid chunk order and oversized Runtime payloads return `runtime/error`.

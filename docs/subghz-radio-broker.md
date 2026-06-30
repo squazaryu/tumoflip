@@ -7,6 +7,7 @@ radio clients. It provides:
 - external CC1101 power ownership;
 - preservation of OTG power enabled by another subsystem;
 - selected internal/external device status;
+- observable lifecycle status, lease ticks, and last error;
 - automatic external-power cleanup when a valid lease is released.
 
 The system Sub-GHz application and all current ARF radio applications are
@@ -24,6 +25,11 @@ power ownership.
 Applying a global lease inside
 `subghz_devices_init` would turn an existing missing `deinit` into a persistent
 radio lock, so migration remains explicit per application.
+
+Runtime `radio_status` keeps the original `busy`, `external_power`, `device`,
+and `owner` fields, then appends `state`, `acquired_tick`, `held_ticks`,
+`last_transition_tick`, and `last_error`. This is an observability contract
+only; it does not acquire, release, or reconfigure the radio.
 
 The public API is in
 `applications/services/subghz_radio_broker/subghz_radio_broker.h`.
