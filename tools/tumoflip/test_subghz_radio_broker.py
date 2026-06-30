@@ -29,6 +29,13 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
         for state in (
             "SubGhzRadioBrokerStateIdle",
             "SubGhzRadioBrokerStateAcquired",
+            "SubGhzRadioBrokerStateProbing",
+            "SubGhzRadioBrokerStateInitialized",
+            "SubGhzRadioBrokerStateRx",
+            "SubGhzRadioBrokerStateTx",
+            "SubGhzRadioBrokerStateAsyncRx",
+            "SubGhzRadioBrokerStateAsyncTx",
+            "SubGhzRadioBrokerStateCleaningUp",
             "SubGhzRadioBrokerStateExternalPowerOn",
             "SubGhzRadioBrokerStateReleasing",
             "SubGhzRadioBrokerStateError",
@@ -46,6 +53,7 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
 
         self.assertIn("SubGhzRadioBrokerStatusV2", header)
         self.assertIn("subghz_radio_broker_get_status_v2", header)
+        self.assertIn("subghz_radio_broker_set_state", header)
         self.assertIn("*status = broker->status.base;", broker)
         self.assertIn("*status = broker->status;", broker)
         self.assertIn("subghz_radio_broker_get_status_v2(runtime->radio_broker", runtime)
@@ -68,9 +76,22 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
             "last_error=%s",
         ):
             self.assertIn(payload_key, runtime)
+        for state_name in (
+            '"probing"',
+            '"initialized"',
+            '"rx"',
+            '"tx"',
+            '"async_rx"',
+            '"async_tx"',
+            '"cleaning_up"',
+        ):
+            self.assertIn(state_name, runtime)
 
         self.assertIn("lifecycle state", bridge_docs)
+        self.assertIn("async_rx", bridge_docs)
+        self.assertIn("async_tx", bridge_docs)
         self.assertIn("observability contract", broker_docs)
+        self.assertIn("explicit lifecycle transitions", broker_docs)
 
     def test_direct_radio_control_paths_are_brokered_or_allowlisted(self) -> None:
         direct_control = re.compile(
@@ -137,6 +158,24 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
 
         for command in ("chat", "tx", "rx", "rx_raw", "tx_from_file"):
             self.assertIn(f'furi_string_cmp_str(cmd, "{command}") == 0', cli)
+
+    def test_brokered_txrx_reports_v2_state_transitions(self) -> None:
+        for relative in (
+            "applications/main/subghz/helpers/subghz_txrx.c",
+            "applications_user/arf_subghz_full/helpers/subghz_txrx.c",
+        ):
+            source = (REPO_ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn("subghz_txrx_radio_state", source)
+            for state in (
+                "SubGhzRadioBrokerStateProbing",
+                "SubGhzRadioBrokerStateInitialized",
+                "SubGhzRadioBrokerStateRx",
+                "SubGhzRadioBrokerStateTx",
+                "SubGhzRadioBrokerStateAsyncRx",
+                "SubGhzRadioBrokerStateAsyncTx",
+                "SubGhzRadioBrokerStateCleaningUp",
+            ):
+                self.assertIn(state, source)
 
 
 if __name__ == "__main__":

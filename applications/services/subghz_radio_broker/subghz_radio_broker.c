@@ -184,6 +184,23 @@ bool subghz_radio_broker_set_selected_device(
     return valid;
 }
 
+bool subghz_radio_broker_set_state(
+    SubGhzRadioBroker* broker,
+    const SubGhzRadioBrokerLease* lease,
+    SubGhzRadioBrokerState state) {
+    furi_check(broker);
+
+    furi_check(furi_mutex_acquire(broker->state_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool valid = subghz_radio_broker_is_lease_valid(broker, lease);
+    if(valid) {
+        subghz_radio_broker_set_state_locked(broker, state, NULL);
+    } else {
+        subghz_radio_broker_note_error_locked(broker, "invalid_lease");
+    }
+    furi_mutex_release(broker->state_mutex);
+    return valid;
+}
+
 void subghz_radio_broker_get_status(SubGhzRadioBroker* broker, SubGhzRadioBrokerStatus* status) {
     furi_check(broker);
     furi_check(status);

@@ -21,6 +21,13 @@ typedef enum {
 typedef enum {
     SubGhzRadioBrokerStateIdle,
     SubGhzRadioBrokerStateAcquired,
+    SubGhzRadioBrokerStateProbing,
+    SubGhzRadioBrokerStateInitialized,
+    SubGhzRadioBrokerStateRx,
+    SubGhzRadioBrokerStateTx,
+    SubGhzRadioBrokerStateAsyncRx,
+    SubGhzRadioBrokerStateAsyncTx,
+    SubGhzRadioBrokerStateCleaningUp,
     SubGhzRadioBrokerStateExternalPowerOn,
     SubGhzRadioBrokerStateReleasing,
     SubGhzRadioBrokerStateError,
@@ -65,6 +72,11 @@ bool subghz_radio_broker_set_selected_device(
     SubGhzRadioBroker* broker,
     const SubGhzRadioBrokerLease* lease,
     SubGhzRadioBrokerDevice device);
+
+bool subghz_radio_broker_set_state(
+    SubGhzRadioBroker* broker,
+    const SubGhzRadioBrokerLease* lease,
+    SubGhzRadioBrokerState state);
 
 void subghz_radio_broker_get_status(SubGhzRadioBroker* broker, SubGhzRadioBrokerStatus* status);
 

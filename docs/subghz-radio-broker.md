@@ -13,8 +13,10 @@ radio clients. It provides:
 The system Sub-GHz application and all current ARF radio applications are
 Broker clients. They acquire a lease
 before initializing the device registry and releases it after stopping the
-radio and deinitializing the registry. External-module probing and fallback to
-the internal CC1101 keep their existing behavior.
+radio and deinitializing the registry. Core and ARF `subghz_txrx` now report
+explicit lifecycle transitions: `probing`, `initialized`, `rx`, `tx`,
+`async_rx`, `async_tx`, and `cleaning_up`. External-module probing and fallback
+to the internal CC1101 keep their existing behavior.
 
 RollJam reports a dual-radio selection and routes its external CC1101 power
 through the Broker while retaining its direct internal-RX/external-TX logic.

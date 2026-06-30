@@ -98,6 +98,20 @@ static const char* tumoflip_runtime_radio_state_name(SubGhzRadioBrokerState stat
         return "idle";
     case SubGhzRadioBrokerStateAcquired:
         return "acquired";
+    case SubGhzRadioBrokerStateProbing:
+        return "probing";
+    case SubGhzRadioBrokerStateInitialized:
+        return "initialized";
+    case SubGhzRadioBrokerStateRx:
+        return "rx";
+    case SubGhzRadioBrokerStateTx:
+        return "tx";
+    case SubGhzRadioBrokerStateAsyncRx:
+        return "async_rx";
+    case SubGhzRadioBrokerStateAsyncTx:
+        return "async_tx";
+    case SubGhzRadioBrokerStateCleaningUp:
+        return "cleaning_up";
     case SubGhzRadioBrokerStateExternalPowerOn:
         return "external_power_on";
     case SubGhzRadioBrokerStateReleasing:
