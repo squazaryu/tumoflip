@@ -63,6 +63,14 @@ Use `--dry-run` to verify the manifest and every source hash without modifying
 the card. Successful installs write `/.tumoflip/install-state.json` and retain
 replaced files under `/.tumoflip/rollback/<transaction>`.
 
+Successful installs also write `/.tumoflip/package-state.txt`, a compact
+FlipperFormat-compatible state file intended for future firmware-side package
+audits. Version 1 records the package schema, release id, transaction id,
+firmware version/API, package release id, installed groups, installed file
+count, cleanup candidate count, and rollback path. It is read-only status for
+firmware and companion diagnostics; it is not an instruction to delete or
+overwrite files.
+
 Validation fails when:
 
 - updater or radio CRC differs from `update.fuf`;

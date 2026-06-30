@@ -6,10 +6,10 @@ import unittest
 from pathlib import Path
 
 try:
-    from .apply_packages import PackageError, apply_packages
+    from .apply_packages import PACKAGE_STATE_FILE, PackageError, apply_packages
     from .validate_release import manifest_release_id, sha256
 except ImportError:
-    from apply_packages import PackageError, apply_packages
+    from apply_packages import PACKAGE_STATE_FILE, PackageError, apply_packages
     from validate_release import manifest_release_id, sha256
 
 
@@ -26,6 +26,13 @@ class ApplyPackagesTest(unittest.TestCase):
         legacy.write_bytes(b"old app")
         manifest = {
             "schema": 2,
+            "firmware": {
+                "version": "t-dev-089-035-001",
+                "api": "87.17",
+            },
+            "package_release": {
+                "id": "test-package",
+            },
             "packages": {
                 "arf": [
                     {
@@ -58,6 +65,24 @@ class ApplyPackagesTest(unittest.TestCase):
             self.assertFalse((sd / "apps/ARF Tools/ARF Status.fap").exists())
             self.assertEqual(state["groups"], ["arf"])
             self.assertTrue((sd / ".tumoflip/install-state.json").is_file())
+            package_state = sd / ".tumoflip" / PACKAGE_STATE_FILE
+            self.assertTrue(package_state.is_file())
+            state_text = package_state.read_text(encoding="utf-8")
+            for expected in (
+                "Filetype: Tumoflip Package State",
+                "Version: 1",
+                "Schema: 2",
+                f"ReleaseId: {state['release_id']}",
+                f"Transaction: {state['transaction']}",
+                "Firmware: t-dev-089-035-001",
+                "FirmwareApi: 87.17",
+                "PackageRelease: test-package",
+                "Groups: arf",
+                "InstalledFiles: 1",
+                "CleanupCandidates: 1",
+                f"Rollback: {state['rollback']}",
+            ):
+                self.assertIn(expected, state_text)
 
     def test_dry_run_does_not_change_sd(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -65,6 +90,7 @@ class ApplyPackagesTest(unittest.TestCase):
             result = apply_packages(manifest, resources, sd, dry_run=True)
             self.assertEqual(result["verified"], 1)
             self.assertFalse((sd / "apps/ARF Tools/arf_status.fap").exists())
+            self.assertFalse((sd / ".tumoflip" / PACKAGE_STATE_FILE).exists())
 
     def test_bad_source_hash_is_rejected_before_install(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

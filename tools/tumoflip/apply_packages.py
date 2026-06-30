@@ -21,6 +21,9 @@ class PackageError(RuntimeError):
     pass
 
 
+PACKAGE_STATE_FILE = "package-state.txt"
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -87,6 +90,44 @@ def verify_sources(
         ext_relative(str(entry["target"]))
 
 
+def package_state_text(
+    manifest: dict[str, object],
+    transaction: str,
+    selected_groups: list[str],
+    installed_count: int,
+    cleanup_candidates: int,
+) -> str:
+    firmware = manifest.get("firmware", {})
+    package_release = manifest.get("package_release", {})
+    firmware_version = "unknown"
+    firmware_api = "unknown"
+    if isinstance(firmware, dict):
+        firmware_version = str(firmware.get("version", firmware_version))
+        firmware_api = str(firmware.get("api", firmware_api))
+
+    package_release_id = "firmware"
+    if isinstance(package_release, dict):
+        package_release_id = str(package_release.get("id", package_release_id))
+
+    return "\n".join(
+        (
+            "Filetype: Tumoflip Package State",
+            "Version: 1",
+            "Schema: 2",
+            f"ReleaseId: {manifest['release_id']}",
+            f"Transaction: {transaction}",
+            f"Firmware: {firmware_version}",
+            f"FirmwareApi: {firmware_api}",
+            f"PackageRelease: {package_release_id}",
+            f"Groups: {','.join(selected_groups)}",
+            f"InstalledFiles: {installed_count}",
+            f"CleanupCandidates: {cleanup_candidates}",
+            f"Rollback: /.tumoflip/rollback/{transaction}",
+            "",
+        )
+    )
+
+
 def apply_packages(
     manifest_path: Path,
     resources_root: Path,
@@ -105,6 +146,7 @@ def apply_packages(
 
     transaction = f"{str(manifest['release_id'])[:16]}-{uuid.uuid4().hex[:8]}"
     metadata_root = sd_root / ".tumoflip"
+    selected_groups = sorted(manifest["packages"] if groups is None else groups)
     staging_root = metadata_root / "staging" / transaction
     rollback_root = metadata_root / "rollback" / transaction
     staging_root.mkdir(parents=True)
@@ -162,7 +204,7 @@ def apply_packages(
             "schema": 1,
             "release_id": manifest["release_id"],
             "transaction": transaction,
-            "groups": sorted(manifest["packages"] if groups is None else groups),
+            "groups": selected_groups,
             "files": [
                 {"target": entry["target"], "sha256": entry["sha256"]}
                 for _, entry in entries
@@ -173,6 +215,22 @@ def apply_packages(
         state_tmp = state_path.with_suffix(".tmp")
         state_tmp.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
         os.replace(state_tmp, state_path)
+        package_state_path = metadata_root / PACKAGE_STATE_FILE
+        package_state_tmp = package_state_path.with_suffix(".tmp")
+        cleanup_candidates = 0
+        if groups is None or "arf" in selected_groups:
+            cleanup_candidates = len(manifest.get("cleanup", []))
+        package_state_tmp.write_text(
+            package_state_text(
+                manifest,
+                transaction,
+                selected_groups,
+                len(entries),
+                cleanup_candidates,
+            ),
+            encoding="utf-8",
+        )
+        os.replace(package_state_tmp, package_state_path)
         shutil.rmtree(staging_root)
         return state
     except Exception:
