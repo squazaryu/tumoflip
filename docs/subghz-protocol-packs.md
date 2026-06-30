@@ -59,12 +59,12 @@ same time. The Receiver configuration therefore exposes one active group:
 - `Shuka Auto`: decode-only GM Rolling, Honda/Acura, Hyundai New, Nissan,
   Renault, and Toyota/Lexus.
 
-`Legacy` is the default and preserves the pack set shipped before v0.2.0. A
-group change is applied immediately: the application stops RX, replaces the
-plugin registry and decoder instances, restores callbacks and filters, then
-resumes RX. The selection is also stored in the existing Sub-GHz settings.
-Every pack remains on SD; the selection only controls which files are mapped
-into RAM for the current session.
+`Core` is the default. `Legacy` remains available for the older optional pack
+set shipped before v0.2.0. A group change is applied immediately: the
+application stops RX, replaces the plugin registry and decoder instances,
+restores callbacks and filters, then resumes RX. The selection is also stored
+in the existing Sub-GHz settings. Every pack remains on SD; the selection only
+controls which files are mapped into RAM for the current session.
 
 ## Protocol Pack Inspector
 

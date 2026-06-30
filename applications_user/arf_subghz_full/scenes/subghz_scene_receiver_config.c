@@ -591,8 +591,8 @@ static void subghz_scene_receiver_config_var_list_enter_callback(void* context, 
         subghz->last_settings->preset_hopping_threshold = SUBGHZ_LAST_SETTING_DEFAULT_PRESET_HOPPING_THRESHOLD;
         subghz_txrx_preset_hopper_set_state(subghz->txrx, SubGhzPresetHopperStateOFF);
         subghz->last_settings->enable_combined_hopping = false;
-        if(subghz_txrx_reload_protocol_pack(subghz->txrx, SubGhzProtocolPackGroupLegacy)) {
-            subghz->last_settings->protocol_pack_group = SubGhzProtocolPackGroupLegacy;
+        if(subghz_txrx_reload_protocol_pack(subghz->txrx, SubGhzProtocolPackGroupCore)) {
+            subghz->last_settings->protocol_pack_group = SubGhzProtocolPackGroupCore;
         }
 
         variable_item_list_set_selected_item(subghz->variable_item_list, default_index);

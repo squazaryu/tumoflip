@@ -57,7 +57,7 @@ void subghz_last_settings_load(SubGhzLastSettings* instance, size_t preset_count
     instance->enable_combined_hopping = false;
     instance->combined_hopping_threshold = SUBGHZ_LAST_SETTING_DEFAULT_COMBINED_HOPPING_THRESHOLD;
     instance->leds_and_amp = true;
-    instance->protocol_pack_group = SubGhzProtocolPackGroupLegacy;
+    instance->protocol_pack_group = SubGhzProtocolPackGroupCore;
     instance->protocol_filter[0] = '\0';
 
     Storage* storage = furi_record_open(RECORD_STORAGE);
@@ -175,7 +175,7 @@ void subghz_last_settings_load(SubGhzLastSettings* instance, size_t preset_count
                 flipper_format_rewind(fff_data_file);
             }
             instance->tx_power = (uint8_t)(tx_power & 0xFF);
-            uint32_t protocol_pack_group = SubGhzProtocolPackGroupLegacy;
+            uint32_t protocol_pack_group = SubGhzProtocolPackGroupCore;
             if(!flipper_format_read_uint32(
                    fff_data_file,
                    SUBGHZ_LAST_SETTING_FIELD_PROTOCOL_PACK_GROUP,

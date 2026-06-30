@@ -165,7 +165,7 @@ SubGhzProtocolPackRegistry* subghz_protocol_pack_registry_alloc(
 
     const size_t heap_before = memmgr_get_free_heap();
     SubGhzProtocolPackRegistry* instance = malloc(sizeof(SubGhzProtocolPackRegistry));
-    if(group >= SubGhzProtocolPackGroupCount) group = SubGhzProtocolPackGroupLegacy;
+    if(group >= SubGhzProtocolPackGroupCount) group = SubGhzProtocolPackGroupCore;
 
     const uint32_t group_mask = PACK_GROUP(group);
     size_t expected_plugin_count = 0;

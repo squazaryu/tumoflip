@@ -30,6 +30,40 @@ class SubGhzProtocolPackTest(unittest.TestCase):
         self.assertIn("subghz_receiver_set_rx_callback(", txrx)
         self.assertIn("if(resume_rx) subghz_txrx_rx_start(instance);", txrx)
 
+    def test_core_is_default_pack_for_core_and_arf_subghz(self) -> None:
+        files = [
+            REPO_ROOT / "applications/main/subghz/subghz_last_settings.c",
+            REPO_ROOT / "applications_user/arf_subghz_full/subghz_last_settings.c",
+            REPO_ROOT / "applications/main/subghz/scenes/subghz_scene_receiver_config.c",
+            REPO_ROOT / "applications_user/arf_subghz_full/scenes/subghz_scene_receiver_config.c",
+        ]
+
+        for path in files:
+            with self.subTest(path=path):
+                source = path.read_text(encoding="utf-8")
+                self.assertIn("SubGhzProtocolPackGroupCore", source)
+                self.assertNotIn("protocol_pack_group = SubGhzProtocolPackGroupLegacy", source)
+                self.assertNotIn(
+                    "subghz_txrx_reload_protocol_pack(subghz->txrx, SubGhzProtocolPackGroupLegacy)",
+                    source,
+                )
+
+        docs = (REPO_ROOT / "docs/subghz-protocol-packs.md").read_text(encoding="utf-8")
+        self.assertIn("`Core` is the default", docs)
+        self.assertNotIn("`Legacy` is the default", docs)
+
+        registry = (REPO_ROOT / "lib/subghz/protocols/plugin_registry.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "if(group >= SubGhzProtocolPackGroupCount) group = SubGhzProtocolPackGroupCore;",
+            registry,
+        )
+        self.assertNotIn(
+            "if(group >= SubGhzProtocolPackGroupCount) group = SubGhzProtocolPackGroupLegacy;",
+            registry,
+        )
+
     def test_pack_status_screen_lists_files_and_error_causes(self) -> None:
         info_scene = (
             REPO_ROOT / "applications/main/subghz/scenes/subghz_scene_protocol_pack_info.c"

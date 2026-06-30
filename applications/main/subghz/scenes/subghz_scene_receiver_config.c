@@ -376,8 +376,8 @@ static void subghz_scene_receiver_config_var_list_enter_callback(void* context, 
 
         subghz_txrx_hopper_set_state(subghz->txrx, hopping_value[default_index]);
         subghz->last_settings->hopping_mode = SubGhzHoppingModeOff;
-        if(subghz_txrx_reload_protocol_pack(subghz->txrx, SubGhzProtocolPackGroupLegacy)) {
-            subghz->last_settings->protocol_pack_group = SubGhzProtocolPackGroupLegacy;
+        if(subghz_txrx_reload_protocol_pack(subghz->txrx, SubGhzProtocolPackGroupCore)) {
+            subghz->last_settings->protocol_pack_group = SubGhzProtocolPackGroupCore;
         }
 
         variable_item_list_set_selected_item(subghz->variable_item_list, default_index);
