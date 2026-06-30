@@ -78,8 +78,6 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
             r"subghz_devices_(?:init|deinit)\("
         )
         allowed_direct_without_broker = {
-            "applications/main/subghz/subghz_cli.c",
-            "applications_user/arf_subghz_full/subghz_cli.c",
             "applications_user/flipper_companion/helpers/subghz_txrx.c",
             "applications_user/flipper_xremote/xremote.c",
             "applications_user/garage_door_remote/helpers/radio_device_loader.c",
@@ -115,6 +113,30 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
                 unexpected.append(relative)
 
         self.assertEqual(unexpected, [])
+
+    def test_core_subghz_cli_radio_commands_use_broker(self) -> None:
+        cli = (REPO_ROOT / "applications/main/subghz/subghz_cli.c").read_text(
+            encoding="utf-8"
+        )
+        manifest = (REPO_ROOT / "applications/main/subghz/application.fam").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('appid="cli_subghz"', manifest)
+        self.assertIn('requires=["cli", "subghz_radio_broker"]', manifest)
+
+        for required in (
+            "subghz_cli_command_needs_radio",
+            "SUBGHZ_CLI_RADIO_ACQUIRE_TIMEOUT",
+            "subghz_radio_broker_acquire(",
+            '"subghz_cli"',
+            "subghz_radio_broker_release(radio_broker, &radio_lease)",
+            'printf("Sub-GHz radio is busy\\r\\n");',
+        ):
+            self.assertIn(required, cli)
+
+        for command in ("chat", "tx", "rx", "rx_raw", "tx_from_file"):
+            self.assertIn(f'furi_string_cmp_str(cmd, "{command}") == 0', cli)
 
 
 if __name__ == "__main__":

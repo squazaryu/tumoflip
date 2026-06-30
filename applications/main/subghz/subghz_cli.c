@@ -5,6 +5,7 @@
 
 #include <applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h>
 #include <cli/cli_main_commands.h>
+#include <subghz_radio_broker/subghz_radio_broker.h>
 #include <toolbox/cli/cli_ansi.h>
 
 #include <lib/subghz/subghz_keystore.h>
@@ -36,6 +37,22 @@
 // Chat          | both
 
 #define TAG "SubGhzCli"
+#define SUBGHZ_CLI_RADIO_ACQUIRE_TIMEOUT 1000U
+
+static bool subghz_cli_command_needs_radio(const FuriString* cmd) {
+    if((furi_string_cmp_str(cmd, "chat") == 0) || (furi_string_cmp_str(cmd, "tx") == 0) ||
+       (furi_string_cmp_str(cmd, "rx") == 0) || (furi_string_cmp_str(cmd, "rx_raw") == 0) ||
+       (furi_string_cmp_str(cmd, "tx_from_file") == 0)) {
+        return true;
+    }
+
+    if(!furi_hal_rtc_is_flag_set(FuriHalRtcFlagDebug)) {
+        return false;
+    }
+
+    return (furi_string_cmp_str(cmd, "tx_carrier") == 0) ||
+           (furi_string_cmp_str(cmd, "rx_carrier") == 0);
+}
 
 static void subghz_cli_radio_device_power_on(void) {
     uint8_t attempts = 5;
@@ -1129,11 +1146,27 @@ static void subghz_cli_command_chat(PipeSide* pipe, FuriString* args) {
 static void execute(PipeSide* pipe, FuriString* args, void* context) {
     FuriString* cmd;
     cmd = furi_string_alloc();
+    SubGhzRadioBroker* radio_broker = NULL;
+    SubGhzRadioBrokerLease radio_lease = {0};
 
     do {
         if(!args_read_string_and_trim(args, cmd)) {
             subghz_cli_command_print_usage();
             break;
+        }
+
+        if(subghz_cli_command_needs_radio(cmd)) {
+            radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+            if(!subghz_radio_broker_acquire(
+                   radio_broker,
+                   "subghz_cli",
+                   SUBGHZ_CLI_RADIO_ACQUIRE_TIMEOUT,
+                   &radio_lease)) {
+                furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
+                radio_broker = NULL;
+                printf("Sub-GHz radio is busy\r\n");
+                break;
+            }
         }
 
         if(furi_string_cmp_str(cmd, "chat") == 0) {
@@ -1191,6 +1224,10 @@ static void execute(PipeSide* pipe, FuriString* args, void* context) {
         subghz_cli_command_print_usage();
     } while(false);
 
+    if(radio_broker) {
+        subghz_radio_broker_release(radio_broker, &radio_lease);
+        furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
+    }
     furi_string_free(cmd);
 }
 
