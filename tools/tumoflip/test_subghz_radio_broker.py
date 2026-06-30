@@ -67,7 +67,7 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
         ):
             self.assertIn(transition, broker)
 
-        self.assertIn("radio_status_v2", runtime)
+        self.assertIn("SubGhzRadioBrokerStatusV2 status;", runtime)
         for payload_key in (
             "state=%s",
             "acquired_tick=%lu",

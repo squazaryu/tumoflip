@@ -1,5 +1,7 @@
 #include <bt/bt_service/bt_i.h>
 #include <furi.h>
+#include <furi_hal_info.h>
+#include <furi_hal_version.h>
 #include <subghz_radio_broker/subghz_radio_broker.h>
 #include <string.h>
 
@@ -8,10 +10,10 @@
 #define TUMOFLIP_RUNTIME_APP_ID         "runtime"
 #define TUMOFLIP_RUNTIME_QUEUE_DEPTH    8U
 #define TUMOFLIP_RUNTIME_REASSEMBLY_MAX 512U
+#define TUMOFLIP_RUNTIME_STATUS_MAX     160U
 #define TUMOFLIP_RUNTIME_CAPABILITIES                                            \
     "runtime=1;fab=2;packages=2;legacy=1;payload=160;chunks=255;reassembly=512;" \
-    "features=request_id,chunking,error,capabilities,radio_status,radio_status_v2," \
-    "transfer_activity"
+    "features=request_id,chunking,error,capabilities,radio_status,status,transfer_activity"
 
 typedef struct {
     BtAppBridgeEvent event;
@@ -33,6 +35,7 @@ typedef struct {
     FuriMessageQueue* queue;
     FuriPubSubSubscription* subscription;
     TumoflipRuntimeAssembly assembly;
+    bool transfer_active;
 } TumoflipRuntime;
 
 static void tumoflip_runtime_bridge_callback(const void* message, void* context) {
@@ -64,6 +67,7 @@ static void tumoflip_runtime_reply(
 }
 
 static void tumoflip_runtime_transfer_activity(TumoflipRuntime* runtime, bool active) {
+    runtime->transfer_active = active;
     BtMessage message = {
         .lock = api_lock_alloc_locked(),
         .type = BtMessageTypeTransferActivity,
@@ -123,6 +127,37 @@ static const char* tumoflip_runtime_radio_state_name(SubGhzRadioBrokerState stat
     }
 }
 
+static const char* tumoflip_runtime_str_or_unknown(const char* value) {
+    return value ? value : "unknown";
+}
+
+static void
+    tumoflip_runtime_make_status_payload(TumoflipRuntime* runtime, char* payload, size_t size) {
+    const Version* version = furi_hal_version_get_firmware_version();
+    uint16_t api_major = 0;
+    uint16_t api_minor = 0;
+    furi_hal_info_get_api_version(&api_major, &api_minor);
+
+    SubGhzRadioBrokerStatusV2 radio_status;
+    subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status);
+
+    snprintf(
+        payload,
+        size,
+        "schema=2;fw=%s;commit=%.8s;dirty=%u;origin=%s;api=%u.%u;target=%u;"
+        "transfer=%u;radio=%s;owner=%s",
+        tumoflip_runtime_str_or_unknown(version_get_version(version)),
+        tumoflip_runtime_str_or_unknown(version_get_githash(version)),
+        (unsigned int)version_get_dirty_flag(version),
+        tumoflip_runtime_str_or_unknown(version_get_firmware_origin(version)),
+        (unsigned int)api_major,
+        (unsigned int)api_minor,
+        (unsigned int)version_get_target(version),
+        (unsigned int)runtime->transfer_active,
+        tumoflip_runtime_radio_state_name(radio_status.state),
+        radio_status.base.owner);
+}
+
 static bool
     tumoflip_runtime_assembly_append(TumoflipRuntime* runtime, const BtAppBridgeEvent* event) {
     TumoflipRuntimeAssembly* assembly = &runtime->assembly;
@@ -165,6 +200,10 @@ static void
     } else if(strcmp(runtime->assembly.command, "capabilities") == 0) {
         tumoflip_runtime_reply(
             runtime, event->request_id, "capabilities", TUMOFLIP_RUNTIME_CAPABILITIES, false);
+    } else if(strcmp(runtime->assembly.command, "status") == 0) {
+        char payload[TUMOFLIP_RUNTIME_STATUS_MAX];
+        tumoflip_runtime_make_status_payload(runtime, payload, sizeof(payload));
+        tumoflip_runtime_reply(runtime, event->request_id, "status", payload, false);
     } else if(strcmp(runtime->assembly.command, "radio_status") == 0) {
         SubGhzRadioBrokerStatusV2 status;
         subghz_radio_broker_get_status_v2(runtime->radio_broker, &status);

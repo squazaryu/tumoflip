@@ -37,6 +37,9 @@ The system app ID is `runtime`.
 - `ping` returns `runtime/pong` with payload `ok`.
 - `capabilities` returns `runtime/capabilities` with a semicolon-separated
   `key=value` payload.
+- `status` returns `runtime/status` with compact schema v2 fields:
+  `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
+  `radio`, and `owner`. It is designed to fit in one FAB2 response frame.
 - `radio_status` reports whether the Sub-GHz Broker is busy, its owner,
   selected device, external-power state, lifecycle state, lease age in ticks,
   transition tick, and last error. Lifecycle states include `idle`, `acquired`,
