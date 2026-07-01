@@ -78,25 +78,20 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
         repo_root / build_dir / ".extapps" / "garage_door_remote.fap",
         arf_tools_dir / "garage_door_remote.fap",
     )
-    copy_file(
-        repo_root / build_dir / ".extapps" / "rolljam_standalone.fap",
-        arf_tools_dir / "rolljam_standalone.fap",
+    module_extapps = (
+        ("arf_keeloq", "arf_keeloq.fap"),
+        ("arf_counter_bf", "arf_counter_bf.fap"),
+        ("arf_car_emulate", "arf_car_emulate.fap"),
+        ("arf_psa_decrypt", "arf_psa_decrypt.fap"),
+        ("arf_status", "arf_status.fap"),
+        ("proto_pirate", "proto_pirate.fap"),
+        ("rolljam_standalone", "rolljam.fap"),
+        ("subghz_bruteforcer", "subghz_bruteforcer.fap"),
     )
-
-    module_appids = (
-        "arf_keeloq",
-        "arf_counter_bf",
-        "arf_car_emulate",
-        "arf_psa_decrypt",
-        "arf_status",
-        "proto_pirate",
-        "rolljam",
-        "subghz_bruteforcer",
-    )
-    for appid in module_appids:
+    for source_appid, target_filename in module_extapps:
         copy_file(
-            repo_root / build_dir / ".extapps" / f"{appid}.fap",
-            modules_dir / f"{appid}.fap",
+            repo_root / build_dir / ".extapps" / f"{source_appid}.fap",
+            modules_dir / target_filename,
         )
 
     expected_visible = {
@@ -105,7 +100,6 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
         "ble_killer.fap",
         "garage_door_remote.fap",
         "keeloq_keystore_decryptor.fap",
-        "rolljam_standalone.fap",
         "subghz_raw_edit.fap",
     }
     for old_app in arf_tools_dir.glob("*.fap"):
@@ -114,7 +108,7 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
     stale_analyzer = modules_dir / "arf_frequency_analyzer.fap"
     if stale_analyzer.exists():
         stale_analyzer.unlink()
-    expected_modules = {f"{appid}.fap" for appid in module_appids}
+    expected_modules = {target_filename for _, target_filename in module_extapps}
     for old_module in modules_dir.glob("*.fap"):
         if old_module.name not in expected_modules:
             old_module.unlink()

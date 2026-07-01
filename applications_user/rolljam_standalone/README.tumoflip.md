@@ -1,10 +1,11 @@
-# RollJam Standalone
+# RollJam 2.0 ARF module
 
-Tumoflip packages this ARF RollJam 2.0 app as an isolated opt-in external app
-under `/ext/apps/ARF Tools/rolljam_standalone.fap`.
+Tumoflip packages this ARF RollJam 2.0 app as the canonical RollJam child module
+under `/ext/apps_data/arf_subghz_full/modules/rolljam.fap`.
 
-It does not replace the existing lightweight `rolljam` child module used by
-ARF Sub-GHz Full. The standalone app is kept separate so hardware testing can
-decide whether it is stable enough to become the default RollJam path later.
+The app keeps `appid=rolljam_standalone` so its embedded protocol plugins retain
+their existing dependency graph, but it is no longer shipped as a second visible
+`ARF Tools` app. The legacy `applications_user/rolljam` source remains in-tree
+for reference and is excluded from reproducible updater packages.
 
 Use only with devices you own or are explicitly authorized to test.

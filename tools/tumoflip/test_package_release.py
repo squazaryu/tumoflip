@@ -138,6 +138,39 @@ class PackageReleaseTest(unittest.TestCase):
                     b"wifi mapper fix",
                 )
 
+    def test_package_only_release_routes_rolljam_standalone_to_arf_module(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo, build, resources = prepare_package_tree(Path(directory))
+            legacy_visible = resources / "apps/ARF Tools/rolljam_standalone.fap"
+            extapp_rolljam = build / ".extapps/rolljam_standalone.fap"
+            write_file(legacy_visible, b"old visible rolljam")
+            write_file(extapp_rolljam, b"rolljam 2 module")
+
+            manifest = build_package_release(
+                repo,
+                build,
+                repo / "dist/f7-C/f7-update-tmwhflpprarf089-031",
+                package_id="rolljam-2-module",
+                target_release_tag="v0.3.1",
+            )
+
+            canonical = resources / "apps_data/arf_subghz_full/modules/rolljam.fap"
+            self.assertFalse(legacy_visible.exists())
+            self.assertEqual(canonical.read_bytes(), b"rolljam 2 module")
+
+            arf_entries = {entry["target"]: entry for entry in manifest["packages"]["arf"]}
+            self.assertIn(
+                "/ext/apps_data/arf_subghz_full/modules/rolljam.fap", arf_entries
+            )
+            self.assertNotIn("/ext/apps/ARF Tools/rolljam_standalone.fap", arf_entries)
+            self.assertIn(
+                {
+                    "legacy": "/ext/apps/ARF Tools/rolljam_standalone.fap",
+                    "canonical": "/ext/apps_data/arf_subghz_full/modules/rolljam.fap",
+                },
+                manifest["cleanup"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

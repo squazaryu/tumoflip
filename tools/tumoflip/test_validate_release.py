@@ -54,7 +54,6 @@ class ValidateReleaseTest(unittest.TestCase):
                 "ble_killer",
                 "garage_door_remote",
                 "keeloq_keystore_decryptor",
-                "rolljam_standalone",
                 "subghz_raw_edit",
             },
         )

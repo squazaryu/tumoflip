@@ -123,8 +123,8 @@ are legally allowed to test.
   its scan/console flows do not crash the app.
 - Launch `Garage Door Remote`, enter/exit its receive views, and confirm core
   `Sub-GHz` can still receive afterward.
-- Launch `RollJam Standalone`, back out without capture/transmit, and confirm
-  core `Sub-GHz` can still receive afterward.
+- Launch `RollJam` from `ARF Sub-GHz Full`, back out without capture/transmit,
+  and confirm core `Sub-GHz` can still receive afterward.
 - Launch and exit every packaged ARF child FAP:
   `arf_keeloq`, `arf_counter_bf`, `arf_car_emulate`, `arf_psa_decrypt`,
   `proto_pirate`, `rolljam`, `subghz_bruteforcer`, and `arf_status`.

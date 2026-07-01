@@ -57,7 +57,6 @@ ARF_VISIBLE_APP_IDS = {
     "ble_killer",
     "garage_door_remote",
     "keeloq_keystore_decryptor",
-    "rolljam_standalone",
     "subghz_raw_edit",
 }
 ARF_MODULE_APP_IDS = {
@@ -77,6 +76,15 @@ ARF_MODULE_PATHS = {
 }
 ARF_VISIBLE_PATHS = {
     appid: f"/ext/apps/ARF Tools/{appid}.fap" for appid in ARF_VISIBLE_APP_IDS
+}
+ARF_EXTAPP_TARGETS = {
+    **{f"{appid}.fap": path for appid, path in ARF_VISIBLE_PATHS.items()},
+    **{
+        f"{appid}.fap": path
+        for appid, path in ARF_MODULE_PATHS.items()
+        if appid != "rolljam"
+    },
+    "rolljam_standalone.fap": ARF_MODULE_PATHS["rolljam"],
 }
 STATIC_SD_RESOURCES = Path("tools/tumoflip/sd_resources")
 MODULE_ONE_PACKAGE_FILES = (
@@ -109,6 +117,7 @@ ARF_LEGACY_PATHS = {
     "/ext/apps/ARF Tools/ARF PSA Decrypt.fap": ARF_MODULE_PATHS["arf_psa_decrypt"],
     "/ext/apps/ARF Tools/ARF Sub-GHz.fap": "/ext/apps/ARF Tools/arf_subghz_full.fap",
     "/ext/apps/ARF Tools/arf_subghz.fap": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+    "/ext/apps/ARF Tools/rolljam_standalone.fap": ARF_MODULE_PATHS["rolljam"],
 }
 
 
@@ -124,9 +133,12 @@ def resource_path_from_ext_target(path: str) -> str:
 
 def package_extapp_exports() -> dict[str, str]:
     exports = {Path(relative).name: relative for relative in MODULE_ONE_PACKAGE_FILES}
-    for target in {**ARF_VISIBLE_PATHS, **ARF_MODULE_PATHS}.values():
-        relative = resource_path_from_ext_target(target)
-        exports[Path(relative).name] = relative
+    exports.update(
+        {
+            source_filename: resource_path_from_ext_target(target)
+            for source_filename, target in ARF_EXTAPP_TARGETS.items()
+        }
+    )
     return exports
 
 
@@ -263,7 +275,21 @@ def sync_extapp_package_exports(build_dir: Path, resources: Path) -> list[dict[s
                 "sha256": sha256(target),
             }
         )
+    prune_legacy_resource_exports(resources)
     return synced
+
+
+def prune_legacy_resource_exports(resources: Path) -> None:
+    for legacy, canonical in ARF_LEGACY_PATHS.items():
+        if legacy == canonical:
+            continue
+        legacy_relative = resource_path_from_ext_target(legacy)
+        canonical_relative = resource_path_from_ext_target(canonical)
+        if legacy_relative == canonical_relative:
+            continue
+        legacy_path = resources / legacy_relative
+        if legacy_path.is_file():
+            legacy_path.unlink()
 
 
 def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:

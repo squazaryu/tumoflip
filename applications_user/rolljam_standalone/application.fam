@@ -10,6 +10,7 @@ App(
     fap_description="RollJam Shield Receiver",
     fap_version="2.0",
     fap_category="ARF Tools",
+    fap_dist_path="apps_data/arf_subghz_full/modules/rolljam.fap",
     fap_author="D4C1 Labs; tumoflip integration",
     cdefines=["ENABLE_SHIELD_RX_SCENE=1", "ENABLE_EMULATE_FEATURE=1"],
     fap_icon="icon.png",

@@ -88,7 +88,7 @@ FIRMWARE_APP_SET = "default"
 
 # Local experiments may have an application.fam under applications_user. Keep
 # unfinished apps out of reproducible updater packages until explicitly added.
-EXCLUDED_EXT_APPS = ("claude_buddy",)
+EXCLUDED_EXT_APPS = ("claude_buddy", "rolljam")
 
 custom_options_fn = "fbt_options_local.py"
 

@@ -8,7 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class RollJamStandaloneIntegrationTest(unittest.TestCase):
-    def test_rolljam_standalone_is_visible_arf_tool(self) -> None:
+    def test_rolljam_standalone_is_canonical_arf_module(self) -> None:
         manifest = (
             REPO_ROOT / "applications_user/rolljam_standalone/application.fam"
         ).read_text(encoding="utf-8")
@@ -16,8 +16,10 @@ class RollJamStandaloneIntegrationTest(unittest.TestCase):
         self.assertIn('appid="rolljam_standalone"', manifest)
         self.assertIn('name="RollJam"', manifest)
         self.assertIn('fap_category="ARF Tools"', manifest)
+        self.assertIn(
+            'fap_dist_path="apps_data/arf_subghz_full/modules/rolljam.fap"', manifest
+        )
         self.assertIn("D4C1 Labs; tumoflip integration", manifest)
-        self.assertNotIn("fap_dist_path", manifest)
 
     def test_rolljam_standalone_is_source_only_import(self) -> None:
         app_dir = REPO_ROOT / "applications_user/rolljam_standalone"
@@ -70,7 +72,7 @@ class RollJamStandaloneIntegrationTest(unittest.TestCase):
             fm_extra_plugin,
         )
 
-    def test_release_and_deploy_include_rolljam_standalone(self) -> None:
+    def test_release_and_deploy_route_rolljam_2_to_arf_module(self) -> None:
         validate = (REPO_ROOT / "tools/tumoflip/validate_release.py").read_text(
             encoding="utf-8"
         )
@@ -79,9 +81,10 @@ class RollJamStandaloneIntegrationTest(unittest.TestCase):
         )
         docs = (REPO_ROOT / "docs/arf-subghz-full.md").read_text(encoding="utf-8")
 
-        self.assertIn('"rolljam_standalone"', validate)
-        self.assertIn("rolljam_standalone.fap", deploy)
-        self.assertIn("RollJam Standalone", docs)
+        self.assertIn('"rolljam_standalone.fap": ARF_MODULE_PATHS["rolljam"]', validate)
+        self.assertIn('"rolljam_standalone", "rolljam.fap"', deploy)
+        self.assertIn("RollJam 2.0", docs)
+        self.assertNotIn("RollJam Standalone is visible", docs)
 
 
 if __name__ == "__main__":

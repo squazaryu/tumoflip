@@ -52,11 +52,18 @@ class ArfSubGhzFullTest(unittest.TestCase):
             app_manifests.count(
                 'fap_dist_path="apps_data/arf_subghz_full/modules/{filename}"'
             ),
-            len(child_faps),
+            len(child_faps) - 1,
         )
         for filename in child_faps:
             appid = filename.removesuffix(".fap")
-            self.assertIn(f'appid="{appid}"', app_manifests)
+            if appid == "rolljam":
+                self.assertIn('appid="rolljam_standalone"', app_manifests)
+                self.assertIn(
+                    'fap_dist_path="apps_data/arf_subghz_full/modules/rolljam.fap"',
+                    app_manifests,
+                )
+            else:
+                self.assertIn(f'appid="{appid}"', app_manifests)
 
     def test_legacy_duplicate_is_removed(self) -> None:
         self.assertFalse((REPO_ROOT / "applications_user/arf_subghz").exists())
