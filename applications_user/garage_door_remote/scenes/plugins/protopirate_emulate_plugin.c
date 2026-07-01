@@ -942,8 +942,8 @@ static const ProtoPirateEmulatePlugin protopirate_emulate_plugin = {
 };
 
 static const FlipperAppPluginDescriptor protopirate_emulate_plugin_descriptor = {
-    .appid = PROTOPIRATE_EMULATE_PLUGIN_APP_ID,
-    .ep_api_version = PROTOPIRATE_EMULATE_PLUGIN_API_VERSION,
+    .appid = GDR_EMULATE_PLUGIN_APP_ID,
+    .ep_api_version = GDR_EMULATE_PLUGIN_API_VERSION,
     .entry_point = &protopirate_emulate_plugin,
 };
 

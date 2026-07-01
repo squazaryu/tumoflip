@@ -55,8 +55,8 @@ static const ProtoPiratePsaBfPlugin protopirate_psa_bf_plugin = {
 };
 
 static const FlipperAppPluginDescriptor protopirate_psa_bf_plugin_descriptor = {
-    .appid = PROTOPIRATE_PSA_BF_PLUGIN_APP_ID,
-    .ep_api_version = PROTOPIRATE_PSA_BF_PLUGIN_API_VERSION,
+    .appid = GDR_PSA_BF_PLUGIN_APP_ID,
+    .ep_api_version = GDR_PSA_BF_PLUGIN_API_VERSION,
     .entry_point = &protopirate_psa_bf_plugin,
 };
 

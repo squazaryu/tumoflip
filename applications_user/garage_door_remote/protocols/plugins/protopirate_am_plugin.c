@@ -44,8 +44,8 @@ static const ProtoPirateProtocolPlugin protopirate_am_plugin = {
 };
 
 static const FlipperAppPluginDescriptor protopirate_am_plugin_descriptor = {
-    .appid = PROTOPIRATE_PROTOCOL_PLUGIN_APP_ID,
-    .ep_api_version = PROTOPIRATE_PROTOCOL_PLUGIN_API_VERSION,
+    .appid = GDR_PROTOCOL_PLUGIN_APP_ID,
+    .ep_api_version = GDR_PROTOCOL_PLUGIN_API_VERSION,
     .entry_point = &protopirate_am_plugin,
 };
 

@@ -578,8 +578,8 @@ bool protopirate_rx_chain_init_receiver(ProtoPirateRxChain* chain) {
         composite_api_resolver_add(resolver, firmware_api_interface);
 
         PluginManager* manager = plugin_manager_alloc(
-            PROTOPIRATE_PROTOCOL_PLUGIN_APP_ID,
-            PROTOPIRATE_PROTOCOL_PLUGIN_API_VERSION,
+            GDR_PROTOCOL_PLUGIN_APP_ID,
+            GDR_PROTOCOL_PLUGIN_API_VERSION,
             composite_api_resolver_get(resolver));
         if(!manager) {
             FURI_LOG_E(TAG, "[%c] Failed to allocate plugin manager", chain->label);

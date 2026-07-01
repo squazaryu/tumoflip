@@ -55,6 +55,44 @@ class GarageDoorRemoteIntegrationTest(unittest.TestCase):
         self.assertIn("garage_door_remote_fm_plugin.fal", rx_chain)
         self.assertIn("garage_door_remote_emulate_plugin.fal", emulate_scene)
 
+    def test_embedded_plugin_interfaces_are_garage_door_scoped(self) -> None:
+        app_dir = REPO_ROOT / "applications_user/garage_door_remote"
+
+        protocol_header = (
+            app_dir / "protocols/protopirate_protocol_plugins.h"
+        ).read_text(encoding="utf-8")
+        emulate_header = (
+            app_dir / "scenes/plugins/protopirate_emulate_plugin.h"
+        ).read_text(encoding="utf-8")
+        psa_header = (
+            app_dir / "scenes/plugins/protopirate_psa_bf_plugin.h"
+        ).read_text(encoding="utf-8")
+        app_i = (app_dir / "protopirate_app_i.c").read_text(encoding="utf-8")
+        rx_chain = (app_dir / "helpers/protopirate_rx_chain.c").read_text(
+            encoding="utf-8"
+        )
+        emulate_scene = (
+            app_dir / "scenes/protopirate_scene_emulate.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            'GDR_PROTOCOL_PLUGIN_APP_ID      "gdr_protocol_plugins"',
+            protocol_header,
+        )
+        self.assertIn(
+            'GDR_EMULATE_PLUGIN_APP_ID      "gdr_emulate_plugin"',
+            emulate_header,
+        )
+        self.assertIn(
+            'GDR_PSA_BF_PLUGIN_APP_ID      "gdr_psa_bf_plugin"', psa_header
+        )
+        self.assertIn("GDR_PROTOCOL_PLUGIN_APP_ID", app_i)
+        self.assertIn("GDR_PROTOCOL_PLUGIN_APP_ID", rx_chain)
+        self.assertIn("GDR_EMULATE_PLUGIN_APP_ID", emulate_scene)
+        self.assertNotIn("PROTOPIRATE_PROTOCOL_PLUGIN_APP_ID", app_i)
+        self.assertNotIn("PROTOPIRATE_PROTOCOL_PLUGIN_APP_ID", rx_chain)
+        self.assertNotIn("PROTOPIRATE_EMULATE_PLUGIN_APP_ID", emulate_scene)
+
     def test_release_and_deploy_include_garage_door_remote(self) -> None:
         validate = (REPO_ROOT / "tools/tumoflip/validate_release.py").read_text(
             encoding="utf-8"

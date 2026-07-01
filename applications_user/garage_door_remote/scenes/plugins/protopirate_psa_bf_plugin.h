@@ -8,8 +8,8 @@
 
 #include "../../protocols/psa_bf_types.h"
 
-#define PROTOPIRATE_PSA_BF_PLUGIN_APP_ID      "protopirate_psa_bf_plugin"
-#define PROTOPIRATE_PSA_BF_PLUGIN_API_VERSION 1U
+#define GDR_PSA_BF_PLUGIN_APP_ID      "gdr_psa_bf_plugin"
+#define GDR_PSA_BF_PLUGIN_API_VERSION 1U
 
 typedef struct ProtoPirateApp ProtoPirateApp;
 typedef struct ProtoPirateHistory ProtoPirateHistory;

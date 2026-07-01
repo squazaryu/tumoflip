@@ -166,8 +166,8 @@ static bool protopirate_ensure_protocol_registry_plugin(
     composite_api_resolver_add(resolver, firmware_api_interface);
 
     PluginManager* manager = plugin_manager_alloc(
-        PROTOPIRATE_PROTOCOL_PLUGIN_APP_ID,
-        PROTOPIRATE_PROTOCOL_PLUGIN_API_VERSION,
+        GDR_PROTOCOL_PLUGIN_APP_ID,
+        GDR_PROTOCOL_PLUGIN_API_VERSION,
         composite_api_resolver_get(resolver));
     if(!manager) {
         FURI_LOG_E(TAG, "Failed to allocate protocol plugin manager");
