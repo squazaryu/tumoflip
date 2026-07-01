@@ -116,8 +116,12 @@ static void protopirate_scene_dual_receiver_teardown(ProtoPirateApp* app) {
     s_bind_b.chain = NULL;
 
     if(s_dual_devices_inited) {
+        subghz_radio_broker_set_state(
+            app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateCleaningUp);
         subghz_devices_deinit();
         s_dual_devices_inited = false;
+        subghz_radio_broker_set_state(
+            app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateAcquired);
     }
 }
 
@@ -141,6 +145,8 @@ static bool protopirate_scene_dual_receiver_build(ProtoPirateApp* app) {
         }
     }
 
+    subghz_radio_broker_set_state(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateProbing);
     subghz_devices_init();
     s_dual_devices_inited = true;
 
@@ -153,12 +159,19 @@ static bool protopirate_scene_dual_receiver_build(ProtoPirateApp* app) {
     }
 
     if(!protopirate_rx_chain_acquire_device(
-           app->dual_chain_a, SubGhzRadioDeviceTypeExternalCC1101)) {
+           app->dual_chain_a,
+           SubGhzRadioDeviceTypeExternalCC1101,
+           app->radio_broker,
+           &app->radio_lease)) {
         FURI_LOG_E(TAG, "External CC1101 unavailable - dual RX requires it");
         protopirate_scene_dual_receiver_teardown(app);
         return false;
     }
-    if(!protopirate_rx_chain_acquire_device(app->dual_chain_b, SubGhzRadioDeviceTypeInternal)) {
+    if(!protopirate_rx_chain_acquire_device(
+           app->dual_chain_b,
+           SubGhzRadioDeviceTypeInternal,
+           app->radio_broker,
+           &app->radio_lease)) {
         FURI_LOG_E(TAG, "Internal CC1101 unavailable");
         protopirate_scene_dual_receiver_teardown(app);
         return false;
@@ -205,6 +218,10 @@ static bool protopirate_scene_dual_receiver_build(ProtoPirateApp* app) {
     protopirate_rx_chain_set_decode_callback(
         app->dual_chain_b, protopirate_scene_dual_receiver_decode_cb, &s_bind_b);
 
+    subghz_radio_broker_set_selected_device(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerDeviceDual);
+    subghz_radio_broker_set_state(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateInitialized);
     return true;
 }
 
@@ -265,6 +282,8 @@ bool protopirate_scene_dual_receiver_on_event(void* context, SceneManagerEvent e
                 consumed = true;
                 break;
             }
+            subghz_radio_broker_set_state(
+                app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateAsyncRx);
             protopirate_scene_dual_receiver_update_status(app);
             consumed = true;
             break;

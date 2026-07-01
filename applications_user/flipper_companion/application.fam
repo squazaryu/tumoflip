@@ -3,6 +3,7 @@ App(
     name="Flipper Companion",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="flipper_companion_app",
+    requires=["subghz_radio_broker"],
     stack_size=4 * 1024,
     fap_category="Bluetooth",
     fap_version="0.1",

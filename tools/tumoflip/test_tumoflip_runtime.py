@@ -19,7 +19,8 @@ class TumoflipRuntimeTest(unittest.TestCase):
         )
 
         self.assertIn("#define TUMOFLIP_RUNTIME_STATUS_MAX     160U", runtime)
-        self.assertIn("radio_status,status,transfer_activity", runtime)
+        self.assertIn("status,transfer_activity", runtime)
+        self.assertNotIn('"radio_status"', runtime)
         self.assertIn('strcmp(runtime->assembly.command, "status") == 0', runtime)
         self.assertIn(
             'tumoflip_runtime_reply(runtime, event->request_id, "status", payload, false)',
@@ -75,7 +76,6 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "packages=2",
             "payload=160",
             "reassembly=512",
-            "radio_status",
             "status",
             "transfer_activity",
         ):

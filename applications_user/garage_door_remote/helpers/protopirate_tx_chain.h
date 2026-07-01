@@ -12,6 +12,8 @@
 
 typedef struct {
     const SubGhzDevice* device;
+    SubGhzRadioBroker* broker;
+    const SubGhzRadioBrokerLease* lease;
     const GpioPin* data_gpio;
     uint8_t* preset_data;
     size_t preset_data_size;
@@ -23,7 +25,10 @@ typedef struct {
 ProtoPirateTxChain* protopirate_tx_chain_alloc(void);
 void protopirate_tx_chain_free(ProtoPirateTxChain* chain);
 
-bool protopirate_tx_chain_acquire_device(ProtoPirateTxChain* chain);
+bool protopirate_tx_chain_acquire_device(
+    ProtoPirateTxChain* chain,
+    SubGhzRadioBroker* broker,
+    const SubGhzRadioBrokerLease* lease);
 
 bool protopirate_tx_chain_configure(
     ProtoPirateTxChain* chain,

@@ -21,6 +21,8 @@ typedef struct {
     char label; // 'A' or 'B' (display tag)
     const SubGhzDevice* device;
     bool is_external;
+    SubGhzRadioBroker* broker;
+    const SubGhzRadioBrokerLease* lease;
 
     SubGhzWorker* worker;
     SubGhzReceiver* receiver;
@@ -56,7 +58,9 @@ void rolljam_rx_chain_free(RollJamRxChain* chain);
 
 bool rolljam_rx_chain_acquire_device(
     RollJamRxChain* chain,
-    SubGhzRadioDeviceType type);
+    SubGhzRadioDeviceType type,
+    SubGhzRadioBroker* broker,
+    const SubGhzRadioBrokerLease* lease);
 
 bool rolljam_rx_chain_set_preset(
     RollJamRxChain* chain,

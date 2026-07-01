@@ -4,7 +4,7 @@ App(
     apptype=FlipperAppType.EXTERNAL,
     targets=["f7"],
     entry_point="rolljam_app",
-    requires=["gui"],
+    requires=["gui", "subghz_radio_broker"],
     stack_size=10 * 1024,
     order=10,
     fap_description="RollJam Shield Receiver",

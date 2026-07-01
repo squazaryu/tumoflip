@@ -13,7 +13,7 @@
 #define TUMOFLIP_RUNTIME_STATUS_MAX     160U
 #define TUMOFLIP_RUNTIME_CAPABILITIES                                            \
     "runtime=1;fab=2;packages=2;legacy=1;payload=160;chunks=255;reassembly=512;" \
-    "features=request_id,chunking,error,capabilities,radio_status,status,transfer_activity"
+    "features=request_id,chunking,error,capabilities,status,transfer_activity"
 
 typedef struct {
     BtAppBridgeEvent event;
@@ -81,19 +81,6 @@ static void tumoflip_runtime_transfer_activity(TumoflipRuntime* runtime, bool ac
 
 static void tumoflip_runtime_assembly_reset(TumoflipRuntimeAssembly* assembly) {
     memset(assembly, 0, sizeof(TumoflipRuntimeAssembly));
-}
-
-static const char* tumoflip_runtime_radio_device_name(SubGhzRadioBrokerDevice device) {
-    switch(device) {
-    case SubGhzRadioBrokerDeviceInternal:
-        return "internal";
-    case SubGhzRadioBrokerDeviceExternalCC1101:
-        return "external";
-    case SubGhzRadioBrokerDeviceDual:
-        return "dual";
-    default:
-        return "unknown";
-    }
 }
 
 static const char* tumoflip_runtime_radio_state_name(SubGhzRadioBrokerState state) {
@@ -204,27 +191,6 @@ static void
         char payload[TUMOFLIP_RUNTIME_STATUS_MAX];
         tumoflip_runtime_make_status_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "status", payload, false);
-    } else if(strcmp(runtime->assembly.command, "radio_status") == 0) {
-        SubGhzRadioBrokerStatusV2 status;
-        subghz_radio_broker_get_status_v2(runtime->radio_broker, &status);
-        const uint32_t held_ticks =
-            status.acquired_tick ? (furi_get_tick() - status.acquired_tick) : 0;
-        char payload[256];
-        snprintf(
-            payload,
-            sizeof(payload),
-            "busy=%u;external_power=%u;device=%s;owner=%s;state=%s;"
-            "acquired_tick=%lu;held_ticks=%lu;last_transition_tick=%lu;last_error=%s",
-            status.base.busy,
-            status.base.external_powered,
-            tumoflip_runtime_radio_device_name(status.base.selected_device),
-            status.base.owner,
-            tumoflip_runtime_radio_state_name(status.state),
-            (unsigned long)status.acquired_tick,
-            (unsigned long)held_ticks,
-            (unsigned long)status.last_transition_tick,
-            status.last_error);
-        tumoflip_runtime_reply(runtime, event->request_id, "radio_status", payload, false);
     } else if(strcmp(runtime->assembly.command, "transfer_begin") == 0) {
         tumoflip_runtime_transfer_activity(runtime, true);
         tumoflip_runtime_reply(runtime, event->request_id, "transfer_begin", "ok", false);

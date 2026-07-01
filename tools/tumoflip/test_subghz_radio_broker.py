@@ -45,9 +45,7 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
 
         for field in (
             "SubGhzRadioBrokerStatus base;",
-            "uint32_t acquired_tick;",
-            "uint32_t last_transition_tick;",
-            "char last_error[SUBGHZ_RADIO_BROKER_ERROR_MAX + 1];",
+            "SubGhzRadioBrokerState state;",
         ):
             self.assertIn(field, header)
 
@@ -60,20 +58,14 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
 
         for transition in (
             "subghz_radio_broker_set_state_locked",
-            '"acquire_timeout"',
-            '"invalid_lease"',
-            '"invalid_release"',
-            '"external_power_failed"',
+            "subghz_radio_broker_note_error_locked",
+            "SubGhzRadioBrokerStateError",
         ):
             self.assertIn(transition, broker)
 
-        self.assertIn("SubGhzRadioBrokerStatusV2 status;", runtime)
         for payload_key in (
-            "state=%s",
-            "acquired_tick=%lu",
-            "held_ticks=%lu",
-            "last_transition_tick=%lu",
-            "last_error=%s",
+            "radio=%s",
+            "owner=%s",
         ):
             self.assertIn(payload_key, runtime)
         for state_name in (
@@ -99,21 +91,13 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
             r"subghz_devices_(?:init|deinit)\("
         )
         allowed_direct_without_broker = {
-            "applications_user/flipper_companion/helpers/subghz_txrx.c",
             "applications_user/flipper_xremote/xremote.c",
-            "applications_user/garage_door_remote/helpers/radio_device_loader.c",
-            "applications_user/garage_door_remote/protopirate_app.c",
-            "applications_user/garage_door_remote/scenes/protopirate_scene_dual_receiver.c",
-            "applications_user/garage_door_remote/scenes/protopirate_scene_shield_receiver.c",
             "applications_user/quac/actions/action_ir.c",
-            "applications_user/quac/actions/helpers/subghz_txrx.c",
-            "applications_user/rolljam_standalone/helpers/radio_device_loader.c",
-            "applications_user/rolljam_standalone/rolljam_app.c",
-            "applications_user/rolljam_standalone/scenes/rolljam_scene_dual_receiver.c",
-            "applications_user/rolljam_standalone/scenes/rolljam_scene_shield_receiver.c",
         }
         roots = (
             REPO_ROOT / "applications/main/subghz",
+            REPO_ROOT / "applications/main/subghz_remote",
+            REPO_ROOT / "applications/system/js_app/modules/js_subghz",
             REPO_ROOT / "applications_user",
             REPO_ROOT / "applications/debug/subghz_test",
         )
@@ -147,7 +131,7 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
         self.assertIn('requires=["cli", "subghz_radio_broker"]', manifest)
 
         for required in (
-            "subghz_cli_command_needs_radio",
+            "subghz_cli_radio_acquire",
             "SUBGHZ_CLI_RADIO_ACQUIRE_TIMEOUT",
             "subghz_radio_broker_acquire(",
             '"subghz_cli"',
@@ -176,6 +160,222 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
                 "SubGhzRadioBrokerStateCleaningUp",
             ):
                 self.assertIn(state, source)
+
+    def test_companion_and_quac_subghz_helpers_use_broker(self) -> None:
+        for relative, owner in (
+            ("applications_user/flipper_companion/helpers/subghz_txrx.c", "flipper_companion"),
+            ("applications_user/quac/actions/helpers/subghz_txrx.c", "quac_subghz"),
+        ):
+            source = (REPO_ROOT / relative).read_text(encoding="utf-8")
+            header = (REPO_ROOT / relative.replace(".c", "_i.h")).read_text(
+                encoding="utf-8"
+            )
+
+            for required in (
+                "SubGhzRadioBroker* radio_broker;",
+                "SubGhzRadioBrokerLease radio_lease;",
+            ):
+                self.assertIn(required, header)
+
+            for required in (
+                "furi_record_open(RECORD_SUBGHZ_RADIO_BROKER)",
+                "subghz_radio_broker_acquire(",
+                f'"{owner}"',
+                "subghz_radio_broker_external_power_on(",
+                "subghz_radio_broker_external_power_off(",
+                "subghz_radio_broker_set_selected_device(",
+                "subghz_radio_broker_set_state(",
+                "subghz_radio_broker_release(",
+                "furi_record_close(RECORD_SUBGHZ_RADIO_BROKER)",
+            ):
+                self.assertIn(required, source)
+
+            for state in (
+                "SubGhzRadioBrokerStateProbing",
+                "SubGhzRadioBrokerStateInitialized",
+                "SubGhzRadioBrokerStateRx",
+                "SubGhzRadioBrokerStateTx",
+                "SubGhzRadioBrokerStateAsyncRx",
+                "SubGhzRadioBrokerStateAsyncTx",
+                "SubGhzRadioBrokerStateCleaningUp",
+            ):
+                self.assertIn(state, source)
+
+        for relative in (
+            "applications_user/flipper_companion/application.fam",
+            "applications_user/quac/application.fam",
+        ):
+            manifest = (REPO_ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn('"subghz_radio_broker"', manifest)
+
+    def test_subghz_remote_uses_broker(self) -> None:
+        source = (
+            REPO_ROOT
+            / "applications/main/subghz_remote/helpers/txrx/subghz_txrx.c"
+        ).read_text(encoding="utf-8")
+        header = (
+            REPO_ROOT
+            / "applications/main/subghz_remote/helpers/txrx/subghz_txrx_i.h"
+        ).read_text(encoding="utf-8")
+        manifest = (
+            REPO_ROOT / "applications/main/subghz_remote/application.fam"
+        ).read_text(encoding="utf-8")
+
+        for required in (
+            "SubGhzRadioBroker* radio_broker;",
+            "SubGhzRadioBrokerLease radio_lease;",
+        ):
+            self.assertIn(required, header)
+
+        for required in (
+            "furi_record_open(RECORD_SUBGHZ_RADIO_BROKER)",
+            "subghz_radio_broker_acquire(",
+            '"subghz_remote"',
+            "subghz_radio_broker_external_power_on(",
+            "subghz_radio_broker_external_power_off(",
+            "subghz_radio_broker_set_selected_device(",
+            "subghz_radio_broker_set_state(",
+            "subghz_radio_broker_release(",
+            "furi_record_close(RECORD_SUBGHZ_RADIO_BROKER)",
+        ):
+            self.assertIn(required, source)
+
+        for state in (
+            "SubGhzRadioBrokerStateProbing",
+            "SubGhzRadioBrokerStateInitialized",
+            "SubGhzRadioBrokerStateRx",
+            "SubGhzRadioBrokerStateTx",
+            "SubGhzRadioBrokerStateAsyncRx",
+            "SubGhzRadioBrokerStateAsyncTx",
+            "SubGhzRadioBrokerStateCleaningUp",
+        ):
+            self.assertIn(state, source)
+
+        self.assertIn('"subghz_radio_broker"', manifest)
+
+    def test_standalone_arf_apps_use_brokered_radio_loaders(self) -> None:
+        apps = (
+            (
+                "applications_user/garage_door_remote",
+                "protopirate_app",
+                "garage_door_remote",
+                "protopirate",
+            ),
+            (
+                "applications_user/rolljam_standalone",
+                "rolljam_app",
+                "rolljam_standalone",
+                "rolljam",
+            ),
+        )
+        for app_dir, app_prefix, owner, chain_prefix in apps:
+            manifest = (REPO_ROOT / app_dir / "application.fam").read_text(
+                encoding="utf-8"
+            )
+            app_i = (REPO_ROOT / app_dir / f"{app_prefix}_i.h").read_text(
+                encoding="utf-8"
+            )
+            app_c = (REPO_ROOT / app_dir / f"{app_prefix}.c").read_text(
+                encoding="utf-8"
+            )
+            loader_h = (REPO_ROOT / app_dir / "helpers/radio_device_loader.h").read_text(
+                encoding="utf-8"
+            )
+            loader_c = (REPO_ROOT / app_dir / "helpers/radio_device_loader.c").read_text(
+                encoding="utf-8"
+            )
+            rx_chain = (REPO_ROOT / app_dir / f"helpers/{chain_prefix}_rx_chain.c").read_text(
+                encoding="utf-8"
+            )
+            tx_chain = (REPO_ROOT / app_dir / f"helpers/{chain_prefix}_tx_chain.c").read_text(
+                encoding="utf-8"
+            )
+            dual_scene = (
+                REPO_ROOT / app_dir / f"scenes/{chain_prefix}_scene_dual_receiver.c"
+            ).read_text(encoding="utf-8")
+            shield_scene = (
+                REPO_ROOT / app_dir / f"scenes/{chain_prefix}_scene_shield_receiver.c"
+            ).read_text(encoding="utf-8")
+            broker_sources = app_c + loader_c + rx_chain + tx_chain + dual_scene + shield_scene
+
+            self.assertIn('"subghz_radio_broker"', manifest)
+            self.assertIn("SubGhzRadioBroker* radio_broker;", app_i)
+            self.assertIn("SubGhzRadioBrokerLease radio_lease;", app_i)
+            self.assertIn(f'"{owner}"', app_c)
+            self.assertIn("subghz_radio_broker_acquire(", app_c)
+            self.assertIn("subghz_radio_broker_release(", app_c)
+            self.assertIn("SubGhzRadioBrokerDeviceDual", broker_sources)
+            for state in (
+                "SubGhzRadioBrokerStateProbing",
+                "SubGhzRadioBrokerStateInitialized",
+                "SubGhzRadioBrokerStateAsyncRx",
+                "SubGhzRadioBrokerStateCleaningUp",
+                "SubGhzRadioBrokerStateAcquired",
+            ):
+                self.assertIn(state, broker_sources)
+
+            for signature in (
+                "SubGhzRadioBroker* broker",
+                "const SubGhzRadioBrokerLease* lease",
+            ):
+                self.assertIn(signature, loader_h)
+                self.assertIn(signature, loader_c)
+                self.assertIn(signature, rx_chain)
+                self.assertIn(signature, tx_chain)
+
+            self.assertIn("subghz_radio_broker_external_power_on(", loader_c)
+            self.assertIn("subghz_radio_broker_external_power_off(", loader_c)
+
+    def test_js_subghz_module_uses_brokered_radio_loader(self) -> None:
+        source = (
+            REPO_ROOT / "applications/system/js_app/modules/js_subghz/js_subghz.c"
+        ).read_text(encoding="utf-8")
+        manifest = (REPO_ROOT / "applications/system/js_app/application.fam").read_text(
+            encoding="utf-8"
+        )
+        loader_h = (
+            REPO_ROOT / "applications/system/js_app/modules/js_subghz/radio_device_loader.h"
+        ).read_text(encoding="utf-8")
+        loader_c = (
+            REPO_ROOT / "applications/system/js_app/modules/js_subghz/radio_device_loader.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('appid="js_subghz"', manifest)
+        self.assertIn('requires=["js_app", "subghz_radio_broker"]', manifest)
+        self.assertIn("SubGhzRadioBroker* radio_broker;", source)
+        self.assertIn("SubGhzRadioBrokerLease radio_lease;", source)
+        self.assertIn("memset(js_subghz, 0, sizeof(JsSubghzInst));", source)
+        self.assertIn("furi_record_open(RECORD_SUBGHZ_RADIO_BROKER)", source)
+        self.assertIn("subghz_radio_broker_acquire(", source)
+        self.assertIn('"js_subghz"', source)
+        self.assertIn("subghz_radio_broker_release(", source)
+        self.assertIn("furi_record_close(RECORD_SUBGHZ_RADIO_BROKER)", source)
+        self.assertIn("radio_device_loader_set(", source)
+        self.assertIn("radio_device_loader_end(", source)
+        self.assertIn("radio_device_loader_is_external(", source)
+        self.assertIn("subghz_radio_broker_set_selected_device(", source)
+        self.assertIn("subghz_radio_broker_set_state(", source)
+
+        for state in (
+            "SubGhzRadioBrokerStateAcquired",
+            "SubGhzRadioBrokerStateProbing",
+            "SubGhzRadioBrokerStateInitialized",
+            "SubGhzRadioBrokerStateRx",
+            "SubGhzRadioBrokerStateTx",
+            "SubGhzRadioBrokerStateAsyncTx",
+            "SubGhzRadioBrokerStateCleaningUp",
+        ):
+            self.assertIn(state, source)
+
+        for signature in (
+            "SubGhzRadioBroker* broker",
+            "const SubGhzRadioBrokerLease* lease",
+        ):
+            self.assertIn(signature, loader_h)
+            self.assertIn(signature, loader_c)
+
+        self.assertIn("subghz_radio_broker_external_power_on(", loader_c)
+        self.assertIn("subghz_radio_broker_external_power_off(", loader_c)
 
 
 if __name__ == "__main__":

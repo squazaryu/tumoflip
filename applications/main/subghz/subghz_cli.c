@@ -39,21 +39,6 @@
 #define TAG "SubGhzCli"
 #define SUBGHZ_CLI_RADIO_ACQUIRE_TIMEOUT 1000U
 
-static bool subghz_cli_command_needs_radio(const FuriString* cmd) {
-    if((furi_string_cmp_str(cmd, "chat") == 0) || (furi_string_cmp_str(cmd, "tx") == 0) ||
-       (furi_string_cmp_str(cmd, "rx") == 0) || (furi_string_cmp_str(cmd, "rx_raw") == 0) ||
-       (furi_string_cmp_str(cmd, "tx_from_file") == 0)) {
-        return true;
-    }
-
-    if(!furi_hal_rtc_is_flag_set(FuriHalRtcFlagDebug)) {
-        return false;
-    }
-
-    return (furi_string_cmp_str(cmd, "tx_carrier") == 0) ||
-           (furi_string_cmp_str(cmd, "rx_carrier") == 0);
-}
-
 static void subghz_cli_radio_device_power_on(void) {
     uint8_t attempts = 5;
     while(--attempts > 0) {
@@ -71,6 +56,21 @@ static void subghz_cli_radio_device_power_on(void) {
 
 static void subghz_cli_radio_device_power_off(void) {
     if(furi_hal_power_is_otg_enabled()) furi_hal_power_disable_otg();
+}
+
+static bool subghz_cli_radio_acquire(
+    SubGhzRadioBroker** radio_broker,
+    SubGhzRadioBrokerLease* radio_lease) {
+    *radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+    if(subghz_radio_broker_acquire(
+           *radio_broker, "subghz_cli", SUBGHZ_CLI_RADIO_ACQUIRE_TIMEOUT, radio_lease)) {
+        return true;
+    }
+
+    furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
+    *radio_broker = NULL;
+    printf("Sub-GHz radio is busy\r\n");
+    return false;
 }
 
 static SubGhzEnvironment* subghz_cli_environment_init(void) {
@@ -1155,37 +1155,31 @@ static void execute(PipeSide* pipe, FuriString* args, void* context) {
             break;
         }
 
-        if(subghz_cli_command_needs_radio(cmd)) {
-            radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
-            if(!subghz_radio_broker_acquire(
-                   radio_broker,
-                   "subghz_cli",
-                   SUBGHZ_CLI_RADIO_ACQUIRE_TIMEOUT,
-                   &radio_lease)) {
-                furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
-                radio_broker = NULL;
-                printf("Sub-GHz radio is busy\r\n");
-                break;
-            }
-        }
-
         if(furi_string_cmp_str(cmd, "chat") == 0) {
-            subghz_cli_command_chat(pipe, args);
+            if(subghz_cli_radio_acquire(&radio_broker, &radio_lease)) {
+                subghz_cli_command_chat(pipe, args);
+            }
             break;
         }
 
         if(furi_string_cmp_str(cmd, "tx") == 0) {
-            subghz_cli_command_tx(pipe, args, context);
+            if(subghz_cli_radio_acquire(&radio_broker, &radio_lease)) {
+                subghz_cli_command_tx(pipe, args, context);
+            }
             break;
         }
 
         if(furi_string_cmp_str(cmd, "rx") == 0) {
-            subghz_cli_command_rx(pipe, args, context);
+            if(subghz_cli_radio_acquire(&radio_broker, &radio_lease)) {
+                subghz_cli_command_rx(pipe, args, context);
+            }
             break;
         }
 
         if(furi_string_cmp_str(cmd, "rx_raw") == 0) {
-            subghz_cli_command_rx_raw(pipe, args, context);
+            if(subghz_cli_radio_acquire(&radio_broker, &radio_lease)) {
+                subghz_cli_command_rx_raw(pipe, args, context);
+            }
             break;
         }
 
@@ -1195,7 +1189,9 @@ static void execute(PipeSide* pipe, FuriString* args, void* context) {
         }
 
         if(furi_string_cmp_str(cmd, "tx_from_file") == 0) {
-            subghz_cli_command_tx_from_file(pipe, args, context);
+            if(subghz_cli_radio_acquire(&radio_broker, &radio_lease)) {
+                subghz_cli_command_tx_from_file(pipe, args, context);
+            }
             break;
         }
 
@@ -1211,12 +1207,16 @@ static void execute(PipeSide* pipe, FuriString* args, void* context) {
             }
 
             if(furi_string_cmp_str(cmd, "tx_carrier") == 0) {
-                subghz_cli_command_tx_carrier(pipe, args, context);
+                if(subghz_cli_radio_acquire(&radio_broker, &radio_lease)) {
+                    subghz_cli_command_tx_carrier(pipe, args, context);
+                }
                 break;
             }
 
             if(furi_string_cmp_str(cmd, "rx_carrier") == 0) {
-                subghz_cli_command_rx_carrier(pipe, args, context);
+                if(subghz_cli_radio_acquire(&radio_broker, &radio_lease)) {
+                    subghz_cli_command_rx_carrier(pipe, args, context);
+                }
                 break;
             }
         }

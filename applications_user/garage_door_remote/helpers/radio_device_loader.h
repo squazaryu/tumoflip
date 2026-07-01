@@ -2,6 +2,7 @@
 #pragma once
 
 #include <lib/subghz/devices/devices.h>
+#include <subghz_radio_broker/subghz_radio_broker.h>
 
 #define SUBGHZ_DEVICE_CC1101_INT_NAME "cc1101_int"
 #define SUBGHZ_DEVICE_CC1101_EXT_NAME "cc1101_ext"
@@ -14,8 +15,16 @@ typedef enum {
 
 const SubGhzDevice* radio_device_loader_set(
     const SubGhzDevice* current_radio_device,
-    SubGhzRadioDeviceType radio_device_type);
+    SubGhzRadioDeviceType radio_device_type,
+    SubGhzRadioBroker* broker,
+    const SubGhzRadioBrokerLease* lease);
 
-bool radio_device_loader_is_connect_external(const char* name);
+bool radio_device_loader_is_connect_external(
+    const char* name,
+    SubGhzRadioBroker* broker,
+    const SubGhzRadioBrokerLease* lease);
 bool radio_device_loader_is_external(const SubGhzDevice* radio_device);
-void radio_device_loader_end(const SubGhzDevice* radio_device);
+void radio_device_loader_end(
+    const SubGhzDevice* radio_device,
+    SubGhzRadioBroker* broker,
+    const SubGhzRadioBrokerLease* lease);

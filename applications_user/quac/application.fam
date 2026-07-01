@@ -5,6 +5,7 @@ App(
     name="Quac!",  # Displayed in menus
     apptype=FlipperAppType.EXTERNAL,
     entry_point="quac_app",
+    requires=["subghz_radio_broker"],
     stack_size=2 * 1024,
     fap_category="Tools",
     # Optional values

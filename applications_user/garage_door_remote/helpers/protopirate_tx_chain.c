@@ -107,7 +107,7 @@ void protopirate_tx_chain_free(ProtoPirateTxChain* chain) {
 
     if(chain->device) {
         subghz_devices_idle(chain->device);
-        radio_device_loader_end(chain->device);
+        radio_device_loader_end(chain->device, chain->broker, chain->lease);
         chain->device = NULL;
     }
 
@@ -125,10 +125,17 @@ void protopirate_tx_chain_free(ProtoPirateTxChain* chain) {
     free(chain);
 }
 
-bool protopirate_tx_chain_acquire_device(ProtoPirateTxChain* chain) {
+bool protopirate_tx_chain_acquire_device(
+    ProtoPirateTxChain* chain,
+    SubGhzRadioBroker* broker,
+    const SubGhzRadioBrokerLease* lease) {
     furi_check(chain);
+    furi_check(broker);
+    furi_check(lease);
 
-    chain->device = radio_device_loader_set(NULL, SubGhzRadioDeviceTypeInternal);
+    chain->broker = broker;
+    chain->lease = lease;
+    chain->device = radio_device_loader_set(NULL, SubGhzRadioDeviceTypeInternal, broker, lease);
     if(!chain->device) {
         FURI_LOG_E(TAG, "Failed to acquire internal radio");
         return false;
@@ -136,7 +143,7 @@ bool protopirate_tx_chain_acquire_device(ProtoPirateTxChain* chain) {
 
     if(radio_device_loader_is_external(chain->device)) {
         FURI_LOG_E(TAG, "Internal radio requested but external was acquired");
-        radio_device_loader_end(chain->device);
+        radio_device_loader_end(chain->device, chain->broker, chain->lease);
         chain->device = NULL;
         return false;
     }
@@ -146,7 +153,7 @@ bool protopirate_tx_chain_acquire_device(ProtoPirateTxChain* chain) {
     chain->data_gpio = subghz_devices_get_data_gpio(chain->device);
     if(!chain->data_gpio) {
         FURI_LOG_E(TAG, "Internal radio has no data GPIO");
-        radio_device_loader_end(chain->device);
+        radio_device_loader_end(chain->device, chain->broker, chain->lease);
         chain->device = NULL;
         return false;
     }

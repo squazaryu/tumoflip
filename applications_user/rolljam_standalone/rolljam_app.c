@@ -173,6 +173,12 @@ bool rolljam_ensure_receiver_view(RollJamApp* app) {
     return true;
 }
 
+static void rolljam_radio_state(RollJamApp* app, SubGhzRadioBrokerState state) {
+    if(app->radio_lease.token) {
+        subghz_radio_broker_set_state(app->radio_broker, &app->radio_lease, state);
+    }
+}
+
 #ifdef ENABLE_DUAL_RX_SCENE
 bool rolljam_ensure_dual_receiver_view(RollJamApp* app) {
     furi_check(app);
@@ -206,7 +212,7 @@ static void rolljam_radio_init_cleanup(RollJamApp* app, bool devices_initialized
         if(devices_initialized) {
             subghz_devices_idle(app->txrx->radio_device);
         }
-        radio_device_loader_end(app->txrx->radio_device);
+        radio_device_loader_end(app->txrx->radio_device, app->radio_broker, &app->radio_lease);
         app->txrx->radio_device = NULL;
     }
 
@@ -227,6 +233,7 @@ static void rolljam_radio_init_cleanup(RollJamApp* app, bool devices_initialized
     if(devices_initialized) {
         subghz_devices_deinit();
     }
+    rolljam_radio_state(app, SubGhzRadioBrokerStateAcquired);
 
     app->txrx->protocol_registry = NULL;
     app->txrx->protocol_plugin = NULL;
@@ -271,6 +278,9 @@ RollJamApp* rolljam_app_alloc() {
 
     // Open Dialogs record
     app->dialogs = furi_record_open(RECORD_DIALOGS);
+    app->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+    furi_check(subghz_radio_broker_acquire(
+        app->radio_broker, "rolljam_standalone", FuriWaitForever, &app->radio_lease));
 
     // SubMenu
     app->submenu = submenu_alloc();
@@ -480,16 +490,25 @@ bool rolljam_radio_init(RollJamApp* app) {
     FURI_LOG_I(TAG, "Loaded RollJam secure keys");
 
     // Initialize SubGhz devices
+    rolljam_radio_state(app, SubGhzRadioBrokerStateProbing);
     subghz_devices_init();
     FURI_LOG_D(TAG, "SubGhz devices initialized");
 
     // Try external CC1101 first
-    app->txrx->radio_device = radio_device_loader_set(NULL, SubGhzRadioDeviceTypeExternalCC1101);
+    app->txrx->radio_device = radio_device_loader_set(
+        NULL,
+        SubGhzRadioDeviceTypeExternalCC1101,
+        app->radio_broker,
+        &app->radio_lease);
 
     // if not loading, fallback to internal
     if(!app->txrx->radio_device) {
         FURI_LOG_W(TAG, "External CC1101 not found, trying internal radio");
-        app->txrx->radio_device = radio_device_loader_set(NULL, SubGhzRadioDeviceTypeInternal);
+        app->txrx->radio_device = radio_device_loader_set(
+            NULL,
+            SubGhzRadioDeviceTypeInternal,
+            app->radio_broker,
+            &app->radio_lease);
     }
 
     if(!app->txrx->radio_device) {
@@ -508,6 +527,13 @@ bool rolljam_radio_init(RollJamApp* app) {
 #endif
     subghz_devices_reset(app->txrx->radio_device);
     subghz_devices_idle(app->txrx->radio_device);
+    subghz_radio_broker_set_selected_device(
+        app->radio_broker,
+        &app->radio_lease,
+        radio_device_loader_is_external(app->txrx->radio_device) ?
+            SubGhzRadioBrokerDeviceExternalCC1101 :
+            SubGhzRadioBrokerDeviceInternal);
+    rolljam_radio_state(app, SubGhzRadioBrokerStateInitialized);
 
     app->radio_initialized = true;
 
@@ -538,6 +564,7 @@ void rolljam_radio_deinit(RollJamApp* app) {
     }
 
     bool devices_initialized = app->radio_initialized || (app->txrx->radio_device != NULL);
+    rolljam_radio_state(app, SubGhzRadioBrokerStateCleaningUp);
 
     // Make sure we're not receiving
     if(app->txrx->worker && app->txrx->txrx_state == RollJamTxRxStateRx) {
@@ -551,7 +578,7 @@ void rolljam_radio_deinit(RollJamApp* app) {
     if(app->txrx->radio_device) {
         FURI_LOG_D(TAG, "Putting radio device to sleep and ending: %p", app->txrx->radio_device);
         subghz_devices_sleep(app->txrx->radio_device);
-        radio_device_loader_end(app->txrx->radio_device);
+        radio_device_loader_end(app->txrx->radio_device, app->radio_broker, &app->radio_lease);
         app->txrx->radio_device = NULL;
     } else {
         FURI_LOG_D(TAG, "Radio device was NULL, skipping sleep/end");
@@ -612,6 +639,7 @@ void rolljam_radio_deinit(RollJamApp* app) {
 
     app->txrx->txrx_state = RollJamTxRxStateIDLE;
     app->radio_initialized = false;
+    rolljam_radio_state(app, SubGhzRadioBrokerStateAcquired);
 
     FURI_LOG_D(TAG, "Final state: radio_initialized=%d", app->radio_initialized);
 }
@@ -755,7 +783,9 @@ void rolljam_app_free(RollJamApp* app) {
         app->dual_chain_b = NULL;
     }
     if(dual_devices_initialized) {
+        rolljam_radio_state(app, SubGhzRadioBrokerStateCleaningUp);
         subghz_devices_deinit();
+        rolljam_radio_state(app, SubGhzRadioBrokerStateAcquired);
     }
     if(app->dual_receiver) {
         FURI_LOG_D(TAG, "Removing dual receiver view");
@@ -787,7 +817,9 @@ void rolljam_app_free(RollJamApp* app) {
         app->shield_tx_chain = NULL;
     }
     if(shield_devices_initialized) {
+        rolljam_radio_state(app, SubGhzRadioBrokerStateCleaningUp);
         subghz_devices_deinit();
+        rolljam_radio_state(app, SubGhzRadioBrokerStateAcquired);
     }
     if(app->shield_history) {
         if(app->selected_capture.history == app->shield_history) {
@@ -843,6 +875,14 @@ void rolljam_app_free(RollJamApp* app) {
     // Close records
     FURI_LOG_D(TAG, "Closing GUI record");
     furi_record_close(RECORD_GUI);
+
+    if(app->radio_lease.token) {
+        subghz_radio_broker_release(app->radio_broker, &app->radio_lease);
+    }
+    if(app->radio_broker) {
+        furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
+        app->radio_broker = NULL;
+    }
 
     FURI_LOG_I(TAG, "App free complete");
     free(app);

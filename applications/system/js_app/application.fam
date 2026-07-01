@@ -236,7 +236,7 @@ App(
     appid="js_subghz",
     apptype=FlipperAppType.PLUGIN,
     entry_point="js_subghz_ep",
-    requires=["js_app"],
+    requires=["js_app", "subghz_radio_broker"],
     sources=["modules/js_subghz/*.c"],
 )
 

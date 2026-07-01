@@ -12,6 +12,8 @@
 
 typedef struct {
     const SubGhzDevice* device;
+    SubGhzRadioBroker* broker;
+    const SubGhzRadioBrokerLease* lease;
     const GpioPin* data_gpio;
     uint8_t* preset_data;
     size_t preset_data_size;
@@ -23,7 +25,10 @@ typedef struct {
 RollJamTxChain* rolljam_tx_chain_alloc(void);
 void rolljam_tx_chain_free(RollJamTxChain* chain);
 
-bool rolljam_tx_chain_acquire_device(RollJamTxChain* chain);
+bool rolljam_tx_chain_acquire_device(
+    RollJamTxChain* chain,
+    SubGhzRadioBroker* broker,
+    const SubGhzRadioBrokerLease* lease);
 
 bool rolljam_tx_chain_configure(
     RollJamTxChain* chain,

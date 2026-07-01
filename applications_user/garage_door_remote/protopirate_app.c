@@ -170,6 +170,12 @@ bool protopirate_ensure_receiver_view(ProtoPirateApp* app) {
     return true;
 }
 
+static void protopirate_radio_state(ProtoPirateApp* app, SubGhzRadioBrokerState state) {
+    if(app->radio_lease.token) {
+        subghz_radio_broker_set_state(app->radio_broker, &app->radio_lease, state);
+    }
+}
+
 #ifdef ENABLE_DUAL_RX_SCENE
 bool protopirate_ensure_dual_receiver_view(ProtoPirateApp* app) {
     furi_check(app);
@@ -203,7 +209,7 @@ static void protopirate_radio_init_cleanup(ProtoPirateApp* app, bool devices_ini
         if(devices_initialized) {
             subghz_devices_idle(app->txrx->radio_device);
         }
-        radio_device_loader_end(app->txrx->radio_device);
+        radio_device_loader_end(app->txrx->radio_device, app->radio_broker, &app->radio_lease);
         app->txrx->radio_device = NULL;
     }
 
@@ -225,6 +231,7 @@ static void protopirate_radio_init_cleanup(ProtoPirateApp* app, bool devices_ini
     if(devices_initialized) {
         subghz_devices_deinit();
     }
+    protopirate_radio_state(app, SubGhzRadioBrokerStateAcquired);
 
     app->txrx->protocol_registry = NULL;
     app->txrx->protocol_plugin = NULL;
@@ -269,6 +276,9 @@ ProtoPirateApp* protopirate_app_alloc() {
 
     // Open Dialogs record
     app->dialogs = furi_record_open(RECORD_DIALOGS);
+    app->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+    furi_check(subghz_radio_broker_acquire(
+        app->radio_broker, "garage_door_remote", FuriWaitForever, &app->radio_lease));
 
     // SubMenu
     app->submenu = submenu_alloc();
@@ -475,16 +485,25 @@ bool protopirate_radio_init(ProtoPirateApp* app) {
     FURI_LOG_I(TAG, "Loaded ProtoPirate secure keys");
 
     // Initialize SubGhz devices
+    protopirate_radio_state(app, SubGhzRadioBrokerStateProbing);
     subghz_devices_init();
     FURI_LOG_D(TAG, "SubGhz devices initialized");
 
     // Try external CC1101 first
-    app->txrx->radio_device = radio_device_loader_set(NULL, SubGhzRadioDeviceTypeExternalCC1101);
+    app->txrx->radio_device = radio_device_loader_set(
+        NULL,
+        SubGhzRadioDeviceTypeExternalCC1101,
+        app->radio_broker,
+        &app->radio_lease);
 
     // if not loading, fallback to internal
     if(!app->txrx->radio_device) {
         FURI_LOG_W(TAG, "External CC1101 not found, trying internal radio");
-        app->txrx->radio_device = radio_device_loader_set(NULL, SubGhzRadioDeviceTypeInternal);
+        app->txrx->radio_device = radio_device_loader_set(
+            NULL,
+            SubGhzRadioDeviceTypeInternal,
+            app->radio_broker,
+            &app->radio_lease);
     }
 
     if(!app->txrx->radio_device) {
@@ -503,6 +522,13 @@ bool protopirate_radio_init(ProtoPirateApp* app) {
 #endif
     subghz_devices_reset(app->txrx->radio_device);
     subghz_devices_idle(app->txrx->radio_device);
+    subghz_radio_broker_set_selected_device(
+        app->radio_broker,
+        &app->radio_lease,
+        radio_device_loader_is_external(app->txrx->radio_device) ?
+            SubGhzRadioBrokerDeviceExternalCC1101 :
+            SubGhzRadioBrokerDeviceInternal);
+    protopirate_radio_state(app, SubGhzRadioBrokerStateInitialized);
 
     app->radio_initialized = true;
 
@@ -533,6 +559,7 @@ void protopirate_radio_deinit(ProtoPirateApp* app) {
     }
 
     bool devices_initialized = app->radio_initialized || (app->txrx->radio_device != NULL);
+    protopirate_radio_state(app, SubGhzRadioBrokerStateCleaningUp);
 
     // Make sure we're not receiving
     if(app->txrx->worker && app->txrx->txrx_state == ProtoPirateTxRxStateRx) {
@@ -546,7 +573,7 @@ void protopirate_radio_deinit(ProtoPirateApp* app) {
     if(app->txrx->radio_device) {
         FURI_LOG_D(TAG, "Putting radio device to sleep and ending: %p", app->txrx->radio_device);
         subghz_devices_sleep(app->txrx->radio_device);
-        radio_device_loader_end(app->txrx->radio_device);
+        radio_device_loader_end(app->txrx->radio_device, app->radio_broker, &app->radio_lease);
         app->txrx->radio_device = NULL;
     } else {
         FURI_LOG_D(TAG, "Radio device was NULL, skipping sleep/end");
@@ -608,6 +635,7 @@ void protopirate_radio_deinit(ProtoPirateApp* app) {
 
     app->txrx->txrx_state = ProtoPirateTxRxStateIDLE;
     app->radio_initialized = false;
+    protopirate_radio_state(app, SubGhzRadioBrokerStateAcquired);
 
     FURI_LOG_D(TAG, "Final state: radio_initialized=%d", app->radio_initialized);
 }
@@ -751,7 +779,9 @@ void protopirate_app_free(ProtoPirateApp* app) {
         app->dual_chain_b = NULL;
     }
     if(dual_devices_initialized) {
+        protopirate_radio_state(app, SubGhzRadioBrokerStateCleaningUp);
         subghz_devices_deinit();
+        protopirate_radio_state(app, SubGhzRadioBrokerStateAcquired);
     }
     if(app->dual_receiver) {
         FURI_LOG_D(TAG, "Removing dual receiver view");
@@ -783,7 +813,9 @@ void protopirate_app_free(ProtoPirateApp* app) {
         app->shield_tx_chain = NULL;
     }
     if(shield_devices_initialized) {
+        protopirate_radio_state(app, SubGhzRadioBrokerStateCleaningUp);
         subghz_devices_deinit();
+        protopirate_radio_state(app, SubGhzRadioBrokerStateAcquired);
     }
     if(app->shield_history) {
         if(app->selected_capture.history == app->shield_history) {
@@ -835,6 +867,14 @@ void protopirate_app_free(ProtoPirateApp* app) {
     // Close records
     FURI_LOG_D(TAG, "Closing GUI record");
     furi_record_close(RECORD_GUI);
+
+    if(app->radio_lease.token) {
+        subghz_radio_broker_release(app->radio_broker, &app->radio_lease);
+    }
+    if(app->radio_broker) {
+        furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
+        app->radio_broker = NULL;
+    }
 
     FURI_LOG_I(TAG, "App free complete");
     free(app);

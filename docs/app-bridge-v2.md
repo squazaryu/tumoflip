@@ -39,12 +39,10 @@ The system app ID is `runtime`.
   `key=value` payload.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
-  `radio`, and `owner`. It is designed to fit in one FAB2 response frame.
-- `radio_status` reports whether the Sub-GHz Broker is busy, its owner,
-  selected device, external-power state, lifecycle state, lease age in ticks,
-  transition tick, and last error. Lifecycle states include `idle`, `acquired`,
-  `probing`, `initialized`, `rx`, `tx`, `async_rx`, `async_tx`, `cleaning_up`,
-  `external_power_on`, `releasing`, and `error`. It does not acquire the radio.
+  `radio`, and `owner`. `radio` is the Sub-GHz Broker lifecycle state, such as
+  `idle`, `acquired`, `probing`, `initialized`, `rx`, `tx`, `async_rx`,
+  `async_tx`, `cleaning_up`, `external_power_on`, `releasing`, or `error`. The
+  command is read-only and designed to fit in one FAB2 response frame.
 - An unknown command returns `runtime/error`, sets response and error flags,
   and carries `unsupported_command`.
 - Invalid chunk order and oversized Runtime payloads return `runtime/error`.

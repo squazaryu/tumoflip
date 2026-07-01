@@ -116,8 +116,12 @@ static void rolljam_scene_dual_receiver_teardown(RollJamApp* app) {
     s_bind_b.chain = NULL;
 
     if(s_dual_devices_inited) {
+        subghz_radio_broker_set_state(
+            app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateCleaningUp);
         subghz_devices_deinit();
         s_dual_devices_inited = false;
+        subghz_radio_broker_set_state(
+            app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateAcquired);
     }
 }
 
@@ -141,6 +145,8 @@ static bool rolljam_scene_dual_receiver_build(RollJamApp* app) {
         }
     }
 
+    subghz_radio_broker_set_state(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateProbing);
     subghz_devices_init();
     s_dual_devices_inited = true;
 
@@ -153,12 +159,19 @@ static bool rolljam_scene_dual_receiver_build(RollJamApp* app) {
     }
 
     if(!rolljam_rx_chain_acquire_device(
-           app->dual_chain_a, SubGhzRadioDeviceTypeExternalCC1101)) {
+           app->dual_chain_a,
+           SubGhzRadioDeviceTypeExternalCC1101,
+           app->radio_broker,
+           &app->radio_lease)) {
         FURI_LOG_E(TAG, "External CC1101 unavailable - dual RX requires it");
         rolljam_scene_dual_receiver_teardown(app);
         return false;
     }
-    if(!rolljam_rx_chain_acquire_device(app->dual_chain_b, SubGhzRadioDeviceTypeInternal)) {
+    if(!rolljam_rx_chain_acquire_device(
+           app->dual_chain_b,
+           SubGhzRadioDeviceTypeInternal,
+           app->radio_broker,
+           &app->radio_lease)) {
         FURI_LOG_E(TAG, "Internal CC1101 unavailable");
         rolljam_scene_dual_receiver_teardown(app);
         return false;
@@ -205,6 +218,10 @@ static bool rolljam_scene_dual_receiver_build(RollJamApp* app) {
     rolljam_rx_chain_set_decode_callback(
         app->dual_chain_b, rolljam_scene_dual_receiver_decode_cb, &s_bind_b);
 
+    subghz_radio_broker_set_selected_device(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerDeviceDual);
+    subghz_radio_broker_set_state(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateInitialized);
     return true;
 }
 
@@ -265,6 +282,8 @@ bool rolljam_scene_dual_receiver_on_event(void* context, SceneManagerEvent event
                 consumed = true;
                 break;
             }
+            subghz_radio_broker_set_state(
+                app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateAsyncRx);
             rolljam_scene_dual_receiver_update_status(app);
             consumed = true;
             break;

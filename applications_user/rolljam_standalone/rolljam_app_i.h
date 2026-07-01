@@ -29,6 +29,7 @@
 #include <lib/flipper_application/plugins/plugin_manager.h>
 #include <lib/flipper_application/plugins/composite_resolver.h>
 #include <dialogs/dialogs.h>
+#include <subghz_radio_broker/subghz_radio_broker.h>
 #include "defines.h"
 #include "protocols/protocols_common.h"
 #include "protocols/protocol_items.h"
@@ -63,6 +64,8 @@ typedef struct {
 } RollJamTxRx;
 
 struct RollJamApp {
+    SubGhzRadioBroker* radio_broker;
+    SubGhzRadioBrokerLease radio_lease;
     Gui* gui;
     ViewDispatcher* view_dispatcher;
     SceneManager* scene_manager;

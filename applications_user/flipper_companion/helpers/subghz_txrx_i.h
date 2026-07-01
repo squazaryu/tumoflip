@@ -1,9 +1,13 @@
 #pragma once
 
 #include "subghz_txrx.h"
+#include <subghz_radio_broker/subghz_radio_broker.h>
 
 struct SubGhzTxRx {
     SubGhzWorker* worker;
+
+    SubGhzRadioBroker* radio_broker;
+    SubGhzRadioBrokerLease radio_lease;
 
     SubGhzEnvironment* environment;
     SubGhzReceiver* receiver;

@@ -416,8 +416,12 @@ static void rolljam_scene_shield_receiver_teardown(RollJamApp* app) {
     }
 
     if(s_shield_devices_inited) {
+        subghz_radio_broker_set_state(
+            app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateCleaningUp);
         subghz_devices_deinit();
         s_shield_devices_inited = false;
+        subghz_radio_broker_set_state(
+            app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateAcquired);
     }
 
     if(s_shield_rolljam_tx_thread) {
@@ -450,6 +454,8 @@ static bool rolljam_scene_shield_receiver_build(RollJamApp* app) {
     }
     furi_mutex_release(app->shield_history_mutex);
 
+    subghz_radio_broker_set_state(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateProbing);
     subghz_devices_init();
     s_shield_devices_inited = true;
 
@@ -462,12 +468,16 @@ static bool rolljam_scene_shield_receiver_build(RollJamApp* app) {
     }
 
     if(!rolljam_rx_chain_acquire_device(
-           app->shield_rx_chain, SubGhzRadioDeviceTypeExternalCC1101)) {
+           app->shield_rx_chain,
+           SubGhzRadioDeviceTypeExternalCC1101,
+           app->radio_broker,
+           &app->radio_lease)) {
         FURI_LOG_E(TAG, "External CC1101 unavailable - Shield RX requires it");
         rolljam_scene_shield_receiver_teardown(app);
         return false;
     }
-    if(!rolljam_tx_chain_acquire_device(app->shield_tx_chain)) {
+    if(!rolljam_tx_chain_acquire_device(
+           app->shield_tx_chain, app->radio_broker, &app->radio_lease)) {
         FURI_LOG_E(TAG, "Internal CC1101 unavailable");
         rolljam_scene_shield_receiver_teardown(app);
         return false;
@@ -509,6 +519,10 @@ static bool rolljam_scene_shield_receiver_build(RollJamApp* app) {
     rolljam_rx_chain_set_decode_callback(
         app->shield_rx_chain, rolljam_scene_shield_receiver_decode_cb, app);
 
+    subghz_radio_broker_set_selected_device(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerDeviceDual);
+    subghz_radio_broker_set_state(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateInitialized);
     return true;
 }
 
@@ -598,6 +612,8 @@ bool rolljam_scene_shield_receiver_on_event(void* context, SceneManagerEvent eve
                 scene_manager_search_and_switch_to_previous_scene(
                     app->scene_manager, RollJamSceneStart);
             } else {
+                subghz_radio_broker_set_state(
+                    app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateAsyncRx);
                 notification_message(app->notifications, &sequence_tx);
                 rolljam_scene_shield_receiver_update_statusbar(app);
             }

@@ -206,7 +206,7 @@ void protopirate_rx_chain_free(ProtoPirateRxChain* chain) {
 
     if(chain->device) {
         subghz_devices_idle(chain->device);
-        radio_device_loader_end(chain->device);
+        radio_device_loader_end(chain->device, chain->broker, chain->lease);
         chain->device = NULL;
     }
 
@@ -232,10 +232,16 @@ void protopirate_rx_chain_free(ProtoPirateRxChain* chain) {
 
 bool protopirate_rx_chain_acquire_device(
     ProtoPirateRxChain* chain,
-    SubGhzRadioDeviceType type) {
+    SubGhzRadioDeviceType type,
+    SubGhzRadioBroker* broker,
+    const SubGhzRadioBrokerLease* lease) {
     furi_check(chain);
+    furi_check(broker);
+    furi_check(lease);
 
-    chain->device = radio_device_loader_set(NULL, type);
+    chain->broker = broker;
+    chain->lease = lease;
+    chain->device = radio_device_loader_set(NULL, type, broker, lease);
     if(!chain->device) {
         FURI_LOG_E(TAG, "[%c] Failed to acquire radio device (type=%d)", chain->label, type);
         return false;
@@ -246,7 +252,7 @@ bool protopirate_rx_chain_acquire_device(
     if(type == SubGhzRadioDeviceTypeExternalCC1101 && !chain->is_external) {
 
         FURI_LOG_E(TAG, "[%c] External requested but unavailable", chain->label);
-        radio_device_loader_end(chain->device);
+        radio_device_loader_end(chain->device, chain->broker, chain->lease);
         chain->device = NULL;
         return false;
     }

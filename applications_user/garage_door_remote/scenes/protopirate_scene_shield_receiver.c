@@ -171,8 +171,12 @@ static void protopirate_scene_shield_receiver_teardown(ProtoPirateApp* app) {
     }
 
     if(s_shield_devices_inited) {
+        subghz_radio_broker_set_state(
+            app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateCleaningUp);
         subghz_devices_deinit();
         s_shield_devices_inited = false;
+        subghz_radio_broker_set_state(
+            app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateAcquired);
     }
 }
 
@@ -201,6 +205,8 @@ static bool protopirate_scene_shield_receiver_build(ProtoPirateApp* app) {
     }
     furi_mutex_release(app->shield_history_mutex);
 
+    subghz_radio_broker_set_state(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateProbing);
     subghz_devices_init();
     s_shield_devices_inited = true;
 
@@ -213,12 +219,16 @@ static bool protopirate_scene_shield_receiver_build(ProtoPirateApp* app) {
     }
 
     if(!protopirate_rx_chain_acquire_device(
-           app->shield_rx_chain, SubGhzRadioDeviceTypeExternalCC1101)) {
+           app->shield_rx_chain,
+           SubGhzRadioDeviceTypeExternalCC1101,
+           app->radio_broker,
+           &app->radio_lease)) {
         FURI_LOG_E(TAG, "External CC1101 unavailable - Shield RX requires it");
         protopirate_scene_shield_receiver_teardown(app);
         return false;
     }
-    if(!protopirate_tx_chain_acquire_device(app->shield_tx_chain)) {
+    if(!protopirate_tx_chain_acquire_device(
+           app->shield_tx_chain, app->radio_broker, &app->radio_lease)) {
         FURI_LOG_E(TAG, "Internal CC1101 unavailable");
         protopirate_scene_shield_receiver_teardown(app);
         return false;
@@ -260,6 +270,10 @@ static bool protopirate_scene_shield_receiver_build(ProtoPirateApp* app) {
     protopirate_rx_chain_set_decode_callback(
         app->shield_rx_chain, protopirate_scene_shield_receiver_decode_cb, app);
 
+    subghz_radio_broker_set_selected_device(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerDeviceDual);
+    subghz_radio_broker_set_state(
+        app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateInitialized);
     return true;
 }
 
@@ -345,6 +359,8 @@ bool protopirate_scene_shield_receiver_on_event(void* context, SceneManagerEvent
                 scene_manager_search_and_switch_to_previous_scene(
                     app->scene_manager, ProtoPirateSceneStart);
             } else {
+                subghz_radio_broker_set_state(
+                    app->radio_broker, &app->radio_lease, SubGhzRadioBrokerStateAsyncRx);
                 notification_message(app->notifications, &sequence_tx);
                 protopirate_scene_shield_receiver_update_statusbar(app);
             }

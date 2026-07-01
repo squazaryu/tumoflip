@@ -6,6 +6,7 @@
 #include <lib/subghz/protocols/protocol_items.h>
 
 #include <flipper_format/flipper_format_i.h>
+#include <string.h>
 
 #define TAG "js_subghz"
 
@@ -16,11 +17,24 @@ typedef enum {
 } JsSubghzRadioState;
 
 typedef struct {
+    SubGhzRadioBroker* radio_broker;
+    SubGhzRadioBrokerLease radio_lease;
     const SubGhzDevice* radio_device;
     int frequency;
     bool is_external;
     JsSubghzRadioState state;
 } JsSubghzInst;
+
+static void js_subghz_radio_state(JsSubghzInst* js_subghz, SubGhzRadioBrokerState state) {
+    subghz_radio_broker_set_state(js_subghz->radio_broker, &js_subghz->radio_lease, state);
+}
+
+static void js_subghz_radio_selected_device(
+    JsSubghzInst* js_subghz,
+    SubGhzRadioBrokerDevice device) {
+    subghz_radio_broker_set_selected_device(
+        js_subghz->radio_broker, &js_subghz->radio_lease, device);
+}
 
 static FuriHalSubGhzPreset js_subghz_get_preset_name(const char* preset_name) {
     FuriHalSubGhzPreset preset = FuriHalSubGhzPresetIDLE;
@@ -56,6 +70,7 @@ static void js_subghz_set_rx(struct mjs* mjs) {
     if(js_subghz->state != JsSubghzRadioStateRX) {
         subghz_devices_set_rx(js_subghz->radio_device);
         js_subghz->state = JsSubghzRadioStateRX;
+        js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateRx);
     }
 
     mjs_return(mjs, MJS_UNDEFINED);
@@ -75,6 +90,7 @@ static void js_subghz_set_idle(struct mjs* mjs) {
     if(js_subghz->state != JsSubghzRadioStateIDLE) {
         subghz_devices_idle(js_subghz->radio_device);
         js_subghz->state = JsSubghzRadioStateIDLE;
+        js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateInitialized);
     }
 
     mjs_return(mjs, MJS_UNDEFINED);
@@ -377,7 +393,9 @@ static void js_subghz_transmit_file(struct mjs* mjs) {
         if(!js_subghz->is_external) {
             furi_hal_power_suppress_charge_enter();
         }
+        js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateTx);
         subghz_devices_set_tx(js_subghz->radio_device);
+        js_subghz->state = JsSubghzRadioStateTX;
         FURI_LOG_I(TAG, "Transmitting file %s", file_path);
 
         while(repeat) {
@@ -387,6 +405,7 @@ static void js_subghz_transmit_file(struct mjs* mjs) {
                 mjs_prepend_errorf(mjs, MJS_INTERNAL_ERROR, "Failed to start async tx");
                 break;
             }
+            js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateAsyncTx);
             while(!subghz_devices_is_async_complete_tx(js_subghz->radio_device)) {
                 furi_delay_ms(100);
             }
@@ -412,6 +431,7 @@ static void js_subghz_transmit_file(struct mjs* mjs) {
 
     subghz_devices_idle(js_subghz->radio_device);
     js_subghz->state = JsSubghzRadioStateIDLE;
+    js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateInitialized);
 
     if(transmitter) {
         subghz_transmitter_free(transmitter);
@@ -446,20 +466,25 @@ static void js_subghz_setup(struct mjs* mjs) {
         return;
     }
 
-    js_subghz->radio_device =
-        radio_device_loader_set(js_subghz->radio_device, SubGhzRadioDeviceTypeExternalCC1101);
+    js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateProbing);
+    js_subghz->radio_device = radio_device_loader_set(
+        js_subghz->radio_device,
+        SubGhzRadioDeviceTypeExternalCC1101,
+        js_subghz->radio_broker,
+        &js_subghz->radio_lease);
 
-    if(!subghz_devices_is_connect(js_subghz->radio_device)) {
-        js_subghz->is_external = true;
-    } else {
-        js_subghz->is_external = false;
-    }
+    js_subghz->is_external = radio_device_loader_is_external(js_subghz->radio_device);
+    js_subghz_radio_selected_device(
+        js_subghz,
+        js_subghz->is_external ? SubGhzRadioBrokerDeviceExternalCC1101 :
+                                 SubGhzRadioBrokerDeviceInternal);
 
     js_subghz->state = JsSubghzRadioStateIDLE;
     js_subghz->frequency = 433920000;
 
     subghz_devices_reset(js_subghz->radio_device);
     subghz_devices_idle(js_subghz->radio_device);
+    js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateInitialized);
 
     mjs_return(mjs, MJS_UNDEFINED);
 }
@@ -475,13 +500,17 @@ static void js_subghz_end(struct mjs* mjs) {
         return;
     }
 
+    js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateCleaningUp);
     subghz_devices_sleep(js_subghz->radio_device);
-    radio_device_loader_end(js_subghz->radio_device);
+    radio_device_loader_end(
+        js_subghz->radio_device, js_subghz->radio_broker, &js_subghz->radio_lease);
     js_subghz->radio_device = NULL;
 
     js_subghz->is_external = false;
     js_subghz->state = -1;
     js_subghz->frequency = 0;
+    js_subghz_radio_selected_device(js_subghz, SubGhzRadioBrokerDeviceInternal);
+    js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateAcquired);
 
     mjs_return(mjs, MJS_UNDEFINED);
 }
@@ -489,9 +518,16 @@ static void js_subghz_end(struct mjs* mjs) {
 static void* js_subghz_create(struct mjs* mjs, mjs_val_t* object, JsModules* modules) {
     UNUSED(modules);
     JsSubghzInst* js_subghz = malloc(sizeof(JsSubghzInst));
+    memset(js_subghz, 0, sizeof(JsSubghzInst));
     mjs_val_t subghz_obj = mjs_mk_object(mjs);
 
+    js_subghz->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+    furi_check(subghz_radio_broker_acquire(
+        js_subghz->radio_broker, "js_subghz", FuriWaitForever, &js_subghz->radio_lease));
+    js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateProbing);
     subghz_devices_init();
+    js_subghz_radio_selected_device(js_subghz, SubGhzRadioBrokerDeviceInternal);
+    js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateAcquired);
 
     mjs_set(mjs, subghz_obj, INST_PROP_NAME, ~0, mjs_mk_foreign(mjs, js_subghz));
     mjs_set(mjs, subghz_obj, "setup", ~0, MJS_MK_FN(js_subghz_setup));
@@ -514,11 +550,16 @@ static void js_subghz_destroy(void* inst) {
     JsSubghzInst* js_subghz = inst;
 
     if(js_subghz->radio_device) {
+        js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateCleaningUp);
         subghz_devices_sleep(js_subghz->radio_device);
-        radio_device_loader_end(js_subghz->radio_device);
+        radio_device_loader_end(
+            js_subghz->radio_device, js_subghz->radio_broker, &js_subghz->radio_lease);
     }
 
+    js_subghz_radio_state(js_subghz, SubGhzRadioBrokerStateCleaningUp);
     subghz_devices_deinit();
+    subghz_radio_broker_release(js_subghz->radio_broker, &js_subghz->radio_lease);
+    furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
 
     free(js_subghz);
 }

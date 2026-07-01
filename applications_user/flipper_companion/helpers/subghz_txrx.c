@@ -7,28 +7,22 @@
 #define TAG "SubGhz"
 
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
-    UNUSED(instance);
-    uint8_t attempts = 5;
-    while(--attempts > 0) {
-        if(furi_hal_power_enable_otg()) break;
-    }
-    if(attempts == 0) {
-        if(furi_hal_power_get_usb_voltage() < 4.5f) {
-            FURI_LOG_E(
-                TAG,
-                "Error power otg enable. BQ2589 check otg fault = %d",
-                furi_hal_power_check_otg_fault() ? 1 : 0);
-        }
-    }
+    subghz_radio_broker_external_power_on(instance->radio_broker, &instance->radio_lease);
 }
 
 static void subghz_txrx_radio_device_power_off(SubGhzTxRx* instance) {
-    UNUSED(instance);
-    if(furi_hal_power_is_otg_enabled()) furi_hal_power_disable_otg();
+    subghz_radio_broker_external_power_off(instance->radio_broker, &instance->radio_lease);
+}
+
+static void subghz_txrx_radio_state(SubGhzTxRx* instance, SubGhzRadioBrokerState state) {
+    subghz_radio_broker_set_state(instance->radio_broker, &instance->radio_lease, state);
 }
 
 SubGhzTxRx* subghz_txrx_alloc(void) {
     SubGhzTxRx* instance = malloc(sizeof(SubGhzTxRx));
+    instance->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+    furi_check(subghz_radio_broker_acquire(
+        instance->radio_broker, "flipper_companion", FuriWaitForever, &instance->radio_lease));
     instance->setting = subghz_setting_alloc();
     subghz_setting_load(instance->setting, EXT_PATH("subghz/assets/setting_user"));
 
@@ -66,10 +60,12 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
     subghz_worker_set_context(instance->worker, instance->receiver);
 
     //set default device External
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateProbing);
     subghz_devices_init();
     instance->radio_device_type = SubGhzRadioDeviceTypeInternal;
     instance->radio_device_type =
         subghz_txrx_radio_device_set(instance, SubGhzRadioDeviceTypeExternalCC1101);
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateInitialized);
     FURI_LOG_I(
         TAG,
         "radio device type = %s",
@@ -81,12 +77,15 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
 void subghz_txrx_free(SubGhzTxRx* instance) {
     furi_assert(instance);
 
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateCleaningUp);
     if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
         subghz_txrx_radio_device_power_off(instance);
         subghz_devices_end(instance->radio_device);
     }
 
     subghz_devices_deinit();
+    subghz_radio_broker_release(instance->radio_broker, &instance->radio_lease);
+    furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
 
     subghz_worker_free(instance->worker);
     subghz_receiver_free(instance->receiver);
@@ -166,6 +165,7 @@ static void subghz_txrx_begin(SubGhzTxRx* instance, uint8_t* preset_data) {
     subghz_devices_idle(instance->radio_device);
     subghz_devices_load_preset(instance->radio_device, FuriHalSubGhzPresetCustom, preset_data);
     instance->txrx_state = SubGhzTxRxStateIDLE;
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateInitialized);
 }
 
 static uint32_t subghz_txrx_rx(SubGhzTxRx* instance, uint32_t frequency) {
@@ -178,12 +178,14 @@ static uint32_t subghz_txrx_rx(SubGhzTxRx* instance, uint32_t frequency) {
 
     uint32_t value = subghz_devices_set_frequency(instance->radio_device, frequency);
     subghz_devices_flush_rx(instance->radio_device);
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateRx);
     subghz_txrx_speaker_on(instance);
 
     subghz_devices_start_async_rx(
         instance->radio_device, subghz_worker_rx_callback, instance->worker);
     subghz_worker_start(instance->worker);
     instance->txrx_state = SubGhzTxRxStateRx;
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateAsyncRx);
     return value;
 }
 
@@ -193,6 +195,7 @@ static void subghz_txrx_idle(SubGhzTxRx* instance) {
         subghz_devices_idle(instance->radio_device);
         subghz_txrx_speaker_off(instance);
         instance->txrx_state = SubGhzTxRxStateIDLE;
+        subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateInitialized);
     }
 }
 
@@ -200,6 +203,7 @@ static void subghz_txrx_rx_end(SubGhzTxRx* instance) {
     furi_assert(instance);
     furi_assert(instance->txrx_state == SubGhzTxRxStateRx);
 
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateCleaningUp);
     if(subghz_worker_is_running(instance->worker)) {
         subghz_worker_stop(instance->worker);
         subghz_devices_stop_async_rx(instance->radio_device);
@@ -207,6 +211,7 @@ static void subghz_txrx_rx_end(SubGhzTxRx* instance) {
     subghz_devices_idle(instance->radio_device);
     subghz_txrx_speaker_off(instance);
     instance->txrx_state = SubGhzTxRxStateIDLE;
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateInitialized);
 }
 
 void subghz_txrx_sleep(SubGhzTxRx* instance) {
@@ -225,6 +230,7 @@ static bool subghz_txrx_tx(SubGhzTxRx* instance, uint32_t frequency) {
     if(ret) {
         subghz_txrx_speaker_on(instance);
         instance->txrx_state = SubGhzTxRxStateTx;
+        subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateTx);
     }
 
     return ret;
@@ -285,6 +291,7 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
                     //Start TX
                     subghz_devices_start_async_tx(
                         instance->radio_device, subghz_transmitter_yield, instance->transmitter);
+                    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateAsyncTx);
                 }
             } else {
                 ret = SubGhzTxRxStartTxStateErrorParserOthers;
@@ -326,6 +333,7 @@ void subghz_txrx_set_need_save_callback(
 static void subghz_txrx_tx_stop(SubGhzTxRx* instance) {
     furi_assert(instance);
     furi_assert(instance->txrx_state == SubGhzTxRxStateTx);
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateCleaningUp);
     //Stop TX
     subghz_devices_stop_async_tx(instance->radio_device);
     subghz_transmitter_stop(instance->transmitter);
@@ -574,12 +582,15 @@ SubGhzRadioDeviceType
     subghz_txrx_radio_device_set(SubGhzTxRx* instance, SubGhzRadioDeviceType radio_device_type) {
     furi_assert(instance);
 
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateProbing);
     if(radio_device_type == SubGhzRadioDeviceTypeExternalCC1101 &&
        subghz_txrx_radio_device_is_external_connected(instance, SUBGHZ_DEVICE_CC1101_EXT_NAME)) {
         subghz_txrx_radio_device_power_on(instance);
         instance->radio_device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_EXT_NAME);
         subghz_devices_begin(instance->radio_device);
         instance->radio_device_type = SubGhzRadioDeviceTypeExternalCC1101;
+        subghz_radio_broker_set_selected_device(
+            instance->radio_broker, &instance->radio_lease, SubGhzRadioBrokerDeviceExternalCC1101);
     } else {
         subghz_txrx_radio_device_power_off(instance);
         if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
@@ -587,8 +598,11 @@ SubGhzRadioDeviceType
         }
         instance->radio_device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
         instance->radio_device_type = SubGhzRadioDeviceTypeInternal;
+        subghz_radio_broker_set_selected_device(
+            instance->radio_broker, &instance->radio_lease, SubGhzRadioBrokerDeviceInternal);
     }
 
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateInitialized);
     return instance->radio_device_type;
 }
 
