@@ -299,6 +299,7 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             resources / "apps/Tools/ai_dashboard.fap",
             resources / "apps/Tools/flipper_relay.fap",
             resources / "apps/Tools/quac.fap",
+            resources / "apps/Tools/tumoflip_packages.fap",
             resources / "apps/Tools/totp.fap",
         ],
         "module_one": [

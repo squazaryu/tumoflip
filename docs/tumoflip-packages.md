@@ -81,6 +81,14 @@ Firmware exposes the first read-only audit through FAB2 `runtime/status`:
 firmware pass does not parse package fields, hash SD files, or delete stale
 duplicates.
 
+For full on-device inspection, open `Apps` -> `Tools` -> `Tumoflip Packages`.
+This external FAP keeps the flash-critical runtime small while still running on
+the Flipper itself. It reads `/.tumoflip/package-state.txt` and
+`/.tumoflip/install-state.json`, verifies each recorded package target with
+SHA-256, reports missing or mismatched files, and flags known legacy ARF paths
+for review. It is intentionally read-only and never deletes or overwrites SD
+content.
+
 Validation fails when:
 
 - updater or radio CRC differs from `update.fuf`;

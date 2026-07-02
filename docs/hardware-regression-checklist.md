@@ -61,6 +61,9 @@ are legally allowed to test.
 - Confirm SD card is detected after reboot.
 - Confirm the companion can read `tumoflip-packages.json` and verify SD package
   hashes.
+- Open `Apps` -> `Tools` -> `Tumoflip Packages` -> `Run Audit`; confirm the
+  report opens, returns to the menu with Back, and shows no missing or
+  mismatched package files on a clean install.
 - Confirm no unexpected `FW packages` update warning remains after package
   installation.
 

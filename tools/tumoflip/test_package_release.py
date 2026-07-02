@@ -59,6 +59,7 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
         "apps/Tools/ai_dashboard.fap",
         "apps/Tools/flipper_relay.fap",
         "apps/Tools/quac.fap",
+        "apps/Tools/tumoflip_packages.fap",
         "apps/Tools/totp.fap",
     ):
         write_file(resources / relative, relative.encode())
