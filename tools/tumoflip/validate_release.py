@@ -119,6 +119,37 @@ ARF_LEGACY_PATHS = {
     "/ext/apps/ARF Tools/arf_subghz.fap": "/ext/apps/ARF Tools/arf_subghz_full.fap",
     "/ext/apps/ARF Tools/rolljam_standalone.fap": ARF_MODULE_PATHS["rolljam"],
 }
+RUNTIME_CAPABILITIES_MAX_BYTES = 160
+RUNTIME_REQUIRED_CAPABILITIES = {
+    "runtime=1",
+    "fab=2",
+    "session=3",
+    "status=2",
+    "packages=1",
+    "radio=2",
+    "sd=1",
+}
+RUNTIME_REQUIRED_FEATURES = {
+    "transfer_activity",
+    "pkg_state",
+    "radio_v2",
+}
+RUNTIME_REQUIRED_STATUS_FIELDS = (
+    "schema=2",
+    "fw=%.8s",
+    "commit=%.8s",
+    "dirty=%hhu",
+    "origin=%.4s",
+    "api=%hu.%hu",
+    "target=%hhu",
+    "transfer=%hhu",
+    "sd=%hhu",
+    "pkg=%hhu",
+    "sid=%08lX",
+    "bo=%.8s",
+    "radio=%hhu",
+    "owner=%.4s",
+)
 
 
 class ValidationError(RuntimeError):
@@ -238,6 +269,65 @@ def require_file(path: Path, label: str) -> Path:
     if not path.is_file():
         raise ValidationError(f"Missing {label}: {path}")
     return path
+
+
+def runtime_capabilities(repo_root: Path) -> str:
+    runtime = require_file(
+        repo_root / "applications/services/tumoflip_runtime/tumoflip_runtime.c",
+        "Tumoflip Runtime source",
+    ).read_text(encoding="utf-8")
+    lines = runtime.splitlines()
+    for index, line in enumerate(lines):
+        if not line.startswith("#define TUMOFLIP_RUNTIME_CAPABILITIES"):
+            continue
+
+        parts = []
+        for value_line in lines[index + 1 :]:
+            strings = re.findall(r'"([^"]*)"', value_line)
+            if not strings:
+                break
+            parts.extend(strings)
+            if not value_line.rstrip().endswith("\\"):
+                break
+        if not parts:
+            raise ValidationError("Tumoflip Runtime capabilities payload is empty")
+        return "".join(parts)
+
+    raise ValidationError("Tumoflip Runtime capabilities macro is missing")
+
+
+def validate_runtime_contract(repo_root: Path) -> None:
+    capabilities = runtime_capabilities(repo_root)
+    capability_bytes = len(capabilities.encode("ascii"))
+    if capability_bytes > RUNTIME_CAPABILITIES_MAX_BYTES:
+        raise ValidationError(
+            "Tumoflip Runtime capabilities payload is too large: "
+            f"{capability_bytes} > {RUNTIME_CAPABILITIES_MAX_BYTES} bytes"
+        )
+
+    capability_fields = set(capabilities.split(";"))
+    missing = sorted(RUNTIME_REQUIRED_CAPABILITIES - capability_fields)
+    if missing:
+        raise ValidationError(f"Tumoflip Runtime capabilities missing: {missing}")
+
+    feature_field = next(
+        (field for field in capability_fields if field.startswith("features=")), ""
+    )
+    features = set(feature_field.removeprefix("features=").split(","))
+    missing_features = sorted(RUNTIME_REQUIRED_FEATURES - features)
+    if missing_features:
+        raise ValidationError(
+            f"Tumoflip Runtime capabilities features missing: {missing_features}"
+        )
+
+    runtime = (
+        repo_root / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
+    ).read_text(encoding="utf-8")
+    for required in RUNTIME_REQUIRED_STATUS_FIELDS:
+        if required not in runtime:
+            raise ValidationError(f"Tumoflip Runtime status field is missing: {required}")
+    if "storage_sd_status(runtime->storage)" not in runtime:
+        raise ValidationError("Tumoflip Runtime status must expose SD readiness")
 
 
 def install_static_sd_resources(repo_root: Path, resources: Path) -> None:
@@ -381,6 +471,8 @@ def validate_release(
     min_c2_gap: int,
     write_manifest: bool,
 ) -> dict[str, object]:
+    validate_runtime_contract(repo_root)
+
     fuf_path = require_file(update_dir / "update.fuf", "update manifest")
     fuf = parse_fuf(fuf_path)
     if fuf.get("Target") != "7":

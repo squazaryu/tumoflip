@@ -74,12 +74,14 @@ overwrite files.
 Firmware exposes the first read-only audit through FAB2 `runtime/status`:
 
 ```text
-...;transfer=0;pkg=1;sid=00000000;...
+...;transfer=0;sd=1;pkg=1;sid=00000000;...
 ```
 
-`pkg=1` means the state file is present; `pkg=0` means it is missing. This first
-firmware pass does not parse package fields, hash SD files, or delete stale
-duplicates.
+Current Runtime v2 status also includes `sd=0/1`. `sd=1;pkg=1` means the SD card
+is ready and the state file is present. `sd=1;pkg=0` means the SD card is ready
+but no package transaction has been recorded yet. `sd=0;pkg=0` means package
+state cannot be trusted until external storage is ready. This firmware pass does
+not parse package fields, hash SD files, or delete stale duplicates.
 
 For full on-device inspection, open `Apps` -> `Tools` -> `Tumoflip Packages`.
 This external FAP keeps the flash-critical runtime small while still running on

@@ -41,7 +41,6 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
             "SubGhzRadioBrokerStateError",
         ):
             self.assertIn(state, header)
-            self.assertIn(state, broker + runtime)
 
         for field in (
             "SubGhzRadioBrokerStatus base;",
@@ -64,24 +63,15 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
             self.assertIn(transition, broker)
 
         for payload_key in (
-            "radio=%.8s",
+            "radio=%hhu",
             "owner=%.4s",
         ):
             self.assertIn(payload_key, runtime)
-        for state_name in (
-            '"probe"',
-            '"init"',
-            '"rx"',
-            '"tx"',
-            '"async_rx"',
-            '"async_tx"',
-            '"cleanup"',
-            '"ext_pwr"',
-            '"release"',
-        ):
-            self.assertIn(state_name, runtime)
+        self.assertIn("(uint8_t)radio_status.state", runtime)
+        self.assertNotIn("tumoflip_runtime_radio_state_name", runtime)
 
-        self.assertIn("lifecycle state", bridge_docs)
+        self.assertIn("numeric `SubGhzRadioBrokerState`", bridge_docs)
+        self.assertIn("0=idle", bridge_docs)
         self.assertIn("async_rx", bridge_docs)
         self.assertIn("async_tx", bridge_docs)
         self.assertIn("observability contract", broker_docs)

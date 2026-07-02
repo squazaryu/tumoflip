@@ -21,8 +21,9 @@ class TumoflipRuntimeTest(unittest.TestCase):
         self.assertIn("#define TUMOFLIP_RUNTIME_STATUS_MAX", runtime)
         self.assertIn("TUMOFLIP_RUNTIME_STATUS_MAX        160U", runtime)
         self.assertIn("session=3", runtime)
-        self.assertIn("features=transfer_activity", runtime)
+        self.assertIn("features=transfer_activity,pkg_state,radio_v2", runtime)
         self.assertNotIn('"radio_status"', runtime)
+        self.assertNotIn("tumoflip_runtime_radio_state_name", runtime)
         self.assertIn('strcmp(runtime->assembly.command, "status") == 0', runtime)
         self.assertIn(
             'tumoflip_runtime_reply(runtime, event->request_id, "status", payload, false)',
@@ -37,6 +38,7 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "furi_hal_info_get_api_version(&api_major, &api_minor)",
             "version_get_target(version)",
             "runtime->transfer_active",
+            "storage_sd_status(runtime->storage)",
             "subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status)",
         ):
             self.assertIn(required, runtime)
@@ -50,10 +52,11 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "api=%hu.%hu",
             "target=%hhu",
             "transfer=%hhu",
+            "sd=%hhu",
             "pkg=%hhu",
             "sid=%08lX",
             "bo=%.8s",
-            "radio=%.8s",
+            "radio=%hhu",
             "owner=%.4s",
         ):
             self.assertIn(field, runtime)
@@ -65,20 +68,27 @@ class TumoflipRuntimeTest(unittest.TestCase):
         runtime = (
             REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
         ).read_text(encoding="utf-8")
-        match = re.search(
+        macro = re.search(
             r"#define TUMOFLIP_RUNTIME_CAPABILITIES\s+\\\n"
-            r'\s+"([^"]+)"',
+            r"(?P<body>(?:\s+\"[^\"]+\"(?:\s+\\)?\n?)+)",
             runtime,
+            re.MULTILINE,
         )
 
-        self.assertIsNotNone(match)
-        capabilities = "".join(match.groups())
+        self.assertIsNotNone(macro)
+        capabilities = "".join(re.findall(r'"([^"]+)"', macro.group("body")))
         self.assertLessEqual(len(capabilities), 160)
         for required in (
             "runtime=1",
             "fab=2",
             "session=3",
+            "status=2",
+            "packages=1",
+            "radio=2",
+            "sd=1",
             "features=transfer_activity",
+            "pkg_state",
+            "radio_v2",
             "transfer_activity",
         ):
             self.assertIn(required, capabilities)
@@ -100,12 +110,15 @@ class TumoflipRuntimeTest(unittest.TestCase):
         for required in (
             'requires=["bt", "storage", "subghz_radio_broker"]',
             'EXT_PATH(".tumoflip/package-state.txt")',
-            "storage_file_exists(runtime->storage, TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH)",
+            "storage_sd_status(runtime->storage)",
+            "sd=%hhu",
             "pkg=%hhu",
         ):
             self.assertIn(required, runtime if required != 'requires=["bt", "storage", "subghz_radio_broker"]' else app)
 
         for required in (
+            "sd=1",
+            "sd=0",
             "pkg=1",
             "pkg=0",
             "package-state.txt",

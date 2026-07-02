@@ -18,6 +18,8 @@ try:
         little_endian_hex,
         manifest_release_id,
         parse_fuf,
+        runtime_capabilities,
+        validate_runtime_contract,
     )
 except ImportError:
     from validate_release import (
@@ -30,6 +32,8 @@ except ImportError:
         little_endian_hex,
         manifest_release_id,
         parse_fuf,
+        runtime_capabilities,
+        validate_runtime_contract,
     )
 
 
@@ -117,6 +121,23 @@ class ValidateReleaseTest(unittest.TestCase):
                 path = REPO_ROOT / STATIC_SD_RESOURCES / relative
                 self.assertTrue(path.is_file(), str(path))
                 self.assertGreater(path.stat().st_size, 100 * 1024)
+
+    def test_runtime_contract_is_validated_for_release(self) -> None:
+        capabilities = runtime_capabilities(REPO_ROOT)
+        self.assertLessEqual(len(capabilities), 160)
+        for required in (
+            "runtime=1",
+            "fab=2",
+            "session=3",
+            "status=2",
+            "packages=1",
+            "radio=2",
+            "sd=1",
+            "features=transfer_activity,pkg_state,radio_v2",
+        ):
+            self.assertIn(required, capabilities)
+
+        validate_runtime_contract(REPO_ROOT)
 
 
 if __name__ == "__main__":

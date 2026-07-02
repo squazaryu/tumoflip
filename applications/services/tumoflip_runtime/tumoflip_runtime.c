@@ -15,7 +15,8 @@
 #define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX 24U
 #define TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
 #define TUMOFLIP_RUNTIME_CAPABILITIES \
-    "runtime=1;fab=2;session=3;features=transfer_activity"
+    "runtime=1;fab=2;session=3;status=2;packages=1;radio=2;sd=1;" \
+    "features=transfer_activity,pkg_state,radio_v2"
 
 typedef struct {
     BtAppBridgeEvent event;
@@ -92,37 +93,6 @@ static void tumoflip_runtime_assembly_reset(TumoflipRuntimeAssembly* assembly) {
     memset(assembly, 0, sizeof(TumoflipRuntimeAssembly));
 }
 
-static const char* tumoflip_runtime_radio_state_name(SubGhzRadioBrokerState state) {
-    switch(state) {
-    case SubGhzRadioBrokerStateIdle:
-        return "idle";
-    case SubGhzRadioBrokerStateAcquired:
-        return "acq";
-    case SubGhzRadioBrokerStateProbing:
-        return "probe";
-    case SubGhzRadioBrokerStateInitialized:
-        return "init";
-    case SubGhzRadioBrokerStateRx:
-        return "rx";
-    case SubGhzRadioBrokerStateTx:
-        return "tx";
-    case SubGhzRadioBrokerStateAsyncRx:
-        return "async_rx";
-    case SubGhzRadioBrokerStateAsyncTx:
-        return "async_tx";
-    case SubGhzRadioBrokerStateCleaningUp:
-        return "cleanup";
-    case SubGhzRadioBrokerStateExternalPowerOn:
-        return "ext_pwr";
-    case SubGhzRadioBrokerStateReleasing:
-        return "release";
-    case SubGhzRadioBrokerStateError:
-        return "error";
-    default:
-        return "unknown";
-    }
-}
-
 static const char* tumoflip_runtime_str_or_unknown(const char* value) {
     return value ? value : "unknown";
 }
@@ -136,8 +106,11 @@ static void
     const uint8_t dirty = version_get_dirty_flag(version) ? 1U : 0U;
     const uint8_t target = version_get_target(version);
     const uint8_t transfer_active = runtime->transfer_active ? 1U : 0U;
+    const uint8_t sd_ready = (storage_sd_status(runtime->storage) == FSE_OK) ? 1U : 0U;
     const uint8_t package_state =
-        storage_file_exists(runtime->storage, TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH) ? 1U : 0U;
+        (sd_ready && storage_file_exists(runtime->storage, TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH)) ?
+            1U :
+            0U;
 
     SubGhzRadioBrokerStatusV2 radio_status;
     subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status);
@@ -146,7 +119,7 @@ static void
         payload,
         size,
         "schema=2;fw=%.8s;commit=%.8s;dirty=%hhu;origin=%.4s;api=%hu.%hu;target=%hhu;"
-        "transfer=%hhu;pkg=%hhu;sid=%08lX;bo=%.8s;radio=%.8s;owner=%.4s",
+        "transfer=%hhu;sd=%hhu;pkg=%hhu;sid=%08lX;bo=%.8s;radio=%hhu;owner=%.4s",
         tumoflip_runtime_str_or_unknown(version_get_version(version)),
         tumoflip_runtime_str_or_unknown(version_get_githash(version)),
         dirty,
@@ -155,10 +128,11 @@ static void
         api_minor,
         target,
         transfer_active,
+        sd_ready,
         package_state,
         (unsigned long)runtime->session.session_id,
         runtime->session.owner,
-        tumoflip_runtime_radio_state_name(radio_status.state),
+        (uint8_t)radio_status.state,
         radio_status.base.owner);
 }
 

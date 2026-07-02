@@ -36,17 +36,23 @@ The system app ID is `runtime`.
 
 - `ping` returns `runtime/pong` with payload `ok`.
 - `capabilities` returns `runtime/capabilities` with a semicolon-separated
-  `key=value` payload.
+  `key=value` payload. Runtime v2 keeps backward-compatible keys
+  `runtime=1`, `fab=2`, and `session=3`, and advertises `status=2`,
+  `packages=1`, `radio=2`, `sd=1`, plus feature flags such as
+  `transfer_activity`, `pkg_state`, and `radio_v2`.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
-  `pkg`, `sid`, `bo`, `radio`, and `owner`. `pkg=1` means
-  `/.tumoflip/package-state.txt` is present; `pkg=0` means package state is not
-  installed. `sid` and `bo` identify the current v3 session and bridge owner.
-  `radio` is the compact Sub-GHz Broker lifecycle state, such as `idle`, `acq`,
-  `probe`, `init`, `rx`, `tx`, `async_rx`, `async_tx`, `cleanup`, `ext_pwr`,
-  `release`, or `error`. The
-  command is read-only and designed to fit in one FAB2 response frame. Long
-  owner names may be shortened in this compact status response.
+  `sd`, `pkg`, `sid`, `bo`, `radio`, and `owner`. `sd=1` means the SD card is
+  mounted and ready; `sd=0` means package state cannot be trusted yet.
+  `pkg=1` means `/.tumoflip/package-state.txt` is present on a ready SD card;
+  `pkg=0` means package state is not installed or the SD card is unavailable.
+  `sid` and `bo` identify the current v3 session and bridge owner.
+  `radio` is the compact numeric `SubGhzRadioBrokerState`: `0=idle`,
+  `1=acquired`, `2=probing`, `3=initialized`, `4=rx`, `5=tx`, `6=async_rx`,
+  `7=async_tx`, `8=cleanup`, `9=external_power_on`, `10=releasing`,
+  `11=error`. The command is read-only and designed to fit in one FAB2
+  response frame. Long owner names may be shortened in this compact status
+  response.
 - `hello` implements the first App Bridge v3 session layer documented in
   `docs/app-bridge-v3.md`.
 - An unknown command returns `runtime/error`, sets response and error flags,
