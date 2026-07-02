@@ -180,6 +180,38 @@ class PackageReleaseTest(unittest.TestCase):
                 manifest["cleanup"],
             )
 
+    def test_package_only_release_removes_retired_ble_killer(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo, build, resources = prepare_package_tree(Path(directory))
+            stale_visible = resources / "apps/ARF Tools/ble_killer.fap"
+            stale_extapp = build / ".extapps/ble_killer.fap"
+            write_file(stale_visible, b"old ble killer")
+            write_file(stale_extapp, b"stale ble killer extapp")
+
+            manifest = build_package_release(
+                repo,
+                build,
+                repo / "dist/f7-C/f7-update-tmwhflpprarf089-031",
+                package_id="remove-ble-killer",
+                target_release_tag="v0.3.1",
+            )
+
+            self.assertFalse(stale_visible.exists())
+            synced_sources = {
+                entry["source"] for entry in manifest["package_release"]["synced_extapps"]
+            }
+            self.assertNotIn(".extapps/ble_killer.fap", synced_sources)
+
+            arf_entries = {entry["target"]: entry for entry in manifest["packages"]["arf"]}
+            self.assertNotIn("/ext/apps/ARF Tools/ble_killer.fap", arf_entries)
+            self.assertIn(
+                {
+                    "legacy": "/ext/apps/ARF Tools/ble_killer.fap",
+                    "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+                },
+                manifest["cleanup"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

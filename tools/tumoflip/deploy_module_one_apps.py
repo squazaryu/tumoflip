@@ -71,10 +71,6 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
         arf_tools_dir / "keeloq_keystore_decryptor.fap",
     )
     copy_file(
-        repo_root / build_dir / ".extapps" / "ble_killer.fap",
-        arf_tools_dir / "ble_killer.fap",
-    )
-    copy_file(
         repo_root / build_dir / ".extapps" / "garage_door_remote.fap",
         arf_tools_dir / "garage_door_remote.fap",
     )
@@ -97,7 +93,6 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
     expected_visible = {
         "arf_frequency_analyzer.fap",
         "arf_subghz_full.fap",
-        "ble_killer.fap",
         "garage_door_remote.fap",
         "keeloq_keystore_decryptor.fap",
         "subghz_raw_edit.fap",

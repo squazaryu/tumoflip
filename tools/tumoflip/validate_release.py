@@ -54,7 +54,6 @@ PROTOCOL_PACKS = {
 ARF_VISIBLE_APP_IDS = {
     "arf_frequency_analyzer",
     "arf_subghz_full",
-    "ble_killer",
     "garage_door_remote",
     "keeloq_keystore_decryptor",
     "subghz_raw_edit",
@@ -116,6 +115,7 @@ ARF_LEGACY_PATHS = {
     "/ext/apps/ARF Tools/ARF Sub-GHz.fap": "/ext/apps/ARF Tools/arf_subghz_full.fap",
     "/ext/apps/ARF Tools/arf_subghz.fap": "/ext/apps/ARF Tools/arf_subghz_full.fap",
     "/ext/apps/ARF Tools/rolljam_standalone.fap": ARF_MODULE_PATHS["rolljam"],
+    "/ext/apps/ARF Tools/ble_killer.fap": ARF_VISIBLE_PATHS["arf_subghz_full"],
 }
 RUNTIME_CAPABILITIES_MAX_BYTES = 160
 RUNTIME_REQUIRED_CAPABILITIES = {

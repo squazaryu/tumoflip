@@ -15,8 +15,6 @@
 !arf_tools/**
 !arf_subghz_full/
 !arf_subghz_full/**
-!ble_killer/
-!ble_killer/**
 !rolljam/
 !rolljam/**
 !rolljam_standalone/

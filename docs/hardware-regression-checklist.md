@@ -121,9 +121,6 @@ are legally allowed to test.
   exit without saving, and confirm no radio broker lock remains.
 - Launch `KeeLoq Keystore Decryptor` only on your own test SD/firmware setup;
   confirm it exits cleanly and do not share `/ext/keystore_decrypted.txt`.
-- Launch `BLE Killer`; confirm it opens, backs out cleanly, and does not
-  affect Bluetooth App Bridge pairing. With Module One ESP32 attached, verify
-  its scan/console flows do not crash the app.
 - Launch `Garage Door Remote`, enter/exit its receive views, and confirm core
   `Sub-GHz` can still receive afterward.
 - Launch `RollJam` from `ARF Sub-GHz Full`, back out without capture/transmit,
