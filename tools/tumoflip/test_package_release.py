@@ -139,25 +139,33 @@ class PackageReleaseTest(unittest.TestCase):
                     b"wifi mapper fix",
                 )
 
-    def test_package_only_release_routes_rolljam_standalone_to_arf_module(self) -> None:
+    def test_package_only_release_routes_classic_rolljam_to_arf_module(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo, build, resources = prepare_package_tree(Path(directory))
             legacy_visible = resources / "apps/ARF Tools/rolljam_standalone.fap"
-            extapp_rolljam = build / ".extapps/rolljam_standalone.fap"
+            extapp_rolljam = build / ".extapps/rolljam.fap"
+            extapp_standalone = build / ".extapps/rolljam_standalone.fap"
             write_file(legacy_visible, b"old visible rolljam")
-            write_file(extapp_rolljam, b"rolljam 2 module")
+            write_file(extapp_rolljam, b"classic rolljam module")
+            write_file(extapp_standalone, b"shield receiver module")
 
             manifest = build_package_release(
                 repo,
                 build,
                 repo / "dist/f7-C/f7-update-tmwhflpprarf089-031",
-                package_id="rolljam-2-module",
+                package_id="rolljam-module",
                 target_release_tag="v0.3.1",
             )
 
             canonical = resources / "apps_data/arf_subghz_full/modules/rolljam.fap"
             self.assertFalse(legacy_visible.exists())
-            self.assertEqual(canonical.read_bytes(), b"rolljam 2 module")
+            self.assertEqual(canonical.read_bytes(), b"classic rolljam module")
+
+            synced_sources = {
+                entry["source"] for entry in manifest["package_release"]["synced_extapps"]
+            }
+            self.assertIn(".extapps/rolljam.fap", synced_sources)
+            self.assertNotIn(".extapps/rolljam_standalone.fap", synced_sources)
 
             arf_entries = {entry["target"]: entry for entry in manifest["packages"]["arf"]}
             self.assertIn(

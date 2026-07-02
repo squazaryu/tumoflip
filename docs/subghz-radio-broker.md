@@ -12,7 +12,8 @@ radio clients. It provides:
 
 The system Sub-GHz application, Sub-GHz Remote, JS Sub-GHz module, ARF Sub-GHz
 Full, Flipper Companion Sub-GHz TX, QUAC Sub-GHz actions, Garage Door Remote,
-RollJam 2.0, ProtoPirate, and Sub-GHz Bruteforcer are Broker clients.
+classic RollJam, the RollJam Shield Receiver source, ProtoPirate, and Sub-GHz
+Bruteforcer are Broker clients.
 They acquire a lease before
 initializing the device registry and release it after stopping the radio and
 deinitializing the registry. Core, ARF, Companion, and QUAC `subghz_txrx` helpers
@@ -20,9 +21,10 @@ report explicit lifecycle transitions: `probing`, `initialized`, `rx`, `tx`,
 `async_rx`, `async_tx`, and `cleaning_up`. External-module probing and fallback
 to the internal CC1101 keep their existing behavior.
 
-RollJam 2.0 and Garage Door Remote report a dual-radio
-selection for dual/shield receiver modes and route external CC1101 power through
-the Broker while retaining their direct internal-RX/external-TX logic.
+Classic RollJam is the ARF Sub-GHz Full `RollJam` child module. It owns a Broker
+lease and routes external CC1101 power through the Broker while retaining its
+direct internal-RX/external-TX logic. The RollJam Shield Receiver source and
+Garage Door Remote report dual-radio selection for dual/shield receiver modes.
 ProtoPirate and Sub-GHz Bruteforcer keep their custom device loaders, but pass
 the active lease explicitly so probing, fallback, and cleanup preserve Broker
 power ownership.

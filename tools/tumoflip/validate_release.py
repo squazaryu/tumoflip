@@ -82,9 +82,7 @@ ARF_EXTAPP_TARGETS = {
     **{
         f"{appid}.fap": path
         for appid, path in ARF_MODULE_PATHS.items()
-        if appid != "rolljam"
     },
-    "rolljam_standalone.fap": ARF_MODULE_PATHS["rolljam"],
 }
 STATIC_SD_RESOURCES = Path("tools/tumoflip/sd_resources")
 MODULE_ONE_PACKAGE_FILES = (

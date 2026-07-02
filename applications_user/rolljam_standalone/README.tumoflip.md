@@ -1,14 +1,16 @@
-# RollJam 2.0 ARF module
+# RollJam Shield Receiver source
 
-Tumoflip packages this ARF RollJam 2.0 app as the canonical RollJam child module
-under `/ext/apps_data/arf_subghz_full/modules/rolljam.fap`.
+Tumoflip keeps this RollJam Shield Receiver in-tree as an experimental source
+import, but it is not the canonical `RollJam` entry in ARF Sub-GHz Full.
 
 The app keeps `appid=rolljam_standalone` so its protocol plugins retain their
-existing dependency graph, but it is no longer shipped as a second visible
-`ARF Tools` app. Protocol and emulate plugins are distributed separately under
-`/ext/apps_data/rolljam_standalone/plugins` instead of being embedded in the
-startup FAP, keeping the RollJam process small enough to launch reliably from
-the ARF Sub-GHz Full hub. The legacy `applications_user/rolljam` source remains
-in-tree for reference and is excluded from reproducible updater packages.
+existing dependency graph. If it is built manually, its FAP is routed under
+`/ext/apps_data/rolljam_standalone/` and its protocol and emulate plugins are
+loaded from `/ext/apps_data/rolljam_standalone/plugins`; it must not overwrite
+`/ext/apps_data/arf_subghz_full/modules/rolljam.fap`.
+
+The canonical ARF Sub-GHz Full `RollJam` child is the classic RollJam app from
+`applications_user/rolljam`, packaged as
+`/ext/apps_data/arf_subghz_full/modules/rolljam.fap`.
 
 Use only with devices you own or are explicitly authorized to test.

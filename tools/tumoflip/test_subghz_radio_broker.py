@@ -318,6 +318,32 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
             self.assertIn("subghz_radio_broker_external_power_on(", loader_c)
             self.assertIn("subghz_radio_broker_external_power_off(", loader_c)
 
+    def test_classic_rolljam_uses_brokered_external_power(self) -> None:
+        manifest = (
+            REPO_ROOT / "applications_user/rolljam/application.fam"
+        ).read_text(encoding="utf-8")
+        header = (REPO_ROOT / "applications_user/rolljam/rolljam.h").read_text(
+            encoding="utf-8"
+        )
+        app_c = (REPO_ROOT / "applications_user/rolljam/rolljam.c").read_text(
+            encoding="utf-8"
+        )
+        external_cc1101 = (
+            REPO_ROOT / "applications_user/rolljam/helpers/rolljam_cc1101_ext.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('"subghz_radio_broker"', manifest)
+        self.assertIn("SubGhzRadioBroker* radio_broker;", header)
+        self.assertIn("SubGhzRadioBrokerLease radio_lease;", header)
+        self.assertIn("furi_record_open(RECORD_SUBGHZ_RADIO_BROKER)", app_c)
+        self.assertIn('"rolljam"', app_c)
+        self.assertIn("subghz_radio_broker_acquire(", app_c)
+        self.assertIn("SubGhzRadioBrokerDeviceDual", app_c)
+        self.assertIn("subghz_radio_broker_release(", app_c)
+        self.assertIn("furi_record_close(RECORD_SUBGHZ_RADIO_BROKER)", app_c)
+        self.assertIn("subghz_radio_broker_external_power_on(", external_cc1101)
+        self.assertIn("subghz_radio_broker_external_power_off(", external_cc1101)
+
     def test_js_subghz_module_uses_brokered_radio_loader(self) -> None:
         source = (
             REPO_ROOT / "applications/system/js_app/modules/js_subghz/js_subghz.c"

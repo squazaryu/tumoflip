@@ -85,7 +85,7 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
         ("arf_psa_decrypt", "arf_psa_decrypt.fap"),
         ("arf_status", "arf_status.fap"),
         ("proto_pirate", "proto_pirate.fap"),
-        ("rolljam_standalone", "rolljam.fap"),
+        ("rolljam", "rolljam.fap"),
         ("subghz_bruteforcer", "subghz_bruteforcer.fap"),
     )
     for source_appid, target_filename in module_extapps:
