@@ -64,18 +64,20 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
             self.assertIn(transition, broker)
 
         for payload_key in (
-            "radio=%s",
-            "owner=%s",
+            "radio=%.8s",
+            "owner=%.4s",
         ):
             self.assertIn(payload_key, runtime)
         for state_name in (
-            '"probing"',
-            '"initialized"',
+            '"probe"',
+            '"init"',
             '"rx"',
             '"tx"',
             '"async_rx"',
             '"async_tx"',
-            '"cleaning_up"',
+            '"cleanup"',
+            '"ext_pwr"',
+            '"release"',
         ):
             self.assertIn(state_name, runtime)
 

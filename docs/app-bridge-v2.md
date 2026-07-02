@@ -39,10 +39,14 @@ The system app ID is `runtime`.
   `key=value` payload.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
-  `radio`, and `owner`. `radio` is the Sub-GHz Broker lifecycle state, such as
-  `idle`, `acquired`, `probing`, `initialized`, `rx`, `tx`, `async_rx`,
-  `async_tx`, `cleaning_up`, `external_power_on`, `releasing`, or `error`. The
-  command is read-only and designed to fit in one FAB2 response frame.
+  `sid`, `bo`, `radio`, and `owner`. `sid` and `bo` identify the current v3
+  session and bridge owner. `radio` is the compact Sub-GHz Broker lifecycle state,
+  such as `idle`, `acq`, `probe`, `init`, `rx`, `tx`, `async_rx`, `async_tx`,
+  `cleanup`, `ext_pwr`, `release`, or `error`. The
+  command is read-only and designed to fit in one FAB2 response frame. Long
+  owner names may be shortened in this compact status response.
+- `hello` implements the first App Bridge v3 session layer documented in
+  `docs/app-bridge-v3.md`.
 - An unknown command returns `runtime/error`, sets response and error flags,
   and carries `unsupported_command`.
 - Invalid chunk order and oversized Runtime payloads return `runtime/error`.

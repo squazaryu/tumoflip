@@ -18,8 +18,10 @@ class TumoflipRuntimeTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("#define TUMOFLIP_RUNTIME_STATUS_MAX     160U", runtime)
-        self.assertIn("status,transfer_activity", runtime)
+        self.assertIn("#define TUMOFLIP_RUNTIME_STATUS_MAX", runtime)
+        self.assertIn("TUMOFLIP_RUNTIME_STATUS_MAX        160U", runtime)
+        self.assertIn("session=3", runtime)
+        self.assertIn("features=transfer_activity", runtime)
         self.assertNotIn('"radio_status"', runtime)
         self.assertIn('strcmp(runtime->assembly.command, "status") == 0', runtime)
         self.assertIn(
@@ -41,15 +43,17 @@ class TumoflipRuntimeTest(unittest.TestCase):
 
         for field in (
             "schema=2",
-            "fw=%s",
+            "fw=%.8s",
             "commit=%.8s",
-            "dirty=%u",
-            "origin=%s",
-            "api=%u.%u",
-            "target=%u",
-            "transfer=%u",
-            "radio=%s",
-            "owner=%s",
+            "dirty=%hhu",
+            "origin=%.4s",
+            "api=%hu.%hu",
+            "target=%hhu",
+            "transfer=%hhu",
+            "sid=%08lX",
+            "bo=%.8s",
+            "radio=%.8s",
+            "owner=%.4s",
         ):
             self.assertIn(field, runtime)
             self.assertIn(field.split("=")[0], bridge_docs)
@@ -62,7 +66,6 @@ class TumoflipRuntimeTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         match = re.search(
             r"#define TUMOFLIP_RUNTIME_CAPABILITIES\s+\\\n"
-            r'\s+"([^"]+)"\s+\\\n'
             r'\s+"([^"]+)"',
             runtime,
         )
@@ -73,13 +76,47 @@ class TumoflipRuntimeTest(unittest.TestCase):
         for required in (
             "runtime=1",
             "fab=2",
-            "packages=2",
-            "payload=160",
-            "reassembly=512",
-            "status",
+            "session=3",
+            "features=transfer_activity",
             "transfer_activity",
         ):
             self.assertIn(required, capabilities)
+
+    def test_app_bridge_v3_sessions_are_documented_and_guarded(self) -> None:
+        runtime = (
+            REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
+        ).read_text(encoding="utf-8")
+        bridge_v2_docs = (REPO_ROOT / "docs/app-bridge-v2.md").read_text(
+            encoding="utf-8"
+        )
+        bridge_v3_docs = (REPO_ROOT / "docs/app-bridge-v3.md").read_text(
+            encoding="utf-8"
+        )
+        checklist = (REPO_ROOT / "docs/hardware-regression-checklist.md").read_text(
+            encoding="utf-8"
+        )
+
+        for required in (
+            "#define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX 24U",
+            "typedef struct {\n    uint32_t session_id;",
+            'strcmp(runtime->assembly.command, "hello") == 0',
+            "owner_byte != ';'",
+            "owner_byte != '='",
+            "invalid_owner",
+        ):
+            self.assertIn(required, runtime)
+
+        for required in (
+            "App Bridge v3",
+            "hello",
+            "sid=<session id>",
+            "bo=<owner>",
+        ):
+            self.assertIn(required, bridge_v3_docs)
+
+        self.assertIn("docs/app-bridge-v3.md", bridge_v2_docs)
+        self.assertIn("Runtime `hello`", checklist)
+        self.assertIn("`sid` and `bo`", checklist)
 
 
 if __name__ == "__main__":

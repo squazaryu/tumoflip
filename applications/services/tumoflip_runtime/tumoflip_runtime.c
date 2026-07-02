@@ -7,13 +7,13 @@
 
 #define TAG "TumoflipRuntime"
 
-#define TUMOFLIP_RUNTIME_APP_ID         "runtime"
-#define TUMOFLIP_RUNTIME_QUEUE_DEPTH    8U
-#define TUMOFLIP_RUNTIME_REASSEMBLY_MAX 512U
-#define TUMOFLIP_RUNTIME_STATUS_MAX     160U
-#define TUMOFLIP_RUNTIME_CAPABILITIES                                            \
-    "runtime=1;fab=2;packages=2;legacy=1;payload=160;chunks=255;reassembly=512;" \
-    "features=request_id,chunking,error,capabilities,status,transfer_activity"
+#define TUMOFLIP_RUNTIME_APP_ID            "runtime"
+#define TUMOFLIP_RUNTIME_QUEUE_DEPTH       8U
+#define TUMOFLIP_RUNTIME_REASSEMBLY_MAX    512U
+#define TUMOFLIP_RUNTIME_STATUS_MAX        160U
+#define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX 24U
+#define TUMOFLIP_RUNTIME_CAPABILITIES \
+    "runtime=1;fab=2;session=3;features=transfer_activity"
 
 typedef struct {
     BtAppBridgeEvent event;
@@ -30,11 +30,17 @@ typedef struct {
 } TumoflipRuntimeAssembly;
 
 typedef struct {
+    uint32_t session_id;
+    char owner[TUMOFLIP_RUNTIME_SESSION_OWNER_MAX + 1];
+} TumoflipRuntimeSession;
+
+typedef struct {
     Bt* bt;
     SubGhzRadioBroker* radio_broker;
     FuriMessageQueue* queue;
     FuriPubSubSubscription* subscription;
     TumoflipRuntimeAssembly assembly;
+    TumoflipRuntimeSession session;
     bool transfer_active;
 } TumoflipRuntime;
 
@@ -88,11 +94,11 @@ static const char* tumoflip_runtime_radio_state_name(SubGhzRadioBrokerState stat
     case SubGhzRadioBrokerStateIdle:
         return "idle";
     case SubGhzRadioBrokerStateAcquired:
-        return "acquired";
+        return "acq";
     case SubGhzRadioBrokerStateProbing:
-        return "probing";
+        return "probe";
     case SubGhzRadioBrokerStateInitialized:
-        return "initialized";
+        return "init";
     case SubGhzRadioBrokerStateRx:
         return "rx";
     case SubGhzRadioBrokerStateTx:
@@ -102,11 +108,11 @@ static const char* tumoflip_runtime_radio_state_name(SubGhzRadioBrokerState stat
     case SubGhzRadioBrokerStateAsyncTx:
         return "async_tx";
     case SubGhzRadioBrokerStateCleaningUp:
-        return "cleaning_up";
+        return "cleanup";
     case SubGhzRadioBrokerStateExternalPowerOn:
-        return "external_power_on";
+        return "ext_pwr";
     case SubGhzRadioBrokerStateReleasing:
-        return "releasing";
+        return "release";
     case SubGhzRadioBrokerStateError:
         return "error";
     default:
@@ -124,6 +130,9 @@ static void
     uint16_t api_major = 0;
     uint16_t api_minor = 0;
     furi_hal_info_get_api_version(&api_major, &api_minor);
+    const uint8_t dirty = version_get_dirty_flag(version) ? 1U : 0U;
+    const uint8_t target = version_get_target(version);
+    const uint8_t transfer_active = runtime->transfer_active ? 1U : 0U;
 
     SubGhzRadioBrokerStatusV2 radio_status;
     subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status);
@@ -131,16 +140,18 @@ static void
     snprintf(
         payload,
         size,
-        "schema=2;fw=%s;commit=%.8s;dirty=%u;origin=%s;api=%u.%u;target=%u;"
-        "transfer=%u;radio=%s;owner=%s",
+        "schema=2;fw=%.8s;commit=%.8s;dirty=%hhu;origin=%.4s;api=%hu.%hu;target=%hhu;"
+        "transfer=%hhu;sid=%08lX;bo=%.8s;radio=%.8s;owner=%.4s",
         tumoflip_runtime_str_or_unknown(version_get_version(version)),
         tumoflip_runtime_str_or_unknown(version_get_githash(version)),
-        (unsigned int)version_get_dirty_flag(version),
+        dirty,
         tumoflip_runtime_str_or_unknown(version_get_firmware_origin(version)),
-        (unsigned int)api_major,
-        (unsigned int)api_minor,
-        (unsigned int)version_get_target(version),
-        (unsigned int)runtime->transfer_active,
+        api_major,
+        api_minor,
+        target,
+        transfer_active,
+        (unsigned long)runtime->session.session_id,
+        runtime->session.owner,
         tumoflip_runtime_radio_state_name(radio_status.state),
         radio_status.base.owner);
 }
@@ -191,6 +202,37 @@ static void
         char payload[TUMOFLIP_RUNTIME_STATUS_MAX];
         tumoflip_runtime_make_status_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "status", payload, false);
+    } else if(strcmp(runtime->assembly.command, "hello") == 0) {
+        const size_t owner_prefix_len = 6U;
+        const size_t payload_len = runtime->assembly.payload_len;
+        size_t owner_len = 0U;
+        bool owner_valid = (payload_len > owner_prefix_len) &&
+                           (memcmp(runtime->assembly.payload, "owner=", owner_prefix_len) == 0);
+        if(owner_valid) {
+            owner_len = payload_len - owner_prefix_len;
+            owner_valid = owner_len <= TUMOFLIP_RUNTIME_SESSION_OWNER_MAX;
+            for(size_t i = 0; owner_valid && (i < owner_len); i++) {
+                const uint8_t owner_byte = runtime->assembly.payload[owner_prefix_len + i];
+                owner_valid = (owner_byte > ' ') && (owner_byte <= '~') && (owner_byte != ';') &&
+                              (owner_byte != '=');
+            }
+        }
+
+        if(!owner_valid) {
+            tumoflip_runtime_reply(runtime, event->request_id, "error", "invalid_owner", true);
+        } else {
+            runtime->session.session_id = event->request_id ? event->request_id : 1U;
+            memcpy(runtime->session.owner, &runtime->assembly.payload[owner_prefix_len], owner_len);
+            runtime->session.owner[owner_len] = '\0';
+
+            char response[48];
+            snprintf(
+                response,
+                sizeof(response),
+                "sid=%08lX",
+                (unsigned long)runtime->session.session_id);
+            tumoflip_runtime_reply(runtime, event->request_id, "hello", response, false);
+        }
     } else if(strcmp(runtime->assembly.command, "transfer_begin") == 0) {
         tumoflip_runtime_transfer_activity(runtime, true);
         tumoflip_runtime_reply(runtime, event->request_id, "transfer_begin", "ok", false);
@@ -219,7 +261,6 @@ int32_t tumoflip_runtime_srv(void* context) {
     runtime->subscription = furi_pubsub_subscribe(
         bt_app_bridge_get_pubsub(runtime->bt), tumoflip_runtime_bridge_callback, runtime);
 
-    FURI_LOG_I(TAG, "Runtime ready");
     TumoflipRuntimeMessage message;
     while(true) {
         if(furi_message_queue_get(runtime->queue, &message, FuriWaitForever) == FuriStatusOk) {

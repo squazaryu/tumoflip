@@ -137,7 +137,9 @@ are legally allowed to test.
 - Confirm legacy FAB1-compatible traffic still works where applicable.
 - Query FAB2 Runtime capabilities.
 - Query FAB2 Runtime status and confirm firmware identity, API, transfer state,
-  and Radio Broker state are present.
+  App Bridge session owner, and Radio Broker state are present.
+- Send Runtime `hello`, confirm a v3 session ID is returned, then query
+  `status` and confirm `sid` and `bo` are present.
 - Send a small Runtime command and verify a response or explicit error frame.
 - Disconnect and reconnect without rebooting the Flipper.
 
