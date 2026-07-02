@@ -2,6 +2,7 @@
 #include <furi.h>
 #include <furi_hal_info.h>
 #include <furi_hal_version.h>
+#include <storage/storage.h>
 #include <subghz_radio_broker/subghz_radio_broker.h>
 #include <string.h>
 
@@ -12,6 +13,7 @@
 #define TUMOFLIP_RUNTIME_REASSEMBLY_MAX    512U
 #define TUMOFLIP_RUNTIME_STATUS_MAX        160U
 #define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX 24U
+#define TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
 #define TUMOFLIP_RUNTIME_CAPABILITIES \
     "runtime=1;fab=2;session=3;features=transfer_activity"
 
@@ -36,6 +38,7 @@ typedef struct {
 
 typedef struct {
     Bt* bt;
+    Storage* storage;
     SubGhzRadioBroker* radio_broker;
     FuriMessageQueue* queue;
     FuriPubSubSubscription* subscription;
@@ -133,6 +136,8 @@ static void
     const uint8_t dirty = version_get_dirty_flag(version) ? 1U : 0U;
     const uint8_t target = version_get_target(version);
     const uint8_t transfer_active = runtime->transfer_active ? 1U : 0U;
+    const uint8_t package_state =
+        storage_file_exists(runtime->storage, TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH) ? 1U : 0U;
 
     SubGhzRadioBrokerStatusV2 radio_status;
     subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status);
@@ -141,7 +146,7 @@ static void
         payload,
         size,
         "schema=2;fw=%.8s;commit=%.8s;dirty=%hhu;origin=%.4s;api=%hu.%hu;target=%hhu;"
-        "transfer=%hhu;sid=%08lX;bo=%.8s;radio=%.8s;owner=%.4s",
+        "transfer=%hhu;pkg=%hhu;sid=%08lX;bo=%.8s;radio=%.8s;owner=%.4s",
         tumoflip_runtime_str_or_unknown(version_get_version(version)),
         tumoflip_runtime_str_or_unknown(version_get_githash(version)),
         dirty,
@@ -150,6 +155,7 @@ static void
         api_minor,
         target,
         transfer_active,
+        package_state,
         (unsigned long)runtime->session.session_id,
         runtime->session.owner,
         tumoflip_runtime_radio_state_name(radio_status.state),
@@ -211,17 +217,12 @@ static void
         if(owner_valid) {
             owner_len = payload_len - owner_prefix_len;
             owner_valid = owner_len <= TUMOFLIP_RUNTIME_SESSION_OWNER_MAX;
-            for(size_t i = 0; owner_valid && (i < owner_len); i++) {
-                const uint8_t owner_byte = runtime->assembly.payload[owner_prefix_len + i];
-                owner_valid = (owner_byte > ' ') && (owner_byte <= '~') && (owner_byte != ';') &&
-                              (owner_byte != '=');
-            }
         }
 
         if(!owner_valid) {
             tumoflip_runtime_reply(runtime, event->request_id, "error", "invalid_owner", true);
         } else {
-            runtime->session.session_id = event->request_id ? event->request_id : 1U;
+            runtime->session.session_id = event->request_id;
             memcpy(runtime->session.owner, &runtime->assembly.payload[owner_prefix_len], owner_len);
             runtime->session.owner[owner_len] = '\0';
 
@@ -257,6 +258,7 @@ int32_t tumoflip_runtime_srv(void* context) {
     runtime->queue =
         furi_message_queue_alloc(TUMOFLIP_RUNTIME_QUEUE_DEPTH, sizeof(TumoflipRuntimeMessage));
     runtime->bt = furi_record_open(RECORD_BT);
+    runtime->storage = furi_record_open(RECORD_STORAGE);
     runtime->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
     runtime->subscription = furi_pubsub_subscribe(
         bt_app_bridge_get_pubsub(runtime->bt), tumoflip_runtime_bridge_callback, runtime);

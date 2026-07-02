@@ -39,10 +39,12 @@ The system app ID is `runtime`.
   `key=value` payload.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
-  `sid`, `bo`, `radio`, and `owner`. `sid` and `bo` identify the current v3
-  session and bridge owner. `radio` is the compact Sub-GHz Broker lifecycle state,
-  such as `idle`, `acq`, `probe`, `init`, `rx`, `tx`, `async_rx`, `async_tx`,
-  `cleanup`, `ext_pwr`, `release`, or `error`. The
+  `pkg`, `sid`, `bo`, `radio`, and `owner`. `pkg=1` means
+  `/.tumoflip/package-state.txt` is present; `pkg=0` means package state is not
+  installed. `sid` and `bo` identify the current v3 session and bridge owner.
+  `radio` is the compact Sub-GHz Broker lifecycle state, such as `idle`, `acq`,
+  `probe`, `init`, `rx`, `tx`, `async_rx`, `async_tx`, `cleanup`, `ext_pwr`,
+  `release`, or `error`. The
   command is read-only and designed to fit in one FAB2 response frame. Long
   owner names may be shortened in this compact status response.
 - `hello` implements the first App Bridge v3 session layer documented in

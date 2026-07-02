@@ -60,7 +60,8 @@ since boot.
 ## Compatibility
 
 - Existing `FAB1` and `FAB2` clients keep using the same GATT transport.
-- `runtime/capabilities` advertises `session=3` and `features=transfer_activity`.
+- `runtime/capabilities` advertises `session=3` and keeps
+  `features=transfer_activity`.
 - A v3 client should call `hello` and treat the returned `sid` plus `sid`/`bo` in
   `runtime/status` as the current firmware-side ownership signal.
 - Handoff request, heartbeat, release, and explicit cancel semantics are

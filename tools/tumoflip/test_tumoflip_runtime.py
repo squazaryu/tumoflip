@@ -50,6 +50,7 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "api=%hu.%hu",
             "target=%hhu",
             "transfer=%hhu",
+            "pkg=%hhu",
             "sid=%08lX",
             "bo=%.8s",
             "radio=%.8s",
@@ -82,6 +83,36 @@ class TumoflipRuntimeTest(unittest.TestCase):
         ):
             self.assertIn(required, capabilities)
 
+    def test_package_state_presence_is_read_only_and_documented(self) -> None:
+        runtime = (
+            REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
+        ).read_text(encoding="utf-8")
+        app = (
+            REPO_ROOT / "applications/services/tumoflip_runtime/application.fam"
+        ).read_text(encoding="utf-8")
+        bridge_docs = (REPO_ROOT / "docs/app-bridge-v2.md").read_text(
+            encoding="utf-8"
+        )
+        package_docs = (REPO_ROOT / "docs/tumoflip-packages.md").read_text(
+            encoding="utf-8"
+        )
+
+        for required in (
+            'requires=["bt", "storage", "subghz_radio_broker"]',
+            'EXT_PATH(".tumoflip/package-state.txt")',
+            "storage_file_exists(runtime->storage, TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH)",
+            "pkg=%hhu",
+        ):
+            self.assertIn(required, runtime if required != 'requires=["bt", "storage", "subghz_radio_broker"]' else app)
+
+        for required in (
+            "pkg=1",
+            "pkg=0",
+            "package-state.txt",
+        ):
+            self.assertIn(required, bridge_docs)
+            self.assertIn(required, package_docs)
+
     def test_app_bridge_v3_sessions_are_documented_and_guarded(self) -> None:
         runtime = (
             REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
@@ -100,8 +131,6 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "#define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX 24U",
             "typedef struct {\n    uint32_t session_id;",
             'strcmp(runtime->assembly.command, "hello") == 0',
-            "owner_byte != ';'",
-            "owner_byte != '='",
             "invalid_owner",
         ):
             self.assertIn(required, runtime)

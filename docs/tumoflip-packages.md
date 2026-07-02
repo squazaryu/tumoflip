@@ -71,6 +71,16 @@ count, cleanup candidate count, and rollback path. It is read-only status for
 firmware and companion diagnostics; it is not an instruction to delete or
 overwrite files.
 
+Firmware exposes the first read-only audit through FAB2 `runtime/status`:
+
+```text
+...;transfer=0;pkg=1;sid=00000000;...
+```
+
+`pkg=1` means the state file is present; `pkg=0` means it is missing. This first
+firmware pass does not parse package fields, hash SD files, or delete stale
+duplicates.
+
 Validation fails when:
 
 - updater or radio CRC differs from `update.fuf`;
