@@ -595,6 +595,17 @@ static void tumo_audit_legacy_paths(Storage* storage, TumoAuditStats* stats) {
     }
 }
 
+static void tumo_packages_append_missing_state_note(FuriString* text) {
+    furi_string_cat_printf(
+        text,
+        "No package transaction has been recorded yet.\n\n"
+        "This is normal after a firmware-only self-update: the app is installed, but "
+        "package metadata is created only by the Tumoflip package install flow.\n\n"
+        "Apply the Tumoflip FW Package bundle once to enable full SHA audit and rollback "
+        "status.\n\n"
+        "No files are changed by this app.");
+}
+
 static void tumo_packages_show_state(TumoPackagesApp* app) {
     TumoPackageState state;
     tumo_state_init(&state);
@@ -602,7 +613,9 @@ static void tumo_packages_show_state(TumoPackagesApp* app) {
 
     furi_string_set_str(app->text, "Package state\n\n");
     if(!state.present) {
-        furi_string_cat_printf(app->text, "State: missing\nPath: %s\n", TUMO_PACKAGE_STATE_PATH);
+        furi_string_cat_printf(
+            app->text, "State: not recorded\nPath: %s\n\n", TUMO_PACKAGE_STATE_PATH);
+        tumo_packages_append_missing_state_note(app->text);
     } else {
         furi_string_cat_printf(app->text, "State: %s\n", state.complete ? "OK" : "partial");
         furi_string_cat_printf(
@@ -638,6 +651,7 @@ static void tumo_packages_show_audit(TumoPackagesApp* app) {
     tumo_audit_install_state(app->storage, &stats);
     tumo_audit_legacy_paths(app->storage, &stats);
 
+    const bool metadata_missing = !state.present && !stats.install_state_present;
     const bool clean = state.complete && stats.install_state_present && !stats.capped &&
                        !stats.line_too_long && (stats.parse_errors == 0) &&
                        (stats.invalid_paths == 0) && (stats.missing == 0) &&
@@ -645,14 +659,23 @@ static void tumo_packages_show_audit(TumoPackagesApp* app) {
                        (stats.legacy_duplicates == 0) && (stats.legacy_review == 0);
 
     furi_string_set_str(app->text, "Tumoflip package audit\n\n");
-    furi_string_cat_printf(app->text, "Overall: %s\n", clean ? "OK" : "needs review");
+    if(metadata_missing) {
+        furi_string_cat_printf(app->text, "Overall: no package metadata\n");
+    } else {
+        furi_string_cat_printf(app->text, "Overall: %s\n", clean ? "OK" : "needs review");
+    }
     furi_string_cat_printf(
-        app->text, "State file: %s\n", state.complete ? "OK" : "missing/partial");
+        app->text,
+        "State file: %s\n",
+        state.complete ? "OK" : (state.present ? "partial" : "not recorded"));
     furi_string_cat_printf(
-        app->text, "Install state: %s\n", stats.install_state_present ? "OK" : "missing");
+        app->text, "Install state: %s\n", stats.install_state_present ? "OK" : "not recorded");
     if(state.present) {
         furi_string_cat_printf(app->text, "FW: %s\n", furi_string_get_cstr(state.firmware));
         furi_string_cat_printf(app->text, "Groups: %s\n", furi_string_get_cstr(state.groups));
+    } else if(metadata_missing) {
+        furi_string_cat_printf(app->text, "\n");
+        tumo_packages_append_missing_state_note(app->text);
     }
 
     furi_string_cat_printf(app->text, "\nFiles\n");

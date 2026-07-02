@@ -34,6 +34,16 @@ class PackageAuditAppTest(unittest.TestCase):
         for forbidden in ("storage_common_remove", "FSAM_WRITE", "FSOM_CREATE"):
             self.assertNotIn(forbidden, source)
 
+    def test_package_audit_app_explains_firmware_only_state(self) -> None:
+        source = (APP_ROOT / "tumoflip_packages.c").read_text(encoding="utf-8")
+        for expected in (
+            "Overall: no package metadata",
+            "State: not recorded",
+            "normal after a firmware-only self-update",
+            "Apply the Tumoflip FW Package bundle once",
+        ):
+            self.assertIn(expected, source)
+
     def test_known_release_cleanup_paths_are_visible_in_audit(self) -> None:
         source = (APP_ROOT / "tumoflip_packages.c").read_text(encoding="utf-8")
         for legacy, canonical in ARF_LEGACY_PATHS.items():
