@@ -84,7 +84,7 @@ App(
         "protocols/protocol_items.c",
         "protocols/protocols_common.c",
     ],
-    fal_embedded=True,
+    fal_embedded=False,
 )
 
 
@@ -114,7 +114,7 @@ App(
         "protocols/star_line.c",
         "protocols/keeloq.c",
     ],
-    fal_embedded=True,
+    fal_embedded=False,
 )
 
 App(
@@ -134,7 +134,7 @@ App(
         "protocols/psa.c",
         "protocols/psa_crypto.c"
     ],
-    fal_embedded=True,
+    fal_embedded=False,
 )
 
 App(
@@ -161,5 +161,5 @@ App(
         "protocols/ford_v3.c",
         "protocols/honda_static.c",
     ],
-    fal_embedded=True,
+    fal_embedded=False,
 )

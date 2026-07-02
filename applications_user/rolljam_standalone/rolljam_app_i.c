@@ -7,9 +7,8 @@
 #define TAG "RollJamTxRx"
 
 static const char* rolljam_get_registry_plugin_path(RollJamProtocolRegistryFilter filter) {
-    return (filter == RollJamProtocolRegistryFilterFM) ?
-               APP_ASSETS_PATH("plugins/rolljam_fm_plugin.fal") :
-               APP_ASSETS_PATH("plugins/rolljam_am_plugin.fal");
+    return (filter == RollJamProtocolRegistryFilterFM) ? ROLLJAM_PROTOCOL_FM_PLUGIN_PATH :
+                                                        ROLLJAM_PROTOCOL_AM_PLUGIN_PATH;
 }
 
 void rolljam_unload_protocol_plugin(RollJamTxRx* txrx) {

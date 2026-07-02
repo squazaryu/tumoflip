@@ -34,9 +34,8 @@
 #define ROLLJAM_CC1101_MOD_FORMAT_OOK  0x30U
 
 static const char* rolljam_rx_chain_plugin_path(RollJamProtocolRegistryFilter filter) {
-    return (filter == RollJamProtocolRegistryFilterFM) ?
-               APP_ASSETS_PATH("plugins/rolljam_fm_plugin.fal") :
-               APP_ASSETS_PATH("plugins/rolljam_am_plugin.fal");
+    return (filter == RollJamProtocolRegistryFilterFM) ? ROLLJAM_PROTOCOL_FM_PLUGIN_PATH :
+                                                        ROLLJAM_PROTOCOL_AM_PLUGIN_PATH;
 }
 
 static bool rolljam_rx_chain_preset_get_register(

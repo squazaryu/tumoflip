@@ -13,7 +13,7 @@
 
 #define TAG "RollJamSceneEmulate"
 
-#define EMULATE_PLUGIN_PATH APP_ASSETS_PATH("plugins/rolljam_emulate_plugin.fal")
+#define EMULATE_PLUGIN_PATH ROLLJAM_PLUGIN_DATA_DIR "/rolljam_emulate_plugin.fal"
 
 static bool host_radio_init(void* app) {
     return rolljam_radio_init((RollJamApp*)app);
