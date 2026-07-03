@@ -197,8 +197,7 @@ static void chrysler_v0_decode_packet(SubGhzProtocolDecoderChrysler_V0* instance
         memcpy(instance->plain_a, decoded, sizeof(instance->plain_a));
         instance->plain_a_present = 1U;
 
-        instance->generic.cnt = ((uint32_t)decoded[0] << 24U) |
-                                ((uint32_t)decoded[1] << 16U) |
+        instance->generic.cnt = ((uint32_t)decoded[0] << 24U) | ((uint32_t)decoded[1] << 16U) |
                                 ((uint32_t)decoded[2] << 8U) | (uint32_t)decoded[3];
     }
 
@@ -216,7 +215,7 @@ static void chrysler_v0_decoder_commit(SubGhzProtocolDecoderChrysler_V0* instanc
     }
 }
 
-#ifdef ENABLE_EMULATE_FEATURE
+#if PROTOPIRATE_WITH_ENCODER
 
 static uint8_t chrysler_v0_payload_get_bit(const uint8_t payload[10], uint8_t index) {
     const uint8_t byte = payload[index >> 3U];
@@ -296,7 +295,7 @@ const SubGhzProtocolDecoder subghz_protocol_chrysler_v0_decoder = {
     .get_string = subghz_protocol_decoder_chrysler_v0_get_string,
 };
 
-#ifdef ENABLE_EMULATE_FEATURE
+#if PROTOPIRATE_WITH_ENCODER
 const SubGhzProtocolEncoder subghz_protocol_chrysler_v0_encoder = {
     .alloc = subghz_protocol_encoder_chrysler_v0_alloc,
     .free = pp_encoder_free,
@@ -317,18 +316,25 @@ const SubGhzProtocolEncoder subghz_protocol_chrysler_v0_encoder = {
 const SubGhzProtocol chrysler_protocol_v0 = {
     .name = CHRYSLER_PROTOCOL_V0_NAME,
     .type = SubGhzProtocolTypeDynamic,
-    .flag = SubGhzProtocolFlag_315 | SubGhzProtocolFlag_433 |
-            SubGhzProtocolFlag_AM | SubGhzProtocolFlag_Decodable | SubGhzProtocolFlag_Save |
-            SubGhzProtocolFlag_Load
-#ifdef ENABLE_EMULATE_FEATURE
+    .flag = SubGhzProtocolFlag_315 | SubGhzProtocolFlag_433 | SubGhzProtocolFlag_AM |
+            SubGhzProtocolFlag_Decodable | SubGhzProtocolFlag_Save | SubGhzProtocolFlag_Load
+#if PROTOPIRATE_WITH_ENCODER
             | SubGhzProtocolFlag_Send
 #endif
     ,
+    #if PROTOPIRATE_WITH_DECODER
     .decoder = &subghz_protocol_chrysler_v0_decoder,
+    #else
+    .decoder = NULL,
+    #endif
+    #if PROTOPIRATE_WITH_ENCODER
     .encoder = &subghz_protocol_chrysler_v0_encoder,
+    #else
+    .encoder = NULL,
+    #endif
 };
 
-#ifdef ENABLE_EMULATE_FEATURE
+#if PROTOPIRATE_WITH_ENCODER
 
 void* subghz_protocol_encoder_chrysler_v0_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);

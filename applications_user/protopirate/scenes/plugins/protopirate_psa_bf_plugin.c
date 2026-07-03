@@ -27,13 +27,6 @@ static ProtoPiratePsaBfContext g_active_ctx = ProtoPiratePsaBfContextReceiverInf
 static void show_bf_result(void* app, uint8_t status, ButtonCallback callback);
 static void bf_finish_and_show_result(void* app, ButtonCallback result_callback);
 
-static void psa_bf_done_cb(void* context) {
-    if(g_host_api && g_host_api->send_custom_event) {
-        g_host_api->send_custom_event(
-            context, ProtoPirateCustomEventPsaBruteforceComplete);
-    }
-}
-
 static bool item_needs_bruteforce_from_ff(FlipperFormat* ff, bool require_psa_protocol) {
     if(!ff) return false;
     FuriString* s = furi_string_alloc();
@@ -105,8 +98,7 @@ static void bf_result_ok_callback(GuiButtonType result, InputType type, void* co
     void* app = context;
     if((type == InputTypeShort || type == InputTypeLong) && result == GuiButtonTypeCenter) {
         if(g_host_api && g_host_api->send_custom_event) {
-            g_host_api->send_custom_event(
-                app, ProtoPirateCustomEventReceiverInfoBruteforceCancel);
+            g_host_api->send_custom_event(app, ProtoPirateCustomEventReceiverInfoBruteforceCancel);
         }
     }
 }
@@ -204,8 +196,7 @@ static void bf_cancel_thread(void) {
 
 static bool plugin_needs_bruteforce(void* app, ProtoPiratePsaBfContext ctx) {
     FlipperFormat* ff = g_host_api->get_history_flipper_format(app);
-    return item_needs_bruteforce_from_ff(
-        ff, ctx == ProtoPiratePsaBfContextReceiverInfo);
+    return item_needs_bruteforce_from_ff(ff, ctx == ProtoPiratePsaBfContextReceiverInfo);
 }
 
 static bool plugin_is_running(void* app) {
@@ -240,8 +231,8 @@ static bool start_bruteforce(void* app) {
         g_host_api->notification_error(app);
         return false;
     }
-    state->on_done = psa_bf_done_cb;
-    state->on_done_ctx = app;
+    state->on_done = NULL;
+    state->on_done_ctx = NULL;
     g_bf_state = state;
     g_bf_thread = furi_thread_alloc_ex("PsaBf", 2048, psa_brute_force_thread_entry, state);
     if(!g_bf_thread) {
@@ -255,10 +246,8 @@ static bool start_bruteforce(void* app) {
     return true;
 }
 
-static bool plugin_on_scene_event(
-    void* app,
-    ProtoPiratePsaBfContext ctx,
-    SceneManagerEvent event) {
+static bool
+    plugin_on_scene_event(void* app, ProtoPiratePsaBfContext ctx, SceneManagerEvent event) {
     g_active_ctx = ctx;
 
     if(event.type == SceneManagerEventTypeBack) {
@@ -283,7 +272,11 @@ static bool plugin_on_scene_event(
             if(bfst == PSA_BF_STATUS_IDLE || bfst == PSA_BF_STATUS_RUNNING) {
                 show_bf_progress(app);
             } else {
-                bf_finish_and_show_result(app, NULL);
+                if(ctx == ProtoPiratePsaBfContextSubDecode) {
+                    g_host_api->send_custom_event(app, ProtoPirateCustomEventPsaBruteforceComplete);
+                } else {
+                    bf_finish_and_show_result(app, NULL);
+                }
             }
             return true;
         }
@@ -340,6 +333,7 @@ static bool plugin_on_scene_event(
 static void plugin_on_scene_exit(void* app, ProtoPiratePsaBfContext ctx) {
     UNUSED(app);
     UNUSED(ctx);
+    bf_cancel_thread();
 }
 
 static bool plugin_widget_left_should_bruteforce(void* app, ProtoPiratePsaBfContext ctx) {

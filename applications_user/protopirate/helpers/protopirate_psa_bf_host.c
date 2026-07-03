@@ -9,7 +9,7 @@
 #include <lib/flipper_application/plugins/composite_resolver.h>
 #include <notification/notification_messages.h>
 
-#define TAG "ProtoPiratePsaBfHost"
+#define TAG                "ProtoPiratePsaBfHost"
 #define PSA_BF_PLUGIN_PATH APP_ASSETS_PATH("plugins/protopirate_psa_bf_plugin.fal")
 
 static bool host_ensure_widget(void* app) {
@@ -80,15 +80,9 @@ static void host_receiver_info_rebuild_widget(void* app) {
     protopirate_receiver_info_rebuild_normal_widget(app);
 }
 
-#ifdef ENABLE_SUB_DECODE_SCENE
 static void host_subdecode_signal_info_refresh(void* app) {
-    protopirate_subdecode_psa_bf_complete_refresh(app);
+    host_send_custom_event(app, ProtoPirateCustomEventSubDecodeUpdate);
 }
-#else
-static void host_subdecode_signal_info_refresh(void* app) {
-    UNUSED(app);
-}
-#endif
 
 static void host_scene_previous(void* app) {
     ProtoPirateApp* a = (ProtoPirateApp*)app;
@@ -178,7 +172,8 @@ bool protopirate_psa_bf_plugin_ensure_loaded(ProtoPirateApp* app) {
 
 void protopirate_psa_bf_plugin_unload_if_idle(ProtoPirateApp* app) {
     if(!app) return;
-    if(app->psa_bf_plugin && app->psa_bf_plugin->is_running && app->psa_bf_plugin->is_running(app)) {
+    if(app->psa_bf_plugin && app->psa_bf_plugin->is_running &&
+       app->psa_bf_plugin->is_running(app)) {
         return;
     }
     psa_bf_plugin_unload(app);
