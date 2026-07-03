@@ -1,0 +1,14 @@
+App(
+    appid="tumo_ir_lab",
+    name="Tumo IR Lab",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="tumo_ir_lab_app",
+    requires=["gui", "storage", "infrared"],
+    fap_libs=["infrared"],
+    stack_size=4 * 1024,
+    fap_category="Module One/IR Blaster",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip",
+    fap_description="Controlled IR carrier, RAW timing, and protocol sandbox for Module One.",
+)
