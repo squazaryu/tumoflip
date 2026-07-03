@@ -7,8 +7,9 @@ App(
     fap_libs=["infrared"],
     stack_size=4 * 1024,
     fap_category="Module One/IR Blaster",
-    fap_version="0.1.0",
+    fap_version="0.2.0",
+    fap_icon="icon.png",
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip",
-    fap_description="Controlled IR carrier, RAW timing, and protocol sandbox for Module One.",
+    fap_description="Controlled IR carrier, PA7 PWM, RAW timing, and protocol sandbox for Module One.",
 )

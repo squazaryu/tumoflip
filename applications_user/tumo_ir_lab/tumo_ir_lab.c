@@ -1,5 +1,6 @@
 #include <furi.h>
 #include <furi_hal_infrared.h>
+#include <furi_hal_pwm.h>
 #include <flipper_format/flipper_format.h>
 #include <gui/gui.h>
 #include <gui/modules/submenu.h>
@@ -10,6 +11,7 @@
 #include <infrared_transmit.h>
 #include <storage/storage.h>
 
+#include <stdio.h>
 #include <string.h>
 
 #define TAG "TumoIrLab"
@@ -17,6 +19,12 @@
 #define TUMO_IR_LAB_DIR         EXT_PATH("apps_data/tumo_ir_lab")
 #define TUMO_IR_LAB_PRESET_PATH EXT_PATH("apps_data/tumo_ir_lab/preset.irlab")
 #define TUMO_IR_LAB_RAW_MAX     64U
+#define TUMO_IR_LAB_CARRIER_KHZ_MIN 10U
+#define TUMO_IR_LAB_CARRIER_KHZ_MAX 250U
+#define TUMO_IR_LAB_CARRIER_KHZ_COUNT \
+    (TUMO_IR_LAB_CARRIER_KHZ_MAX - TUMO_IR_LAB_CARRIER_KHZ_MIN + 1U)
+#define TUMO_IR_LAB_PWM_WHOLE_MAX 250U
+#define TUMO_IR_LAB_DECIMAL_COUNT 10U
 
 typedef enum {
     TumoIrLabViewMain,
@@ -26,6 +34,7 @@ typedef enum {
 
 typedef enum {
     TumoIrLabMenuCarrier,
+    TumoIrLabMenuPwm,
     TumoIrLabMenuRaw,
     TumoIrLabMenuProtocol,
     TumoIrLabMenuSettings,
@@ -41,10 +50,11 @@ typedef enum {
     TumoIrLabOutputCount,
 } TumoIrLabOutput;
 
-typedef struct {
-    const char* label;
-    uint32_t hz;
-} TumoIrLabFrequency;
+typedef enum {
+    TumoIrLabPwmUnitHz,
+    TumoIrLabPwmUnitKhz,
+    TumoIrLabPwmUnitCount,
+} TumoIrLabPwmUnit;
 
 typedef struct {
     const char* label;
@@ -83,14 +93,22 @@ typedef struct {
     FuriString* text;
 
     VariableItem* output_item;
-    VariableItem* frequency_item;
+    VariableItem* carrier_khz_item;
+    VariableItem* carrier_tenth_item;
+    VariableItem* pwm_unit_item;
+    VariableItem* pwm_whole_item;
+    VariableItem* pwm_tenth_item;
     VariableItem* duty_item;
     VariableItem* burst_item;
     VariableItem* repeat_item;
     VariableItem* protocol_item;
 
     uint8_t output_index;
-    uint8_t frequency_index;
+    uint8_t carrier_khz_index;
+    uint8_t carrier_tenth_index;
+    uint8_t pwm_unit_index;
+    uint8_t pwm_whole_index;
+    uint8_t pwm_tenth_index;
     uint8_t duty_index;
     uint8_t burst_index;
     uint8_t repeat_index;
@@ -99,6 +117,7 @@ typedef struct {
     uint32_t raw_timings[TUMO_IR_LAB_RAW_MAX];
     uint32_t raw_count;
     bool raw_start_from_mark;
+    bool pwm_running;
 } TumoIrLabApp;
 
 static const char* const tumo_ir_lab_output_labels[TumoIrLabOutputCount] = {
@@ -107,11 +126,9 @@ static const char* const tumo_ir_lab_output_labels[TumoIrLabOutputCount] = {
     "Module One",
 };
 
-static const TumoIrLabFrequency tumo_ir_lab_frequencies[] = {
-    {"36 kHz", 36000},
-    {"38 kHz", 38000},
-    {"40 kHz", 40000},
-    {"56 kHz", 56000},
+static const char* const tumo_ir_lab_pwm_unit_labels[TumoIrLabPwmUnitCount] = {
+    "Hz",
+    "kHz",
 };
 
 static const TumoIrLabDuty tumo_ir_lab_duties[] = {
@@ -160,6 +177,108 @@ static uint8_t tumo_ir_lab_clamp_index(uint32_t index, size_t count, uint8_t fal
     return (index < count) ? index : fallback;
 }
 
+static uint32_t tumo_ir_lab_clamp_u32(uint32_t value, uint32_t min, uint32_t max) {
+    if(value < min) return min;
+    if(value > max) return max;
+    return value;
+}
+
+static uint32_t tumo_ir_lab_carrier_deci_khz(const TumoIrLabApp* app) {
+    return ((TUMO_IR_LAB_CARRIER_KHZ_MIN + app->carrier_khz_index) * 10U) +
+           app->carrier_tenth_index;
+}
+
+static uint32_t tumo_ir_lab_carrier_frequency_hz(const TumoIrLabApp* app) {
+    return tumo_ir_lab_carrier_deci_khz(app) * 100U;
+}
+
+static uint32_t tumo_ir_lab_pwm_deci_value(const TumoIrLabApp* app) {
+    return ((uint32_t)app->pwm_whole_index * 10U) + app->pwm_tenth_index;
+}
+
+static uint32_t tumo_ir_lab_pwm_frequency_hz(const TumoIrLabApp* app) {
+    uint32_t deci_value = tumo_ir_lab_pwm_deci_value(app);
+
+    if(app->pwm_unit_index == TumoIrLabPwmUnitKhz) {
+        if(deci_value == 0U) deci_value = 1U;
+        return deci_value * 100U;
+    }
+
+    if(deci_value < 100U) deci_value = 100U;
+    return (deci_value + 5U) / 10U;
+}
+
+static void tumo_ir_lab_format_deci_khz(uint32_t deci_khz, char* buffer, size_t size) {
+    snprintf(
+        buffer,
+        size,
+        "%lu.%lu kHz",
+        (unsigned long)(deci_khz / 10U),
+        (unsigned long)(deci_khz % 10U));
+}
+
+static void tumo_ir_lab_format_pwm(const TumoIrLabApp* app, char* buffer, size_t size) {
+    const uint32_t deci_value = tumo_ir_lab_pwm_deci_value(app);
+
+    snprintf(
+        buffer,
+        size,
+        "%lu.%lu %s",
+        (unsigned long)(deci_value / 10U),
+        (unsigned long)(deci_value % 10U),
+        tumo_ir_lab_pwm_unit_labels[app->pwm_unit_index]);
+}
+
+static void tumo_ir_lab_format_whole(uint32_t value, char* buffer, size_t size) {
+    snprintf(buffer, size, "%lu", (unsigned long)value);
+}
+
+static void tumo_ir_lab_format_tenth(uint8_t tenth, char* buffer, size_t size) {
+    snprintf(buffer, size, ".%u", tenth);
+}
+
+static void tumo_ir_lab_set_carrier_frequency(TumoIrLabApp* app, uint32_t frequency_hz) {
+    uint32_t deci_khz = (frequency_hz + 50U) / 100U;
+    deci_khz = tumo_ir_lab_clamp_u32(
+        deci_khz,
+        TUMO_IR_LAB_CARRIER_KHZ_MIN * 10U,
+        (TUMO_IR_LAB_CARRIER_KHZ_MAX * 10U) + 9U);
+
+    const uint32_t whole_khz = deci_khz / 10U;
+    app->carrier_khz_index = whole_khz - TUMO_IR_LAB_CARRIER_KHZ_MIN;
+    app->carrier_tenth_index = deci_khz % 10U;
+}
+
+static void tumo_ir_lab_set_pwm_frequency(TumoIrLabApp* app, uint32_t frequency_hz) {
+    frequency_hz = tumo_ir_lab_clamp_u32(
+        frequency_hz, 10U, (TUMO_IR_LAB_PWM_WHOLE_MAX * 1000U) + 900U);
+
+    if(frequency_hz < 1000U) {
+        uint32_t deci_hz = frequency_hz * 10U;
+        deci_hz = tumo_ir_lab_clamp_u32(deci_hz, 100U, TUMO_IR_LAB_PWM_WHOLE_MAX * 10U + 9U);
+        app->pwm_unit_index = TumoIrLabPwmUnitHz;
+        app->pwm_whole_index = deci_hz / 10U;
+        app->pwm_tenth_index = deci_hz % 10U;
+    } else {
+        uint32_t deci_khz = (frequency_hz + 50U) / 100U;
+        deci_khz = tumo_ir_lab_clamp_u32(deci_khz, 1U, TUMO_IR_LAB_PWM_WHOLE_MAX * 10U + 9U);
+        app->pwm_unit_index = TumoIrLabPwmUnitKhz;
+        app->pwm_whole_index = deci_khz / 10U;
+        app->pwm_tenth_index = deci_khz % 10U;
+    }
+}
+
+static void tumo_ir_lab_normalize_pwm(TumoIrLabApp* app) {
+    if(app->pwm_unit_index == TumoIrLabPwmUnitHz) {
+        if(app->pwm_whole_index < 10U) {
+            app->pwm_whole_index = 10U;
+            app->pwm_tenth_index = 0U;
+        }
+    } else if((app->pwm_whole_index == 0U) && (app->pwm_tenth_index == 0U)) {
+        app->pwm_tenth_index = 1U;
+    }
+}
+
 static float tumo_ir_lab_duty_value(const TumoIrLabApp* app) {
     return (float)tumo_ir_lab_duties[app->duty_index].percent / 100.0f;
 }
@@ -184,12 +303,16 @@ static void tumo_ir_lab_set_text(TumoIrLabApp* app) {
 }
 
 static void tumo_ir_lab_status_header(TumoIrLabApp* app, const char* title) {
+    char frequency_text[24];
+    tumo_ir_lab_format_deci_khz(
+        tumo_ir_lab_carrier_deci_khz(app), frequency_text, sizeof(frequency_text));
+
     furi_string_printf(
         app->text,
         "%s\n\nOutput: %s\nFreq: %s\nDuty: %s\n",
         title,
         tumo_ir_lab_output_labels[app->output_index],
-        tumo_ir_lab_frequencies[app->frequency_index].label,
+        frequency_text,
         tumo_ir_lab_duties[app->duty_index].label);
 }
 
@@ -229,9 +352,18 @@ static bool tumo_ir_lab_send_carrier(
     return true;
 }
 
+static void tumo_ir_lab_stop_pwm(TumoIrLabApp* app) {
+    if(app->pwm_running) {
+        furi_hal_pwm_stop(FuriHalPwmOutputIdTim1PA7);
+        app->pwm_running = false;
+    }
+}
+
 static void tumo_ir_lab_run_carrier(TumoIrLabApp* app) {
+    tumo_ir_lab_stop_pwm(app);
+
     const FuriHalInfraredTxPin output = tumo_ir_lab_resolve_output(app);
-    const uint32_t frequency = tumo_ir_lab_frequencies[app->frequency_index].hz;
+    const uint32_t frequency = tumo_ir_lab_carrier_frequency_hz(app);
     const uint32_t burst_ms = tumo_ir_lab_bursts[app->burst_index].ms;
     const bool ok = tumo_ir_lab_send_carrier(
         frequency, tumo_ir_lab_duty_value(app), burst_ms, output);
@@ -246,9 +378,60 @@ static void tumo_ir_lab_run_carrier(TumoIrLabApp* app) {
     tumo_ir_lab_set_text(app);
 }
 
+static void tumo_ir_lab_run_pwm(TumoIrLabApp* app) {
+    tumo_ir_lab_normalize_pwm(app);
+
+    char pwm_text[24];
+    tumo_ir_lab_format_pwm(app, pwm_text, sizeof(pwm_text));
+
+    const uint32_t frequency = tumo_ir_lab_pwm_frequency_hz(app);
+    const uint8_t duty = tumo_ir_lab_duties[app->duty_index].percent;
+
+    if(app->pwm_running) {
+        tumo_ir_lab_stop_pwm(app);
+        furi_string_printf(
+            app->text,
+            "PA7 PWM generator\n\nSelected: %s\nActual: %lu Hz\nDuty: %u%%\n\nPWM stopped.",
+            pwm_text,
+            frequency,
+            duty);
+        tumo_ir_lab_set_text(app);
+        return;
+    }
+
+    if(furi_hal_infrared_is_busy()) {
+        furi_string_printf(
+            app->text,
+            "PA7 PWM generator\n\nIR is busy. Close other IR apps before starting PWM.");
+        tumo_ir_lab_set_text(app);
+        return;
+    }
+
+    if(furi_hal_pwm_is_running(FuriHalPwmOutputIdTim1PA7)) {
+        furi_string_set_str(
+            app->text,
+            "PA7 PWM generator\n\nPA7 PWM is already running. Close the other GPIO/PWM app first.");
+        tumo_ir_lab_set_text(app);
+        return;
+    }
+
+    furi_hal_pwm_start(FuriHalPwmOutputIdTim1PA7, frequency, duty);
+    app->pwm_running = true;
+
+    furi_string_printf(
+        app->text,
+        "PA7 PWM generator\n\nSelected: %s\nActual: %lu Hz\nDuty: %u%%\nPin: Module One PA7\n\nOpen this item again to stop.",
+        pwm_text,
+        frequency,
+        duty);
+    tumo_ir_lab_set_text(app);
+}
+
 static void tumo_ir_lab_run_raw(TumoIrLabApp* app) {
+    tumo_ir_lab_stop_pwm(app);
+
     const FuriHalInfraredTxPin output = tumo_ir_lab_resolve_output(app);
-    const uint32_t frequency = tumo_ir_lab_frequencies[app->frequency_index].hz;
+    const uint32_t frequency = tumo_ir_lab_carrier_frequency_hz(app);
     const uint8_t repeats = tumo_ir_lab_repeats[app->repeat_index].count;
     bool ok = app->raw_count > 1;
 
@@ -282,6 +465,8 @@ static void tumo_ir_lab_run_raw(TumoIrLabApp* app) {
 }
 
 static void tumo_ir_lab_run_protocol(TumoIrLabApp* app) {
+    tumo_ir_lab_stop_pwm(app);
+
     const TumoIrLabProtocolSample* sample = &tumo_ir_lab_protocols[app->protocol_index];
     const FuriHalInfraredTxPin output = tumo_ir_lab_resolve_output(app);
     bool ok = !furi_hal_infrared_is_busy();
@@ -329,8 +514,11 @@ static bool tumo_ir_lab_save_preset(TumoIrLabApp* app) {
         uint32_t value = app->output_index;
         if(!flipper_format_write_uint32(ff, "OutputMode", &value, 1)) break;
 
-        value = tumo_ir_lab_frequencies[app->frequency_index].hz;
+        value = tumo_ir_lab_carrier_frequency_hz(app);
         if(!flipper_format_write_uint32(ff, "Frequency", &value, 1)) break;
+
+        value = tumo_ir_lab_pwm_frequency_hz(app);
+        if(!flipper_format_write_uint32(ff, "PwmFrequency", &value, 1)) break;
 
         value = tumo_ir_lab_duties[app->duty_index].percent;
         if(!flipper_format_write_uint32(ff, "DutyPercent", &value, 1)) break;
@@ -360,13 +548,6 @@ static bool tumo_ir_lab_save_preset(TumoIrLabApp* app) {
     return success;
 }
 
-static uint8_t tumo_ir_lab_find_frequency(uint32_t value) {
-    for(size_t i = 0; i < COUNT_OF(tumo_ir_lab_frequencies); i++) {
-        if(tumo_ir_lab_frequencies[i].hz == value) return i;
-    }
-    return 1;
-}
-
 static uint8_t tumo_ir_lab_find_duty(uint32_t value) {
     for(size_t i = 0; i < COUNT_OF(tumo_ir_lab_duties); i++) {
         if(tumo_ir_lab_duties[i].percent == value) return i;
@@ -390,7 +571,11 @@ static uint8_t tumo_ir_lab_find_repeat(uint32_t value) {
 
 static bool tumo_ir_lab_load_preset(TumoIrLabApp* app) {
     const uint8_t old_output_index = app->output_index;
-    const uint8_t old_frequency_index = app->frequency_index;
+    const uint8_t old_carrier_khz_index = app->carrier_khz_index;
+    const uint8_t old_carrier_tenth_index = app->carrier_tenth_index;
+    const uint8_t old_pwm_unit_index = app->pwm_unit_index;
+    const uint8_t old_pwm_whole_index = app->pwm_whole_index;
+    const uint8_t old_pwm_tenth_index = app->pwm_tenth_index;
     const uint8_t old_duty_index = app->duty_index;
     const uint8_t old_burst_index = app->burst_index;
     const uint8_t old_repeat_index = app->repeat_index;
@@ -416,7 +601,11 @@ static bool tumo_ir_lab_load_preset(TumoIrLabApp* app) {
         }
 
         if(flipper_format_read_uint32(ff, "Frequency", &value, 1)) {
-            app->frequency_index = tumo_ir_lab_find_frequency(value);
+            tumo_ir_lab_set_carrier_frequency(app, value);
+        }
+
+        if(flipper_format_read_uint32(ff, "PwmFrequency", &value, 1)) {
+            tumo_ir_lab_set_pwm_frequency(app, value);
         }
 
         if(flipper_format_read_uint32(ff, "DutyPercent", &value, 1)) {
@@ -455,7 +644,11 @@ static bool tumo_ir_lab_load_preset(TumoIrLabApp* app) {
 
     if(!success) {
         app->output_index = old_output_index;
-        app->frequency_index = old_frequency_index;
+        app->carrier_khz_index = old_carrier_khz_index;
+        app->carrier_tenth_index = old_carrier_tenth_index;
+        app->pwm_unit_index = old_pwm_unit_index;
+        app->pwm_whole_index = old_pwm_whole_index;
+        app->pwm_tenth_index = old_pwm_tenth_index;
         app->duty_index = old_duty_index;
         app->burst_index = old_burst_index;
         app->repeat_index = old_repeat_index;
@@ -469,13 +662,35 @@ static bool tumo_ir_lab_load_preset(TumoIrLabApp* app) {
 }
 
 static void tumo_ir_lab_settings_refresh(TumoIrLabApp* app) {
+    char value_text[24];
+
     variable_item_set_current_value_index(app->output_item, app->output_index);
     variable_item_set_current_value_text(
         app->output_item, tumo_ir_lab_output_labels[app->output_index]);
 
-    variable_item_set_current_value_index(app->frequency_item, app->frequency_index);
+    variable_item_set_current_value_index(app->carrier_khz_item, app->carrier_khz_index);
+    tumo_ir_lab_format_whole(
+        TUMO_IR_LAB_CARRIER_KHZ_MIN + app->carrier_khz_index,
+        value_text,
+        sizeof(value_text));
+    variable_item_set_current_value_text(app->carrier_khz_item, value_text);
+
+    variable_item_set_current_value_index(app->carrier_tenth_item, app->carrier_tenth_index);
+    tumo_ir_lab_format_tenth(app->carrier_tenth_index, value_text, sizeof(value_text));
+    variable_item_set_current_value_text(app->carrier_tenth_item, value_text);
+
+    tumo_ir_lab_normalize_pwm(app);
+    variable_item_set_current_value_index(app->pwm_unit_item, app->pwm_unit_index);
     variable_item_set_current_value_text(
-        app->frequency_item, tumo_ir_lab_frequencies[app->frequency_index].label);
+        app->pwm_unit_item, tumo_ir_lab_pwm_unit_labels[app->pwm_unit_index]);
+
+    variable_item_set_current_value_index(app->pwm_whole_item, app->pwm_whole_index);
+    tumo_ir_lab_format_whole(app->pwm_whole_index, value_text, sizeof(value_text));
+    variable_item_set_current_value_text(app->pwm_whole_item, value_text);
+
+    variable_item_set_current_value_index(app->pwm_tenth_item, app->pwm_tenth_index);
+    tumo_ir_lab_format_tenth(app->pwm_tenth_index, value_text, sizeof(value_text));
+    variable_item_set_current_value_text(app->pwm_tenth_item, value_text);
 
     variable_item_set_current_value_index(app->duty_item, app->duty_index);
     variable_item_set_current_value_text(
@@ -501,11 +716,50 @@ static void tumo_ir_lab_output_changed(VariableItem* item) {
         item, tumo_ir_lab_output_labels[app->output_index]);
 }
 
-static void tumo_ir_lab_frequency_changed(VariableItem* item) {
+static void tumo_ir_lab_carrier_khz_changed(VariableItem* item) {
+    char value_text[24];
     TumoIrLabApp* app = variable_item_get_context(item);
-    app->frequency_index = variable_item_get_current_value_index(item);
-    variable_item_set_current_value_text(
-        item, tumo_ir_lab_frequencies[app->frequency_index].label);
+    app->carrier_khz_index = variable_item_get_current_value_index(item);
+    tumo_ir_lab_format_whole(
+        TUMO_IR_LAB_CARRIER_KHZ_MIN + app->carrier_khz_index,
+        value_text,
+        sizeof(value_text));
+    variable_item_set_current_value_text(item, value_text);
+}
+
+static void tumo_ir_lab_carrier_tenth_changed(VariableItem* item) {
+    char value_text[24];
+    TumoIrLabApp* app = variable_item_get_context(item);
+    app->carrier_tenth_index = variable_item_get_current_value_index(item);
+    tumo_ir_lab_format_tenth(app->carrier_tenth_index, value_text, sizeof(value_text));
+    variable_item_set_current_value_text(item, value_text);
+}
+
+static void tumo_ir_lab_pwm_unit_changed(VariableItem* item) {
+    TumoIrLabApp* app = variable_item_get_context(item);
+    app->pwm_unit_index = variable_item_get_current_value_index(item);
+    tumo_ir_lab_normalize_pwm(app);
+    tumo_ir_lab_settings_refresh(app);
+}
+
+static void tumo_ir_lab_pwm_whole_changed(VariableItem* item) {
+    char value_text[24];
+    TumoIrLabApp* app = variable_item_get_context(item);
+    app->pwm_whole_index = variable_item_get_current_value_index(item);
+    tumo_ir_lab_normalize_pwm(app);
+    tumo_ir_lab_format_whole(app->pwm_whole_index, value_text, sizeof(value_text));
+    variable_item_set_current_value_index(item, app->pwm_whole_index);
+    variable_item_set_current_value_text(item, value_text);
+}
+
+static void tumo_ir_lab_pwm_tenth_changed(VariableItem* item) {
+    char value_text[24];
+    TumoIrLabApp* app = variable_item_get_context(item);
+    app->pwm_tenth_index = variable_item_get_current_value_index(item);
+    tumo_ir_lab_normalize_pwm(app);
+    tumo_ir_lab_format_tenth(app->pwm_tenth_index, value_text, sizeof(value_text));
+    variable_item_set_current_value_index(item, app->pwm_tenth_index);
+    variable_item_set_current_value_text(item, value_text);
 }
 
 static void tumo_ir_lab_duty_changed(VariableItem* item) {
@@ -560,9 +814,9 @@ static void tumo_ir_lab_load(TumoIrLabApp* app) {
 static void tumo_ir_lab_show_about(TumoIrLabApp* app) {
     furi_string_set_str(
         app->text,
-        "Tumo IR Lab 0.1\n\n"
-        "Carrier burst, RAW sample replay, and NEC/SIRC/RC5 sample transmit.\n\n"
-        "IR-only output. Module One uses PA7 external IR when selected or detected.");
+        "Tumo IR Lab 0.2\n\n"
+        "Carrier burst, PA7 PWM generator, RAW replay, and NEC/SIRC/RC5 sample transmit.\n\n"
+        "IR carrier: 10.0-250.9 kHz.\nPA7 PWM: from 10 Hz on Module One.");
     tumo_ir_lab_set_text(app);
 }
 
@@ -577,6 +831,9 @@ static bool tumo_ir_lab_custom_event_callback(void* context, uint32_t event) {
     switch(event) {
     case TumoIrLabMenuCarrier:
         tumo_ir_lab_run_carrier(app);
+        return true;
+    case TumoIrLabMenuPwm:
+        tumo_ir_lab_run_pwm(app);
         return true;
     case TumoIrLabMenuRaw:
         tumo_ir_lab_run_raw(app);
@@ -619,7 +876,8 @@ static TumoIrLabApp* tumo_ir_lab_alloc(void) {
     app->storage = furi_record_open(RECORD_STORAGE);
     app->text = furi_string_alloc();
     app->output_index = TumoIrLabOutputAuto;
-    app->frequency_index = 1;
+    tumo_ir_lab_set_carrier_frequency(app, 38000U);
+    tumo_ir_lab_set_pwm_frequency(app, 38000U);
     app->duty_index = 1;
     app->burst_index = 1;
     app->repeat_index = 0;
@@ -636,6 +894,8 @@ static TumoIrLabApp* tumo_ir_lab_alloc(void) {
     submenu_set_header(app->main_menu, "Tumo IR Lab");
     submenu_add_item(
         app->main_menu, "Carrier Burst", TumoIrLabMenuCarrier, tumo_ir_lab_menu_callback, app);
+    submenu_add_item(
+        app->main_menu, "PA7 PWM Start/Stop", TumoIrLabMenuPwm, tumo_ir_lab_menu_callback, app);
     submenu_add_item(
         app->main_menu, "Replay RAW Sample", TumoIrLabMenuRaw, tumo_ir_lab_menu_callback, app);
     submenu_add_item(
@@ -659,11 +919,35 @@ static TumoIrLabApp* tumo_ir_lab_alloc(void) {
         TumoIrLabOutputCount,
         tumo_ir_lab_output_changed,
         app);
-    app->frequency_item = variable_item_list_add(
+    app->carrier_khz_item = variable_item_list_add(
         app->settings,
-        "Carrier",
-        COUNT_OF(tumo_ir_lab_frequencies),
-        tumo_ir_lab_frequency_changed,
+        "IR kHz",
+        TUMO_IR_LAB_CARRIER_KHZ_COUNT,
+        tumo_ir_lab_carrier_khz_changed,
+        app);
+    app->carrier_tenth_item = variable_item_list_add(
+        app->settings,
+        "IR .1",
+        TUMO_IR_LAB_DECIMAL_COUNT,
+        tumo_ir_lab_carrier_tenth_changed,
+        app);
+    app->pwm_unit_item = variable_item_list_add(
+        app->settings,
+        "PA7 Unit",
+        TumoIrLabPwmUnitCount,
+        tumo_ir_lab_pwm_unit_changed,
+        app);
+    app->pwm_whole_item = variable_item_list_add(
+        app->settings,
+        "PA7 Whole",
+        TUMO_IR_LAB_PWM_WHOLE_MAX + 1U,
+        tumo_ir_lab_pwm_whole_changed,
+        app);
+    app->pwm_tenth_item = variable_item_list_add(
+        app->settings,
+        "PA7 .1",
+        TUMO_IR_LAB_DECIMAL_COUNT,
+        tumo_ir_lab_pwm_tenth_changed,
         app);
     app->duty_item = variable_item_list_add(
         app->settings, "Duty", COUNT_OF(tumo_ir_lab_duties), tumo_ir_lab_duty_changed, app);
@@ -699,6 +983,8 @@ static TumoIrLabApp* tumo_ir_lab_alloc(void) {
 
 static void tumo_ir_lab_free(TumoIrLabApp* app) {
     furi_assert(app);
+
+    tumo_ir_lab_stop_pwm(app);
 
     if(!furi_hal_infrared_is_busy()) {
         furi_hal_infrared_set_tx_output(FuriHalInfraredTxPinInternal);
