@@ -4,6 +4,7 @@
 #include <gui/view_dispatcher.h>
 #include <loader/loader.h>
 #include <storage/storage.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #define ARF_TOOLS_PATH   EXT_PATH("apps/ARF Tools/")
@@ -50,6 +51,18 @@ static void arf_subghz_hub_launch_callback(void* context, uint32_t index) {
         arf_subghz_hub_items[index].target,
         arf_subghz_hub_items[index].args,
         LoaderDeferredLaunchFlagGui);
+
+    FuriString* self_path = furi_string_alloc();
+    if(loader_get_application_launch_path(app->loader, self_path)) {
+        char selected_item_arg[8];
+        snprintf(selected_item_arg, sizeof(selected_item_arg), "%lu", (unsigned long)index);
+        loader_enqueue_launch(
+            app->loader,
+            furi_string_get_cstr(self_path),
+            selected_item_arg,
+            LoaderDeferredLaunchFlagGui);
+    }
+    furi_string_free(self_path);
 
     view_dispatcher_stop(app->view_dispatcher);
 }

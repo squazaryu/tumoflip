@@ -96,15 +96,17 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertNotIn("view_dispatcher_stop(loader_menu->view_dispatcher)", loader_menu)
         self.assertNotIn("loader_menu_has_pending_launch", loader)
 
-    def test_full_launches_children_without_reopening_itself(self) -> None:
+    def test_full_reopens_after_child_exit(self) -> None:
         start_scene = (
             REPO_ROOT / "applications_user/arf_subghz_full/arf_subghz_hub.c"
         ).read_text(encoding="utf-8")
 
         self.assertIn("Frequency Analyzer", start_scene)
         self.assertNotIn("ARF Analyzer", start_scene)
-        self.assertEqual(start_scene.count("loader_enqueue_launch("), 1)
-        self.assertNotIn("loader_get_application_launch_path", start_scene)
+        self.assertEqual(start_scene.count("loader_enqueue_launch("), 2)
+        self.assertIn("loader_get_application_launch_path", start_scene)
+        self.assertIn("selected_item_arg", start_scene)
+        self.assertIn("snprintf(selected_item_arg", start_scene)
 
     def test_frequency_analyzer_fap_starts_directly(self) -> None:
         manifest = (
