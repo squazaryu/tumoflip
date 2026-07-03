@@ -40,6 +40,7 @@ GeoJSON exports are written to:
 - `Left` / `Right`: switch between `Scan All`, `Scan AP`, and `Wardrive`.
 - `Up`: send the selected scan command.
 - `Down`: send `stopscan`.
+- Hold `Down`: toggle the opt-in Companion live BLE relay.
 - `Back`: exit.
 
 ## Session Summary
@@ -83,6 +84,30 @@ Open the `WiFi` tab and use `WiFi Mapper` to view clean or raw exports on a map.
 The companion parser keeps the Flipper export format simple: coordinates come
 from GeoJSON `Point` geometry, while `ssid`, `bssid`, `auth`, `channel`, RSSI,
 `samples`, and tick metadata stay in feature properties.
+
+## Companion Live Relay
+
+Hold `Down` on the live screen to arm or disable live BLE relay for the current
+WiFi Mapper app session. The relay is not persisted and is never started in the
+background; the on-screen `BLE` marker is shown while it is armed.
+
+When armed, printable UART lines from the ESP32 are relayed over App Bridge v2
+as best-effort events:
+
+- app ID: `wifi_mapper`
+- command: `live_line`
+- request ID: `0`
+- flags: `0`
+- chunk index/count: `0/1`
+- payload: UTF-8 text containing one or more raw UART lines separated by `\n`
+- payload limit: `150` bytes per event, below the FAB2 `160` byte cap
+
+Long individual lines are clipped to the relay payload limit. Multiple short
+lines may be coalesced into one event to reduce pressure on the shared BLE/RPC
+link. Pending lines are flushed when the relay is disabled, logging stops, or
+the app exits. If App Bridge is disabled, the phone is disconnected, or BLE
+cannot accept the event, that flush is dropped; the CSV session log remains the
+source of truth for offline review.
 
 ## Log Format
 

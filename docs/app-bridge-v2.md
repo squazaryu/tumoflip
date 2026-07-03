@@ -63,6 +63,32 @@ Every response carries the request ID of the command. Runtime responses are
 semantic acknowledgements; the acknowledgement-requested flag is reserved for
 future generic delivery acknowledgements.
 
+## App Events
+
+FAPs may also emit best-effort events to the paired central. These events use
+the same FAB2 frame format but are not Runtime command responses unless the
+response flag is set.
+
+### WiFi Mapper live relay
+
+`WiFi Mapper` can relay live ESP32 scan output to the iOS Companion after the
+user explicitly arms it on the Flipper.
+
+| Field | Value |
+|---|---|
+| App ID | `wifi_mapper` |
+| Command | `live_line` |
+| Request ID | `0` |
+| Flags | `0` |
+| Chunk index/count | `0/1` |
+| Payload | UTF-8 text with one or more raw UART lines separated by `\n` |
+| Payload limit | `150` bytes |
+
+The relay is opt-in, session-local, and best-effort. It does not request
+acknowledgements and it does not replay missed events. If the phone is
+disconnected or App Bridge is disabled, the firmware may drop the event while
+continuing to write the local WiFi Mapper CSV log.
+
 ## Compatibility
 
 The firmware accepts both `FAB1` and `FAB2`. Existing FAP subscribers receive

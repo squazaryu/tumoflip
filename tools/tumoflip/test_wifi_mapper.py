@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 
+import re
 import unittest
 from pathlib import Path
+
+try:
+    from .app_bridge_v2 import PAYLOAD_MAX
+except ImportError:
+    from app_bridge_v2 import PAYLOAD_MAX
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -14,7 +20,9 @@ class WiFiMapperTest(unittest.TestCase):
 
         self.assertIn('appid="wifi_mapper"', manifest)
         self.assertIn("FlipperAppType.EXTERNAL", manifest)
+        self.assertIn('requires=["gui", "storage", "notification", "bt"]', manifest)
         self.assertIn('fap_category="Module One/ESP32 Wi-Fi"', manifest)
+        self.assertIn('fap_version="0.9"', manifest)
         self.assertIn('fap_icon="wifi_mapper_10px.png"', manifest)
         self.assertTrue((APP_DIR / "wifi_mapper_10px.png").is_file())
 
@@ -75,6 +83,46 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn('elements_button_right(canvas, "Mode")', source)
         self.assertIn("FuriHalSerialIdUsart", source)
         self.assertIn("FSOM_CREATE_ALWAYS", source)
+
+    def test_live_relay_contract_is_stable_and_opt_in(self) -> None:
+        source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
+
+        self.assertIn("#include <bt/bt_service/bt.h>", source)
+        self.assertIn('#define WIFI_MAPPER_RELAY_APP_ID      "wifi_mapper"', source)
+        self.assertIn('#define WIFI_MAPPER_RELAY_COMMAND     "live_line"', source)
+        self.assertIn("bt_app_bridge_send_text_v2(", source)
+        self.assertIn("app->bt = furi_record_open(RECORD_BT);", source)
+        self.assertIn("furi_record_close(RECORD_BT);", source)
+        self.assertIn("WiFiMapperModel", source)
+        self.assertIn("bool ble_relay;", source)
+        self.assertIn('model->ble_relay ? "BLE" : ""', source)
+        self.assertIn("(event->type == InputTypeLong) && (event->key == InputKeyDown)", source)
+        self.assertIn('strlcpy(app->status, "BLE live on"', source)
+        self.assertIn('strlcpy(app->status, "BLE live off"', source)
+        self.assertIn("wifi_mapper_relay_flush_locked(app);", source)
+        self.assertIn("wifi_mapper_close_log(app);", source)
+        self.assertIn("char relay_buffer[WIFI_MAPPER_RELAY_PAYLOAD_MAX + 1U];", source)
+        self.assertNotIn("Issue #6", source)
+
+        match = re.search(r"#define WIFI_MAPPER_RELAY_PAYLOAD_MAX\s+(\d+)U", source)
+        self.assertIsNotNone(match)
+        self.assertLessEqual(int(match.group(1)), PAYLOAD_MAX)
+
+    def test_live_relay_contract_is_documented_for_companion(self) -> None:
+        wifi_doc = (REPO_ROOT / "docs/wifi-mapper.md").read_text(encoding="utf-8")
+        bridge_doc = (REPO_ROOT / "docs/app-bridge-v2.md").read_text(encoding="utf-8")
+
+        for doc in (wifi_doc, bridge_doc):
+            self.assertIn("wifi_mapper", doc)
+            self.assertIn("live_line", doc)
+            self.assertIn("150", doc)
+            self.assertIn("best-effort", doc)
+            self.assertIn("0/1", doc)
+
+        self.assertIn("Hold `Down`", wifi_doc)
+        self.assertIn("not persisted", wifi_doc)
+        self.assertIn("App Bridge is disabled", wifi_doc)
+        self.assertIn("WiFi Mapper live relay", bridge_doc)
 
     def test_uart_logger_does_not_expose_attack_commands(self) -> None:
         source = (APP_DIR / "wifi_mapper.c").read_text(

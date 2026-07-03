@@ -9,6 +9,7 @@
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
 #include <storage/storage.h>
+#include <bt/bt_service/bt.h>
 
 #include <ctype.h>
 #include <stdint.h>
@@ -41,6 +42,16 @@
 #define WIFI_MAPPER_SCAN_AP_COMMAND  "scanap\r\n"
 #define WIFI_MAPPER_WARDRIVE_COMMAND "wardrive -serial\r\n"
 #define WIFI_MAPPER_STOP_COMMAND "stopscan\r\n"
+
+// Opt-in live relay for Companion Live WiFi scan. The payload is one or more
+// raw printable UART lines separated by '\n' and sent as a single FAB2 frame:
+// app_id "wifi_mapper", command "live_line", request_id 0, flags 0.
+// Keep the payload below the App Bridge v2 160-byte cap; long single lines are
+// clipped rather than dropped so the phone still receives a useful sample.
+#define WIFI_MAPPER_RELAY_APP_ID      "wifi_mapper"
+#define WIFI_MAPPER_RELAY_COMMAND     "live_line"
+#define WIFI_MAPPER_RELAY_PAYLOAD_MAX 150U
+#define WIFI_MAPPER_RELAY_FLUSH_MS    120U
 
 typedef enum {
     WiFiMapperEventReserved = (1 << 0),
@@ -171,6 +182,7 @@ typedef struct {
     WiFiMapperScreen screen;
     bool logging;
     bool uart_ready;
+    bool ble_relay;
     WiFiMapperScanMode scan_mode;
     WiFiMapperExportMode export_mode;
     WiFiMapperSessionStats session;
@@ -186,6 +198,7 @@ typedef struct {
     Gui* gui;
     Storage* storage;
     NotificationApp* notification;
+    Bt* bt;
     ViewDispatcher* view_dispatcher;
     View* view;
     FuriThread* worker_thread;
@@ -199,6 +212,10 @@ typedef struct {
     WiFiMapperScreen screen;
     bool logging;
     bool uart_ready;
+    bool ble_relay;
+    char relay_buffer[WIFI_MAPPER_RELAY_PAYLOAD_MAX + 1U];
+    size_t relay_buffer_len;
+    uint32_t relay_last_send_ms;
     WiFiMapperScanMode scan_mode;
     WiFiMapperExportMode export_mode;
     WiFiMapperSessionStats session;
@@ -240,6 +257,7 @@ static void wifi_mapper_update_model(WiFiMapperApp* app) {
     const WiFiMapperScreen screen = app->screen;
     const bool logging = app->logging;
     const bool uart_ready = app->uart_ready;
+    const bool ble_relay = app->ble_relay;
     const WiFiMapperScanMode scan_mode = app->scan_mode;
     const WiFiMapperExportMode export_mode = app->export_mode;
     const WiFiMapperSessionStats session = app->session;
@@ -261,6 +279,7 @@ static void wifi_mapper_update_model(WiFiMapperApp* app) {
             model->screen = screen;
             model->logging = logging;
             model->uart_ready = uart_ready;
+            model->ble_relay = ble_relay;
             model->scan_mode = scan_mode;
             model->export_mode = export_mode;
             model->session = session;
@@ -1456,6 +1475,76 @@ static void wifi_mapper_write_log_record(
     storage_file_write(file, "\n", 1);
 }
 
+// Must be called with app->mutex held. Sends whatever is buffered (if any) as one
+// App Bridge event and resets the buffer. Best-effort: a failed/absent BLE link just
+// drops this flush, matching how the rest of the app treats a missing connection.
+static void wifi_mapper_relay_flush_locked(WiFiMapperApp* app) {
+    if(app->relay_buffer_len == 0U) {
+        return;
+    }
+    app->relay_buffer[app->relay_buffer_len] = '\0';
+    if(app->bt) {
+        bt_app_bridge_send_text_v2(
+            app->bt, WIFI_MAPPER_RELAY_APP_ID, WIFI_MAPPER_RELAY_COMMAND, 0, 0, app->relay_buffer);
+    }
+    app->relay_buffer_len = 0U;
+    app->relay_last_send_ms =
+        (furi_get_tick() * 1000U) / furi_kernel_get_tick_frequency();
+}
+
+// Must be called with app->mutex held. Lines are coalesced into fewer BLE
+// sends, then flushed on the first line, after a short interval, before buffer
+// overflow, on stop, on explicit disable, or on app exit.
+static void wifi_mapper_relay_append_locked(WiFiMapperApp* app, const char* line) {
+    const uint32_t now_ms = (furi_get_tick() * 1000U) / furi_kernel_get_tick_frequency();
+    const size_t capacity = sizeof(app->relay_buffer) - 1U;
+    const bool due = (now_ms - app->relay_last_send_ms) >= WIFI_MAPPER_RELAY_FLUSH_MS;
+
+    size_t line_len = strlen(line);
+    if(line_len > capacity) {
+        line_len = capacity;
+    }
+
+    if(app->relay_buffer_len > 0U) {
+        const size_t required = 1U + line_len; // newline plus line bytes
+        if((app->relay_buffer_len + required) > capacity) {
+            wifi_mapper_relay_flush_locked(app);
+        }
+    }
+
+    if(app->relay_buffer_len > 0U) {
+        app->relay_buffer[app->relay_buffer_len++] = '\n';
+    }
+
+    const size_t available = capacity - app->relay_buffer_len;
+    if(line_len > available) {
+        line_len = available;
+    }
+    if(line_len > 0U) {
+        memcpy(app->relay_buffer + app->relay_buffer_len, line, line_len);
+        app->relay_buffer_len += line_len;
+    }
+
+    if(due || (app->relay_buffer_len >= capacity)) {
+        wifi_mapper_relay_flush_locked(app);
+    }
+}
+
+static void wifi_mapper_toggle_ble_relay(WiFiMapperApp* app) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    app->ble_relay = !app->ble_relay;
+    if(app->ble_relay) {
+        app->relay_buffer_len = 0U;
+        app->relay_last_send_ms = 0U;
+        strlcpy(app->status, "BLE live on", sizeof(app->status));
+    } else {
+        wifi_mapper_relay_flush_locked(app);
+        strlcpy(app->status, "BLE live off", sizeof(app->status));
+    }
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+    wifi_mapper_update_model(app);
+}
+
 static void wifi_mapper_log_line(WiFiMapperApp* app, const char* line) {
     const WiFiMapperRecord record = wifi_mapper_parse_record(line);
 
@@ -1464,6 +1553,9 @@ static void wifi_mapper_log_line(WiFiMapperApp* app, const char* line) {
         const uint32_t tick_ms = (furi_get_tick() * 1000U) /
                                  furi_kernel_get_tick_frequency();
         wifi_mapper_write_log_record(app->log_file, tick_ms, &record, line);
+    }
+    if(app->ble_relay) {
+        wifi_mapper_relay_append_locked(app, line);
     }
 
     app->lines++;
@@ -1515,6 +1607,7 @@ static void wifi_mapper_stop_logging(WiFiMapperApp* app) {
 
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
     wifi_mapper_close_log(app);
+    wifi_mapper_relay_flush_locked(app);
     app->logging = false;
     strlcpy(
         app->status,
@@ -1539,6 +1632,7 @@ static void wifi_mapper_draw_live(Canvas* canvas, WiFiMapperModel* model) {
         "< %s >",
         wifi_mapper_get_scan_mode_config(model->scan_mode)->label);
     canvas_draw_str(canvas, 0, 34, line);
+    canvas_draw_str(canvas, 92, 34, model->ble_relay ? "BLE" : "");
 
     snprintf(
         line,
@@ -1671,6 +1765,11 @@ static bool wifi_mapper_input_callback(InputEvent* event, void* context) {
         return true;
     }
 
+    if((event->type == InputTypeLong) && (event->key == InputKeyDown)) {
+        wifi_mapper_toggle_ble_relay(app);
+        return true;
+    }
+
     if(event->type != InputTypeShort) {
         return false;
     }
@@ -1793,6 +1892,7 @@ static WiFiMapperApp* wifi_mapper_alloc(void) {
     app->storage = furi_record_open(RECORD_STORAGE);
     app->notification = furi_record_open(RECORD_NOTIFICATION);
     app->gui = furi_record_open(RECORD_GUI);
+    app->bt = furi_record_open(RECORD_BT);
 
     app->view_dispatcher = view_dispatcher_alloc();
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
@@ -1833,6 +1933,10 @@ static void wifi_mapper_free(WiFiMapperApp* app) {
 
     wifi_mapper_stop_logging(app);
 
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    wifi_mapper_relay_flush_locked(app);
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
     if(app->serial_handle) {
         furi_hal_serial_async_rx_stop(app->serial_handle);
         furi_hal_serial_deinit(app->serial_handle);
@@ -1853,6 +1957,7 @@ static void wifi_mapper_free(WiFiMapperApp* app) {
     furi_record_close(RECORD_GUI);
     furi_record_close(RECORD_NOTIFICATION);
     furi_record_close(RECORD_STORAGE);
+    furi_record_close(RECORD_BT);
 
     free(app);
 }
