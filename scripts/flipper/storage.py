@@ -69,8 +69,10 @@ class BufferedRead:
         self.buffer = bytearray()
         self.stream = stream
 
-    def until(self, eol: str = "\n", cut_eol: bool = True):
+    def until(self, eol: str = "\n", cut_eol: bool = True, timeout: float = None):
         eol = eol.encode("ascii")
+        # timeout=None keeps the original behavior for reboot/update paths.
+        deadline = None if timeout is None else time.monotonic() + timeout
         while True:
             # search in buffer
             i = self.buffer.find(eol)
@@ -86,16 +88,27 @@ class BufferedRead:
             i = max(1, self.stream.in_waiting)
             data = self.stream.read(i)
             self.buffer.extend(data)
+            if deadline is None:
+                continue
+            if data:
+                deadline = time.monotonic() + timeout
+            elif time.monotonic() > deadline:
+                raise FlipperStorageException(
+                    f"Timed out after {timeout:.0f}s waiting for "
+                    f"{eol!r} from Flipper (CLI/RPC hung)"
+                )
 
 
 class FlipperStorage:
     CLI_PROMPT = ">: "
     CLI_EOL = "\r\n"
+    WRITE_CHUNK_TIMEOUT = 60.0
 
     def __init__(self, portname: str, chunk_size: int = 8192):
         self.port = serial.Serial()
         self.port.port = portname
         self.port.timeout = 2
+        self.port.write_timeout = self.WRITE_CHUNK_TIMEOUT
         self.port.baudrate = 115200  # Doesn't matter for VCP
         self.read = BufferedRead(self.port)
         self.chunk_size = chunk_size
@@ -246,17 +259,19 @@ class FlipperStorage:
                 if size == 0:
                     break
 
-                self.send_and_wait_eol(f'storage write_chunk "{filename_to}" {size}\r')
-                answer = self.read.until(self.CLI_EOL)
+                timeout = self.WRITE_CHUNK_TIMEOUT
+                self.send(f'storage write_chunk "{filename_to}" {size}\r')
+                self.read.until(self.CLI_EOL, timeout=timeout)
+                answer = self.read.until(self.CLI_EOL, timeout=timeout)
                 if self.has_error(answer):
                     last_error = self.get_error(answer)
-                    self.read.until(self.CLI_PROMPT)
+                    self.read.until(self.CLI_PROMPT, timeout=timeout)
                     raise FlipperStorageException.from_error_code(
                         filename_to, last_error
                     )
 
                 self.port.write(filedata)
-                self.read.until(self.CLI_PROMPT)
+                self.read.until(self.CLI_PROMPT, timeout=timeout)
 
                 ftell = file.tell()
                 percent = math.ceil(ftell / filesize * 100)
