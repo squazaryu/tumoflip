@@ -15,7 +15,8 @@
 #define MODULE_ONE_MENU_NAME "8/1"
 #define MODULE_ONE_APPS_PATH EXT_PATH("apps/Module One")
 #define ARF_TOOLS_MENU_NAME "ARF Tools"
-#define ARF_TOOLS_APPS_PATH EXT_PATH("apps/ARF Tools")
+#define ARF_SUBGHZ_FULL_APP_PATH EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")
+#define MODULE_ONE_COCKPIT_APP_PATH EXT_PATH("apps/Module One/module_one_cockpit.fap")
 
 struct LoaderMenu {
     FuriThread* thread;
@@ -80,12 +81,18 @@ static void loader_menu_start(const char* name) {
 static void loader_menu_apps_callback(void* context, uint32_t index) {
     UNUSED(context);
     const char* name = FLIPPER_APPS[index].name;
+    if(strcmp(name, "Sub-GHz") == 0) {
+        name = ARF_SUBGHZ_FULL_APP_PATH;
+    }
     loader_menu_start(name);
 }
 
 static void loader_menu_external_apps_callback(void* context, uint32_t index) {
     UNUSED(context);
     const char* path = FLIPPER_EXTERNAL_APPS[index].name;
+    if(strcmp(path, "Sub-GHz Remote") == 0) {
+        path = MODULE_ONE_COCKPIT_APP_PATH;
+    }
     loader_menu_start(path);
 }
 
@@ -100,12 +107,6 @@ static void loader_menu_module_one_callback(void* context, uint32_t index) {
     UNUSED(index);
     UNUSED(context);
     loader_menu_start_with_args(LOADER_APPLICATIONS_NAME, MODULE_ONE_APPS_PATH);
-}
-
-static void loader_menu_arf_tools_callback(void* context, uint32_t index) {
-    UNUSED(index);
-    UNUSED(context);
-    loader_menu_start_with_args(LOADER_APPLICATIONS_NAME, ARF_TOOLS_APPS_PATH);
 }
 
 static void
@@ -173,9 +174,9 @@ static void loader_menu_build_menu(LoaderMenuApp* app, LoaderMenu* menu) {
                 app->primary_menu,
                 ARF_TOOLS_MENU_NAME,
                 loader_asset_pack_get_icon(
-                    app->asset_pack, LoaderAssetPackIconArfTools, &A_ARFTools_14),
+                    app->asset_pack, LoaderAssetPackIconModuleOne, &A_ModuleOne_14),
                 i,
-                loader_menu_arf_tools_callback,
+                loader_menu_external_apps_callback,
                 (void*)menu);
             continue;
         }

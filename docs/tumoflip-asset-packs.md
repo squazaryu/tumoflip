@@ -33,7 +33,6 @@ Version: 1
 Name: <pack>
 Target: desktop-ok-menu
 ModuleOneIcon: ModuleOne_14.bmx
-ARFToolsIcon: ARFTools_14.bmx
 ```
 
 The loader accepts only `Version: 1` and `Target: desktop-ok-menu`. The manifest
@@ -41,12 +40,16 @@ The loader accepts only `Version: 1` and `Target: desktop-ok-menu`. The manifest
 current implementation scoped to Desktop OK-menu icons and prevents accidental
 loading of unrelated asset directories.
 
-Currently supported files:
+Currently supported active files:
 
 ```text
 ModuleOne_14.bmx
-ARFTools_14.bmx
 ```
+
+`ARFToolsIcon: ARFTools_14.bmx` and `ARFTools_14.bmx` are legacy optional
+entries. Existing generated packs may keep them, but current firmware ignores
+that icon slot and uses the Module One icon slot for the Desktop item that opens
+Module One Cockpit.
 
 ## Icon Format
 
@@ -96,6 +99,9 @@ build/tumoflip-asset-packs/tumo-default/manifest.txt
 build/tumoflip-asset-packs/tumo-default/Icons/ModuleOne_14.bmx
 build/tumoflip-asset-packs/tumo-default/Icons/ARFTools_14.bmx
 ```
+
+The generated `ARFTools_14.bmx` file is kept for compatibility with older dev
+builds.
 
 If the SD card is mounted on macOS, the script can write directly into the
 Flipper SD root:

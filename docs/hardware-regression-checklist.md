@@ -69,7 +69,8 @@ are legally allowed to test.
 
 ### System Sub-GHz Internal CC1101
 
-- Open Desktop `Sub-GHz`; confirm it starts the core firmware app.
+- Open Desktop `Sub-GHz`; confirm it starts `ARF Sub-GHz Full`.
+- Select `Standard Sub-GHz`; confirm it starts the core firmware app.
 - Run `Read` with internal CC1101 and confirm RX starts.
 - Run `Read RAW`, start and stop capture, then exit without reboot.
 - Save a legal test signal and reopen it from Saved.
@@ -114,7 +115,8 @@ are legally allowed to test.
 
 ### ARF Tools
 
-- Open Desktop `ARF Tools`.
+- Open Desktop `ARF Tools`; confirm it starts `Module One Cockpit`.
+- Open Apps -> ARF Tools.
 - Launch `ARF Sub-GHz Full`; confirm it is only a launcher.
 - Launch and exit `Frequency Analyzer`.
 - Launch `Sub-GHz RAW Edit`, open a known `/ext/subghz/*.sub` RAW capture,

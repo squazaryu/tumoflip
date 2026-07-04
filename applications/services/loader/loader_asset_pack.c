@@ -23,7 +23,6 @@
 #define LOADER_ASSET_PACK_MANIFEST_VERSION    1U
 #define LOADER_ASSET_PACK_MANIFEST_TARGET     "desktop-ok-menu"
 #define LOADER_ASSET_PACK_MODULE_ONE_ICON     "ModuleOne_14.bmx"
-#define LOADER_ASSET_PACK_ARF_TOOLS_ICON      "ARFTools_14.bmx"
 
 typedef struct FURI_PACKED {
     uint32_t width;
@@ -38,7 +37,6 @@ typedef struct {
 
 struct LoaderAssetPack {
     LoaderAssetPackStaticIcon* module_one_icon;
-    LoaderAssetPackStaticIcon* arf_tools_icon;
 };
 
 static bool loader_asset_pack_is_name_char(char c) {
@@ -162,11 +160,6 @@ static bool loader_asset_pack_validate_manifest(Storage* storage, const char* pa
             break;
         }
 
-        if(!loader_asset_pack_read_string_equals(
-               manifest, "ARFToolsIcon", LOADER_ASSET_PACK_ARF_TOOLS_ICON)) {
-            break;
-        }
-
         valid = true;
     } while(false);
 
@@ -239,7 +232,6 @@ LoaderAssetPack* loader_asset_pack_alloc(void) {
     }
 
     pack->module_one_icon = NULL;
-    pack->arf_tools_icon = NULL;
 
     Storage* storage = furi_record_open(RECORD_STORAGE);
     char pack_name[LOADER_ASSET_PACK_NAME_MAX + 1U];
@@ -248,8 +240,6 @@ LoaderAssetPack* loader_asset_pack_alloc(void) {
         if(loader_asset_pack_validate_manifest(storage, pack_name)) {
             pack->module_one_icon =
                 loader_asset_pack_load_icon(storage, pack_name, LOADER_ASSET_PACK_MODULE_ONE_ICON);
-            pack->arf_tools_icon =
-                loader_asset_pack_load_icon(storage, pack_name, LOADER_ASSET_PACK_ARF_TOOLS_ICON);
         }
     }
 
@@ -263,7 +253,6 @@ void loader_asset_pack_free(LoaderAssetPack* pack) {
     }
 
     free(pack->module_one_icon);
-    free(pack->arf_tools_icon);
     free(pack);
 }
 
@@ -279,8 +268,6 @@ const Icon* loader_asset_pack_get_icon(
     LoaderAssetPackStaticIcon* icon = NULL;
     if(id == LoaderAssetPackIconModuleOne) {
         icon = pack->module_one_icon;
-    } else if(id == LoaderAssetPackIconArfTools) {
-        icon = pack->arf_tools_icon;
     }
 
     return icon ? &icon->icon : fallback;

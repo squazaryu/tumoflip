@@ -4,10 +4,12 @@
 point for the stable core Sub-GHz app and isolated ARF tools without loading all
 their code into the same process.
 
-The Desktop `Sub-GHz` entry opens the standard core Sub-GHz app. The former
-Desktop `Sub-GHz Remote` slot opens the `ARF Tools` folder, where the Full
-launcher, ARF Frequency Analyzer, Sub-GHz RAW Edit, and KeeLoq Keystore
-Decryptor are visible. Garage Door Remote is visible as a separate
+The Desktop `Sub-GHz` entry opens this hub. Its `Standard Sub-GHz` item then
+launches the core firmware Sub-GHz app, so standard receive/transmit workflows
+remain one click inside the Tumoflip hub. The Desktop `ARF Tools` entry opens
+`Module One Cockpit`; the ARF Tools folder remains available from Apps, where
+the Full launcher, ARF Frequency Analyzer, Sub-GHz RAW Edit, and KeeLoq
+Keystore Decryptor are visible. Garage Door Remote is visible as a separate
 ProtoPirate-derived garage/gate tool. The RollJam entry inside ARF Sub-GHz Full
 opens the classic RollJam app packaged as a child module instead of exposing a
 second visible ARF Tools app. The Shield Receiver source remains in-tree as

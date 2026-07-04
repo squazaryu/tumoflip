@@ -20,16 +20,17 @@ The supported extension model is:
   `/ext/apps_data/arf_subghz_full/modules`;
 - visible ARF entry points under `/ext/apps/ARF Tools`.
 
-Desktop follows the same boundary:
+Desktop uses Tumoflip shortcuts on top of the same runtime boundary:
 
-- `Sub-GHz` opens the core firmware app;
-- `ARF Tools` opens the ARF tools folder;
-- `ARF Sub-GHz Full` is only a lightweight launcher, not a replacement for the
-  core app.
+- `Sub-GHz` opens `ARF Sub-GHz Full`, the Tumoflip Sub-GHz hub;
+- `ARF Tools` opens `Module One Cockpit`;
+- `Standard Sub-GHz` inside `ARF Sub-GHz Full` opens the core firmware app;
+- the ARF tools folder remains available under Apps.
 
 Release validation and unit tests enforce this layout by rejecting stale
-`arf_subghz_standard.fap` package entries and by checking that Desktop no longer
-redirects `Sub-GHz` to ARF Full.
+`arf_subghz_standard.fap` package entries and by checking that the hub keeps
+standard Sub-GHz as a launch target instead of shipping a second standard
+Sub-GHz copy.
 
 The ARF FAPs still share some source files with the core Sub-GHz app. Files
 listed in `tools/tumoflip/subghz_drift_manifest.txt` are expected to remain

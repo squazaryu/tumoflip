@@ -61,7 +61,11 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("core Sub-GHz in firmware", doc)
         self.assertIn("arf_subghz_standard.fap", doc)
         self.assertIn("must not be reintroduced", doc)
-        self.assertIn("Sub-GHz` opens the core firmware app", doc)
+        self.assertIn("Sub-GHz` opens `ARF Sub-GHz Full`", doc)
+        self.assertIn(
+            "Standard Sub-GHz` inside `ARF Sub-GHz Full` opens the core firmware app",
+            doc,
+        )
         self.assertIn("Protocol Packs", doc)
         self.assertIn("subghz_drift_manifest.txt", doc)
 

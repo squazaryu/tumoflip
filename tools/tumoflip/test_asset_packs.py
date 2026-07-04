@@ -32,13 +32,13 @@ class AssetPacksTest(unittest.TestCase):
             source,
         )
         self.assertIn('"ModuleOne_14.bmx"', source)
-        self.assertIn('"ARFTools_14.bmx"', source)
+        self.assertNotIn('"ARFTools_14.bmx"', source)
         self.assertIn("LoaderAssetPackIconModuleOne", header)
-        self.assertIn("LoaderAssetPackIconArfTools", header)
+        self.assertNotIn("LoaderAssetPackIconArfTools", header)
         self.assertIn('#include "loader_asset_pack.h"', loader_menu)
         self.assertIn("loader_asset_pack_get_icon", loader_menu)
         self.assertIn("LoaderAssetPackIconModuleOne", loader_menu)
-        self.assertIn("LoaderAssetPackIconArfTools", loader_menu)
+        self.assertNotIn("LoaderAssetPackIconArfTools", loader_menu)
 
     def test_asset_pack_loader_has_safe_fallback_boundaries(self) -> None:
         source = (
@@ -53,13 +53,13 @@ class AssetPacksTest(unittest.TestCase):
         self.assertIn("flipper_format_read_header", source)
         self.assertIn('"Target"', source)
         self.assertIn('"ModuleOneIcon"', source)
-        self.assertIn('"ARFToolsIcon"', source)
+        self.assertNotIn('"ARFToolsIcon"', source)
         self.assertIn("header.width != LOADER_ASSET_PACK_ICON_WIDTH", source)
         self.assertIn("header.height != LOADER_ASSET_PACK_ICON_HEIGHT", source)
         self.assertIn("loader_asset_pack_validate_name", source)
         self.assertIn("return icon ? &icon->icon : fallback;", source)
         self.assertIn("free(pack->module_one_icon);", source)
-        self.assertIn("free(pack->arf_tools_icon);", source)
+        self.assertNotIn("free(pack->arf_tools_icon);", source)
 
     def test_docs_describe_sd_layout_and_fallback(self) -> None:
         docs = (REPO_ROOT / "docs/tumoflip-asset-packs.md").read_text(
@@ -73,6 +73,7 @@ class AssetPacksTest(unittest.TestCase):
         self.assertIn("Target: desktop-ok-menu", docs)
         self.assertIn("ModuleOne_14.bmx", docs)
         self.assertIn("ARFTools_14.bmx", docs)
+        self.assertIn("legacy optional", docs)
         self.assertIn("no SD card: built-in icons", docs)
         self.assertIn("missing or invalid manifest", docs)
         self.assertIn("Loaded", docs)

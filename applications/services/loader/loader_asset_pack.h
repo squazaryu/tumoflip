@@ -6,7 +6,6 @@ typedef struct LoaderAssetPack LoaderAssetPack;
 
 typedef enum {
     LoaderAssetPackIconModuleOne,
-    LoaderAssetPackIconArfTools,
 } LoaderAssetPackIconId;
 
 LoaderAssetPack* loader_asset_pack_alloc(void);
