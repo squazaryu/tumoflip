@@ -131,6 +131,24 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertIsNotNone(deferred_launch)
         self.assertIn("loading_get_view(loader->loading)", deferred_launch.group(0))
         self.assertIn("view_holder_send_to_front(loader->view_holder)", deferred_launch.group(0))
+        self.assertIn(
+            "if(!is_successful) view_holder_set_view(loader->view_holder, NULL)",
+            deferred_launch.group(0),
+        )
+        self.assertNotIn(
+            "\n    view_holder_set_view(loader->view_holder, NULL);\n"
+            "    furi_string_free(error_message);",
+            deferred_launch.group(0),
+        )
+
+        queue_empty = re.search(
+            r"static void loader_do_emit_queue_empty_event\(.*?\n}\n\n"
+            r"static bool loader_do_deferred_launch",
+            loader,
+            re.S,
+        )
+        self.assertIsNotNone(queue_empty)
+        self.assertIn("view_holder_set_view(loader->view_holder, NULL)", queue_empty.group(0))
 
         enqueue_case = re.search(
             r"case LoaderMessageTypeEnqueueLaunch: \{(?P<body>.*?)\n\s*}\n"
