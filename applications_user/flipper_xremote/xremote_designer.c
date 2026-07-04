@@ -26,31 +26,56 @@ struct XRemoteDesignerContext {
     InfraredRemote* output_remote;
     VariableItemList* item_list;
     TextInput* text_input;
+    DialogEx* dialog_ex;
     XRemoteDesignerItemContext item_contexts[XREMOTE_BUTTON_COUNT];
     uint8_t selected_source[XREMOTE_BUTTON_COUNT];
     char text_store[XREMOTE_DESIGNER_NAME_MAX + 1];
+    char dialog_header[24];
+    char dialog_text[96];
+    XRemoteViewID dialog_return_view;
     XRemoteRemoteType remote_type;
     uint8_t source_count;
     bool map_view_added;
+    bool dialog_view_added;
 };
 
-static void xremote_designer_show_error(const char* text) {
+static void xremote_designer_show_load_error(const char* text) {
     DialogsApp* dialogs = furi_record_open(RECORD_DIALOGS);
     dialog_message_show_storage_error(dialogs, text);
     furi_record_close(RECORD_DIALOGS);
 }
 
-static void xremote_designer_show_message(const char* header, const char* text) {
-    DialogsApp* dialogs = furi_record_open(RECORD_DIALOGS);
-    DialogMessage* message = dialog_message_alloc();
+static void xremote_designer_dialog_callback(DialogExResult result, void* context) {
+    UNUSED(result);
+    XRemoteDesignerContext* ctx = context;
+    xremote_app_assert_void(ctx);
 
-    dialog_message_set_header(message, header, 64, 3, AlignCenter, AlignTop);
-    dialog_message_set_text(message, text, 64, 25, AlignCenter, AlignCenter);
-    dialog_message_set_buttons(message, NULL, NULL, "OK");
-    dialog_message_show(dialogs, message);
+    view_dispatcher_switch_to_view(ctx->app_ctx->view_dispatcher, ctx->dialog_return_view);
+}
 
-    dialog_message_free(message);
-    furi_record_close(RECORD_DIALOGS);
+static void xremote_designer_show_status(
+    XRemoteDesignerContext* ctx,
+    const char* header,
+    const char* text,
+    XRemoteViewID return_view) {
+    xremote_app_assert_void(ctx);
+    xremote_app_assert_void(ctx->dialog_ex);
+
+    snprintf(ctx->dialog_header, sizeof(ctx->dialog_header), "%s", header);
+    snprintf(ctx->dialog_text, sizeof(ctx->dialog_text), "%s", text);
+    ctx->dialog_return_view = return_view;
+
+    dialog_ex_reset(ctx->dialog_ex);
+    dialog_ex_set_header(ctx->dialog_ex, ctx->dialog_header, 64, 7, AlignCenter, AlignTop);
+    dialog_ex_set_text(ctx->dialog_ex, ctx->dialog_text, 64, 25, AlignCenter, AlignTop);
+    dialog_ex_set_icon(ctx->dialog_ex, 0, 0, NULL);
+    dialog_ex_set_left_button_text(ctx->dialog_ex, NULL);
+    dialog_ex_set_center_button_text(ctx->dialog_ex, NULL);
+    dialog_ex_set_right_button_text(ctx->dialog_ex, "OK");
+    dialog_ex_set_result_callback(ctx->dialog_ex, xremote_designer_dialog_callback);
+    dialog_ex_set_context(ctx->dialog_ex, ctx);
+
+    view_dispatcher_switch_to_view(ctx->app_ctx->view_dispatcher, XRemoteViewDialogExit);
 }
 
 static const char* xremote_designer_source_name(
@@ -99,12 +124,14 @@ static bool xremote_designer_store_output(XRemoteDesignerContext* ctx, const cha
     char output_file[256];
 
     if(xremote_designer_mapped_count(ctx) == 0) {
-        xremote_designer_show_error("Nothing mapped\nSelect commands first");
+        xremote_designer_show_status(
+            ctx, "Not saved", "Nothing mapped\nSelect commands first", XRemoteViewDesignerMap);
         return false;
     }
 
     if(!xremote_designer_sanitize_name(name, safe_name, sizeof(safe_name))) {
-        xremote_designer_show_error("Invalid remote\nname");
+        xremote_designer_show_status(
+            ctx, "Not saved", "Invalid remote\nname", XRemoteViewDesignerMap);
         return false;
     }
 
@@ -112,11 +139,12 @@ static bool xremote_designer_store_output(XRemoteDesignerContext* ctx, const cha
         output_file,
         sizeof(output_file),
         "%s/%s%s",
-        XREMOTE_APP_FOLDER,
-        safe_name,
-        XREMOTE_APP_EXTENSION);
+            XREMOTE_APP_FOLDER,
+            safe_name,
+            XREMOTE_APP_EXTENSION);
     if(written <= 0 || (size_t)written >= sizeof(output_file)) {
-        xremote_designer_show_error("Remote path\ntoo long");
+        xremote_designer_show_status(
+            ctx, "Not saved", "Remote path\ntoo long", XRemoteViewDesignerMap);
         return false;
     }
 
@@ -137,7 +165,8 @@ static bool xremote_designer_store_output(XRemoteDesignerContext* ctx, const cha
     }
 
     if(!infrared_remote_store(ctx->output_remote)) {
-        xremote_designer_show_error("Cannot save\nremote file");
+        xremote_designer_show_status(
+            ctx, "Not saved", "Cannot save\nremote file", XRemoteViewDesignerMap);
         return false;
     }
 
@@ -151,13 +180,15 @@ static bool xremote_designer_store_output(XRemoteDesignerContext* ctx, const cha
     furi_string_free(output_path);
 
     if(!extension_stored) {
-        xremote_designer_show_error("Cannot save\nlayout data");
+        xremote_designer_show_status(
+            ctx, "Not saved", "Cannot save\nlayout data", XRemoteViewDesignerMap);
         return false;
     }
 
     xremote_app_context_notify_led(ctx->app_ctx);
-    xremote_designer_show_message("Saved", output_file);
-    view_dispatcher_switch_to_view(ctx->app_ctx->view_dispatcher, XRemoteViewSubmenu);
+    char status_text[96];
+    snprintf(status_text, sizeof(status_text), "Saved as\n%.80s%s", safe_name, XREMOTE_APP_EXTENSION);
+    xremote_designer_show_status(ctx, "Saved", status_text, XRemoteViewSubmenu);
     return true;
 }
 
@@ -210,7 +241,8 @@ static void xremote_designer_map_enter_callback(void* context, uint32_t index) {
 
     const uint8_t source_index = ctx->selected_source[index];
     if(source_index == 0) {
-        xremote_designer_show_error("No command\nmapped");
+        xremote_designer_show_status(
+            ctx, "Preview", "No command\nmapped", XRemoteViewDesignerMap);
         return;
     }
 
@@ -296,16 +328,18 @@ static XRemoteDesignerContext* xremote_designer_context_alloc(XRemoteAppContext*
     ctx->output_remote = infrared_remote_alloc();
     ctx->item_list = variable_item_list_alloc();
     ctx->text_input = text_input_alloc();
+    ctx->dialog_ex = dialog_ex_alloc();
+    ctx->dialog_return_view = XRemoteViewDesignerMap;
     ctx->remote_type = XRemoteRemoteTypeGeneric;
 
     if(!infrared_remote_load(ctx->source_remote, app_ctx->file_path)) {
-        xremote_designer_show_error("Cannot load\nsource .ir");
+        xremote_designer_show_load_error("Cannot load\nsource .ir");
         goto fail;
     }
 
     const size_t button_count = infrared_remote_get_button_count(ctx->source_remote);
     if(button_count == 0) {
-        xremote_designer_show_error("Source .ir has\nno commands");
+        xremote_designer_show_load_error("Source .ir has\nno commands");
         goto fail;
     }
 
@@ -318,9 +352,14 @@ static XRemoteDesignerContext* xremote_designer_context_alloc(XRemoteAppContext*
     text_input_set_validator(ctx->text_input, NULL, ctx);
     view_dispatcher_add_view(app_ctx->view_dispatcher, XRemoteViewTextInput, view);
 
+    view = dialog_ex_get_view(ctx->dialog_ex);
+    view_dispatcher_add_view(app_ctx->view_dispatcher, XRemoteViewDialogExit, view);
+    ctx->dialog_view_added = true;
+
     return ctx;
 
 fail:
+    if(ctx->dialog_ex) dialog_ex_free(ctx->dialog_ex);
     if(ctx->text_input) text_input_free(ctx->text_input);
     if(ctx->item_list) variable_item_list_free(ctx->item_list);
     if(ctx->output_remote) infrared_remote_free(ctx->output_remote);
@@ -336,8 +375,12 @@ static void xremote_designer_context_free(XRemoteDesignerContext* ctx) {
     if(ctx->map_view_added) {
         view_dispatcher_remove_view(view_disp, XRemoteViewDesignerMap);
     }
+    if(ctx->dialog_view_added) {
+        view_dispatcher_remove_view(view_disp, XRemoteViewDialogExit);
+    }
     view_dispatcher_remove_view(view_disp, XRemoteViewTextInput);
 
+    dialog_ex_free(ctx->dialog_ex);
     text_input_free(ctx->text_input);
     variable_item_list_free(ctx->item_list);
     infrared_remote_free(ctx->output_remote);
