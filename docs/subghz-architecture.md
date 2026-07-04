@@ -47,14 +47,16 @@ files that differed only by comment whitespace were synchronized and added to
 the drift manifest. The current checked surface is:
 
 - 75 common paths between core Sub-GHz and ARF FAP sources;
-- 35 byte-identical shared files tracked by
+- 33 byte-identical shared files tracked by
   `tools/tumoflip/subghz_drift_manifest.txt`;
-- 40 intentionally diverged files.
+- 42 intentionally diverged files.
 
 The remaining diverged files include ARF profile adapters, app entry points,
-radio lifecycle/state code, and ARF-only UI scenes. Those files must not be
-shared mechanically. Extracting them requires a small explicit API first, plus
-FAP size, heap, and launch/exit validation.
+radio lifecycle/state code, and ARF-only UI scenes. The ARF Frequency Analyzer
+view is also intentionally forked because the standalone ARF app adds
+receive-only field notebook export behavior to the analyzer OK action. Those
+files must not be shared mechanically. Extracting them requires a small explicit
+API first, plus FAP size, heap, and launch/exit validation.
 
 ## Shared APIs
 

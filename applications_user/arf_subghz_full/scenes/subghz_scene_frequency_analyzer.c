@@ -1,4 +1,5 @@
 #include "../subghz_i.h" // IWYU pragma: keep
+#include "../helpers/subghz_frequency_notebook.h"
 #include "../views/subghz_frequency_analyzer.h"
 
 #define TAG "SubGhzSceneFrequencyAnalyzer"
@@ -58,9 +59,18 @@ bool subghz_scene_frequency_analyzer_on_event(void* context, SceneManagerEvent e
             notification_message(subghz->notifications, &sequence_reset_rgb);
             return true;
         } else if(event.event == SubGhzCustomEventViewFreqAnalOkShort) {
-            notification_message(subghz->notifications, &sequence_saved);
-            uint32_t frequency =
-                subghz_frequency_analyzer_get_frequency_to_save(subghz->subghz_frequency_analyzer);
+            SubGhzFrequencyAnalyzerObservation observation;
+            const bool has_observation = subghz_frequency_analyzer_get_observation(
+                subghz->subghz_frequency_analyzer, &observation);
+            const bool notebook_saved =
+                has_observation && subghz_frequency_notebook_append(&observation);
+            notification_message(
+                subghz->notifications, notebook_saved ? &sequence_saved : &sequence_error);
+
+            uint32_t frequency = has_observation ?
+                                     observation.frequency :
+                                     subghz_frequency_analyzer_get_frequency_to_save(
+                                         subghz->subghz_frequency_analyzer);
             if(frequency > 0) {
                 subghz->last_settings->frequency = frequency;
                 // Disable Hopping before opening the receiver scene!

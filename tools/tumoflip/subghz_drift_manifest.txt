@@ -36,8 +36,6 @@ subghz_cli.h
 subghz_dangerous_freq.c
 subghz_history.h
 views/receiver.h
-views/subghz_frequency_analyzer.c
-views/subghz_frequency_analyzer.h
 views/subghz_read_raw.c
 views/subghz_read_raw.h
 views/transmitter.h

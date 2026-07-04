@@ -8,6 +8,7 @@
 
 #include <assets_icons.h>
 #include <float_tools.h>
+#include <string.h>
 
 #define TAG "frequency_analyzer"
 
@@ -37,6 +38,7 @@ struct SubGhzFrequencyAnalyzer {
     uint8_t selected_index;
     uint8_t max_index;
     bool show_frame;
+    SubGhzFrequencyAnalyzerObservation last_observation;
 };
 
 typedef struct {
@@ -210,7 +212,61 @@ void subghz_frequency_analyzer_draw(Canvas* canvas, SubGhzFrequencyAnalyzerModel
     // Buttons hint
     canvas_set_font(canvas, FontSecondary);
     elements_button_left(canvas, "T-");
+    elements_button_center(canvas, "Log");
     elements_button_right(canvas, "+T");
+}
+
+static int16_t subghz_frequency_analyzer_dbm_to_x10(float dbm) {
+    if(dbm >= 0.0f) {
+        return (int16_t)(dbm * 10.0f + 0.5f);
+    }
+
+    return (int16_t)(dbm * 10.0f - 0.5f);
+}
+
+static bool subghz_frequency_analyzer_prepare_observation(
+    SubGhzFrequencyAnalyzer* instance,
+    SubGhzFrequencyAnalyzerModel* model,
+    SubGhzFrequencyAnalyzerObservation* observation) {
+    furi_assert(instance);
+    furi_assert(model);
+    furi_assert(observation);
+
+    memset(observation, 0, sizeof(SubGhzFrequencyAnalyzerObservation));
+    observation->trigger_dbm_x10 = subghz_frequency_analyzer_dbm_to_x10(model->trigger);
+    observation->is_ext_radio = model->is_ext_radio;
+    observation->signal = model->signal;
+
+    uint32_t frequency_candidate = 0;
+    if(model->show_frame && !model->signal && model->selected_index < MAX_HISTORY) {
+        frequency_candidate = model->history_frequency[model->selected_index];
+        observation->source = SubGhzFrequencyAnalyzerObservationSourceHistory;
+        observation->history_index = model->selected_index + 1;
+        observation->rx_count = model->history_frequency_rx_count[model->selected_index] > 0 ?
+                                    model->history_frequency_rx_count[model->selected_index] :
+                                    1;
+        observation->rssi_dbm_x10 = subghz_frequency_analyzer_dbm_to_x10(model->rssi_last);
+    } else if(model->signal && model->frequency > 0) {
+        frequency_candidate =
+            subghz_frequency_analyzer_get_nearest_frequency(instance->worker, model->frequency);
+        observation->source = SubGhzFrequencyAnalyzerObservationSourceLive;
+        observation->rx_count = 1;
+        observation->rssi_dbm_x10 = subghz_frequency_analyzer_dbm_to_x10(model->rssi);
+    }
+
+    if(frequency_candidate == 0) {
+        return false;
+    }
+
+    frequency_candidate =
+        subghz_frequency_analyzer_get_nearest_frequency(instance->worker, frequency_candidate);
+    if(!subghz_txrx_radio_device_is_frequency_valid(instance->txrx, frequency_candidate)) {
+        return false;
+    }
+
+    observation->frequency = frequency_candidate;
+    observation->valid = true;
+    return true;
 }
 
 bool subghz_frequency_analyzer_input(InputEvent* event, void* context) {
@@ -258,41 +314,26 @@ bool subghz_frequency_analyzer_input(InputEvent* event, void* context) {
         (event->type == InputTypeShort || event->type == InputTypeLong) &&
         event->key == InputKeyOk) {
         need_redraw = false;
-        bool updated = false;
-        uint32_t frequency_to_save;
+        bool observation_valid = false;
+        uint32_t frequency_to_save = 0;
         with_view_model(
             instance->view,
             SubGhzFrequencyAnalyzerModel * model,
             {
-                frequency_to_save = model->frequency_to_save;
-                uint32_t prev_freq_to_save = model->frequency_to_save;
-                uint32_t frequency_candidate = 0;
-
-                if(model->show_frame && !model->signal) {
-                    frequency_candidate = model->history_frequency[model->selected_index];
-                } else if(
-                    (model->show_frame && model->signal) ||
-                    (!model->show_frame && model->signal)) {
-                    frequency_candidate = subghz_frequency_analyzer_get_nearest_frequency(
-                        instance->worker, model->frequency);
-                }
-
-                frequency_candidate = frequency_candidate == 0 ||
-                                              !subghz_txrx_radio_device_is_frequency_valid(
-                                                  instance->txrx, frequency_candidate) ||
-                                              prev_freq_to_save == frequency_candidate ?
-                                          0 :
-                                          subghz_frequency_analyzer_get_nearest_frequency(
-                                              instance->worker, frequency_candidate);
-                if(frequency_candidate > 0 && frequency_candidate != model->frequency_to_save) {
-                    model->frequency_to_save = frequency_candidate;
-                    frequency_to_save = frequency_candidate;
-                    updated = true;
+                SubGhzFrequencyAnalyzerObservation observation;
+                observation_valid =
+                    subghz_frequency_analyzer_prepare_observation(instance, model, &observation);
+                if(observation_valid) {
+                    model->frequency_to_save = observation.frequency;
+                    instance->last_observation = observation;
+                    frequency_to_save = observation.frequency;
+                } else {
+                    instance->last_observation.valid = false;
                 }
             },
             false);
 
-        if(updated) {
+        if(observation_valid) {
             instance->callback(SubGhzCustomEventViewFreqAnalOkShort, instance->context);
         }
 
@@ -543,6 +584,16 @@ uint32_t subghz_frequency_analyzer_get_frequency_to_save(SubGhzFrequencyAnalyzer
         false);
 
     return frequency;
+}
+
+bool subghz_frequency_analyzer_get_observation(
+    SubGhzFrequencyAnalyzer* instance,
+    SubGhzFrequencyAnalyzerObservation* observation) {
+    furi_assert(instance);
+    furi_assert(observation);
+
+    *observation = instance->last_observation;
+    return observation->valid;
 }
 
 SubGHzFrequencyAnalyzerFeedbackLevel subghz_frequency_analyzer_feedback_level(
