@@ -99,10 +99,14 @@ class PackageReleaseTest(unittest.TestCase):
             extapp_wifi = build / ".extapps/wifi_mapper.fap"
             old_ir_lab = resources / "apps/Module One/IR Blaster/tumo_ir_lab.fap"
             extapp_ir_lab = build / ".extapps/tumo_ir_lab.fap"
+            old_cockpit = resources / "apps/Module One/module_one_cockpit.fap"
+            extapp_cockpit = build / ".extapps/module_one_cockpit.fap"
             old_wifi.write_bytes(b"old wifi mapper")
             write_file(extapp_wifi, b"wifi mapper fix")
             old_ir_lab.write_bytes(b"old ir lab")
             write_file(extapp_ir_lab, b"tumo ir lab fix")
+            old_cockpit.write_bytes(b"old module one cockpit")
+            write_file(extapp_cockpit, b"module one cockpit")
 
             manifest = build_package_release(
                 repo,
@@ -120,6 +124,7 @@ class PackageReleaseTest(unittest.TestCase):
                 b"wifi mapper fix",
             )
             self.assertEqual(old_ir_lab.read_bytes(), b"tumo ir lab fix")
+            self.assertEqual(old_cockpit.read_bytes(), b"module one cockpit")
 
             module_entries = {
                 entry["source"]: entry
@@ -129,6 +134,8 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(wifi_entry["sha256"], sha256(extapp_wifi))
             ir_lab_entry = module_entries["apps/Module One/IR Blaster/tumo_ir_lab.fap"]
             self.assertEqual(ir_lab_entry["sha256"], sha256(extapp_ir_lab))
+            cockpit_entry = module_entries["apps/Module One/module_one_cockpit.fap"]
+            self.assertEqual(cockpit_entry["sha256"], sha256(extapp_cockpit))
             self.assertEqual(manifest["artifacts"], {})
 
             manifest_path = (
@@ -145,9 +152,17 @@ class PackageReleaseTest(unittest.TestCase):
                     "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
                     archive.namelist(),
                 )
+                self.assertIn(
+                    "apps/Module One/module_one_cockpit.fap",
+                    archive.namelist(),
+                )
                 self.assertEqual(
                     archive.read("apps/Module One/IR Blaster/tumo_ir_lab.fap"),
                     b"tumo ir lab fix",
+                )
+                self.assertEqual(
+                    archive.read("apps/Module One/module_one_cockpit.fap"),
+                    b"module one cockpit",
                 )
                 self.assertEqual(
                     archive.read("apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap"),

@@ -108,6 +108,10 @@ class ValidateReleaseTest(unittest.TestCase):
 
     def test_static_module_one_package_files_are_vendored(self) -> None:
         self.assertIn(
+            "apps/Module One/module_one_cockpit.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
             "apps/Module One/IR Blaster/tumo_ir_lab.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
