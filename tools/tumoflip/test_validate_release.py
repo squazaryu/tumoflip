@@ -112,6 +112,10 @@ class ValidateReleaseTest(unittest.TestCase):
             MODULE_ONE_PACKAGE_FILES,
         )
         self.assertIn(
+            "apps/Module One/module_one_sensor_logger.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
             "apps/Module One/IR Blaster/tumo_ir_lab.fap",
             MODULE_ONE_PACKAGE_FILES,
         )

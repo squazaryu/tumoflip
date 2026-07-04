@@ -101,12 +101,16 @@ class PackageReleaseTest(unittest.TestCase):
             extapp_ir_lab = build / ".extapps/tumo_ir_lab.fap"
             old_cockpit = resources / "apps/Module One/module_one_cockpit.fap"
             extapp_cockpit = build / ".extapps/module_one_cockpit.fap"
+            old_sensor_logger = resources / "apps/Module One/module_one_sensor_logger.fap"
+            extapp_sensor_logger = build / ".extapps/module_one_sensor_logger.fap"
             old_wifi.write_bytes(b"old wifi mapper")
             write_file(extapp_wifi, b"wifi mapper fix")
             old_ir_lab.write_bytes(b"old ir lab")
             write_file(extapp_ir_lab, b"tumo ir lab fix")
             old_cockpit.write_bytes(b"old module one cockpit")
             write_file(extapp_cockpit, b"module one cockpit")
+            old_sensor_logger.write_bytes(b"old sensor logger")
+            write_file(extapp_sensor_logger, b"sensor logger")
 
             manifest = build_package_release(
                 repo,
@@ -125,6 +129,7 @@ class PackageReleaseTest(unittest.TestCase):
             )
             self.assertEqual(old_ir_lab.read_bytes(), b"tumo ir lab fix")
             self.assertEqual(old_cockpit.read_bytes(), b"module one cockpit")
+            self.assertEqual(old_sensor_logger.read_bytes(), b"sensor logger")
 
             module_entries = {
                 entry["source"]: entry
@@ -136,6 +141,10 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(ir_lab_entry["sha256"], sha256(extapp_ir_lab))
             cockpit_entry = module_entries["apps/Module One/module_one_cockpit.fap"]
             self.assertEqual(cockpit_entry["sha256"], sha256(extapp_cockpit))
+            sensor_logger_entry = module_entries[
+                "apps/Module One/module_one_sensor_logger.fap"
+            ]
+            self.assertEqual(sensor_logger_entry["sha256"], sha256(extapp_sensor_logger))
             self.assertEqual(manifest["artifacts"], {})
 
             manifest_path = (
@@ -156,6 +165,10 @@ class PackageReleaseTest(unittest.TestCase):
                     "apps/Module One/module_one_cockpit.fap",
                     archive.namelist(),
                 )
+                self.assertIn(
+                    "apps/Module One/module_one_sensor_logger.fap",
+                    archive.namelist(),
+                )
                 self.assertEqual(
                     archive.read("apps/Module One/IR Blaster/tumo_ir_lab.fap"),
                     b"tumo ir lab fix",
@@ -163,6 +176,10 @@ class PackageReleaseTest(unittest.TestCase):
                 self.assertEqual(
                     archive.read("apps/Module One/module_one_cockpit.fap"),
                     b"module one cockpit",
+                )
+                self.assertEqual(
+                    archive.read("apps/Module One/module_one_sensor_logger.fap"),
+                    b"sensor logger",
                 )
                 self.assertEqual(
                     archive.read("apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap"),

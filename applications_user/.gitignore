@@ -35,3 +35,5 @@
 !totp/**
 !wifi_mapper/
 !wifi_mapper/**
+!module_one_sensor_logger/
+!module_one_sensor_logger/**

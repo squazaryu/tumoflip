@@ -32,6 +32,7 @@ typedef enum {
     ModuleOneCockpitActionIrBlink,
     ModuleOneCockpitActionI2cScan,
     ModuleOneCockpitActionUartStatus,
+    ModuleOneCockpitActionLaunchSensorLogger,
     ModuleOneCockpitActionEsp32Ping,
     ModuleOneCockpitActionLaunchIrLab,
     ModuleOneCockpitActionLaunchXRemote,
@@ -49,6 +50,7 @@ typedef enum {
     ModuleOneCockpitBlockEsp32,
     ModuleOneCockpitBlockGps,
     ModuleOneCockpitBlockBme280,
+    ModuleOneCockpitBlockSensor,
     ModuleOneCockpitBlockNrf24,
     ModuleOneCockpitBlockCc1101,
     ModuleOneCockpitBlockSystem,
@@ -93,6 +95,7 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"ESP32: WiFi Mapper", ModuleOneCockpitActionLaunchWifiMapper},
     {"GPS/UART: Status", ModuleOneCockpitActionUartStatus},
     {"BME280/I2C: Scan", ModuleOneCockpitActionI2cScan},
+    {"Sensors: Logger", ModuleOneCockpitActionLaunchSensorLogger},
     {"CC1101: ARF Full", ModuleOneCockpitActionLaunchArfHub},
     {"CC1101: ARF Status", ModuleOneCockpitActionLaunchArfStatus},
     {"System: GPIO", ModuleOneCockpitActionLaunchGpio},
@@ -122,6 +125,14 @@ static const ModuleOneCockpitLaunchTarget module_one_cockpit_targets[] = {
         ModuleOneCockpitBlockEsp32,
         "WiFi Mapper",
         EXT_PATH("apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap"),
+        NULL,
+        true,
+    },
+    {
+        ModuleOneCockpitActionLaunchSensorLogger,
+        ModuleOneCockpitBlockSensor,
+        "Sensor Logger",
+        EXT_PATH("apps/Module One/module_one_sensor_logger.fap"),
         NULL,
         true,
     },
@@ -184,6 +195,8 @@ static const char* module_one_cockpit_block_label(ModuleOneCockpitBlock block) {
         return "GPS";
     case ModuleOneCockpitBlockBme280:
         return "BME280";
+    case ModuleOneCockpitBlockSensor:
+        return "Sensor";
     case ModuleOneCockpitBlockNrf24:
         return "NRF24";
     case ModuleOneCockpitBlockCc1101:
@@ -247,8 +260,7 @@ static void module_one_cockpit_build_status(ModuleOneCockpitApp* app) {
         "\nHardware blocks\n"
         "IR: use IR Blink or Tumo IR Lab\n"
         "ESP32: use UART/AT or WiFi Mapper\n"
-        "GPS: use UART Status; no dedicated app yet\n"
-        "BME280: use I2C scan, 0x76/0x77\n"
+        "GPS/BME280: use Sensor Logger\n"
         "NRF24: no packaged app yet\n"
         "CC1101: use ARF Sub-GHz Full\n");
 }
