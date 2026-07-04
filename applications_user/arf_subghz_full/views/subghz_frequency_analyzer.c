@@ -158,12 +158,10 @@ static void subghz_frequency_analyzer_history_frequency_draw(
 void subghz_frequency_analyzer_draw(Canvas* canvas, SubGhzFrequencyAnalyzerModel* model) {
     char buffer[64] = {0};
 
-    // Title
+    // Action hint
     canvas_set_color(canvas, ColorBlack);
     canvas_set_font(canvas, FontSecondary);
-
-    //canvas_draw_str(canvas, 0, 7, model->is_ext_radio ? "Ext" : "Int");
-    canvas_draw_str(canvas, 20, 7, "Frequency Analyzer");
+    canvas_draw_str(canvas, 2, 7, "OK Log");
 
     // RSSI
     canvas_draw_str(canvas, 33, 62, "RSSI");
@@ -212,7 +210,6 @@ void subghz_frequency_analyzer_draw(Canvas* canvas, SubGhzFrequencyAnalyzerModel
     // Buttons hint
     canvas_set_font(canvas, FontSecondary);
     elements_button_left(canvas, "T-");
-    elements_button_center(canvas, "Log");
     elements_button_right(canvas, "+T");
 }
 
