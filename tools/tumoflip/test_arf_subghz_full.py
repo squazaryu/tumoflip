@@ -117,6 +117,35 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertIn("selected_item_arg", start_scene)
         self.assertIn("snprintf(selected_item_arg", start_scene)
 
+    def test_loader_prearms_deferred_launch_loading_overlay(self) -> None:
+        loader = (REPO_ROOT / "applications/services/loader/loader.c").read_text(
+            encoding="utf-8"
+        )
+
+        deferred_launch = re.search(
+            r"static bool loader_do_deferred_launch\(.*?\n}\n\n"
+            r"static void loader_do_app_closed",
+            loader,
+            re.S,
+        )
+        self.assertIsNotNone(deferred_launch)
+        self.assertIn("loading_get_view(loader->loading)", deferred_launch.group(0))
+        self.assertIn("view_holder_send_to_front(loader->view_holder)", deferred_launch.group(0))
+
+        enqueue_case = re.search(
+            r"case LoaderMessageTypeEnqueueLaunch: \{(?P<body>.*?)\n\s*}\n"
+            r"\s*case LoaderMessageTypeClearLaunchQueue",
+            loader,
+            re.S,
+        )
+        self.assertIsNotNone(enqueue_case)
+        enqueue_body = enqueue_case.group("body")
+        self.assertIn("queue_was_empty = loader->launch_queue.item_cnt == 0", enqueue_body)
+        self.assertIn("loader_queue_push(&loader->launch_queue", enqueue_body)
+        self.assertIn("queue_was_empty && loader_is_application_running(loader)", enqueue_body)
+        self.assertIn("loading_get_view(loader->loading)", enqueue_body)
+        self.assertIn("view_holder_send_to_front(loader->view_holder)", enqueue_body)
+
     def test_frequency_analyzer_fap_starts_directly(self) -> None:
         manifest = (
             REPO_ROOT / "applications_user/arf_subghz_full/application.fam"

@@ -970,10 +970,16 @@ int32_t loader_srv(void* p) {
                     loader_do_get_application_launch_path(loader, message.application_name);
                 api_lock_unlock(message.api_lock);
                 break;
-            case LoaderMessageTypeEnqueueLaunch:
+            case LoaderMessageTypeEnqueueLaunch: {
+                const bool queue_was_empty = loader->launch_queue.item_cnt == 0;
                 furi_check(loader_queue_push(&loader->launch_queue, &message.defer_start));
+                if(queue_was_empty && loader_is_application_running(loader)) {
+                    view_holder_set_view(loader->view_holder, loading_get_view(loader->loading));
+                    view_holder_send_to_front(loader->view_holder);
+                }
                 api_lock_unlock(message.api_lock);
                 break;
+            }
             case LoaderMessageTypeClearLaunchQueue:
                 loader_queue_clear(&loader->launch_queue);
                 api_lock_unlock(message.api_lock);
