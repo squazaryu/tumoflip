@@ -116,6 +116,25 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertIn("loader_get_application_launch_path", start_scene)
         self.assertIn("selected_item_arg", start_scene)
         self.assertIn("snprintf(selected_item_arg", start_scene)
+        self.assertLess(
+            start_scene.index("loader_clear_launch_queue(app->loader)"),
+            start_scene.index("loader_enqueue_launch("),
+        )
+
+    def test_nested_hubs_clear_parent_deferred_launch_before_child_launch(self) -> None:
+        arf_hub = (
+            REPO_ROOT / "applications_user/arf_subghz_full/arf_subghz_hub.c"
+        ).read_text(encoding="utf-8")
+        cockpit = (
+            REPO_ROOT / "applications_user/module_one_cockpit/module_one_cockpit.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("loader_clear_launch_queue(app->loader);", arf_hub)
+        self.assertIn("loader_clear_launch_queue(app->loader);", cockpit)
+        self.assertLess(
+            cockpit.index("loader_clear_launch_queue(app->loader)"),
+            cockpit.index("loader_enqueue_launch(app->loader, target->target"),
+        )
 
     def test_loader_prearms_deferred_launch_loading_overlay(self) -> None:
         loader = (REPO_ROOT / "applications/services/loader/loader.c").read_text(

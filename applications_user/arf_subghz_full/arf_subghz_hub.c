@@ -46,6 +46,7 @@ static void arf_subghz_hub_launch_callback(void* context, uint32_t index) {
     ArfSubGhzHub* app = context;
     furi_check(index < COUNT_OF(arf_subghz_hub_items));
 
+    loader_clear_launch_queue(app->loader);
     loader_enqueue_launch(
         app->loader,
         arf_subghz_hub_items[index].target,

@@ -419,6 +419,7 @@ static void module_one_cockpit_launch_or_report(
         return;
     }
 
+    loader_clear_launch_queue(app->loader);
     loader_enqueue_launch(app->loader, target->target, target->args, LoaderDeferredLaunchFlagGui);
 
     FuriString* self_path = furi_string_alloc();
