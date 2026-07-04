@@ -9,7 +9,7 @@
 #include "xremote_app.h"
 
 #define XREMOTE_VERSION_MAJ  1
-#define XREMOTE_VERSION_MIN  6
+#define XREMOTE_VERSION_MIN  7
 #define XREMOTE_BUILD_NUMBER 0
 
 /* Returns FAP_VERSION + XREMOTE_BUILD_NUMBER */

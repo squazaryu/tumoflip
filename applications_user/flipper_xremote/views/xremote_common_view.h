@@ -151,6 +151,8 @@ typedef enum {
     XRemoteViewSubmenu,
     XRemoteViewLearn,
     XRemoteViewLearnCapture,
+    XRemoteViewDesigner,
+    XRemoteViewDesignerMap,
     XRemoteViewSaved,
     XRemoteViewAnalyzer,
     XRemoteViewSettings,
