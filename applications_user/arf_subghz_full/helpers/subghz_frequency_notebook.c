@@ -54,14 +54,28 @@ static const char* subghz_frequency_notebook_radio_name(
     return observation->is_ext_radio ? "external" : "internal";
 }
 
+static const char* subghz_frequency_notebook_tag_name(
+    const SubGhzFrequencyAnalyzerObservation* observation) {
+    switch(observation->notebook_tag) {
+    case SubGhzFrequencyAnalyzerNotebookTagField:
+        return "field";
+    case SubGhzFrequencyAnalyzerNotebookTagTest:
+        return "test";
+    case SubGhzFrequencyAnalyzerNotebookTagNoise:
+        return "noise";
+    case SubGhzFrequencyAnalyzerNotebookTagOther:
+        return "other";
+    case SubGhzFrequencyAnalyzerNotebookTagCount:
+        break;
+    }
+
+    return "field";
+}
+
 static void subghz_frequency_notebook_format_note(
     FuriString* output,
     const SubGhzFrequencyAnalyzerObservation* observation) {
-    if(observation->source == SubGhzFrequencyAnalyzerObservationSourceHistory) {
-        furi_string_printf(output, "history_%u", observation->history_index);
-    } else {
-        furi_string_printf(output, "live");
-    }
+    furi_string_set(output, subghz_frequency_notebook_tag_name(observation));
 }
 
 static bool subghz_frequency_notebook_write_line(

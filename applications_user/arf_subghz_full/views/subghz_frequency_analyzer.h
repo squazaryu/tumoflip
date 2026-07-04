@@ -19,6 +19,14 @@ typedef enum {
     SubGhzFrequencyAnalyzerObservationSourceHistory,
 } SubGhzFrequencyAnalyzerObservationSource;
 
+typedef enum {
+    SubGhzFrequencyAnalyzerNotebookTagField,
+    SubGhzFrequencyAnalyzerNotebookTagTest,
+    SubGhzFrequencyAnalyzerNotebookTagNoise,
+    SubGhzFrequencyAnalyzerNotebookTagOther,
+    SubGhzFrequencyAnalyzerNotebookTagCount,
+} SubGhzFrequencyAnalyzerNotebookTag;
+
 typedef struct {
     bool valid;
     uint32_t frequency;
@@ -29,6 +37,7 @@ typedef struct {
     bool signal;
     bool is_ext_radio;
     SubGhzFrequencyAnalyzerObservationSource source;
+    SubGhzFrequencyAnalyzerNotebookTag notebook_tag;
 } SubGhzFrequencyAnalyzerObservation;
 
 void subghz_frequency_analyzer_set_callback(

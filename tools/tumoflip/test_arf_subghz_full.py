@@ -191,6 +191,34 @@ class ArfSubGhzFullTest(unittest.TestCase):
             hub,
         )
 
+    def test_frequency_analyzer_notebook_has_short_tags(self) -> None:
+        header = (
+            REPO_ROOT
+            / "applications_user/arf_subghz_full/views/subghz_frequency_analyzer.h"
+        ).read_text(encoding="utf-8")
+        view = (
+            REPO_ROOT
+            / "applications_user/arf_subghz_full/views/subghz_frequency_analyzer.c"
+        ).read_text(encoding="utf-8")
+        notebook = (
+            REPO_ROOT
+            / "applications_user/arf_subghz_full/helpers/subghz_frequency_notebook.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("SubGhzFrequencyAnalyzerNotebookTagField", header)
+        self.assertIn("SubGhzFrequencyAnalyzerNotebookTagCount", header)
+        for tag in ("field", "test", "noise", "other"):
+            self.assertIn(f'return "{tag}";', notebook)
+
+        self.assertIn("event->type == InputTypeLong && event->key == InputKeyDown", view)
+        self.assertIn(
+            "(instance->notebook_tag + 1) % SubGhzFrequencyAnalyzerNotebookTagCount",
+            view,
+        )
+        self.assertIn("observation->notebook_tag = model->notebook_tag", view)
+        self.assertIn("subghz_frequency_notebook_tag_name(observation)", notebook)
+        self.assertNotIn("payload", notebook.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -21,6 +21,22 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 #endif
 
+static const char* const notebook_tag_labels[SubGhzFrequencyAnalyzerNotebookTagCount] = {
+    [SubGhzFrequencyAnalyzerNotebookTagField] = "field",
+    [SubGhzFrequencyAnalyzerNotebookTagTest] = "test",
+    [SubGhzFrequencyAnalyzerNotebookTagNoise] = "noise",
+    [SubGhzFrequencyAnalyzerNotebookTagOther] = "other",
+};
+
+static const char* subghz_frequency_analyzer_notebook_tag_label(
+    SubGhzFrequencyAnalyzerNotebookTag tag) {
+    if(tag >= SubGhzFrequencyAnalyzerNotebookTagCount) {
+        return notebook_tag_labels[SubGhzFrequencyAnalyzerNotebookTagField];
+    }
+
+    return notebook_tag_labels[tag];
+}
+
 typedef enum {
     SubGhzFrequencyAnalyzerStatusIDLE,
 } SubGhzFrequencyAnalyzerStatus;
@@ -39,6 +55,7 @@ struct SubGhzFrequencyAnalyzer {
     uint8_t max_index;
     bool show_frame;
     SubGhzFrequencyAnalyzerObservation last_observation;
+    SubGhzFrequencyAnalyzerNotebookTag notebook_tag;
 };
 
 typedef struct {
@@ -55,6 +72,7 @@ typedef struct {
     uint8_t max_index;
     bool show_frame;
     bool is_ext_radio;
+    SubGhzFrequencyAnalyzerNotebookTag notebook_tag;
 } SubGhzFrequencyAnalyzerModel;
 
 void subghz_frequency_analyzer_set_callback(
@@ -162,6 +180,8 @@ void subghz_frequency_analyzer_draw(Canvas* canvas, SubGhzFrequencyAnalyzerModel
     canvas_set_color(canvas, ColorBlack);
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, 2, 7, "OK Log");
+    canvas_draw_str(
+        canvas, 45, 7, subghz_frequency_analyzer_notebook_tag_label(model->notebook_tag));
 
     // RSSI
     canvas_draw_str(canvas, 33, 62, "RSSI");
@@ -233,6 +253,7 @@ static bool subghz_frequency_analyzer_prepare_observation(
     observation->trigger_dbm_x10 = subghz_frequency_analyzer_dbm_to_x10(model->trigger);
     observation->is_ext_radio = model->is_ext_radio;
     observation->signal = model->signal;
+    observation->notebook_tag = model->notebook_tag;
 
     uint32_t frequency_candidate = 0;
     if(model->show_frame && !model->signal && model->selected_index < MAX_HISTORY) {
@@ -307,6 +328,10 @@ bool subghz_frequency_analyzer_input(InputEvent* event, void* context) {
             instance->selected_index = (instance->selected_index + 1) % instance->max_index;
             need_redraw = true;
         }
+    } else if(event->type == InputTypeLong && event->key == InputKeyDown) {
+        instance->notebook_tag =
+            (instance->notebook_tag + 1) % SubGhzFrequencyAnalyzerNotebookTagCount;
+        need_redraw = true;
     } else if(
         (event->type == InputTypeShort || event->type == InputTypeLong) &&
         event->key == InputKeyOk) {
@@ -354,6 +379,7 @@ bool subghz_frequency_analyzer_input(InputEvent* event, void* context) {
                 model->max_index = instance->max_index;
                 model->show_frame = instance->show_frame;
                 model->selected_index = instance->selected_index;
+                model->notebook_tag = instance->notebook_tag;
             },
             true);
     }
@@ -476,6 +502,7 @@ void subghz_frequency_analyzer_pair_callback(
             model->max_index = instance->max_index;
             model->show_frame = instance->show_frame;
             model->selected_index = instance->selected_index;
+            model->notebook_tag = instance->notebook_tag;
         },
         true);
 }
@@ -498,6 +525,7 @@ void subghz_frequency_analyzer_enter(void* context) {
     instance->selected_index = 0;
     instance->max_index = 0;
     instance->show_frame = false;
+    instance->notebook_tag = SubGhzFrequencyAnalyzerNotebookTagField;
     //subghz_frequency_analyzer_worker_set_trigger_level(instance->worker, RSSI_MIN);
 
     with_view_model(
@@ -522,6 +550,7 @@ void subghz_frequency_analyzer_enter(void* context) {
             model->trigger = RSSI_MIN;
             model->is_ext_radio =
                 (subghz_txrx_radio_device_get(instance->txrx) != SubGhzRadioDeviceTypeInternal);
+            model->notebook_tag = instance->notebook_tag;
         },
         true);
 }
@@ -543,6 +572,7 @@ SubGhzFrequencyAnalyzer* subghz_frequency_analyzer_alloc(SubGhzTxRx* txrx) {
     SubGhzFrequencyAnalyzer* instance = malloc(sizeof(SubGhzFrequencyAnalyzer));
 
     instance->feedback_level = SubGHzFrequencyAnalyzerFeedbackLevelMute;
+    instance->notebook_tag = SubGhzFrequencyAnalyzerNotebookTagField;
 
     // View allocation and configuration
     instance->view = view_alloc();
