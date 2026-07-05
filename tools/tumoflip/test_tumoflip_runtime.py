@@ -22,9 +22,11 @@ class TumoflipRuntimeTest(unittest.TestCase):
         self.assertIn("TUMOFLIP_RUNTIME_STATUS_MAX        160U", runtime)
         self.assertIn("#define TUMOFLIP_RUNTIME_TRACE_DEPTH       8U", runtime)
         self.assertIn("#define TUMOFLIP_RUNTIME_TRACE_MAX         160U", runtime)
+        self.assertIn("#define TUMOFLIP_RUNTIME_TWIN_MAX          160U", runtime)
         self.assertIn("session=3", runtime)
         self.assertIn("trace=1", runtime)
-        self.assertIn("features=transfer_activity,pkg_state,radio_v2,trace_ring", runtime)
+        self.assertIn("twin=1", runtime)
+        self.assertIn("features=transfer_activity,pkg_state,radio_v2,trace_ring,device_twin", runtime)
         self.assertNotIn('"radio_status"', runtime)
         self.assertNotIn("tumoflip_runtime_radio_state_name", runtime)
         self.assertIn('strcmp(runtime->assembly.command, "status") == 0', runtime)
@@ -34,6 +36,8 @@ class TumoflipRuntimeTest(unittest.TestCase):
         )
         self.assertIn('strcmp(runtime->assembly.command, "trace") == 0', runtime)
         self.assertIn("tumoflip_runtime_make_trace_payload(runtime, payload, sizeof(payload))", runtime)
+        self.assertIn('strcmp(runtime->assembly.command, "twin") == 0', runtime)
+        self.assertIn("tumoflip_runtime_make_twin_payload(runtime, payload, sizeof(payload))", runtime)
 
         for required in (
             "version_get_version(version)",
@@ -89,6 +93,7 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "session=3",
             "status=2",
             "trace=1",
+            "twin=1",
             "packages=1",
             "radio=2",
             "sd=1",
@@ -96,9 +101,36 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "pkg_state",
             "radio_v2",
             "trace_ring",
+            "device_twin",
             "transfer_activity",
         ):
             self.assertIn(required, capabilities)
+
+    def test_runtime_device_twin_payload_is_live_and_bounded(self) -> None:
+        runtime = (
+            REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
+        ).read_text(encoding="utf-8")
+        bridge_docs = (REPO_ROOT / "docs/app-bridge-v2.md").read_text(encoding="utf-8")
+        checklist = (REPO_ROOT / "docs/hardware-regression-checklist.md").read_text(
+            encoding="utf-8"
+        )
+
+        for required in (
+            "tumoflip_runtime_make_twin_payload",
+            "furi_hal_power_get_pct()",
+            "furi_hal_power_is_charging()",
+            "furi_hal_power_is_otg_enabled()",
+            "memmgr_heap_get_max_free_block()",
+            "subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status)",
+            "schema=1;fw=%.8s;cm=%.8s;dy=%hhu;sd=%hhu;pkg=%hhu;bat=%u;chg=%hhu;otg=%hhu;",
+            "heap=%lu;rf=%hhu;ro=%.4s;sid=%08lX;bo=%.8s",
+            'tumoflip_runtime_reply(runtime, event->request_id, "twin", payload, false)',
+        ):
+            self.assertIn(required, runtime)
+
+        self.assertIn("`twin` returns `runtime/twin`", bridge_docs)
+        self.assertIn("Device Twin", bridge_docs)
+        self.assertIn("Runtime `twin`", checklist)
 
     def test_runtime_trace_ring_is_bounded_and_documented(self) -> None:
         runtime = (

@@ -133,6 +133,7 @@ RUNTIME_REQUIRED_CAPABILITIES = {
     "session=3",
     "status=2",
     "trace=1",
+    "twin=1",
     "packages=1",
     "radio=2",
     "sd=1",
@@ -142,6 +143,7 @@ RUNTIME_REQUIRED_FEATURES = {
     "pkg_state",
     "radio_v2",
     "trace_ring",
+    "device_twin",
 }
 RUNTIME_REQUIRED_STATUS_FIELDS = (
     "schema=2",

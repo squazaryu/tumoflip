@@ -1,6 +1,7 @@
 #include <bt/bt_service/bt_i.h>
 #include <furi.h>
 #include <furi_hal_info.h>
+#include <furi_hal_power.h>
 #include <furi_hal_version.h>
 #include <storage/storage.h>
 #include <subghz_radio_broker/subghz_radio_broker.h>
@@ -15,11 +16,12 @@
 #define TUMOFLIP_RUNTIME_STATUS_MAX        160U
 #define TUMOFLIP_RUNTIME_TRACE_DEPTH       8U
 #define TUMOFLIP_RUNTIME_TRACE_MAX         160U
+#define TUMOFLIP_RUNTIME_TWIN_MAX          160U
 #define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX 24U
 #define TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
 #define TUMOFLIP_RUNTIME_CAPABILITIES \
-    "runtime=1;fab=2;session=3;status=2;trace=1;packages=1;radio=2;sd=1;" \
-    "features=transfer_activity,pkg_state,radio_v2,trace_ring"
+    "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;packages=1;radio=2;sd=1;" \
+    "features=transfer_activity,pkg_state,radio_v2,trace_ring,device_twin"
 
 typedef struct {
     BtAppBridgeEvent event;
@@ -218,6 +220,41 @@ static void
         radio_status.base.owner);
 }
 
+static void
+    tumoflip_runtime_make_twin_payload(TumoflipRuntime* runtime, char* payload, size_t size) {
+    const Version* version = furi_hal_version_get_firmware_version();
+    const uint8_t dirty = version_get_dirty_flag(version) ? 1U : 0U;
+    const uint8_t sd_ready = (storage_sd_status(runtime->storage) == FSE_OK) ? 1U : 0U;
+    const uint8_t package_state =
+        (sd_ready && storage_file_exists(runtime->storage, TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH)) ?
+            1U :
+            0U;
+    const uint8_t charging = furi_hal_power_is_charging() ? 1U : 0U;
+    const uint8_t otg = furi_hal_power_is_otg_enabled() ? 1U : 0U;
+
+    SubGhzRadioBrokerStatusV2 radio_status;
+    subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status);
+
+    snprintf(
+        payload,
+        size,
+        "schema=1;fw=%.8s;cm=%.8s;dy=%hhu;sd=%hhu;pkg=%hhu;bat=%u;chg=%hhu;otg=%hhu;"
+        "heap=%lu;rf=%hhu;ro=%.4s;sid=%08lX;bo=%.8s",
+        tumoflip_runtime_str_or_unknown(version_get_version(version)),
+        tumoflip_runtime_str_or_unknown(version_get_githash(version)),
+        dirty,
+        sd_ready,
+        package_state,
+        furi_hal_power_get_pct(),
+        charging,
+        otg,
+        (unsigned long)memmgr_heap_get_max_free_block(),
+        (uint8_t)radio_status.state,
+        radio_status.base.owner,
+        (unsigned long)runtime->session.session_id,
+        runtime->session.owner);
+}
+
 static bool
     tumoflip_runtime_assembly_append(TumoflipRuntime* runtime, const BtAppBridgeEvent* event) {
     TumoflipRuntimeAssembly* assembly = &runtime->assembly;
@@ -271,6 +308,10 @@ static void
         char payload[TUMOFLIP_RUNTIME_TRACE_MAX];
         tumoflip_runtime_make_trace_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "trace", payload, false);
+    } else if(strcmp(runtime->assembly.command, "twin") == 0) {
+        char payload[TUMOFLIP_RUNTIME_TWIN_MAX];
+        tumoflip_runtime_make_twin_payload(runtime, payload, sizeof(payload));
+        tumoflip_runtime_reply(runtime, event->request_id, "twin", payload, false);
     } else if(strcmp(runtime->assembly.command, "hello") == 0) {
         const size_t owner_prefix_len = 6U;
         const size_t payload_len = runtime->assembly.payload_len;

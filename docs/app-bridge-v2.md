@@ -38,8 +38,9 @@ The system app ID is `runtime`.
 - `capabilities` returns `runtime/capabilities` with a semicolon-separated
   `key=value` payload. Runtime v2 keeps backward-compatible keys
   `runtime=1`, `fab=2`, and `session=3`, and advertises `status=2`,
-  `trace=1`, `packages=1`, `radio=2`, `sd=1`, plus feature flags such as
-  `transfer_activity`, `pkg_state`, `radio_v2`, and `trace_ring`.
+  `trace=1`, `twin=1`, `packages=1`, `radio=2`, `sd=1`, plus feature flags
+  such as `transfer_activity`, `pkg_state`, `radio_v2`, `trace_ring`, and
+  `device_twin`.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
   `sd`, `pkg`, `sid`, `bo`, `radio`, and `owner`. `sd=1` means the SD card is
@@ -61,6 +62,13 @@ The system app ID is `runtime`.
   The snapshot is bounded to one FAB2 response frame and is intended for
   Companion diagnostics, not full persistent logging. Example:
   `schema=1;depth=8;count=2;drop=0|01,rx,000A,status,o|02,tx,000A,status,o`.
+- `twin` returns `runtime/twin` with the compact Device Twin schema v1 for the
+  current Flipper state. Fields are `fw` firmware version, `cm` commit, `dy`
+  dirty flag, `sd` SD readiness, `pkg` package-state presence, `bat` battery
+  percentage, `chg` charging flag, `otg` 5V output flag, `heap` largest free
+  heap block, `rf` Radio Broker state, `ro` radio owner, `sid` App Bridge
+  session ID, and `bo` bridge owner. The payload is read-only and bounded to
+  one FAB2 response frame.
 - `hello` implements the first App Bridge v3 session layer documented in
   `docs/app-bridge-v3.md`.
 - An unknown command returns `runtime/error`, sets response and error flags,

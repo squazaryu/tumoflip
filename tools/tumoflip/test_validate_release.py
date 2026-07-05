@@ -166,10 +166,11 @@ class ValidateReleaseTest(unittest.TestCase):
             "session=3",
             "status=2",
             "trace=1",
+            "twin=1",
             "packages=1",
             "radio=2",
             "sd=1",
-            "features=transfer_activity,pkg_state,radio_v2,trace_ring",
+            "features=transfer_activity,pkg_state,radio_v2,trace_ring,device_twin",
         ):
             self.assertIn(required, capabilities)
 
