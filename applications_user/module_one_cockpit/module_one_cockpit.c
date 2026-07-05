@@ -44,6 +44,7 @@ typedef enum {
     ModuleOneCockpitActionLaunchWifiMapper,
     ModuleOneCockpitActionLaunchArfHub,
     ModuleOneCockpitActionLaunchArfStatus,
+    ModuleOneCockpitActionLaunchAcceptance,
     ModuleOneCockpitActionLaunchGpio,
     ModuleOneCockpitActionLaunchSubGhz,
     ModuleOneCockpitActionExportDiagnostics,
@@ -113,6 +114,7 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"Sensors: Logger", ModuleOneCockpitActionLaunchSensorLogger},
     {"CC1101: ARF Full", ModuleOneCockpitActionLaunchArfHub},
     {"CC1101: ARF Status", ModuleOneCockpitActionLaunchArfStatus},
+    {"System: Acceptance", ModuleOneCockpitActionLaunchAcceptance},
     {"System: GPIO", ModuleOneCockpitActionLaunchGpio},
     {"System: Sub-GHz", ModuleOneCockpitActionLaunchSubGhz},
     {"Diagnostics: Export", ModuleOneCockpitActionExportDiagnostics},
@@ -181,6 +183,14 @@ static const ModuleOneCockpitLaunchTarget module_one_cockpit_targets[] = {
         ModuleOneCockpitBlockCc1101,
         "ARF Status",
         EXT_PATH("apps_data/arf_subghz_full/modules/arf_status.fap"),
+        NULL,
+        true,
+    },
+    {
+        ModuleOneCockpitActionLaunchAcceptance,
+        ModuleOneCockpitBlockSystem,
+        "Tumo Acceptance",
+        EXT_PATH("apps/Module One/tumo_acceptance_suite.fap"),
         NULL,
         true,
     },
@@ -405,6 +415,7 @@ static void module_one_cockpit_build_report(ModuleOneCockpitApp* app, FuriString
         "ESP32: use UART/AT or WiFi Mapper\n"
         "BLE: use BLE GATT Lab for App Bridge diagnostics\n"
         "Macros: use Tumo Macro Deck for local action sequences\n"
+        "Acceptance: export release smoke reports after each flash\n"
         "GPS/BME280: use Sensor Logger\n"
         "NRF24: passive detection is not implemented yet\n"
         "CC1101: use ARF Sub-GHz Full or Sub-GHz status\n");

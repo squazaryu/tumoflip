@@ -86,6 +86,7 @@ ARF_EXTAPP_TARGETS = {
 STATIC_SD_RESOURCES = Path("tools/tumoflip/sd_resources")
 MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/module_one_cockpit.fap",
+    "apps/Module One/tumo_acceptance_suite.fap",
     "apps/Module One/module_one_sensor_logger.fap",
     "apps/Module One/BLE/ble_gatt_lab.fap",
     "apps/Module One/Macros/tumo_macro_deck.fap",

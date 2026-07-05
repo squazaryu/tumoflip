@@ -23,8 +23,13 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn('fap_icon="icon.png"', self.manifest)
         self.assertTrue((APP_DIR / "icon.png").is_file())
         self.assertIn("BLE: GATT Lab", self.source)
+        self.assertIn("System: Acceptance", self.source)
         self.assertIn(
             'EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/tumo_acceptance_suite.fap")',
             self.source,
         )
 
@@ -55,6 +60,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("furi_hal_i2c_release(&furi_hal_i2c_handle_external)", self.source)
         self.assertNotIn("furi_hal_power_enable_otg", self.source)
         self.assertNotIn("furi_hal_power_disable_otg", self.source)
+        self.assertIn("Acceptance: export release smoke reports after each flash", self.source)
 
     def test_nested_launches_restore_cockpit_selection(self) -> None:
         self.assertIn("loader_clear_launch_queue(app->loader);", self.source)
