@@ -218,12 +218,6 @@ static void pv_capture_set_file(ProtocolVisualizerCapture* capture, const char* 
     strlcpy(capture->name, name ? name + 1 : path, sizeof(capture->name));
 }
 
-static bool pv_ends_with(const char* text, const char* suffix) {
-    const size_t text_len = strlen(text);
-    const size_t suffix_len = strlen(suffix);
-    return (text_len >= suffix_len) && (strcmp(text + text_len - suffix_len, suffix) == 0);
-}
-
 static bool pv_load_ir(ProtocolVisualizerApp* app, const char* path) {
     ProtocolVisualizerCapture* capture = &app->capture;
     pv_capture_reset(capture, ProtocolVisualizerKindIr);
@@ -692,26 +686,6 @@ static ProtocolVisualizerApp* pv_app_alloc(void) {
     return app;
 }
 
-static void pv_try_load_context_path(ProtocolVisualizerApp* app, const char* path) {
-    bool loaded = false;
-    if(pv_ends_with(path, ".ir")) {
-        loaded = pv_load_ir(app, path);
-    } else if(pv_ends_with(path, ".sub")) {
-        loaded = pv_load_subghz(app, path);
-    }
-
-    if(loaded) {
-        pv_window_reset(app);
-        submenu_set_selected_item(app->submenu, ProtocolVisualizerMenuExport);
-        view_dispatcher_switch_to_view(app->view_dispatcher, ProtocolVisualizerViewWave);
-    } else {
-        furi_string_printf(app->text, "Cannot load:\n%s", path);
-        text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
-        text_box_set_focus(app->text_box, TextBoxFocusStart);
-        view_dispatcher_switch_to_view(app->view_dispatcher, ProtocolVisualizerViewText);
-    }
-}
-
 static void pv_app_free(ProtocolVisualizerApp* app) {
     view_dispatcher_remove_view(app->view_dispatcher, ProtocolVisualizerViewText);
     view_dispatcher_remove_view(app->view_dispatcher, ProtocolVisualizerViewWave);
@@ -731,10 +705,8 @@ static void pv_app_free(ProtocolVisualizerApp* app) {
 }
 
 int32_t protocol_visualizer_app(void* context) {
+    UNUSED(context);
     ProtocolVisualizerApp* app = pv_app_alloc();
-    if(context) {
-        pv_try_load_context_path(app, context);
-    }
     view_dispatcher_run(app->view_dispatcher);
     pv_app_free(app);
     return 0;
