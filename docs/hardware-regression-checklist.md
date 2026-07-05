@@ -138,16 +138,16 @@ are legally allowed to test.
 - Pair/connect with the iOS companion.
 - Confirm legacy FAB1-compatible traffic still works where applicable.
 - Query FAB2 Runtime capabilities.
-- Query FAB2 Runtime status and confirm firmware identity, API, transfer state,
+- Query FAB2 Runtime status and confirm firmware identity, API, transfer field,
   SD readiness, package-state presence, App Bridge session owner, and Radio
   Broker state are present.
 - Send Runtime `hello`, confirm a v3 session ID is returned, then query
   `status` and confirm `sid` and `bo` are present.
 - Query Runtime `trace` after several commands and confirm the compact
-  `schema=1` ring includes recent `rx` and `tx`/`er` events without exceeding
+  `schema=1` ring includes recent `r` and `t`/`e` events without exceeding
   one response frame.
 - Query Runtime `twin` and confirm Device Twin fields reflect live firmware,
-  SD/package, power, heap, Radio Broker, and App Bridge owner state.
+  SD/package, battery, Radio Broker, and App Bridge owner state.
 - Send a small Runtime command and verify a response or explicit error frame.
 - Disconnect and reconnect without rebooting the Flipper.
 

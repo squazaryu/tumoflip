@@ -134,16 +134,15 @@ RUNTIME_REQUIRED_CAPABILITIES = {
     "status=2",
     "trace=1",
     "twin=1",
-    "packages=1",
+    "pkg=1",
     "radio=2",
     "sd=1",
 }
 RUNTIME_REQUIRED_FEATURES = {
-    "transfer_activity",
-    "pkg_state",
-    "radio_v2",
-    "trace_ring",
-    "device_twin",
+    "pkg",
+    "radio",
+    "trace",
+    "twin",
 }
 RUNTIME_REQUIRED_STATUS_FIELDS = (
     "schema=2",
@@ -321,10 +320,8 @@ def validate_runtime_contract(repo_root: Path) -> None:
     if missing:
         raise ValidationError(f"Tumoflip Runtime capabilities missing: {missing}")
 
-    feature_field = next(
-        (field for field in capability_fields if field.startswith("features=")), ""
-    )
-    features = set(feature_field.removeprefix("features=").split(","))
+    feature_field = next((field for field in capability_fields if field.startswith("feat=")), "")
+    features = set(feature_field.removeprefix("feat=").split(","))
     missing_features = sorted(RUNTIME_REQUIRED_FEATURES - features)
     if missing_features:
         raise ValidationError(

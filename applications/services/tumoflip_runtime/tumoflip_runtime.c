@@ -8,11 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#define TAG "TumoflipRuntime"
-
 #define TUMOFLIP_RUNTIME_APP_ID            "runtime"
 #define TUMOFLIP_RUNTIME_QUEUE_DEPTH       8U
-#define TUMOFLIP_RUNTIME_REASSEMBLY_MAX    512U
 #define TUMOFLIP_RUNTIME_STATUS_MAX        160U
 #define TUMOFLIP_RUNTIME_TRACE_DEPTH       8U
 #define TUMOFLIP_RUNTIME_TRACE_MAX         160U
@@ -20,22 +17,12 @@
 #define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX 24U
 #define TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
 #define TUMOFLIP_RUNTIME_CAPABILITIES \
-    "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;packages=1;radio=2;sd=1;" \
-    "features=transfer_activity,pkg_state,radio_v2,trace_ring,device_twin"
+    "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;pkg=1;radio=2;sd=1;" \
+    "feat=pkg,radio,trace,twin"
 
 typedef struct {
     BtAppBridgeEvent event;
 } TumoflipRuntimeMessage;
-
-typedef struct {
-    bool active;
-    uint32_t request_id;
-    uint8_t next_chunk;
-    uint8_t chunk_count;
-    char command[BT_APP_BRIDGE_COMMAND_LEN_MAX + 1];
-    uint8_t payload[TUMOFLIP_RUNTIME_REASSEMBLY_MAX];
-    size_t payload_len;
-} TumoflipRuntimeAssembly;
 
 typedef struct {
     uint32_t session_id;
@@ -43,10 +30,8 @@ typedef struct {
 } TumoflipRuntimeSession;
 
 typedef struct {
-    uint8_t sequence;
-    uint32_t request_id;
-    char code[3];
-    char command[BT_APP_BRIDGE_COMMAND_LEN_MAX + 1];
+    char code;
+    char command;
     bool error;
 } TumoflipRuntimeTraceEvent;
 
@@ -56,20 +41,15 @@ typedef struct {
     SubGhzRadioBroker* radio_broker;
     FuriMessageQueue* queue;
     FuriPubSubSubscription* subscription;
-    TumoflipRuntimeAssembly assembly;
     TumoflipRuntimeSession session;
     TumoflipRuntimeTraceEvent trace[TUMOFLIP_RUNTIME_TRACE_DEPTH];
     uint8_t trace_head;
     uint8_t trace_count;
-    uint8_t trace_sequence;
-    uint32_t trace_dropped;
-    bool transfer_active;
 } TumoflipRuntime;
 
 static void tumoflip_runtime_trace_add(
     TumoflipRuntime* runtime,
-    const char* code,
-    uint32_t request_id,
+    char code,
     const char* command,
     bool error);
 
@@ -83,9 +63,7 @@ static void tumoflip_runtime_bridge_callback(const void* message, void* context)
     }
 
     const TumoflipRuntimeMessage runtime_message = {.event = *event};
-    if(furi_message_queue_put(runtime->queue, &runtime_message, 0) != FuriStatusOk) {
-        FURI_LOG_W(TAG, "Dropping bridge request: queue is full");
-    }
+    furi_message_queue_put(runtime->queue, &runtime_message, 0);
 }
 
 static void tumoflip_runtime_reply(
@@ -95,29 +73,9 @@ static void tumoflip_runtime_reply(
     const char* payload,
     bool error) {
     const uint8_t flags = BtAppBridgeFlagResponse | (error ? BtAppBridgeFlagError : 0);
-    if(!bt_app_bridge_send_text_v2(
-           runtime->bt, TUMOFLIP_RUNTIME_APP_ID, command, request_id, flags, payload)) {
-        FURI_LOG_W(TAG, "Failed to send %s response", command);
-    }
-    tumoflip_runtime_trace_add(runtime, error ? "er" : "tx", request_id, command, error);
-}
-
-static void tumoflip_runtime_transfer_activity(TumoflipRuntime* runtime, bool active) {
-    runtime->transfer_active = active;
-    BtMessage message = {
-        .lock = api_lock_alloc_locked(),
-        .type = BtMessageTypeTransferActivity,
-        .data.transfer_active = active,
-    };
-    furi_check(
-        furi_message_queue_put(runtime->bt->message_queue, &message, FuriWaitForever) ==
-        FuriStatusOk);
-    api_lock_wait_unlock_and_free(message.lock);
-    tumoflip_runtime_trace_add(runtime, "tr", 0, active ? "transfer_on" : "transfer_off", false);
-}
-
-static void tumoflip_runtime_assembly_reset(TumoflipRuntimeAssembly* assembly) {
-    memset(assembly, 0, sizeof(TumoflipRuntimeAssembly));
+    bt_app_bridge_send_text_v2(
+        runtime->bt, TUMOFLIP_RUNTIME_APP_ID, command, request_id, flags, payload);
+    tumoflip_runtime_trace_add(runtime, error ? 'e' : 't', command, error);
 }
 
 static const char* tumoflip_runtime_str_or_unknown(const char* value) {
@@ -126,22 +84,17 @@ static const char* tumoflip_runtime_str_or_unknown(const char* value) {
 
 static void tumoflip_runtime_trace_add(
     TumoflipRuntime* runtime,
-    const char* code,
-    uint32_t request_id,
+    char code,
     const char* command,
     bool error) {
     TumoflipRuntimeTraceEvent* trace = &runtime->trace[runtime->trace_head];
-    trace->sequence = runtime->trace_sequence++;
-    trace->request_id = request_id;
-    strlcpy(trace->code, code, sizeof(trace->code));
-    strlcpy(trace->command, command ? command : "", sizeof(trace->command));
+    trace->code = code;
+    trace->command = (command && command[0]) ? command[0] : '-';
     trace->error = error;
 
     runtime->trace_head = (runtime->trace_head + 1U) % TUMOFLIP_RUNTIME_TRACE_DEPTH;
     if(runtime->trace_count < TUMOFLIP_RUNTIME_TRACE_DEPTH) {
         runtime->trace_count++;
-    } else {
-        runtime->trace_dropped++;
     }
 }
 
@@ -149,13 +102,15 @@ static void tumoflip_runtime_make_trace_payload(
     TumoflipRuntime* runtime,
     char* payload,
     size_t size) {
-    snprintf(
+    int written = snprintf(
         payload,
         size,
-        "schema=1;depth=%u;count=%u;drop=%lu",
+        "schema=1;depth=%u;count=%u",
         TUMOFLIP_RUNTIME_TRACE_DEPTH,
-        runtime->trace_count,
-        (unsigned long)runtime->trace_dropped);
+        runtime->trace_count);
+    if(written < 0) return;
+    size_t used = (size_t)written;
+    if(used >= size) return;
 
     for(uint8_t offset = 0; offset < runtime->trace_count; offset++) {
         const uint8_t index =
@@ -163,21 +118,17 @@ static void tumoflip_runtime_make_trace_payload(
             TUMOFLIP_RUNTIME_TRACE_DEPTH;
         const TumoflipRuntimeTraceEvent* trace = &runtime->trace[index];
 
-        char entry[40];
-        snprintf(
-            entry,
-            sizeof(entry),
-            "|%02X,%s,%04lX,%.6s,%c",
-            trace->sequence,
+        written = snprintf(
+            &payload[used],
+            size - used,
+            "|%c,%c,%c",
             trace->code,
-            (unsigned long)(trace->request_id & 0xFFFFU),
             trace->command,
             trace->error ? 'e' : 'o');
 
-        if((strlen(payload) + strlen(entry) + 1U) >= size) {
-            break;
-        }
-        strlcat(payload, entry, size);
+        if(written < 0) break;
+        used += (size_t)written;
+        if(used >= size) break;
     }
 }
 
@@ -189,7 +140,6 @@ static void
     furi_hal_info_get_api_version(&api_major, &api_minor);
     const uint8_t dirty = version_get_dirty_flag(version) ? 1U : 0U;
     const uint8_t target = version_get_target(version);
-    const uint8_t transfer_active = runtime->transfer_active ? 1U : 0U;
     const uint8_t sd_ready = (storage_sd_status(runtime->storage) == FSE_OK) ? 1U : 0U;
     const uint8_t package_state =
         (sd_ready && storage_file_exists(runtime->storage, TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH)) ?
@@ -211,7 +161,7 @@ static void
         api_major,
         api_minor,
         target,
-        transfer_active,
+        0U,
         sd_ready,
         package_state,
         (unsigned long)runtime->session.session_id,
@@ -229,8 +179,6 @@ static void
         (sd_ready && storage_file_exists(runtime->storage, TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH)) ?
             1U :
             0U;
-    const uint8_t charging = furi_hal_power_is_charging() ? 1U : 0U;
-    const uint8_t otg = furi_hal_power_is_otg_enabled() ? 1U : 0U;
 
     SubGhzRadioBrokerStatusV2 radio_status;
     subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status);
@@ -238,99 +186,69 @@ static void
     snprintf(
         payload,
         size,
-        "schema=1;fw=%.8s;cm=%.8s;dy=%hhu;sd=%hhu;pkg=%hhu;bat=%u;chg=%hhu;otg=%hhu;"
-        "heap=%lu;rf=%hhu;ro=%.4s;sid=%08lX;bo=%.8s",
+        "schema=1;fw=%.8s;cm=%.8s;dy=%hhu;sd=%hhu;pkg=%hhu;bat=%u;rf=%hhu;"
+        "ro=%.4s;sid=%08lX;bo=%.8s",
         tumoflip_runtime_str_or_unknown(version_get_version(version)),
         tumoflip_runtime_str_or_unknown(version_get_githash(version)),
         dirty,
         sd_ready,
         package_state,
         furi_hal_power_get_pct(),
-        charging,
-        otg,
-        (unsigned long)memmgr_heap_get_max_free_block(),
         (uint8_t)radio_status.state,
         radio_status.base.owner,
         (unsigned long)runtime->session.session_id,
         runtime->session.owner);
 }
 
-static bool
-    tumoflip_runtime_assembly_append(TumoflipRuntime* runtime, const BtAppBridgeEvent* event) {
-    TumoflipRuntimeAssembly* assembly = &runtime->assembly;
-
-    if(event->chunk_index == 0) {
-        tumoflip_runtime_assembly_reset(assembly);
-        assembly->active = true;
-        assembly->request_id = event->request_id;
-        assembly->chunk_count = event->chunk_count;
-        strlcpy(assembly->command, event->command, sizeof(assembly->command));
-    }
-
-    if(!assembly->active || (assembly->request_id != event->request_id) ||
-       (assembly->chunk_count != event->chunk_count) ||
-       (assembly->next_chunk != event->chunk_index) ||
-       (strcmp(assembly->command, event->command) != 0)) {
-        tumoflip_runtime_trace_add(runtime, "er", event->request_id, event->command, true);
-        tumoflip_runtime_reply(runtime, event->request_id, "error", "invalid_chunk_order", true);
-        tumoflip_runtime_assembly_reset(assembly);
-        return false;
-    }
-
-    if((assembly->payload_len + event->payload_len) > TUMOFLIP_RUNTIME_REASSEMBLY_MAX) {
-        tumoflip_runtime_trace_add(runtime, "er", event->request_id, event->command, true);
-        tumoflip_runtime_reply(runtime, event->request_id, "error", "payload_too_large", true);
-        tumoflip_runtime_assembly_reset(assembly);
-        return false;
-    }
-
-    memcpy(&assembly->payload[assembly->payload_len], event->payload, event->payload_len);
-    assembly->payload_len += event->payload_len;
-    assembly->next_chunk++;
-    return assembly->next_chunk == assembly->chunk_count;
-}
-
 static void
     tumoflip_runtime_handle_request(TumoflipRuntime* runtime, const BtAppBridgeEvent* event) {
-    if(!tumoflip_runtime_assembly_append(runtime, event)) return;
-    tumoflip_runtime_trace_add(runtime, "rx", event->request_id, runtime->assembly.command, false);
+    const char* command = event->command;
+    const uint8_t* payload = event->payload;
+    const size_t payload_len = event->payload_len;
 
-    if(strcmp(runtime->assembly.command, "ping") == 0) {
+    if((event->chunk_index != 0U) || (event->chunk_count != 1U)) {
+        tumoflip_runtime_trace_add(runtime, 'e', command, true);
+        tumoflip_runtime_reply(runtime, event->request_id, "error", "chunk", true);
+        return;
+    }
+
+    tumoflip_runtime_trace_add(runtime, 'r', command, false);
+
+    if(strcmp(command, "ping") == 0) {
         tumoflip_runtime_reply(runtime, event->request_id, "pong", "ok", false);
-    } else if(strcmp(runtime->assembly.command, "capabilities") == 0) {
+    } else if(strcmp(command, "capabilities") == 0) {
         tumoflip_runtime_reply(
             runtime, event->request_id, "capabilities", TUMOFLIP_RUNTIME_CAPABILITIES, false);
-    } else if(strcmp(runtime->assembly.command, "status") == 0) {
+    } else if(strcmp(command, "status") == 0) {
         char payload[TUMOFLIP_RUNTIME_STATUS_MAX];
         tumoflip_runtime_make_status_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "status", payload, false);
-    } else if(strcmp(runtime->assembly.command, "trace") == 0) {
+    } else if(strcmp(command, "trace") == 0) {
         char payload[TUMOFLIP_RUNTIME_TRACE_MAX];
         tumoflip_runtime_make_trace_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "trace", payload, false);
-    } else if(strcmp(runtime->assembly.command, "twin") == 0) {
+    } else if(strcmp(command, "twin") == 0) {
         char payload[TUMOFLIP_RUNTIME_TWIN_MAX];
         tumoflip_runtime_make_twin_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "twin", payload, false);
-    } else if(strcmp(runtime->assembly.command, "hello") == 0) {
+    } else if(strcmp(command, "hello") == 0) {
         const size_t owner_prefix_len = 6U;
-        const size_t payload_len = runtime->assembly.payload_len;
         size_t owner_len = 0U;
         bool owner_valid = (payload_len > owner_prefix_len) &&
-                           (memcmp(runtime->assembly.payload, "owner=", owner_prefix_len) == 0);
+                           (memcmp(payload, "owner=", owner_prefix_len) == 0);
         if(owner_valid) {
             owner_len = payload_len - owner_prefix_len;
             owner_valid = owner_len <= TUMOFLIP_RUNTIME_SESSION_OWNER_MAX;
         }
 
         if(!owner_valid) {
-            tumoflip_runtime_trace_add(runtime, "er", event->request_id, "hello", true);
-            tumoflip_runtime_reply(runtime, event->request_id, "error", "invalid_owner", true);
+            tumoflip_runtime_trace_add(runtime, 'e', "hello", true);
+            tumoflip_runtime_reply(runtime, event->request_id, "error", "owner", true);
         } else {
             runtime->session.session_id = event->request_id;
-            memcpy(runtime->session.owner, &runtime->assembly.payload[owner_prefix_len], owner_len);
+            memcpy(runtime->session.owner, &payload[owner_prefix_len], owner_len);
             runtime->session.owner[owner_len] = '\0';
-            tumoflip_runtime_trace_add(runtime, "ss", event->request_id, runtime->session.owner, false);
+            tumoflip_runtime_trace_add(runtime, 's', runtime->session.owner, false);
 
             char response[48];
             snprintf(
@@ -340,21 +258,10 @@ static void
                 (unsigned long)runtime->session.session_id);
             tumoflip_runtime_reply(runtime, event->request_id, "hello", response, false);
         }
-    } else if(strcmp(runtime->assembly.command, "transfer_begin") == 0) {
-        tumoflip_runtime_transfer_activity(runtime, true);
-        tumoflip_runtime_reply(runtime, event->request_id, "transfer_begin", "ok", false);
-    } else if(strcmp(runtime->assembly.command, "transfer_progress") == 0) {
-        tumoflip_runtime_transfer_activity(runtime, true);
-        tumoflip_runtime_reply(runtime, event->request_id, "transfer_progress", "ok", false);
-    } else if(strcmp(runtime->assembly.command, "transfer_end") == 0) {
-        tumoflip_runtime_transfer_activity(runtime, false);
-        tumoflip_runtime_reply(runtime, event->request_id, "transfer_end", "ok", false);
     } else {
-        tumoflip_runtime_trace_add(runtime, "er", event->request_id, runtime->assembly.command, true);
-        tumoflip_runtime_reply(runtime, event->request_id, "error", "unsupported_command", true);
+        tumoflip_runtime_trace_add(runtime, 'e', command, true);
+        tumoflip_runtime_reply(runtime, event->request_id, "error", "badcmd", true);
     }
-
-    tumoflip_runtime_assembly_reset(&runtime->assembly);
 }
 
 int32_t tumoflip_runtime_srv(void* context) {

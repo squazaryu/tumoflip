@@ -26,17 +26,17 @@ class TumoflipRuntimeTest(unittest.TestCase):
         self.assertIn("session=3", runtime)
         self.assertIn("trace=1", runtime)
         self.assertIn("twin=1", runtime)
-        self.assertIn("features=transfer_activity,pkg_state,radio_v2,trace_ring,device_twin", runtime)
+        self.assertIn("feat=pkg,radio,trace,twin", runtime)
         self.assertNotIn('"radio_status"', runtime)
         self.assertNotIn("tumoflip_runtime_radio_state_name", runtime)
-        self.assertIn('strcmp(runtime->assembly.command, "status") == 0', runtime)
+        self.assertIn('strcmp(command, "status") == 0', runtime)
         self.assertIn(
             'tumoflip_runtime_reply(runtime, event->request_id, "status", payload, false)',
             runtime,
         )
-        self.assertIn('strcmp(runtime->assembly.command, "trace") == 0', runtime)
+        self.assertIn('strcmp(command, "trace") == 0', runtime)
         self.assertIn("tumoflip_runtime_make_trace_payload(runtime, payload, sizeof(payload))", runtime)
-        self.assertIn('strcmp(runtime->assembly.command, "twin") == 0', runtime)
+        self.assertIn('strcmp(command, "twin") == 0', runtime)
         self.assertIn("tumoflip_runtime_make_twin_payload(runtime, payload, sizeof(payload))", runtime)
 
         for required in (
@@ -46,7 +46,6 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "version_get_firmware_origin(version)",
             "furi_hal_info_get_api_version(&api_major, &api_minor)",
             "version_get_target(version)",
-            "runtime->transfer_active",
             "storage_sd_status(runtime->storage)",
             "subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status)",
         ):
@@ -94,15 +93,14 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "status=2",
             "trace=1",
             "twin=1",
-            "packages=1",
+            "pkg=1",
             "radio=2",
             "sd=1",
-            "features=transfer_activity",
-            "pkg_state",
-            "radio_v2",
-            "trace_ring",
-            "device_twin",
-            "transfer_activity",
+            "feat=pkg",
+            "pkg",
+            "radio",
+            "trace",
+            "twin",
         ):
             self.assertIn(required, capabilities)
 
@@ -118,12 +116,9 @@ class TumoflipRuntimeTest(unittest.TestCase):
         for required in (
             "tumoflip_runtime_make_twin_payload",
             "furi_hal_power_get_pct()",
-            "furi_hal_power_is_charging()",
-            "furi_hal_power_is_otg_enabled()",
-            "memmgr_heap_get_max_free_block()",
             "subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status)",
-            "schema=1;fw=%.8s;cm=%.8s;dy=%hhu;sd=%hhu;pkg=%hhu;bat=%u;chg=%hhu;otg=%hhu;",
-            "heap=%lu;rf=%hhu;ro=%.4s;sid=%08lX;bo=%.8s",
+            "schema=1;fw=%.8s;cm=%.8s;dy=%hhu;sd=%hhu;pkg=%hhu;bat=%u;rf=%hhu;",
+            "ro=%.4s;sid=%08lX;bo=%.8s",
             'tumoflip_runtime_reply(runtime, event->request_id, "twin", payload, false)',
         ):
             self.assertIn(required, runtime)
@@ -145,13 +140,11 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "TumoflipRuntimeTraceEvent trace[TUMOFLIP_RUNTIME_TRACE_DEPTH]",
             "runtime->trace_head",
             "runtime->trace_count",
-            "runtime->trace_dropped",
-            "tumoflip_runtime_trace_add(runtime, \"rx\"",
-            "tumoflip_runtime_trace_add(runtime, error ? \"er\" : \"tx\"",
-            "tumoflip_runtime_trace_add(runtime, \"tr\"",
-            "tumoflip_runtime_trace_add(runtime, \"ss\"",
-            "schema=1;depth=%u;count=%u;drop=%lu",
-            '"|%02X,%s,%04lX,%.6s,%c"',
+            "tumoflip_runtime_trace_add(runtime, 'r'",
+            "tumoflip_runtime_trace_add(runtime, error ? 'e' : 't'",
+            "tumoflip_runtime_trace_add(runtime, 's'",
+            "schema=1;depth=%u;count=%u",
+            '"|%c,%c,%c"',
         ):
             self.assertIn(required, runtime)
 
@@ -209,8 +202,9 @@ class TumoflipRuntimeTest(unittest.TestCase):
         for required in (
             "#define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX 24U",
             "typedef struct {\n    uint32_t session_id;",
-            'strcmp(runtime->assembly.command, "hello") == 0',
-            "invalid_owner",
+            'strcmp(command, "hello") == 0',
+            "chunk",
+            "owner",
         ):
             self.assertIn(required, runtime)
 

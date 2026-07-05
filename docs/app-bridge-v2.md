@@ -28,7 +28,8 @@ Flags:
 
 The complete frame must not exceed 244 bytes. Chunks belonging to one request
 must have the same request ID, app ID, command, and chunk count, and must arrive
-in order. The firmware Runtime reassembles up to 512 bytes for its own commands.
+in order. The firmware Runtime commands are single-frame commands; chunked
+`runtime` requests return an explicit error.
 
 ## Runtime commands
 
@@ -38,9 +39,8 @@ The system app ID is `runtime`.
 - `capabilities` returns `runtime/capabilities` with a semicolon-separated
   `key=value` payload. Runtime v2 keeps backward-compatible keys
   `runtime=1`, `fab=2`, and `session=3`, and advertises `status=2`,
-  `trace=1`, `twin=1`, `packages=1`, `radio=2`, `sd=1`, plus feature flags
-  such as `transfer_activity`, `pkg_state`, `radio_v2`, `trace_ring`, and
-  `device_twin`.
+  `trace=1`, `twin=1`, `pkg=1`, `radio=2`, `sd=1`, plus compact feature
+  flags in `feat`, currently `pkg`, `radio`, `trace`, and `twin`.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
   `sd`, `pkg`, `sid`, `bo`, `radio`, and `owner`. `sd=1` means the SD card is
@@ -55,25 +55,25 @@ The system app ID is `runtime`.
   response frame. Long owner names may be shortened in this compact status
   response.
 - `trace` returns `runtime/trace` with compact schema v1 fields:
-  `schema`, `depth`, `count`, and `drop`, followed by pipe-delimited ring
-  entries. Each entry is `seq,code,request,command,result`, where `code`
-  currently uses `rx` for received commands, `tx` for successful responses,
-  `er` for errors, `ss` for session ownership, and `tr` for transfer activity.
+  `schema`, `depth`, and `count`, followed by pipe-delimited ring entries.
+  Each entry is `code,command,result`, where `code` currently uses `r` for
+  received commands, `t` for successful responses, `e` for errors, and `s` for
+  session ownership. `command` is the first character of the related command
+  token.
   The snapshot is bounded to one FAB2 response frame and is intended for
   Companion diagnostics, not full persistent logging. Example:
-  `schema=1;depth=8;count=2;drop=0|01,rx,000A,status,o|02,tx,000A,status,o`.
+  `schema=1;depth=8;count=2|r,s,o|t,s,o`.
 - `twin` returns `runtime/twin` with the compact Device Twin schema v1 for the
   current Flipper state. Fields are `fw` firmware version, `cm` commit, `dy`
   dirty flag, `sd` SD readiness, `pkg` package-state presence, `bat` battery
-  percentage, `chg` charging flag, `otg` 5V output flag, `heap` largest free
-  heap block, `rf` Radio Broker state, `ro` radio owner, `sid` App Bridge
+  percentage, `rf` Radio Broker state, `ro` radio owner, `sid` App Bridge
   session ID, and `bo` bridge owner. The payload is read-only and bounded to
   one FAB2 response frame.
 - `hello` implements the first App Bridge v3 session layer documented in
   `docs/app-bridge-v3.md`.
 - An unknown command returns `runtime/error`, sets response and error flags,
-  and carries `unsupported_command`.
-- Invalid chunk order and oversized Runtime payloads return `runtime/error`.
+  and carries `badcmd`.
+- Chunked Runtime requests return `runtime/error` with `chunk`.
 
 Every response carries the request ID of the command. Runtime responses are
 semantic acknowledgements; the acknowledgement-requested flag is reserved for
