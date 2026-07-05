@@ -36,6 +36,8 @@ class ModuleOneCockpitTest(unittest.TestCase):
     def test_cockpit_pro_exports_diagnostic_report(self) -> None:
         self.assertIn("MODULE_ONE_COCKPIT_DATA_DIR", self.source)
         self.assertIn('EXT_PATH("apps_data/module_one_cockpit")', self.source)
+        self.assertIn("MODULE_ONE_COCKPIT_PACKAGE_STATE_PATH", self.source)
+        self.assertIn('EXT_PATH(".tumoflip/package-state.txt")', self.source)
         self.assertIn("ModuleOneCockpitActionExportDiagnostics", self.source)
         self.assertIn('"Diagnostics: Export"', self.source)
         self.assertIn("module_one_cockpit_export_report", self.source)
@@ -46,6 +48,16 @@ class ModuleOneCockpitTest(unittest.TestCase):
 
     def test_health_report_uses_passive_checks_only(self) -> None:
         self.assertIn("Module One Cockpit Pro", self.source)
+        self.assertIn("module_one_cockpit_append_firmware_report", self.source)
+        self.assertIn("module_one_cockpit_append_storage_report(app, output)", self.source)
+        self.assertIn("module_one_cockpit_append_memory_report", self.source)
+        self.assertIn("version_get_version(version)", self.source)
+        self.assertIn("version_get_githash(version)", self.source)
+        self.assertIn("version_get_dirty_flag(version)", self.source)
+        self.assertIn("furi_hal_info_get_api_version(&api_major, &api_minor)", self.source)
+        self.assertIn("storage_sd_status(app->storage)", self.source)
+        self.assertIn("storage_file_exists(app->storage, MODULE_ONE_COCKPIT_PACKAGE_STATE_PATH)", self.source)
+        self.assertIn("memmgr_heap_get_max_free_block()", self.source)
         self.assertIn("Runtime health", self.source)
         self.assertIn("furi_hal_infrared_is_busy()", self.source)
         self.assertIn("furi_hal_serial_control_is_busy(FuriHalSerialIdUsart)", self.source)

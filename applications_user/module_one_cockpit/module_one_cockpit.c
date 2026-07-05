@@ -1,10 +1,12 @@
 #include <furi.h>
+#include <furi_hal_info.h>
 #include <furi_hal_i2c.h>
 #include <furi_hal_infrared.h>
 #include <furi_hal_power.h>
 #include <furi_hal_rtc.h>
 #include <furi_hal_serial.h>
 #include <furi_hal_serial_control.h>
+#include <furi_hal_version.h>
 #include <gui/gui.h>
 #include <gui/modules/submenu.h>
 #include <gui/modules/text_box.h>
@@ -23,6 +25,7 @@
 #define MODULE_ONE_COCKPIT_I2C_TIMEOUT_MS 2U
 #define MODULE_ONE_COCKPIT_UART_BAUD 115200U
 #define MODULE_ONE_COCKPIT_DATA_DIR EXT_PATH("apps_data/module_one_cockpit")
+#define MODULE_ONE_COCKPIT_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
 #define MODULE_ONE_COCKPIT_REPORT_PATH_SIZE 128U
 
 typedef enum {
@@ -357,6 +360,60 @@ static void module_one_cockpit_append_power_report(FuriString* output) {
         furi_hal_power_check_otg_fault() ? "yes" : "no");
 }
 
+static void module_one_cockpit_append_firmware_report(FuriString* output) {
+    const Version* version = furi_hal_version_get_firmware_version();
+    uint16_t api_major = 0;
+    uint16_t api_minor = 0;
+    furi_hal_info_get_api_version(&api_major, &api_minor);
+
+    furi_string_cat_printf(
+        output,
+        "Firmware\n"
+        "Version: %s\n"
+        "Commit: %s\n"
+        "Branch: %s\n"
+        "Origin: %s\n"
+        "Dirty: %s\n"
+        "API: %u.%u\n"
+        "Target: %u\n\n",
+        version_get_version(version),
+        version_get_githash(version),
+        version_get_gitbranch(version),
+        version_get_firmware_origin(version),
+        version_get_dirty_flag(version) ? "yes" : "no",
+        api_major,
+        api_minor,
+        version_get_target(version));
+}
+
+static void module_one_cockpit_append_storage_report(ModuleOneCockpitApp* app, FuriString* output) {
+    const bool sd_ready = storage_sd_status(app->storage) == FSE_OK;
+    const bool package_state =
+        sd_ready && storage_file_exists(app->storage, MODULE_ONE_COCKPIT_PACKAGE_STATE_PATH);
+
+    furi_string_cat_printf(
+        output,
+        "Storage\n"
+        "SD: %s\n"
+        "Package state: %s\n"
+        "Package path: %s\n\n",
+        sd_ready ? "ready" : "not ready",
+        package_state ? "present" : "missing",
+        MODULE_ONE_COCKPIT_PACKAGE_STATE_PATH);
+}
+
+static void module_one_cockpit_append_memory_report(FuriString* output) {
+    furi_string_cat_printf(
+        output,
+        "Memory\n"
+        "Free heap: %lu\n"
+        "Min free heap: %lu\n"
+        "Max block: %lu\n\n",
+        (unsigned long)memmgr_get_free_heap(),
+        (unsigned long)memmgr_get_minimum_free_heap(),
+        (unsigned long)memmgr_heap_get_max_free_block());
+}
+
 static void module_one_cockpit_append_runtime_report(FuriString* output) {
     const bool ir_busy = furi_hal_infrared_is_busy();
     const bool usart_busy = furi_hal_serial_control_is_busy(FuriHalSerialIdUsart);
@@ -404,6 +461,9 @@ static void module_one_cockpit_build_report(ModuleOneCockpitApp* app, FuriString
     module_one_cockpit_append_iso_timestamp(output);
     furi_string_cat_printf(output, "\n\n");
 
+    module_one_cockpit_append_firmware_report(output);
+    module_one_cockpit_append_storage_report(app, output);
+    module_one_cockpit_append_memory_report(output);
     module_one_cockpit_append_power_report(output);
     module_one_cockpit_append_runtime_report(output);
     module_one_cockpit_append_app_report(app, output);
