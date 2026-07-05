@@ -37,3 +37,5 @@
 !wifi_mapper/**
 !module_one_sensor_logger/
 !module_one_sensor_logger/**
+!protocol_visualizer/
+!protocol_visualizer/**

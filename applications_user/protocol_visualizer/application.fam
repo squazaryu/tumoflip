@@ -1,0 +1,13 @@
+App(
+    appid="protocol_visualizer",
+    name="Protocol Visualizer",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="protocol_visualizer_app",
+    requires=["gui", "dialogs", "storage"],
+    stack_size=4 * 1024,
+    fap_category="ARF Tools",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip",
+    fap_description="Receive-only IR and Sub-GHz capture visualizer with pulse/gap timeline and SD summary export.",
+)

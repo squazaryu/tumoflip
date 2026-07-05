@@ -10,6 +10,7 @@
 
 #define ARF_FULL_PATH          EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")
 #define ARF_ANALYZER_PATH      EXT_PATH("apps/ARF Tools/arf_frequency_analyzer.fap")
+#define ARF_VISUALIZER_PATH    EXT_PATH("apps/ARF Tools/protocol_visualizer.fap")
 #define ARF_MODULES_PATH       EXT_PATH("apps_data/arf_subghz_full/modules/")
 
 typedef enum {
@@ -66,6 +67,7 @@ static void arf_tools_show_assets(ArfToolsApp* app) {
     arf_tools_append_exists(app, "Car Emulate", ARF_MODULES_PATH "arf_car_emulate.fap");
     arf_tools_append_exists(app, "PSA Decrypt", ARF_MODULES_PATH "arf_psa_decrypt.fap");
     arf_tools_append_exists(app, "Analyzer", ARF_ANALYZER_PATH);
+    arf_tools_append_exists(app, "Protocol Visualizer", ARF_VISUALIZER_PATH);
     arf_tools_append_exists(app, "RollJam", ARF_MODULES_PATH "rolljam.fap");
     arf_tools_append_exists(
         app, "SubBrute", ARF_MODULES_PATH "subghz_bruteforcer.fap");
@@ -78,7 +80,7 @@ static void arf_tools_show_about(ArfToolsApp* app) {
         app,
         "ARF Status 0.2\n\n"
         "Checks the Full launcher, visible ARF apps, and isolated modules.\n\n"
-        "Full and Frequency Analyzer are exposed in /ext/apps/ARF Tools.");
+        "Full, Frequency Analyzer, and Protocol Visualizer are exposed in /ext/apps/ARF Tools.");
 }
 
 static void arf_tools_menu_callback(void* context, uint32_t index) {

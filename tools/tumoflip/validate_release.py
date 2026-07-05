@@ -56,6 +56,7 @@ ARF_VISIBLE_APP_IDS = {
     "arf_subghz_full",
     "garage_door_remote",
     "keeloq_keystore_decryptor",
+    "protocol_visualizer",
     "subghz_raw_edit",
 }
 ARF_MODULE_APP_IDS = {
