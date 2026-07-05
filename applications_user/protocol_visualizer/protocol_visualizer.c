@@ -638,6 +638,11 @@ static bool pv_back_callback(void* context) {
     return true;
 }
 
+static uint32_t pv_wave_previous_callback(void* context) {
+    UNUSED(context);
+    return ProtocolVisualizerViewMenu;
+}
+
 static uint32_t pv_text_previous_callback(void* context) {
     UNUSED(context);
     return ProtocolVisualizerViewMenu;
@@ -672,6 +677,7 @@ static ProtocolVisualizerApp* pv_app_alloc(void) {
     view_set_context(app->wave_view, app);
     view_set_draw_callback(app->wave_view, pv_draw_wave);
     view_set_input_callback(app->wave_view, pv_wave_input);
+    view_set_previous_callback(app->wave_view, pv_wave_previous_callback);
     view_set_previous_callback(text_box_get_view(app->text_box), pv_text_previous_callback);
 
     view_dispatcher_add_view(
