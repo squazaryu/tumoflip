@@ -593,7 +593,11 @@ static bool pv_wave_input(InputEvent* event, void* context) {
     ProtocolVisualizerApp* app = context;
     if(event->type != InputTypeShort && event->type != InputTypeRepeat) return false;
 
-    if(event->key == InputKeyOk) {
+    if(event->key == InputKeyBack) {
+        submenu_set_selected_item(app->submenu, ProtocolVisualizerMenuExport);
+        view_dispatcher_switch_to_view(app->view_dispatcher, ProtocolVisualizerViewMenu);
+        return true;
+    } else if(event->key == InputKeyOk) {
         pv_show_text(app);
         return true;
     } else if(event->key == InputKeyLeft) {
