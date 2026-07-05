@@ -14,7 +14,43 @@ class ProtocolVisualizerTest(unittest.TestCase):
         self.assertIn('appid="protocol_visualizer"', manifest)
         self.assertIn('name="Protocol Visualizer"', manifest)
         self.assertIn('fap_category="ARF Tools"', manifest)
+        self.assertIn('fap_icon="assets/sub1_10px.png"', manifest)
+        self.assertIn('fap_icon_assets="assets"', manifest)
         self.assertIn('requires=["gui", "dialogs", "storage"]', manifest)
+
+    def test_file_browser_icons_are_bundled_with_fap(self) -> None:
+        app_dir = REPO_ROOT / "applications_user/protocol_visualizer"
+        source = (app_dir / "protocol_visualizer.c").read_text(encoding="utf-8")
+
+        self.assertTrue((app_dir / "assets/sub1_10px.png").is_file())
+        self.assertTrue((app_dir / "assets/IR_Icon_10x10.png").is_file())
+        self.assertIn('#include "protocol_visualizer_icons.h"', source)
+        self.assertIn("&I_sub1_10px", source)
+        self.assertIn("&I_IR_Icon_10x10", source)
+
+    def test_file_loaders_validate_known_flipper_filetypes(self) -> None:
+        source = (
+            REPO_ROOT / "applications_user/protocol_visualizer/protocol_visualizer.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('"Flipper SubGhz Key File"', source)
+        self.assertIn('"Flipper SubGhz RAW File"', source)
+        self.assertIn('"IR signals file"', source)
+        self.assertIn('"IR library file"', source)
+        self.assertIn("valid_header", source)
+        self.assertIn("has_payload", source)
+        self.assertIn("has_signal", source)
+        self.assertIn("return false", source)
+
+    def test_capture_loader_bounds_line_memory(self) -> None:
+        source = (
+            REPO_ROOT / "applications_user/protocol_visualizer/protocol_visualizer.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("#define PV_LINE_BUF_SIZE 256U", source)
+        self.assertIn("bool* line_truncated", source)
+        self.assertIn("furi_string_size(output) < PV_LINE_BUF_SIZE - 1U", source)
+        self.assertIn("capture->truncated = true", source)
 
     def test_hub_launches_visible_fap(self) -> None:
         hub = (

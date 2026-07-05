@@ -6,6 +6,8 @@ App(
     requires=["gui", "dialogs", "storage"],
     stack_size=8 * 1024,
     fap_category="ARF Tools",
+    fap_icon="assets/sub1_10px.png",
+    fap_icon_assets="assets",
     fap_version="0.1.0",
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip",

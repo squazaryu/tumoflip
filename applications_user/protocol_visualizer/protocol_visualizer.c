@@ -9,6 +9,8 @@
 #include <gui/view_dispatcher.h>
 #include <storage/storage.h>
 
+#include "protocol_visualizer_icons.h"
+
 #include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -20,7 +22,7 @@
 #define PV_IR_BASE_DIR   EXT_PATH("infrared")
 #define PV_SUB_BASE_DIR  EXT_PATH("subghz")
 #define PV_MAX_SAMPLES   4096U
-#define PV_LINE_BUF_SIZE 160U
+#define PV_LINE_BUF_SIZE 256U
 #define PV_PATH_SIZE     128U
 #define PV_TEXT_SIZE     64U
 #define PV_WAVE_TOP      18
@@ -95,8 +97,12 @@ typedef struct {
     size_t window_size;
 } ProtocolVisualizerApp;
 
-static bool pv_read_line(ProtocolVisualizerLineReader* reader, FuriString* output) {
+static bool pv_read_line(
+    ProtocolVisualizerLineReader* reader,
+    FuriString* output,
+    bool* line_truncated) {
     furi_string_reset(output);
+    if(line_truncated) *line_truncated = false;
     bool any = false;
 
     while(true) {
@@ -118,7 +124,11 @@ static bool pv_read_line(ProtocolVisualizerLineReader* reader, FuriString* outpu
         }
         if(c == '\r') continue;
 
-        furi_string_push_back(output, c);
+        if(furi_string_size(output) < PV_LINE_BUF_SIZE - 1U) {
+            furi_string_push_back(output, c);
+        } else if(line_truncated) {
+            *line_truncated = true;
+        }
         any = true;
     }
 
@@ -135,6 +145,21 @@ static const char* pv_value_after_key(const char* line, const char* key) {
     if(strncmp(line, key, key_len) != 0) return NULL;
     if(line[key_len] != ':') return NULL;
     return pv_skip_space(line + key_len + 1);
+}
+
+static bool pv_value_equals(const char* value, const char* expected) {
+    return strcmp(pv_skip_space(value), expected) == 0;
+}
+
+static bool pv_is_supported_ir_filetype(const char* value) {
+    value = pv_skip_space(value);
+    return strcmp(value, "IR signals file") == 0 || strcmp(value, "IR library file") == 0;
+}
+
+static bool pv_is_supported_subghz_filetype(const char* value) {
+    value = pv_skip_space(value);
+    return strcmp(value, "Flipper SubGhz Key File") == 0 ||
+           strcmp(value, "Flipper SubGhz RAW File") == 0;
 }
 
 static void pv_copy_value(char* output, size_t output_size, const char* value) {
@@ -233,18 +258,27 @@ static bool pv_load_ir(ProtocolVisualizerApp* app, const char* path) {
     FuriString* line = furi_string_alloc();
     bool current_raw = false;
     bool raw_loaded = false;
+    bool valid_header = false;
+    bool has_signal = false;
 
-    while(pv_read_line(&reader, line)) {
+    bool line_truncated = false;
+    while(pv_read_line(&reader, line, &line_truncated)) {
         const char* text = furi_string_get_cstr(line);
         const char* value = NULL;
+        if(line_truncated) capture->truncated = true;
 
-        if((value = pv_value_after_key(text, "name"))) {
+        if((value = pv_value_after_key(text, "Filetype"))) {
+            valid_header = pv_is_supported_ir_filetype(value);
+        } else if((value = pv_value_after_key(text, "name"))) {
             if(capture->detail1[0] == '\0') pv_capture_add_detail(capture, "Name", value);
             current_raw = false;
+            has_signal = true;
         } else if((value = pv_value_after_key(text, "type"))) {
-            current_raw = strcmp(value, "raw") == 0;
+            current_raw = pv_value_equals(value, "raw");
             if(current_raw) {
                 strlcpy(capture->protocol, "IR RAW", sizeof(capture->protocol));
+            } else if(pv_value_equals(value, "parsed")) {
+                has_signal = true;
             }
         } else if((value = pv_value_after_key(text, "frequency"))) {
             if(capture->frequency == 0) capture->frequency = strtoul(value, NULL, 10);
@@ -255,6 +289,7 @@ static bool pv_load_ir(ProtocolVisualizerApp* app, const char* path) {
             }
         } else if((value = pv_value_after_key(text, "protocol"))) {
             if(capture->protocol[0] == '\0') pv_copy_value(capture->protocol, sizeof(capture->protocol), value);
+            has_signal = true;
         } else if((value = pv_value_after_key(text, "address"))) {
             pv_capture_add_detail(capture, "Address", value);
         } else if((value = pv_value_after_key(text, "command"))) {
@@ -270,6 +305,11 @@ static bool pv_load_ir(ProtocolVisualizerApp* app, const char* path) {
     furi_string_free(line);
     storage_file_close(file);
     storage_file_free(file);
+
+    if(!valid_header || !has_signal) {
+        pv_capture_reset(capture, ProtocolVisualizerKindIr);
+        return false;
+    }
 
     if(capture->protocol[0] == '\0') strlcpy(capture->protocol, "IR", sizeof(capture->protocol));
     capture->decoded_only = capture->total_count == 0;
@@ -290,23 +330,34 @@ static bool pv_load_subghz(ProtocolVisualizerApp* app, const char* path) {
 
     ProtocolVisualizerLineReader reader = {.file = file};
     FuriString* line = furi_string_alloc();
+    bool valid_header = false;
+    bool has_payload = false;
 
-    while(pv_read_line(&reader, line)) {
+    bool line_truncated = false;
+    while(pv_read_line(&reader, line, &line_truncated)) {
         const char* text = furi_string_get_cstr(line);
         const char* value = NULL;
+        if(line_truncated) capture->truncated = true;
 
-        if((value = pv_value_after_key(text, "Frequency"))) {
+        if((value = pv_value_after_key(text, "Filetype"))) {
+            valid_header = pv_is_supported_subghz_filetype(value);
+        } else if((value = pv_value_after_key(text, "Frequency"))) {
             capture->frequency = strtoul(value, NULL, 10);
+            has_payload = true;
         } else if((value = pv_value_after_key(text, "Preset"))) {
             pv_copy_value(capture->preset, sizeof(capture->preset), value);
         } else if((value = pv_value_after_key(text, "Protocol"))) {
             pv_copy_value(capture->protocol, sizeof(capture->protocol), value);
+            has_payload = true;
         } else if((value = pv_value_after_key(text, "RAW_Data"))) {
             pv_parse_sample_list(capture, value, true, false);
+            has_payload = true;
         } else if((value = pv_value_after_key(text, "Key"))) {
             pv_capture_add_detail(capture, "Key", value);
+            has_payload = true;
         } else if((value = pv_value_after_key(text, "Bit"))) {
             pv_capture_add_detail(capture, "Bit", value);
+            has_payload = true;
         } else if((value = pv_value_after_key(text, "TE"))) {
             pv_capture_add_detail(capture, "TE", value);
         } else if((value = pv_value_after_key(text, "Te"))) {
@@ -319,6 +370,11 @@ static bool pv_load_subghz(ProtocolVisualizerApp* app, const char* path) {
     furi_string_free(line);
     storage_file_close(file);
     storage_file_free(file);
+
+    if(!valid_header || !has_payload) {
+        pv_capture_reset(capture, ProtocolVisualizerKindSubGhz);
+        return false;
+    }
 
     if(capture->protocol[0] == '\0') strlcpy(capture->protocol, "Sub-GHz", sizeof(capture->protocol));
     capture->decoded_only = capture->total_count == 0;
@@ -452,19 +508,23 @@ static bool pv_export_summary(ProtocolVisualizerApp* app) {
 static bool pv_select_and_load(
     ProtocolVisualizerApp* app,
     const char* extension,
+    const Icon* icon,
     const char* base_path,
     bool (*loader)(ProtocolVisualizerApp*, const char*)) {
     furi_string_set(app->file_path, base_path);
 
     DialogsFileBrowserOptions options;
-    dialog_file_browser_set_basic_options(&options, extension, NULL);
+    dialog_file_browser_set_basic_options(&options, extension, icon);
     options.base_path = base_path;
 
     bool selected =
         dialog_file_browser_show(app->dialogs, app->file_path, app->file_path, &options);
     if(!selected) return false;
 
-    const bool loaded = loader(app, furi_string_get_cstr(app->file_path));
+    bool loaded = furi_string_end_withi_str(app->file_path, extension);
+    if(loaded) {
+        loaded = loader(app, furi_string_get_cstr(app->file_path));
+    }
     if(loaded) {
         pv_window_reset(app);
         submenu_set_selected_item(app->submenu, ProtocolVisualizerMenuExport);
@@ -486,10 +546,10 @@ static void pv_menu_callback(void* context, uint32_t index) {
 
     switch(index) {
     case ProtocolVisualizerMenuOpenIr:
-        pv_select_and_load(app, ".ir", PV_IR_BASE_DIR, pv_load_ir);
+        pv_select_and_load(app, ".ir", &I_IR_Icon_10x10, PV_IR_BASE_DIR, pv_load_ir);
         break;
     case ProtocolVisualizerMenuOpenSubGhz:
-        pv_select_and_load(app, ".sub", PV_SUB_BASE_DIR, pv_load_subghz);
+        pv_select_and_load(app, ".sub", &I_sub1_10px, PV_SUB_BASE_DIR, pv_load_subghz);
         break;
     case ProtocolVisualizerMenuExport:
         if(app->capture.valid) {
