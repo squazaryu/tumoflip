@@ -53,6 +53,13 @@ class TumoMacroDeckTest(unittest.TestCase):
         self.assertIn('"timestamp,macro,step,line,command,status,detail\\n"', self.source)
         self.assertIn("storage_file_sync(app->log_file)", self.source)
         self.assertIn("continue_on_error", self.source)
+        self.assertIn("TumoMacroPlan* plan = malloc(sizeof(TumoMacroPlan));", self.source)
+        self.assertIn("free(plan);", self.source)
+        self.assertNotIn("TumoMacroPlan plan;", self.source)
+
+    def test_browse_screen_makes_selection_state_clear(self) -> None:
+        self.assertIn('"Up/Down Select"', self.source)
+        self.assertIn('"One macro"', self.source)
 
     def test_app_bridge_event_contract(self) -> None:
         self.assertIn('#define TUMO_MACRO_DECK_APP_ID "tumo_macro_deck"', self.source)

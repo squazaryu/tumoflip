@@ -203,7 +203,13 @@ static void tumo_macro_deck_draw_callback(Canvas* canvas, void* context) {
             (unsigned)app->macro_count);
         canvas_draw_str(canvas, 0, 23, counter);
         canvas_draw_str(canvas, 0, 35, macro_name);
-        canvas_draw_str(canvas, 0, 48, status);
+        canvas_draw_str(
+            canvas,
+            0,
+            48,
+            app->macro_count > 1U ? "Up/Down Select" :
+            app->macro_count == 1U ? "One macro" :
+                                     status);
         canvas_draw_str(canvas, 0, 60, detail);
         canvas_draw_str_aligned(canvas, 127, 23, AlignRight, AlignBottom, "OK Run");
     } else {
@@ -694,11 +700,17 @@ static void tumo_macro_deck_run_selected(TumoMacroDeckApp* app) {
     macro = app->macros[app->selected];
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
 
-    TumoMacroPlan plan;
-    if(!tumo_macro_deck_load_plan(app, &macro, &plan)) {
+    TumoMacroPlan* plan = malloc(sizeof(TumoMacroPlan));
+    if(!plan) {
+        tumo_macro_deck_set_model(app, TumoMacroDeckModeBrowse, "No memory", macro.name, 0, 0);
+        return;
+    }
+
+    if(!tumo_macro_deck_load_plan(app, &macro, plan)) {
         char detail[48];
-        snprintf(detail, sizeof(detail), "parse errors: %u", (unsigned)plan.parse_errors);
+        snprintf(detail, sizeof(detail), "parse errors: %u", (unsigned)plan->parse_errors);
         tumo_macro_deck_set_model(app, TumoMacroDeckModeBrowse, "Load failed", detail, 0, 0);
+        free(plan);
         return;
     }
 
@@ -708,17 +720,17 @@ static void tumo_macro_deck_run_selected(TumoMacroDeckApp* app) {
         app,
         TumoMacroDeckModeRun,
         log_opened ? "Running" : "Running no log",
-        plan.name,
+        plan->name,
         0,
-        plan.step_count);
+        plan->step_count);
 
     bool stopped_on_error = false;
-    for(uint8_t i = 0; i < plan.step_count; i++) {
-        const bool ok = tumo_macro_deck_execute_step(app, &plan, &plan.steps[i], i + 1U);
+    for(uint8_t i = 0; i < plan->step_count; i++) {
+        const bool ok = tumo_macro_deck_execute_step(app, plan, &plan->steps[i], i + 1U);
         if(app->cancel_requested) {
             break;
         }
-        if(!ok && !plan.continue_on_error) {
+        if(!ok && !plan->continue_on_error) {
             stopped_on_error = true;
             break;
         }
@@ -726,12 +738,13 @@ static void tumo_macro_deck_run_selected(TumoMacroDeckApp* app) {
 
     tumo_macro_deck_close_log(app);
     if(app->cancel_requested) {
-        tumo_macro_deck_set_model(app, TumoMacroDeckModeBrowse, "Cancelled", plan.name, 0, 0);
+        tumo_macro_deck_set_model(app, TumoMacroDeckModeBrowse, "Cancelled", plan->name, 0, 0);
     } else if(stopped_on_error) {
-        tumo_macro_deck_set_model(app, TumoMacroDeckModeBrowse, "Stopped on error", plan.name, 0, 0);
+        tumo_macro_deck_set_model(app, TumoMacroDeckModeBrowse, "Stopped on error", plan->name, 0, 0);
     } else {
-        tumo_macro_deck_set_model(app, TumoMacroDeckModeBrowse, "Done", plan.name, 0, 0);
+        tumo_macro_deck_set_model(app, TumoMacroDeckModeBrowse, "Done", plan->name, 0, 0);
     }
+    free(plan);
 }
 
 static TumoMacroDeckApp* tumo_macro_deck_alloc(void) {
