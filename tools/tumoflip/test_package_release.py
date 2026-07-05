@@ -13,6 +13,7 @@ try:
     from .validate_release import (
         ARF_MODULE_APP_IDS,
         ARF_VISIBLE_APP_IDS,
+        MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
         sha256,
@@ -23,6 +24,7 @@ except ImportError:
     from validate_release import (
         ARF_MODULE_APP_IDS,
         ARF_VISIBLE_APP_IDS,
+        MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
         sha256,
@@ -66,6 +68,8 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
 
     for relative in MODULE_ONE_PACKAGE_FILES:
         write_file(resources / relative, relative.encode())
+    for relative in MODULE_ONE_PACKAGE_DATA_FILES:
+        write_file(resources / relative, relative.encode())
 
     for appid in ARF_VISIBLE_APP_IDS:
         write_file(resources / f"apps/ARF Tools/{appid}.fap", appid.encode())
@@ -105,6 +109,8 @@ class PackageReleaseTest(unittest.TestCase):
             extapp_sensor_logger = build / ".extapps/module_one_sensor_logger.fap"
             old_ble_gatt_lab = resources / "apps/Module One/BLE/ble_gatt_lab.fap"
             extapp_ble_gatt_lab = build / ".extapps/ble_gatt_lab.fap"
+            old_macro_deck = resources / "apps/Module One/Macros/tumo_macro_deck.fap"
+            extapp_macro_deck = build / ".extapps/tumo_macro_deck.fap"
             old_wifi.write_bytes(b"old wifi mapper")
             write_file(extapp_wifi, b"wifi mapper fix")
             old_ir_lab.write_bytes(b"old ir lab")
@@ -115,6 +121,8 @@ class PackageReleaseTest(unittest.TestCase):
             write_file(extapp_sensor_logger, b"sensor logger")
             old_ble_gatt_lab.write_bytes(b"old ble gatt lab")
             write_file(extapp_ble_gatt_lab, b"ble gatt lab")
+            old_macro_deck.write_bytes(b"old macro deck")
+            write_file(extapp_macro_deck, b"macro deck")
 
             manifest = build_package_release(
                 repo,
@@ -135,6 +143,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(old_cockpit.read_bytes(), b"module one cockpit")
             self.assertEqual(old_sensor_logger.read_bytes(), b"sensor logger")
             self.assertEqual(old_ble_gatt_lab.read_bytes(), b"ble gatt lab")
+            self.assertEqual(old_macro_deck.read_bytes(), b"macro deck")
 
             module_entries = {
                 entry["source"]: entry
@@ -152,6 +161,12 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(sensor_logger_entry["sha256"], sha256(extapp_sensor_logger))
             ble_gatt_lab_entry = module_entries["apps/Module One/BLE/ble_gatt_lab.fap"]
             self.assertEqual(ble_gatt_lab_entry["sha256"], sha256(extapp_ble_gatt_lab))
+            macro_deck_entry = module_entries["apps/Module One/Macros/tumo_macro_deck.fap"]
+            self.assertEqual(macro_deck_entry["sha256"], sha256(extapp_macro_deck))
+            self.assertIn(
+                "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
+                module_entries,
+            )
             self.assertEqual(manifest["artifacts"], {})
 
             manifest_path = (
@@ -180,6 +195,14 @@ class PackageReleaseTest(unittest.TestCase):
                     "apps/Module One/BLE/ble_gatt_lab.fap",
                     archive.namelist(),
                 )
+                self.assertIn(
+                    "apps/Module One/Macros/tumo_macro_deck.fap",
+                    archive.namelist(),
+                )
+                self.assertIn(
+                    "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
+                    archive.namelist(),
+                )
                 self.assertEqual(
                     archive.read("apps/Module One/IR Blaster/tumo_ir_lab.fap"),
                     b"tumo ir lab fix",
@@ -195,6 +218,10 @@ class PackageReleaseTest(unittest.TestCase):
                 self.assertEqual(
                     archive.read("apps/Module One/BLE/ble_gatt_lab.fap"),
                     b"ble gatt lab",
+                )
+                self.assertEqual(
+                    archive.read("apps/Module One/Macros/tumo_macro_deck.fap"),
+                    b"macro deck",
                 )
                 self.assertEqual(
                     archive.read("apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap"),

@@ -10,6 +10,7 @@ from pathlib import Path
 try:
     from .validate_release import (
         ARF_VISIBLE_APP_IDS,
+        MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
@@ -24,6 +25,7 @@ try:
 except ImportError:
     from validate_release import (
         ARF_VISIBLE_APP_IDS,
+        MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
@@ -120,6 +122,10 @@ class ValidateReleaseTest(unittest.TestCase):
             MODULE_ONE_PACKAGE_FILES,
         )
         self.assertIn(
+            "apps/Module One/Macros/tumo_macro_deck.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
             "apps/Module One/IR Blaster/tumo_ir_lab.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
@@ -136,6 +142,16 @@ class ValidateReleaseTest(unittest.TestCase):
                 path = REPO_ROOT / STATIC_SD_RESOURCES / relative
                 self.assertTrue(path.is_file(), str(path))
                 self.assertGreater(path.stat().st_size, 100 * 1024)
+        self.assertIn(
+            "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
+            MODULE_ONE_PACKAGE_DATA_FILES,
+        )
+        sample = (
+            REPO_ROOT
+            / STATIC_SD_RESOURCES
+            / "apps_data/tumo_macro_deck/macros/safe_demo.tmacro"
+        )
+        self.assertTrue(sample.is_file(), str(sample))
 
     def test_runtime_contract_is_validated_for_release(self) -> None:
         capabilities = runtime_capabilities(REPO_ROOT)

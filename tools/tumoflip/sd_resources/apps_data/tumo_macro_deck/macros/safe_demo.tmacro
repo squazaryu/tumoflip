@@ -1,0 +1,8 @@
+# Tumo Macro Deck v1
+name Safe Demo
+policy stop
+log Macro started
+delay 250
+ble_event safe_demo_started
+wait_button Press OK
+log Macro done

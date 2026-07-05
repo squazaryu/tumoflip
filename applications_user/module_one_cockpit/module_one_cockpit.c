@@ -36,6 +36,7 @@ typedef enum {
     ModuleOneCockpitActionI2cScan,
     ModuleOneCockpitActionUartStatus,
     ModuleOneCockpitActionLaunchBleGattLab,
+    ModuleOneCockpitActionLaunchMacroDeck,
     ModuleOneCockpitActionLaunchSensorLogger,
     ModuleOneCockpitActionEsp32Ping,
     ModuleOneCockpitActionLaunchIrLab,
@@ -57,6 +58,7 @@ typedef enum {
     ModuleOneCockpitBlockBme280,
     ModuleOneCockpitBlockSensor,
     ModuleOneCockpitBlockBle,
+    ModuleOneCockpitBlockMacro,
     ModuleOneCockpitBlockNrf24,
     ModuleOneCockpitBlockCc1101,
     ModuleOneCockpitBlockSystem,
@@ -106,6 +108,7 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"ESP32: WiFi Mapper", ModuleOneCockpitActionLaunchWifiMapper},
     {"GPS/UART: Status", ModuleOneCockpitActionUartStatus},
     {"BLE: GATT Lab", ModuleOneCockpitActionLaunchBleGattLab},
+    {"Macros: Deck", ModuleOneCockpitActionLaunchMacroDeck},
     {"BME280/I2C: Scan", ModuleOneCockpitActionI2cScan},
     {"Sensors: Logger", ModuleOneCockpitActionLaunchSensorLogger},
     {"CC1101: ARF Full", ModuleOneCockpitActionLaunchArfHub},
@@ -146,6 +149,14 @@ static const ModuleOneCockpitLaunchTarget module_one_cockpit_targets[] = {
         ModuleOneCockpitBlockBle,
         "BLE GATT Lab",
         EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap"),
+        NULL,
+        true,
+    },
+    {
+        ModuleOneCockpitActionLaunchMacroDeck,
+        ModuleOneCockpitBlockMacro,
+        "Tumo Macro Deck",
+        EXT_PATH("apps/Module One/Macros/tumo_macro_deck.fap"),
         NULL,
         true,
     },
@@ -254,6 +265,8 @@ static const char* module_one_cockpit_block_label(ModuleOneCockpitBlock block) {
         return "Sensor";
     case ModuleOneCockpitBlockBle:
         return "BLE";
+    case ModuleOneCockpitBlockMacro:
+        return "Macros";
     case ModuleOneCockpitBlockNrf24:
         return "NRF24";
     case ModuleOneCockpitBlockCc1101:
@@ -362,6 +375,7 @@ static void module_one_cockpit_append_runtime_report(FuriString* output) {
         output,
         "ESP32/GPS: UART free means probe-safe; use dedicated screens for active checks\n"
         "BLE: use BLE GATT Lab for App Bridge ping/status/echo\n"
+        "Macros: use Tumo Macro Deck for SD-backed safe local sequences\n"
         "NRF24: unknown, no safe passive probe yet\n"
         "CC1101: unknown, use ARF/Sub-GHz status before transmit\n\n");
 }
@@ -390,6 +404,7 @@ static void module_one_cockpit_build_report(ModuleOneCockpitApp* app, FuriString
         "IR: use IR Blink or Tumo IR Lab\n"
         "ESP32: use UART/AT or WiFi Mapper\n"
         "BLE: use BLE GATT Lab for App Bridge diagnostics\n"
+        "Macros: use Tumo Macro Deck for local action sequences\n"
         "GPS/BME280: use Sensor Logger\n"
         "NRF24: passive detection is not implemented yet\n"
         "CC1101: use ARF Sub-GHz Full or Sub-GHz status\n");

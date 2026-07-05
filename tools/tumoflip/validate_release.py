@@ -88,10 +88,14 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/module_one_cockpit.fap",
     "apps/Module One/module_one_sensor_logger.fap",
     "apps/Module One/BLE/ble_gatt_lab.fap",
+    "apps/Module One/Macros/tumo_macro_deck.fap",
     "apps/Module One/IR Blaster/tumo_ir_lab.fap",
     "apps/Module One/IR Blaster/tumoflip_xremote.fap",
     "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
     "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
+)
+MODULE_ONE_PACKAGE_DATA_FILES = (
+    "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
 )
 ARF_LEGACY_PATHS = {
     **{
@@ -395,7 +399,8 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             resources / "apps/Tools/totp.fap",
         ],
         "module_one": [
-            resources / relative for relative in MODULE_ONE_PACKAGE_FILES
+            resources / relative
+            for relative in (*MODULE_ONE_PACKAGE_FILES, *MODULE_ONE_PACKAGE_DATA_FILES)
         ],
         "arf": sorted((resources / "apps/ARF Tools").glob("*.fap"))
         + sorted((resources / "apps_data/arf_subghz_full/modules").glob("*.fap")),

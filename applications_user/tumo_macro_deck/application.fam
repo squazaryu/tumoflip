@@ -1,0 +1,15 @@
+App(
+    appid="tumo_macro_deck",
+    name="Tumo Macro Deck",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="tumo_macro_deck_app",
+    requires=["gui", "storage", "bt"],
+    stack_size=5 * 1024,
+    icon="A_Plugins_14",
+    fap_category="Module One/Macros",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip",
+    fap_description="SD-backed local macro runner for safe logs, delays, waits, App Bridge events, and gated hardware steps.",
+)

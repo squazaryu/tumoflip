@@ -108,6 +108,26 @@ The FAP also emits best-effort `ble_gatt_lab/event` frames when opened and when
 the user presses `OK`. These event frames use request IDs generated locally and
 do not request acknowledgements.
 
+### Tumo Macro Deck events
+
+`Tumo Macro Deck` can emit best-effort App Bridge events from local SD-backed
+macros. The macro runner does not require a Companion connection; a failed send
+is recorded in the local run log and then follows the macro policy.
+
+| Field | Value |
+|---|---|
+| App ID | `tumo_macro_deck` |
+| Command | `event` |
+| Request ID | Generated locally per event |
+| Flags | `0` |
+| Payload | User-authored UTF-8 payload from `ble_event ...` |
+| Local log | `/ext/apps_data/tumo_macro_deck/runs/run_YYYYMMDD_HHMMSS.csv` |
+
+Signal-emitting macro steps (`ir`, `gpio`) are parsed and require on-device
+confirmation before execution. In the first safe increment they intentionally
+return `unsupported` after confirmation, so macro policy and logging can be
+validated before hardware output is enabled.
+
 ## Compatibility
 
 The firmware accepts both `FAB1` and `FAB2`. Existing FAP subscribers receive
