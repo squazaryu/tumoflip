@@ -38,8 +38,8 @@ The system app ID is `runtime`.
 - `capabilities` returns `runtime/capabilities` with a semicolon-separated
   `key=value` payload. Runtime v2 keeps backward-compatible keys
   `runtime=1`, `fab=2`, and `session=3`, and advertises `status=2`,
-  `packages=1`, `radio=2`, `sd=1`, plus feature flags such as
-  `transfer_activity`, `pkg_state`, and `radio_v2`.
+  `trace=1`, `packages=1`, `radio=2`, `sd=1`, plus feature flags such as
+  `transfer_activity`, `pkg_state`, `radio_v2`, and `trace_ring`.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
   `sd`, `pkg`, `sid`, `bo`, `radio`, and `owner`. `sd=1` means the SD card is
@@ -53,6 +53,14 @@ The system app ID is `runtime`.
   `11=error`. The command is read-only and designed to fit in one FAB2
   response frame. Long owner names may be shortened in this compact status
   response.
+- `trace` returns `runtime/trace` with compact schema v1 fields:
+  `schema`, `depth`, `count`, and `drop`, followed by pipe-delimited ring
+  entries. Each entry is `seq,code,request,command,result`, where `code`
+  currently uses `rx` for received commands, `tx` for successful responses,
+  `er` for errors, `ss` for session ownership, and `tr` for transfer activity.
+  The snapshot is bounded to one FAB2 response frame and is intended for
+  Companion diagnostics, not full persistent logging. Example:
+  `schema=1;depth=8;count=2;drop=0|01,rx,000A,status,o|02,tx,000A,status,o`.
 - `hello` implements the first App Bridge v3 session layer documented in
   `docs/app-bridge-v3.md`.
 - An unknown command returns `runtime/error`, sets response and error flags,

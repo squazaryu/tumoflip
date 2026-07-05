@@ -4,6 +4,7 @@
 #include <furi_hal_version.h>
 #include <storage/storage.h>
 #include <subghz_radio_broker/subghz_radio_broker.h>
+#include <stdio.h>
 #include <string.h>
 
 #define TAG "TumoflipRuntime"
@@ -12,11 +13,13 @@
 #define TUMOFLIP_RUNTIME_QUEUE_DEPTH       8U
 #define TUMOFLIP_RUNTIME_REASSEMBLY_MAX    512U
 #define TUMOFLIP_RUNTIME_STATUS_MAX        160U
+#define TUMOFLIP_RUNTIME_TRACE_DEPTH       8U
+#define TUMOFLIP_RUNTIME_TRACE_MAX         160U
 #define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX 24U
 #define TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
 #define TUMOFLIP_RUNTIME_CAPABILITIES \
-    "runtime=1;fab=2;session=3;status=2;packages=1;radio=2;sd=1;" \
-    "features=transfer_activity,pkg_state,radio_v2"
+    "runtime=1;fab=2;session=3;status=2;trace=1;packages=1;radio=2;sd=1;" \
+    "features=transfer_activity,pkg_state,radio_v2,trace_ring"
 
 typedef struct {
     BtAppBridgeEvent event;
@@ -38,6 +41,14 @@ typedef struct {
 } TumoflipRuntimeSession;
 
 typedef struct {
+    uint8_t sequence;
+    uint32_t request_id;
+    char code[3];
+    char command[BT_APP_BRIDGE_COMMAND_LEN_MAX + 1];
+    bool error;
+} TumoflipRuntimeTraceEvent;
+
+typedef struct {
     Bt* bt;
     Storage* storage;
     SubGhzRadioBroker* radio_broker;
@@ -45,8 +56,20 @@ typedef struct {
     FuriPubSubSubscription* subscription;
     TumoflipRuntimeAssembly assembly;
     TumoflipRuntimeSession session;
+    TumoflipRuntimeTraceEvent trace[TUMOFLIP_RUNTIME_TRACE_DEPTH];
+    uint8_t trace_head;
+    uint8_t trace_count;
+    uint8_t trace_sequence;
+    uint32_t trace_dropped;
     bool transfer_active;
 } TumoflipRuntime;
+
+static void tumoflip_runtime_trace_add(
+    TumoflipRuntime* runtime,
+    const char* code,
+    uint32_t request_id,
+    const char* command,
+    bool error);
 
 static void tumoflip_runtime_bridge_callback(const void* message, void* context) {
     TumoflipRuntime* runtime = context;
@@ -74,6 +97,7 @@ static void tumoflip_runtime_reply(
            runtime->bt, TUMOFLIP_RUNTIME_APP_ID, command, request_id, flags, payload)) {
         FURI_LOG_W(TAG, "Failed to send %s response", command);
     }
+    tumoflip_runtime_trace_add(runtime, error ? "er" : "tx", request_id, command, error);
 }
 
 static void tumoflip_runtime_transfer_activity(TumoflipRuntime* runtime, bool active) {
@@ -87,6 +111,7 @@ static void tumoflip_runtime_transfer_activity(TumoflipRuntime* runtime, bool ac
         furi_message_queue_put(runtime->bt->message_queue, &message, FuriWaitForever) ==
         FuriStatusOk);
     api_lock_wait_unlock_and_free(message.lock);
+    tumoflip_runtime_trace_add(runtime, "tr", 0, active ? "transfer_on" : "transfer_off", false);
 }
 
 static void tumoflip_runtime_assembly_reset(TumoflipRuntimeAssembly* assembly) {
@@ -95,6 +120,63 @@ static void tumoflip_runtime_assembly_reset(TumoflipRuntimeAssembly* assembly) {
 
 static const char* tumoflip_runtime_str_or_unknown(const char* value) {
     return value ? value : "unknown";
+}
+
+static void tumoflip_runtime_trace_add(
+    TumoflipRuntime* runtime,
+    const char* code,
+    uint32_t request_id,
+    const char* command,
+    bool error) {
+    TumoflipRuntimeTraceEvent* trace = &runtime->trace[runtime->trace_head];
+    trace->sequence = runtime->trace_sequence++;
+    trace->request_id = request_id;
+    strlcpy(trace->code, code, sizeof(trace->code));
+    strlcpy(trace->command, command ? command : "", sizeof(trace->command));
+    trace->error = error;
+
+    runtime->trace_head = (runtime->trace_head + 1U) % TUMOFLIP_RUNTIME_TRACE_DEPTH;
+    if(runtime->trace_count < TUMOFLIP_RUNTIME_TRACE_DEPTH) {
+        runtime->trace_count++;
+    } else {
+        runtime->trace_dropped++;
+    }
+}
+
+static void tumoflip_runtime_make_trace_payload(
+    TumoflipRuntime* runtime,
+    char* payload,
+    size_t size) {
+    snprintf(
+        payload,
+        size,
+        "schema=1;depth=%u;count=%u;drop=%lu",
+        TUMOFLIP_RUNTIME_TRACE_DEPTH,
+        runtime->trace_count,
+        (unsigned long)runtime->trace_dropped);
+
+    for(uint8_t offset = 0; offset < runtime->trace_count; offset++) {
+        const uint8_t index =
+            (runtime->trace_head + TUMOFLIP_RUNTIME_TRACE_DEPTH - runtime->trace_count + offset) %
+            TUMOFLIP_RUNTIME_TRACE_DEPTH;
+        const TumoflipRuntimeTraceEvent* trace = &runtime->trace[index];
+
+        char entry[40];
+        snprintf(
+            entry,
+            sizeof(entry),
+            "|%02X,%s,%04lX,%.6s,%c",
+            trace->sequence,
+            trace->code,
+            (unsigned long)(trace->request_id & 0xFFFFU),
+            trace->command,
+            trace->error ? 'e' : 'o');
+
+        if((strlen(payload) + strlen(entry) + 1U) >= size) {
+            break;
+        }
+        strlcat(payload, entry, size);
+    }
 }
 
 static void
@@ -152,12 +234,14 @@ static bool
        (assembly->chunk_count != event->chunk_count) ||
        (assembly->next_chunk != event->chunk_index) ||
        (strcmp(assembly->command, event->command) != 0)) {
+        tumoflip_runtime_trace_add(runtime, "er", event->request_id, event->command, true);
         tumoflip_runtime_reply(runtime, event->request_id, "error", "invalid_chunk_order", true);
         tumoflip_runtime_assembly_reset(assembly);
         return false;
     }
 
     if((assembly->payload_len + event->payload_len) > TUMOFLIP_RUNTIME_REASSEMBLY_MAX) {
+        tumoflip_runtime_trace_add(runtime, "er", event->request_id, event->command, true);
         tumoflip_runtime_reply(runtime, event->request_id, "error", "payload_too_large", true);
         tumoflip_runtime_assembly_reset(assembly);
         return false;
@@ -172,6 +256,7 @@ static bool
 static void
     tumoflip_runtime_handle_request(TumoflipRuntime* runtime, const BtAppBridgeEvent* event) {
     if(!tumoflip_runtime_assembly_append(runtime, event)) return;
+    tumoflip_runtime_trace_add(runtime, "rx", event->request_id, runtime->assembly.command, false);
 
     if(strcmp(runtime->assembly.command, "ping") == 0) {
         tumoflip_runtime_reply(runtime, event->request_id, "pong", "ok", false);
@@ -182,6 +267,10 @@ static void
         char payload[TUMOFLIP_RUNTIME_STATUS_MAX];
         tumoflip_runtime_make_status_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "status", payload, false);
+    } else if(strcmp(runtime->assembly.command, "trace") == 0) {
+        char payload[TUMOFLIP_RUNTIME_TRACE_MAX];
+        tumoflip_runtime_make_trace_payload(runtime, payload, sizeof(payload));
+        tumoflip_runtime_reply(runtime, event->request_id, "trace", payload, false);
     } else if(strcmp(runtime->assembly.command, "hello") == 0) {
         const size_t owner_prefix_len = 6U;
         const size_t payload_len = runtime->assembly.payload_len;
@@ -194,11 +283,13 @@ static void
         }
 
         if(!owner_valid) {
+            tumoflip_runtime_trace_add(runtime, "er", event->request_id, "hello", true);
             tumoflip_runtime_reply(runtime, event->request_id, "error", "invalid_owner", true);
         } else {
             runtime->session.session_id = event->request_id;
             memcpy(runtime->session.owner, &runtime->assembly.payload[owner_prefix_len], owner_len);
             runtime->session.owner[owner_len] = '\0';
+            tumoflip_runtime_trace_add(runtime, "ss", event->request_id, runtime->session.owner, false);
 
             char response[48];
             snprintf(
@@ -218,6 +309,7 @@ static void
         tumoflip_runtime_transfer_activity(runtime, false);
         tumoflip_runtime_reply(runtime, event->request_id, "transfer_end", "ok", false);
     } else {
+        tumoflip_runtime_trace_add(runtime, "er", event->request_id, runtime->assembly.command, true);
         tumoflip_runtime_reply(runtime, event->request_id, "error", "unsupported_command", true);
     }
 

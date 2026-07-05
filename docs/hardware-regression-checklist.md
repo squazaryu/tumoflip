@@ -143,6 +143,9 @@ are legally allowed to test.
   Broker state are present.
 - Send Runtime `hello`, confirm a v3 session ID is returned, then query
   `status` and confirm `sid` and `bo` are present.
+- Query Runtime `trace` after several commands and confirm the compact
+  `schema=1` ring includes recent `rx` and `tx`/`er` events without exceeding
+  one response frame.
 - Send a small Runtime command and verify a response or explicit error frame.
 - Disconnect and reconnect without rebooting the Flipper.
 

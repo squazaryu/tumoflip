@@ -20,8 +20,11 @@ class TumoflipRuntimeTest(unittest.TestCase):
 
         self.assertIn("#define TUMOFLIP_RUNTIME_STATUS_MAX", runtime)
         self.assertIn("TUMOFLIP_RUNTIME_STATUS_MAX        160U", runtime)
+        self.assertIn("#define TUMOFLIP_RUNTIME_TRACE_DEPTH       8U", runtime)
+        self.assertIn("#define TUMOFLIP_RUNTIME_TRACE_MAX         160U", runtime)
         self.assertIn("session=3", runtime)
-        self.assertIn("features=transfer_activity,pkg_state,radio_v2", runtime)
+        self.assertIn("trace=1", runtime)
+        self.assertIn("features=transfer_activity,pkg_state,radio_v2,trace_ring", runtime)
         self.assertNotIn('"radio_status"', runtime)
         self.assertNotIn("tumoflip_runtime_radio_state_name", runtime)
         self.assertIn('strcmp(runtime->assembly.command, "status") == 0', runtime)
@@ -29,6 +32,8 @@ class TumoflipRuntimeTest(unittest.TestCase):
             'tumoflip_runtime_reply(runtime, event->request_id, "status", payload, false)',
             runtime,
         )
+        self.assertIn('strcmp(runtime->assembly.command, "trace") == 0', runtime)
+        self.assertIn("tumoflip_runtime_make_trace_payload(runtime, payload, sizeof(payload))", runtime)
 
         for required in (
             "version_get_version(version)",
@@ -83,15 +88,44 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "fab=2",
             "session=3",
             "status=2",
+            "trace=1",
             "packages=1",
             "radio=2",
             "sd=1",
             "features=transfer_activity",
             "pkg_state",
             "radio_v2",
+            "trace_ring",
             "transfer_activity",
         ):
             self.assertIn(required, capabilities)
+
+    def test_runtime_trace_ring_is_bounded_and_documented(self) -> None:
+        runtime = (
+            REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
+        ).read_text(encoding="utf-8")
+        bridge_docs = (REPO_ROOT / "docs/app-bridge-v2.md").read_text(encoding="utf-8")
+        checklist = (REPO_ROOT / "docs/hardware-regression-checklist.md").read_text(
+            encoding="utf-8"
+        )
+
+        for required in (
+            "TumoflipRuntimeTraceEvent trace[TUMOFLIP_RUNTIME_TRACE_DEPTH]",
+            "runtime->trace_head",
+            "runtime->trace_count",
+            "runtime->trace_dropped",
+            "tumoflip_runtime_trace_add(runtime, \"rx\"",
+            "tumoflip_runtime_trace_add(runtime, error ? \"er\" : \"tx\"",
+            "tumoflip_runtime_trace_add(runtime, \"tr\"",
+            "tumoflip_runtime_trace_add(runtime, \"ss\"",
+            "schema=1;depth=%u;count=%u;drop=%lu",
+            '"|%02X,%s,%04lX,%.6s,%c"',
+        ):
+            self.assertIn(required, runtime)
+
+        self.assertIn("`trace` returns `runtime/trace`", bridge_docs)
+        self.assertIn("schema=1", bridge_docs)
+        self.assertIn("Runtime `trace`", checklist)
 
     def test_package_state_presence_is_read_only_and_documented(self) -> None:
         runtime = (
