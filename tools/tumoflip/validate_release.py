@@ -87,6 +87,7 @@ STATIC_SD_RESOURCES = Path("tools/tumoflip/sd_resources")
 MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/module_one_cockpit.fap",
     "apps/Module One/module_one_sensor_logger.fap",
+    "apps/Module One/BLE/ble_gatt_lab.fap",
     "apps/Module One/IR Blaster/tumo_ir_lab.fap",
     "apps/Module One/IR Blaster/tumoflip_xremote.fap",
     "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",

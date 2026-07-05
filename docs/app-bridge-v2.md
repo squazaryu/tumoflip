@@ -89,6 +89,25 @@ acknowledgements and it does not replay missed events. If the phone is
 disconnected or App Bridge is disabled, the firmware may drop the event while
 continuing to write the local WiFi Mapper CSV log.
 
+### BLE GATT Lab diagnostics
+
+`BLE GATT Lab` is a development FAP for safe App Bridge request/response tests.
+It does not scan BLE devices and it does not install a custom GATT profile; it
+uses the existing authenticated App Bridge service.
+
+| Field | Value |
+|---|---|
+| App ID | `ble_gatt_lab` |
+| Commands | `ping`, `status`, `echo` |
+| Responses | `pong`, `status`, `echo`, `error` |
+| Flags | Responses set `0x02`; errors set `0x02 | 0x04` |
+| Payload limit | UTF-8 text, clipped to one FAB2 frame |
+| Local log | `/ext/apps_data/ble_gatt_lab/ble_gatt_lab_YYYYMMDD_HHMMSS.csv` |
+
+The FAP also emits best-effort `ble_gatt_lab/event` frames when opened and when
+the user presses `OK`. These event frames use request IDs generated locally and
+do not request acknowledgements.
+
 ## Compatibility
 
 The firmware accepts both `FAB1` and `FAB2`. Existing FAP subscribers receive

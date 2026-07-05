@@ -103,6 +103,8 @@ class PackageReleaseTest(unittest.TestCase):
             extapp_cockpit = build / ".extapps/module_one_cockpit.fap"
             old_sensor_logger = resources / "apps/Module One/module_one_sensor_logger.fap"
             extapp_sensor_logger = build / ".extapps/module_one_sensor_logger.fap"
+            old_ble_gatt_lab = resources / "apps/Module One/BLE/ble_gatt_lab.fap"
+            extapp_ble_gatt_lab = build / ".extapps/ble_gatt_lab.fap"
             old_wifi.write_bytes(b"old wifi mapper")
             write_file(extapp_wifi, b"wifi mapper fix")
             old_ir_lab.write_bytes(b"old ir lab")
@@ -111,6 +113,8 @@ class PackageReleaseTest(unittest.TestCase):
             write_file(extapp_cockpit, b"module one cockpit")
             old_sensor_logger.write_bytes(b"old sensor logger")
             write_file(extapp_sensor_logger, b"sensor logger")
+            old_ble_gatt_lab.write_bytes(b"old ble gatt lab")
+            write_file(extapp_ble_gatt_lab, b"ble gatt lab")
 
             manifest = build_package_release(
                 repo,
@@ -130,6 +134,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(old_ir_lab.read_bytes(), b"tumo ir lab fix")
             self.assertEqual(old_cockpit.read_bytes(), b"module one cockpit")
             self.assertEqual(old_sensor_logger.read_bytes(), b"sensor logger")
+            self.assertEqual(old_ble_gatt_lab.read_bytes(), b"ble gatt lab")
 
             module_entries = {
                 entry["source"]: entry
@@ -145,6 +150,8 @@ class PackageReleaseTest(unittest.TestCase):
                 "apps/Module One/module_one_sensor_logger.fap"
             ]
             self.assertEqual(sensor_logger_entry["sha256"], sha256(extapp_sensor_logger))
+            ble_gatt_lab_entry = module_entries["apps/Module One/BLE/ble_gatt_lab.fap"]
+            self.assertEqual(ble_gatt_lab_entry["sha256"], sha256(extapp_ble_gatt_lab))
             self.assertEqual(manifest["artifacts"], {})
 
             manifest_path = (
@@ -169,6 +176,10 @@ class PackageReleaseTest(unittest.TestCase):
                     "apps/Module One/module_one_sensor_logger.fap",
                     archive.namelist(),
                 )
+                self.assertIn(
+                    "apps/Module One/BLE/ble_gatt_lab.fap",
+                    archive.namelist(),
+                )
                 self.assertEqual(
                     archive.read("apps/Module One/IR Blaster/tumo_ir_lab.fap"),
                     b"tumo ir lab fix",
@@ -180,6 +191,10 @@ class PackageReleaseTest(unittest.TestCase):
                 self.assertEqual(
                     archive.read("apps/Module One/module_one_sensor_logger.fap"),
                     b"sensor logger",
+                )
+                self.assertEqual(
+                    archive.read("apps/Module One/BLE/ble_gatt_lab.fap"),
+                    b"ble gatt lab",
                 )
                 self.assertEqual(
                     archive.read("apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap"),
