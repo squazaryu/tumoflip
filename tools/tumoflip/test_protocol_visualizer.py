@@ -28,6 +28,31 @@ class ProtocolVisualizerTest(unittest.TestCase):
         self.assertIn("&I_sub1_10px", source)
         self.assertIn("&I_IR_Icon_10x10", source)
 
+    def test_context_paths_are_loaded_safely(self) -> None:
+        source = (
+            REPO_ROOT / "applications_user/protocol_visualizer/protocol_visualizer.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("static bool pv_path_has_extension", source)
+        self.assertIn('pv_path_has_extension(load_path, ".ir")', source)
+        self.assertIn('pv_path_has_extension(load_path, ".sub")', source)
+        self.assertIn("pv_load_path(app, context)", source)
+        self.assertIn("if(context) {", source)
+
+    def test_selected_browser_path_is_copied_before_reuse(self) -> None:
+        source = (
+            REPO_ROOT / "applications_user/protocol_visualizer/protocol_visualizer.c"
+        ).read_text(encoding="utf-8")
+
+        load_path_start = source.index("static bool pv_load_path")
+        load_path_end = source.index("static bool pv_select_and_load")
+        load_path = source[load_path_start:load_path_end]
+
+        self.assertIn("FuriString* safe_path = furi_string_alloc_set(path)", load_path)
+        self.assertIn("const char* load_path = furi_string_get_cstr(safe_path)", load_path)
+        self.assertIn("furi_string_free(safe_path)", load_path)
+        self.assertNotIn("furi_string_set(app->file_path, path)", load_path)
+
     def test_file_loaders_validate_known_flipper_filetypes(self) -> None:
         source = (
             REPO_ROOT / "applications_user/protocol_visualizer/protocol_visualizer.c"

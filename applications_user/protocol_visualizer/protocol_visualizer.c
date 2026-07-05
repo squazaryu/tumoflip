@@ -162,6 +162,16 @@ static bool pv_is_supported_subghz_filetype(const char* value) {
            strcmp(value, "Flipper SubGhz RAW File") == 0;
 }
 
+static bool pv_path_has_extension(const char* path, const char* extension) {
+    if(!path || !extension) return false;
+
+    const size_t path_len = strlen(path);
+    const size_t extension_len = strlen(extension);
+    if(path_len < extension_len) return false;
+
+    return strcasecmp(path + path_len - extension_len, extension) == 0;
+}
+
 static void pv_copy_value(char* output, size_t output_size, const char* value) {
     strlcpy(output, pv_skip_space(value), output_size);
 }
@@ -505,12 +515,40 @@ static bool pv_export_summary(ProtocolVisualizerApp* app) {
     return ok;
 }
 
+static bool pv_load_path(ProtocolVisualizerApp* app, const char* path) {
+    if(!path || path[0] == '\0') return false;
+
+    FuriString* safe_path = furi_string_alloc_set(path);
+    const char* load_path = furi_string_get_cstr(safe_path);
+    furi_string_set(app->file_path, load_path);
+
+    bool loaded = false;
+    if(pv_path_has_extension(load_path, ".ir")) {
+        loaded = pv_load_ir(app, load_path);
+    } else if(pv_path_has_extension(load_path, ".sub")) {
+        loaded = pv_load_subghz(app, load_path);
+    }
+
+    if(loaded) {
+        pv_window_reset(app);
+        submenu_set_selected_item(app->submenu, ProtocolVisualizerMenuExport);
+        view_dispatcher_switch_to_view(app->view_dispatcher, ProtocolVisualizerViewWave);
+    } else {
+        furi_string_printf(app->text, "Cannot load file.\n\n%s", load_path);
+        text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
+        text_box_set_focus(app->text_box, TextBoxFocusStart);
+        view_dispatcher_switch_to_view(app->view_dispatcher, ProtocolVisualizerViewText);
+    }
+
+    furi_string_free(safe_path);
+    return loaded;
+}
+
 static bool pv_select_and_load(
     ProtocolVisualizerApp* app,
     const char* extension,
     const Icon* icon,
-    const char* base_path,
-    bool (*loader)(ProtocolVisualizerApp*, const char*)) {
+    const char* base_path) {
     furi_string_set(app->file_path, base_path);
 
     DialogsFileBrowserOptions options;
@@ -521,24 +559,8 @@ static bool pv_select_and_load(
         dialog_file_browser_show(app->dialogs, app->file_path, app->file_path, &options);
     if(!selected) return false;
 
-    bool loaded = furi_string_end_withi_str(app->file_path, extension);
-    if(loaded) {
-        loaded = loader(app, furi_string_get_cstr(app->file_path));
-    }
-    if(loaded) {
-        pv_window_reset(app);
-        submenu_set_selected_item(app->submenu, ProtocolVisualizerMenuExport);
-        view_dispatcher_switch_to_view(app->view_dispatcher, ProtocolVisualizerViewWave);
-    } else {
-        furi_string_printf(
-            app->text,
-            "Cannot load file.\n\n%s",
-            furi_string_get_cstr(app->file_path));
-        text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
-        text_box_set_focus(app->text_box, TextBoxFocusStart);
-        view_dispatcher_switch_to_view(app->view_dispatcher, ProtocolVisualizerViewText);
-    }
-    return loaded;
+    const char* selected_path = furi_string_get_cstr(app->file_path);
+    return pv_load_path(app, selected_path);
 }
 
 static void pv_menu_callback(void* context, uint32_t index) {
@@ -546,10 +568,10 @@ static void pv_menu_callback(void* context, uint32_t index) {
 
     switch(index) {
     case ProtocolVisualizerMenuOpenIr:
-        pv_select_and_load(app, ".ir", &I_IR_Icon_10x10, PV_IR_BASE_DIR, pv_load_ir);
+        pv_select_and_load(app, ".ir", &I_IR_Icon_10x10, PV_IR_BASE_DIR);
         break;
     case ProtocolVisualizerMenuOpenSubGhz:
-        pv_select_and_load(app, ".sub", &I_sub1_10px, PV_SUB_BASE_DIR, pv_load_subghz);
+        pv_select_and_load(app, ".sub", &I_sub1_10px, PV_SUB_BASE_DIR);
         break;
     case ProtocolVisualizerMenuExport:
         if(app->capture.valid) {
@@ -765,8 +787,10 @@ static void pv_app_free(ProtocolVisualizerApp* app) {
 }
 
 int32_t protocol_visualizer_app(void* context) {
-    UNUSED(context);
     ProtocolVisualizerApp* app = pv_app_alloc();
+    if(context) {
+        pv_load_path(app, context);
+    }
     view_dispatcher_run(app->view_dispatcher);
     pv_app_free(app);
     return 0;
