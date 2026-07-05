@@ -2,6 +2,7 @@
 #include <furi_hal_i2c.h>
 #include <furi_hal_infrared.h>
 #include <furi_hal_power.h>
+#include <furi_hal_rtc.h>
 #include <furi_hal_serial.h>
 #include <furi_hal_serial_control.h>
 #include <gui/gui.h>
@@ -21,6 +22,8 @@
 #define MODULE_ONE_COCKPIT_IR_TIMEOUT_MS 250U
 #define MODULE_ONE_COCKPIT_I2C_TIMEOUT_MS 2U
 #define MODULE_ONE_COCKPIT_UART_BAUD 115200U
+#define MODULE_ONE_COCKPIT_DATA_DIR EXT_PATH("apps_data/module_one_cockpit")
+#define MODULE_ONE_COCKPIT_REPORT_PATH_SIZE 128U
 
 typedef enum {
     ModuleOneCockpitViewMenu,
@@ -41,6 +44,7 @@ typedef enum {
     ModuleOneCockpitActionLaunchArfStatus,
     ModuleOneCockpitActionLaunchGpio,
     ModuleOneCockpitActionLaunchSubGhz,
+    ModuleOneCockpitActionExportDiagnostics,
     ModuleOneCockpitActionAbout,
     ModuleOneCockpitActionCount,
 } ModuleOneCockpitAction;
@@ -76,6 +80,11 @@ typedef struct {
 } ModuleOneCockpitIrTx;
 
 typedef struct {
+    bool found;
+    uint8_t address;
+} ModuleOneCockpitI2cProbe;
+
+typedef struct {
     Gui* gui;
     Storage* storage;
     Loader* loader;
@@ -100,6 +109,7 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"CC1101: ARF Status", ModuleOneCockpitActionLaunchArfStatus},
     {"System: GPIO", ModuleOneCockpitActionLaunchGpio},
     {"System: Sub-GHz", ModuleOneCockpitActionLaunchSubGhz},
+    {"Diagnostics: Export", ModuleOneCockpitActionExportDiagnostics},
     {"About", ModuleOneCockpitActionAbout},
 };
 
@@ -174,6 +184,40 @@ static bool module_one_cockpit_path_exists(Storage* storage, const char* path) {
     return storage_common_stat(storage, path, NULL) == FSE_OK;
 }
 
+static bool module_one_cockpit_mkdir(Storage* storage, const char* path) {
+    const FS_Error error = storage_common_mkdir(storage, path);
+    return (error == FSE_OK) || (error == FSE_EXIST);
+}
+
+static void module_one_cockpit_format_filename_timestamp(char* output, size_t output_size) {
+    DateTime now;
+    furi_hal_rtc_get_datetime(&now);
+    snprintf(
+        output,
+        output_size,
+        "%04u%02u%02u_%02u%02u%02u",
+        now.year,
+        now.month,
+        now.day,
+        now.hour,
+        now.minute,
+        now.second);
+}
+
+static void module_one_cockpit_append_iso_timestamp(FuriString* output) {
+    DateTime now;
+    furi_hal_rtc_get_datetime(&now);
+    furi_string_cat_printf(
+        output,
+        "%04u-%02u-%02uT%02u:%02u:%02u",
+        now.year,
+        now.month,
+        now.day,
+        now.hour,
+        now.minute,
+        now.second);
+}
+
 static const ModuleOneCockpitLaunchTarget*
     module_one_cockpit_find_target(ModuleOneCockpitAction action) {
     for(size_t i = 0; i < COUNT_OF(module_one_cockpit_targets); i++) {
@@ -216,53 +260,128 @@ static void module_one_cockpit_show_text(ModuleOneCockpitApp* app, const char* t
 
 static void module_one_cockpit_append_app_status(
     ModuleOneCockpitApp* app,
+    FuriString* output,
     const ModuleOneCockpitLaunchTarget* target) {
     const bool available = !target->storage_backed ||
                            module_one_cockpit_path_exists(app->storage, target->target);
     furi_string_cat_printf(
-        app->text,
+        output,
         "%s / %s: %s\n",
         module_one_cockpit_block_label(target->block),
         target->name,
         available ? "OK" : "missing");
     furi_string_cat_printf(
-        app->text,
+        output,
         "  %s%s\n",
         target->storage_backed ? "" : "loader: ",
         target->target);
 }
 
-static void module_one_cockpit_build_status(ModuleOneCockpitApp* app) {
+static bool module_one_cockpit_i2c_ready(uint8_t addr_7bit) {
+    return furi_hal_i2c_is_device_ready(
+        &furi_hal_i2c_handle_external, (uint8_t)(addr_7bit << 1), MODULE_ONE_COCKPIT_I2C_TIMEOUT_MS);
+}
+
+static ModuleOneCockpitI2cProbe module_one_cockpit_probe_bme280(void) {
+    ModuleOneCockpitI2cProbe probe = {
+        .found = false,
+        .address = 0,
+    };
+
+    furi_hal_i2c_acquire(&furi_hal_i2c_handle_external);
+    if(module_one_cockpit_i2c_ready(0x76)) {
+        probe.found = true;
+        probe.address = 0x76;
+    } else if(module_one_cockpit_i2c_ready(0x77)) {
+        probe.found = true;
+        probe.address = 0x77;
+    }
+    furi_hal_i2c_release(&furi_hal_i2c_handle_external);
+    return probe;
+}
+
+static void module_one_cockpit_append_power_report(FuriString* output) {
     const uint32_t usb_mv = (uint32_t)(furi_hal_power_get_usb_voltage() * 1000.0f);
 
-    furi_string_reset(app->text);
-    furi_string_cat_printf(app->text, "Module One Cockpit\n\n");
     furi_string_cat_printf(
-        app->text,
+        output,
         "Power\n"
         "Battery: %u%%\n"
+        "Battery health: %u%%\n"
+        "Charging: %s\n"
         "USB: %lu.%02lu V\n"
         "OTG 5V: %s\n"
         "OTG fault: %s\n\n",
         furi_hal_power_get_pct(),
+        furi_hal_power_get_bat_health_pct(),
+        furi_hal_power_is_charging() ? "yes" : "no",
         (unsigned long)(usb_mv / 1000U),
         (unsigned long)((usb_mv % 1000U) / 10U),
         furi_hal_power_is_otg_enabled() ? "on" : "off",
         furi_hal_power_check_otg_fault() ? "yes" : "no");
+}
 
-    furi_string_cat_printf(app->text, "Apps\n");
-    for(size_t i = 0; i < COUNT_OF(module_one_cockpit_targets); i++) {
-        module_one_cockpit_append_app_status(app, &module_one_cockpit_targets[i]);
+static void module_one_cockpit_append_runtime_report(FuriString* output) {
+    const bool ir_busy = furi_hal_infrared_is_busy();
+    const bool usart_busy = furi_hal_serial_control_is_busy(FuriHalSerialIdUsart);
+    const bool lpuart_busy = furi_hal_serial_control_is_busy(FuriHalSerialIdLpuart);
+    const ModuleOneCockpitI2cProbe bme280 = module_one_cockpit_probe_bme280();
+
+    furi_string_cat_printf(
+        output,
+        "Runtime health\n"
+        "IR HAL: %s\n"
+        "USART: %s\n"
+        "LPUART: %s\n"
+        "Sleep: %s\n",
+        ir_busy ? "busy" : "free",
+        usart_busy ? "busy" : "free",
+        lpuart_busy ? "busy" : "free",
+        furi_hal_power_sleep_available() ? "available" : "locked");
+
+    if(bme280.found) {
+        furi_string_cat_printf(output, "BME280: present at 0x%02X\n", bme280.address);
+    } else {
+        furi_string_cat_printf(output, "BME280: not detected on 0x76/0x77\n");
     }
 
     furi_string_cat_printf(
-        app->text,
+        output,
+        "ESP32/GPS: UART free means probe-safe; use dedicated screens for active checks\n"
+        "NRF24: unknown, no safe passive probe yet\n"
+        "CC1101: unknown, use ARF/Sub-GHz status before transmit\n\n");
+}
+
+static void module_one_cockpit_append_app_report(ModuleOneCockpitApp* app, FuriString* output) {
+    furi_string_cat_printf(output, "Apps\n");
+    for(size_t i = 0; i < COUNT_OF(module_one_cockpit_targets); i++) {
+        module_one_cockpit_append_app_status(app, output, &module_one_cockpit_targets[i]);
+    }
+}
+
+static void module_one_cockpit_build_report(ModuleOneCockpitApp* app, FuriString* output) {
+    furi_string_reset(output);
+    furi_string_cat_printf(output, "Module One Cockpit Pro\n");
+    furi_string_cat_printf(output, "Generated: ");
+    module_one_cockpit_append_iso_timestamp(output);
+    furi_string_cat_printf(output, "\n\n");
+
+    module_one_cockpit_append_power_report(output);
+    module_one_cockpit_append_runtime_report(output);
+    module_one_cockpit_append_app_report(app, output);
+
+    furi_string_cat_printf(
+        output,
         "\nHardware blocks\n"
         "IR: use IR Blink or Tumo IR Lab\n"
         "ESP32: use UART/AT or WiFi Mapper\n"
         "GPS/BME280: use Sensor Logger\n"
-        "NRF24: no packaged app yet\n"
-        "CC1101: use ARF Sub-GHz Full\n");
+        "NRF24: passive detection is not implemented yet\n"
+        "CC1101: use ARF Sub-GHz Full or Sub-GHz status\n");
+}
+
+static void module_one_cockpit_build_status(ModuleOneCockpitApp* app) {
+    module_one_cockpit_build_report(app, app->text);
 }
 
 static FuriHalInfraredTxGetDataState
@@ -329,11 +448,6 @@ static void module_one_cockpit_run_ir_blink(ModuleOneCockpitApp* app) {
         done ? "sent" : "timeout");
 }
 
-static bool module_one_cockpit_i2c_ready(uint8_t addr_7bit) {
-    return furi_hal_i2c_is_device_ready(
-        &furi_hal_i2c_handle_external, (uint8_t)(addr_7bit << 1), MODULE_ONE_COCKPIT_I2C_TIMEOUT_MS);
-}
-
 static void module_one_cockpit_run_i2c_scan(ModuleOneCockpitApp* app) {
     furi_string_reset(app->text);
     furi_string_cat_printf(
@@ -367,6 +481,50 @@ static void module_one_cockpit_run_i2c_scan(ModuleOneCockpitApp* app) {
         "\nFound: %u\nBME280: %s\n",
         found,
         bme280_found ? "possible" : "not detected");
+}
+
+static bool module_one_cockpit_write_text_file(
+    Storage* storage,
+    const char* path,
+    const char* text) {
+    File* file = storage_file_alloc(storage);
+    bool ok = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    if(ok) {
+        const size_t size = strlen(text);
+        ok = storage_file_write(file, text, size) == size;
+    }
+    storage_file_close(file);
+    storage_file_free(file);
+    return ok;
+}
+
+static void module_one_cockpit_export_report(ModuleOneCockpitApp* app) {
+    char timestamp[32];
+    char path[MODULE_ONE_COCKPIT_REPORT_PATH_SIZE];
+    module_one_cockpit_format_filename_timestamp(timestamp, sizeof(timestamp));
+    snprintf(
+        path,
+        sizeof(path),
+        MODULE_ONE_COCKPIT_DATA_DIR "/diagnostics_%s.txt",
+        timestamp);
+
+    FuriString* report = furi_string_alloc();
+    module_one_cockpit_build_report(app, report);
+
+    const bool dir_ok = module_one_cockpit_mkdir(app->storage, MODULE_ONE_COCKPIT_DATA_DIR);
+    const bool write_ok =
+        dir_ok && module_one_cockpit_write_text_file(app->storage, path, furi_string_get_cstr(report));
+
+    furi_string_reset(app->text);
+    furi_string_cat_printf(
+        app->text,
+        "Diagnostics Export\n\n"
+        "Result: %s\n"
+        "Path:\n%s\n\n",
+        write_ok ? "saved" : (dir_ok ? "write failed" : "mkdir failed"),
+        path);
+    furi_string_cat(app->text, report);
+    furi_string_free(report);
 }
 
 static void module_one_cockpit_build_uart_status(ModuleOneCockpitApp* app) {
@@ -476,6 +634,9 @@ static void module_one_cockpit_submenu_callback(void* context, uint32_t index) {
         break;
     case ModuleOneCockpitActionEsp32Ping:
         module_one_cockpit_run_esp32_ping(app);
+        break;
+    case ModuleOneCockpitActionExportDiagnostics:
+        module_one_cockpit_export_report(app);
         break;
     case ModuleOneCockpitActionAbout:
         module_one_cockpit_build_about(app);
