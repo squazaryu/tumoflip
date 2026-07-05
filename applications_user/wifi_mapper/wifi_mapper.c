@@ -1617,9 +1617,18 @@ static void wifi_mapper_stop_logging(WiFiMapperApp* app) {
     wifi_mapper_update_model(app);
 }
 
+static void wifi_mapper_draw_top_action(Canvas* canvas, const char* label) {
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_rbox(canvas, 94, 1, 34, 12, 2);
+    canvas_set_color(canvas, ColorWhite);
+    canvas_draw_str_aligned(canvas, 111, 10, AlignCenter, AlignBottom, label);
+    canvas_set_color(canvas, ColorBlack);
+}
+
 static void wifi_mapper_draw_live(Canvas* canvas, WiFiMapperModel* model) {
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 0, 10, "WiFi Mapper");
+    wifi_mapper_draw_top_action(canvas, model->logging ? "Stop" : "Start");
 
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, 0, 22, model->status);
@@ -1649,8 +1658,6 @@ static void wifi_mapper_draw_live(Canvas* canvas, WiFiMapperModel* model) {
         0,
         58,
         model->file_name[0] ? model->file_name : "OK start Hold stats");
-
-    elements_button_center(canvas, model->logging ? "Stop" : "Start");
 }
 
 static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {

@@ -1052,12 +1052,21 @@ static bool module_one_sensor_start_logging(ModuleOneSensorApp* app) {
     return true;
 }
 
+static void module_one_sensor_draw_top_action(Canvas* canvas, const char* label) {
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_rbox(canvas, 96, 1, 32, 12, 2);
+    canvas_set_color(canvas, ColorWhite);
+    canvas_draw_str_aligned(canvas, 112, 10, AlignCenter, AlignBottom, label);
+    canvas_set_color(canvas, ColorBlack);
+}
+
 static void module_one_sensor_draw_callback(Canvas* canvas, void* context) {
     ModuleOneSensorModel* model = context;
     canvas_clear(canvas);
     canvas_set_color(canvas, ColorBlack);
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 0, 10, "Sensor Logger");
+    module_one_sensor_draw_top_action(canvas, "Stop");
 
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, 0, 21, model->status);
@@ -1098,7 +1107,6 @@ static void module_one_sensor_draw_callback(Canvas* canvas, void* context) {
         snprintf(line, sizeof(line), "BME %s", model->bme.ready ? "wait" : "not found");
     }
     canvas_draw_str(canvas, 0, 61, line);
-    elements_button_center(canvas, "Stop");
 }
 
 static bool module_one_sensor_input_callback(InputEvent* event, void* context) {
