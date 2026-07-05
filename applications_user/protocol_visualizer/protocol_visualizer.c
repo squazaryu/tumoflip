@@ -473,6 +473,7 @@ static bool pv_select_and_load(
     const bool loaded = loader(app, furi_string_get_cstr(app->file_path));
     if(loaded) {
         pv_window_reset(app);
+        submenu_set_selected_item(app->submenu, ProtocolVisualizerMenuExport);
         view_dispatcher_switch_to_view(app->view_dispatcher, ProtocolVisualizerViewWave);
     } else {
         furi_string_printf(
@@ -593,11 +594,7 @@ static bool pv_wave_input(InputEvent* event, void* context) {
     ProtocolVisualizerApp* app = context;
     if(event->type != InputTypeShort && event->type != InputTypeRepeat) return false;
 
-    if(event->key == InputKeyBack) {
-        submenu_set_selected_item(app->submenu, ProtocolVisualizerMenuExport);
-        view_dispatcher_switch_to_view(app->view_dispatcher, ProtocolVisualizerViewMenu);
-        return true;
-    } else if(event->key == InputKeyOk) {
+    if(event->key == InputKeyOk) {
         pv_show_text(app);
         return true;
     } else if(event->key == InputKeyLeft) {
@@ -705,6 +702,7 @@ static void pv_try_load_context_path(ProtocolVisualizerApp* app, const char* pat
 
     if(loaded) {
         pv_window_reset(app);
+        submenu_set_selected_item(app->submenu, ProtocolVisualizerMenuExport);
         view_dispatcher_switch_to_view(app->view_dispatcher, ProtocolVisualizerViewWave);
     } else {
         furi_string_printf(app->text, "Cannot load:\n%s", path);
