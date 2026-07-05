@@ -79,6 +79,8 @@ class ArfSubGhzFullTest(unittest.TestCase):
             '#define MODULE_ONE_COCKPIT_APP_PATH EXT_PATH("apps/Module One/module_one_cockpit.fap")',
             loader_menu,
         )
+        self.assertIn('#define ARF_TOOLS_MENU_NAME "Cockpit"', loader_menu)
+        self.assertNotIn('#define ARF_TOOLS_MENU_NAME "ARF Tools"', loader_menu)
         self.assertNotIn("loader_menu_arf_tools_callback", loader_menu)
         self.assertNotIn("loader_menu_arf_subghz_full_callback", loader_menu)
         self.assertIn('strcmp(name, "Sub-GHz") == 0', loader_menu)

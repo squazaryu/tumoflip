@@ -24,7 +24,9 @@ class ModuleOneSensorLoggerTest(unittest.TestCase):
         self.assertIn('appid="module_one_sensor_logger"', self.manifest)
         self.assertIn('apptype=FlipperAppType.EXTERNAL', self.manifest)
         self.assertIn('fap_category="Module One"', self.manifest)
+        self.assertIn('fap_icon="icon.png"', self.manifest)
         self.assertIn('requires=["gui", "storage", "notification"]', self.manifest)
+        self.assertTrue((APP_DIR / "icon.png").is_file())
 
     def test_logger_exports_csv_jsonl_and_gpx_sessions(self) -> None:
         self.assertIn("MODULE_ONE_SENSOR_SESSIONS_DIR", self.source)
