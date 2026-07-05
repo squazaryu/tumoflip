@@ -57,7 +57,6 @@ class ValidateReleaseTest(unittest.TestCase):
                 "arf_subghz_full",
                 "garage_door_remote",
                 "keeloq_keystore_decryptor",
-                "protocol_visualizer",
                 "subghz_raw_edit",
             },
         )
