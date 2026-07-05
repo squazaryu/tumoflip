@@ -84,6 +84,14 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn("FuriHalSerialIdUsart", source)
         self.assertIn("FSOM_CREATE_ALWAYS", source)
 
+    def test_live_screen_uses_non_blocking_start_stop_hint(self) -> None:
+        source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
+
+        self.assertIn("wifi_mapper_draw_action_hint", source)
+        self.assertIn('model->logging ? "OK Stop" : "OK Start"', source)
+        self.assertNotIn("wifi_mapper_draw_top_action", source)
+        self.assertNotIn("canvas_draw_rbox(canvas, 94, 1, 34, 12, 2)", source)
+
     def test_live_relay_contract_is_stable_and_opt_in(self) -> None:
         source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
 

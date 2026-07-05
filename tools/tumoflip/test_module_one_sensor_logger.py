@@ -57,6 +57,12 @@ class ModuleOneSensorLoggerTest(unittest.TestCase):
         self.assertIn("</trkseg></trk>", self.source)
         self.assertNotIn("furi_string_reset((FuriString*)NULL)", self.source)
 
+    def test_run_screen_uses_non_blocking_stop_hint(self) -> None:
+        self.assertIn("module_one_sensor_draw_action_hint", self.source)
+        self.assertIn('module_one_sensor_draw_action_hint(canvas, "OK Stop")', self.source)
+        self.assertNotIn("module_one_sensor_draw_top_action", self.source)
+        self.assertNotIn("canvas_draw_rbox(canvas, 96, 1, 32, 12, 2)", self.source)
+
     def test_cockpit_and_package_route_sensor_logger(self) -> None:
         self.assertIn("Sensors: Logger", self.cockpit)
         self.assertIn(
