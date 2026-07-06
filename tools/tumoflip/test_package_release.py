@@ -13,6 +13,7 @@ try:
     from .validate_release import (
         ARF_MODULE_APP_IDS,
         ARF_VISIBLE_APP_IDS,
+        BASE_PACKAGE_FILES,
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
@@ -24,6 +25,7 @@ except ImportError:
     from validate_release import (
         ARF_MODULE_APP_IDS,
         ARF_VISIBLE_APP_IDS,
+        BASE_PACKAGE_FILES,
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
@@ -56,14 +58,7 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
     )
     write_file(resources / "Manifest")
 
-    for relative in (
-        "apps/Bluetooth/flipper_companion.fap",
-        "apps/Tools/ai_dashboard.fap",
-        "apps/Tools/flipper_relay.fap",
-        "apps/Tools/quac.fap",
-        "apps/Tools/tumoflip_packages.fap",
-        "apps/Tools/totp.fap",
-    ):
+    for relative in BASE_PACKAGE_FILES:
         write_file(resources / relative, relative.encode())
 
     for relative in MODULE_ONE_PACKAGE_FILES:
@@ -113,6 +108,8 @@ class PackageReleaseTest(unittest.TestCase):
             extapp_ble_gatt_lab = build / ".extapps/ble_gatt_lab.fap"
             old_macro_deck = resources / "apps/Module One/Macros/tumo_macro_deck.fap"
             extapp_macro_deck = build / ".extapps/tumo_macro_deck.fap"
+            old_subghz = resources / "apps/Sub-GHz/subghz.fap"
+            extapp_subghz = build / ".extapps/subghz.fap"
             old_wifi.write_bytes(b"old wifi mapper")
             write_file(extapp_wifi, b"wifi mapper fix")
             old_ir_lab.write_bytes(b"old ir lab")
@@ -127,6 +124,8 @@ class PackageReleaseTest(unittest.TestCase):
             write_file(extapp_ble_gatt_lab, b"ble gatt lab")
             old_macro_deck.write_bytes(b"old macro deck")
             write_file(extapp_macro_deck, b"macro deck")
+            old_subghz.write_bytes(b"old stock subghz")
+            write_file(extapp_subghz, b"stock subghz external")
 
             manifest = build_package_release(
                 repo,
@@ -149,6 +148,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(old_sensor_logger.read_bytes(), b"sensor logger")
             self.assertEqual(old_ble_gatt_lab.read_bytes(), b"ble gatt lab")
             self.assertEqual(old_macro_deck.read_bytes(), b"macro deck")
+            self.assertEqual(old_subghz.read_bytes(), b"stock subghz external")
 
             module_entries = {
                 entry["source"]: entry
@@ -178,6 +178,9 @@ class PackageReleaseTest(unittest.TestCase):
                 "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
                 module_entries,
             )
+            base_entries = {entry["source"]: entry for entry in manifest["packages"]["base"]}
+            subghz_entry = base_entries["apps/Sub-GHz/subghz.fap"]
+            self.assertEqual(subghz_entry["sha256"], sha256(extapp_subghz))
             self.assertEqual(manifest["artifacts"], {})
             self.assertIn(
                 {

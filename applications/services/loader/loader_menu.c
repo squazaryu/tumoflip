@@ -78,12 +78,15 @@ static void loader_menu_start(const char* name) {
     loader_menu_start_with_args(name, NULL);
 }
 
+static void loader_menu_arf_subghz_callback(void* context, uint32_t index) {
+    UNUSED(index);
+    UNUSED(context);
+    loader_menu_start(ARF_SUBGHZ_FULL_APP_PATH);
+}
+
 static void loader_menu_apps_callback(void* context, uint32_t index) {
     UNUSED(context);
     const char* name = FLIPPER_APPS[index].name;
-    if(strcmp(name, "Sub-GHz") == 0) {
-        name = ARF_SUBGHZ_FULL_APP_PATH;
-    }
     loader_menu_start(name);
 }
 
@@ -152,6 +155,13 @@ static void loader_menu_build_menu(LoaderMenuApp* app, LoaderMenu* menu) {
             app->asset_pack, LoaderAssetPackIconModuleOne, &A_ModuleOne_14),
         i++,
         loader_menu_module_one_callback,
+        (void*)menu);
+    menu_add_item(
+        app->primary_menu,
+        "Sub-GHz",
+        &A_Sub1ghz_14,
+        i++,
+        loader_menu_arf_subghz_callback,
         (void*)menu);
 
     for(i = 0; i < FLIPPER_APPS_COUNT; i++) {

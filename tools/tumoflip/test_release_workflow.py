@@ -53,17 +53,18 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("flipper-z-f7-full-${VERSION}.dfu", workflow)
         self.assertNotIn("gh release create", workflow)
 
-    def test_subghz_architecture_is_documented_as_core_first(self) -> None:
+    def test_subghz_architecture_documents_externalized_stock_app(self) -> None:
         doc = (REPO_ROOT / "docs/subghz-architecture.md").read_text(
             encoding="utf-8"
         )
 
-        self.assertIn("core Sub-GHz in firmware", doc)
+        self.assertIn("ships it as an SD `.fap`", doc)
+        self.assertIn("/ext/apps/Sub-GHz/subghz.fap", doc)
         self.assertIn("arf_subghz_standard.fap", doc)
-        self.assertIn("must not be reintroduced", doc)
+        self.assertIn("must not be\nreintroduced", doc)
         self.assertIn("Sub-GHz` opens `ARF Sub-GHz Full`", doc)
         self.assertIn(
-            "Standard Sub-GHz` inside `ARF Sub-GHz Full` opens the core firmware app",
+            "Standard Sub-GHz` inside `ARF Sub-GHz Full` opens",
             doc,
         )
         self.assertIn("Protocol Packs", doc)
