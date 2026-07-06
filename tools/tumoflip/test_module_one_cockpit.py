@@ -19,7 +19,8 @@ class ModuleOneCockpitTest(unittest.TestCase):
     def test_app_is_module_one_external_fap(self) -> None:
         self.assertIn('appid="module_one_cockpit"', self.manifest)
         self.assertIn('apptype=FlipperAppType.EXTERNAL', self.manifest)
-        self.assertIn('fap_category="Module One"', self.manifest)
+        self.assertIn('fap_category="Module One/Diagnostics"', self.manifest)
+        self.assertIn('fap_dist_path="apps/Module One/Diagnostics/cockpit.fap"', self.manifest)
         self.assertIn('fap_icon="icon.png"', self.manifest)
         self.assertTrue((APP_DIR / "icon.png").is_file())
         self.assertIn("BLE: GATT Lab", self.source)
@@ -29,7 +30,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
             self.source,
         )
         self.assertIn(
-            'EXT_PATH("apps/Module One/tumo_acceptance_suite.fap")',
+            'EXT_PATH("apps/Module One/Diagnostics/tumo_acceptance_suite.fap")',
             self.source,
         )
 

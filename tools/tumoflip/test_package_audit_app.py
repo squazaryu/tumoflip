@@ -4,9 +4,9 @@ import unittest
 from pathlib import Path
 
 try:
-    from .validate_release import ARF_LEGACY_PATHS
+    from .validate_release import RELEASE_CLEANUP_PATHS
 except ImportError:
-    from validate_release import ARF_LEGACY_PATHS
+    from validate_release import RELEASE_CLEANUP_PATHS
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -46,7 +46,7 @@ class PackageAuditAppTest(unittest.TestCase):
 
     def test_known_release_cleanup_paths_are_visible_in_audit(self) -> None:
         source = (APP_ROOT / "tumoflip_packages.c").read_text(encoding="utf-8")
-        for legacy, canonical in ARF_LEGACY_PATHS.items():
+        for legacy, canonical in RELEASE_CLEANUP_PATHS.items():
             self.assertIn(legacy, source)
             self.assertIn(canonical, source)
 

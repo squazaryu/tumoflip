@@ -12,26 +12,26 @@ from pathlib import Path
 try:
     from .make_packages_zip import build_packages_zip
     from .validate_release import (
-        ARF_LEGACY_PATHS,
         ValidationError,
         api_version,
         install_static_sd_resources,
         manifest_release_id,
         package_entries,
         require_file,
+        release_cleanup_entries,
         sync_extapp_package_exports,
         validate_layout,
     )
 except ImportError:
     from make_packages_zip import build_packages_zip
     from validate_release import (
-        ARF_LEGACY_PATHS,
         ValidationError,
         api_version,
         install_static_sd_resources,
         manifest_release_id,
         package_entries,
         require_file,
+        release_cleanup_entries,
         sync_extapp_package_exports,
         validate_layout,
     )
@@ -104,10 +104,7 @@ def build_package_release(
         },
         "artifacts": {},
         "packages": packages,
-        "cleanup": [
-            {"legacy": legacy, "canonical": canonical}
-            for legacy, canonical in sorted(ARF_LEGACY_PATHS.items())
-        ],
+        "cleanup": release_cleanup_entries(),
     }
     manifest["release_id"] = manifest_release_id(manifest)
 

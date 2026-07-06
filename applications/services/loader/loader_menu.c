@@ -16,7 +16,7 @@
 #define MODULE_ONE_APPS_PATH EXT_PATH("apps/Module One")
 #define ARF_TOOLS_MENU_NAME "Cockpit"
 #define ARF_SUBGHZ_FULL_APP_PATH EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")
-#define MODULE_ONE_COCKPIT_APP_PATH EXT_PATH("apps/Module One/module_one_cockpit.fap")
+#define MODULE_ONE_COCKPIT_APP_PATH EXT_PATH("apps/Module One/Diagnostics/cockpit.fap")
 
 struct LoaderMenu {
     FuriThread* thread;

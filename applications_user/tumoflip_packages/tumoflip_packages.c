@@ -108,6 +108,12 @@ static const TumoLegacyPath tumo_legacy_paths[] = {
     {"/ext/apps/Sub-GHz/subghz_bruteforcer.fap",
      "/ext/apps_data/arf_subghz_full/modules/subghz_bruteforcer.fap"},
     {"/ext/apps/Sub-GHz/subghz_raw_edit.fap", "/ext/apps/ARF Tools/subghz_raw_edit.fap"},
+    {"/ext/apps/Module One/module_one_cockpit.fap",
+     "/ext/apps/Module One/Diagnostics/cockpit.fap"},
+    {"/ext/apps/Module One/module_one_sensor_logger.fap",
+     "/ext/apps/Module One/Sensors BME280/module_one_sensor_logger.fap"},
+    {"/ext/apps/Module One/tumo_acceptance_suite.fap",
+     "/ext/apps/Module One/Diagnostics/tumo_acceptance_suite.fap"},
 };
 
 typedef struct {

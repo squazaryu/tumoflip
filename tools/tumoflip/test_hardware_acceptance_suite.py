@@ -24,7 +24,9 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
         self.assertIn('appid="tumo_acceptance_suite"', self.manifest)
         self.assertIn('apptype=FlipperAppType.EXTERNAL', self.manifest)
         self.assertIn('requires=["gui", "storage"]', self.manifest)
-        self.assertIn('fap_category="Module One"', self.manifest)
+        self.assertIn('fap_category="Module One/Diagnostics"', self.manifest)
+        self.assertIn('fap_icon="icon.png"', self.manifest)
+        self.assertTrue((APP_DIR / "icon.png").is_file())
         self.assertIn('icon="A_Plugins_14"', self.manifest)
 
     def test_report_covers_release_acceptance_inputs(self) -> None:
@@ -47,8 +49,8 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
 
     def test_app_checks_key_packaged_paths_without_active_transmit(self) -> None:
         for required in (
-            'EXT_PATH("apps/Module One/module_one_cockpit.fap")',
-            'EXT_PATH("apps/Module One/module_one_sensor_logger.fap")',
+            'EXT_PATH("apps/Module One/Diagnostics/cockpit.fap")',
+            'EXT_PATH("apps/Module One/Sensors BME280/module_one_sensor_logger.fap")',
             'EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap")',
             'EXT_PATH("apps/Module One/Macros/tumo_macro_deck.fap")',
             'EXT_PATH("apps/Module One/IR Blaster/tumo_ir_lab.fap")',
@@ -68,10 +70,13 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
         self.assertIn("storage_file_sync(file)", self.source)
         self.assertIn("System: Acceptance", self.cockpit)
         self.assertIn(
-            'EXT_PATH("apps/Module One/tumo_acceptance_suite.fap")',
+            'EXT_PATH("apps/Module One/Diagnostics/tumo_acceptance_suite.fap")',
             self.cockpit,
         )
-        self.assertIn('"apps/Module One/tumo_acceptance_suite.fap"', self.validator)
+        self.assertIn(
+            '"apps/Module One/Diagnostics/tumo_acceptance_suite.fap"',
+            self.validator,
+        )
 
 
 if __name__ == "__main__":

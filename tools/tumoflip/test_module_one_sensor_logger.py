@@ -23,7 +23,7 @@ class ModuleOneSensorLoggerTest(unittest.TestCase):
     def test_app_is_module_one_external_fap(self) -> None:
         self.assertIn('appid="module_one_sensor_logger"', self.manifest)
         self.assertIn('apptype=FlipperAppType.EXTERNAL', self.manifest)
-        self.assertIn('fap_category="Module One"', self.manifest)
+        self.assertIn('fap_category="Module One/Sensors BME280"', self.manifest)
         self.assertIn('fap_icon="icon.png"', self.manifest)
         self.assertIn('requires=["gui", "storage", "notification"]', self.manifest)
         self.assertTrue((APP_DIR / "icon.png").is_file())
@@ -66,11 +66,11 @@ class ModuleOneSensorLoggerTest(unittest.TestCase):
     def test_cockpit_and_package_route_sensor_logger(self) -> None:
         self.assertIn("Sensors: Logger", self.cockpit)
         self.assertIn(
-            'EXT_PATH("apps/Module One/module_one_sensor_logger.fap")',
+            'EXT_PATH("apps/Module One/Sensors BME280/module_one_sensor_logger.fap")',
             self.cockpit,
         )
         self.assertIn(
-            '"apps/Module One/module_one_sensor_logger.fap"',
+            '"apps/Module One/Sensors BME280/module_one_sensor_logger.fap"',
             self.validator,
         )
 

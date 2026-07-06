@@ -185,15 +185,19 @@ def apply_packages(
                 raise
             installed.append((target, backup))
 
-        if groups is None or "arf" in groups:
-            for cleanup in manifest.get("cleanup", []):
-                legacy = sd_root / ext_relative(str(cleanup["legacy"]))
-                canonical = sd_root / ext_relative(str(cleanup["canonical"]))
-                if legacy.exists() and canonical.exists() and legacy != canonical:
-                    backup = rollback_root / "legacy" / legacy.relative_to(sd_root)
-                    backup.parent.mkdir(parents=True, exist_ok=True)
-                    os.replace(legacy, backup)
-                    removed_legacy.append((legacy, backup))
+        cleanup_selected = 0
+        for cleanup in manifest.get("cleanup", []):
+            cleanup_group = str(cleanup.get("group", "arf"))
+            if groups is not None and cleanup_group not in selected_groups:
+                continue
+            cleanup_selected += 1
+            legacy = sd_root / ext_relative(str(cleanup["legacy"]))
+            canonical = sd_root / ext_relative(str(cleanup["canonical"]))
+            if legacy.exists() and canonical.exists() and legacy != canonical:
+                backup = rollback_root / "legacy" / legacy.relative_to(sd_root)
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(legacy, backup)
+                removed_legacy.append((legacy, backup))
 
         for _, entry in entries:
             target = sd_root / ext_relative(str(entry["target"]))
@@ -217,9 +221,7 @@ def apply_packages(
         os.replace(state_tmp, state_path)
         package_state_path = metadata_root / PACKAGE_STATE_FILE
         package_state_tmp = package_state_path.with_suffix(".tmp")
-        cleanup_candidates = 0
-        if groups is None or "arf" in selected_groups:
-            cleanup_candidates = len(manifest.get("cleanup", []))
+        cleanup_candidates = cleanup_selected
         package_state_tmp.write_text(
             package_state_text(
                 manifest,

@@ -76,7 +76,7 @@ class ArfSubGhzFullTest(unittest.TestCase):
             loader_menu,
         )
         self.assertIn(
-            '#define MODULE_ONE_COCKPIT_APP_PATH EXT_PATH("apps/Module One/module_one_cockpit.fap")',
+            '#define MODULE_ONE_COCKPIT_APP_PATH EXT_PATH("apps/Module One/Diagnostics/cockpit.fap")',
             loader_menu,
         )
         self.assertIn('#define ARF_TOOLS_MENU_NAME "Cockpit"', loader_menu)

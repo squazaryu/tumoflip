@@ -103,11 +103,11 @@ class PackageReleaseTest(unittest.TestCase):
             extapp_wifi = build / ".extapps/wifi_mapper.fap"
             old_ir_lab = resources / "apps/Module One/IR Blaster/tumo_ir_lab.fap"
             extapp_ir_lab = build / ".extapps/tumo_ir_lab.fap"
-            old_cockpit = resources / "apps/Module One/module_one_cockpit.fap"
+            old_cockpit = resources / "apps/Module One/Diagnostics/cockpit.fap"
             extapp_cockpit = build / ".extapps/module_one_cockpit.fap"
-            old_acceptance = resources / "apps/Module One/tumo_acceptance_suite.fap"
+            old_acceptance = resources / "apps/Module One/Diagnostics/tumo_acceptance_suite.fap"
             extapp_acceptance = build / ".extapps/tumo_acceptance_suite.fap"
-            old_sensor_logger = resources / "apps/Module One/module_one_sensor_logger.fap"
+            old_sensor_logger = resources / "apps/Module One/Sensors BME280/module_one_sensor_logger.fap"
             extapp_sensor_logger = build / ".extapps/module_one_sensor_logger.fap"
             old_ble_gatt_lab = resources / "apps/Module One/BLE/ble_gatt_lab.fap"
             extapp_ble_gatt_lab = build / ".extapps/ble_gatt_lab.fap"
@@ -158,12 +158,16 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(wifi_entry["sha256"], sha256(extapp_wifi))
             ir_lab_entry = module_entries["apps/Module One/IR Blaster/tumo_ir_lab.fap"]
             self.assertEqual(ir_lab_entry["sha256"], sha256(extapp_ir_lab))
-            cockpit_entry = module_entries["apps/Module One/module_one_cockpit.fap"]
+            cockpit_entry = module_entries[
+                "apps/Module One/Diagnostics/cockpit.fap"
+            ]
             self.assertEqual(cockpit_entry["sha256"], sha256(extapp_cockpit))
-            acceptance_entry = module_entries["apps/Module One/tumo_acceptance_suite.fap"]
+            acceptance_entry = module_entries[
+                "apps/Module One/Diagnostics/tumo_acceptance_suite.fap"
+            ]
             self.assertEqual(acceptance_entry["sha256"], sha256(extapp_acceptance))
             sensor_logger_entry = module_entries[
-                "apps/Module One/module_one_sensor_logger.fap"
+                "apps/Module One/Sensors BME280/module_one_sensor_logger.fap"
             ]
             self.assertEqual(sensor_logger_entry["sha256"], sha256(extapp_sensor_logger))
             ble_gatt_lab_entry = module_entries["apps/Module One/BLE/ble_gatt_lab.fap"]
@@ -175,6 +179,30 @@ class PackageReleaseTest(unittest.TestCase):
                 module_entries,
             )
             self.assertEqual(manifest["artifacts"], {})
+            self.assertIn(
+                {
+                    "group": "module_one",
+                    "legacy": "/ext/apps/Module One/module_one_cockpit.fap",
+                    "canonical": "/ext/apps/Module One/Diagnostics/cockpit.fap",
+                },
+                manifest["cleanup"],
+            )
+            self.assertIn(
+                {
+                    "group": "module_one",
+                    "legacy": "/ext/apps/Module One/tumo_acceptance_suite.fap",
+                    "canonical": "/ext/apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
+                },
+                manifest["cleanup"],
+            )
+            self.assertIn(
+                {
+                    "group": "module_one",
+                    "legacy": "/ext/apps/Module One/module_one_sensor_logger.fap",
+                    "canonical": "/ext/apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
+                },
+                manifest["cleanup"],
+            )
 
             manifest_path = (
                 repo
@@ -191,15 +219,15 @@ class PackageReleaseTest(unittest.TestCase):
                     archive.namelist(),
                 )
                 self.assertIn(
-                    "apps/Module One/module_one_cockpit.fap",
+                    "apps/Module One/Diagnostics/cockpit.fap",
                     archive.namelist(),
                 )
                 self.assertIn(
-                    "apps/Module One/tumo_acceptance_suite.fap",
+                    "apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
                     archive.namelist(),
                 )
                 self.assertIn(
-                    "apps/Module One/module_one_sensor_logger.fap",
+                    "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
                     archive.namelist(),
                 )
                 self.assertIn(
@@ -219,15 +247,15 @@ class PackageReleaseTest(unittest.TestCase):
                     b"tumo ir lab fix",
                 )
                 self.assertEqual(
-                    archive.read("apps/Module One/module_one_cockpit.fap"),
+                    archive.read("apps/Module One/Diagnostics/cockpit.fap"),
                     b"module one cockpit",
                 )
                 self.assertEqual(
-                    archive.read("apps/Module One/tumo_acceptance_suite.fap"),
+                    archive.read("apps/Module One/Diagnostics/tumo_acceptance_suite.fap"),
                     b"acceptance suite",
                 )
                 self.assertEqual(
-                    archive.read("apps/Module One/module_one_sensor_logger.fap"),
+                    archive.read("apps/Module One/Sensors BME280/module_one_sensor_logger.fap"),
                     b"sensor logger",
                 )
                 self.assertEqual(
@@ -278,6 +306,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertNotIn("/ext/apps/ARF Tools/rolljam_standalone.fap", arf_entries)
             self.assertIn(
                 {
+                    "group": "arf",
                     "legacy": "/ext/apps/ARF Tools/rolljam_standalone.fap",
                     "canonical": "/ext/apps_data/arf_subghz_full/modules/rolljam.fap",
                 },
@@ -310,6 +339,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertNotIn("/ext/apps/ARF Tools/ble_killer.fap", arf_entries)
             self.assertIn(
                 {
+                    "group": "arf",
                     "legacy": "/ext/apps/ARF Tools/ble_killer.fap",
                     "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
                 },

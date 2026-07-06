@@ -85,9 +85,9 @@ ARF_EXTAPP_TARGETS = {
 }
 STATIC_SD_RESOURCES = Path("tools/tumoflip/sd_resources")
 MODULE_ONE_PACKAGE_FILES = (
-    "apps/Module One/module_one_cockpit.fap",
-    "apps/Module One/tumo_acceptance_suite.fap",
-    "apps/Module One/module_one_sensor_logger.fap",
+    "apps/Module One/Diagnostics/cockpit.fap",
+    "apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
+    "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
     "apps/Module One/BLE/ble_gatt_lab.fap",
     "apps/Module One/Macros/tumo_macro_deck.fap",
     "apps/Module One/IR Blaster/tumo_ir_lab.fap",
@@ -125,6 +125,18 @@ ARF_LEGACY_PATHS = {
     "/ext/apps/ARF Tools/arf_subghz.fap": "/ext/apps/ARF Tools/arf_subghz_full.fap",
     "/ext/apps/ARF Tools/rolljam_standalone.fap": ARF_MODULE_PATHS["rolljam"],
     "/ext/apps/ARF Tools/ble_killer.fap": ARF_VISIBLE_PATHS["arf_subghz_full"],
+}
+MODULE_ONE_LEGACY_PATHS = {
+    "/ext/apps/Module One/module_one_cockpit.fap":
+        "/ext/apps/Module One/Diagnostics/cockpit.fap",
+    "/ext/apps/Module One/tumo_acceptance_suite.fap":
+        "/ext/apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
+    "/ext/apps/Module One/module_one_sensor_logger.fap":
+        "/ext/apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
+}
+RELEASE_CLEANUP_PATHS = {
+    **ARF_LEGACY_PATHS,
+    **MODULE_ONE_LEGACY_PATHS,
 }
 RUNTIME_CAPABILITIES_MAX_BYTES = 160
 RUNTIME_REQUIRED_CAPABILITIES = {
@@ -172,8 +184,19 @@ def resource_path_from_ext_target(path: str) -> str:
     return path.removeprefix("/ext/")
 
 
+def release_cleanup_entries() -> list[dict[str, str]]:
+    return [
+        {"group": "arf", "legacy": legacy, "canonical": canonical}
+        for legacy, canonical in sorted(ARF_LEGACY_PATHS.items())
+    ] + [
+        {"group": "module_one", "legacy": legacy, "canonical": canonical}
+        for legacy, canonical in sorted(MODULE_ONE_LEGACY_PATHS.items())
+    ]
+
+
 def package_extapp_exports() -> dict[str, str]:
     exports = {Path(relative).name: relative for relative in MODULE_ONE_PACKAGE_FILES}
+    exports["module_one_cockpit.fap"] = "apps/Module One/Diagnostics/cockpit.fap"
     exports.update(
         {
             source_filename: resource_path_from_ext_target(target)
@@ -378,7 +401,7 @@ def sync_extapp_package_exports(build_dir: Path, resources: Path) -> list[dict[s
 
 
 def prune_legacy_resource_exports(resources: Path) -> None:
-    for legacy, canonical in ARF_LEGACY_PATHS.items():
+    for legacy, canonical in RELEASE_CLEANUP_PATHS.items():
         if legacy == canonical:
             continue
         legacy_relative = resource_path_from_ext_target(legacy)
@@ -554,10 +577,7 @@ def validate_release(
             for path in sorted(referenced.values())
         },
         "packages": packages,
-        "cleanup": [
-            {"legacy": legacy, "canonical": canonical}
-            for legacy, canonical in sorted(ARF_LEGACY_PATHS.items())
-        ],
+        "cleanup": release_cleanup_entries(),
     }
     manifest["release_id"] = manifest_release_id(manifest)
     if write_manifest:
