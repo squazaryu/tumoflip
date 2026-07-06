@@ -365,6 +365,36 @@ class PackageReleaseTest(unittest.TestCase):
                 manifest["cleanup"],
             )
 
+    def test_package_only_release_removes_module_one_frequency_analyzer_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo, build, resources = prepare_package_tree(Path(directory))
+            stale_visible = resources / "apps/Module One/Sub-GHz/freq_analyzer_ext.fap"
+            write_file(stale_visible, b"old module one analyzer")
+
+            manifest = build_package_release(
+                repo,
+                build,
+                repo / "dist/f7-C/f7-update-tmwhflpprarf089-031",
+                package_id="remove-module-one-analyzer",
+                target_release_tag="v0.3.1",
+            )
+
+            self.assertFalse(stale_visible.exists())
+            arf_entries = {entry["target"]: entry for entry in manifest["packages"]["arf"]}
+            self.assertIn("/ext/apps/ARF Tools/arf_frequency_analyzer.fap", arf_entries)
+            self.assertNotIn(
+                "/ext/apps/Module One/Sub-GHz/freq_analyzer_ext.fap",
+                arf_entries,
+            )
+            self.assertIn(
+                {
+                    "group": "arf",
+                    "legacy": "/ext/apps/Module One/Sub-GHz/freq_analyzer_ext.fap",
+                    "canonical": "/ext/apps/ARF Tools/arf_frequency_analyzer.fap",
+                },
+                manifest["cleanup"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

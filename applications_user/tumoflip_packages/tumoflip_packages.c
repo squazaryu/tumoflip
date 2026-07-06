@@ -43,6 +43,8 @@ static const TumoLegacyPath tumo_legacy_paths[] = {
      "/ext/apps_data/arf_subghz_full/modules/arf_counter_bf.fap"},
     {"/ext/apps/ARF Tools/ARF Frequency Analyzer.fap",
      "/ext/apps/ARF Tools/arf_frequency_analyzer.fap"},
+    {"/ext/apps/Module One/Sub-GHz/freq_analyzer_ext.fap",
+     "/ext/apps/ARF Tools/arf_frequency_analyzer.fap"},
     {"/ext/apps/ARF Tools/ARF KeeLoq.fap",
      "/ext/apps_data/arf_subghz_full/modules/arf_keeloq.fap"},
     {"/ext/apps/ARF Tools/ARF PSA Decrypt.fap",

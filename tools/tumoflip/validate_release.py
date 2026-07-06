@@ -115,6 +115,9 @@ ARF_LEGACY_PATHS = {
     "/ext/apps/ARF Tools/ARF Frequency Analyzer.fap": ARF_VISIBLE_PATHS[
         "arf_frequency_analyzer"
     ],
+    "/ext/apps/Module One/Sub-GHz/freq_analyzer_ext.fap": ARF_VISIBLE_PATHS[
+        "arf_frequency_analyzer"
+    ],
     f"{ARF_MODULE_ROOT}/arf_frequency_analyzer.fap": ARF_VISIBLE_PATHS[
         "arf_frequency_analyzer"
     ],
@@ -378,6 +381,7 @@ def install_static_sd_resources(repo_root: Path, resources: Path) -> None:
 def sync_extapp_package_exports(build_dir: Path, resources: Path) -> list[dict[str, object]]:
     extapps = build_dir / ".extapps"
     if not extapps.is_dir():
+        prune_legacy_resource_exports(resources)
         return []
 
     synced: list[dict[str, object]] = []
