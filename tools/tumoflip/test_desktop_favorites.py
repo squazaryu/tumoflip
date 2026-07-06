@@ -18,6 +18,8 @@ class DesktopFavoritesTest(unittest.TestCase):
         self.assertIn('#define ARF_TOOLS_FOLDER_PATH  EXT_PATH("apps/ARF Tools")', source)
         self.assertIn('.extension = ".fap"', source)
         self.assertIn('EXTERNAL_APPLICATION_NAME  ("[Select App]")', source)
+        self.assertIn('#define JS_RUNNER_APP_NAME    "JS Runner"', source)
+        self.assertIn("favorite_fap_is_shortcut_visible(name)", source)
         self.assertNotIn('.extension = ".fap|.js"', source)
 
     def test_desktop_launches_favorite_targets_by_type(self) -> None:

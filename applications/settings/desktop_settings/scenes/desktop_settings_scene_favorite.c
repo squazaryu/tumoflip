@@ -11,6 +11,7 @@
 #define DEFAULT_INDEX         (0)
 #define EXTERNAL_BROWSER_NAME ("Apps Menu (Default)")
 #define PASSPORT_NAME         ("Passport (Default)")
+#define JS_RUNNER_APP_NAME    "JS Runner"
 
 #define NONE_APPLICATION_INDEX (1)
 #define NONE_APPLICATION_NAME  "None (disable)"
@@ -40,6 +41,10 @@ static const char* favorite_fap_get_app_name(size_t i) {
     }
 
     return name;
+}
+
+static bool favorite_fap_is_shortcut_visible(const char* name) {
+    return strcmp(name, JS_RUNNER_APP_NAME);
 }
 
 static bool favorite_fap_selector_item_callback(
@@ -123,6 +128,9 @@ void desktop_settings_scene_favorite_on_enter(void* context) {
 
     for(size_t i = 0; i < APPS_COUNT; i++) {
         const char* name = favorite_fap_get_app_name(i);
+        if(!favorite_fap_is_shortcut_visible(name)) {
+            continue;
+        }
 
         submenu_add_item(
             submenu,
