@@ -15,6 +15,9 @@ class JsRunnerPackagingTest(unittest.TestCase):
         self.desktop = (
             REPO_ROOT / "applications/services/desktop/scenes/desktop_scene_main.c"
         ).read_text(encoding="utf-8")
+        self.loader_menu = (
+            REPO_ROOT / "applications/services/loader/loader_menu.c"
+        ).read_text(encoding="utf-8")
         self.archive = (
             REPO_ROOT / "applications/main/archive/scenes/archive_scene_browser.c"
         ).read_text(encoding="utf-8")
@@ -33,6 +36,13 @@ class JsRunnerPackagingTest(unittest.TestCase):
 
     def test_desktop_favorites_do_not_target_js_runner(self) -> None:
         self.assertNotIn('"JS Runner"', self.desktop)
+
+    def test_desktop_ok_menu_hides_js_runner(self) -> None:
+        self.assertIn('#define JS_RUNNER_MENU_NAME "JS Runner"', self.loader_menu)
+        self.assertIn(
+            "strcmp(FLIPPER_EXTERNAL_APPS[i].name, JS_RUNNER_MENU_NAME) == 0",
+            self.loader_menu,
+        )
 
 
 if __name__ == "__main__":

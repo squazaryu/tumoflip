@@ -15,6 +15,7 @@
 #define MODULE_ONE_MENU_NAME "8/1"
 #define MODULE_ONE_APPS_PATH EXT_PATH("apps/Module One")
 #define ARF_TOOLS_MENU_NAME "Cockpit"
+#define JS_RUNNER_MENU_NAME "JS Runner"
 #define ARF_SUBGHZ_FULL_APP_PATH EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")
 #define MODULE_ONE_COCKPIT_APP_PATH EXT_PATH("apps/Module One/Diagnostics/cockpit.fap")
 
@@ -166,6 +167,10 @@ static void loader_menu_build_menu(LoaderMenuApp* app, LoaderMenu* menu) {
 
     for(i = 0; i < FLIPPER_EXTERNAL_APPS_COUNT; i++) {
         if(strcmp(FLIPPER_EXTERNAL_APPS[i].name, "Clock") == 0) {
+            continue;
+        }
+
+        if(strcmp(FLIPPER_EXTERNAL_APPS[i].name, JS_RUNNER_MENU_NAME) == 0) {
             continue;
         }
 
