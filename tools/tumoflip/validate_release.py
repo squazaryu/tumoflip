@@ -84,26 +84,6 @@ ARF_EXTAPP_TARGETS = {
     },
 }
 STATIC_SD_RESOURCES = Path("tools/tumoflip/sd_resources")
-STOCK_SUBGHZ_FAP = "apps/Sub-GHz/subghz.fap"
-STOCK_SUBGHZ_ASSET_FILES = (
-    "subghz/assets/alutech_at_4n",
-    "subghz/assets/dangerous_settings",
-    "subghz/assets/keeloq_mfcodes",
-    "subghz/assets/keeloq_mfcodes_user.example",
-    "subghz/assets/nice_flor_s",
-    "subghz/assets/setting_user.example",
-    "subghz/assets/vag",
-)
-BASE_PACKAGE_FILES = (
-    "apps/Bluetooth/flipper_companion.fap",
-    "apps/Tools/ai_dashboard.fap",
-    "apps/Tools/flipper_relay.fap",
-    "apps/Tools/quac.fap",
-    "apps/Tools/tumoflip_packages.fap",
-    "apps/Tools/totp.fap",
-    STOCK_SUBGHZ_FAP,
-    *STOCK_SUBGHZ_ASSET_FILES,
-)
 MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Diagnostics/cockpit.fap",
     "apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
@@ -217,7 +197,6 @@ def release_cleanup_entries() -> list[dict[str, str]]:
 def package_extapp_exports() -> dict[str, str]:
     exports = {Path(relative).name: relative for relative in MODULE_ONE_PACKAGE_FILES}
     exports["module_one_cockpit.fap"] = "apps/Module One/Diagnostics/cockpit.fap"
-    exports["subghz.fap"] = STOCK_SUBGHZ_FAP
     exports.update(
         {
             source_filename: resource_path_from_ext_target(target)
@@ -436,7 +415,14 @@ def prune_legacy_resource_exports(resources: Path) -> None:
 
 def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
     groups: dict[str, list[Path]] = {
-        "base": [resources / relative for relative in BASE_PACKAGE_FILES],
+        "base": [
+            resources / "apps/Bluetooth/flipper_companion.fap",
+            resources / "apps/Tools/ai_dashboard.fap",
+            resources / "apps/Tools/flipper_relay.fap",
+            resources / "apps/Tools/quac.fap",
+            resources / "apps/Tools/tumoflip_packages.fap",
+            resources / "apps/Tools/totp.fap",
+        ],
         "module_one": [
             resources / relative
             for relative in (*MODULE_ONE_PACKAGE_FILES, *MODULE_ONE_PACKAGE_DATA_FILES)
@@ -474,10 +460,6 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
 
 
 def validate_layout(resources: Path) -> None:
-    require_file(resources / STOCK_SUBGHZ_FAP, "stock Sub-GHz external FAP")
-    for relative in STOCK_SUBGHZ_ASSET_FILES:
-        require_file(resources / relative, f"stock Sub-GHz resource {relative}")
-
     protocol_dir = resources / "apps_data/subghz/plugins"
     actual_protocols = {path.name for path in protocol_dir.glob("protocol_*.fal")}
     if actual_protocols != PROTOCOL_PACKS:

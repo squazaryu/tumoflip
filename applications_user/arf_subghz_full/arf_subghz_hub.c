@@ -9,7 +9,6 @@
 
 #define ARF_TOOLS_PATH   EXT_PATH("apps/ARF Tools/")
 #define ARF_MODULES_PATH EXT_PATH("apps_data/arf_subghz_full/modules/")
-#define STANDARD_SUBGHZ_PATH EXT_PATH("apps/Sub-GHz/subghz.fap")
 
 typedef struct {
     Gui* gui;
@@ -25,7 +24,7 @@ typedef struct {
 } ArfSubGhzHubItem;
 
 static const ArfSubGhzHubItem arf_subghz_hub_items[] = {
-    {.label = "Standard Sub-GHz", .target = STANDARD_SUBGHZ_PATH},
+    {.label = "Standard Sub-GHz", .target = "Sub-GHz"},
     {.label = "Frequency Analyzer", .target = ARF_TOOLS_PATH "arf_frequency_analyzer.fap"},
     {.label = "ARF KeeLoq", .target = ARF_MODULES_PATH "arf_keeloq.fap"},
     {.label = "ARF Counter BF", .target = ARF_MODULES_PATH "arf_counter_bf.fap"},

@@ -10,7 +10,6 @@
 
 #define SCENE_STATE_DEFAULT      (0)
 #define SCENE_STATE_NEED_REFRESH (1)
-#define ARCHIVE_SUBGHZ_APP_PATH EXT_PATH("apps/Sub-GHz/subghz.fap")
 
 static const char* archive_get_flipper_app_name(ArchiveFileTypeEnum file_type) {
     switch(file_type) {
@@ -19,7 +18,7 @@ static const char* archive_get_flipper_app_name(ArchiveFileTypeEnum file_type) {
     case ArchiveFileTypeNFC:
         return "NFC";
     case ArchiveFileTypeSubGhz:
-        return ARCHIVE_SUBGHZ_APP_PATH;
+        return "Sub-GHz";
     case ArchiveFileTypeSubGhzRemote:
         return "Sub-GHz Remote";
     case ArchiveFileTypeLFRFID:

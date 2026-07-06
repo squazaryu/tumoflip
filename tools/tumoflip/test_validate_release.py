@@ -10,13 +10,10 @@ from pathlib import Path
 try:
     from .validate_release import (
         ARF_VISIBLE_APP_IDS,
-        BASE_PACKAGE_FILES,
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
-        STOCK_SUBGHZ_ASSET_FILES,
-        STOCK_SUBGHZ_FAP,
         crc32,
         find_objdump,
         little_endian_hex,
@@ -28,13 +25,10 @@ try:
 except ImportError:
     from validate_release import (
         ARF_VISIBLE_APP_IDS,
-        BASE_PACKAGE_FILES,
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
-        STOCK_SUBGHZ_ASSET_FILES,
-        STOCK_SUBGHZ_FAP,
         crc32,
         find_objdump,
         little_endian_hex,
@@ -162,13 +156,6 @@ class ValidateReleaseTest(unittest.TestCase):
             / "apps_data/tumo_macro_deck/macros/safe_demo.tmacro"
         )
         self.assertTrue(sample.is_file(), str(sample))
-
-    def test_stock_subghz_external_fap_is_packaged_with_shared_assets(self) -> None:
-        self.assertEqual(STOCK_SUBGHZ_FAP, "apps/Sub-GHz/subghz.fap")
-        self.assertIn(STOCK_SUBGHZ_FAP, BASE_PACKAGE_FILES)
-        self.assertIn("subghz/assets/keeloq_mfcodes", STOCK_SUBGHZ_ASSET_FILES)
-        for relative in STOCK_SUBGHZ_ASSET_FILES:
-            self.assertIn(relative, BASE_PACKAGE_FILES)
 
     def test_runtime_contract_is_validated_for_release(self) -> None:
         capabilities = runtime_capabilities(REPO_ROOT)

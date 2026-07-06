@@ -1,19 +1,19 @@
 # Sub-GHz Architecture
 
-Tumoflip keeps the stock `Sub-GHz` application as the primary receiver,
-transmitter, saved-file, RAW, radio settings, external CC1101, RPC, and
-file-launch surface, but ships it as an SD `.fap` instead of embedding the full
-UI in C1 firmware flash. This recovers firmware/C2 headroom while preserving
-the standard Sub-GHz behavior behind the ARF hub.
+Tumoflip keeps the system `Sub-GHz` application in firmware as the primary
+receiver, transmitter, saved-file, RAW, radio settings, external CC1101, RPC,
+and file-launch surface.
 
-This is intentionally different from the removed `arf_subghz_standard.fap`
-experiment. There is still only one stock Sub-GHz implementation; it lives at
-`/ext/apps/Sub-GHz/subghz.fap`. `arf_subghz_standard.fap` must not be
-reintroduced as a second copy.
+This is intentional. Hardware testing showed that rebuilding the full standard
+Sub-GHz app as an external `.fap` creates a second large Sub-GHz copy and can
+exhaust the Flipper application heap. The failed external backend was removed;
+`arf_subghz_standard.fap` must not be reintroduced as a release module unless
+Sub-GHz is first split into a smaller service/client architecture and validated
+on hardware.
 
 The supported extension model is:
 
-- stock Sub-GHz as `/ext/apps/Sub-GHz/subghz.fap` for normal workflows;
+- core Sub-GHz in firmware for normal workflows;
 - `.fal` Protocol Packs under `/ext/apps_data/subghz/plugins` for optional
   decoders;
 - isolated ARF utilities as separate `.fap` processes under
@@ -24,13 +24,13 @@ Desktop uses Tumoflip shortcuts on top of the same runtime boundary:
 
 - `Sub-GHz` opens `ARF Sub-GHz Full`, the Tumoflip Sub-GHz hub;
 - `ARF Tools` opens `Module One Cockpit`;
-- `Standard Sub-GHz` inside `ARF Sub-GHz Full` opens
-  `/ext/apps/Sub-GHz/subghz.fap`;
+- `Standard Sub-GHz` inside `ARF Sub-GHz Full` opens the core firmware app;
 - the ARF tools folder remains available under Apps.
 
 Release validation and unit tests enforce this layout by rejecting stale
-`arf_subghz_standard.fap` package entries and by checking that the hub routes to
-the single stock Sub-GHz FAP instead of shipping a second standard Sub-GHz copy.
+`arf_subghz_standard.fap` package entries and by checking that the hub keeps
+standard Sub-GHz as a launch target instead of shipping a second standard
+Sub-GHz copy.
 
 The ARF FAPs still share some source files with the core Sub-GHz app. Files
 listed in `tools/tumoflip/subghz_drift_manifest.txt` are expected to remain

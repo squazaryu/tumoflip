@@ -44,14 +44,7 @@ class ArfSubGhzFullTest(unittest.TestCase):
                 "subghz_bruteforcer.fap",
             },
         )
-        self.assertIn(
-            '#define STANDARD_SUBGHZ_PATH EXT_PATH("apps/Sub-GHz/subghz.fap")',
-            start_scene,
-        )
-        self.assertIn(
-            '{.label = "Standard Sub-GHz", .target = STANDARD_SUBGHZ_PATH}',
-            start_scene,
-        )
+        self.assertIn('.target = "Sub-GHz"', start_scene)
         self.assertNotIn("#define ARF_STANDARD_PATH", start_scene)
         self.assertNotIn("arf_subghz_standard.fap", start_scene)
         self.assertNotIn('appid="arf_subghz_standard"', app_manifests)
@@ -74,36 +67,6 @@ class ArfSubGhzFullTest(unittest.TestCase):
     def test_legacy_duplicate_is_removed(self) -> None:
         self.assertFalse((REPO_ROOT / "applications_user/arf_subghz").exists())
 
-    def test_stock_subghz_is_externalized_for_flash_budget(self) -> None:
-        manifest = (REPO_ROOT / "applications/main/subghz/application.fam").read_text(
-            encoding="utf-8"
-        )
-        archive = (
-            REPO_ROOT / "applications/main/archive/scenes/archive_scene_browser.c"
-        ).read_text(encoding="utf-8")
-
-        self.assertIn('appid="subghz"', manifest)
-        self.assertIn("apptype=FlipperAppType.EXTERNAL", manifest)
-        self.assertNotIn("resources=\"resources\"", manifest)
-        self.assertIn(
-            '#define ARCHIVE_SUBGHZ_APP_PATH EXT_PATH("apps/Sub-GHz/subghz.fap")',
-            archive,
-        )
-        self.assertIn("return ARCHIVE_SUBGHZ_APP_PATH", archive)
-
-    def test_stock_subghz_shared_assets_are_kept_in_resource_bundle(self) -> None:
-        firmware_scons = (REPO_ROOT / "firmware.scons").read_text(encoding="utf-8")
-
-        self.assertIn(
-            'fwenv.Dir("#/applications/main/subghz/resources/subghz")',
-            firmware_scons,
-        )
-        self.assertIn("subghz_resources_dir", firmware_scons)
-        self.assertIn(
-            '_EXTRA_DIST=[fwenv["DOLPHIN_EXTERNAL_OUT_DIR"], subghz_resources_dir]',
-            firmware_scons,
-        )
-
     def test_desktop_routes_subghz_to_arf_hub_and_arf_tools_to_cockpit(self) -> None:
         loader_menu = (
             REPO_ROOT / "applications/services/loader/loader_menu.c"
@@ -119,9 +82,9 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertIn('#define ARF_TOOLS_MENU_NAME "Cockpit"', loader_menu)
         self.assertNotIn('#define ARF_TOOLS_MENU_NAME "ARF Tools"', loader_menu)
         self.assertNotIn("loader_menu_arf_tools_callback", loader_menu)
-        self.assertIn("loader_menu_arf_subghz_callback", loader_menu)
-        self.assertIn('"Sub-GHz"', loader_menu)
-        self.assertIn("loader_menu_start(ARF_SUBGHZ_FULL_APP_PATH)", loader_menu)
+        self.assertNotIn("loader_menu_arf_subghz_full_callback", loader_menu)
+        self.assertIn('strcmp(name, "Sub-GHz") == 0', loader_menu)
+        self.assertIn("name = ARF_SUBGHZ_FULL_APP_PATH", loader_menu)
         self.assertIn('strcmp(path, "Sub-GHz Remote") == 0', loader_menu)
         self.assertIn("path = MODULE_ONE_COCKPIT_APP_PATH", loader_menu)
         self.assertNotIn("loader_menu_esp32_marauder_callback", loader_menu)
