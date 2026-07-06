@@ -11,7 +11,6 @@
 #include "desktop_scene.h"
 
 #define TAG "DesktopSrv"
-#define JS_RUNNER_APP "JS Runner"
 
 static void desktop_scene_main_new_idle_animation_callback(void* context) {
     furi_assert(context);
@@ -83,9 +82,7 @@ static bool desktop_scene_main_is_apps_folder_target(const char* path) {
 }
 
 static void desktop_scene_main_launch_target(Desktop* desktop, const char* target) {
-    if(desktop_scene_main_path_ends_with(target, ".js")) {
-        loader_start_detached_with_gui_error(desktop->loader, JS_RUNNER_APP, target);
-    } else if(desktop_scene_main_is_apps_folder_target(target)) {
+    if(desktop_scene_main_is_apps_folder_target(target)) {
         loader_start_detached_with_gui_error(desktop->loader, LOADER_APPLICATIONS_NAME, target);
     } else {
         loader_start_detached_with_gui_error(desktop->loader, target, NULL);

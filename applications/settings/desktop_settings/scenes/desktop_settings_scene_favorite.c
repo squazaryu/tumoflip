@@ -5,7 +5,6 @@
 #include <flipper_application/flipper_application.h>
 #include <storage/storage.h>
 #include <dialogs/dialogs.h>
-#include <lib/toolbox/path.h>
 
 #define APPS_COUNT (FLIPPER_APPS_COUNT + FLIPPER_EXTERNAL_APPS_COUNT)
 
@@ -18,7 +17,7 @@
 #define LOCK_APPLICATION_NAME  "Lock Flipper"
 
 #define EXTERNAL_APPLICATION_INDEX (2)
-#define EXTERNAL_APPLICATION_NAME  ("[Select App/Script]")
+#define EXTERNAL_APPLICATION_NAME  ("[Select App]")
 
 #define MODULE_ONE_FOLDER_INDEX (3)
 #define MODULE_ONE_FOLDER_NAME  "8/1 Folder"
@@ -49,17 +48,10 @@ static bool favorite_fap_selector_item_callback(
     uint8_t** icon_ptr,
     FuriString* item_name) {
     UNUSED(context);
-    if(furi_string_end_with(file_path, ".js")) {
-        path_extract_filename(file_path, item_name, false);
-        memcpy(*icon_ptr, icon_get_frame_data(&I_js_script_10px, 0), FAP_MANIFEST_MAX_ICON_SIZE);
-        return true;
-    } else {
-        Storage* storage = furi_record_open(RECORD_STORAGE);
-        bool success =
-            flipper_application_load_name_and_icon(file_path, storage, icon_ptr, item_name);
-        furi_record_close(RECORD_STORAGE);
-        return success;
-    }
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    bool success = flipper_application_load_name_and_icon(file_path, storage, icon_ptr, item_name);
+    furi_record_close(RECORD_STORAGE);
+    return success;
 }
 
 static bool favorite_target_file_exists(const char* file_path) {
@@ -188,7 +180,7 @@ bool desktop_settings_scene_favorite_on_event(void* context, SceneManagerEvent e
             consumed = true;
         } else if(event.event == EXTERNAL_APPLICATION_INDEX) {
             const DialogsFileBrowserOptions browser_options = {
-                .extension = ".fap|.js",
+                .extension = ".fap",
                 .icon = &I_unknown_10px,
                 .skip_assets = true,
                 .hide_ext = true,

@@ -28,9 +28,11 @@ class JsRunnerPackagingTest(unittest.TestCase):
         self.assertIn('fap_icon="icon.png"', js_app_block)
         self.assertNotIn("provides=[\"js_app_start\"]", js_app_block)
 
-    def test_script_launchers_still_target_js_runner_by_name(self) -> None:
-        for source in (self.desktop, self.archive):
-            self.assertIn('"JS Runner"', source)
+    def test_archive_still_targets_js_runner_by_name(self) -> None:
+        self.assertIn('"JS Runner"', self.archive)
+
+    def test_desktop_favorites_do_not_target_js_runner(self) -> None:
+        self.assertNotIn('"JS Runner"', self.desktop)
 
 
 if __name__ == "__main__":

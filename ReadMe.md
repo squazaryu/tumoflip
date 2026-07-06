@@ -25,12 +25,12 @@ you find a tumoflip-specific issue, report it in this repository:
 ## Current Build
 
 - Base: Unleashed 089 with selected upstream dev updates
-- Firmware version: `t-dev-089-036-045`
+- Firmware version: `t-dev-089-036-046`
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `87.17`
 - Target: Flipper Zero F7
 - Release channel: `dev` development line
-- Release package: `flipper-z-f7-update-t-dev-089-036-045.tgz`
+- Release package: `flipper-z-f7-update-t-dev-089-036-046.tgz`
 
 ## Version Scheme
 
@@ -43,7 +43,7 @@ tmwhflpprarf<unleashed>-<build>
 Development `dev` firmware versions use this format:
 
 ```text
-t-dev-089-036-045
+t-dev-089-036-046
 ```
 
 - `tmwhflpprarf`: tumoflip firmware name shown as the installed firmware
@@ -51,7 +51,7 @@ t-dev-089-036-045
 - `t-dev`: Tumoflip development build prefix for unstable builds.
 - `089`: upstream Unleashed base version.
 - `036`: tumoflip internal build version.
-- `045`: development iteration inside the tumoflip internal build version.
+- `046`: development iteration inside the tumoflip internal build version.
 
 `main` should only receive builds that are stable enough to publish as tagged
 releases. Active firmware work lands on `dev` first. When the Unleashed base
@@ -76,7 +76,7 @@ The four-page post-update splash screen is generated automatically from
 ## tumoflip Changes
 
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
-  `t-dev-089-036-045`.
+  `t-dev-089-036-046`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.
 - Replaced the Desktop OK menu `Sub-GHz Remote` shortcut with the `ARF Tools`
@@ -156,7 +156,7 @@ identity.
 
 | Area | Unleashed | tumoflip |
 | --- | --- | --- |
-| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: t-dev-089-036-045` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: t-dev-089-036-046` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
@@ -169,7 +169,7 @@ identity.
 | Sub-GHz hopping | Frequency hopping only. | Adds preset and combined hopping plus an adaptive scan dwell, signal hold, post-signal grace period, and bounded hold time to system Sub-GHz. |
 | NFC additions | Uses the Unleashed 089 NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK and adds the Bambu Lab filament spool parser. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `t-dev-089-036-045` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `t-dev-089-036-046` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -354,7 +354,7 @@ Stable `main` update packages are published on
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases). Development
 `dev` packages use the current build artifact name:
 
-- `flipper-z-f7-update-t-dev-089-036-045.tgz`
+- `flipper-z-f7-update-t-dev-089-036-046.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -376,7 +376,7 @@ python3 tools/tumoflip/validate_release.py --write-manifest
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-t-dev-089-036-045.tgz
+dist/f7-C/flipper-z-f7-update-t-dev-089-036-046.tgz
 ```
 
 ## Upstream
