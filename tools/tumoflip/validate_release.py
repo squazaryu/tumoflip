@@ -416,13 +416,15 @@ def prune_legacy_resource_exports(resources: Path) -> None:
 def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
     groups: dict[str, list[Path]] = {
         "base": [
+            resources / "apps/Scripts/js_app.fap",
             resources / "apps/Bluetooth/flipper_companion.fap",
             resources / "apps/Tools/ai_dashboard.fap",
             resources / "apps/Tools/flipper_relay.fap",
             resources / "apps/Tools/quac.fap",
             resources / "apps/Tools/tumoflip_packages.fap",
             resources / "apps/Tools/totp.fap",
-        ],
+        ]
+        + sorted((resources / "apps_data/js_app/plugins").glob("*.fal")),
         "module_one": [
             resources / relative
             for relative in (*MODULE_ONE_PACKAGE_FILES, *MODULE_ONE_PACKAGE_DATA_FILES)

@@ -109,9 +109,9 @@ are legally allowed to test.
 - Stop hopping, leave Sub-GHz, reopen it, and confirm normal RX still works.
 - Launch `Sub-GHz Remote`, start/stop a known safe saved remote, exit, and
   confirm core `Sub-GHz` can still receive afterward.
-- Launch JS Runner `Scripts/js_examples/subghz.js` with transmit disabled or a
-  known safe owned signal, exit, and confirm core `Sub-GHz` can still receive
-  afterward.
+- Launch Apps -> Scripts -> JS Runner, then run `Scripts/js_examples/subghz.js`
+  with transmit disabled or a known safe owned signal. Exit and confirm core
+  `Sub-GHz` can still receive afterward.
 
 ### ARF Tools
 
