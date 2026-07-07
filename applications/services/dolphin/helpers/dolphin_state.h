@@ -5,6 +5,8 @@
 
 #include "dolphin_deed.h"
 
+#define DOLPHIN_LEVEL_MAX 100U
+
 #ifdef __cplusplus
 extern "C" {
 #endif

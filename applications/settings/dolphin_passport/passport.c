@@ -7,18 +7,18 @@
 
 #include <assets_icons.h>
 
-#define MOODS_TOTAL  3
-#define BUTTHURT_MAX 3
+#define MOODS_TOTAL           3
+#define PORTRAIT_LEVELS_TOTAL 3
 
-static const Icon* const portrait_happy[BUTTHURT_MAX] = {
+static const Icon* const portrait_happy[PORTRAIT_LEVELS_TOTAL] = {
     &I_passport_happy1_46x49,
     &I_passport_happy2_46x49,
     &I_passport_happy3_46x49};
-static const Icon* const portrait_ok[BUTTHURT_MAX] = {
+static const Icon* const portrait_ok[PORTRAIT_LEVELS_TOTAL] = {
     &I_passport_okay1_46x49,
     &I_passport_okay2_46x49,
     &I_passport_okay3_46x49};
-static const Icon* const portrait_bad[BUTTHURT_MAX] = {
+static const Icon* const portrait_bad[PORTRAIT_LEVELS_TOTAL] = {
     &I_passport_bad1_46x49,
     &I_passport_bad2_46x49,
     &I_passport_bad3_46x49};
@@ -55,9 +55,9 @@ static void render_callback(Canvas* canvas, void* ctx) {
     uint32_t xp_to_levelup = dolphin_state_xp_to_levelup(stats->icounter);
     uint32_t xp_for_current_level =
         xp_to_levelup + dolphin_state_xp_above_last_levelup(stats->icounter);
-    if(stats->level == 3) {
+    if(stats->level >= DOLPHIN_LEVEL_MAX) {
         xp_progress = 0;
-    } else {
+    } else if(xp_for_current_level) {
         xp_progress = xp_to_levelup * 64 / xp_for_current_level;
     }
 
@@ -69,14 +69,15 @@ static void render_callback(Canvas* canvas, void* ctx) {
     canvas_draw_dot(canvas, 126, 1);
 
     // portrait
-    furi_assert((stats->level > 0) && (stats->level <= 3));
-    canvas_draw_icon(canvas, 9, 5, portraits[mood][stats->level - 1]);
+    furi_assert((stats->level > 0) && (stats->level <= DOLPHIN_LEVEL_MAX));
+    const uint8_t portrait_level = MIN(stats->level, (uint8_t)PORTRAIT_LEVELS_TOTAL);
+    canvas_draw_icon(canvas, 9, 5, portraits[mood][portrait_level - 1]);
     canvas_draw_line(canvas, 58, 16, 123, 16);
     canvas_draw_line(canvas, 58, 30, 123, 30);
     canvas_draw_line(canvas, 58, 44, 123, 44);
 
     const char* my_name = furi_hal_version_get_name_ptr();
-    snprintf(level_str, 20, "Level: %hu", stats->level);
+    snprintf(level_str, sizeof(level_str), "Level: %hu", stats->level);
     canvas_draw_str(canvas, 58, 12, my_name ? my_name : "Unknown");
     canvas_draw_str(canvas, 58, 26, mood_str);
     canvas_draw_str(canvas, 58, 40, level_str);
