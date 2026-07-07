@@ -146,6 +146,9 @@ are legally allowed to test.
 - Query Runtime `trace` after several commands and confirm the compact
   `schema=1` ring includes recent `r` and `t`/`e` events without exceeding
   one response frame.
+- Open `Apps -> Module One -> Diagnostics -> Runtime Trace`, confirm the
+  Runtime Trace viewer renders the same compact ring, export a report, and
+  verify `/ext/apps_data/runtime_trace_viewer/trace_*.txt` exists.
 - Query Runtime `twin` and confirm Device Twin fields reflect live firmware,
   SD/package, battery, Radio Broker, and App Bridge owner state.
 - Send a small Runtime command and verify a response or explicit error frame.

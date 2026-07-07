@@ -3,6 +3,7 @@
 #include <furi_hal_info.h>
 #include <furi_hal_power.h>
 #include <furi_hal_version.h>
+#include <tumoflip_runtime/tumoflip_runtime.h>
 #include <storage/storage.h>
 #include <subghz_radio_broker/subghz_radio_broker.h>
 #include <stdio.h>
@@ -40,7 +41,9 @@ typedef struct {
     Storage* storage;
     SubGhzRadioBroker* radio_broker;
     FuriMessageQueue* queue;
+    FuriMutex* trace_mutex;
     FuriPubSubSubscription* subscription;
+    TumoflipRuntimeApi api;
     TumoflipRuntimeSession session;
     TumoflipRuntimeTraceEvent trace[TUMOFLIP_RUNTIME_TRACE_DEPTH];
     uint8_t trace_head;
@@ -52,6 +55,10 @@ static void tumoflip_runtime_trace_add(
     char code,
     const char* command,
     bool error);
+static bool tumoflip_runtime_api_get_trace(
+    TumoflipRuntimeApi* api,
+    char* output,
+    size_t output_size);
 
 static void tumoflip_runtime_bridge_callback(const void* message, void* context) {
     TumoflipRuntime* runtime = context;
@@ -87,6 +94,7 @@ static void tumoflip_runtime_trace_add(
     char code,
     const char* command,
     bool error) {
+    furi_check(furi_mutex_acquire(runtime->trace_mutex, FuriWaitForever) == FuriStatusOk);
     TumoflipRuntimeTraceEvent* trace = &runtime->trace[runtime->trace_head];
     trace->code = code;
     trace->command = (command && command[0]) ? command[0] : '-';
@@ -96,21 +104,23 @@ static void tumoflip_runtime_trace_add(
     if(runtime->trace_count < TUMOFLIP_RUNTIME_TRACE_DEPTH) {
         runtime->trace_count++;
     }
+    furi_check(furi_mutex_release(runtime->trace_mutex) == FuriStatusOk);
 }
 
 static void tumoflip_runtime_make_trace_payload(
     TumoflipRuntime* runtime,
     char* payload,
     size_t size) {
+    furi_check(furi_mutex_acquire(runtime->trace_mutex, FuriWaitForever) == FuriStatusOk);
     int written = snprintf(
         payload,
         size,
         "schema=1;depth=%u;count=%u",
         TUMOFLIP_RUNTIME_TRACE_DEPTH,
         runtime->trace_count);
-    if(written < 0) return;
+    if(written < 0) goto out;
     size_t used = (size_t)written;
-    if(used >= size) return;
+    if(used >= size) goto out;
 
     for(uint8_t offset = 0; offset < runtime->trace_count; offset++) {
         const uint8_t index =
@@ -130,6 +140,25 @@ static void tumoflip_runtime_make_trace_payload(
         used += (size_t)written;
         if(used >= size) break;
     }
+
+out:
+    furi_check(furi_mutex_release(runtime->trace_mutex) == FuriStatusOk);
+}
+
+static bool tumoflip_runtime_api_get_trace(
+    TumoflipRuntimeApi* api,
+    char* output,
+    size_t output_size) {
+    furi_assert(api);
+    furi_assert(output);
+    TumoflipRuntime* runtime = api->context;
+    if(!runtime || output_size == 0U) {
+        return false;
+    }
+
+    tumoflip_runtime_make_trace_payload(runtime, output, output_size);
+    output[output_size - 1U] = '\0';
+    return true;
 }
 
 static void
@@ -271,9 +300,13 @@ int32_t tumoflip_runtime_srv(void* context) {
     memset(runtime, 0, sizeof(TumoflipRuntime));
     runtime->queue =
         furi_message_queue_alloc(TUMOFLIP_RUNTIME_QUEUE_DEPTH, sizeof(TumoflipRuntimeMessage));
+    runtime->trace_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
+    runtime->api.get_trace = tumoflip_runtime_api_get_trace;
+    runtime->api.context = runtime;
     runtime->bt = furi_record_open(RECORD_BT);
     runtime->storage = furi_record_open(RECORD_STORAGE);
     runtime->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+    furi_record_create(RECORD_TUMOFLIP_RUNTIME, &runtime->api);
     runtime->subscription = furi_pubsub_subscribe(
         bt_app_bridge_get_pubsub(runtime->bt), tumoflip_runtime_bridge_callback, runtime);
 

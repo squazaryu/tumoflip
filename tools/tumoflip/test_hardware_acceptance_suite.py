@@ -50,6 +50,7 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
     def test_app_checks_key_packaged_paths_without_active_transmit(self) -> None:
         for required in (
             'EXT_PATH("apps/Module One/Diagnostics/cockpit.fap")',
+            'EXT_PATH("apps/Module One/Diagnostics/runtime_trace_viewer.fap")',
             'EXT_PATH("apps/Module One/Sensors BME280/module_one_sensor_logger.fap")',
             'EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap")',
             'EXT_PATH("apps/Module One/Macros/tumo_macro_deck.fap")',
@@ -69,12 +70,21 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
         self.assertIn("storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS)", self.source)
         self.assertIn("storage_file_sync(file)", self.source)
         self.assertIn("System: Acceptance", self.cockpit)
+        self.assertIn("System: Runtime Trace", self.cockpit)
         self.assertIn(
             'EXT_PATH("apps/Module One/Diagnostics/tumo_acceptance_suite.fap")',
             self.cockpit,
         )
         self.assertIn(
+            'EXT_PATH("apps/Module One/Diagnostics/runtime_trace_viewer.fap")',
+            self.cockpit,
+        )
+        self.assertIn(
             '"apps/Module One/Diagnostics/tumo_acceptance_suite.fap"',
+            self.validator,
+        )
+        self.assertIn(
+            '"apps/Module One/Diagnostics/runtime_trace_viewer.fap"',
             self.validator,
         )
 

@@ -25,12 +25,17 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertTrue((APP_DIR / "icon.png").is_file())
         self.assertIn("BLE: GATT Lab", self.source)
         self.assertIn("System: Acceptance", self.source)
+        self.assertIn("System: Runtime Trace", self.source)
         self.assertIn(
             'EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap")',
             self.source,
         )
         self.assertIn(
             'EXT_PATH("apps/Module One/Diagnostics/tumo_acceptance_suite.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/Diagnostics/runtime_trace_viewer.fap")',
             self.source,
         )
 

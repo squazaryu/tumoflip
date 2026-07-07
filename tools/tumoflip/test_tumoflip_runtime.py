@@ -138,16 +138,26 @@ class TumoflipRuntimeTest(unittest.TestCase):
 
         for required in (
             "TumoflipRuntimeTraceEvent trace[TUMOFLIP_RUNTIME_TRACE_DEPTH]",
+            "FuriMutex* trace_mutex",
             "runtime->trace_head",
             "runtime->trace_count",
             "tumoflip_runtime_trace_add(runtime, 'r'",
             "tumoflip_runtime_trace_add(runtime, error ? 'e' : 't'",
             "tumoflip_runtime_trace_add(runtime, 's'",
+            "TumoflipRuntimeApi",
+            "furi_record_create(RECORD_TUMOFLIP_RUNTIME, &runtime->api)",
+            "tumoflip_runtime_api_get_trace",
+            "furi_mutex_acquire(runtime->trace_mutex, FuriWaitForever)",
             "schema=1;depth=%u;count=%u",
             '"|%c,%c,%c"',
         ):
             self.assertIn(required, runtime)
 
+        header = (
+            REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.h"
+        ).read_text(encoding="utf-8")
+        self.assertIn('#define RECORD_TUMOFLIP_RUNTIME "tumoflip_runtime"', header)
+        self.assertIn("bool (*get_trace)", header)
         self.assertIn("`trace` returns `runtime/trace`", bridge_docs)
         self.assertIn("schema=1", bridge_docs)
         self.assertIn("Runtime `trace`", checklist)

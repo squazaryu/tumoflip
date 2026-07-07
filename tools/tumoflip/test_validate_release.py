@@ -118,6 +118,10 @@ class ValidateReleaseTest(unittest.TestCase):
             MODULE_ONE_PACKAGE_FILES,
         )
         self.assertIn(
+            "apps/Module One/Diagnostics/runtime_trace_viewer.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
             "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
             MODULE_ONE_PACKAGE_FILES,
         )

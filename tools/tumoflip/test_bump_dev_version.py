@@ -82,7 +82,7 @@ class BumpDevVersionTest(unittest.TestCase):
     def test_current_dist_suffix_is_dev_version(self) -> None:
         self.assertEqual(
             parse_dist_suffix(fbt_options.DIST_SUFFIX),
-            ("t-dev", "089", "036", "051"),
+            ("t-dev", "089", "036", "052"),
         )
 
 
