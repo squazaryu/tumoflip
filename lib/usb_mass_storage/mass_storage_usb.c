@@ -276,7 +276,10 @@ static void usb_init(usbd_device* dev, FuriHalUsbInterface* intf, void* ctx) {
 
     mass->thread = furi_thread_alloc();
     furi_thread_set_name(mass->thread, "MassStorageUsb");
-    furi_thread_set_stack_size(mass->thread, 1024);
+    // 4 KB, not 1 KB: direct SD block I/O can run synchronously on this thread.
+    // Tumoflip USB SD Mode uses furi_hal_sd_read_blocks/write_blocks directly, and
+    // the retry/init path can overflow a 1 KB stack under host mass-storage traffic.
+    furi_thread_set_stack_size(mass->thread, 4096);
     furi_thread_set_context(mass->thread, ctx);
     furi_thread_set_callback(mass->thread, mass_thread_worker);
     furi_thread_start(mass->thread);
