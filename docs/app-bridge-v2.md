@@ -58,18 +58,20 @@ The system app ID is `runtime`.
   response frame. Long owner names may be shortened in this compact status
   response.
 - `trace` returns `runtime/trace` with compact schema v1 fields:
-  `schema`, `depth`, and `count`, followed by pipe-delimited ring entries.
+  `schema`, `depth`, `count`, and `drop`, followed by pipe-delimited ring entries.
   Each entry is `code,command,result`, where `code` currently uses `r` for
   received commands, `t` for successful responses, `e` for errors, and `s` for
   session ownership. `command` is the first character of the related command
   token.
+  `drop` increments when the bounded ring overwrites older entries.
   The snapshot is bounded to one FAB2 response frame and is intended for
   Companion diagnostics, not full persistent logging. Example:
-  `schema=1;depth=8;count=2|r,s,o|t,s,o`.
+  `schema=1;depth=8;count=2;drop=0|r,s,o|t,s,o`.
 - `twin` returns `runtime/twin` with the compact Device Twin schema v1 for the
   current Flipper state. Fields are `fw` firmware version, `cm` commit, `dy`
   dirty flag, `sd` SD readiness, `pkg` package-state presence, `bat` battery
-  percentage, `rf` Radio Broker state, `ro` radio owner, `sid` App Bridge
+  percentage, `chg` charging state, `otg` OTG power state, `heap` maximum free
+  heap block, `rf` Radio Broker state, `ro` radio owner, `sid` App Bridge
   session ID, and `bo` bridge owner. The payload is read-only and bounded to
   one FAB2 response frame.
 - `transfer_begin`, `transfer_progress`, and `transfer_end` return matching

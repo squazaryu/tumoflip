@@ -186,6 +186,18 @@ RUNTIME_REQUIRED_STATUS_FIELDS = (
     "radio=%hhu",
     "owner=%.4s",
 )
+RUNTIME_REQUIRED_TRACE_FIELDS = (
+    "schema=1;depth=%u;count=%u;drop=%lu",
+    '"|%c,%c,%c"',
+    "runtime->trace_dropped",
+)
+RUNTIME_REQUIRED_TWIN_FIELDS = (
+    "schema=1;fw=%.8s;cm=%.8s;dy=%hhu;sd=%hhu;pkg=%hhu;bat=%u;chg=%hhu;otg=%hhu;",
+    "heap=%lu;rf=%hhu;ro=%.4s;sid=%08lX;bo=%.8s",
+    "furi_hal_power_is_charging()",
+    "furi_hal_power_is_otg_enabled()",
+    "memmgr_heap_get_max_free_block()",
+)
 
 
 class ValidationError(RuntimeError):
@@ -374,6 +386,12 @@ def validate_runtime_contract(repo_root: Path) -> None:
     for required in RUNTIME_REQUIRED_STATUS_FIELDS:
         if required not in runtime:
             raise ValidationError(f"Tumoflip Runtime status field is missing: {required}")
+    for required in RUNTIME_REQUIRED_TRACE_FIELDS:
+        if required not in runtime:
+            raise ValidationError(f"Tumoflip Runtime trace field is missing: {required}")
+    for required in RUNTIME_REQUIRED_TWIN_FIELDS:
+        if required not in runtime:
+            raise ValidationError(f"Tumoflip Runtime twin field is missing: {required}")
     if "storage_sd_status(runtime->storage)" not in runtime:
         raise ValidationError("Tumoflip Runtime status must expose SD readiness")
 

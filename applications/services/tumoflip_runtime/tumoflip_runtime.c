@@ -48,6 +48,7 @@ typedef struct {
     TumoflipRuntimeTraceEvent trace[TUMOFLIP_RUNTIME_TRACE_DEPTH];
     uint8_t trace_head;
     uint8_t trace_count;
+    uint32_t trace_dropped;
     bool transfer_active;
 } TumoflipRuntime;
 
@@ -117,6 +118,8 @@ static void tumoflip_runtime_trace_add(
     runtime->trace_head = (runtime->trace_head + 1U) % TUMOFLIP_RUNTIME_TRACE_DEPTH;
     if(runtime->trace_count < TUMOFLIP_RUNTIME_TRACE_DEPTH) {
         runtime->trace_count++;
+    } else {
+        runtime->trace_dropped++;
     }
     furi_check(furi_mutex_release(runtime->trace_mutex) == FuriStatusOk);
 }
@@ -129,9 +132,10 @@ static void tumoflip_runtime_make_trace_payload(
     int written = snprintf(
         payload,
         size,
-        "schema=1;depth=%u;count=%u",
+        "schema=1;depth=%u;count=%u;drop=%lu",
         TUMOFLIP_RUNTIME_TRACE_DEPTH,
-        runtime->trace_count);
+        runtime->trace_count,
+        (unsigned long)runtime->trace_dropped);
     if(written < 0) goto out;
     size_t used = (size_t)written;
     if(used >= size) goto out;
@@ -223,6 +227,8 @@ static void
         (sd_ready && storage_file_exists(runtime->storage, TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH)) ?
             1U :
             0U;
+    const uint8_t charging = furi_hal_power_is_charging() ? 1U : 0U;
+    const uint8_t otg = furi_hal_power_is_otg_enabled() ? 1U : 0U;
 
     SubGhzRadioBrokerStatusV2 radio_status;
     subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status);
@@ -230,14 +236,17 @@ static void
     snprintf(
         payload,
         size,
-        "schema=1;fw=%.8s;cm=%.8s;dy=%hhu;sd=%hhu;pkg=%hhu;bat=%u;rf=%hhu;"
-        "ro=%.4s;sid=%08lX;bo=%.8s",
+        "schema=1;fw=%.8s;cm=%.8s;dy=%hhu;sd=%hhu;pkg=%hhu;bat=%u;chg=%hhu;otg=%hhu;"
+        "heap=%lu;rf=%hhu;ro=%.4s;sid=%08lX;bo=%.8s",
         tumoflip_runtime_str_or_unknown(version_get_version(version)),
         tumoflip_runtime_str_or_unknown(version_get_githash(version)),
         dirty,
         sd_ready,
         package_state,
         furi_hal_power_get_pct(),
+        charging,
+        otg,
+        (unsigned long)memmgr_heap_get_max_free_block(),
         (uint8_t)radio_status.state,
         radio_status.base.owner,
         (unsigned long)runtime->session.session_id,

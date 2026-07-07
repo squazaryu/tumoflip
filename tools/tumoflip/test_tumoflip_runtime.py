@@ -9,6 +9,28 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class TumoflipRuntimeTest(unittest.TestCase):
+    def test_runtime_command_contract_snapshot(self) -> None:
+        runtime = (
+            REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
+        ).read_text(encoding="utf-8")
+
+        commands = set(re.findall(r'strcmp\(command, "([^"]+)"\) == 0', runtime))
+        self.assertEqual(
+            commands,
+            {
+                "ping",
+                "capabilities",
+                "status",
+                "trace",
+                "twin",
+                "transfer_begin",
+                "transfer_progress",
+                "transfer_end",
+                "hello",
+            },
+        )
+        self.assertIn("feat=pkg,radio,trace,twin,transfer", runtime)
+
     def test_runtime_status_schema_is_documented_and_bounded(self) -> None:
         runtime = (
             REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
@@ -122,14 +144,25 @@ class TumoflipRuntimeTest(unittest.TestCase):
         for required in (
             "tumoflip_runtime_make_twin_payload",
             "furi_hal_power_get_pct()",
+            "furi_hal_power_is_charging()",
+            "furi_hal_power_is_otg_enabled()",
+            "memmgr_heap_get_max_free_block()",
             "subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status)",
-            "schema=1;fw=%.8s;cm=%.8s;dy=%hhu;sd=%hhu;pkg=%hhu;bat=%u;rf=%hhu;",
+            "schema=1;fw=%.8s;cm=%.8s;dy=%hhu;sd=%hhu;pkg=%hhu;bat=%u;chg=%hhu;otg=%hhu;",
+            "heap=%lu;rf=%hhu;ro=%.4s;sid=%08lX;bo=%.8s",
             "ro=%.4s;sid=%08lX;bo=%.8s",
             'tumoflip_runtime_reply(runtime, event->request_id, "twin", payload, false)',
         ):
             self.assertIn(required, runtime)
 
-        self.assertIn("`twin` returns `runtime/twin`", bridge_docs)
+        worst_case_twin = (
+            "schema=1;fw=12345678;cm=12345678;dy=1;sd=1;pkg=1;bat=100;"
+            "chg=1;otg=1;heap=4294967295;rf=255;ro=1234;sid=FFFFFFFF;bo=12345678"
+        )
+        self.assertLessEqual(len(worst_case_twin), 160)
+
+        for field in ("`twin` returns `runtime/twin`", "`chg`", "`otg`", "`heap`"):
+            self.assertIn(field, bridge_docs)
         self.assertIn("Device Twin", bridge_docs)
         self.assertIn("Runtime `twin`", checklist)
 
@@ -147,6 +180,7 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "FuriMutex* trace_mutex",
             "runtime->trace_head",
             "runtime->trace_count",
+            "runtime->trace_dropped",
             "tumoflip_runtime_trace_add(runtime, 'r'",
             "tumoflip_runtime_trace_add(runtime, error ? 'e' : 't'",
             "tumoflip_runtime_trace_add(runtime, 's'",
@@ -154,10 +188,16 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "furi_record_create(RECORD_TUMOFLIP_RUNTIME, &runtime->api)",
             "tumoflip_runtime_api_get_trace",
             "furi_mutex_acquire(runtime->trace_mutex, FuriWaitForever)",
-            "schema=1;depth=%u;count=%u",
+            "schema=1;depth=%u;count=%u;drop=%lu",
             '"|%c,%c,%c"',
         ):
             self.assertIn(required, runtime)
+
+        worst_case_trace = (
+            "schema=1;depth=8;count=8;drop=4294967295"
+            + "|r,s,o" * 8
+        )
+        self.assertLessEqual(len(worst_case_trace), 160)
 
         header = (
             REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.h"
@@ -166,6 +206,7 @@ class TumoflipRuntimeTest(unittest.TestCase):
         self.assertIn("bool (*get_trace)", header)
         self.assertIn("`trace` returns `runtime/trace`", bridge_docs)
         self.assertIn("schema=1", bridge_docs)
+        self.assertIn("`drop`", bridge_docs)
         self.assertIn("Runtime `trace`", checklist)
 
     def test_package_state_presence_is_read_only_and_documented(self) -> None:
