@@ -92,6 +92,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Signals/signal_workbench.fap",
     "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
     "apps/Module One/BLE/ble_gatt_lab.fap",
+    "apps/Module One/BLE/app_bridge_terminal.fap",
     "apps/Module One/Macros/tumo_macro_deck.fap",
     "apps/Module One/Scripts/tumoscript.fap",
     "apps/Module One/IR Blaster/tumo_ir_lab.fap",

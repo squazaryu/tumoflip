@@ -124,6 +124,28 @@ The FAP also emits best-effort `ble_gatt_lab/event` frames when opened and when
 the user presses `OK`. These event frames use request IDs generated locally and
 do not request acknowledgements.
 
+### App Bridge Terminal
+
+`App Bridge Terminal` is a whitelisted Companion-to-FAP command bus for
+interactive App Bridge diagnostics. It is not a shell and does not launch apps
+or execute arbitrary code.
+
+| Field | Value |
+|---|---|
+| App ID | `app_bridge_terminal` |
+| Commands | `hello`, `ping`, `status`, `help`, `echo`, `emit`, `release` |
+| Responses | `hello`, `pong`, `status`, `help`, `echo`, `emit`, `release`, `error` |
+| Flags | Responses set `0x02`; errors set `0x02 | 0x04` |
+| Local log | `/ext/apps_data/app_bridge_terminal/terminal_YYYYMMDD_HHMMSS.csv` |
+
+`hello` opens a bounded session with payload `owner=<token>` and returns
+`schema=1;sid=<hex>;owner=<token>;timeout_ms=30000;commands=...`. Commands that
+change terminal state (`echo`, `emit`, and `release`) require the current
+`sid=<hex>` in their payload. `emit` responds with `app_bridge_terminal/emit`
+payload `ok` and then emits a best-effort `app_bridge_terminal/event` frame
+with payload `schema=1;type=remote;seq=<n>;owner=<token>;text=<text>`. The user
+can also press `OK` on the FAP to emit a `type=manual` event.
+
 ### Tumo Macro Deck events
 
 `Tumo Macro Deck` can emit best-effort App Bridge events from local SD-backed

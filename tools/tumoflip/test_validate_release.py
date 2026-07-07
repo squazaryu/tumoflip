@@ -138,6 +138,10 @@ class ValidateReleaseTest(unittest.TestCase):
             MODULE_ONE_PACKAGE_FILES,
         )
         self.assertIn(
+            "apps/Module One/BLE/app_bridge_terminal.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
             "apps/Module One/Macros/tumo_macro_deck.fap",
             MODULE_ONE_PACKAGE_FILES,
         )

@@ -120,6 +120,8 @@ class PackageReleaseTest(unittest.TestCase):
             extapp_sensor_logger = build / ".extapps/module_one_sensor_logger.fap"
             old_ble_gatt_lab = resources / "apps/Module One/BLE/ble_gatt_lab.fap"
             extapp_ble_gatt_lab = build / ".extapps/ble_gatt_lab.fap"
+            old_app_bridge_terminal = resources / "apps/Module One/BLE/app_bridge_terminal.fap"
+            extapp_app_bridge_terminal = build / ".extapps/app_bridge_terminal.fap"
             old_macro_deck = resources / "apps/Module One/Macros/tumo_macro_deck.fap"
             extapp_macro_deck = build / ".extapps/tumo_macro_deck.fap"
             old_tumoscript = resources / "apps/Module One/Scripts/tumoscript.fap"
@@ -142,6 +144,8 @@ class PackageReleaseTest(unittest.TestCase):
             write_file(extapp_sensor_logger, b"sensor logger")
             old_ble_gatt_lab.write_bytes(b"old ble gatt lab")
             write_file(extapp_ble_gatt_lab, b"ble gatt lab")
+            old_app_bridge_terminal.write_bytes(b"old app bridge terminal")
+            write_file(extapp_app_bridge_terminal, b"app bridge terminal")
             old_macro_deck.write_bytes(b"old macro deck")
             write_file(extapp_macro_deck, b"macro deck")
             old_tumoscript.write_bytes(b"old tumoscript")
@@ -170,6 +174,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(old_signal_workbench.read_bytes(), b"signal workbench")
             self.assertEqual(old_sensor_logger.read_bytes(), b"sensor logger")
             self.assertEqual(old_ble_gatt_lab.read_bytes(), b"ble gatt lab")
+            self.assertEqual(old_app_bridge_terminal.read_bytes(), b"app bridge terminal")
             self.assertEqual(old_macro_deck.read_bytes(), b"macro deck")
             self.assertEqual(old_tumoscript.read_bytes(), b"tumoscript")
 
@@ -213,6 +218,12 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(sensor_logger_entry["sha256"], sha256(extapp_sensor_logger))
             ble_gatt_lab_entry = module_entries["apps/Module One/BLE/ble_gatt_lab.fap"]
             self.assertEqual(ble_gatt_lab_entry["sha256"], sha256(extapp_ble_gatt_lab))
+            app_bridge_terminal_entry = module_entries[
+                "apps/Module One/BLE/app_bridge_terminal.fap"
+            ]
+            self.assertEqual(
+                app_bridge_terminal_entry["sha256"], sha256(extapp_app_bridge_terminal)
+            )
             macro_deck_entry = module_entries["apps/Module One/Macros/tumo_macro_deck.fap"]
             self.assertEqual(macro_deck_entry["sha256"], sha256(extapp_macro_deck))
             tumoscript_entry = module_entries["apps/Module One/Scripts/tumoscript.fap"]
@@ -307,6 +318,10 @@ class PackageReleaseTest(unittest.TestCase):
                     archive.namelist(),
                 )
                 self.assertIn(
+                    "apps/Module One/BLE/app_bridge_terminal.fap",
+                    archive.namelist(),
+                )
+                self.assertIn(
                     "apps/Module One/Macros/tumo_macro_deck.fap",
                     archive.namelist(),
                 )
@@ -349,6 +364,10 @@ class PackageReleaseTest(unittest.TestCase):
                 self.assertEqual(
                     archive.read("apps/Module One/BLE/ble_gatt_lab.fap"),
                     b"ble gatt lab",
+                )
+                self.assertEqual(
+                    archive.read("apps/Module One/BLE/app_bridge_terminal.fap"),
+                    b"app bridge terminal",
                 )
                 self.assertEqual(
                     archive.read("apps/Module One/Macros/tumo_macro_deck.fap"),

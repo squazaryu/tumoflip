@@ -43,6 +43,8 @@
 !signal_workbench/**
 !ble_gatt_lab/
 !ble_gatt_lab/**
+!app_bridge_terminal/
+!app_bridge_terminal/**
 !tumo_macro_deck/
 !tumo_macro_deck/**
 !tumoscript/

@@ -24,6 +24,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn('fap_icon="icon.png"', self.manifest)
         self.assertTrue((APP_DIR / "icon.png").is_file())
         self.assertIn("BLE: GATT Lab", self.source)
+        self.assertIn("BLE: Terminal", self.source)
         self.assertIn("Field: Logger", self.source)
         self.assertIn("Signals: Workbench", self.source)
         self.assertIn("Macros: TumoScript", self.source)
@@ -31,6 +32,10 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("System: Runtime Trace", self.source)
         self.assertIn(
             'EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/BLE/app_bridge_terminal.fap")',
             self.source,
         )
         self.assertIn(

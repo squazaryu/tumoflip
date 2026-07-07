@@ -1,0 +1,16 @@
+App(
+    appid="app_bridge_terminal",
+    name="App Bridge Terminal",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="app_bridge_terminal_app",
+    requires=["gui", "storage", "bt"],
+    stack_size=5 * 1024,
+    icon="A_GPIO_14",
+    fap_icon="icon.png",
+    fap_category="Module One/BLE",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip",
+    fap_description="Whitelisted App Bridge terminal for Companion command, session, and event-stream diagnostics.",
+)
