@@ -39,6 +39,8 @@
 !module_one_sensor_logger/**
 !field_logger/
 !field_logger/**
+!signal_workbench/
+!signal_workbench/**
 !ble_gatt_lab/
 !ble_gatt_lab/**
 !tumo_macro_deck/

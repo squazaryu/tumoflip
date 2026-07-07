@@ -1,0 +1,17 @@
+App(
+    appid="signal_workbench",
+    name="Signal Workbench",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="signal_workbench_app",
+    requires=["gui", "storage", "notification"],
+    stack_size=5 * 1024,
+    icon="A_Plugins_14",
+    fap_icon="icon.png",
+    fap_category="Module One/Signals",
+    fap_dist_path="apps/Module One/Signals/signal_workbench.fap",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip",
+    fap_description="Bounded signal analysis workspace for saved IR RAW metadata, receive-only ARF notebook context, and explicit GPIO pulse profiles.",
+)

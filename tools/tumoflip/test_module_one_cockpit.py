@@ -25,6 +25,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertTrue((APP_DIR / "icon.png").is_file())
         self.assertIn("BLE: GATT Lab", self.source)
         self.assertIn("Field: Logger", self.source)
+        self.assertIn("Signals: Workbench", self.source)
         self.assertIn("System: Acceptance", self.source)
         self.assertIn("System: Runtime Trace", self.source)
         self.assertIn(
@@ -41,6 +42,10 @@ class ModuleOneCockpitTest(unittest.TestCase):
         )
         self.assertIn(
             'EXT_PATH("apps/Module One/Field/field_logger.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/Signals/signal_workbench.fap")',
             self.source,
         )
 
@@ -84,6 +89,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertNotIn("furi_hal_power_enable_otg", self.source)
         self.assertNotIn("furi_hal_power_disable_otg", self.source)
         self.assertIn("Acceptance: export release smoke reports after each flash", self.source)
+        self.assertIn("Signals: use Signal Workbench", self.source)
 
     def test_nested_launches_restore_cockpit_selection(self) -> None:
         self.assertIn("loader_clear_launch_queue(app->loader);", self.source)

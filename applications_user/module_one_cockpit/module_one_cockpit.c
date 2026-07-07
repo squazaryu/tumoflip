@@ -41,6 +41,7 @@ typedef enum {
     ModuleOneCockpitActionLaunchBleGattLab,
     ModuleOneCockpitActionLaunchMacroDeck,
     ModuleOneCockpitActionLaunchFieldLogger,
+    ModuleOneCockpitActionLaunchSignalWorkbench,
     ModuleOneCockpitActionLaunchSensorLogger,
     ModuleOneCockpitActionEsp32Ping,
     ModuleOneCockpitActionLaunchIrLab,
@@ -63,6 +64,7 @@ typedef enum {
     ModuleOneCockpitBlockGps,
     ModuleOneCockpitBlockBme280,
     ModuleOneCockpitBlockSensor,
+    ModuleOneCockpitBlockSignal,
     ModuleOneCockpitBlockBle,
     ModuleOneCockpitBlockMacro,
     ModuleOneCockpitBlockNrf24,
@@ -116,6 +118,7 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"BLE: GATT Lab", ModuleOneCockpitActionLaunchBleGattLab},
     {"Macros: Deck", ModuleOneCockpitActionLaunchMacroDeck},
     {"Field: Logger", ModuleOneCockpitActionLaunchFieldLogger},
+    {"Signals: Workbench", ModuleOneCockpitActionLaunchSignalWorkbench},
     {"BME280/I2C: Scan", ModuleOneCockpitActionI2cScan},
     {"Sensors: Logger", ModuleOneCockpitActionLaunchSensorLogger},
     {"CC1101: ARF Full", ModuleOneCockpitActionLaunchArfHub},
@@ -174,6 +177,14 @@ static const ModuleOneCockpitLaunchTarget module_one_cockpit_targets[] = {
         ModuleOneCockpitBlockSensor,
         "Field Logger",
         EXT_PATH("apps/Module One/Field/field_logger.fap"),
+        NULL,
+        true,
+    },
+    {
+        ModuleOneCockpitActionLaunchSignalWorkbench,
+        ModuleOneCockpitBlockSignal,
+        "Signal Workbench",
+        EXT_PATH("apps/Module One/Signals/signal_workbench.fap"),
         NULL,
         true,
     },
@@ -296,6 +307,8 @@ static const char* module_one_cockpit_block_label(ModuleOneCockpitBlock block) {
         return "BME280";
     case ModuleOneCockpitBlockSensor:
         return "Sensor";
+    case ModuleOneCockpitBlockSignal:
+        return "Signals";
     case ModuleOneCockpitBlockBle:
         return "BLE";
     case ModuleOneCockpitBlockMacro:
@@ -495,6 +508,7 @@ static void module_one_cockpit_build_report(ModuleOneCockpitApp* app, FuriString
         "ESP32: use UART/AT or WiFi Mapper\n"
         "BLE: use BLE GATT Lab for App Bridge diagnostics\n"
         "Macros: use Tumo Macro Deck for local action sequences\n"
+        "Signals: use Signal Workbench for bounded IR/GPIO/RF metadata reports\n"
         "Acceptance: export release smoke reports after each flash\n"
         "GPS/BME280: use Sensor Logger\n"
         "NRF24: passive detection is not implemented yet\n"
