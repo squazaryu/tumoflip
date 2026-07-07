@@ -19,7 +19,7 @@
 #define TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
 #define TUMOFLIP_RUNTIME_CAPABILITIES \
     "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;pkg=1;radio=2;sd=1;" \
-    "feat=pkg,radio,trace,twin"
+    "feat=pkg,radio,trace,twin,transfer"
 
 typedef struct {
     BtAppBridgeEvent event;
@@ -48,6 +48,7 @@ typedef struct {
     TumoflipRuntimeTraceEvent trace[TUMOFLIP_RUNTIME_TRACE_DEPTH];
     uint8_t trace_head;
     uint8_t trace_count;
+    bool transfer_active;
 } TumoflipRuntime;
 
 static void tumoflip_runtime_trace_add(
@@ -87,6 +88,19 @@ static void tumoflip_runtime_reply(
 
 static const char* tumoflip_runtime_str_or_unknown(const char* value) {
     return value ? value : "unknown";
+}
+
+static void tumoflip_runtime_transfer_activity(TumoflipRuntime* runtime, bool active) {
+    runtime->transfer_active = active;
+    BtMessage message = {
+        .lock = api_lock_alloc_locked(),
+        .type = BtMessageTypeTransferActivity,
+        .data.transfer_active = active,
+    };
+    furi_check(
+        furi_message_queue_put(runtime->bt->message_queue, &message, FuriWaitForever) ==
+        FuriStatusOk);
+    api_lock_wait_unlock_and_free(message.lock);
 }
 
 static void tumoflip_runtime_trace_add(
@@ -169,6 +183,7 @@ static void
     furi_hal_info_get_api_version(&api_major, &api_minor);
     const uint8_t dirty = version_get_dirty_flag(version) ? 1U : 0U;
     const uint8_t target = version_get_target(version);
+    const uint8_t transfer_active = runtime->transfer_active ? 1U : 0U;
     const uint8_t sd_ready = (storage_sd_status(runtime->storage) == FSE_OK) ? 1U : 0U;
     const uint8_t package_state =
         (sd_ready && storage_file_exists(runtime->storage, TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH)) ?
@@ -190,7 +205,7 @@ static void
         api_major,
         api_minor,
         target,
-        0U,
+        transfer_active,
         sd_ready,
         package_state,
         (unsigned long)runtime->session.session_id,
@@ -260,6 +275,15 @@ static void
         char payload[TUMOFLIP_RUNTIME_TWIN_MAX];
         tumoflip_runtime_make_twin_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "twin", payload, false);
+    } else if(strcmp(command, "transfer_begin") == 0) {
+        tumoflip_runtime_transfer_activity(runtime, true);
+        tumoflip_runtime_reply(runtime, event->request_id, "transfer_begin", "ok", false);
+    } else if(strcmp(command, "transfer_progress") == 0) {
+        tumoflip_runtime_transfer_activity(runtime, true);
+        tumoflip_runtime_reply(runtime, event->request_id, "transfer_progress", "ok", false);
+    } else if(strcmp(command, "transfer_end") == 0) {
+        tumoflip_runtime_transfer_activity(runtime, false);
+        tumoflip_runtime_reply(runtime, event->request_id, "transfer_end", "ok", false);
     } else if(strcmp(command, "hello") == 0) {
         const size_t owner_prefix_len = 6U;
         size_t owner_len = 0U;

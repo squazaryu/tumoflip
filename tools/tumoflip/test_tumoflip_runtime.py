@@ -26,7 +26,7 @@ class TumoflipRuntimeTest(unittest.TestCase):
         self.assertIn("session=3", runtime)
         self.assertIn("trace=1", runtime)
         self.assertIn("twin=1", runtime)
-        self.assertIn("feat=pkg,radio,trace,twin", runtime)
+        self.assertIn("feat=pkg,radio,trace,twin,transfer", runtime)
         self.assertNotIn('"radio_status"', runtime)
         self.assertNotIn("tumoflip_runtime_radio_state_name", runtime)
         self.assertIn('strcmp(command, "status") == 0', runtime)
@@ -48,6 +48,11 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "version_get_target(version)",
             "storage_sd_status(runtime->storage)",
             "subghz_radio_broker_get_status_v2(runtime->radio_broker, &radio_status)",
+            "runtime->transfer_active",
+            'strcmp(command, "transfer_begin") == 0',
+            'strcmp(command, "transfer_progress") == 0',
+            'strcmp(command, "transfer_end") == 0',
+            "BtMessageTypeTransferActivity",
         ):
             self.assertIn(required, runtime)
 
@@ -101,6 +106,7 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "radio",
             "trace",
             "twin",
+            "transfer",
         ):
             self.assertIn(required, capabilities)
 

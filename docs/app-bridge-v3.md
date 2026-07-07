@@ -61,7 +61,7 @@ since boot.
 
 - Existing `FAB1` and `FAB2` clients keep using the same GATT transport.
 - `runtime/capabilities` advertises `session=3` and keeps
-  `feat=pkg,radio,trace,twin`, plus `status=2`, `trace=1`, `twin=1`,
+  `feat=pkg,radio,trace,twin,transfer`, plus `status=2`, `trace=1`, `twin=1`,
   `pkg=1`, `radio=2`, and `sd=1`.
 - A v3 client should call `hello` and treat the returned `sid` plus `sid`/`bo` in
   `runtime/status` as the current firmware-side ownership signal.

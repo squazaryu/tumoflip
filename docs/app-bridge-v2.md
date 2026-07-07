@@ -40,11 +40,14 @@ The system app ID is `runtime`.
   `key=value` payload. Runtime v2 keeps backward-compatible keys
   `runtime=1`, `fab=2`, and `session=3`, and advertises `status=2`,
   `trace=1`, `twin=1`, `pkg=1`, `radio=2`, `sd=1`, plus compact feature
-  flags in `feat`, currently `pkg`, `radio`, `trace`, and `twin`.
+  flags in `feat`, currently `pkg`, `radio`, `trace`, `twin`, and
+  `transfer`.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
   `sd`, `pkg`, `sid`, `bo`, `radio`, and `owner`. `sd=1` means the SD card is
   mounted and ready; `sd=0` means package state cannot be trusted yet.
+  `transfer=1` means the companion has marked an active BLE file transfer;
+  `transfer=0` means no transfer activity is currently advertised.
   `pkg=1` means `/.tumoflip/package-state.txt` is present on a ready SD card;
   `pkg=0` means package state is not installed or the SD card is unavailable.
   `sid` and `bo` identify the current v3 session and bridge owner.
@@ -69,6 +72,10 @@ The system app ID is `runtime`.
   percentage, `rf` Radio Broker state, `ro` radio owner, `sid` App Bridge
   session ID, and `bo` bridge owner. The payload is read-only and bounded to
   one FAB2 response frame.
+- `transfer_begin`, `transfer_progress`, and `transfer_end` return matching
+  `runtime/*` `ok` replies and drive the on-device BLE transfer activity
+  indicator. Repeated progress pulses keep the indicator alive; `transfer_end`
+  clears it.
 - `hello` implements the first App Bridge v3 session layer documented in
   `docs/app-bridge-v3.md`.
 - An unknown command returns `runtime/error`, sets response and error flags,

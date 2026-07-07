@@ -167,6 +167,7 @@ RUNTIME_REQUIRED_FEATURES = {
     "pkg",
     "radio",
     "trace",
+    "transfer",
     "twin",
 }
 RUNTIME_REQUIRED_STATUS_FIELDS = (
