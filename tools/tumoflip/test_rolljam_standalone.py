@@ -31,10 +31,8 @@ class RollJamStandaloneIntegrationTest(unittest.TestCase):
             'fap_dist_path="apps_data/rolljam_standalone/{filename}"',
             standalone_manifest,
         )
-        self.assertIn(
-            'EXCLUDED_EXT_APPS = ("claude_buddy", "rolljam_standalone")',
-            fbt_options,
-        )
+        self.assertIn("EXCLUDED_EXT_APPS", fbt_options)
+        self.assertIn('"rolljam_standalone"', fbt_options)
 
     def test_rolljam_standalone_is_source_only_import(self) -> None:
         app_dir = REPO_ROOT / "applications_user/rolljam_standalone"

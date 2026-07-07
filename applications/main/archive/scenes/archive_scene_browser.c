@@ -31,8 +31,6 @@ static const char* archive_get_flipper_app_name(ArchiveFileTypeEnum file_type) {
         return "U2F";
     case ArchiveFileTypeUpdateManifest:
         return "UpdaterApp";
-    case ArchiveFileTypeJS:
-        return "JS Runner";
     case ArchiveFileTypeFolder:
         return "Archive";
     default:

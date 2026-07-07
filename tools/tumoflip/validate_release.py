@@ -137,7 +137,11 @@ MODULE_ONE_LEGACY_PATHS = {
     "/ext/apps/Module One/module_one_sensor_logger.fap":
         "/ext/apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
 }
+BASE_LEGACY_PATHS = {
+    "/ext/apps/Scripts/js_app.fap": "/ext/apps/Bluetooth/flipper_companion.fap",
+}
 RELEASE_CLEANUP_PATHS = {
+    **BASE_LEGACY_PATHS,
     **ARF_LEGACY_PATHS,
     **MODULE_ONE_LEGACY_PATHS,
 }
@@ -189,6 +193,9 @@ def resource_path_from_ext_target(path: str) -> str:
 
 def release_cleanup_entries() -> list[dict[str, str]]:
     return [
+        {"group": "base", "legacy": legacy, "canonical": canonical}
+        for legacy, canonical in sorted(BASE_LEGACY_PATHS.items())
+    ] + [
         {"group": "arf", "legacy": legacy, "canonical": canonical}
         for legacy, canonical in sorted(ARF_LEGACY_PATHS.items())
     ] + [
@@ -420,15 +427,13 @@ def prune_legacy_resource_exports(resources: Path) -> None:
 def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
     groups: dict[str, list[Path]] = {
         "base": [
-            resources / "apps/Scripts/js_app.fap",
             resources / "apps/Bluetooth/flipper_companion.fap",
             resources / "apps/Tools/ai_dashboard.fap",
             resources / "apps/Tools/flipper_relay.fap",
             resources / "apps/Tools/quac.fap",
             resources / "apps/Tools/tumoflip_packages.fap",
             resources / "apps/Tools/totp.fap",
-        ]
-        + sorted((resources / "apps_data/js_app/plugins").glob("*.fal")),
+        ],
         "module_one": [
             resources / relative
             for relative in (*MODULE_ONE_PACKAGE_FILES, *MODULE_ONE_PACKAGE_DATA_FILES)

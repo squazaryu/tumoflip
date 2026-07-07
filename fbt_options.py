@@ -16,7 +16,7 @@ DEBUG = 1
 
 # Suffix to add to files when building distribution
 # If OS environment has DIST_SUFFIX set, it will be used instead
-DIST_SUFFIX = "t-dev-089-036-049"
+DIST_SUFFIX = "t-dev-089-036-050"
 
 # Post-update slideshow shown by the updater package
 UPDATE_SPLASH = "tumoflip_update"
@@ -88,7 +88,43 @@ FIRMWARE_APP_SET = "default"
 
 # Local experiments may have an application.fam under applications_user. Keep
 # unfinished apps out of reproducible updater packages until explicitly added.
-EXCLUDED_EXT_APPS = ("claude_buddy", "rolljam_standalone")
+EXCLUDED_EXT_APPS = (
+    "claude_buddy",
+    "js_app",
+    "js_badusb",
+    "js_blebeacon",
+    "js_event_loop",
+    "js_gpio",
+    "js_gui",
+    "js_gui__button_menu",
+    "js_gui__button_panel",
+    "js_gui__byte_input",
+    "js_gui__dialog",
+    "js_gui__empty_screen",
+    "js_gui__file_picker",
+    "js_gui__icon",
+    "js_gui__loading",
+    "js_gui__menu",
+    "js_gui__number_input",
+    "js_gui__popup",
+    "js_gui__submenu",
+    "js_gui__text_box",
+    "js_gui__text_input",
+    "js_gui__vi_list",
+    "js_gui__widget",
+    "js_i2c",
+    "js_infrared",
+    "js_math",
+    "js_notification",
+    "js_serial",
+    "js_spi",
+    "js_storage",
+    "js_subghz",
+    "js_usbdisk",
+    "js_vgm",
+    "rolljam_standalone",
+    "test_js",
+)
 
 custom_options_fn = "fbt_options_local.py"
 

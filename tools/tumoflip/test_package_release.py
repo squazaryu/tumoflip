@@ -161,9 +161,10 @@ class PackageReleaseTest(unittest.TestCase):
                 entry["source"]: entry
                 for entry in manifest["packages"]["base"]
             }
-            self.assertIn("apps/Scripts/js_app.fap", base_entries)
-            self.assertIn("apps_data/js_app/plugins/js_gui.fal", base_entries)
-            self.assertIn("apps_data/js_app/plugins/js_subghz.fal", base_entries)
+            self.assertNotIn("apps/Scripts/js_app.fap", base_entries)
+            self.assertNotIn("apps_data/js_app/plugins/js_gui.fal", base_entries)
+            self.assertNotIn("apps_data/js_app/plugins/js_subghz.fal", base_entries)
+            self.assertFalse((resources / "apps/Scripts/js_app.fap").exists())
             wifi_entry = module_entries["apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap"]
             self.assertEqual(wifi_entry["sha256"], sha256(extapp_wifi))
             ir_lab_entry = module_entries["apps/Module One/IR Blaster/tumo_ir_lab.fap"]
@@ -189,6 +190,14 @@ class PackageReleaseTest(unittest.TestCase):
                 module_entries,
             )
             self.assertEqual(manifest["artifacts"], {})
+            self.assertIn(
+                {
+                    "group": "base",
+                    "legacy": "/ext/apps/Scripts/js_app.fap",
+                    "canonical": "/ext/apps/Bluetooth/flipper_companion.fap",
+                },
+                manifest["cleanup"],
+            )
             self.assertIn(
                 {
                     "group": "module_one",
@@ -224,12 +233,12 @@ class PackageReleaseTest(unittest.TestCase):
                     "apps/Module One/IR Blaster/tumo_ir_lab.fap",
                     archive.namelist(),
                 )
-                self.assertIn("apps/Scripts/js_app.fap", archive.namelist())
-                self.assertIn(
+                self.assertNotIn("apps/Scripts/js_app.fap", archive.namelist())
+                self.assertNotIn(
                     "apps_data/js_app/plugins/js_gui.fal",
                     archive.namelist(),
                 )
-                self.assertIn(
+                self.assertNotIn(
                     "apps_data/js_app/plugins/js_subghz.fal",
                     archive.namelist(),
                 )

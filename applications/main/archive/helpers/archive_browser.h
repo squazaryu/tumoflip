@@ -36,7 +36,7 @@ static const char* const known_ext[] = {
     [ArchiveFileTypeUpdateManifest] = ".fuf",
     [ArchiveFileTypeFolder] = "?",
     [ArchiveFileTypeUnknown] = "*",
-    [ArchiveFileTypeAppOrJs] = ".fap|.js",
+    [ArchiveFileTypeAppOrJs] = ".fap",
     [ArchiveFileTypeSetting] = "?",
 };
 

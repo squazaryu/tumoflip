@@ -37,6 +37,7 @@ typedef struct {
 } TumoLegacyPath;
 
 static const TumoLegacyPath tumo_legacy_paths[] = {
+    {"/ext/apps/Scripts/js_app.fap", "/ext/apps/Bluetooth/flipper_companion.fap"},
     {"/ext/apps/ARF Tools/ARF Car Emulate.fap",
      "/ext/apps_data/arf_subghz_full/modules/arf_car_emulate.fap"},
     {"/ext/apps/ARF Tools/ARF Counter BF.fap",
