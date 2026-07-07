@@ -88,6 +88,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Diagnostics/cockpit.fap",
     "apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
     "apps/Module One/Diagnostics/runtime_trace_viewer.fap",
+    "apps/Module One/Field/field_logger.fap",
     "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
     "apps/Module One/BLE/ble_gatt_lab.fap",
     "apps/Module One/Macros/tumo_macro_deck.fap",

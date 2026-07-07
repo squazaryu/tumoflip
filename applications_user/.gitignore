@@ -37,6 +37,8 @@
 !wifi_mapper/**
 !module_one_sensor_logger/
 !module_one_sensor_logger/**
+!field_logger/
+!field_logger/**
 !ble_gatt_lab/
 !ble_gatt_lab/**
 !tumo_macro_deck/

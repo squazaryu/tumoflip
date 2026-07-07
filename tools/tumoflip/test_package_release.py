@@ -112,6 +112,8 @@ class PackageReleaseTest(unittest.TestCase):
             extapp_acceptance = build / ".extapps/tumo_acceptance_suite.fap"
             old_trace_viewer = resources / "apps/Module One/Diagnostics/runtime_trace_viewer.fap"
             extapp_trace_viewer = build / ".extapps/runtime_trace_viewer.fap"
+            old_field_logger = resources / "apps/Module One/Field/field_logger.fap"
+            extapp_field_logger = build / ".extapps/field_logger.fap"
             old_sensor_logger = resources / "apps/Module One/Sensors BME280/module_one_sensor_logger.fap"
             extapp_sensor_logger = build / ".extapps/module_one_sensor_logger.fap"
             old_ble_gatt_lab = resources / "apps/Module One/BLE/ble_gatt_lab.fap"
@@ -128,6 +130,8 @@ class PackageReleaseTest(unittest.TestCase):
             write_file(extapp_acceptance, b"acceptance suite")
             old_trace_viewer.write_bytes(b"old trace viewer")
             write_file(extapp_trace_viewer, b"runtime trace viewer")
+            old_field_logger.write_bytes(b"old field logger")
+            write_file(extapp_field_logger, b"field logger")
             old_sensor_logger.write_bytes(b"old sensor logger")
             write_file(extapp_sensor_logger, b"sensor logger")
             old_ble_gatt_lab.write_bytes(b"old ble gatt lab")
@@ -154,6 +158,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(old_cockpit.read_bytes(), b"module one cockpit")
             self.assertEqual(old_acceptance.read_bytes(), b"acceptance suite")
             self.assertEqual(old_trace_viewer.read_bytes(), b"runtime trace viewer")
+            self.assertEqual(old_field_logger.read_bytes(), b"field logger")
             self.assertEqual(old_sensor_logger.read_bytes(), b"sensor logger")
             self.assertEqual(old_ble_gatt_lab.read_bytes(), b"ble gatt lab")
             self.assertEqual(old_macro_deck.read_bytes(), b"macro deck")
@@ -186,6 +191,8 @@ class PackageReleaseTest(unittest.TestCase):
                 "apps/Module One/Diagnostics/runtime_trace_viewer.fap"
             ]
             self.assertEqual(trace_viewer_entry["sha256"], sha256(extapp_trace_viewer))
+            field_logger_entry = module_entries["apps/Module One/Field/field_logger.fap"]
+            self.assertEqual(field_logger_entry["sha256"], sha256(extapp_field_logger))
             sensor_logger_entry = module_entries[
                 "apps/Module One/Sensors BME280/module_one_sensor_logger.fap"
             ]
@@ -264,6 +271,10 @@ class PackageReleaseTest(unittest.TestCase):
                     archive.namelist(),
                 )
                 self.assertIn(
+                    "apps/Module One/Field/field_logger.fap",
+                    archive.namelist(),
+                )
+                self.assertIn(
                     "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
                     archive.namelist(),
                 )
@@ -290,6 +301,10 @@ class PackageReleaseTest(unittest.TestCase):
                 self.assertEqual(
                     archive.read("apps/Module One/Diagnostics/tumo_acceptance_suite.fap"),
                     b"acceptance suite",
+                )
+                self.assertEqual(
+                    archive.read("apps/Module One/Field/field_logger.fap"),
+                    b"field logger",
                 )
                 self.assertEqual(
                     archive.read("apps/Module One/Sensors BME280/module_one_sensor_logger.fap"),

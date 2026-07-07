@@ -1,0 +1,17 @@
+App(
+    appid="field_logger",
+    name="Field Logger",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="field_logger_app",
+    requires=["gui", "storage", "notification"],
+    stack_size=5 * 1024,
+    icon="A_GPIO_14",
+    fap_icon="icon.png",
+    fap_category="Module One/Field",
+    fap_dist_path="apps/Module One/Field/field_logger.fap",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip",
+    fap_description="Unified field timeline logger for battery, session metadata, optional Sensor Logger context, and receive-only ARF Frequency Analyzer notebook observations.",
+)

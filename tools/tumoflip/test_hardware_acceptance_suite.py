@@ -51,6 +51,7 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
         for required in (
             'EXT_PATH("apps/Module One/Diagnostics/cockpit.fap")',
             'EXT_PATH("apps/Module One/Diagnostics/runtime_trace_viewer.fap")',
+            'EXT_PATH("apps/Module One/Field/field_logger.fap")',
             'EXT_PATH("apps/Module One/Sensors BME280/module_one_sensor_logger.fap")',
             'EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap")',
             'EXT_PATH("apps/Module One/Macros/tumo_macro_deck.fap")',
@@ -85,6 +86,10 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
         )
         self.assertIn(
             '"apps/Module One/Diagnostics/runtime_trace_viewer.fap"',
+            self.validator,
+        )
+        self.assertIn(
+            '"apps/Module One/Field/field_logger.fap"',
             self.validator,
         )
 

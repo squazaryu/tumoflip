@@ -149,6 +149,11 @@ are legally allowed to test.
 - Open `Apps -> Module One -> Diagnostics -> Runtime Trace`, confirm the
   Runtime Trace viewer renders the same compact ring, export a report, and
   verify `/ext/apps_data/runtime_trace_viewer/trace_*.txt` exists.
+- Open `Apps -> Module One -> Field -> Field Logger`, start a session, press
+  `OK` to add a manual sample, press `Right` to import the latest ARF
+  Frequency Analyzer notebook observation or record the missing-source state,
+  then press `Back` and confirm CSV/JSONL/GPX files exist under
+  `/ext/apps_data/field_logger/sessions`.
 - Query Runtime `twin` and confirm Device Twin fields reflect live firmware,
   SD/package, battery, Radio Broker, and App Bridge owner state.
 - Send a small Runtime command and verify a response or explicit error frame.
