@@ -1,0 +1,10 @@
+# TumoScript v1 safe_demo.tscr
+name Safe Demo
+policy stop
+log Scenario started
+delay 250
+prompt Press OK to continue
+bridge event safe_demo_started
+gpio_pulse pc0 4 500 500
+label done
+log Scenario done

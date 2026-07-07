@@ -93,6 +93,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
     "apps/Module One/BLE/ble_gatt_lab.fap",
     "apps/Module One/Macros/tumo_macro_deck.fap",
+    "apps/Module One/Scripts/tumoscript.fap",
     "apps/Module One/IR Blaster/tumo_ir_lab.fap",
     "apps/Module One/IR Blaster/tumoflip_xremote.fap",
     "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
@@ -100,6 +101,7 @@ MODULE_ONE_PACKAGE_FILES = (
 )
 MODULE_ONE_PACKAGE_DATA_FILES = (
     "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
+    "apps_data/tumoscript/scripts/safe_demo.tscr",
 )
 ARF_LEGACY_PATHS = {
     **{

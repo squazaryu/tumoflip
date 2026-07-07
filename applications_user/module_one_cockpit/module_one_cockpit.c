@@ -40,6 +40,7 @@ typedef enum {
     ModuleOneCockpitActionUartStatus,
     ModuleOneCockpitActionLaunchBleGattLab,
     ModuleOneCockpitActionLaunchMacroDeck,
+    ModuleOneCockpitActionLaunchTumoScript,
     ModuleOneCockpitActionLaunchFieldLogger,
     ModuleOneCockpitActionLaunchSignalWorkbench,
     ModuleOneCockpitActionLaunchSensorLogger,
@@ -117,6 +118,7 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"GPS/UART: Status", ModuleOneCockpitActionUartStatus},
     {"BLE: GATT Lab", ModuleOneCockpitActionLaunchBleGattLab},
     {"Macros: Deck", ModuleOneCockpitActionLaunchMacroDeck},
+    {"Macros: TumoScript", ModuleOneCockpitActionLaunchTumoScript},
     {"Field: Logger", ModuleOneCockpitActionLaunchFieldLogger},
     {"Signals: Workbench", ModuleOneCockpitActionLaunchSignalWorkbench},
     {"BME280/I2C: Scan", ModuleOneCockpitActionI2cScan},
@@ -169,6 +171,14 @@ static const ModuleOneCockpitLaunchTarget module_one_cockpit_targets[] = {
         ModuleOneCockpitBlockMacro,
         "Tumo Macro Deck",
         EXT_PATH("apps/Module One/Macros/tumo_macro_deck.fap"),
+        NULL,
+        true,
+    },
+    {
+        ModuleOneCockpitActionLaunchTumoScript,
+        ModuleOneCockpitBlockMacro,
+        "TumoScript",
+        EXT_PATH("apps/Module One/Scripts/tumoscript.fap"),
         NULL,
         true,
     },
@@ -475,7 +485,7 @@ static void module_one_cockpit_append_runtime_report(FuriString* output) {
         output,
         "ESP32/GPS: UART free means probe-safe; use dedicated screens for active checks\n"
         "BLE: use BLE GATT Lab for App Bridge ping/status/echo\n"
-        "Macros: use Tumo Macro Deck for SD-backed safe local sequences\n"
+        "Macros: use Macro Deck for local sequences or TumoScript for scripted dry-runs\n"
         "NRF24: unknown, no safe passive probe yet\n"
         "CC1101: unknown, use ARF/Sub-GHz status before transmit\n\n");
 }
@@ -507,7 +517,7 @@ static void module_one_cockpit_build_report(ModuleOneCockpitApp* app, FuriString
         "IR: use IR Blink or Tumo IR Lab\n"
         "ESP32: use UART/AT or WiFi Mapper\n"
         "BLE: use BLE GATT Lab for App Bridge diagnostics\n"
-        "Macros: use Tumo Macro Deck for local action sequences\n"
+        "Macros: use Macro Deck or TumoScript for local action sequences\n"
         "Signals: use Signal Workbench for bounded IR/GPIO/RF metadata reports\n"
         "Acceptance: export release smoke reports after each flash\n"
         "GPS/BME280: use Sensor Logger\n"

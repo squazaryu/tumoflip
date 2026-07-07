@@ -26,6 +26,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("BLE: GATT Lab", self.source)
         self.assertIn("Field: Logger", self.source)
         self.assertIn("Signals: Workbench", self.source)
+        self.assertIn("Macros: TumoScript", self.source)
         self.assertIn("System: Acceptance", self.source)
         self.assertIn("System: Runtime Trace", self.source)
         self.assertIn(
@@ -46,6 +47,10 @@ class ModuleOneCockpitTest(unittest.TestCase):
         )
         self.assertIn(
             'EXT_PATH("apps/Module One/Signals/signal_workbench.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/Scripts/tumoscript.fap")',
             self.source,
         )
 

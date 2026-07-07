@@ -56,6 +56,7 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
             'EXT_PATH("apps/Module One/Sensors BME280/module_one_sensor_logger.fap")',
             'EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap")',
             'EXT_PATH("apps/Module One/Macros/tumo_macro_deck.fap")',
+            'EXT_PATH("apps/Module One/Scripts/tumoscript.fap")',
             'EXT_PATH("apps/Module One/IR Blaster/tumo_ir_lab.fap")',
             'EXT_PATH("apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap")',
             'EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")',
@@ -95,6 +96,10 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
         )
         self.assertIn(
             '"apps/Module One/Signals/signal_workbench.fap"',
+            self.validator,
+        )
+        self.assertIn(
+            '"apps/Module One/Scripts/tumoscript.fap"',
             self.validator,
         )
 

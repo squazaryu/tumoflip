@@ -53,6 +53,7 @@ static const TumoAcceptancePathCheck tumo_acceptance_paths[] = {
     {"Sensor Logger", EXT_PATH("apps/Module One/Sensors BME280/module_one_sensor_logger.fap"), true},
     {"BLE GATT Lab", EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap"), true},
     {"Macro Deck", EXT_PATH("apps/Module One/Macros/tumo_macro_deck.fap"), true},
+    {"TumoScript", EXT_PATH("apps/Module One/Scripts/tumoscript.fap"), true},
     {"Tumo IR Lab", EXT_PATH("apps/Module One/IR Blaster/tumo_ir_lab.fap"), true},
     {"Tumo XRemote", EXT_PATH("apps/Module One/IR Blaster/tumoflip_xremote.fap"), true},
     {"WiFi Mapper", EXT_PATH("apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap"), true},

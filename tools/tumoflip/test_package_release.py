@@ -122,6 +122,8 @@ class PackageReleaseTest(unittest.TestCase):
             extapp_ble_gatt_lab = build / ".extapps/ble_gatt_lab.fap"
             old_macro_deck = resources / "apps/Module One/Macros/tumo_macro_deck.fap"
             extapp_macro_deck = build / ".extapps/tumo_macro_deck.fap"
+            old_tumoscript = resources / "apps/Module One/Scripts/tumoscript.fap"
+            extapp_tumoscript = build / ".extapps/tumoscript.fap"
             old_wifi.write_bytes(b"old wifi mapper")
             write_file(extapp_wifi, b"wifi mapper fix")
             old_ir_lab.write_bytes(b"old ir lab")
@@ -142,6 +144,8 @@ class PackageReleaseTest(unittest.TestCase):
             write_file(extapp_ble_gatt_lab, b"ble gatt lab")
             old_macro_deck.write_bytes(b"old macro deck")
             write_file(extapp_macro_deck, b"macro deck")
+            old_tumoscript.write_bytes(b"old tumoscript")
+            write_file(extapp_tumoscript, b"tumoscript")
 
             manifest = build_package_release(
                 repo,
@@ -167,6 +171,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(old_sensor_logger.read_bytes(), b"sensor logger")
             self.assertEqual(old_ble_gatt_lab.read_bytes(), b"ble gatt lab")
             self.assertEqual(old_macro_deck.read_bytes(), b"macro deck")
+            self.assertEqual(old_tumoscript.read_bytes(), b"tumoscript")
 
             module_entries = {
                 entry["source"]: entry
@@ -210,8 +215,14 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(ble_gatt_lab_entry["sha256"], sha256(extapp_ble_gatt_lab))
             macro_deck_entry = module_entries["apps/Module One/Macros/tumo_macro_deck.fap"]
             self.assertEqual(macro_deck_entry["sha256"], sha256(extapp_macro_deck))
+            tumoscript_entry = module_entries["apps/Module One/Scripts/tumoscript.fap"]
+            self.assertEqual(tumoscript_entry["sha256"], sha256(extapp_tumoscript))
             self.assertIn(
                 "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
+                module_entries,
+            )
+            self.assertIn(
+                "apps_data/tumoscript/scripts/safe_demo.tscr",
                 module_entries,
             )
             self.assertEqual(manifest["artifacts"], {})
@@ -300,7 +311,15 @@ class PackageReleaseTest(unittest.TestCase):
                     archive.namelist(),
                 )
                 self.assertIn(
+                    "apps/Module One/Scripts/tumoscript.fap",
+                    archive.namelist(),
+                )
+                self.assertIn(
                     "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
+                    archive.namelist(),
+                )
+                self.assertIn(
+                    "apps_data/tumoscript/scripts/safe_demo.tscr",
                     archive.namelist(),
                 )
                 self.assertEqual(
@@ -334,6 +353,10 @@ class PackageReleaseTest(unittest.TestCase):
                 self.assertEqual(
                     archive.read("apps/Module One/Macros/tumo_macro_deck.fap"),
                     b"macro deck",
+                )
+                self.assertEqual(
+                    archive.read("apps/Module One/Scripts/tumoscript.fap"),
+                    b"tumoscript",
                 )
                 self.assertEqual(
                     archive.read("apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap"),

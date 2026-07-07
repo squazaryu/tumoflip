@@ -1,0 +1,17 @@
+App(
+    appid="tumoscript",
+    name="TumoScript",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="tumoscript_app",
+    requires=["gui", "storage", "bt", "notification"],
+    stack_size=6 * 1024,
+    icon="A_Plugins_14",
+    fap_icon="icon.png",
+    fap_category="Module One/Scripts",
+    fap_dist_path="apps/Module One/Scripts/tumoscript.fap",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip",
+    fap_description="Bounded SD-backed TumoScript scenario runner with validation, dry-run, App Bridge events, prompts, GPIO pulses, IR bursts, and simple branches.",
+)
