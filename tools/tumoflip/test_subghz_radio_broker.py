@@ -200,18 +200,16 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
             manifest = (REPO_ROOT / relative).read_text(encoding="utf-8")
             self.assertIn('"subghz_radio_broker"', manifest)
 
-    def test_subghz_remote_uses_broker(self) -> None:
-        source = (
-            REPO_ROOT
-            / "applications/main/subghz_remote/helpers/txrx/subghz_txrx.c"
-        ).read_text(encoding="utf-8")
+    def test_system_subghz_uses_broker(self) -> None:
+        source = (REPO_ROOT / "applications/main/subghz/helpers/subghz_txrx.c").read_text(
+            encoding="utf-8"
+        )
         header = (
-            REPO_ROOT
-            / "applications/main/subghz_remote/helpers/txrx/subghz_txrx_i.h"
+            REPO_ROOT / "applications/main/subghz/helpers/subghz_txrx_i.h"
         ).read_text(encoding="utf-8")
-        manifest = (
-            REPO_ROOT / "applications/main/subghz_remote/application.fam"
-        ).read_text(encoding="utf-8")
+        manifest = (REPO_ROOT / "applications/main/subghz/application.fam").read_text(
+            encoding="utf-8"
+        )
 
         for required in (
             "SubGhzRadioBroker* radio_broker;",
@@ -222,7 +220,7 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
         for required in (
             "furi_record_open(RECORD_SUBGHZ_RADIO_BROKER)",
             "subghz_radio_broker_acquire(",
-            '"subghz_remote"',
+            '"system_subghz"',
             "subghz_radio_broker_external_power_on(",
             "subghz_radio_broker_external_power_off(",
             "subghz_radio_broker_set_selected_device(",
