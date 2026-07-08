@@ -335,15 +335,15 @@ def generate_slideshow(
     generate(title, version, frames[0])
     generate_message_frame(
         (
-            ("UNLEASHED 089", gravity_bold(8), 18),
-            ("TUMOFLIP FORK", gravity_bold(8), 32),
+            ("UNLEASHED 089", gravity_bold(8), 22),
+            ("TUMOFLIP FORK", gravity_bold(8), 36),
         ),
         frames[1],
     )
     generate_message_frame(
         (
-            ("CUSTOM BUILD", gravity_bold(8), 18),
-            ("USE WITH CARE", gravity_bold(8), 32),
+            ("CUSTOM BUILD", gravity_bold(8), 22),
+            ("USE WITH CARE", gravity_bold(8), 36),
         ),
         frames[2],
     )
