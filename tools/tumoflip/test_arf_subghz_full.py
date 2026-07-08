@@ -236,9 +236,34 @@ class ArfSubGhzFullTest(unittest.TestCase):
             "(instance->notebook_tag + 1) % SubGhzFrequencyAnalyzerNotebookTagCount",
             view,
         )
+        self.assertIn('"Save"', view)
+        self.assertIn('"RX"', view)
+        self.assertIn("I_ButtonCenter_7x7", view)
+        self.assertIn("const size_t button_height = 9", view)
+        self.assertIn("const int32_t rx_right_margin = 14", view)
+        self.assertIn("button_y + button_height / 2 + 1", view)
+        self.assertIn("canvas_draw_box(canvas, save_x, button_y, save_width, button_height)", view)
+        self.assertIn("canvas_draw_box(canvas, rx_x, button_y, rx_width, button_height)", view)
+        self.assertIn("canvas_draw_str_aligned", view)
+        self.assertNotIn("tag_x", view)
+        self.assertNotIn('"OK Log"', view)
         self.assertIn("observation->notebook_tag = model->notebook_tag", view)
         self.assertIn("subghz_frequency_notebook_tag_name(observation)", notebook)
         self.assertNotIn("payload", notebook.lower())
+
+    def test_frequency_analyzer_long_ok_keeps_receiver_shortcut(self) -> None:
+        scene = (
+            REPO_ROOT
+            / "applications_user/arf_subghz_full/scenes/subghz_scene_frequency_analyzer.c"
+        ).read_text(encoding="utf-8")
+        view = (
+            REPO_ROOT
+            / "applications_user/arf_subghz_full/views/subghz_frequency_analyzer.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("SubGhzCustomEventViewFreqAnalOkLong", view)
+        self.assertIn("SubGhzCustomEventViewFreqAnalOkLong", scene)
+        self.assertIn("scene_manager_next_scene(subghz->scene_manager, SubGhzSceneReceiver)", scene)
 
 
 if __name__ == "__main__":

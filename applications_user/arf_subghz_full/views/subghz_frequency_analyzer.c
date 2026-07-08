@@ -21,22 +21,6 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 #endif
 
-static const char* const notebook_tag_labels[SubGhzFrequencyAnalyzerNotebookTagCount] = {
-    [SubGhzFrequencyAnalyzerNotebookTagField] = "field",
-    [SubGhzFrequencyAnalyzerNotebookTagTest] = "test",
-    [SubGhzFrequencyAnalyzerNotebookTagNoise] = "noise",
-    [SubGhzFrequencyAnalyzerNotebookTagOther] = "other",
-};
-
-static const char* subghz_frequency_analyzer_notebook_tag_label(
-    SubGhzFrequencyAnalyzerNotebookTag tag) {
-    if(tag >= SubGhzFrequencyAnalyzerNotebookTagCount) {
-        return notebook_tag_labels[SubGhzFrequencyAnalyzerNotebookTagField];
-    }
-
-    return notebook_tag_labels[tag];
-}
-
 typedef enum {
     SubGhzFrequencyAnalyzerStatusIDLE,
 } SubGhzFrequencyAnalyzerStatus;
@@ -173,15 +157,58 @@ static void subghz_frequency_analyzer_history_frequency_draw(
     }
 }
 
+static void subghz_frequency_analyzer_draw_action_hint(
+    Canvas* canvas) {
+    const size_t button_height = 9;
+    const int32_t button_y = 1;
+    const int32_t rx_right_margin = 14;
+    const size_t horizontal_padding = 3;
+    const int32_t icon_h_offset = 3;
+    const Icon* icon = &I_ButtonCenter_7x7;
+
+    const char* save_label = "Save";
+    const char* rx_label = "RX";
+    const int32_t icon_width_with_offset = icon_get_width(icon) + icon_h_offset;
+    const size_t save_width =
+        canvas_string_width(canvas, save_label) + horizontal_padding * 2 + icon_width_with_offset;
+    const size_t rx_width =
+        canvas_string_width(canvas, rx_label) + horizontal_padding * 2 + icon_width_with_offset;
+    const int32_t save_x = 2;
+    const int32_t rx_x = canvas_width(canvas) - rx_width - rx_right_margin;
+    const int32_t icon_y =
+        button_y + ((int32_t)button_height - (int32_t)icon_get_height(icon)) / 2;
+    const int32_t text_y = button_y + button_height / 2 + 1;
+
+    canvas_draw_box(canvas, save_x, button_y, save_width, button_height);
+    canvas_draw_box(canvas, rx_x, button_y, rx_width, button_height);
+
+    canvas_invert_color(canvas);
+    canvas_draw_icon(canvas, save_x + horizontal_padding, icon_y, icon);
+    canvas_draw_str_aligned(
+        canvas,
+        save_x + horizontal_padding + icon_width_with_offset,
+        text_y,
+        AlignLeft,
+        AlignCenter,
+        save_label);
+    canvas_draw_icon(canvas, rx_x + horizontal_padding, icon_y, icon);
+    canvas_draw_str_aligned(
+        canvas,
+        rx_x + horizontal_padding + icon_width_with_offset,
+        text_y,
+        AlignLeft,
+        AlignCenter,
+        rx_label);
+    canvas_invert_color(canvas);
+}
+
 void subghz_frequency_analyzer_draw(Canvas* canvas, SubGhzFrequencyAnalyzerModel* model) {
     char buffer[64] = {0};
 
-    // Action hint
+    // Action hint: short OK saves/logs, long OK opens Receiver on the selected frequency.
     canvas_set_color(canvas, ColorBlack);
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 2, 7, "OK Log");
-    canvas_draw_str(
-        canvas, 45, 7, subghz_frequency_analyzer_notebook_tag_label(model->notebook_tag));
+    subghz_frequency_analyzer_draw_action_hint(canvas);
 
     // RSSI
     canvas_draw_str(canvas, 33, 62, "RSSI");
