@@ -21,7 +21,7 @@ except ModuleNotFoundError:
     from generate_update_splash import generate_slideshow
 
 
-DEFAULT_TITLE = "TMWHFLPPRARF"
+DEFAULT_TITLE = "TUMOFLIP"
 DEV_TITLE = "T-DEV"
 DEFAULT_PREFIX = "tmwhflpprarf"
 DEV_SUFFIX_RE = re.compile(r"^t-dev-(?P<version>\d{3}-\d{3}-\d{3})$")

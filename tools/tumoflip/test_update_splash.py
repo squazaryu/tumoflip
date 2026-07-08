@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from hashlib import sha256
 from pathlib import Path
 import tempfile
 import unittest
@@ -18,11 +17,7 @@ from tools.tumoflip.sync_update_splash import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SPLASH_DIR = REPO_ROOT / "assets/slideshow/tumoflip_update"
-STATIC_FRAME_SHA256 = {
-    "frame_01.png": "9b42c3774f389f168c2b072705dc7c516087009b15f66b4c6b8745bdfd615bd0",
-    "frame_02.png": "fe93ce94fda74729938823e9896878fafc70098ebeb2b1919b33388a11645c56",
-    "frame_03.png": "71cd8aba43d2f63b02343282e0896a01f0cc0fa43b25872c48a32ec3a248f94a",
-}
+GRAVITY_FONT_DIR = REPO_ROOT / "assets/tumoflip/fonts/gravity"
 
 
 class UpdateSplashTest(unittest.TestCase):
@@ -53,12 +48,26 @@ class UpdateSplashTest(unittest.TestCase):
             ["frame_00.png", "frame_01.png", "frame_02.png", "frame_03.png"],
         )
 
-    def test_static_pages_match_089_015_layout(self) -> None:
-        for name, expected_hash in STATIC_FRAME_SHA256.items():
-            self.assertEqual(
-                sha256((SPLASH_DIR / name).read_bytes()).hexdigest(),
-                expected_hash,
-            )
+    def test_generated_pages_use_friendly_post_install_copy(self) -> None:
+        generator = (
+            REPO_ROOT / "tools/tumoflip/generate_update_splash.py"
+        ).read_text(encoding="utf-8")
+
+        for phrase in (
+            "UNLEASHED 089",
+            "TUMOFLIP FORK",
+            "CUSTOM BUILD",
+            "USE WITH CARE",
+            "ISSUES",
+            "GH: SQUAZARYU/TUMOFLIP",
+            "GravityBold8.ttf",
+            "GravityRegular5.ttf",
+        ):
+            self.assertIn(phrase, generator)
+
+    def test_gravity_font_assets_are_vendored(self) -> None:
+        for name in ("GravityBold8.ttf", "GravityRegular5.ttf", "README.md"):
+            self.assertTrue((GRAVITY_FONT_DIR / name).exists(), name)
 
     def test_sync_update_splash_removes_stale_frames(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -89,7 +98,7 @@ class UpdateSplashTest(unittest.TestCase):
         )
         self.assertEqual(
             current_splash_metadata("tmwhflpprarf089-031"),
-            ("TMWHFLPPRARF", "089-031"),
+            ("TUMOFLIP", "089-031"),
         )
 
     def test_fbt_autogenerates_tumoflip_update_splash(self) -> None:

@@ -8,8 +8,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_STATIC_FRAMES_DIR = REPO_ROOT / "assets/slideshow/tumoflip_update"
-STATIC_FRAME_NAMES = ("frame_01.png", "frame_02.png", "frame_03.png")
+DISPLAY_SIZE = (128, 64)
+GRAVITY_FONT_DIR = REPO_ROOT / "assets/tumoflip/fonts/gravity"
+GRAVITY_BOLD = GRAVITY_FONT_DIR / "GravityBold8.ttf"
+GRAVITY_REGULAR = GRAVITY_FONT_DIR / "GravityRegular5.ttf"
 
 
 SMALL_GLYPHS = {
@@ -29,6 +31,24 @@ SMALL_GLYPHS = {
         "#..##",
         "#...#",
         "#...#",
+        "#...#",
+    ),
+    "O": (
+        ".###.",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        "#...#",
+        ".###.",
+    ),
+    "K": (
+        "#...#",
+        "#..#.",
+        "#.#..",
+        "##...",
+        "#.#..",
+        "#..#.",
         "#...#",
     ),
     "T": (
@@ -239,23 +259,70 @@ def big_text_width(text: str) -> int:
     return pixel_text_width(BIG_DIGITS, text, spacing=2)
 
 
+def load_gravity_font(path: Path, size: int) -> ImageFont.ImageFont:
+    try:
+        return ImageFont.truetype(path, size=size)
+    except OSError:
+        return ImageFont.load_default()
+
+
+def gravity_bold(size: int) -> ImageFont.ImageFont:
+    return load_gravity_font(GRAVITY_BOLD, size)
+
+
+def gravity_regular(size: int) -> ImageFont.ImageFont:
+    return load_gravity_font(GRAVITY_REGULAR, size)
+
+
 def draw_next_button(draw: ImageDraw.ImageDraw) -> None:
-    draw_button(draw, "NEXT", (94, 45, 125, 57))
+    draw_button(draw, "NEXT", (88, 50, 125, 62))
 
 
 def draw_button(draw: ImageDraw.ImageDraw, text: str, button: tuple[int, int, int, int]) -> None:
     draw.rectangle(button, outline=0)
 
-    text_width = pixel_text_width(SMALL_GLYPHS, text)
+    font = gravity_bold(8)
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
     text_x = button[0] + ((button[2] - button[0] + 1) - text_width) // 2
-    draw_pixel_text(draw, SMALL_GLYPHS, text, text_x, 48)
+    text_y = button[1] + ((button[3] - button[1] + 1) - text_height) // 2
+    draw.text((text_x, text_y), text, font=font, fill=0)
+
+
+def draw_centered_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    y: int,
+    font: ImageFont.ImageFont,
+    extra_word_spacing: int = 0,
+) -> None:
+    words = text.split(" ")
+    if len(words) == 1:
+        bbox = draw.textbbox((0, 0), text, font=font)
+        width = bbox[2] - bbox[0]
+        draw.text(((DISPLAY_SIZE[0] - width) // 2, y), text, font=font, fill=0)
+        return
+
+    space_bbox = draw.textbbox((0, 0), " ", font=font)
+    space_width = max(3, space_bbox[2] - space_bbox[0]) + extra_word_spacing
+    word_widths = []
+    for word in words:
+        bbox = draw.textbbox((0, 0), word, font=font)
+        word_widths.append(bbox[2] - bbox[0])
+
+    width = sum(word_widths) + space_width * (len(words) - 1)
+    x = (DISPLAY_SIZE[0] - width) // 2
+    for word, word_width in zip(words, word_widths):
+        draw.text((x, y), word, font=font, fill=0)
+        x += word_width + space_width
 
 
 def generate_slideshow(
     title: str,
     version: str,
     output_dir: Path,
-    static_frames_dir: Path = DEFAULT_STATIC_FRAMES_DIR,
+    static_frames_dir: Path | None = None,
 ) -> list[Path]:
     frames = [
         output_dir / "frame_00.png",
@@ -264,17 +331,30 @@ def generate_slideshow(
         output_dir / "frame_03.png",
     ]
 
-    generate(title, version, frames[0])
-
     output_dir.mkdir(parents=True, exist_ok=True)
-    for name in STATIC_FRAME_NAMES:
-        source = static_frames_dir / name
-        target = output_dir / name
-        if source.resolve() == target.resolve():
-            if not target.exists():
-                raise FileNotFoundError(f"Missing static update splash frame: {target}")
-            continue
-        target.write_bytes(source.read_bytes())
+    generate(title, version, frames[0])
+    generate_message_frame(
+        (
+            ("UNLEASHED 089", gravity_bold(8), 18),
+            ("TUMOFLIP FORK", gravity_bold(8), 32),
+        ),
+        frames[1],
+    )
+    generate_message_frame(
+        (
+            ("CUSTOM BUILD", gravity_bold(8), 18),
+            ("USE WITH CARE", gravity_bold(8), 32),
+        ),
+        frames[2],
+    )
+    generate_message_frame(
+        (
+            ("ISSUES", gravity_bold(16), 16),
+            ("GH: SQUAZARYU/TUMOFLIP", gravity_regular(5), 39),
+        ),
+        frames[3],
+        button="OK",
+    )
 
     return frames
 
@@ -284,16 +364,17 @@ def generate(title: str, version: str, output: Path) -> None:
     if unsupported:
         raise ValueError(f"Unsupported version characters: {''.join(unsupported)}")
 
-    image = Image.new("1", (128, 64), 1)
+    image = Image.new("1", DISPLAY_SIZE, 1)
     draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default()
+    title_font = gravity_bold(16)
+    version_font = gravity_bold(16)
 
-    title_bbox = draw.textbbox((0, 0), title, font=font)
-    title_width = title_bbox[2] - title_bbox[0]
-    draw.text(((128 - title_width) // 2, 21), title, font=font, fill=0)
+    draw_centered_text(draw, title, 15, title_font)
 
-    version_width = big_text_width(version)
-    draw_big_text(draw, version, (128 - version_width) // 2, 32)
+    version_bbox = draw.textbbox((0, 0), version, font=version_font)
+    if version_bbox[2] - version_bbox[0] > 116:
+        version_font = gravity_bold(8)
+    draw_centered_text(draw, version, 32, version_font)
 
     draw_next_button(draw)
 
@@ -301,9 +382,25 @@ def generate(title: str, version: str, output: Path) -> None:
     image.save(output)
 
 
+def generate_message_frame(
+    lines: tuple[tuple[str, ImageFont.ImageFont, int], ...],
+    output: Path,
+    button: str = "NEXT",
+) -> None:
+    image = Image.new("1", DISPLAY_SIZE, 1)
+    draw = ImageDraw.Draw(image)
+
+    for text, font, y in lines:
+        draw_centered_text(draw, text, y, font)
+    draw_button(draw, button, (88, 50, 125, 62))
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    image.save(output)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--title", default="TMWHFLPPRARF")
+    parser.add_argument("--title", default="TUMOFLIP")
     parser.add_argument("--version", default="089-031")
     parser.add_argument(
         "--output",
