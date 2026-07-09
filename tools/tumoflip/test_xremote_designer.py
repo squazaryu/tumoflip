@@ -111,65 +111,81 @@ class XRemoteACLayoutTest(unittest.TestCase):
 
 class XRemoteACSmartTest(unittest.TestCase):
     def test_ac_smart_engine_uses_fz_ac_compatible_ir_names(self) -> None:
-        engine = (APP_DIR / "xremote_ac_engine.c").read_text(encoding="utf-8")
-        header = (APP_DIR / "xremote_ac_engine.h").read_text(encoding="utf-8")
-
-        self.assertIn('#define XREMOTE_AC_DIR              APP_DATA_PATH("ac")', header)
-        self.assertIn('#define XREMOTE_AC_FZ_AC_DIR        EXT_PATH("apps_data/fz_ac")', header)
-        self.assertIn('#define XREMOTE_AC_OFF_NAME         "Off"', header)
-        self.assertIn('snprintf(out, out_size, "%s %u", preset, temp);', engine)
-        self.assertIn("xremote_ac_name_parse", engine)
-
-    def test_ac_smart_runtime_loads_single_frame_on_send(self) -> None:
-        engine = (APP_DIR / "xremote_ac_engine.c").read_text(encoding="utf-8")
+        engine = (APP_DIR / "ac_smart/ac_ir.c").read_text(encoding="utf-8")
+        header = (APP_DIR / "ac_smart/ac_ir.h").read_text(encoding="utf-8")
         app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
 
-        self.assertIn("infrared_signal_search_and_read(signal, ff, signal_name)", engine)
-        self.assertIn("xremote_app_send_signal(app_ctx, signal)", engine)
-        self.assertIn('"Open Tumo AC"', app)
-        self.assertIn('"Open fz-ac profile"', app)
-        self.assertIn("xremote_ac_send_current", app)
-        self.assertIn("xremote_ac_send_off", app)
-        self.assertIn("XREMOTE_AC_OFF_NAME", app)
+        self.assertIn('#define XREMOTE_AC_DIR      EXT_PATH("apps_data/fz_ac")', app)
+        self.assertIn('#define AC_OFF_NAME         "Off"', header)
+        self.assertIn('snprintf(out, out_size, "%s %u", preset, temp);', engine)
+        self.assertIn("ac_smart_name_parse", engine)
+        self.assertIn("ac_smart_write_preset", engine)
+
+    def test_ac_smart_runtime_loads_single_frame_on_send(self) -> None:
+        engine = (APP_DIR / "ac_smart/ac_ir.c").read_text(encoding="utf-8")
+        app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
+
+        self.assertIn("ac_file_load_signal", engine)
+        self.assertIn("ac_ir_read_signal_body", engine)
+        self.assertIn("ac_ir_signal_send", engine)
+        self.assertIn('"Add Smart AC"', app)
+        self.assertIn('"Add Simple AC"', app)
+        self.assertIn("xremote_ac_smart_send", app)
+        self.assertIn("ac_remote_panel_add_item", app)
 
     def test_ac_smart_creator_writes_standard_ir_profile(self) -> None:
         app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
 
         for required in (
-            '"Create Smart AC"',
+            '"Add Smart AC"',
+            '"Add Simple AC"',
             "xremote_ac_start_name_input",
-            "XRemoteSignalReceiver* ir_receiver;",
-            "xremote_signal_receiver_start(ctx->ir_receiver)",
-            "xremote_signal_receiver_stop(ctx->ir_receiver)",
-            "infrared_remote_push_button(ctx->output_remote, XREMOTE_AC_OFF_NAME, ctx->capture_signal)",
-            "xremote_ac_signal_name(signal_name, sizeof(signal_name), ctx->preset_name, ctx->sweep_temp)",
-            "infrared_remote_store(ctx->output_remote)",
-            "XREMOTE_AC_SWEEP_TEMP_MIN",
-            "XREMOTE_AC_SWEEP_TEMP_MAX",
+            "InfraredWorker* rx_worker;",
+            "infrared_worker_rx_start(ctx->rx_worker)",
+            "infrared_worker_rx_stop(ctx->rx_worker)",
+            "ac_remote_save(&ctx->staged, ctx->storage, path)",
+            "ac_smart_write_preset(",
+            "LearnView* learn_view;",
+            "SweepView* sweep_view;",
         ):
             self.assertIn(required, app)
 
     def test_ac_smart_creator_cleans_up_rx_on_cancel_and_exit(self) -> None:
         app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
 
-        self.assertIn("xremote_ac_cancel_create", app)
-        self.assertIn("xremote_ac_stop_capture(ctx);", app)
-        self.assertIn("view_dispatcher_switch_to_view(app_ctx->view_dispatcher, XRemoteViewAcSmart)", app)
-        self.assertIn("xremote_signal_receiver_free(ctx->ir_receiver)", app)
+        self.assertIn("xremote_ac_cancel_flow", app)
+        self.assertIn("xremote_ac_rx_stop(ctx);", app)
+        self.assertIn("infrared_worker_free(ctx->rx_worker)", app)
+        self.assertIn("view_dispatcher_remove_view(view_disp, XRemoteViewAcSmartLearn)", app)
+        self.assertIn("view_dispatcher_remove_view(view_disp, XRemoteViewAcSmartSweep)", app)
+        self.assertIn("ac_ir_signal_reset(&ctx->off_capture)", app)
+
+    def test_ac_smart_panel_initializes_button_matrix(self) -> None:
+        panel = (APP_DIR / "ac_smart/views/ac_remote_panel.c").read_text(encoding="utf-8")
+        reserve = panel.split("void ac_remote_panel_reserve", 1)[1].split(
+            "void ac_remote_panel_free", 1
+        )[0]
+
+        self.assertIn("IconList_init(model->icons);", panel)
+        self.assertIn("ButtonMatrix_safe_get(model->button_matrix, x)", reserve)
+        self.assertIn("ButtonArray_safe_get(*array, y)", reserve)
+        self.assertIn("*item = NULL;", reserve)
+        self.assertNotIn("i > model->reserve_y", reserve)
+        self.assertNotIn("LabelList_init(model->labels);", reserve)
 
     def test_ac_smart_capture_defers_rx_ui_work_to_dispatcher(self) -> None:
         app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
         rx_callback = app.split("static void xremote_ac_rx_callback", 1)[1].split(
-            "static bool xremote_ac_custom_event_callback", 1
+            "static void xremote_ac_rx_alloc", 1
         )[0]
 
         self.assertIn("view_dispatcher_send_custom_event", rx_callback)
-        self.assertNotIn("xremote_ac_stop_capture(ctx);", rx_callback)
+        self.assertNotIn("xremote_ac_rx_stop(ctx);", rx_callback)
         self.assertNotIn("view_dispatcher_switch_to_view", rx_callback)
         self.assertIn("static bool xremote_ac_custom_event_callback", app)
         self.assertIn(
             "view_dispatcher_set_custom_event_callback(\n"
-            "        app_ctx->view_dispatcher, xremote_ac_custom_event_callback)",
+            "        ctx->app_ctx->view_dispatcher, xremote_ac_custom_event_callback)",
             app,
         )
 
