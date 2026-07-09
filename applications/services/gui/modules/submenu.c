@@ -30,6 +30,7 @@ static void SubmenuItem_init(SubmenuItem* item) {
     item->index = 0;
     item->callback = NULL;
     item->callback_context = NULL;
+    item->has_extended_events = false;
     item->locked = false;
     item->locked_message = furi_string_alloc();
 }
@@ -39,6 +40,7 @@ static void SubmenuItem_init_set(SubmenuItem* item, const SubmenuItem* src) {
     item->index = src->index;
     item->callback = src->callback;
     item->callback_context = src->callback_context;
+    item->has_extended_events = src->has_extended_events;
     item->locked = src->locked;
     item->locked_message = furi_string_alloc_set(src->locked_message);
 }
@@ -48,6 +50,7 @@ static void SubmenuItem_set(SubmenuItem* item, const SubmenuItem* src) {
     item->index = src->index;
     item->callback = src->callback;
     item->callback_context = src->callback_context;
+    item->has_extended_events = src->has_extended_events;
     item->locked = src->locked;
     furi_string_set(item->locked_message, src->locked_message);
 }

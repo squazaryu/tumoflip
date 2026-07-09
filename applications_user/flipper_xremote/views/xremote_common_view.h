@@ -158,6 +158,7 @@ typedef enum {
     XRemoteViewAcSmartTextInput,
     XRemoteViewAcSmartLearn,
     XRemoteViewAcSmartSweep,
+    XRemoteViewAcSmartDelete,
     XRemoteViewSaved,
     XRemoteViewAnalyzer,
     XRemoteViewSettings,

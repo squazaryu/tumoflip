@@ -15,6 +15,7 @@
 #include "ac_smart/views/sweep_view.h"
 
 #include <ctype.h>
+#include <gui/modules/dialog_ex.h>
 #include <infrared_transmit.h>
 #include <storage/storage.h>
 #include <toolbox/path.h>
@@ -72,6 +73,7 @@ typedef struct {
     XRemoteAppContext* app_ctx;
     Storage* storage;
     TextInput* text_input;
+    DialogEx* delete_dialog;
     ACRemotePanel* panel;
     LearnView* learn_view;
     SweepView* sweep_view;
@@ -100,6 +102,8 @@ typedef struct {
     FuriString* str;
     AcIrSignal capture;
     AcRemote staged;
+    int32_t delete_ac;
+    char delete_name[XREMOTE_AC_NAME_LEN];
 
     AcIrSignal off_capture;
     char preset_buf[AC_PRESET_NAME_LEN];
@@ -117,6 +121,8 @@ static void xremote_ac_start_simple_learn(XRemoteAcContext* ctx);
 static void xremote_ac_start_smart_off(XRemoteAcContext* ctx);
 static void xremote_ac_start_sweep(XRemoteAcContext* ctx);
 static void xremote_ac_submenu_callback(void* context, uint32_t index);
+static void xremote_ac_submenu_callback_ex(void* context, InputType input_type, uint32_t index);
+static void xremote_ac_delete_dialog_callback(DialogExResult result, void* context);
 static void xremote_ac_remote_button_callback(void* context, uint32_t index);
 static void xremote_ac_learn_view_callback(void* context, LearnViewEvent event);
 static void xremote_ac_sweep_view_callback(void* context, SweepViewEvent event);
@@ -129,6 +135,11 @@ static void xremote_ac_switch_to_view(XRemoteAcContext* ctx, uint32_t view_id) {
 static uint32_t xremote_ac_submenu_exit_callback(void* context) {
     UNUSED(context);
     return XRemoteViewSubmenu;
+}
+
+static uint32_t xremote_ac_delete_dialog_exit_callback(void* context) {
+    UNUSED(context);
+    return XRemoteViewAcSmart;
 }
 
 static void xremote_ac_ac_path(const char* name, char* out, size_t out_size) {
@@ -226,11 +237,12 @@ static void xremote_ac_rebuild_menu(XRemoteAcContext* ctx) {
 
     xremote_ac_refresh_list(ctx);
     for(uint32_t i = 0; i < ctx->ac_count; i++) {
-        xremote_app_submenu_add(
-            ctx->app,
+        submenu_add_item_ex(
+            ctx->app->submenu,
             ctx->ac_names[i],
             XRemoteAcMenuOpenBase + i,
-            xremote_ac_submenu_callback);
+            xremote_ac_submenu_callback_ex,
+            ctx);
     }
 }
 
@@ -784,6 +796,77 @@ static void xremote_ac_start_preset_input(XRemoteAcContext* ctx) {
     xremote_ac_switch_to_view(ctx, XRemoteViewAcSmartTextInput);
 }
 
+static void xremote_ac_open_ac_index(XRemoteAcContext* ctx, uint32_t ac_index) {
+    if(ac_index < ctx->ac_count) {
+        ctx->current_ac = ac_index;
+        xremote_ac_open_remote(ctx);
+    }
+}
+
+static void xremote_ac_show_delete_dialog(XRemoteAcContext* ctx, uint32_t ac_index) {
+    if(ac_index >= ctx->ac_count) {
+        xremote_ac_notify(ctx, false);
+        return;
+    }
+
+    ctx->delete_ac = (int32_t)ac_index;
+    snprintf(ctx->delete_name, sizeof(ctx->delete_name), "%s", ctx->ac_names[ac_index]);
+
+    char text[64];
+    snprintf(text, sizeof(text), "%s\nfrom Smart AC", ctx->delete_name);
+
+    dialog_ex_reset(ctx->delete_dialog);
+    dialog_ex_set_header(ctx->delete_dialog, "Delete AC?", 64, 0, AlignCenter, AlignTop);
+    dialog_ex_set_text(ctx->delete_dialog, text, 64, 20, AlignCenter, AlignTop);
+    dialog_ex_set_left_button_text(ctx->delete_dialog, "Cancel");
+    dialog_ex_set_right_button_text(ctx->delete_dialog, "Delete");
+    dialog_ex_set_context(ctx->delete_dialog, ctx);
+    dialog_ex_set_result_callback(ctx->delete_dialog, xremote_ac_delete_dialog_callback);
+    xremote_ac_switch_to_view(ctx, XRemoteViewAcSmartDelete);
+}
+
+static void xremote_ac_delete_pending(XRemoteAcContext* ctx) {
+    if(ctx->delete_ac < 0) {
+        xremote_ac_notify(ctx, false);
+        xremote_ac_switch_to_view(ctx, XRemoteViewAcSmart);
+        return;
+    }
+
+    const uint32_t old_index = (uint32_t)ctx->delete_ac;
+    char path[XREMOTE_AC_PATH_LEN];
+    xremote_ac_ac_path(ctx->delete_name, path, sizeof(path));
+    const FS_Error error = storage_common_remove(ctx->storage, path);
+    const bool deleted = (error == FSE_OK) || (error == FSE_NOT_EXIST);
+
+    ctx->delete_ac = -1;
+    ctx->delete_name[0] = '\0';
+
+    if(deleted) {
+        ctx->current_ac = -1;
+        xremote_ac_rebuild_menu(ctx);
+        if(ctx->ac_count > 0) {
+            const uint32_t next_index = (old_index < ctx->ac_count) ? old_index : ctx->ac_count - 1;
+            submenu_set_selected_item(ctx->app->submenu, XRemoteAcMenuOpenBase + next_index);
+        } else {
+            submenu_set_selected_item(ctx->app->submenu, XRemoteAcMenuAddSmart);
+        }
+    }
+
+    xremote_ac_notify(ctx, deleted);
+    xremote_ac_switch_to_view(ctx, XRemoteViewAcSmart);
+}
+
+static void xremote_ac_delete_dialog_callback(DialogExResult result, void* context) {
+    XRemoteAcContext* ctx = context;
+    if(result == DialogExResultRight) {
+        xremote_ac_delete_pending(ctx);
+    } else if(result == DialogExResultLeft || result == DialogExResultCenter) {
+        ctx->delete_ac = -1;
+        ctx->delete_name[0] = '\0';
+        xremote_ac_switch_to_view(ctx, XRemoteViewAcSmart);
+    }
+}
+
 static void xremote_ac_submenu_callback(void* context, uint32_t index) {
     XRemoteApp* app = context;
     XRemoteAcContext* ctx = app->context;
@@ -793,10 +876,19 @@ static void xremote_ac_submenu_callback(void* context, uint32_t index) {
         xremote_ac_start_name_input(ctx, XRemoteAcFlowSimpleLearn);
     } else if(index >= XRemoteAcMenuOpenBase) {
         const uint32_t ac_index = index - XRemoteAcMenuOpenBase;
-        if(ac_index < ctx->ac_count) {
-            ctx->current_ac = ac_index;
-            xremote_ac_open_remote(ctx);
-        }
+        xremote_ac_open_ac_index(ctx, ac_index);
+    }
+}
+
+static void xremote_ac_submenu_callback_ex(void* context, InputType input_type, uint32_t index) {
+    XRemoteAcContext* ctx = context;
+    if(index < XRemoteAcMenuOpenBase) return;
+
+    const uint32_t ac_index = index - XRemoteAcMenuOpenBase;
+    if(input_type == InputTypeShort) {
+        xremote_ac_open_ac_index(ctx, ac_index);
+    } else if(input_type == InputTypeLong) {
+        xremote_ac_show_delete_dialog(ctx, ac_index);
     }
 }
 
@@ -812,6 +904,8 @@ static void xremote_ac_context_free(void* context) {
 
     view_dispatcher_remove_view(view_disp, XRemoteViewAcSmartTextInput);
     text_input_free(ctx->text_input);
+    view_dispatcher_remove_view(view_disp, XRemoteViewAcSmartDelete);
+    dialog_ex_free(ctx->delete_dialog);
     view_dispatcher_remove_view(view_disp, XRemoteViewAcSmartRemote);
     ac_remote_panel_free(ctx->panel);
     view_dispatcher_remove_view(view_disp, XRemoteViewAcSmartLearn);
@@ -844,6 +938,11 @@ static XRemoteAcContext* xremote_ac_context_alloc(XRemoteApp* app) {
     view_set_previous_callback(text_view, xremote_ac_text_input_exit_callback);
     view_dispatcher_add_view(ctx->app_ctx->view_dispatcher, XRemoteViewAcSmartTextInput, text_view);
 
+    ctx->delete_dialog = dialog_ex_alloc();
+    View* delete_view = dialog_ex_get_view(ctx->delete_dialog);
+    view_set_previous_callback(delete_view, xremote_ac_delete_dialog_exit_callback);
+    view_dispatcher_add_view(ctx->app_ctx->view_dispatcher, XRemoteViewAcSmartDelete, delete_view);
+
     ctx->panel = ac_remote_panel_alloc();
     view_dispatcher_add_view(
         ctx->app_ctx->view_dispatcher, XRemoteViewAcSmartRemote, ac_remote_panel_get_view(ctx->panel));
@@ -861,6 +960,7 @@ static XRemoteAcContext* xremote_ac_context_alloc(XRemoteApp* app) {
     ctx->signal_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     ctx->str = furi_string_alloc();
     ctx->current_ac = -1;
+    ctx->delete_ac = -1;
     ctx->current_view = XRemoteViewAcSmart;
     ctx->temp_display = 20;
     ctx->sweep_temp_start = 16;

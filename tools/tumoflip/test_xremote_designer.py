@@ -124,6 +124,7 @@ class XRemoteACSmartTest(unittest.TestCase):
     def test_ac_smart_runtime_loads_single_frame_on_send(self) -> None:
         engine = (APP_DIR / "ac_smart/ac_ir.c").read_text(encoding="utf-8")
         app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
+        header = (APP_DIR / "views/xremote_common_view.h").read_text(encoding="utf-8")
 
         self.assertIn("ac_file_load_signal", engine)
         self.assertIn("ac_ir_read_signal_body", engine)
@@ -132,6 +133,7 @@ class XRemoteACSmartTest(unittest.TestCase):
         self.assertIn('"Add Button AC"', app)
         self.assertIn("xremote_ac_smart_send", app)
         self.assertIn("ac_remote_panel_add_item", app)
+        self.assertIn("XRemoteViewAcSmartDelete", header)
 
     def test_ac_smart_creator_writes_standard_ir_profile(self) -> None:
         app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
@@ -160,6 +162,17 @@ class XRemoteACSmartTest(unittest.TestCase):
         self.assertIn('"POWER"', engine)
         self.assertIn("const bool has_fan = !smart && ctx->remote.signals[AcButtonFan].present;", app)
         self.assertIn("const bool has_vane = !smart && ctx->remote.signals[AcButtonVane].present;", app)
+
+    def test_ac_smart_long_ok_deletes_saved_remote_with_confirmation(self) -> None:
+        app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
+
+        self.assertIn("submenu_add_item_ex(", app)
+        self.assertIn("xremote_ac_submenu_callback_ex", app)
+        self.assertIn("input_type == InputTypeLong", app)
+        self.assertIn('dialog_ex_set_header(ctx->delete_dialog, "Delete AC?"', app)
+        self.assertIn('dialog_ex_set_right_button_text(ctx->delete_dialog, "Delete")', app)
+        self.assertIn("storage_common_remove(ctx->storage, path)", app)
+        self.assertIn("(error == FSE_OK) || (error == FSE_NOT_EXIST)", app)
 
     def test_ac_smart_creator_cleans_up_rx_on_cancel_and_exit(self) -> None:
         app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
