@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DISPLAY_SIZE = (128, 64)
+FIRST_FRAME_SAFE_TOP = 18
 GRAVITY_FONT_DIR = REPO_ROOT / "assets/tumoflip/fonts/gravity"
 GRAVITY_BOLD = GRAVITY_FONT_DIR / "GravityBold8.ttf"
 GRAVITY_REGULAR = GRAVITY_FONT_DIR / "GravityRegular5.ttf"
@@ -382,12 +383,12 @@ def generate(title: str, version: str, output: Path) -> None:
     title_font = gravity_bold(16)
     version_font = gravity_bold(16)
 
-    draw_centered_text(draw, title, 15, title_font)
+    draw_centered_text(draw, title, FIRST_FRAME_SAFE_TOP, title_font)
 
     version_bbox = draw.textbbox((0, 0), version, font=version_font)
     if version_bbox[2] - version_bbox[0] > 116:
         version_font = gravity_bold(8)
-    draw_centered_text(draw, version, 32, version_font)
+    draw_centered_text(draw, version, 35, version_font)
 
     draw_next_button(draw)
 

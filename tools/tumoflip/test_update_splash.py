@@ -45,6 +45,11 @@ class UpdateSplashTest(unittest.TestCase):
             ["frame_00.png", "frame_01.png", "frame_02.png", "frame_03.png"],
         )
 
+    def test_first_page_keeps_top_bar_clear(self) -> None:
+        with Image.open(SPLASH_DIR / "frame_00.png") as frame:
+            top_bar_area = frame.convert("1").crop((0, 0, 128, 18))
+            self.assertEqual(top_bar_area.getextrema(), (255, 255))
+
     def test_generated_pages_use_friendly_post_install_copy(self) -> None:
         generator = (
             REPO_ROOT / "tools/tumoflip/generate_update_splash.py"
