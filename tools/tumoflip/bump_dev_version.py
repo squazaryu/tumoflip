@@ -71,16 +71,20 @@ def compute_dev_version(
     if set_suffix:
         return DevVersion.parse(set_suffix).format()
 
-    current = DevVersion.parse(current_suffix)
-    new_base = validate_component("base", base) if base else current.base
-    new_build = validate_component("build", build) if build else current.build
+    prefix, current_base, current_build, current_iteration = parse_dist_suffix(current_suffix)
+    new_base = validate_component("base", base) if base else current_base
+    new_build = validate_component("build", build) if build else current_build
 
     if iteration:
         new_iteration = validate_component("iteration", iteration)
-    elif new_base != current.base or new_build != current.build:
+    elif prefix == "tmwhflpprarf":
         new_iteration = "001"
     else:
-        new_iteration = next_iteration(current.iteration)
+        current = DevVersion(current_base, current_build, current_iteration or "001")
+        if new_base != current.base or new_build != current.build:
+            new_iteration = "001"
+        else:
+            new_iteration = next_iteration(current.iteration)
 
     return DevVersion(new_base, new_build, new_iteration).format()
 
@@ -115,7 +119,7 @@ def apply_dev_version(
 ) -> tuple[str, str]:
     repo_root = repo_root.resolve()
     old_suffix = read_dist_suffix(repo_root)
-    DevVersion.parse(old_suffix)
+    parse_dist_suffix(old_suffix)
     DevVersion.parse(new_suffix)
 
     options_path = repo_root / "fbt_options.py"

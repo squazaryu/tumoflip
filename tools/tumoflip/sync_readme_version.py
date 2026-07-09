@@ -72,6 +72,16 @@ def sync_readme_text(text: str, dist_suffix: str, release_tag: str | None = None
             count=1,
         )
 
+    expected_channel = (
+        "main stable line" if prefix == "tmwhflpprarf" else "dev experimental line"
+    )
+    updated = re.sub(
+        r"- Release channel: `[^`]+`[^\n]*",
+        f"- Release channel: `{expected_channel}`",
+        updated,
+        count=1,
+    )
+
     if release_tag:
         if not release_tag.startswith("v"):
             raise ValueError(f"release tag must start with v: {release_tag}")

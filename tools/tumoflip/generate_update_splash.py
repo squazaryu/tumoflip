@@ -333,18 +333,31 @@ def generate_slideshow(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     generate(title, version, frames[0])
-    generate_message_frame(
-        (
-            ("UNLEASHED 089", gravity_bold(8), 22),
+    base_version = version.split("-", 1)[0]
+    if title == "T-DEV":
+        frame_01_lines = (
+            (f"UNLEASHED {base_version}", gravity_bold(8), 22),
+            ("TUMOFLIP DEV", gravity_bold(8), 36),
+        )
+        frame_02_lines = (
+            ("DEV BUILD", gravity_bold(8), 22),
+            ("MAY BE UNSTABLE", gravity_bold(8), 36),
+        )
+    else:
+        frame_01_lines = (
+            (f"UNLEASHED {base_version}", gravity_bold(8), 22),
             ("TUMOFLIP FORK", gravity_bold(8), 36),
-        ),
+        )
+        frame_02_lines = (
+            ("CUSTOM BUILD", gravity_bold(8), 22),
+            ("USE WITH CARE", gravity_bold(8), 36),
+        )
+    generate_message_frame(
+        frame_01_lines,
         frames[1],
     )
     generate_message_frame(
-        (
-            ("CUSTOM BUILD", gravity_bold(8), 22),
-            ("USE WITH CARE", gravity_bold(8), 36),
-        ),
+        frame_02_lines,
         frames[2],
     )
     generate_message_frame(

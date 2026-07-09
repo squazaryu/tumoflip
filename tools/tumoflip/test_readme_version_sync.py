@@ -44,6 +44,7 @@ tmwhflpprarf089-030
     def test_sync_updates_dev_versions(self) -> None:
         original = """# tumoflip
 - Firmware version: `tmwhflpprarf089-034`
+- Release channel: `main` stable line
 - Release package: `flipper-z-f7-update-tmwhflpprarf089-034.tgz`
 tmwhflpprarf089-034
 - `t-dev`: Tumoflip development build prefix for unstable builds.
@@ -54,6 +55,7 @@ tmwhflpprarf089-034
         updated = sync_readme_text(original, "t-dev-089-035-001")
 
         self.assertIn("Firmware version: `t-dev-089-035-001`", updated)
+        self.assertIn("Release channel: `dev experimental line`", updated)
         self.assertIn("flipper-z-f7-update-t-dev-089-035-001.tgz", updated)
         self.assertIn("- `035`: tumoflip internal build version.", updated)
         self.assertIn(

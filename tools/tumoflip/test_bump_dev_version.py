@@ -32,9 +32,11 @@ class BumpDevVersionTest(unittest.TestCase):
             "t-dev-089-036-010",
         )
 
-    def test_rejects_stable_source_version(self) -> None:
-        with self.assertRaises(ValueError):
-            compute_dev_version("tmwhflpprarf089-035")
+    def test_starts_dev_line_from_stable_source_version(self) -> None:
+        self.assertEqual(
+            compute_dev_version("tmwhflpprarf089-036", build="037"),
+            "t-dev-089-037-001",
+        )
 
     def test_updates_options_and_readme_together(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -79,11 +81,16 @@ class BumpDevVersionTest(unittest.TestCase):
                 readme,
             )
 
-    def test_current_dist_suffix_is_release_version(self) -> None:
-        self.assertEqual(
-            parse_dist_suffix(fbt_options.DIST_SUFFIX),
-            ("tmwhflpprarf", "089", "036", None),
-        )
+    def test_current_dist_suffix_is_tumoflip_version(self) -> None:
+        prefix, base, build, iteration = parse_dist_suffix(fbt_options.DIST_SUFFIX)
+
+        self.assertIn(prefix, ("tmwhflpprarf", "t-dev"))
+        self.assertRegex(base, r"^\d{3}$")
+        self.assertRegex(build, r"^\d{3}$")
+        if prefix == "tmwhflpprarf":
+            self.assertIsNone(iteration)
+        else:
+            self.assertRegex(iteration or "", r"^\d{3}$")
 
 
 if __name__ == "__main__":

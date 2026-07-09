@@ -54,10 +54,13 @@ class UpdateSplashTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         for phrase in (
-            "UNLEASHED 089",
+            "UNLEASHED {base_version}",
             "TUMOFLIP FORK",
+            "TUMOFLIP DEV",
             "CUSTOM BUILD",
             "USE WITH CARE",
+            "DEV BUILD",
+            "MAY BE UNSTABLE",
             "ISSUES",
             "GH: SQUAZARYU/TUMOFLIP",
             "GravityBold8.ttf",
