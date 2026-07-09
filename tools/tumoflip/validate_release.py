@@ -5,11 +5,15 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
+import io
 import json
 import re
 import shutil
+import struct
 import subprocess
 import sys
+import tarfile
 import zlib
 from pathlib import Path
 
@@ -410,6 +414,20 @@ def install_static_sd_resources(repo_root: Path, resources: Path) -> None:
         target.write_bytes(source.read_bytes())
 
 
+def validate_static_sd_resources(repo_root: Path, resources: Path) -> None:
+    source_root = repo_root / STATIC_SD_RESOURCES
+    if not source_root.is_dir():
+        raise ValidationError(f"Static SD resource root is missing: {source_root}")
+
+    for source in source_root.rglob("*"):
+        if not source.is_file():
+            continue
+        relative = source.relative_to(source_root)
+        target = require_file(resources / relative, f"static SD resource {relative}")
+        if sha256(source) != sha256(target):
+            raise ValidationError(f"Static SD resource differs from build output: {relative}")
+
+
 def sync_extapp_package_exports(build_dir: Path, resources: Path) -> list[dict[str, object]]:
     extapps = build_dir / ".extapps"
     if not extapps.is_dir():
@@ -434,6 +452,99 @@ def sync_extapp_package_exports(build_dir: Path, resources: Path) -> list[dict[s
         )
     prune_legacy_resource_exports(resources)
     return synced
+
+
+def validate_extapp_package_exports(
+    repo_root: Path, build_dir: Path, resources: Path
+) -> None:
+    require_file(build_dir / "firmware.json", "firmware metadata")
+    extapps = build_dir / ".extapps"
+    if not extapps.is_dir():
+        raise ValidationError(f"External app build directory is missing: {extapps}")
+
+    sources_by_target: dict[str, list[Path]] = {}
+    for filename, relative in package_extapp_exports().items():
+        sources_by_target.setdefault(relative, []).append(extapps / filename)
+
+    for relative, candidates in sorted(sources_by_target.items()):
+        target = require_file(resources / relative, f"packaged external app {relative}")
+        sources = [candidate for candidate in candidates if candidate.is_file()]
+        if not sources:
+            static_source = repo_root / STATIC_SD_RESOURCES / relative
+            if static_source.is_file():
+                continue
+            candidate_names = ", ".join(str(candidate) for candidate in candidates)
+            raise ValidationError(
+                f"External app build artifact is missing for {relative}: {candidate_names}"
+            )
+        target_hash = sha256(target)
+        if all(sha256(source) != target_hash for source in sources):
+            raise ValidationError(f"External app differs from build artifacts: {relative}")
+
+
+def _load_heatshrink2(repo_root: Path):
+    try:
+        return importlib.import_module("heatshrink2")
+    except ImportError:
+        pass
+
+    site_packages = sorted(
+        (repo_root / "toolchain/current/lib").glob("python*/site-packages")
+    )
+    for candidate in site_packages:
+        sys.path.insert(0, str(candidate))
+        try:
+            return importlib.import_module("heatshrink2")
+        except ImportError:
+            continue
+
+    raise ValidationError("heatshrink2 was not found in Python or the workspace toolchain")
+
+
+def resources_archive_hashes(repo_root: Path, archive_path: Path) -> dict[str, str]:
+    data = require_file(archive_path, "resources archive").read_bytes()
+    if len(data) < 7:
+        raise ValidationError("resources.ths is too small")
+
+    magic, version, window, lookahead = struct.unpack("<IBBB", data[:7])
+    if magic != 0x53445348 or version != 1:
+        raise ValidationError("resources.ths has an invalid heatshrink header")
+
+    heatshrink2 = _load_heatshrink2(repo_root)
+    try:
+        plain_tar = heatshrink2.decompress(
+            data[7:], window_sz2=window, lookahead_sz2=lookahead
+        )
+        with tarfile.open(fileobj=io.BytesIO(plain_tar), mode="r:") as archive:
+            hashes: dict[str, str] = {}
+            for member in archive.getmembers():
+                if not member.isfile():
+                    continue
+                stream = archive.extractfile(member)
+                if stream is None:
+                    raise ValidationError(f"resources.ths entry cannot be read: {member.name}")
+                hashes[member.name] = hashlib.sha256(stream.read()).hexdigest()
+            return hashes
+    except Exception as error:
+        if isinstance(error, ValidationError):
+            raise
+        raise ValidationError(f"resources.ths cannot be decoded: {error}") from error
+
+
+def validate_resources_archive(
+    repo_root: Path,
+    archive_path: Path,
+    packages: dict[str, list[dict[str, object]]],
+) -> None:
+    archive_hashes = resources_archive_hashes(repo_root, archive_path)
+    for entries in packages.values():
+        for entry in entries:
+            relative = str(entry["target"]).removeprefix("/ext/")
+            archive_hash = archive_hashes.get(relative)
+            if archive_hash is None:
+                raise ValidationError(f"Package entry is missing from resources.ths: {relative}")
+            if archive_hash != entry["sha256"]:
+                raise ValidationError(f"Package entry differs in resources.ths: {relative}")
 
 
 def prune_legacy_resource_exports(resources: Path) -> None:
@@ -587,10 +698,11 @@ def validate_release(
     resources = require_file(
         build_dir / "resources/Manifest", "resource manifest"
     ).parent
-    install_static_sd_resources(repo_root, resources)
-    sync_extapp_package_exports(build_dir, resources)
+    validate_static_sd_resources(repo_root, resources)
+    validate_extapp_package_exports(repo_root, build_dir, resources)
     validate_layout(resources)
     packages = package_entries(resources)
+    validate_resources_archive(repo_root, referenced["Resources"], packages)
     api = api_version(repo_root / "targets/f7/api_symbols.csv")
     manifest: dict[str, object] = {
         "schema": 2,

@@ -36,10 +36,7 @@ class UpdateSplashTest(unittest.TestCase):
 
             for expected in expected_frames:
                 actual = SPLASH_DIR / expected.name
-                if expected.name == "frame_00.png":
-                    self.assertPngPixelsEqual(actual, expected)
-                else:
-                    self.assertEqual(actual.read_bytes(), expected.read_bytes())
+                self.assertPngPixelsEqual(actual, expected)
 
     def test_update_splash_has_expected_pages(self) -> None:
         frames = sorted(path.name for path in SPLASH_DIR.glob("frame_*.png"))

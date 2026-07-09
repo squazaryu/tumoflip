@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 
 import copy
+import hashlib
+import io
 import os
+import struct
+import tarfile
 import tempfile
 import unittest
 import zlib
@@ -14,13 +18,17 @@ try:
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
+        ValidationError,
+        _load_heatshrink2,
         crc32,
         find_objdump,
         little_endian_hex,
         manifest_release_id,
         parse_fuf,
+        resources_archive_hashes,
         runtime_capabilities,
         validate_runtime_contract,
+        validate_static_sd_resources,
     )
 except ImportError:
     from validate_release import (
@@ -29,13 +37,17 @@ except ImportError:
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
+        ValidationError,
+        _load_heatshrink2,
         crc32,
         find_objdump,
         little_endian_hex,
         manifest_release_id,
         parse_fuf,
+        resources_archive_hashes,
         runtime_capabilities,
         validate_runtime_contract,
+        validate_static_sd_resources,
     )
 
 
@@ -81,6 +93,55 @@ class ValidateReleaseTest(unittest.TestCase):
             path = Path(directory) / "data.bin"
             path.write_bytes(b"tumoflip")
             self.assertEqual(crc32(path), zlib.crc32(b"tumoflip") & 0xFFFFFFFF)
+
+    def test_static_sd_resources_are_build_inputs(self) -> None:
+        firmware = (REPO_ROOT / "firmware.scons").read_text(encoding="utf-8")
+        resource_builder = (
+            REPO_ROOT / "scripts/fbt_tools/fbt_resources.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("_STATIC_SD_RESOURCES", firmware)
+        self.assertIn("#/tools/tumoflip/sd_resources", firmware)
+        self.assertIn('env.get("_STATIC_SD_RESOURCES", [])', resource_builder)
+        self.assertIn('env.GlobRecursive("*", static_root)', resource_builder)
+        self.assertIn("Static resource target collision", resource_builder)
+
+    def test_static_sd_resources_must_match_build_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory) / "repo"
+            source = repo_root / STATIC_SD_RESOURCES / "apps/demo.fap"
+            resources = Path(directory) / "resources"
+            target = resources / "apps/demo.fap"
+            source.parent.mkdir(parents=True)
+            target.parent.mkdir(parents=True)
+            source.write_bytes(b"same")
+            target.write_bytes(b"same")
+
+            validate_static_sd_resources(repo_root, resources)
+            target.write_bytes(b"different")
+            with self.assertRaises(ValidationError):
+                validate_static_sd_resources(repo_root, resources)
+
+    def test_resources_archive_hashes_decodes_ths(self) -> None:
+        payload = b"routed-fap"
+        plain_tar = io.BytesIO()
+        with tarfile.open(fileobj=plain_tar, mode="w:") as archive:
+            info = tarfile.TarInfo("apps/demo.fap")
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+
+        heatshrink2 = _load_heatshrink2(REPO_ROOT)
+        compressed = heatshrink2.compress(
+            plain_tar.getvalue(), window_sz2=13, lookahead_sz2=6
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            archive_path = Path(directory) / "resources.ths"
+            archive_path.write_bytes(
+                struct.pack("<IBBB", 0x53445348, 1, 13, 6) + compressed
+            )
+            hashes = resources_archive_hashes(REPO_ROOT, archive_path)
+
+        self.assertEqual(hashes["apps/demo.fap"], hashlib.sha256(payload).hexdigest())
 
     def test_find_objdump_falls_back_to_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

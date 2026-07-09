@@ -40,6 +40,22 @@ def __generate_resources_dist_entries(env):
                 )
             )
 
+    # Merge Tumoflip-owned static SD resources at the resource root. Keeping
+    # them as explicit source nodes makes SCons rebuild resources.ths whenever
+    # one of these files changes.
+    existing_targets = {target.abspath for _, target in src_target_entries}
+    for static_root in env.get("_STATIC_SD_RESOURCES", []):
+        if not isinstance(static_root, Dir):
+            raise StopError(f"Unsupported static resource root: {type(static_root)}")
+        for res_file in env.GlobRecursive("*", static_root):
+            if not isinstance(res_file, File):
+                continue
+            target = resources_root.File(res_file.get_path(static_root))
+            if target.abspath in existing_targets:
+                raise StopError(f"Static resource target collision: {target.path}")
+            existing_targets.add(target.abspath)
+            src_target_entries.append((res_file, target))
+
     # Deploy other stuff from _EXTRA_DIST
     for extra_dist in env["_EXTRA_DIST"]:
         if isinstance(extra_dist, Dir):

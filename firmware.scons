@@ -164,6 +164,7 @@ if env["IS_BASE_FIRMWARE"]:
         "${RESOURCES_ROOT}/Manifest",
         GIT_UNIX_TIMESTAMP=get_git_commit_unix_timestamp(),
         _EXTRA_DIST=[fwenv["DOLPHIN_EXTERNAL_OUT_DIR"]],
+        _STATIC_SD_RESOURCES=[fwenv.Dir("#/tools/tumoflip/sd_resources")],
     )
     fwenv.Replace(FW_RESOURCES_MANIFEST=manifest)
     fwenv.Alias("resources", manifest)
