@@ -3,7 +3,7 @@ App(
     name="Tumo XRemote",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="xremote_main",
-    requires=["gui", "dialogs", "infrared"],
+    requires=["gui", "dialogs", "infrared", "storage"],
     fap_libs=["assets", "infrared"],
     stack_size=3 * 1024,
     order=1,

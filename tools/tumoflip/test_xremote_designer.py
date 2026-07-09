@@ -21,6 +21,18 @@ class XRemoteDesignerTest(unittest.TestCase):
         self.assertIn("XRemoteViewDesignerMap", header)
         self.assertIn('fap_version="1.7.1"', manifest)
 
+    def test_ac_smart_is_integrated_as_xremote_child_app(self) -> None:
+        source = (APP_DIR / "xremote.c").read_text(encoding="utf-8")
+        header = (APP_DIR / "views/xremote_common_view.h").read_text(encoding="utf-8")
+        manifest = (APP_DIR / "application.fam").read_text(encoding="utf-8")
+
+        self.assertIn('#include "xremote_ac.h"', source)
+        self.assertIn('"AC Smart", XRemoteViewAcSmart', source)
+        self.assertIn("xremote_ac_alloc(app->app_ctx)", source)
+        self.assertIn("XRemoteViewAcSmart", header)
+        self.assertIn("XRemoteViewAcSmartRemote", header)
+        self.assertIn('"storage"', manifest)
+
     def test_designer_exports_standard_ir_with_xremote_layout_metadata(self) -> None:
         designer = (APP_DIR / "xremote_designer.c").read_text(encoding="utf-8")
 
@@ -95,6 +107,30 @@ class XRemoteACLayoutTest(unittest.TestCase):
             "XREMOTE_COMMAND_HEAT_LO",
         ):
             self.assertIn(command, ac_source)
+
+
+class XRemoteACSmartTest(unittest.TestCase):
+    def test_ac_smart_engine_uses_fz_ac_compatible_ir_names(self) -> None:
+        engine = (APP_DIR / "xremote_ac_engine.c").read_text(encoding="utf-8")
+        header = (APP_DIR / "xremote_ac_engine.h").read_text(encoding="utf-8")
+
+        self.assertIn('#define XREMOTE_AC_DIR              APP_DATA_PATH("ac")', header)
+        self.assertIn('#define XREMOTE_AC_FZ_AC_DIR        EXT_PATH("apps_data/fz_ac")', header)
+        self.assertIn('#define XREMOTE_AC_OFF_NAME         "Off"', header)
+        self.assertIn('snprintf(out, out_size, "%s %u", preset, temp);', engine)
+        self.assertIn("xremote_ac_name_parse", engine)
+
+    def test_ac_smart_runtime_loads_single_frame_on_send(self) -> None:
+        engine = (APP_DIR / "xremote_ac_engine.c").read_text(encoding="utf-8")
+        app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
+
+        self.assertIn("infrared_signal_search_and_read(signal, ff, signal_name)", engine)
+        self.assertIn("xremote_app_send_signal(app_ctx, signal)", engine)
+        self.assertIn('"Open Tumo AC"', app)
+        self.assertIn('"Open fz-ac profile"', app)
+        self.assertIn("xremote_ac_send_current", app)
+        self.assertIn("xremote_ac_send_off", app)
+        self.assertIn("XREMOTE_AC_OFF_NAME", app)
 
 
 if __name__ == "__main__":
