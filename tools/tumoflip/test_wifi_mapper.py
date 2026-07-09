@@ -20,20 +20,15 @@ class WiFiMapperTest(unittest.TestCase):
 
         self.assertIn('appid="wifi_mapper"', manifest)
         self.assertIn("FlipperAppType.EXTERNAL", manifest)
-        self.assertIn('requires=["gui", "storage", "notification", "bt"]', manifest)
+        self.assertIn(
+            'requires=["gui", "storage", "notification", "bt", "expansion_start"]',
+            manifest,
+        )
         self.assertIn('fap_category="Module One/ESP32 Wi-Fi"', manifest)
         self.assertIn('fap_version="0.9"', manifest)
         self.assertIn('fap_icon="wifi_mapper_10px.png"', manifest)
-        self.assertIn('fap_icon_assets="icons"', manifest)
+        self.assertNotIn("fap_icon_assets", manifest)
         self.assertTrue((APP_DIR / "wifi_mapper_10px.png").is_file())
-        for icon in (
-            "ButtonUp_7x4.png",
-            "ButtonDown_7x4.png",
-            "ButtonCenter_7x7.png",
-            "ButtonRight_4x7.png",
-            "Pin_back_arrow_10x8.png",
-        ):
-            self.assertTrue((APP_DIR / "icons" / icon).is_file(), icon)
 
     def test_uart_logger_uses_passive_scan_commands(self) -> None:
         source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
@@ -88,22 +83,35 @@ class WiFiMapperTest(unittest.TestCase):
             source,
         )
         self.assertIn('EXT_PATH("apps_data/wifi_mapper/exports")', source)
-        self.assertIn('wifi_mapper_hint(canvas, x, 51, &I_ButtonCenter_7x7, "Export")', source)
-        self.assertIn('wifi_mapper_hint(canvas, x, 62, &I_ButtonRight_4x7, "Clean/Raw")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 51, "OK", "Export")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 62, "R", "Clean/Raw")', source)
         self.assertIn("FuriHalSerialIdUsart", source)
+        self.assertIn("#include <expansion/expansion.h>", source)
+        self.assertIn("Expansion* expansion;", source)
+        self.assertIn("bool expansion_disabled;", source)
+        self.assertIn("app->expansion = furi_record_open(RECORD_EXPANSION);", source)
+        self.assertIn("expansion_disable(app->expansion);", source)
+        self.assertIn("app->serial_handle = furi_hal_serial_control_acquire", source)
+        self.assertLess(
+            source.index("expansion_disable(app->expansion);"),
+            source.index("app->serial_handle = furi_hal_serial_control_acquire"),
+        )
+        self.assertIn("expansion_enable(app->expansion);", source)
+        self.assertIn("furi_record_close(RECORD_EXPANSION);", source)
         self.assertIn("FSOM_CREATE_ALWAYS", source)
 
-    def test_live_screen_uses_icon_legend_without_bottom_button_overlap(self) -> None:
+    def test_live_screen_uses_safe_text_legend_without_bottom_button_overlap(self) -> None:
         source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
 
-        self.assertIn('#include "wifi_mapper_icons.h"', source)
+        self.assertNotIn("wifi_mapper_icons.h", source)
+        self.assertNotIn("canvas_draw_icon", source)
         self.assertIn("static int wifi_mapper_hint(", source)
-        self.assertIn('wifi_mapper_hint(canvas, x, 51, &I_ButtonUp_7x4, "Scan")', source)
-        self.assertIn('wifi_mapper_hint(canvas, x, 51, &I_ButtonDown_7x4, "Stop")', source)
-        self.assertIn('wifi_mapper_hint(canvas, x, 51, &I_ButtonCenter_7x7, "Rec")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 51, "U", "Scan")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 51, "D", "Stop")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 51, "OK", "Rec")', source)
         self.assertIn('canvas_draw_str(canvas, x, 62, "Hold:")', source)
-        self.assertIn('wifi_mapper_hint(canvas, x, 62, &I_ButtonDown_7x4, "BLE")', source)
-        self.assertIn('wifi_mapper_hint(canvas, x, 62, &I_ButtonCenter_7x7, "Sess")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 62, "D", "BLE")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 62, "OK", "Sess")', source)
         self.assertIn('if(model->logging) strlcat(chips, "REC ", sizeof(chips));', source)
         self.assertNotIn("wifi_mapper_draw_top_action", source)
         self.assertNotIn("canvas_draw_rbox(canvas, 94, 1, 34, 12, 2)", source)

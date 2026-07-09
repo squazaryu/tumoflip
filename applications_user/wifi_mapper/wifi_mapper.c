@@ -5,12 +5,12 @@
 #include <gui/elements.h>
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
-#include "wifi_mapper_icons.h"   // generated from icons/ (fap_icon_assets)
 
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
 #include <storage/storage.h>
 #include <bt/bt_service/bt.h>
+#include <expansion/expansion.h>
 
 #include <ctype.h>
 #include <stdint.h>
@@ -200,6 +200,7 @@ typedef struct {
     Storage* storage;
     NotificationApp* notification;
     Bt* bt;
+    Expansion* expansion;
     ViewDispatcher* view_dispatcher;
     View* view;
     FuriThread* worker_thread;
@@ -214,6 +215,7 @@ typedef struct {
     bool logging;
     bool uart_ready;
     bool ble_relay;
+    bool expansion_disabled;
     char relay_buffer[WIFI_MAPPER_RELAY_PAYLOAD_MAX + 1U];
     size_t relay_buffer_len;
     uint32_t relay_last_send_ms;
@@ -1618,12 +1620,12 @@ static void wifi_mapper_stop_logging(WiFiMapperApp* app) {
     wifi_mapper_update_model(app);
 }
 
-// Draws a button glyph + label on the text baseline `y`, starting at `x`. Returns
-// the x just past the segment so hints chain left-to-right. The glyph is bottom-
-// aligned to the baseline so it sits like a leading character next to the word.
-static int wifi_mapper_hint(Canvas* canvas, int x, int y, const Icon* icon, const char* label) {
-    canvas_draw_icon(canvas, x, y - icon_get_height(icon), icon);
-    x += icon_get_width(icon) + 2;
+// Draws a compact text key + label on the baseline `y`. This intentionally avoids
+// generated runtime icon assets so the external FAP can start on older package
+// installs without depending on additional icon relocation state.
+static int wifi_mapper_hint(Canvas* canvas, int x, int y, const char* key, const char* label) {
+    canvas_draw_str(canvas, x, y, key);
+    x += canvas_string_width(canvas, key) + 2;
     canvas_draw_str(canvas, x, y, label);
     return x + canvas_string_width(canvas, label) + 7;
 }
@@ -1674,14 +1676,14 @@ static void wifi_mapper_draw_live(Canvas* canvas, WiFiMapperModel* model) {
     // repeated here.
     canvas_draw_line(canvas, 0, 42, 127, 42);
     int x = 0;
-    x = wifi_mapper_hint(canvas, x, 51, &I_ButtonUp_7x4, "Scan");
-    x = wifi_mapper_hint(canvas, x, 51, &I_ButtonDown_7x4, "Stop");
-    wifi_mapper_hint(canvas, x, 51, &I_ButtonCenter_7x7, "Rec");
+    x = wifi_mapper_hint(canvas, x, 51, "U", "Scan");
+    x = wifi_mapper_hint(canvas, x, 51, "D", "Stop");
+    wifi_mapper_hint(canvas, x, 51, "OK", "Rec");
     x = 0;
     canvas_draw_str(canvas, x, 62, "Hold:");
     x += canvas_string_width(canvas, "Hold:") + 4;
-    x = wifi_mapper_hint(canvas, x, 62, &I_ButtonDown_7x4, "BLE");
-    wifi_mapper_hint(canvas, x, 62, &I_ButtonCenter_7x7, "Sess");
+    x = wifi_mapper_hint(canvas, x, 62, "D", "BLE");
+    wifi_mapper_hint(canvas, x, 62, "OK", "Sess");
 }
 
 static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
@@ -1731,11 +1733,11 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
     // each other or the divider.
     canvas_draw_line(canvas, 0, 42, 127, 42);
     int x = 0;
-    x = wifi_mapper_hint(canvas, x, 51, &I_ButtonUp_7x4, "Refresh");
-    wifi_mapper_hint(canvas, x, 51, &I_ButtonCenter_7x7, "Export");
+    x = wifi_mapper_hint(canvas, x, 51, "U", "Refresh");
+    wifi_mapper_hint(canvas, x, 51, "OK", "Export");
     x = 0;
-    x = wifi_mapper_hint(canvas, x, 62, &I_ButtonRight_4x7, "Clean/Raw");
-    wifi_mapper_hint(canvas, x, 62, &I_Pin_back_arrow_10x8, "Live");
+    x = wifi_mapper_hint(canvas, x, 62, "R", "Clean/Raw");
+    wifi_mapper_hint(canvas, x, 62, "Back", "Live");
 }
 
 static void wifi_mapper_draw_callback(Canvas* canvas, void* context) {
@@ -1912,6 +1914,7 @@ static WiFiMapperApp* wifi_mapper_alloc(void) {
     app->notification = furi_record_open(RECORD_NOTIFICATION);
     app->gui = furi_record_open(RECORD_GUI);
     app->bt = furi_record_open(RECORD_BT);
+    app->expansion = furi_record_open(RECORD_EXPANSION);
 
     app->view_dispatcher = view_dispatcher_alloc();
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
@@ -1928,6 +1931,9 @@ static WiFiMapperApp* wifi_mapper_alloc(void) {
     app->worker_thread = furi_thread_alloc_ex("WiFiMapperRx", 2048, wifi_mapper_worker, app);
     furi_thread_start(app->worker_thread);
 
+    expansion_disable(app->expansion);
+    app->expansion_disabled = true;
+
     app->serial_handle = furi_hal_serial_control_acquire(FuriHalSerialIdUsart);
     if(app->serial_handle) {
         furi_hal_serial_init(app->serial_handle, WIFI_MAPPER_BAUDRATE);
@@ -1939,6 +1945,8 @@ static WiFiMapperApp* wifi_mapper_alloc(void) {
         furi_hal_serial_async_rx_start(app->serial_handle, wifi_mapper_on_irq_cb, app, true);
         app->uart_ready = true;
     } else {
+        expansion_enable(app->expansion);
+        app->expansion_disabled = false;
         app->uart_ready = false;
         strlcpy(app->status, "UART busy", sizeof(app->status));
     }
@@ -1960,6 +1968,12 @@ static void wifi_mapper_free(WiFiMapperApp* app) {
         furi_hal_serial_async_rx_stop(app->serial_handle);
         furi_hal_serial_deinit(app->serial_handle);
         furi_hal_serial_control_release(app->serial_handle);
+        app->serial_handle = NULL;
+    }
+
+    if(app->expansion_disabled) {
+        expansion_enable(app->expansion);
+        app->expansion_disabled = false;
     }
 
     furi_thread_flags_set(furi_thread_get_id(app->worker_thread), WiFiMapperEventStop);
@@ -1977,6 +1991,7 @@ static void wifi_mapper_free(WiFiMapperApp* app) {
     furi_record_close(RECORD_NOTIFICATION);
     furi_record_close(RECORD_STORAGE);
     furi_record_close(RECORD_BT);
+    furi_record_close(RECORD_EXPANSION);
 
     free(app);
 }

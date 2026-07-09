@@ -3,7 +3,7 @@ App(
     name="WiFi Mapper",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="wifi_mapper_app",
-    requires=["gui", "storage", "notification", "bt"],
+    requires=["gui", "storage", "notification", "bt", "expansion_start"],
     stack_size=4 * 1024,
     fap_category="Module One/ESP32 Wi-Fi",
     fap_version="0.9",
@@ -11,5 +11,4 @@ App(
     fap_weburl="https://github.com/squazaryu/tumoflip",
     fap_description="Passive ESP32 Wi-Fi scan logger for Module One. Hold Down to toggle live relay of scan lines to the Unleashed Companion app over BLE App Bridge.",
     fap_icon="wifi_mapper_10px.png",
-    fap_icon_assets="icons",
 )
