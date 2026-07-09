@@ -24,7 +24,16 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn('fap_category="Module One/ESP32 Wi-Fi"', manifest)
         self.assertIn('fap_version="0.9"', manifest)
         self.assertIn('fap_icon="wifi_mapper_10px.png"', manifest)
+        self.assertIn('fap_icon_assets="icons"', manifest)
         self.assertTrue((APP_DIR / "wifi_mapper_10px.png").is_file())
+        for icon in (
+            "ButtonUp_7x4.png",
+            "ButtonDown_7x4.png",
+            "ButtonCenter_7x7.png",
+            "ButtonRight_4x7.png",
+            "Pin_back_arrow_10x8.png",
+        ):
+            self.assertTrue((APP_DIR / "icons" / icon).is_file(), icon)
 
     def test_uart_logger_uses_passive_scan_commands(self) -> None:
         source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
@@ -79,18 +88,27 @@ class WiFiMapperTest(unittest.TestCase):
             source,
         )
         self.assertIn('EXT_PATH("apps_data/wifi_mapper/exports")', source)
-        self.assertIn('elements_button_center(canvas, "Export")', source)
-        self.assertIn('elements_button_right(canvas, "Mode")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 51, &I_ButtonCenter_7x7, "Export")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 62, &I_ButtonRight_4x7, "Clean/Raw")', source)
         self.assertIn("FuriHalSerialIdUsart", source)
         self.assertIn("FSOM_CREATE_ALWAYS", source)
 
-    def test_live_screen_uses_non_blocking_start_stop_hint(self) -> None:
+    def test_live_screen_uses_icon_legend_without_bottom_button_overlap(self) -> None:
         source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
 
-        self.assertIn("wifi_mapper_draw_action_hint", source)
-        self.assertIn('model->logging ? "OK Stop" : "OK Start"', source)
+        self.assertIn('#include "wifi_mapper_icons.h"', source)
+        self.assertIn("static int wifi_mapper_hint(", source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 51, &I_ButtonUp_7x4, "Scan")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 51, &I_ButtonDown_7x4, "Stop")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 51, &I_ButtonCenter_7x7, "Rec")', source)
+        self.assertIn('canvas_draw_str(canvas, x, 62, "Hold:")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 62, &I_ButtonDown_7x4, "BLE")', source)
+        self.assertIn('wifi_mapper_hint(canvas, x, 62, &I_ButtonCenter_7x7, "Sess")', source)
+        self.assertIn('if(model->logging) strlcat(chips, "REC ", sizeof(chips));', source)
         self.assertNotIn("wifi_mapper_draw_top_action", source)
         self.assertNotIn("canvas_draw_rbox(canvas, 94, 1, 34, 12, 2)", source)
+        self.assertNotIn("elements_button_center(canvas", source)
+        self.assertNotIn("elements_button_right(canvas", source)
 
     def test_live_relay_contract_is_stable_and_opt_in(self) -> None:
         source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
@@ -103,7 +121,7 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn("furi_record_close(RECORD_BT);", source)
         self.assertIn("WiFiMapperModel", source)
         self.assertIn("bool ble_relay;", source)
-        self.assertIn('model->ble_relay ? "BLE" : ""', source)
+        self.assertIn('if(model->ble_relay) strlcat(chips, "BLE", sizeof(chips));', source)
         self.assertIn("(event->type == InputTypeLong) && (event->key == InputKeyDown)", source)
         self.assertIn('strlcpy(app->status, "BLE live on"', source)
         self.assertIn('strlcpy(app->status, "BLE live off"', source)

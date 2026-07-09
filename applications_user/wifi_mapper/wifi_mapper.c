@@ -5,6 +5,7 @@
 #include <gui/elements.h>
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
+#include "wifi_mapper_icons.h"   // generated from icons/ (fap_icon_assets)
 
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
@@ -1617,44 +1618,70 @@ static void wifi_mapper_stop_logging(WiFiMapperApp* app) {
     wifi_mapper_update_model(app);
 }
 
-static void wifi_mapper_draw_action_hint(Canvas* canvas, const char* label) {
-    canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str_aligned(canvas, 127, 10, AlignRight, AlignBottom, label);
+// Draws a button glyph + label on the text baseline `y`, starting at `x`. Returns
+// the x just past the segment so hints chain left-to-right. The glyph is bottom-
+// aligned to the baseline so it sits like a leading character next to the word.
+static int wifi_mapper_hint(Canvas* canvas, int x, int y, const Icon* icon, const char* label) {
+    canvas_draw_icon(canvas, x, y - icon_get_height(icon), icon);
+    x += icon_get_width(icon) + 2;
+    canvas_draw_str(canvas, x, y, label);
+    return x + canvas_string_width(canvas, label) + 7;
 }
 
 static void wifi_mapper_draw_live(Canvas* canvas, WiFiMapperModel* model) {
+    char line[48];
+
+    // Title + UART state (right-aligned on the same row).
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 0, 10, "WiFi Mapper");
-    wifi_mapper_draw_action_hint(canvas, model->logging ? "OK Stop" : "OK Start");
-
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 0, 22, model->status);
-    canvas_draw_str(canvas, 78, 22, model->uart_ready ? "UART OK" : "UART --");
+    const char* uart = model->uart_ready ? "UART OK" : "UART --";
+    canvas_draw_str(canvas, 128 - canvas_string_width(canvas, uart), 10, uart);
 
-    char line[48];
-    snprintf(
-        line,
-        sizeof(line),
-        "< %s >",
-        wifi_mapper_get_scan_mode_config(model->scan_mode)->label);
-    canvas_draw_str(canvas, 0, 34, line);
-    canvas_draw_str(canvas, 92, 34, model->ble_relay ? "BLE" : "");
+    // Selected scan mode framed with < > chevrons - the chevrons themselves are
+    // the "Left/Right changes mode" affordance, so mode needs no legend entry.
+    snprintf(line, sizeof(line), "< %s >", wifi_mapper_get_scan_mode_config(model->scan_mode)->label);
+    canvas_draw_str(canvas, 0, 24, line);
+    char chips[16];
+    chips[0] = '\0';
+    if(model->logging) strlcat(chips, "REC ", sizeof(chips));
+    if(model->ble_relay) strlcat(chips, "BLE", sizeof(chips));
+    size_t clen = strlen(chips);
+    if(clen > 0U && chips[clen - 1U] == ' ') chips[clen - 1U] = '\0';
+    if(chips[0]) canvas_draw_str(canvas, 128 - canvas_string_width(canvas, chips), 24, chips);
 
-    snprintf(
-        line,
-        sizeof(line),
-        "Lines:%lu WiFi:%lu",
-        (unsigned long)model->lines,
-        (unsigned long)model->wifi_records);
-    canvas_draw_str(canvas, 0, 46, line);
-    snprintf(line, sizeof(line), "Err:%lu", (unsigned long)model->errors);
-    canvas_draw_str(canvas, 86, 46, line);
+    // Live counters (Err shown only when non-zero, to keep the row quiet).
+    if(model->errors > 0U) {
+        snprintf(
+            line,
+            sizeof(line),
+            "Lines %lu  WiFi %lu  Err %lu",
+            (unsigned long)model->lines,
+            (unsigned long)model->wifi_records,
+            (unsigned long)model->errors);
+    } else {
+        snprintf(
+            line,
+            sizeof(line),
+            "Lines %lu   WiFi %lu",
+            (unsigned long)model->lines,
+            (unsigned long)model->wifi_records);
+    }
+    canvas_draw_str(canvas, 0, 36, line);
 
-    canvas_draw_str(
-        canvas,
-        0,
-        58,
-        model->file_name[0] ? model->file_name : "OK start Hold stats");
+    // Two-line legend with real button glyphs: short-press keys, then the two
+    // long-press ones. Mode is conveyed by the < > chevrons above, so it's not
+    // repeated here.
+    canvas_draw_line(canvas, 0, 42, 127, 42);
+    int x = 0;
+    x = wifi_mapper_hint(canvas, x, 51, &I_ButtonUp_7x4, "Scan");
+    x = wifi_mapper_hint(canvas, x, 51, &I_ButtonDown_7x4, "Stop");
+    wifi_mapper_hint(canvas, x, 51, &I_ButtonCenter_7x7, "Rec");
+    x = 0;
+    canvas_draw_str(canvas, x, 62, "Hold:");
+    x += canvas_string_width(canvas, "Hold:") + 4;
+    x = wifi_mapper_hint(canvas, x, 62, &I_ButtonDown_7x4, "BLE");
+    wifi_mapper_hint(canvas, x, 62, &I_ButtonCenter_7x7, "Sess");
 }
 
 static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
@@ -1664,63 +1691,51 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
     canvas_draw_str(canvas, 0, 10, "Last Session");
 
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 0, 22, model->session.status);
-    snprintf(
-        line,
-        sizeof(line),
-        "[%c]",
-        model->export_mode == WiFiMapperExportModeClean ? 'C' : 'R');
-    canvas_draw_str(canvas, 112, 22, line);
-
-    if(model->session.file_name[0]) {
-        canvas_draw_str(canvas, 0, 34, model->session.file_name);
-    }
+    // Export mode (what OK will write) as a plain word, right-aligned on the title
+    // row - replaces the cryptic [C]/[R].
+    const char* emode = model->export_mode == WiFiMapperExportModeClean ? "Clean" : "Raw";
+    canvas_draw_str(canvas, 128 - canvas_string_width(canvas, emode), 10, emode);
 
     if(model->session.loaded) {
+        if(model->session.file_name[0]) {
+            canvas_draw_str(canvas, 0, 21, model->session.file_name);
+        }
         snprintf(
             line,
             sizeof(line),
-            "AP:%lu GPS:%lu Map:%lu",
+            "AP %lu  loc %lu  map %lu",
             (unsigned long)model->session.aps,
             (unsigned long)model->session.located,
             (unsigned long)model->session.mapped);
-        canvas_draw_str(canvas, 0, 46, line);
+        canvas_draw_str(canvas, 0, 31, line);
 
         snprintf(
             line,
             sizeof(line),
-            "U:%lu D:%lu R:%ld/%ld",
-            (unsigned long)model->session.unique,
-            (unsigned long)model->session.duplicates,
+            "best/avg %ld/%ld dBm",
             (long)model->session.best_rssi,
             (long)model->session.avg_rssi);
-        canvas_draw_str(canvas, 0, 58, line);
-
-        if(model->session.top_channel_count > 0U) {
-            snprintf(
-                line,
-                sizeof(line),
-                "Ch%u:%lu",
-                model->session.top_channel,
-                (unsigned long)model->session.top_channel_count);
-            canvas_draw_str(canvas, 90, 34, line);
-        }
+        canvas_draw_str(canvas, 0, 40, line);
 
         if(model->session.exported > 0U) {
-            snprintf(
-                line,
-                sizeof(line),
-                "E:%lu",
-                (unsigned long)model->session.exported);
-            canvas_draw_str(canvas, 78, 22, line);
+            snprintf(line, sizeof(line), "exp %lu", (unsigned long)model->session.exported);
+            canvas_draw_str(canvas, 128 - canvas_string_width(canvas, line), 40, line);
         }
     } else {
-        canvas_draw_str(canvas, 0, 46, "Up refresh");
-        canvas_draw_str(canvas, 0, 58, "Back live");
+        canvas_draw_str(canvas, 0, 24, model->session.status);
+        canvas_draw_str(canvas, 0, 34, "Press Up to analyze latest.");
     }
 
-    elements_button_center(canvas, "Export");
-    elements_button_right(canvas, "Mode");
+    // Control legend with real button glyphs, strictly below the data. The two
+    // rows sit 11px apart (same as the Live screen) so the 7px glyphs don't touch
+    // each other or the divider.
+    canvas_draw_line(canvas, 0, 42, 127, 42);
+    int x = 0;
+    x = wifi_mapper_hint(canvas, x, 51, &I_ButtonUp_7x4, "Refresh");
+    wifi_mapper_hint(canvas, x, 51, &I_ButtonCenter_7x7, "Export");
+    x = 0;
+    x = wifi_mapper_hint(canvas, x, 62, &I_ButtonRight_4x7, "Clean/Raw");
+    wifi_mapper_hint(canvas, x, 62, &I_Pin_back_arrow_10x8, "Live");
 }
 
 static void wifi_mapper_draw_callback(Canvas* canvas, void* context) {
