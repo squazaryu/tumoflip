@@ -132,6 +132,31 @@ class XRemoteACSmartTest(unittest.TestCase):
         self.assertIn("xremote_ac_send_off", app)
         self.assertIn("XREMOTE_AC_OFF_NAME", app)
 
+    def test_ac_smart_creator_writes_standard_ir_profile(self) -> None:
+        app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
+
+        for required in (
+            '"Create Smart AC"',
+            "xremote_ac_start_name_input",
+            "XRemoteSignalReceiver* ir_receiver;",
+            "xremote_signal_receiver_start(ctx->ir_receiver)",
+            "xremote_signal_receiver_stop(ctx->ir_receiver)",
+            "infrared_remote_push_button(ctx->output_remote, XREMOTE_AC_OFF_NAME, ctx->capture_signal)",
+            "xremote_ac_signal_name(signal_name, sizeof(signal_name), ctx->preset_name, ctx->sweep_temp)",
+            "infrared_remote_store(ctx->output_remote)",
+            "XREMOTE_AC_SWEEP_TEMP_MIN",
+            "XREMOTE_AC_SWEEP_TEMP_MAX",
+        ):
+            self.assertIn(required, app)
+
+    def test_ac_smart_creator_cleans_up_rx_on_cancel_and_exit(self) -> None:
+        app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
+
+        self.assertIn("xremote_ac_cancel_create", app)
+        self.assertIn("xremote_ac_stop_capture(ctx);", app)
+        self.assertIn("view_dispatcher_switch_to_view(app_ctx->view_dispatcher, XRemoteViewAcSmart)", app)
+        self.assertIn("xremote_signal_receiver_free(ctx->ir_receiver)", app)
+
 
 if __name__ == "__main__":
     unittest.main()
