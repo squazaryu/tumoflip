@@ -56,6 +56,19 @@ static void subghz_rpc_command_callback(const RpcAppSystemEvent* event, void* co
         rpc_system_app_confirm(subghz->rpc_ctx, false);
     }
 }
+
+void subghz_ensure_frequency_analyzer_view(SubGhz* subghz) {
+    furi_assert(subghz);
+
+    if(!subghz->subghz_frequency_analyzer) {
+        subghz->subghz_frequency_analyzer = subghz_frequency_analyzer_alloc(subghz->txrx);
+        view_dispatcher_add_view(
+            subghz->view_dispatcher,
+            SubGhzViewIdFrequencyAnalyzer,
+            subghz_frequency_analyzer_get_view(subghz->subghz_frequency_analyzer));
+    }
+}
+
 /*
 static void subghz_load_custom_presets(SubGhzSetting* setting) {
     furi_assert(setting);

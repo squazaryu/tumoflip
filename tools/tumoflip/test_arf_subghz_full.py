@@ -265,6 +265,36 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertIn("SubGhzCustomEventViewFreqAnalOkLong", scene)
         self.assertIn("scene_manager_next_scene(subghz->scene_manager, SubGhzSceneReceiver)", scene)
 
+    def test_core_and_arf_frequency_analyzers_share_the_tumoflip_ui(self) -> None:
+        shared_files = (
+            "helpers/subghz_frequency_notebook.c",
+            "helpers/subghz_frequency_notebook.h",
+            "scenes/subghz_scene_frequency_analyzer.c",
+            "views/subghz_frequency_analyzer.c",
+            "views/subghz_frequency_analyzer.h",
+        )
+        drift_manifest = (
+            REPO_ROOT / "tools/tumoflip/subghz_drift_manifest.txt"
+        ).read_text(encoding="utf-8")
+
+        for relative in shared_files:
+            with self.subTest(relative=relative):
+                core = REPO_ROOT / "applications/main/subghz" / relative
+                arf = REPO_ROOT / "applications_user/arf_subghz_full" / relative
+                self.assertTrue(core.is_file())
+                self.assertTrue(arf.is_file())
+                self.assertEqual(core.read_bytes(), arf.read_bytes())
+                self.assertIn(relative, drift_manifest)
+
+        core_app = (
+            REPO_ROOT / "applications/main/subghz/subghz.c"
+        ).read_text(encoding="utf-8")
+        core_header = (
+            REPO_ROOT / "applications/main/subghz/subghz_i.h"
+        ).read_text(encoding="utf-8")
+        self.assertIn("void subghz_ensure_frequency_analyzer_view", core_app)
+        self.assertIn("void subghz_ensure_frequency_analyzer_view", core_header)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,6 +9,29 @@ APP_DIR = REPO_ROOT / "applications_user/module_one_cockpit"
 APP_SOURCE = APP_DIR / "module_one_cockpit.c"
 APP_MANIFEST = APP_DIR / "application.fam"
 
+COCKPIT_FAP_ROUTES = {
+    "tumo_ir_lab": "apps/Module One/IR Blaster/tumo_ir_lab.fap",
+    "tumoflip_xremote": "apps/Module One/IR Blaster/tumoflip_xremote.fap",
+    "wifi_mapper": "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
+    "ble_gatt_lab": "apps/Module One/BLE/ble_gatt_lab.fap",
+    "app_bridge_terminal": "apps/Module One/BLE/app_bridge_terminal.fap",
+    "tumo_macro_deck": "apps/Module One/Macros/tumo_macro_deck.fap",
+    "tumoscript": "apps/Module One/Scripts/tumoscript.fap",
+    "field_logger": "apps/Module One/Field/field_logger.fap",
+    "signal_workbench": "apps/Module One/Signals/signal_workbench.fap",
+    "module_one_sensor_logger": (
+        "apps/Module One/Sensors BME280/module_one_sensor_logger.fap"
+    ),
+    "arf_subghz_full": "apps/ARF Tools/arf_subghz_full.fap",
+    "arf_status": "apps_data/arf_subghz_full/modules/arf_status.fap",
+    "tumo_acceptance_suite": (
+        "apps/Module One/Diagnostics/tumo_acceptance_suite.fap"
+    ),
+    "runtime_trace_viewer": (
+        "apps/Module One/Diagnostics/runtime_trace_viewer.fap"
+    ),
+}
+
 
 class ModuleOneCockpitTest(unittest.TestCase):
     @classmethod
@@ -110,6 +133,35 @@ class ModuleOneCockpitTest(unittest.TestCase):
             self.source.index("loader_clear_launch_queue(app->loader)"),
             self.source.index("loader_enqueue_launch(app->loader, target->target"),
         )
+
+    def test_all_storage_backed_routes_have_packaged_faps(self) -> None:
+        manifests = "\n".join(
+            path.read_text(encoding="utf-8")
+            for root in (REPO_ROOT / "applications", REPO_ROOT / "applications_user")
+            for path in root.rglob("application.fam")
+        )
+        validator = (
+            REPO_ROOT / "tools/tumoflip/validate_release.py"
+        ).read_text(encoding="utf-8")
+
+        routed_paths = {
+            route
+            for route in COCKPIT_FAP_ROUTES.values()
+            if f'EXT_PATH("{route}")' in self.source
+        }
+        self.assertEqual(routed_paths, set(COCKPIT_FAP_ROUTES.values()))
+
+        for appid, route in COCKPIT_FAP_ROUTES.items():
+            with self.subTest(appid=appid, route=route):
+                self.assertIn(f'appid="{appid}"', manifests)
+                if appid == "arf_status":
+                    self.assertIn('"arf_status"', validator)
+                    self.assertIn("ARF_MODULE_ROOT", validator)
+                elif appid == "arf_subghz_full":
+                    self.assertIn('"arf_subghz_full"', validator)
+                    self.assertIn("ARF_VISIBLE_PATHS", validator)
+                else:
+                    self.assertIn(f'"{route}"', validator)
 
 
 if __name__ == "__main__":

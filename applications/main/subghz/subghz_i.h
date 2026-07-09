@@ -125,5 +125,7 @@ bool subghz_is_locked(SubGhz* subghz);
 void subghz_rx_key_state_set(SubGhz* subghz, SubGhzRxKeyState state);
 SubGhzRxKeyState subghz_rx_key_state_get(SubGhz* subghz);
 
+void subghz_ensure_frequency_analyzer_view(SubGhz* subghz);
+
 extern const NotificationSequence subghz_sequence_rx;
 extern const NotificationSequence subghz_sequence_rx_locked;

@@ -1,4 +1,5 @@
 #include "../subghz_i.h" // IWYU pragma: keep
+#include "../helpers/subghz_frequency_notebook.h"
 #include "../views/subghz_frequency_analyzer.h"
 
 #define TAG "SubGhzSceneFrequencyAnalyzer"
@@ -22,6 +23,9 @@ void subghz_scene_frequency_analyzer_callback(SubGhzCustomEvent event, void* con
 
 void subghz_scene_frequency_analyzer_on_enter(void* context) {
     SubGhz* subghz = context;
+#if !defined(ARF_PROFILE_FA)
+    subghz_ensure_frequency_analyzer_view(subghz);
+#endif
     subghz_frequency_analyzer_set_callback(
         subghz->subghz_frequency_analyzer, subghz_scene_frequency_analyzer_callback, subghz);
     subghz_frequency_analyzer_feedback_level(
@@ -55,12 +59,28 @@ bool subghz_scene_frequency_analyzer_on_event(void* context, SceneManagerEvent e
             notification_message(subghz->notifications, &sequence_reset_rgb);
             return true;
         } else if(event.event == SubGhzCustomEventViewFreqAnalOkShort) {
-            notification_message(subghz->notifications, &sequence_saved);
-            uint32_t frequency =
-                subghz_frequency_analyzer_get_frequency_to_save(subghz->subghz_frequency_analyzer);
+            SubGhzFrequencyAnalyzerObservation observation;
+            const bool has_observation = subghz_frequency_analyzer_get_observation(
+                subghz->subghz_frequency_analyzer, &observation);
+            const bool notebook_saved =
+                has_observation && subghz_frequency_notebook_append(&observation);
+            notification_message(
+                subghz->notifications, notebook_saved ? &sequence_saved : &sequence_error);
+
+            uint32_t frequency = has_observation ?
+                                     observation.frequency :
+                                     subghz_frequency_analyzer_get_frequency_to_save(
+                                         subghz->subghz_frequency_analyzer);
             if(frequency > 0) {
                 subghz->last_settings->frequency = frequency;
+                // Disable Hopping before opening the receiver scene!
+#if defined(ARF_PROFILE_FA)
+                if(subghz->last_settings->enable_hopping) {
+                    subghz->last_settings->enable_hopping = false;
+                }
+#else
                 subghz->last_settings->hopping_mode = SubGhzHoppingModeOff;
+#endif
                 subghz_last_settings_save(subghz->last_settings);
             }
 
@@ -68,8 +88,12 @@ bool subghz_scene_frequency_analyzer_on_event(void* context, SceneManagerEvent e
         } else if(event.event == SubGhzCustomEventViewFreqAnalOkLong) {
             // Don't need to save, we already saved on short event (and on exit event too)
             subghz_rx_key_state_set(subghz, SubGhzRxKeyStateIDLE);
+#if defined(ARF_PROFILE_FA)
+            scene_manager_previous_scene(subghz->scene_manager);
+#else
             scene_manager_previous_scene(subghz->scene_manager); // Stops the worker
             scene_manager_next_scene(subghz->scene_manager, SubGhzSceneReceiver);
+#endif
             return true;
         }
     }

@@ -74,9 +74,13 @@ bool subghz_scene_frequency_analyzer_on_event(void* context, SceneManagerEvent e
             if(frequency > 0) {
                 subghz->last_settings->frequency = frequency;
                 // Disable Hopping before opening the receiver scene!
+#if defined(ARF_PROFILE_FA)
                 if(subghz->last_settings->enable_hopping) {
                     subghz->last_settings->enable_hopping = false;
                 }
+#else
+                subghz->last_settings->hopping_mode = SubGhzHoppingModeOff;
+#endif
                 subghz_last_settings_save(subghz->last_settings);
             }
 
