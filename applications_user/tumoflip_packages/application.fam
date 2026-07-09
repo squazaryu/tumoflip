@@ -5,6 +5,7 @@ App(
     entry_point="tumoflip_packages_app",
     requires=["gui", "storage"],
     stack_size=6 * 1024,
+    fap_icon="icon.png",
     fap_category="Tools",
     fap_version="0.1.0",
     fap_author="squazaryu/tumoflip",

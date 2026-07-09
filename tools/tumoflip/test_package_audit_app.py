@@ -20,6 +20,11 @@ class PackageAuditAppTest(unittest.TestCase):
         )
         self.assertIn("apps/Tools/tumoflip_packages.fap", validate_release)
 
+    def test_package_audit_app_has_fap_icon(self) -> None:
+        manifest = (APP_ROOT / "application.fam").read_text(encoding="utf-8")
+        self.assertIn('fap_icon="icon.png"', manifest)
+        self.assertTrue((APP_ROOT / "icon.png").is_file())
+
     def test_package_audit_app_is_read_only_and_hashes_files(self) -> None:
         source = (APP_ROOT / "tumoflip_packages.c").read_text(encoding="utf-8")
         for expected in (
