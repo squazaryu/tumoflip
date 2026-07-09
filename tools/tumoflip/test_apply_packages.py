@@ -28,7 +28,7 @@ class ApplyPackagesTest(unittest.TestCase):
             "schema": 2,
             "firmware": {
                 "version": "t-dev-089-035-001",
-                "api": "87.17",
+                "api": "87.18",
             },
             "package_release": {
                 "id": "test-package",
@@ -75,7 +75,7 @@ class ApplyPackagesTest(unittest.TestCase):
                 f"ReleaseId: {state['release_id']}",
                 f"Transaction: {state['transaction']}",
                 "Firmware: t-dev-089-035-001",
-                "FirmwareApi: 87.17",
+                "FirmwareApi: 87.18",
                 "PackageRelease: test-package",
                 "Groups: arf",
                 "InstalledFiles: 1",
