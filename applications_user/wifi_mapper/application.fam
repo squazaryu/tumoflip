@@ -11,4 +11,5 @@ App(
     fap_weburl="https://github.com/squazaryu/tumoflip",
     fap_description="Passive ESP32 Wi-Fi scan logger for Module One. Hold Down to toggle live relay of scan lines to the Unleashed Companion app over BLE App Bridge.",
     fap_icon="wifi_mapper_10px.png",
+    fap_icon_assets="icons",
 )

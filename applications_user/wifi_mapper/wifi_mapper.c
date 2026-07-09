@@ -5,6 +5,7 @@
 #include <gui/elements.h>
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
+#include "wifi_mapper_icons.h"   // generated from icons/ (fap_icon_assets)
 
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
@@ -1620,12 +1621,12 @@ static void wifi_mapper_stop_logging(WiFiMapperApp* app) {
     wifi_mapper_update_model(app);
 }
 
-// Draws a compact text key + label on the baseline `y`. This intentionally avoids
-// generated runtime icon assets so the external FAP can start on older package
-// installs without depending on additional icon relocation state.
-static int wifi_mapper_hint(Canvas* canvas, int x, int y, const char* key, const char* label) {
-    canvas_draw_str(canvas, x, y, key);
-    x += canvas_string_width(canvas, key) + 2;
+// Draws a button glyph + label on the text baseline `y`, starting at `x`. Returns
+// the x just past the segment so hints chain left-to-right. The glyph is bottom-
+// aligned to the baseline so it sits like a leading character next to the word.
+static int wifi_mapper_hint(Canvas* canvas, int x, int y, const Icon* icon, const char* label) {
+    canvas_draw_icon(canvas, x, y - icon_get_height(icon), icon);
+    x += icon_get_width(icon) + 2;
     canvas_draw_str(canvas, x, y, label);
     return x + canvas_string_width(canvas, label) + 7;
 }
@@ -1676,14 +1677,14 @@ static void wifi_mapper_draw_live(Canvas* canvas, WiFiMapperModel* model) {
     // repeated here.
     canvas_draw_line(canvas, 0, 42, 127, 42);
     int x = 0;
-    x = wifi_mapper_hint(canvas, x, 51, "U", "Scan");
-    x = wifi_mapper_hint(canvas, x, 51, "D", "Stop");
-    wifi_mapper_hint(canvas, x, 51, "OK", "Rec");
+    x = wifi_mapper_hint(canvas, x, 51, &I_ButtonUp_7x4, "Scan");
+    x = wifi_mapper_hint(canvas, x, 51, &I_ButtonDown_7x4, "Stop");
+    wifi_mapper_hint(canvas, x, 51, &I_ButtonCenter_7x7, "Rec");
     x = 0;
     canvas_draw_str(canvas, x, 62, "Hold:");
     x += canvas_string_width(canvas, "Hold:") + 4;
-    x = wifi_mapper_hint(canvas, x, 62, "D", "BLE");
-    wifi_mapper_hint(canvas, x, 62, "OK", "Sess");
+    x = wifi_mapper_hint(canvas, x, 62, &I_ButtonDown_7x4, "BLE");
+    wifi_mapper_hint(canvas, x, 62, &I_ButtonCenter_7x7, "Sess");
 }
 
 static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
@@ -1733,11 +1734,11 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
     // each other or the divider.
     canvas_draw_line(canvas, 0, 42, 127, 42);
     int x = 0;
-    x = wifi_mapper_hint(canvas, x, 51, "U", "Refresh");
-    wifi_mapper_hint(canvas, x, 51, "OK", "Export");
+    x = wifi_mapper_hint(canvas, x, 51, &I_ButtonUp_7x4, "Refresh");
+    wifi_mapper_hint(canvas, x, 51, &I_ButtonCenter_7x7, "Export");
     x = 0;
-    x = wifi_mapper_hint(canvas, x, 62, "R", "Clean/Raw");
-    wifi_mapper_hint(canvas, x, 62, "Back", "Live");
+    x = wifi_mapper_hint(canvas, x, 62, &I_ButtonRight_4x7, "Clean/Raw");
+    wifi_mapper_hint(canvas, x, 62, &I_Pin_back_arrow_10x8, "Live");
 }
 
 static void wifi_mapper_draw_callback(Canvas* canvas, void* context) {
