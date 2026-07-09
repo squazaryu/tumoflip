@@ -12,6 +12,7 @@
 #include "iso7816/iso7816_atr.h"
 #include "iso7816/iso7816_response.h"
 
+#include "ccid_usb.h"
 #include "ccid_test_app_commands.h"
 
 typedef enum {
@@ -22,7 +23,7 @@ typedef struct {
     Gui* gui;
     ViewPort* view_port;
     FuriMessageQueue* event_queue;
-    FuriHalUsbCcidConfig ccid_cfg;
+    CcidUsbConfig ccid_cfg;
     Iso7816Handler* iso7816_handler;
 } CcidTestApp;
 
@@ -120,9 +121,9 @@ int32_t ccid_test_app(void* p) {
     FuriHalUsbInterface* usb_mode_prev = furi_hal_usb_get_config();
     furi_hal_usb_unlock();
 
-    furi_check(furi_hal_usb_set_config(&usb_ccid, &app->ccid_cfg) == true);
+    furi_check(furi_hal_usb_set_config(&ccid_usb_interface, &app->ccid_cfg) == true);
     iso7816_handler_set_usb_ccid_callbacks();
-    furi_hal_usb_ccid_insert_smartcard();
+    ccid_usb_insert_smartcard();
 
     //handle button events
     CcidTestAppEvent event;

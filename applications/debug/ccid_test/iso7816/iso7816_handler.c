@@ -7,13 +7,14 @@
 #include <furi_hal.h>
 
 #include "iso7816_handler.h"
+#include "../ccid_usb.h"
 
 #include "iso7816_t0_apdu.h"
 #include "iso7816_atr.h"
 #include "iso7816_response.h"
 
 static Iso7816Handler* iso7816_handler;
-static CcidCallbacks* ccid_callbacks;
+static CcidUsbCallbacks* ccid_callbacks;
 static uint8_t* command_apdu_buffer;
 static uint8_t* response_apdu_buffer;
 
@@ -71,7 +72,7 @@ Iso7816Handler* iso7816_handler_alloc() {
     command_apdu_buffer = malloc(sizeof(ISO7816_Command_APDU) + CCID_SHORT_APDU_SIZE);
     response_apdu_buffer = malloc(sizeof(ISO7816_Response_APDU) + CCID_SHORT_APDU_SIZE);
 
-    ccid_callbacks = malloc(sizeof(CcidCallbacks));
+    ccid_callbacks = malloc(sizeof(CcidUsbCallbacks));
     ccid_callbacks->icc_power_on_callback = iso7816_icc_power_on_callback;
     ccid_callbacks->xfr_datablock_callback = iso7816_xfr_datablock_callback;
 
@@ -79,11 +80,11 @@ Iso7816Handler* iso7816_handler_alloc() {
 }
 
 void iso7816_handler_set_usb_ccid_callbacks() {
-    furi_hal_usb_ccid_set_callbacks(ccid_callbacks, iso7816_handler);
+    ccid_usb_set_callbacks(ccid_callbacks, iso7816_handler);
 }
 
 void iso7816_handler_reset_usb_ccid_callbacks() {
-    furi_hal_usb_ccid_set_callbacks(NULL, NULL);
+    ccid_usb_set_callbacks(NULL, NULL);
 }
 
 void iso7816_handler_free(Iso7816Handler* handler) {
