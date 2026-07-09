@@ -15,7 +15,7 @@ const char* const ac_button_names[AC_BUTTON_COUNT] = {
 };
 
 const char* const ac_button_labels[AC_BUTTON_COUNT] = {
-    "OFF",
+    "POWER",
     "MODE",
     "TEMP +",
     "TEMP -",

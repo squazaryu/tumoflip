@@ -23,6 +23,7 @@
 #define XREMOTE_AC_MAX_ACS  32
 #define XREMOTE_AC_NAME_LEN 24
 #define XREMOTE_AC_PATH_LEN 128
+#define XREMOTE_AC_BUTTON_REQUIRED_COUNT 4
 
 typedef enum {
     XRemoteAcMenuAddSmart = 1,
@@ -221,7 +222,7 @@ static void xremote_ac_rebuild_menu(XRemoteAcContext* ctx) {
     xremote_app_submenu_add(
         ctx->app, "Add Smart AC", XRemoteAcMenuAddSmart, xremote_ac_submenu_callback);
     xremote_app_submenu_add(
-        ctx->app, "Add Simple AC", XRemoteAcMenuAddSimple, xremote_ac_submenu_callback);
+        ctx->app, "Add Button AC", XRemoteAcMenuAddSimple, xremote_ac_submenu_callback);
 
     xremote_ac_refresh_list(ctx);
     for(uint32_t i = 0; i < ctx->ac_count; i++) {
@@ -385,6 +386,8 @@ static void xremote_ac_remote_add_button(XRemoteAcContext* ctx, AcButton button)
 static void xremote_ac_panel_refresh(XRemoteAcContext* ctx) {
     ACRemotePanel* panel = ctx->panel;
     const bool smart = ctx->current_type == AcTypeSmart;
+    const bool has_fan = !smart && ctx->remote.signals[AcButtonFan].present;
+    const bool has_vane = !smart && ctx->remote.signals[AcButtonVane].present;
 
     ac_remote_panel_reset(panel);
     ac_remote_panel_reserve(panel, 2, 3);
@@ -392,16 +395,20 @@ static void xremote_ac_panel_refresh(XRemoteAcContext* ctx) {
     xremote_ac_remote_add_button(ctx, AcButtonMode);
     xremote_ac_remote_add_button(ctx, AcButtonTempUp);
     xremote_ac_remote_add_button(ctx, AcButtonTempDown);
-    if(!smart) {
+    if(has_fan) {
         xremote_ac_remote_add_button(ctx, AcButtonFan);
+    }
+    if(has_vane) {
         xremote_ac_remote_add_button(ctx, AcButtonVane);
     }
 
     ac_remote_panel_add_icon(panel, 9, 39, &I_off_text_14x5);
     ac_remote_panel_add_icon(panel, 39, 39, &I_ac_mode_text_20x5);
     ac_remote_panel_add_icon(panel, 0, 63, &I_frame_30x39);
-    if(!smart) {
+    if(has_fan) {
         ac_remote_panel_add_icon(panel, 41, 76, &I_fan_text_14x5);
+    }
+    if(has_vane) {
         ac_remote_panel_add_icon(panel, 38, 113, &I_vane_text_20x5);
     }
 
@@ -500,7 +507,7 @@ static void xremote_ac_show_learn_current(XRemoteAcContext* ctx) {
     if(ctx->flow == XRemoteAcFlowSimpleLearn) {
         label = ac_button_labels[ctx->learn_index];
         index = ctx->learn_index + 1;
-        total = AC_BUTTON_COUNT;
+        total = XREMOTE_AC_BUTTON_REQUIRED_COUNT;
     }
 
     learn_view_set_button(ctx->learn_view, label, index, total);
@@ -556,7 +563,7 @@ static void xremote_ac_simple_finish(XRemoteAcContext* ctx) {
 
 static void xremote_ac_simple_advance(XRemoteAcContext* ctx) {
     ctx->learn_index++;
-    if(ctx->learn_index < AC_BUTTON_COUNT) {
+    if(ctx->learn_index < XREMOTE_AC_BUTTON_REQUIRED_COUNT) {
         xremote_ac_show_learn_current(ctx);
         xremote_ac_rx_start(ctx);
     } else {

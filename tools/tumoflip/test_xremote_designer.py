@@ -129,7 +129,7 @@ class XRemoteACSmartTest(unittest.TestCase):
         self.assertIn("ac_ir_read_signal_body", engine)
         self.assertIn("ac_ir_signal_send", engine)
         self.assertIn('"Add Smart AC"', app)
-        self.assertIn('"Add Simple AC"', app)
+        self.assertIn('"Add Button AC"', app)
         self.assertIn("xremote_ac_smart_send", app)
         self.assertIn("ac_remote_panel_add_item", app)
 
@@ -138,7 +138,7 @@ class XRemoteACSmartTest(unittest.TestCase):
 
         for required in (
             '"Add Smart AC"',
-            '"Add Simple AC"',
+            '"Add Button AC"',
             "xremote_ac_start_name_input",
             "InfraredWorker* rx_worker;",
             "infrared_worker_rx_start(ctx->rx_worker)",
@@ -149,6 +149,17 @@ class XRemoteACSmartTest(unittest.TestCase):
             "SweepView* sweep_view;",
         ):
             self.assertIn(required, app)
+
+    def test_ac_button_capture_keeps_hisense_basics_required(self) -> None:
+        app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
+        engine = (APP_DIR / "ac_smart/ac_ir.c").read_text(encoding="utf-8")
+
+        self.assertIn("#define XREMOTE_AC_BUTTON_REQUIRED_COUNT 4", app)
+        self.assertIn("total = XREMOTE_AC_BUTTON_REQUIRED_COUNT;", app)
+        self.assertIn("ctx->learn_index < XREMOTE_AC_BUTTON_REQUIRED_COUNT", app)
+        self.assertIn('"POWER"', engine)
+        self.assertIn("const bool has_fan = !smart && ctx->remote.signals[AcButtonFan].present;", app)
+        self.assertIn("const bool has_vane = !smart && ctx->remote.signals[AcButtonVane].present;", app)
 
     def test_ac_smart_creator_cleans_up_rx_on_cancel_and_exit(self) -> None:
         app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
