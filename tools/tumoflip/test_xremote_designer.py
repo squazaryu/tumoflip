@@ -157,6 +157,22 @@ class XRemoteACSmartTest(unittest.TestCase):
         self.assertIn("view_dispatcher_switch_to_view(app_ctx->view_dispatcher, XRemoteViewAcSmart)", app)
         self.assertIn("xremote_signal_receiver_free(ctx->ir_receiver)", app)
 
+    def test_ac_smart_capture_defers_rx_ui_work_to_dispatcher(self) -> None:
+        app = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
+        rx_callback = app.split("static void xremote_ac_rx_callback", 1)[1].split(
+            "static bool xremote_ac_custom_event_callback", 1
+        )[0]
+
+        self.assertIn("view_dispatcher_send_custom_event", rx_callback)
+        self.assertNotIn("xremote_ac_stop_capture(ctx);", rx_callback)
+        self.assertNotIn("view_dispatcher_switch_to_view", rx_callback)
+        self.assertIn("static bool xremote_ac_custom_event_callback", app)
+        self.assertIn(
+            "view_dispatcher_set_custom_event_callback(\n"
+            "        app_ctx->view_dispatcher, xremote_ac_custom_event_callback)",
+            app,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

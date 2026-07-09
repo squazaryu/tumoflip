@@ -340,13 +340,31 @@ static void xremote_ac_save_capture(XRemoteAcContext* ctx) {
 static void xremote_ac_rx_callback(void* context, InfraredSignal* signal) {
     XRemoteAcContext* ctx = context;
     xremote_app_assert_void(ctx);
-    if(!ctx->creator_active || !ctx->ir_receiver) return;
+    if(!ctx->creator_active || !ctx->ir_receiver || ctx->capture_ready) return;
 
     infrared_signal_set_signal(ctx->capture_signal, signal);
     ctx->capture_ready = true;
-    xremote_ac_stop_capture(ctx);
-    xremote_ac_set_status(ctx, "Captured. OK save");
-    view_dispatcher_switch_to_view(ctx->app_ctx->view_dispatcher, XRemoteViewAcSmartRemote);
+    view_dispatcher_send_custom_event(
+        ctx->app_ctx->view_dispatcher, XRemoteEventSignalReceived);
+}
+
+static bool xremote_ac_custom_event_callback(void* context, uint32_t event) {
+    xremote_app_assert(context, false);
+    XRemoteAcContext* ctx = context;
+
+    if(event == XRemoteEventSignalReceived && ctx->creator_active && ctx->capture_ready) {
+        xremote_ac_stop_capture(ctx);
+        xremote_ac_set_status(ctx, "Captured. OK save");
+        view_dispatcher_switch_to_view(ctx->app_ctx->view_dispatcher, XRemoteViewAcSmartRemote);
+    }
+
+    return true;
+}
+
+static bool xremote_ac_custom_event_dummy_callback(void* context, uint32_t event) {
+    UNUSED(context);
+    UNUSED(event);
+    return true;
 }
 
 static void xremote_ac_name_input_callback(void* context) {
@@ -588,16 +606,22 @@ static bool xremote_ac_process_creator_input(XRemoteAcContext* ctx, InputEvent* 
 }
 
 static void xremote_ac_process_input(XRemoteView* view, InputEvent* event) {
+    XRemoteAcContext* ctx = xremote_view_get_context(view);
+
+    if(ctx->creator_active && xremote_ac_process_creator_input(ctx, event)) {
+        with_view_model(
+            xremote_view_get_view(view),
+            XRemoteViewModel * model,
+            { model->context = ctx; },
+            true);
+        return;
+    }
+
     with_view_model(
         xremote_view_get_view(view),
         XRemoteViewModel * model,
         {
-            XRemoteAcContext* ctx = xremote_view_get_context(view);
             model->context = ctx;
-
-            if(ctx->creator_active && xremote_ac_process_creator_input(ctx, event)) {
-                return;
-            }
 
             if(event->type == InputTypeShort) {
                 if(event->key == InputKeyOk) {
@@ -668,6 +692,8 @@ static void xremote_ac_context_free(void* context) {
     xremote_app_assert_void(ctx);
     xremote_ac_stop_capture(ctx);
     ViewDispatcher* view_disp = ctx->app_ctx->view_dispatcher;
+    view_dispatcher_set_custom_event_callback(view_disp, xremote_ac_custom_event_dummy_callback);
+    view_dispatcher_set_event_callback_context(view_disp, NULL);
     view_dispatcher_remove_view(view_disp, XRemoteViewTextInput);
     xremote_signal_receiver_free(ctx->ir_receiver);
     infrared_signal_free(ctx->capture_signal);
@@ -691,6 +717,9 @@ static XRemoteAcContext* xremote_ac_context_alloc(XRemoteAppContext* app_ctx) {
     ctx->ir_receiver = xremote_signal_receiver_alloc(app_ctx);
     xremote_signal_receiver_set_context(ctx->ir_receiver, ctx, NULL);
     xremote_signal_receiver_set_rx_callback(ctx->ir_receiver, xremote_ac_rx_callback);
+    view_dispatcher_set_custom_event_callback(
+        app_ctx->view_dispatcher, xremote_ac_custom_event_callback);
+    view_dispatcher_set_event_callback_context(app_ctx->view_dispatcher, ctx);
     ctx->capture_signal = infrared_signal_alloc();
     ctx->output_remote = infrared_remote_alloc();
     xremote_ac_prepare_storage(ctx->storage);
