@@ -88,8 +88,13 @@ class SubGhzRawEditTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("size_t copies = (size_t)g_merge_repeat;", source)
-        self.assertIn("size_t extra = cnt * copies + gaps;", source)
-        self.assertIn("bool over_cap = newtotal > MAX_SAMPLES;", source)
+        self.assertIn("gaps > MAX_SAMPLES - total", source)
+        self.assertIn("over_cap = cnt > remaining / copies;", source)
+        self.assertIn("extra = cnt * copies + gaps;", source)
+        self.assertIn(
+            "bool over_ram = !over_cap &&",
+            source,
+        )
         self.assertIn(
             "newtotal * sizeof(int16_t) + LOAD_HEAP_RESERVE > memmgr_get_free_heap()",
             source,

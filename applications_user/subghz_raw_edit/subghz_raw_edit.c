@@ -2184,11 +2184,27 @@ static void run_merge(Storage *storage, DialogsApp *dialogs)
         }
 
         size_t copies = (size_t)g_merge_repeat;
-        size_t gaps = (n > 0) ? copies : (copies - 1);
-        size_t extra = cnt * copies + gaps;
-        size_t newtotal = total + extra;
-        bool over_cap = newtotal > MAX_SAMPLES;
-        bool over_ram = newtotal * sizeof(int16_t) + LOAD_HEAP_RESERVE > memmgr_get_free_heap();
+        size_t gaps = 0;
+        size_t extra = 0;
+        size_t newtotal = total;
+        bool over_cap = copies == 0 || total > MAX_SAMPLES;
+        if (!over_cap)
+        {
+            gaps = (n > 0) ? copies : (copies - 1);
+            over_cap = gaps > MAX_SAMPLES - total;
+        }
+        if (!over_cap)
+        {
+            size_t remaining = MAX_SAMPLES - total - gaps;
+            over_cap = cnt > remaining / copies;
+            if (!over_cap)
+            {
+                extra = cnt * copies + gaps;
+                newtotal = total + extra;
+            }
+        }
+        bool over_ram = !over_cap &&
+            newtotal * sizeof(int16_t) + LOAD_HEAP_RESERVE > memmgr_get_free_heap();
         if (over_cap || over_ram)
         {
             char msg[128];
