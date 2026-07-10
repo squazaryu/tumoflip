@@ -11,8 +11,10 @@ extern "C" {
 
 /** App-local USB CCID device interface.
  *
- * Tumoflip keeps the legacy furi_hal_usb_ccid API exported for FAP
- * compatibility, while ccid_test owns this private USB interface copy.
+ * This used to live in the firmware HAL (furi_hal_usb_ccid). It now lives
+ * inside the ccid_test app: the app defines its own FuriHalUsbInterface and
+ * drives the libusb_stm32 device stack directly through the usbd_* inline
+ * helpers (usbd_core.h), which are shipped in the app SDK.
  */
 extern FuriHalUsbInterface ccid_usb_interface;
 
@@ -21,7 +23,7 @@ typedef struct {
     uint16_t pid;
     char manuf[32];
     char product[32];
-} CcidUsbConfig;
+} FuriHalUsbCcidConfig;
 
 typedef struct {
     void (*icc_power_on_callback)(uint8_t* dataBlock, uint32_t* dataBlockLen, void* context);
@@ -31,14 +33,14 @@ typedef struct {
         uint8_t* readerToPcDataBlock,
         uint32_t* readerToPcDataBlockLen,
         void* context);
-} CcidUsbCallbacks;
+} CcidCallbacks;
 
 /** Set CCID callbacks
  *
- * @param      cb       CcidUsbCallbacks instance
+ * @param      cb       CcidCallbacks instance
  * @param      context  The context for callbacks
  */
-void ccid_usb_set_callbacks(CcidUsbCallbacks* cb, void* context);
+void ccid_usb_set_callbacks(CcidCallbacks* cb, void* context);
 
 /** Insert Smart Card */
 void ccid_usb_insert_smartcard(void);

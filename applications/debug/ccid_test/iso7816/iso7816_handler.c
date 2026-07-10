@@ -14,7 +14,7 @@
 #include "iso7816_response.h"
 
 static Iso7816Handler* iso7816_handler;
-static CcidUsbCallbacks* ccid_callbacks;
+static CcidCallbacks* ccid_callbacks;
 static uint8_t* command_apdu_buffer;
 static uint8_t* response_apdu_buffer;
 
@@ -72,7 +72,7 @@ Iso7816Handler* iso7816_handler_alloc() {
     command_apdu_buffer = malloc(sizeof(ISO7816_Command_APDU) + CCID_SHORT_APDU_SIZE);
     response_apdu_buffer = malloc(sizeof(ISO7816_Response_APDU) + CCID_SHORT_APDU_SIZE);
 
-    ccid_callbacks = malloc(sizeof(CcidUsbCallbacks));
+    ccid_callbacks = malloc(sizeof(CcidCallbacks));
     ccid_callbacks->icc_power_on_callback = iso7816_icc_power_on_callback;
     ccid_callbacks->xfr_datablock_callback = iso7816_xfr_datablock_callback;
 

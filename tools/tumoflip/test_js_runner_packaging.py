@@ -48,7 +48,7 @@ class JsRunnerPackagingTest(unittest.TestCase):
         self.assertNotIn('"js_app"', self.system_apps)
 
     def test_mjs_runtime_api_is_not_exported(self) -> None:
-        self.assertIn("Version,+,87.18,,", self.api_symbols)
+        self.assertIn("Version,+,88.0,,", self.api_symbols)
         self.assertNotIn("lib/mjs/", self.api_symbols)
         self.assertNotIn("Function,+,mjs_", self.api_symbols)
         self.assertNotIn('"mjs"', self.target_json)

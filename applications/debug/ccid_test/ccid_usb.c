@@ -218,7 +218,7 @@ static usbd_respond ccid_control(usbd_device* dev, usbd_ctlreq* req, usbd_rqc_ca
 typedef struct {
     bool connected;
     bool smartcard_inserted;
-    CcidUsbCallbacks* callbacks[CCID_TOTAL_SLOTS];
+    CcidCallbacks* callbacks[CCID_TOTAL_SLOTS];
     void* cb_ctx[CCID_TOTAL_SLOTS];
     FuriThread* ccid_thread;
     FuriSemaphore* ccid_semaphore;
@@ -247,7 +247,7 @@ static void* ccid_set_string_descr(char* str) {
 static void ccid_init(usbd_device* dev, FuriHalUsbInterface* intf, void* ctx) {
     UNUSED(intf);
 
-    CcidUsbConfig* cfg = (CcidUsbConfig*)ctx;
+    FuriHalUsbCcidConfig* cfg = (FuriHalUsbCcidConfig*)ctx;
 
     furi_check(ccid_usb == NULL);
     ccid_usb = malloc(sizeof(CcidUsb));
@@ -318,7 +318,7 @@ static void ccid_on_suspend(usbd_device* dev) {
     ccid_usb->connected = false;
 }
 
-static void ccid_usb_get_slot_status(
+void CALLBACK_CCID_GetSlotStatus(
     uint8_t slot,
     uint8_t seq,
     struct rdr_to_pc_slot_status* responseSlotStatus) {
@@ -349,7 +349,7 @@ static void ccid_usb_get_slot_status(
     }
 }
 
-static void ccid_usb_set_parameters_t0(
+void CALLBACK_CCID_SetParametersT0(
 
     struct pc_to_rdr_set_parameters_t0* requestSetParametersT0,
     struct rdr_to_pc_parameters_t0* responseSetParametersT0) {
@@ -383,7 +383,7 @@ static void ccid_usb_set_parameters_t0(
     }
 }
 
-static void ccid_usb_icc_power_on(
+void CALLBACK_CCID_IccPowerOn(
     uint8_t slot,
     uint8_t seq,
     struct rdr_to_pc_data_block* responseDataBlock) {
@@ -420,7 +420,7 @@ static void ccid_usb_icc_power_on(
     }
 }
 
-static void ccid_usb_xfr_block(
+void CALLBACK_CCID_XfrBlock(
     struct pc_to_rdr_xfr_block* receivedXfrBlock,
     struct rdr_to_pc_data_block* responseDataBlock) {
     furi_check(receivedXfrBlock);
@@ -459,7 +459,7 @@ static void ccid_usb_xfr_block(
     }
 }
 
-static void ccid_usb_notify_slot_change(
+void CCID_NotifySlotChange(
     struct rdr_to_pc_notify_slot_change* message,
     uint8_t slot,
     bool inserted) {
@@ -483,14 +483,14 @@ void ccid_usb_remove_smartcard(void) {
     furi_thread_flags_set(furi_thread_get_id(ccid_usb->ccid_thread), WorkerEvtRemoveSmartcard);
 }
 
-void ccid_usb_set_callbacks(CcidUsbCallbacks* cb, void* context) {
+void ccid_usb_set_callbacks(CcidCallbacks* cb, void* context) {
     furi_check(ccid_usb);
 
     ccid_usb->callbacks[CCID_SLOT_INDEX] = cb;
     ccid_usb->cb_ctx[CCID_SLOT_INDEX] = context;
 }
 
-static void ccid_send_packet(uint8_t* data, uint8_t len) {
+void ccid_send_packet(uint8_t* data, uint8_t len) {
     furi_check(ccid_usb);
 
     if(ccid_usb->ccid_semaphore == NULL || ccid_usb->connected == false) return;
@@ -500,7 +500,7 @@ static void ccid_send_packet(uint8_t* data, uint8_t len) {
     }
 }
 
-static void ccid_send_response(uint8_t* data, uint32_t len) {
+void ccid_send_response(uint8_t* data, uint32_t len) {
     uint32_t data_to_send = len;
     uint32_t data_index = 0;
     while(data_to_send >= CCID_EPSIZE) {
@@ -570,7 +570,7 @@ static int32_t ccid_worker(void* context) {
                 struct rdr_to_pc_data_block* responseDataBlock =
                     (struct rdr_to_pc_data_block*)&ccid_usb->send_buffer;
 
-                ccid_usb_icc_power_on(
+                CALLBACK_CCID_IccPowerOn(
                     requestDataBlock->bSlot, requestDataBlock->bSeq, responseDataBlock);
 
                 ccid_send_response(
@@ -586,7 +586,7 @@ static int32_t ccid_worker(void* context) {
                 struct rdr_to_pc_slot_status* responseSlotStatus =
                     (struct rdr_to_pc_slot_status*)&ccid_usb->send_buffer; //-V641
 
-                ccid_usb_get_slot_status(
+                CALLBACK_CCID_GetSlotStatus(
                     requestIccPowerOff->bSlot, requestIccPowerOff->bSeq, responseSlotStatus);
 
                 ccid_send_response(ccid_usb->send_buffer, sizeof(struct rdr_to_pc_slot_status));
@@ -599,7 +599,7 @@ static int32_t ccid_worker(void* context) {
                 struct rdr_to_pc_slot_status* responseSlotStatus =
                     (struct rdr_to_pc_slot_status*)&ccid_usb->send_buffer; //-V641
 
-                ccid_usb_get_slot_status(
+                CALLBACK_CCID_GetSlotStatus(
                     requestSlotStatus->bSlot, requestSlotStatus->bSeq, responseSlotStatus);
 
                 ccid_send_response(ccid_usb->send_buffer, sizeof(struct rdr_to_pc_slot_status));
@@ -614,7 +614,7 @@ static int32_t ccid_worker(void* context) {
 
                 if(ccid_usb->receive_buffer_data_index >=
                    sizeof(struct pc_to_rdr_xfr_block) + receivedXfrBlock->dwLength) {
-                    ccid_usb_xfr_block(receivedXfrBlock, responseDataBlock);
+                    CALLBACK_CCID_XfrBlock(receivedXfrBlock, responseDataBlock);
 
                     ccid_send_response(
                         ccid_usb->send_buffer,
@@ -630,7 +630,7 @@ static int32_t ccid_worker(void* context) {
                 struct rdr_to_pc_parameters_t0* responseSetParametersT0 =
                     (struct rdr_to_pc_parameters_t0*)&ccid_usb->send_buffer; //-V641
 
-                ccid_usb_set_parameters_t0(requestSetParametersT0, responseSetParametersT0);
+                CALLBACK_CCID_SetParametersT0(requestSetParametersT0, responseSetParametersT0);
 
                 ccid_send_response(ccid_usb->send_buffer, sizeof(struct rdr_to_pc_parameters_t0));
 
@@ -645,7 +645,7 @@ static int32_t ccid_worker(void* context) {
                 struct rdr_to_pc_notify_slot_change* responseNotifySlotChange =
                     (struct rdr_to_pc_notify_slot_change*)&ccid_usb->send_buffer;
 
-                ccid_usb_notify_slot_change(responseNotifySlotChange, CCID_SLOT_INDEX, true);
+                CCID_NotifySlotChange(responseNotifySlotChange, CCID_SLOT_INDEX, true);
 
                 usbd_ep_write(
                     ccid_usb->usb_dev,
@@ -660,7 +660,7 @@ static int32_t ccid_worker(void* context) {
                 struct rdr_to_pc_notify_slot_change* responseNotifySlotChange =
                     (struct rdr_to_pc_notify_slot_change*)&ccid_usb->send_buffer;
 
-                ccid_usb_notify_slot_change(responseNotifySlotChange, CCID_SLOT_INDEX, false);
+                CCID_NotifySlotChange(responseNotifySlotChange, CCID_SLOT_INDEX, false);
                 usbd_ep_write(
                     ccid_usb->usb_dev,
                     CCID_INTERRUPT_EPADDR,
