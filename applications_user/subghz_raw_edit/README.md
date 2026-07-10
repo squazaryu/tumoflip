@@ -74,6 +74,10 @@ visually, on the device.
 - **Clean output.** The saved frame is aligned to start on a pulse and end on a
   gap, with the original `Frequency` and `Preset` preserved.
   There is also an option to auto normalize jitter quirks which makes the signal even more clean.
+- **Controlled merge.** `Merge .sub files` can repeat each selected signal and
+  place one exact silence separator between copies. In `Config`, **Merge gap**
+  accepts 1-32 ms and **Merge repeat** accepts 1-64 copies. The app checks the
+  resulting sample count and free heap before allocating the output buffer.
 
   Note:
   Some signal receivers will reject a signal if it's "too clean" due to a built-in security layer.
@@ -96,6 +100,10 @@ visually, on the device.
 In the action menu, **Up / Down** move between Save, Cut and Undo, **OK**
 confirms the highlighted action and **Back** closes the menu without doing
 anything.
+
+In `Config`, **Left / Right** adjust Normalize jitter, Merge gap and Merge
+repeat. Press **OK** on Merge gap or Merge repeat to enter an exact numeric
+value; out-of-range values are clamped to the supported limits.
 
 The active marker is the one drawn as a solid line with a small box on top, and
 marked with `>` in the bottom bar. The other marker is dotted.

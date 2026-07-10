@@ -43,6 +43,58 @@ class SubGhzRawEditTest(unittest.TestCase):
         self.assertNotIn("furi_hal_subghz_tx", source)
         self.assertNotIn("subghz_txrx_tx_start", source)
 
+    def test_merge_controls_are_bounded_and_documented(self) -> None:
+        readme = (REPO_ROOT / "applications_user/subghz_raw_edit/README.md").read_text(
+            encoding="utf-8"
+        )
+        source = (
+            REPO_ROOT / "applications_user/subghz_raw_edit/subghz_raw_edit.c"
+        ).read_text(encoding="utf-8")
+
+        for definition in (
+            "#define MERGE_GAP_DEFAULT_MS 15",
+            "#define MERGE_GAP_MIN_MS 1",
+            "#define MERGE_GAP_MAX_MS 32",
+            "#define MERGE_REPEAT_DEFAULT 1",
+            "#define MERGE_REPEAT_MIN 1",
+            "#define MERGE_REPEAT_MAX 64",
+        ):
+            self.assertIn(definition, source)
+
+        self.assertIn('"Merge gap"', source)
+        self.assertIn('"Merge repeat"', source)
+        self.assertIn("Merge gap", readme)
+        self.assertIn("Merge repeat", readme)
+
+    def test_merge_uses_exact_separator_and_dynamic_path_storage(self) -> None:
+        source = (
+            REPO_ROOT / "applications_user/subghz_raw_edit/subghz_raw_edit.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("static void merge_separator(SubData *dst)", source)
+        self.assertIn(
+            "dst->data[dst->count - 1] = (int16_t)gap;",
+            source,
+        )
+        self.assertIn("bool skip_lead = add_separator;", source)
+        self.assertIn("uint8_t *pbuf = safe_malloc(pcap);", source)
+        self.assertIn("uint8_t *np = safe_realloc(pbuf, newcap);", source)
+        self.assertIn("free(pbuf);", source)
+        self.assertNotIn("MERGE_MAX_FILES", source)
+
+    def test_merge_repeat_is_included_in_capacity_guards(self) -> None:
+        source = (
+            REPO_ROOT / "applications_user/subghz_raw_edit/subghz_raw_edit.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("size_t copies = (size_t)g_merge_repeat;", source)
+        self.assertIn("size_t extra = cnt * copies + gaps;", source)
+        self.assertIn("bool over_cap = newtotal > MAX_SAMPLES;", source)
+        self.assertIn(
+            "newtotal * sizeof(int16_t) + LOAD_HEAP_RESERVE > memmgr_get_free_heap()",
+            source,
+        )
+
     def test_release_and_deploy_include_raw_edit_as_visible_app(self) -> None:
         validate = (REPO_ROOT / "tools/tumoflip/validate_release.py").read_text(
             encoding="utf-8"
