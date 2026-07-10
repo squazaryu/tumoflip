@@ -222,11 +222,20 @@ class ValidateReleaseTest(unittest.TestCase):
             "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
-        for relative in MODULE_ONE_PACKAGE_FILES:
-            if relative.endswith("esp32_wifi_marauder.fap"):
-                path = REPO_ROOT / STATIC_SD_RESOURCES / relative
-                self.assertTrue(path.is_file(), str(path))
-                self.assertGreater(path.stat().st_size, 100 * 1024)
+        marauder_manifest = (
+            REPO_ROOT / "applications_user/esp32_wifi_marauder/application.fam"
+        ).read_text(encoding="utf-8")
+        self.assertIn('appid="esp32_wifi_marauder"', marauder_manifest)
+        self.assertIn(
+            'fap_category="Module One/ESP32 Wi-Fi"', marauder_manifest
+        )
+        self.assertFalse(
+            (
+                REPO_ROOT
+                / STATIC_SD_RESOURCES
+                / "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap"
+            ).exists()
+        )
         self.assertIn(
             "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
             MODULE_ONE_PACKAGE_DATA_FILES,
