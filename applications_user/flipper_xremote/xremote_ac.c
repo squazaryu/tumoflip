@@ -425,7 +425,7 @@ static void xremote_ac_panel_refresh(XRemoteAcContext* ctx) {
     }
 
     if(ctx->current_ac >= 0 && ctx->current_ac < (int32_t)ctx->ac_count) {
-        snprintf(ctx->title_buf, sizeof(ctx->title_buf), "%s", ctx->ac_names[ctx->current_ac]);
+        strlcpy(ctx->title_buf, ctx->ac_names[ctx->current_ac], sizeof(ctx->title_buf));
     } else {
         snprintf(ctx->title_buf, sizeof(ctx->title_buf), "AC remote");
     }
