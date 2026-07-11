@@ -32,6 +32,10 @@ int main(void) {
     assert(nfc_ccid_bridge_check_apdu(malformed, sizeof(malformed), NfcCcidBridgePolicyFull) == NfcCcidBridgeApduMalformed);
     assert(nfc_ccid_bridge_response_status(response, sizeof(response)) == 0x9000);
     assert(nfc_ccid_bridge_response_status(response, 1) == 0);
+    assert(nfc_ccid_bridge_amplitude_indicates_removal(150, 132, 149, true));
+    assert(!nfc_ccid_bridge_amplitude_indicates_removal(150, 132, 134, true));
+    assert(nfc_ccid_bridge_amplitude_indicates_removal(0, 132, 145, false));
+    assert(!nfc_ccid_bridge_amplitude_indicates_removal(0, 132, 136, false));
     return 0;
 }
 '''
@@ -92,16 +96,104 @@ int main(void) {
         input_start = source.index("static bool nfc_ccid_input_callback(")
         input_end = source.index("static void nfc_ccid_write_status", input_start)
         input_source = source[input_start:input_end]
+        back_source = input_source[: input_source.index("if(event->key != InputKeyOk)")]
         poller_start = source.index("static NfcCommand nfc_ccid_poller_callback(")
         poller_end = source.index("static bool nfc_ccid_start_usb", poller_start)
         poller_source = source[poller_start:poller_end]
 
         self.assertIn("InputKeyBack", input_source)
-        self.assertIn("app->stopping = true", input_source)
-        self.assertNotIn("nfc_poller_stop", input_source)
+        self.assertIn("app->stopping = true", back_source)
+        self.assertIn("furi_semaphore_release(app->request_done)", back_source)
+        self.assertNotIn("FuriWaitForever", back_source)
+        self.assertNotIn("nfc_poller_stop", back_source)
         self.assertIn("return NfcCommandStop", poller_source)
         self.assertIn("NFC_CCID_EVENT_CLOSE", poller_source)
         self.assertIn("view_dispatcher_stop", source)
+
+    def test_slot_change_notification_is_filled_after_state_change(self) -> None:
+        source = (REPO_ROOT / "applications/debug/ccid_test/ccid_usb.c").read_text(
+            encoding="utf-8"
+        )
+        notify_start = source.index("void CCID_NotifySlotChange(")
+        notify_end = source.index("void ccid_usb_insert_smartcard", notify_start)
+        notify_source = source[notify_start:notify_end]
+
+        self.assertIn("message->bMessageType = RDR_TO_PC_NOTIFYSLOTCHANGE", notify_source)
+        self.assertIn("inserted ? 0x03 : 0x02", notify_source)
+        self.assertNotIn("inserted != ccid_usb->smartcard_inserted", notify_source)
+        self.assertIn("smartcard_target_inserted", source)
+        self.assertIn(
+            "flags & (WorkerEvtInsertSmartcard | WorkerEvtRemoveSmartcard)", source
+        )
+
+    def test_iso14443_4a_reset_restarts_protocol_session(self) -> None:
+        source = (
+            REPO_ROOT / "lib/nfc/protocols/iso14443_4a/iso14443_4a_poller.c"
+        ).read_text(encoding="utf-8")
+        run_start = source.index("static NfcCommand iso14443_4a_poller_run(")
+        run_end = source.index("static bool iso14443_4a_poller_detect(", run_start)
+        run_source = source[run_start:run_end]
+
+        self.assertIn("command == NfcCommandReset", run_source)
+        self.assertIn("Iso14443_4aPollerStateIdle", run_source)
+
+    def test_ui_exposes_card_and_relay_progress(self) -> None:
+        source = (APP_ROOT / "nfc_ccid_bridge.c").read_text(encoding="utf-8")
+        self.assertIn('return "Scanning for card"', source)
+        self.assertIn('return "Card ready"', source)
+        self.assertIn('return "Relaying APDU"', source)
+        self.assertIn('return "Exiting"', source)
+
+    def test_active_card_idle_path_yields_to_gui(self) -> None:
+        source = (APP_ROOT / "nfc_ccid_bridge.c").read_text(encoding="utf-8")
+        poller_start = source.index("static NfcCommand nfc_ccid_poller_callback(")
+        poller_end = source.index("static bool nfc_ccid_start_usb", poller_start)
+        poller_source = source[poller_start:poller_end]
+        idle_start = poller_source.index("if(request_size == 0U)")
+        idle_source = poller_source[idle_start : poller_source.index("bit_buffer_copy_bytes")]
+
+        self.assertIn("furi_delay_ms(NFC_CCID_ACTIVE_IDLE_MS)", idle_source)
+        self.assertIn("return NfcCommandContinue", idle_source)
+        self.assertRegex(source, r"#define\s+NFC_CCID_ACTIVE_IDLE_MS\s+5U")
+
+    def test_relay_uses_emv_compatible_transport_and_reports_errors(self) -> None:
+        source = (APP_ROOT / "nfc_ccid_bridge.c").read_text(encoding="utf-8")
+        poller_start = source.index("static NfcCommand nfc_ccid_poller_callback(")
+        poller_end = source.index("static bool nfc_ccid_start_usb", poller_start)
+        poller_source = source[poller_start:poller_end]
+
+        self.assertIn("iso14443_4a_poller_send_block_pwt_ext", poller_source)
+        self.assertNotIn("iso14443_4a_poller_send_block(", poller_source)
+        self.assertIn('return "PROTO"', source)
+        self.assertIn('return "TIMEOUT"', source)
+        self.assertIn("nfc_ccid_result_from_error(error)", poller_source)
+
+    def test_card_removal_uses_debounced_amplitude_sensing(self) -> None:
+        source = (APP_ROOT / "nfc_ccid_bridge.c").read_text(encoding="utf-8")
+        self.assertIn("ST25R3916_CMD_MEASURE_AMPLITUDE", source)
+        self.assertIn("ST25R3916_REG_AD_RESULT", source)
+        self.assertIn("ST25R3916_IRQ_MASK_DCT", source)
+        self.assertIn("NFC_CCID_PRESENCE_GRACE_MS", source)
+        self.assertIn("last_activity_tick", source)
+        self.assertIn("presence_monitor_armed", source)
+        self.assertIn("if(result == NfcCcidResultOk)", source)
+        self.assertIn("nfc_ccid_bridge_amplitude_indicates_removal", source)
+        self.assertIn("NFC_CCID_REMOVAL_SAMPLES", source)
+        self.assertIn("ccid_usb_remove_smartcard", source)
+        self.assertIn("app->session = NfcCcidSessionScanning", source)
+        self.assertIn("app->presence_monitor_armed = false", source)
+
+    def test_about_and_button_hints_are_real_screens(self) -> None:
+        source = (APP_ROOT / "nfc_ccid_bridge.c").read_text(encoding="utf-8")
+        self.assertIn("NfcCcidScreenAbout", source)
+        self.assertIn("nfc_ccid_draw_about", source)
+        self.assertIn("I_Pin_back_arrow_10x8", source)
+        self.assertIn("I_ButtonRight_4x7", source)
+        self.assertIn('"EMV: Visa / MC / Mir"', source)
+        self.assertIn('"No Classic / Ultralight"', source)
+        self.assertIn('"Version 0.1.6"', source)
+        self.assertIn('"github.com/squazaryu"', source)
+        self.assertIn('"/tumoflip"', source)
 
     def test_release_package_and_privacy_contract(self) -> None:
         manifest = (APP_ROOT / "application.fam").read_text(encoding="utf-8")

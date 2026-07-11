@@ -218,6 +218,7 @@ static usbd_respond ccid_control(usbd_device* dev, usbd_ctlreq* req, usbd_rqc_ca
 typedef struct {
     bool connected;
     bool smartcard_inserted;
+    volatile bool smartcard_target_inserted;
     CcidCallbacks* callbacks[CCID_TOTAL_SLOTS];
     void* cb_ctx[CCID_TOTAL_SLOTS];
     FuriThread* ccid_thread;
@@ -473,23 +474,23 @@ void CCID_NotifySlotChange(
     struct rdr_to_pc_notify_slot_change* message,
     uint8_t slot,
     bool inserted) {
-    if(slot == CCID_SLOT_INDEX && inserted != ccid_usb->smartcard_inserted) {
-        message->bMessageType = RDR_TO_PC_NOTIFYSLOTCHANGE;
-        if(inserted) {
-            message->bmSlotICCState[0] = 0x03; //ICC inserted for slot 0
-        } else {
-            message->bmSlotICCState[0] = 0x02; //ICC removed for slot 0
-        }
-    }
+    furi_check(message);
+    furi_check(ccid_usb);
+    furi_check(slot == CCID_SLOT_INDEX);
+
+    message->bMessageType = RDR_TO_PC_NOTIFYSLOTCHANGE;
+    message->bmSlotICCState[0] = inserted ? 0x03 : 0x02;
 }
 
 void ccid_usb_insert_smartcard(void) {
     furi_check(ccid_usb);
+    ccid_usb->smartcard_target_inserted = true;
     furi_thread_flags_set(furi_thread_get_id(ccid_usb->ccid_thread), WorkerEvtInsertSmartcard);
 }
 
 void ccid_usb_remove_smartcard(void) {
     furi_check(ccid_usb);
+    ccid_usb->smartcard_target_inserted = false;
     furi_thread_flags_set(furi_thread_get_id(ccid_usb->ccid_thread), WorkerEvtRemoveSmartcard);
 }
 
@@ -671,30 +672,15 @@ static int32_t ccid_worker(void* context) {
                 ccid_usb->receive_buffer_data_index = 0;
             }
         }
-        if(flags & WorkerEvtInsertSmartcard) {
-            if(!ccid_usb->smartcard_inserted) {
-                ccid_usb->smartcard_inserted = true;
+        if(flags & (WorkerEvtInsertSmartcard | WorkerEvtRemoveSmartcard)) {
+            const bool inserted = ccid_usb->smartcard_target_inserted;
+            if(ccid_usb->smartcard_inserted != inserted) {
+                ccid_usb->smartcard_inserted = inserted;
 
-                struct rdr_to_pc_notify_slot_change* responseNotifySlotChange =
+                struct rdr_to_pc_notify_slot_change* response_notify =
                     (struct rdr_to_pc_notify_slot_change*)&ccid_usb->send_buffer;
 
-                CCID_NotifySlotChange(responseNotifySlotChange, CCID_SLOT_INDEX, true);
-
-                usbd_ep_write(
-                    ccid_usb->usb_dev,
-                    CCID_INTERRUPT_EPADDR,
-                    ccid_usb->send_buffer,
-                    sizeof(struct rdr_to_pc_notify_slot_change) + sizeof(uint8_t));
-            }
-        }
-        if(flags & WorkerEvtRemoveSmartcard) {
-            if(ccid_usb->smartcard_inserted) {
-                ccid_usb->smartcard_inserted = false;
-
-                struct rdr_to_pc_notify_slot_change* responseNotifySlotChange =
-                    (struct rdr_to_pc_notify_slot_change*)&ccid_usb->send_buffer;
-
-                CCID_NotifySlotChange(responseNotifySlotChange, CCID_SLOT_INDEX, false);
+                CCID_NotifySlotChange(response_notify, CCID_SLOT_INDEX, inserted);
                 usbd_ep_write(
                     ccid_usb->usb_dev,
                     CCID_INTERRUPT_EPADDR,

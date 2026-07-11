@@ -119,6 +119,10 @@ static NfcCommand iso14443_4a_poller_run(NfcGenericEvent event, void* context) {
         command = instance->callback(instance->general_event, instance->context);
     }
 
+    if(command == NfcCommandReset) {
+        instance->poller_state = Iso14443_4aPollerStateIdle;
+    }
+
     return command;
 }
 

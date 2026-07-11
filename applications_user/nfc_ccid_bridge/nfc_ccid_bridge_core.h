@@ -22,4 +22,10 @@ NfcCcidBridgeApduDecision
 
 uint16_t nfc_ccid_bridge_response_status(const uint8_t* response, size_t response_size);
 
+bool nfc_ccid_bridge_amplitude_indicates_removal(
+    uint8_t empty_reference,
+    uint8_t card_reference,
+    uint8_t sample,
+    bool empty_reference_valid);
+
 const char* nfc_ccid_bridge_policy_name(NfcCcidBridgePolicy policy);

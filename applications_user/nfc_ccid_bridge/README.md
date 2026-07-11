@@ -19,6 +19,21 @@ status word.
 - Removing the card, a timeout, malformed APDU, or Back fails closed.
 - Back requests a stop from the NFC callback before the UI exits, avoiding a
   blocking poller join when a non-ISO14443-4A card is still in the field.
+- The screen distinguishes scanning, an activated card, APDU relay, and exit
+  states so card activation is not mistaken for an application freeze.
+- An activated card waits briefly between mailbox checks so the NFC worker does
+  not starve the GUI while no host APDU is pending.
+- ISO14443-4A exchanges use the same extended wait/retry transport as the stock
+  EMV poller. `PROTO` and `TIMEOUT` describe bridge transport failures; the
+  synthetic `SW:6400` is not a status word returned by the physical card.
+- Debounced antenna-amplitude sensing detects physical card removal without
+  resetting an active APDU session. The UI returns from `Card ready` to
+  `Scanning for card` and notifies the USB host. Presence sampling is armed only
+  after the first successful APDU, then runs during idle periods and consumes
+  its diagnostic IRQ locally.
+- Right opens a three-page About screen with supported card families, explicit
+  limits, app version, and the project GitHub address. Back and About use button
+  glyphs instead of plain command text.
 
 `FULL` mode is intended only for cards and commands the user is authorized to
 test. It does not bypass authentication or card cryptography.
@@ -34,3 +49,11 @@ test. It does not bypass authentication or card cryptography.
 
 The temporary PoC USB identity is `076B:3A21` so the macOS in-box CCID driver
 binds without a custom driver. It is not a stable Tumoflip product identity.
+
+## Supported card families
+
+The bridge relays ISO14443-4A APDUs for authorized cards such as EMV payment
+cards, MIFARE DESFire, MIFARE Plus SL3, NFC Forum Type 4 tags, JavaCard, and PIV.
+Authentication and card cryptography still apply. MIFARE Classic and Ultralight
+are not ISO14443-4A and are not supported by this bridge. The app is a relay, not
+an automatic card decoder.
