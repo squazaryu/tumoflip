@@ -17,6 +17,8 @@ status word.
 - Hold OK to arm `FULL` relay for the current app session.
 - Press OK to return immediately to `READ` mode.
 - Removing the card, a timeout, malformed APDU, or Back fails closed.
+- Back requests a stop from the NFC callback before the UI exits, avoiding a
+  blocking poller join when a non-ISO14443-4A card is still in the field.
 
 `FULL` mode is intended only for cards and commands the user is authorized to
 test. It does not bypass authentication or card cryptography.

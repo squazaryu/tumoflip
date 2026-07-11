@@ -87,6 +87,22 @@ int main(void) {
         self.assertIn("ccid_usb_set_callbacks(NULL, NULL)", stop_source)
         self.assertIn("furi_hal_usb_set_config(app->previous_usb, NULL)", stop_source)
 
+    def test_back_uses_two_phase_poller_shutdown(self) -> None:
+        source = (APP_ROOT / "nfc_ccid_bridge.c").read_text(encoding="utf-8")
+        input_start = source.index("static bool nfc_ccid_input_callback(")
+        input_end = source.index("static void nfc_ccid_write_status", input_start)
+        input_source = source[input_start:input_end]
+        poller_start = source.index("static NfcCommand nfc_ccid_poller_callback(")
+        poller_end = source.index("static bool nfc_ccid_start_usb", poller_start)
+        poller_source = source[poller_start:poller_end]
+
+        self.assertIn("InputKeyBack", input_source)
+        self.assertIn("app->stopping = true", input_source)
+        self.assertNotIn("nfc_poller_stop", input_source)
+        self.assertIn("return NfcCommandStop", poller_source)
+        self.assertIn("NFC_CCID_EVENT_CLOSE", poller_source)
+        self.assertIn("view_dispatcher_stop", source)
+
     def test_release_package_and_privacy_contract(self) -> None:
         manifest = (APP_ROOT / "application.fam").read_text(encoding="utf-8")
         readme = (APP_ROOT / "README.md").read_text(encoding="utf-8")

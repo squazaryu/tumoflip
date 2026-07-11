@@ -16,6 +16,7 @@
 
 #define NFC_CCID_VIEW_MAIN        0U
 #define NFC_CCID_EVENT_REFRESH    1U
+#define NFC_CCID_EVENT_CLOSE      2U
 #define NFC_CCID_REFRESH_MS       200U
 #define NFC_CCID_REQUEST_TIMEOUT  1500U
 #define NFC_CCID_TRANSPORT_STATUS 0x6400U
@@ -85,11 +86,15 @@ typedef struct {
     uint16_t last_status;
     uint32_t request_count;
     uint32_t error_count;
+    bool stopping;
+    bool stop_event_sent;
 
     FuriHalUsbInterface* previous_usb;
     FuriHalUsbCcidConfig ccid_config;
     CcidCallbacks ccid_callbacks;
 } NfcCcidBridgeApp;
+
+static void nfc_ccid_fail_pending(NfcCcidBridgeApp* app, NfcCcidResult result);
 
 static uint32_t nfc_ccid_previous_callback(void* context) {
     UNUSED(context);
@@ -183,6 +188,9 @@ static bool nfc_ccid_custom_event_callback(void* context, uint32_t event) {
     if(event == NFC_CCID_EVENT_REFRESH) {
         nfc_ccid_refresh_model(app);
         return true;
+    } else if(event == NFC_CCID_EVENT_CLOSE) {
+        view_dispatcher_stop(app->view_dispatcher);
+        return true;
     }
     return false;
 }
@@ -194,6 +202,16 @@ static void nfc_ccid_refresh_timer_callback(void* context) {
 
 static bool nfc_ccid_input_callback(InputEvent* event, void* context) {
     NfcCcidBridgeApp* app = context;
+
+    if(event->key == InputKeyBack && event->type == InputTypeShort) {
+        furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+        app->stopping = true;
+        app->policy = NfcCcidBridgePolicyReadOnly;
+        furi_mutex_release(app->mutex);
+        nfc_ccid_fail_pending(app, NfcCcidResultTimeout);
+        return true;
+    }
+
     if(event->key != InputKeyOk) return false;
 
     bool changed = false;
@@ -261,7 +279,12 @@ static void nfc_ccid_transfer(
     NfcCcidBridgeApp* app = context;
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
     const NfcCcidBridgePolicy policy = app->policy;
+    const bool stopping = app->stopping;
     furi_mutex_release(app->mutex);
+    if(stopping) {
+        nfc_ccid_write_status(output, output_size, NFC_CCID_TRANSPORT_STATUS);
+        return;
+    }
     const NfcCcidBridgeApduDecision decision =
         nfc_ccid_bridge_check_apdu(input, input_size, policy);
     if(decision != NfcCcidBridgeApduAllowed) {
@@ -348,6 +371,21 @@ static void nfc_ccid_transfer(
 static NfcCommand nfc_ccid_poller_callback(NfcGenericEvent event, void* context) {
     NfcCcidBridgeApp* app = context;
     furi_check(event.protocol == NfcProtocolIso14443_4a);
+
+    bool stopping = false;
+    bool send_stop_event = false;
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    stopping = app->stopping;
+    if(stopping && !app->stop_event_sent) {
+        app->stop_event_sent = true;
+        send_stop_event = true;
+    }
+    furi_mutex_release(app->mutex);
+    if(stopping) {
+        if(send_stop_event)
+            view_dispatcher_send_custom_event(app->view_dispatcher, NFC_CCID_EVENT_CLOSE);
+        return NfcCommandStop;
+    }
 
     Iso14443_4aPollerEvent* poller_event = event.event_data;
     if(poller_event->type == Iso14443_4aPollerEventTypeError) {
@@ -437,6 +475,9 @@ static void nfc_ccid_start_nfc(NfcCcidBridgeApp* app) {
 }
 
 static void nfc_ccid_stop_transports(NfcCcidBridgeApp* app) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    app->stopping = true;
+    furi_mutex_release(app->mutex);
     nfc_ccid_fail_pending(app, NfcCcidResultTimeout);
     if(app->poller) {
         nfc_poller_stop(app->poller);
