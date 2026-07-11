@@ -11,6 +11,8 @@ Hardening:
   * every `source` is validated (relative POSIX path, no traversal/absolute/duplicate),
     and is confirmed to resolve inside the resources root;
   * each file's SHA-256 is verified against the manifest before it is added;
+  * entries use sorted paths, fixed timestamps, normalized Unix permissions, and a
+    fixed compression level so identical package content produces identical bytes;
   * the archive is written to a temp file in the destination directory and only
     atomically renamed into place after the WHOLE archive is built and verified, so a
     failure never leaves a partial or stale package zip.
@@ -24,10 +26,16 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 import sys
 import tempfile
 import zipfile
 from pathlib import Path
+
+
+ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
+ZIP_FILE_MODE = stat.S_IFREG | 0o644
+ZIP_COMPRESSION_LEVEL = 9
 
 
 class PackageError(Exception):
@@ -62,7 +70,19 @@ def iter_package_sources(manifest: dict) -> list[tuple[str, str]]:
                 raise PackageError(f"duplicate source in manifest: {source}")
             seen.add(source)
             out.append((source, sha))
-    return out
+    return sorted(out, key=lambda item: item[0])
+
+
+def _zip_info(source: str) -> zipfile.ZipInfo:
+    """Return normalized metadata for a reproducible package entry."""
+    info = zipfile.ZipInfo(source, date_time=ZIP_TIMESTAMP)
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.create_system = 3  # Unix mode bits in external_attr.
+    info.external_attr = ZIP_FILE_MODE << 16
+    info.internal_attr = 0
+    info.extra = b""
+    info.comment = b""
+    return info
 
 
 def build_packages_zip(manifest: dict, resources_root, out_path) -> int:
@@ -80,7 +100,12 @@ def build_packages_zip(manifest: dict, resources_root, out_path) -> int:
     os.close(handle)
     tmp_path = Path(tmp_name)
     try:
-        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as archive:
+        with zipfile.ZipFile(
+            tmp_path,
+            "w",
+            compression=zipfile.ZIP_DEFLATED,
+            compresslevel=ZIP_COMPRESSION_LEVEL,
+        ) as archive:
             for source, sha in sources:
                 file_path = resources_root / source
                 resolved = file_path.resolve()
@@ -94,7 +119,12 @@ def build_packages_zip(manifest: dict, resources_root, out_path) -> int:
                     raise PackageError(
                         f"sha256 mismatch for {source}: {actual} != {sha}"
                     )
-                archive.writestr(source, data)
+                archive.writestr(
+                    _zip_info(source),
+                    data,
+                    compress_type=zipfile.ZIP_DEFLATED,
+                    compresslevel=ZIP_COMPRESSION_LEVEL,
+                )
         os.replace(tmp_path, out_path)  # atomic publish, only after full verification
     except BaseException:
         try:

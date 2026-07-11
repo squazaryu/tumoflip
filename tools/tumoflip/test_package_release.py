@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -159,6 +160,25 @@ class PackageReleaseTest(unittest.TestCase):
                 package_id="wifi-mapper-fix",
                 target_release_tag="v0.3.1",
             )
+            package_zip = (
+                repo
+                / "dist/f7-C/f7-update-tmwhflpprarf089-031/tumoflip-packages.zip"
+            )
+            first_zip = package_zip.read_bytes()
+            for index, path in enumerate(sorted(resources.rglob("*"))):
+                if path.is_file():
+                    timestamp = 1_700_000_000 + index
+                    os.utime(path, (timestamp, timestamp))
+            repeated_manifest = build_package_release(
+                repo,
+                build,
+                repo / "dist/f7-C/f7-update-tmwhflpprarf089-031",
+                package_id="wifi-mapper-fix",
+                target_release_tag="v0.3.1",
+            )
+
+            self.assertEqual(manifest["release_id"], repeated_manifest["release_id"])
+            self.assertEqual(first_zip, package_zip.read_bytes())
 
             self.assertEqual(manifest["package_release"]["type"], "package-only")
             self.assertEqual(manifest["package_release"]["id"], "wifi-mapper-fix")

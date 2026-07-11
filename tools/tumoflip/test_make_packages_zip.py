@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import hashlib
+import os
+import stat
 import tempfile
 import unittest
 import zipfile
@@ -49,6 +51,43 @@ class MakePackagesZipTest(unittest.TestCase):
                 self.assertEqual(archive.read("apps/Bluetooth/flipper_companion.fap"), b"companion")
             # No leftover temp files.
             self.assertEqual(list(out.parent.glob("*.tmp")), [])
+
+    def test_archive_is_reproducible_across_source_metadata_and_manifest_order(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "resources"
+            files = {
+                "apps/Zeta/z.fap": b"zeta payload",
+                "apps/Alpha/a.fap": b"alpha payload",
+                "apps_data/subghz/plugins/protocol.fal": b"protocol payload",
+            }
+            manifest = self._tree(root, files)
+            manifest["packages"]["arf"] = manifest["packages"].pop("base")
+            manifest["packages"]["arf"].reverse()
+
+            first = Path(d) / "first.zip"
+            second = Path(d) / "second.zip"
+            build_packages_zip(manifest, root, first)
+
+            for index, source in enumerate(files):
+                path = root / source
+                os.utime(path, (1_700_000_000 + index, 1_700_000_000 + index))
+                path.chmod(0o600 if index % 2 else 0o755)
+            manifest["packages"]["arf"].reverse()
+            build_packages_zip(manifest, root, second)
+
+            self.assertEqual(first.read_bytes(), second.read_bytes())
+            self.assertEqual(_sha(first.read_bytes()), _sha(second.read_bytes()))
+
+            with zipfile.ZipFile(first) as archive:
+                self.assertEqual(archive.namelist(), sorted(files))
+                for info in archive.infolist():
+                    self.assertEqual(info.date_time, (1980, 1, 1, 0, 0, 0))
+                    self.assertEqual(info.create_system, 3)
+                    self.assertEqual(info.compress_type, zipfile.ZIP_DEFLATED)
+                    self.assertEqual(stat.S_IMODE(info.external_attr >> 16), 0o644)
+                    self.assertTrue(stat.S_ISREG(info.external_attr >> 16))
+                    self.assertEqual(info.extra, b"")
+                    self.assertEqual(info.comment, b"")
 
     def test_missing_source(self) -> None:
         with tempfile.TemporaryDirectory() as d:
