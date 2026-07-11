@@ -51,3 +51,5 @@
 !tumoscript/**
 !tumovm_poc/
 !tumovm_poc/**
+!nfc_ccid_bridge/
+!nfc_ccid_bridge/**

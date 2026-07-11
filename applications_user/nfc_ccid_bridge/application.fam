@@ -1,0 +1,18 @@
+App(
+    appid="nfc_ccid_bridge",
+    name="NFC CCID Bridge",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="nfc_ccid_bridge_app",
+    requires=["gui"],
+    sources=["*.c"],
+    stack_size=6 * 1024,
+    icon="A_Nfc_14",
+    fap_icon="../../assets/icons/Archive/Nfc_10px.png",
+    fap_category="Module One/NFC",
+    fap_dist_path="apps/Module One/NFC/nfc_ccid_bridge.fap",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip/issues/63",
+    fap_description="Authorized ISO14443-4A card to USB PC/SC bridge.",
+)
