@@ -563,6 +563,7 @@ def prune_legacy_resource_exports(resources: Path) -> None:
 def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
     groups: dict[str, list[Path]] = {
         "base": [
+            resources / "apps/Bluetooth/claude_buddy.fap",
             resources / "apps/Bluetooth/flipper_companion.fap",
             resources / "apps/Tools/ai_dashboard.fap",
             resources / "apps/Tools/flipper_relay.fap",

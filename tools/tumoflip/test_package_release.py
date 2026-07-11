@@ -58,6 +58,7 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
 
     for relative in (
         "apps/Scripts/js_app.fap",
+        "apps/Bluetooth/claude_buddy.fap",
         "apps/Bluetooth/flipper_companion.fap",
         "apps/Tools/ai_dashboard.fap",
         "apps/Tools/flipper_relay.fap",
@@ -187,6 +188,7 @@ class PackageReleaseTest(unittest.TestCase):
                 for entry in manifest["packages"]["base"]
             }
             self.assertNotIn("apps/Scripts/js_app.fap", base_entries)
+            self.assertIn("apps/Bluetooth/claude_buddy.fap", base_entries)
             self.assertNotIn("apps_data/js_app/plugins/js_gui.fal", base_entries)
             self.assertNotIn("apps_data/js_app/plugins/js_subghz.fal", base_entries)
             self.assertFalse((resources / "apps/Scripts/js_app.fap").exists())
