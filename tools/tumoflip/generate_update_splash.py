@@ -274,6 +274,19 @@ def gravity_regular(size: int) -> ImageFont.ImageFont:
     return load_gravity_font(GRAVITY_REGULAR, size)
 
 
+def fit_gravity_bold(
+    text: str,
+    max_width: int,
+    preferred_size: int = 16,
+) -> ImageFont.ImageFont:
+    for size in range(preferred_size, 7, -1):
+        font = gravity_bold(size)
+        bbox = font.getbbox(text)
+        if bbox[2] - bbox[0] <= max_width:
+            return font
+    return gravity_bold(8)
+
+
 def draw_next_button(draw: ImageDraw.ImageDraw) -> None:
     draw_button(draw, "NEXT", (88, 50, 125, 62))
 
@@ -336,7 +349,7 @@ def generate_slideshow(
     generate_message_frame(
         (
             ("UNLEASHED 089", gravity_bold(8), 22),
-            ("TUMOFLIP FORK", gravity_bold(8), 36),
+            ("TUMOWUH FIRMWARE", gravity_bold(8), 36),
         ),
         frames[1],
     )
@@ -366,10 +379,10 @@ def generate(title: str, version: str, output: Path) -> None:
 
     image = Image.new("1", DISPLAY_SIZE, 1)
     draw = ImageDraw.Draw(image)
-    title_font = gravity_bold(16)
+    title_font = fit_gravity_bold(title, 116)
     version_font = gravity_bold(16)
 
-    draw_centered_text(draw, title, 15, title_font)
+    draw_centered_text(draw, title, 17 if title_font.size < 16 else 15, title_font)
 
     version_bbox = draw.textbbox((0, 0), version, font=version_font)
     if version_bbox[2] - version_bbox[0] > 116:
@@ -400,7 +413,7 @@ def generate_message_frame(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--title", default="TUMOFLIP")
+    parser.add_argument("--title", default="T-FLPPR-FW")
     parser.add_argument("--version", default="089-031")
     parser.add_argument(
         "--output",

@@ -7,7 +7,7 @@ import unittest
 import fbt_options
 from PIL import Image
 
-from tools.tumoflip.generate_update_splash import generate_slideshow
+from tools.tumoflip.generate_update_splash import fit_gravity_bold, generate_slideshow
 from tools.tumoflip.sync_update_splash import (
     current_splash_metadata,
     sync_update_splash,
@@ -55,7 +55,7 @@ class UpdateSplashTest(unittest.TestCase):
 
         for phrase in (
             "UNLEASHED 089",
-            "TUMOFLIP FORK",
+            "TUMOWUH FIRMWARE",
             "CUSTOM BUILD",
             "USE WITH CARE",
             "ISSUES",
@@ -68,6 +68,12 @@ class UpdateSplashTest(unittest.TestCase):
     def test_gravity_font_assets_are_vendored(self) -> None:
         for name in ("GravityBold8.ttf", "GravityRegular5.ttf", "README.md"):
             self.assertTrue((GRAVITY_FONT_DIR / name).exists(), name)
+
+    def test_stable_brand_fits_the_display(self) -> None:
+        font = fit_gravity_bold("T-FLPPR-FW", 116)
+        bbox = font.getbbox("T-FLPPR-FW")
+        self.assertLessEqual(bbox[2] - bbox[0], 116)
+        self.assertGreaterEqual(font.size, 12)
 
     def test_sync_update_splash_removes_stale_frames(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -98,7 +104,7 @@ class UpdateSplashTest(unittest.TestCase):
         )
         self.assertEqual(
             current_splash_metadata("tmwhflpprarf089-031"),
-            ("TUMOFLIP", "089-031"),
+            ("T-FLPPR-FW", "089-031"),
         )
 
     def test_fbt_autogenerates_tumoflip_update_splash(self) -> None:
