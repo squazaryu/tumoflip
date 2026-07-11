@@ -1,0 +1,18 @@
+App(
+    appid="tumovm_poc",
+    name="TumoVM PoC",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="tumovm_poc_app",
+    requires=["gui", "storage"],
+    sources=["*.c", "../../applications/debug/ccid_test/ccid_usb.c"],
+    stack_size=6 * 1024,
+    icon="A_Plugins_14",
+    fap_icon="icon.png",
+    fap_category="Module One/Labs",
+    fap_dist_path="apps/Module One/Labs/tumovm_poc.fap",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip/issues/60",
+    fap_description="TumoVM shared NFC Type 4 and USB CCID state proof of concept.",
+)

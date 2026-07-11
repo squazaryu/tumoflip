@@ -49,3 +49,5 @@
 !tumo_macro_deck/**
 !tumoscript/
 !tumoscript/**
+!tumovm_poc/
+!tumovm_poc/**
