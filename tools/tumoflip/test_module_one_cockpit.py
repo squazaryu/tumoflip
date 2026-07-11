@@ -22,6 +22,7 @@ COCKPIT_FAP_ROUTES = {
     "module_one_sensor_logger": (
         "apps/Module One/Sensors BME280/module_one_sensor_logger.fap"
     ),
+    "tumocard_os": "apps/Module One/NFC/tumocard_os.fap",
     "arf_subghz_full": "apps/ARF Tools/arf_subghz_full.fap",
     "arf_status": "apps_data/arf_subghz_full/modules/arf_status.fap",
     "tumo_acceptance_suite": (
@@ -50,6 +51,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("BLE: Terminal", self.source)
         self.assertIn("Field: Logger", self.source)
         self.assertIn("Signals: Workbench", self.source)
+        self.assertIn("NFC: TumoCard OS", self.source)
         self.assertIn("Macros: TumoScript", self.source)
         self.assertIn("System: Acceptance", self.source)
         self.assertIn("System: Runtime Trace", self.source)
@@ -79,6 +81,10 @@ class ModuleOneCockpitTest(unittest.TestCase):
         )
         self.assertIn(
             'EXT_PATH("apps/Module One/Scripts/tumoscript.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/NFC/tumocard_os.fap")',
             self.source,
         )
 

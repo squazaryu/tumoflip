@@ -1,0 +1,18 @@
+App(
+    appid="tumocard_os",
+    name="TumoCard OS",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="tumocard_os_app",
+    requires=["gui", "storage"],
+    sources=["*.c", "../tumovm_poc/tumovm_core.c", "../../applications/debug/ccid_test/ccid_usb.c"],
+    stack_size=8 * 1024,
+    icon="A_Nfc_14",
+    fap_icon="../../assets/icons/Archive/Nfc_10px.png",
+    fap_category="Module One/NFC",
+    fap_dist_path="apps/Module One/NFC/tumocard_os.fap",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip/issues/66",
+    fap_description="Sandboxed multi-applet NFC and USB CCID runtime powered by TumoVM.",
+)

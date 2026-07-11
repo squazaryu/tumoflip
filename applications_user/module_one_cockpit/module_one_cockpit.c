@@ -45,6 +45,7 @@ typedef enum {
     ModuleOneCockpitActionLaunchFieldLogger,
     ModuleOneCockpitActionLaunchSignalWorkbench,
     ModuleOneCockpitActionLaunchSensorLogger,
+    ModuleOneCockpitActionLaunchTumoCardOs,
     ModuleOneCockpitActionEsp32Ping,
     ModuleOneCockpitActionLaunchIrLab,
     ModuleOneCockpitActionLaunchXRemote,
@@ -69,6 +70,7 @@ typedef enum {
     ModuleOneCockpitBlockSignal,
     ModuleOneCockpitBlockBle,
     ModuleOneCockpitBlockMacro,
+    ModuleOneCockpitBlockNfc,
     ModuleOneCockpitBlockNrf24,
     ModuleOneCockpitBlockCc1101,
     ModuleOneCockpitBlockSystem,
@@ -125,6 +127,7 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"Signals: Workbench", ModuleOneCockpitActionLaunchSignalWorkbench},
     {"BME280/I2C: Scan", ModuleOneCockpitActionI2cScan},
     {"Sensors: Logger", ModuleOneCockpitActionLaunchSensorLogger},
+    {"NFC: TumoCard OS", ModuleOneCockpitActionLaunchTumoCardOs},
     {"CC1101: ARF Full", ModuleOneCockpitActionLaunchArfHub},
     {"CC1101: ARF Status", ModuleOneCockpitActionLaunchArfStatus},
     {"System: Acceptance", ModuleOneCockpitActionLaunchAcceptance},
@@ -213,6 +216,14 @@ static const ModuleOneCockpitLaunchTarget module_one_cockpit_targets[] = {
         ModuleOneCockpitBlockSensor,
         "Sensor Logger",
         EXT_PATH("apps/Module One/Sensors BME280/module_one_sensor_logger.fap"),
+        NULL,
+        true,
+    },
+    {
+        ModuleOneCockpitActionLaunchTumoCardOs,
+        ModuleOneCockpitBlockNfc,
+        "TumoCard OS",
+        EXT_PATH("apps/Module One/NFC/tumocard_os.fap"),
         NULL,
         true,
     },
@@ -333,6 +344,8 @@ static const char* module_one_cockpit_block_label(ModuleOneCockpitBlock block) {
         return "BLE";
     case ModuleOneCockpitBlockMacro:
         return "Macros";
+    case ModuleOneCockpitBlockNfc:
+        return "NFC";
     case ModuleOneCockpitBlockNrf24:
         return "NRF24";
     case ModuleOneCockpitBlockCc1101:
