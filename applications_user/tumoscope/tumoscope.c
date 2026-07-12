@@ -13,12 +13,15 @@
 
 #define TAG "TumoScope"
 
-#define TUMOSCOPE_APP_VERSION      "0.2.0"
+#define TUMOSCOPE_APP_VERSION      "0.3.0"
 #define TUMOSCOPE_DATA_DIR         EXT_PATH("apps_data/tumoscope")
 #define TUMOSCOPE_CAPTURE_DIR      TUMOSCOPE_DATA_DIR "/captures"
 #define TUMOSCOPE_EVENT_QUEUE_SIZE 8U
-#define TUMOSCOPE_WAVE_LEFT        12U
-#define TUMOSCOPE_WAVE_WIDTH       116U
+#define TUMOSCOPE_GRAPH_LEFT       38U
+#define TUMOSCOPE_GRAPH_RIGHT      127U
+#define TUMOSCOPE_GRAPH_TOP        12U
+#define TUMOSCOPE_GRAPH_BOTTOM     50U
+#define TUMOSCOPE_GRAPH_WIDTH      (TUMOSCOPE_GRAPH_RIGHT - TUMOSCOPE_GRAPH_LEFT)
 
 typedef enum {
     TumoScopeScreenSetup,
@@ -188,8 +191,8 @@ static void tumoscope_draw_capture(Canvas* canvas, const TumoScopeApp* app) {
 }
 
 static uint8_t tumoscope_wave_y(uint8_t channel, bool high) {
-    static const uint8_t base[] = {18U, 32U, 46U};
-    return high ? base[channel] - 4U : base[channel] + 2U;
+    static const uint8_t base[] = {19U, 32U, 45U};
+    return high ? base[channel] - 3U : base[channel] + 2U;
 }
 
 static void tumoscope_format_frequency(
@@ -197,26 +200,38 @@ static void tumoscope_format_frequency(
     char* output,
     size_t output_size) {
     if(stats->frequency_hz >= 1000000U) {
-        snprintf(output, output_size, "%luM", (unsigned long)(stats->frequency_hz / 1000000U));
-    } else if(stats->frequency_hz >= 1000U) {
-        uint32_t whole = stats->frequency_hz / 1000U;
-        uint32_t hundredths = (stats->frequency_hz % 1000U + 5U) / 10U;
-        if(hundredths == 100U) {
-            whole++;
-            hundredths = 0U;
-        }
-        if(hundredths % 10U)
+        const uint32_t rounded_tenths = (stats->frequency_hz + 50000U) / 100000U;
+        if(rounded_tenths < 100U) {
             snprintf(
-                output, output_size, "%lu.%02luk", (unsigned long)whole, (unsigned long)hundredths);
-        else if(hundredths)
+                output,
+                output_size,
+                "%lu.%luM",
+                (unsigned long)(rounded_tenths / 10U),
+                (unsigned long)(rounded_tenths % 10U));
+        } else {
+            snprintf(output, output_size, "%luM", (unsigned long)((rounded_tenths + 5U) / 10U));
+        }
+    } else if(stats->frequency_hz >= 1000U) {
+        if(stats->frequency_hz >= 99500U) {
+            snprintf(
+                output, output_size, "%luk", (unsigned long)((stats->frequency_hz + 500U) / 1000U));
+        } else if(stats->frequency_hz >= 9950U) {
+            const uint32_t rounded_tenths = (stats->frequency_hz + 50U) / 100U;
             snprintf(
                 output,
                 output_size,
                 "%lu.%luk",
-                (unsigned long)whole,
-                (unsigned long)(hundredths / 10U));
-        else
-            snprintf(output, output_size, "%luk", (unsigned long)whole);
+                (unsigned long)(rounded_tenths / 10U),
+                (unsigned long)(rounded_tenths % 10U));
+        } else {
+            const uint32_t rounded_hundredths = (stats->frequency_hz + 5U) / 10U;
+            snprintf(
+                output,
+                output_size,
+                "%lu.%02luk",
+                (unsigned long)(rounded_hundredths / 100U),
+                (unsigned long)(rounded_hundredths % 100U));
+        }
     } else if(stats->frequency_hz > 0U) {
         snprintf(output, output_size, "%lu", (unsigned long)stats->frequency_hz);
     } else if(stats->transitions > 0U) {
@@ -226,66 +241,171 @@ static void tumoscope_format_frequency(
     }
 }
 
+static const char* tumoscope_channel_role(TumoScopeDecoder decoder, uint8_t channel) {
+    static const char* const raw[] = {"0", "1", "3"};
+    static const char* const uart[] = {"RX", "-", "-"};
+    static const char* const i2c[] = {"SDA", "SCL", "-"};
+    static const char* const spi[] = {"MO", "MI", "CLK"};
+    static const char* const one_wire[] = {"DQ", "-", "-"};
+    switch(decoder) {
+    case TumoScopeDecoderUart:
+        return uart[channel];
+    case TumoScopeDecoderI2c:
+        return i2c[channel];
+    case TumoScopeDecoderSpiMode0:
+        return spi[channel];
+    case TumoScopeDecoderOneWire:
+        return one_wire[channel];
+    case TumoScopeDecoderRaw:
+    default:
+        return raw[channel];
+    }
+}
+
+static void tumoscope_draw_graph_frame(Canvas* canvas) {
+    canvas_draw_line(
+        canvas,
+        TUMOSCOPE_GRAPH_LEFT,
+        TUMOSCOPE_GRAPH_TOP,
+        TUMOSCOPE_GRAPH_RIGHT,
+        TUMOSCOPE_GRAPH_TOP);
+    canvas_draw_line(
+        canvas,
+        TUMOSCOPE_GRAPH_LEFT,
+        TUMOSCOPE_GRAPH_BOTTOM,
+        TUMOSCOPE_GRAPH_RIGHT,
+        TUMOSCOPE_GRAPH_BOTTOM);
+    canvas_draw_line(
+        canvas,
+        TUMOSCOPE_GRAPH_LEFT,
+        TUMOSCOPE_GRAPH_TOP,
+        TUMOSCOPE_GRAPH_LEFT,
+        TUMOSCOPE_GRAPH_BOTTOM);
+    canvas_draw_line(
+        canvas,
+        TUMOSCOPE_GRAPH_RIGHT,
+        TUMOSCOPE_GRAPH_TOP,
+        TUMOSCOPE_GRAPH_RIGHT,
+        TUMOSCOPE_GRAPH_BOTTOM);
+    for(uint8_t x = TUMOSCOPE_GRAPH_LEFT + 10U; x < TUMOSCOPE_GRAPH_RIGHT; x += 10U) {
+        const uint8_t height = ((x - TUMOSCOPE_GRAPH_LEFT) % 30U) == 0U ? 4U : 2U;
+        canvas_draw_line(canvas, x, TUMOSCOPE_GRAPH_TOP, x, TUMOSCOPE_GRAPH_TOP + height);
+    }
+}
+
+static void tumoscope_draw_channel_label(
+    Canvas* canvas,
+    const TumoScopeApp* app,
+    const TumoScopeDecoderProfile* profile,
+    uint8_t channel) {
+    char label[12];
+    if(profile->decoder == TumoScopeDecoderRaw) {
+        char frequency[8];
+        tumoscope_format_frequency(&app->channel_stats[channel], frequency, sizeof(frequency));
+        static const uint8_t pin_numbers[] = {0U, 1U, 3U};
+        snprintf(label, sizeof(label), "%u %s", pin_numbers[channel], frequency);
+    } else {
+        snprintf(
+            label,
+            sizeof(label),
+            "%u %s",
+            channel == 2U ? 3U : channel,
+            tumoscope_channel_role(profile->decoder, channel));
+    }
+    canvas_draw_str(canvas, 1, tumoscope_wave_y(channel, false), label);
+}
+
+static size_t tumoscope_count_bin_transitions(
+    const TumoScopeApp* app,
+    uint8_t channel,
+    size_t first,
+    size_t last) {
+    size_t transitions = 0U;
+    const size_t scan_start = first > 0U ? first - 1U : first;
+    for(size_t sample = scan_start + 1U; sample < last; sample++) {
+        if(tumoscope_sample_level(app->samples[sample - 1U], channel) !=
+           tumoscope_sample_level(app->samples[sample], channel)) {
+            transitions++;
+        }
+    }
+    return transitions;
+}
+
+static void
+    tumoscope_draw_channel_trace(Canvas* canvas, const TumoScopeApp* app, uint8_t channel) {
+    bool previous_level = tumoscope_sample_level(app->samples[app->wave_offset], channel);
+    uint8_t previous_y = tumoscope_wave_y(channel, previous_level);
+    for(uint8_t x = 0U; x < TUMOSCOPE_GRAPH_WIDTH; x++) {
+        const size_t first = app->wave_offset + (size_t)x * app->samples_per_pixel;
+        if(first >= app->sample_count) break;
+        const size_t last = MIN(first + app->samples_per_pixel, app->sample_count);
+        const bool first_level = tumoscope_sample_level(app->samples[first], channel);
+        const bool last_level = tumoscope_sample_level(app->samples[last - 1U], channel);
+        const size_t transitions = tumoscope_count_bin_transitions(app, channel, first, last);
+        const uint8_t screen_x = TUMOSCOPE_GRAPH_LEFT + x;
+        const uint8_t last_y = tumoscope_wave_y(channel, last_level);
+
+        if(first_level != previous_level) {
+            canvas_draw_line(
+                canvas, screen_x, previous_y, screen_x, tumoscope_wave_y(channel, first_level));
+        }
+        if(transitions <= 1U) {
+            if(first_level != last_level) {
+                canvas_draw_line(
+                    canvas, screen_x, tumoscope_wave_y(channel, first_level), screen_x, last_y);
+            }
+            canvas_draw_line(canvas, screen_x, last_y, screen_x + 1U, last_y);
+        } else {
+            const uint8_t activity_y =
+                (tumoscope_wave_y(channel, true) + tumoscope_wave_y(channel, false)) / 2U;
+            canvas_draw_dot(canvas, screen_x, activity_y);
+            if((x & 1U) == 0U) canvas_draw_dot(canvas, screen_x, activity_y - 1U);
+        }
+        previous_level = last_level;
+        previous_y = last_y;
+    }
+}
+
+static void tumoscope_draw_trigger(Canvas* canvas, const TumoScopeApp* app) {
+    if(app->trigger_sample < app->wave_offset) return;
+    const size_t relative = app->trigger_sample - app->wave_offset;
+    const size_t trigger_x = relative / app->samples_per_pixel;
+    if(trigger_x >= TUMOSCOPE_GRAPH_WIDTH) return;
+    const uint8_t x = TUMOSCOPE_GRAPH_LEFT + (uint8_t)trigger_x;
+    for(uint8_t y = TUMOSCOPE_GRAPH_TOP + 2U; y < TUMOSCOPE_GRAPH_BOTTOM; y += 4U) {
+        canvas_draw_line(canvas, x, y, x, MIN(y + 1U, TUMOSCOPE_GRAPH_BOTTOM - 1U));
+    }
+    canvas_draw_triangle(canvas, x - 2U, TUMOSCOPE_GRAPH_TOP, 5, 4, CanvasDirectionBottomToTop);
+}
+
 static void tumoscope_draw_waveform(Canvas* canvas, const TumoScopeApp* app) {
+    const TumoScopeDecoderProfile* profile = &tumoscope_decoders[app->decoder_index];
     canvas_set_font(canvas, FontSecondary);
-    char header[48];
+    canvas_draw_str(canvas, 1, 8, profile->label);
+
     size_t total_transitions = 0U;
     for(uint8_t channel = 0U; channel < TUMOSCOPE_CHANNEL_COUNT; channel++) {
         total_transitions += app->channel_stats[channel].transitions;
     }
+    char status[24];
     if(total_transitions == 0U) {
-        strlcpy(header, "No transitions / static", sizeof(header));
+        strlcpy(status, "No transitions", sizeof(status));
     } else {
-        char pc0[8];
-        char pc1[8];
-        char pc3[8];
-        tumoscope_format_frequency(&app->channel_stats[0], pc0, sizeof(pc0));
-        tumoscope_format_frequency(&app->channel_stats[1], pc1, sizeof(pc1));
-        tumoscope_format_frequency(&app->channel_stats[2], pc3, sizeof(pc3));
-        snprintf(header, sizeof(header), "0:%s 1:%s 3:%s Hz", pc0, pc1, pc3);
+        snprintf(
+            status,
+            sizeof(status),
+            "%s x%u",
+            tumoscope_rate_label(tumoscope_rates[app->rate_index]),
+            (unsigned int)app->samples_per_pixel);
     }
-    canvas_draw_str(canvas, 2, 9, header);
+    canvas_draw_str_aligned(canvas, 126, 8, AlignRight, AlignBottom, status);
 
-    static const char* const labels[] = {"0", "1", "3"};
+    tumoscope_draw_graph_frame(canvas);
     for(uint8_t channel = 0U; channel < TUMOSCOPE_CHANNEL_COUNT; channel++) {
-        canvas_draw_str(canvas, 2, tumoscope_wave_y(channel, false), labels[channel]);
-        for(uint8_t x = 0U; x < TUMOSCOPE_WAVE_WIDTH; x++) {
-            const size_t first = app->wave_offset + (size_t)x * app->samples_per_pixel;
-            if(first >= app->sample_count) break;
-            const size_t last = MIN(first + app->samples_per_pixel, app->sample_count);
-            bool low = false;
-            bool high = false;
-            for(size_t sample = first; sample < last; sample++) {
-                if(tumoscope_sample_level(app->samples[sample], channel))
-                    high = true;
-                else
-                    low = true;
-            }
-            const uint8_t screen_x = TUMOSCOPE_WAVE_LEFT + x;
-            if(high && low) {
-                canvas_draw_line(
-                    canvas,
-                    screen_x,
-                    tumoscope_wave_y(channel, true),
-                    screen_x,
-                    tumoscope_wave_y(channel, false));
-            } else {
-                const uint8_t y = tumoscope_wave_y(channel, high);
-                canvas_draw_dot(canvas, screen_x, y);
-                if(x > 0U) canvas_draw_dot(canvas, screen_x - 1U, y);
-            }
-        }
+        tumoscope_draw_channel_label(canvas, app, profile, channel);
+        tumoscope_draw_channel_trace(canvas, app, channel);
     }
-
-    if(app->trigger_sample >= app->wave_offset) {
-        const size_t relative = app->trigger_sample - app->wave_offset;
-        const size_t trigger_x = relative / app->samples_per_pixel;
-        if(trigger_x < TUMOSCOPE_WAVE_WIDTH) {
-            const uint8_t x = TUMOSCOPE_WAVE_LEFT + (uint8_t)trigger_x;
-            canvas_draw_line(canvas, x, 11, x, 50);
-            canvas_draw_triangle(canvas, x - 2U, 11, 5, 4, CanvasDirectionBottomToTop);
-        }
-    }
+    tumoscope_draw_trigger(canvas, app);
 
     canvas_draw_line(canvas, 0, 51, 127, 51);
     elements_button_left(canvas, "Pan");
@@ -447,7 +567,7 @@ static void tumoscope_decode_capture(TumoScopeApp* app) {
 
 static void tumoscope_prepare_result(TumoScopeApp* app, const char* status) {
     app->samples_per_pixel =
-        MAX(1U, (app->sample_count + TUMOSCOPE_WAVE_WIDTH - 1U) / TUMOSCOPE_WAVE_WIDTH);
+        MAX(1U, (app->sample_count + TUMOSCOPE_GRAPH_WIDTH - 1U) / TUMOSCOPE_GRAPH_WIDTH);
     app->wave_offset = 0U;
     for(uint8_t channel = 0U; channel < TUMOSCOPE_CHANNEL_COUNT; channel++) {
         tumoscope_analyze_channel(
@@ -684,12 +804,12 @@ static void tumoscope_handle_setup(TumoScopeApp* app, const InputEvent* input) {
 }
 
 static void tumoscope_handle_waveform(TumoScopeApp* app, const InputEvent* input) {
-    const size_t visible = app->samples_per_pixel * TUMOSCOPE_WAVE_WIDTH;
+    const size_t visible = app->samples_per_pixel * TUMOSCOPE_GRAPH_WIDTH;
     if(input->key == InputKeyUp) {
         app->samples_per_pixel = MAX(1U, app->samples_per_pixel / 2U);
     } else if(input->key == InputKeyDown) {
         app->samples_per_pixel =
-            MIN(MAX(1U, (app->sample_count + TUMOSCOPE_WAVE_WIDTH - 1U) / TUMOSCOPE_WAVE_WIDTH),
+            MIN(MAX(1U, (app->sample_count + TUMOSCOPE_GRAPH_WIDTH - 1U) / TUMOSCOPE_GRAPH_WIDTH),
                 app->samples_per_pixel * 2U);
     } else if(input->key == InputKeyLeft) {
         const size_t step = MAX(1U, visible / 4U);

@@ -25,8 +25,13 @@ the physical pins documented below.
 Capture rates are 100 kHz, 250 kHz, 500 kHz, and 1 MHz. Capture depth is
 bounded to 1,024, 2,048, 4,096, or 8,192 samples. Edge- and level-triggered
 captures keep 25 percent pre-trigger data; automatic captures begin immediately.
-The waveform header reports measured frequency per channel or clearly shows
-`No transitions / static` when a live capture contains no edges.
+Raw/Edge channel labels report measured frequency, while the status bar clearly
+shows `No transitions` when a live capture contains no edges.
+The waveform uses a framed time scale inspired by the stock Sub-GHz Read RAW
+view. Sparse transitions render as digital steps; bins with multiple transitions
+render as a thin activity trace instead of an unreadable solid block. Frequency
+labels are limited to Raw/Edge captures; protocol profiles use signal roles such
+as RX, SDA/SCL, and MOSI/MISO/CLK.
 
 ## Electrical boundary
 
