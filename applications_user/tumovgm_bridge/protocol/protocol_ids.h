@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define TUMOVGM_PROTOCOL_MAJOR UINT8_C(1)
-#define TUMOVGM_PROTOCOL_MINOR UINT8_C(1)
+#define TUMOVGM_PROTOCOL_MINOR UINT8_C(2)
 #define TUMOVGM_PROTOCOL_MAX_PAYLOAD UINT16_C(512)
 #define TUMOVGM_PROTOCOL_MAGIC_0 UINT8_C(0x54)
 #define TUMOVGM_PROTOCOL_MAGIC_1 UINT8_C(0x56)
@@ -35,6 +35,9 @@ typedef enum TumovgmMessage {
     TumovgmMessageStreamCredit = 16,
     TumovgmMessageStreamData = 17,
     TumovgmMessageStreamEnd = 18,
+    TumovgmMessageImuInfo = 32,
+    TumovgmMessageImuConfig = 33,
+    TumovgmMessageImuGesture = 34,
 } TumovgmMessage;
 
 typedef enum TumovgmError {

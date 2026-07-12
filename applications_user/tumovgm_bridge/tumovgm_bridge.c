@@ -7,6 +7,8 @@
 #include <gui/view_dispatcher.h>
 #include <expansion/expansion.h>
 
+#include <stdlib.h>
+
 #include "protocol/protocol.h"
 
 #define TAG "TumoVgmBridge"
@@ -25,6 +27,20 @@ enum {
     TumoVgmSessionClosePayloadSize = 4,
     TumoVgmPingPayloadSize = 8,
     TumoVgmErrorPayloadSize = 4,
+    TumoVgmImuInfoPayloadSize = 12,
+    TumoVgmImuConfigPayloadSize = 8,
+    TumoVgmImuConfigResponseSize = 12,
+    TumoVgmStreamCreditPayloadSize = 8,
+    TumoVgmStreamCreditResponseSize = 4,
+    TumoVgmImuSamplePayloadSize = 28,
+    TumoVgmImuGesturePayloadSize = 16,
+    TumoVgmImuStreamId = 1,
+    TumoVgmImuRequestedRateHz = 25,
+    TumoVgmImuInitialCredits = 8,
+    TumoVgmImuCreditLowWatermark = 3,
+    TumoVgmImuFlagRawSamples = 1U << 0,
+    TumoVgmImuFlagGestures = 1U << 1,
+    TumoVgmImuSampleFlagCalibrated = 1U << 1,
     TumoVgmRxStreamSize = TumovgmFrameMaxSize * 2,
 };
 
@@ -44,11 +60,12 @@ typedef enum {
     TumoVgmWorkerFlagStart = 1U << 2,
     TumoVgmWorkerFlagStop = 1U << 3,
     TumoVgmWorkerFlagRetry = 1U << 4,
+    TumoVgmWorkerFlagNextPage = 1U << 5,
 } TumoVgmWorkerFlag;
 
-#define TUMOVGM_WORKER_FLAGS                                                    \
+#define TUMOVGM_WORKER_FLAGS                                                  \
     (TumoVgmWorkerFlagData | TumoVgmWorkerFlagExit | TumoVgmWorkerFlagStart | \
-     TumoVgmWorkerFlagStop | TumoVgmWorkerFlagRetry)
+     TumoVgmWorkerFlagStop | TumoVgmWorkerFlagRetry | TumoVgmWorkerFlagNextPage)
 
 typedef struct {
     TumoVgmState state;
@@ -58,6 +75,21 @@ typedef struct {
     uint32_t session_id;
     uint64_t capabilities;
     bool dirty;
+    bool imu_supported;
+    bool imu_streaming;
+    uint8_t imu_page;
+    uint8_t imu_health;
+    uint8_t imu_identity;
+    uint8_t imu_orientation;
+    uint8_t imu_sample_flags;
+    uint8_t gesture;
+    uint8_t gesture_confidence;
+    uint16_t imu_rate_hz;
+    uint16_t imu_credits;
+    uint16_t sample_sequence;
+    int16_t temperature_centi_c;
+    int16_t acceleration_mg[3];
+    int16_t angular_velocity_deci_dps[3];
     char version[25];
     char commit[13];
     char detail[32];
@@ -77,6 +109,7 @@ typedef struct {
     uint16_t sequence;
     uint8_t tx_buffer[TumovgmFrameMaxSize];
     uint8_t rx_buffer[TumovgmFrameMaxSize];
+    uint8_t response_payload[TUMOVGM_PROTOCOL_MAX_PAYLOAD];
     size_t rx_size;
     TumoVgmViewModel device;
 } TumoVgmApp;
@@ -90,9 +123,14 @@ static uint32_t tumovgm_read_u32(const uint8_t* data) {
            ((uint32_t)data[3] << 24);
 }
 
+static int16_t tumovgm_read_i16(const uint8_t* data) {
+    return (int16_t)tumovgm_read_u16(data);
+}
+
 static uint64_t tumovgm_read_u64(const uint8_t* data) {
     uint64_t value = 0;
-    for(uint8_t index = 0; index < 8; index++) value |= (uint64_t)data[index] << (index * 8);
+    for(uint8_t index = 0; index < 8; index++)
+        value |= (uint64_t)data[index] << (index * 8);
     return value;
 }
 
@@ -102,10 +140,52 @@ static void tumovgm_write_u16(uint8_t* data, uint16_t value) {
 }
 
 static void tumovgm_write_u32(uint8_t* data, uint32_t value) {
-    for(uint8_t index = 0; index < 4; index++) data[index] = (uint8_t)(value >> (index * 8));
+    for(uint8_t index = 0; index < 4; index++)
+        data[index] = (uint8_t)(value >> (index * 8));
 }
 
-static void tumovgm_copy_fixed_ascii(char* output, size_t output_size, const uint8_t* input, size_t input_size) {
+static void tumovgm_write_u64(uint8_t* data, uint64_t value) {
+    for(uint8_t index = 0; index < 8; index++) {
+        data[index] = (uint8_t)(value >> (index * 8));
+    }
+}
+
+static const char* tumovgm_orientation_name(uint8_t orientation) {
+    static const char* const names[] = {"--", "X+", "X-", "Y+", "Y-", "Z+", "Z-"};
+    return orientation < COUNT_OF(names) ? names[orientation] : "?";
+}
+
+static const char* tumovgm_imu_health_name(uint8_t health) {
+    switch(health) {
+    case 1:
+        return "READY";
+    case 2:
+        return "BUS ERR";
+    case 3:
+        return "WRONG ID";
+    case 4:
+        return "CAL";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+static const char* tumovgm_gesture_name(uint8_t gesture) {
+    switch(gesture) {
+    case 1:
+        return "ROTATE";
+    case 2:
+        return "SHAKE";
+    default:
+        return "NONE";
+    }
+}
+
+static void tumovgm_copy_fixed_ascii(
+    char* output,
+    size_t output_size,
+    const uint8_t* input,
+    size_t input_size) {
     const size_t copy_size = MIN(output_size - 1, input_size);
     memcpy(output, input, copy_size);
     output[copy_size] = '\0';
@@ -137,11 +217,7 @@ static const char* tumovgm_state_name(TumoVgmState state) {
 }
 
 static void tumovgm_refresh_view(TumoVgmApp* app) {
-    with_view_model(
-        app->view,
-        TumoVgmViewModel * model,
-        { *model = app->device; },
-        true);
+    with_view_model(app->view, TumoVgmViewModel * model, { *model = app->device; }, true);
 }
 
 static void tumovgm_set_state(TumoVgmApp* app, TumoVgmState state, const char* detail) {
@@ -150,9 +226,87 @@ static void tumovgm_set_state(TumoVgmApp* app, TumoVgmState state, const char* d
     tumovgm_refresh_view(app);
 }
 
+static void tumovgm_draw_session(Canvas* canvas, const TumoVgmViewModel* model) {
+    char line[40];
+    canvas_set_font(canvas, FontPrimary);
+    canvas_draw_str_aligned(
+        canvas,
+        64,
+        1,
+        AlignCenter,
+        AlignTop,
+        model->imu_page == 0 ? "TumoVGM Motion" : "IMU Status");
+    canvas_draw_rframe(canvas, 2, 13, 124, 13, 3);
+    canvas_set_font(canvas, FontSecondary);
+
+    if(model->imu_page == 0) {
+        snprintf(
+            line,
+            sizeof(line),
+            model->imu_streaming ? "IMU LIVE  %u Hz" : "IMU unavailable",
+            model->imu_rate_hz);
+        canvas_draw_str_aligned(canvas, 64, 16, AlignCenter, AlignTop, line);
+        snprintf(
+            line,
+            sizeof(line),
+            "A %d %d %d mg",
+            model->acceleration_mg[0],
+            model->acceleration_mg[1],
+            model->acceleration_mg[2]);
+        canvas_draw_str(canvas, 3, 34, line);
+        snprintf(
+            line,
+            sizeof(line),
+            "G %d %d %d d/s",
+            model->angular_velocity_deci_dps[0] / 10,
+            model->angular_velocity_deci_dps[1] / 10,
+            model->angular_velocity_deci_dps[2] / 10);
+        canvas_draw_str(canvas, 3, 43, line);
+        const int32_t temperature = model->temperature_centi_c;
+        const int32_t absolute_temperature = temperature < 0 ? -temperature : temperature;
+        snprintf(
+            line,
+            sizeof(line),
+            "T %s%ld.%02ldC  %s  %s",
+            temperature < 0 ? "-" : "",
+            (long)(absolute_temperature / 100),
+            (long)(absolute_temperature % 100),
+            tumovgm_orientation_name(model->imu_orientation),
+            (model->imu_sample_flags & TumoVgmImuSampleFlagCalibrated) ? "CAL" : "WAIT");
+        canvas_draw_str(canvas, 3, 52, line);
+    } else {
+        snprintf(
+            line,
+            sizeof(line),
+            "WHO %02X  %s",
+            model->imu_identity,
+            tumovgm_imu_health_name(model->imu_health));
+        canvas_draw_str(canvas, 3, 34, line);
+        snprintf(
+            line, sizeof(line), "Rate %u Hz  Seq %u", model->imu_rate_hz, model->sample_sequence);
+        canvas_draw_str(canvas, 3, 43, line);
+        snprintf(
+            line,
+            sizeof(line),
+            "Last %s  %u%%",
+            tumovgm_gesture_name(model->gesture),
+            model->gesture_confidence);
+        canvas_draw_str(canvas, 3, 52, line);
+    }
+
+    elements_button_left(canvas, "Back");
+    elements_button_center(canvas, "Stop");
+    elements_button_right(canvas, model->imu_page == 0 ? "Info" : "Live");
+}
+
 static void tumovgm_draw_callback(Canvas* canvas, void* context) {
     const TumoVgmViewModel* model = context;
     char line[40];
+
+    if(model->state == TumoVgmStateSession) {
+        tumovgm_draw_session(canvas, model);
+        return;
+    }
 
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str_aligned(canvas, 64, 1, AlignCenter, AlignTop, "TumoVGM Bridge");
@@ -161,20 +315,24 @@ static void tumovgm_draw_callback(Canvas* canvas, void* context) {
     canvas_draw_str_aligned(
         canvas, 64, 16, AlignCenter, AlignTop, tumovgm_state_name(model->state));
 
-    if(model->state == TumoVgmStateReady || model->state == TumoVgmStateSession) {
+    if(model->state == TumoVgmStateReady) {
         canvas_draw_str_aligned(
-            canvas, 64, 28, AlignCenter, AlignTop, model->version[0] ? model->version : "Identity unavailable");
+            canvas,
+            64,
+            28,
+            AlignCenter,
+            AlignTop,
+            model->version[0] ? model->version : "Identity unavailable");
         snprintf(
             line,
             sizeof(line),
             "Proto %u.%u  %s",
             model->protocol_major,
             model->protocol_minor,
-            model->hardware_target == TumovgmHardwareTargetVgmRp2040 ? "VGM RP2040" : "Unknown HW");
+            model->hardware_target == TumovgmHardwareTargetVgmRp2040 ? "VGM RP2040" :
+                                                                       "Unknown HW");
         canvas_draw_str_aligned(canvas, 64, 36, AlignCenter, AlignTop, line);
-        if(model->state == TumoVgmStateSession) {
-            snprintf(line, sizeof(line), "Session #%lu", (unsigned long)model->session_id);
-        } else if(model->capabilities == 0) {
+        if(model->capabilities == 0) {
             snprintf(line, sizeof(line), "Caps: none%s", model->dirty ? " DIRTY" : "");
         } else {
             snprintf(
@@ -195,10 +353,9 @@ static void tumovgm_draw_callback(Canvas* canvas, void* context) {
     elements_button_left(canvas, "Back");
     if(model->state == TumoVgmStateReady) {
         elements_button_center(canvas, "Start");
-    } else if(model->state == TumoVgmStateSession) {
-        elements_button_center(canvas, "Stop");
-    } else if(model->state == TumoVgmStateMissing || model->state == TumoVgmStateStock ||
-              model->state == TumoVgmStateIncompatible || model->state == TumoVgmStateError) {
+    } else if(
+        model->state == TumoVgmStateMissing || model->state == TumoVgmStateStock ||
+        model->state == TumoVgmStateIncompatible || model->state == TumoVgmStateError) {
         elements_button_center(canvas, "Retry");
     }
 }
@@ -215,6 +372,15 @@ static bool tumovgm_input_callback(InputEvent* event, void* context) {
     if(event->key == InputKeyLeft) {
         view_dispatcher_stop(app->view_dispatcher);
         return true;
+    }
+    if(event->key == InputKeyRight) {
+        TumoVgmState state;
+        with_view_model(app->view, TumoVgmViewModel * model, { state = model->state; }, false);
+        if(state == TumoVgmStateSession) {
+            furi_thread_flags_set(app->worker_id, TumoVgmWorkerFlagNextPage);
+            return true;
+        }
+        return false;
     }
     if(event->key != InputKeyOk) return false;
 
@@ -279,6 +445,64 @@ static void tumovgm_discard_rx(TumoVgmApp* app, size_t count) {
     }
 }
 
+static void tumovgm_process_event(TumoVgmApp* app, const TumovgmFrame* frame) {
+    if(frame->kind != TumovgmFrameKindEvent) return;
+
+    if(frame->message == TumovgmMessageStreamData &&
+       frame->payload_length == TumoVgmImuSamplePayloadSize &&
+       tumovgm_read_u32(frame->payload) == app->device.session_id &&
+       tumovgm_read_u16(frame->payload + 4) == TumoVgmImuStreamId) {
+        app->device.sample_sequence = tumovgm_read_u16(frame->payload + 6);
+        app->device.temperature_centi_c = tumovgm_read_i16(frame->payload + 12);
+        for(uint8_t axis = 0; axis < 3; axis++) {
+            app->device.acceleration_mg[axis] = tumovgm_read_i16(frame->payload + 14 + axis * 2);
+            app->device.angular_velocity_deci_dps[axis] =
+                tumovgm_read_i16(frame->payload + 20 + axis * 2);
+        }
+        app->device.imu_orientation = frame->payload[26];
+        app->device.imu_sample_flags = frame->payload[27];
+        if(app->device.imu_credits > 0) app->device.imu_credits--;
+        if(app->device.imu_sample_flags & TumoVgmImuSampleFlagCalibrated) {
+            app->device.imu_health = 1;
+        }
+        tumovgm_refresh_view(app);
+    } else if(
+        frame->message == TumovgmMessageImuGesture &&
+        frame->payload_length == TumoVgmImuGesturePayloadSize &&
+        tumovgm_read_u32(frame->payload) == app->device.session_id) {
+        app->device.gesture = frame->payload[6];
+        app->device.gesture_confidence = frame->payload[7];
+        app->device.imu_orientation = frame->payload[12];
+        tumovgm_refresh_view(app);
+    }
+}
+
+static size_t tumovgm_receive_into_buffer(TumoVgmApp* app) {
+    if(app->rx_size == sizeof(app->rx_buffer)) return 0;
+    const size_t received = furi_stream_buffer_receive(
+        app->rx_stream, app->rx_buffer + app->rx_size, sizeof(app->rx_buffer) - app->rx_size, 0);
+    app->rx_size += received;
+    return received;
+}
+
+static void tumovgm_receive_available(TumoVgmApp* app) {
+    while(true) {
+        const size_t received = tumovgm_receive_into_buffer(app);
+        bool progressed = false;
+        while(app->rx_size > 0) {
+            TumovgmFrame decoded;
+            size_t consumed = 0;
+            const TumovgmCodecStatus status =
+                tumovgm_frame_decode(app->rx_buffer, app->rx_size, &decoded, &consumed);
+            if(status == TumovgmCodecStatusNeedMore) break;
+            if(status == TumovgmCodecStatusOk) tumovgm_process_event(app, &decoded);
+            tumovgm_discard_rx(app, consumed > 0 ? consumed : 1);
+            progressed = true;
+        }
+        if(received == 0 && !progressed) break;
+    }
+}
+
 static void tumovgm_drain_stream(TumoVgmApp* app) {
     furi_stream_buffer_reset(app->rx_stream);
     app->rx_size = 0;
@@ -296,7 +520,7 @@ static bool tumovgm_exchange(
     const TumovgmFrame* request,
     TumovgmFrame* response,
     uint32_t timeout_ms) {
-    tumovgm_drain_stream(app);
+    tumovgm_receive_available(app);
     size_t tx_size = 0;
     if(tumovgm_frame_encode(request, app->tx_buffer, sizeof(app->tx_buffer), &tx_size) !=
        TumovgmCodecStatusOk) {
@@ -308,11 +532,7 @@ static bool tumovgm_exchange(
     const uint32_t start = furi_get_tick();
     const uint32_t timeout_ticks = furi_ms_to_ticks(timeout_ms);
     while((uint32_t)(furi_get_tick() - start) < timeout_ticks) {
-        app->rx_size += furi_stream_buffer_receive(
-            app->rx_stream,
-            app->rx_buffer + app->rx_size,
-            sizeof(app->rx_buffer) - app->rx_size,
-            0);
+        tumovgm_receive_into_buffer(app);
         while(app->rx_size > 0) {
             TumovgmFrame decoded;
             size_t consumed = 0;
@@ -322,10 +542,20 @@ static bool tumovgm_exchange(
             if(status == TumovgmCodecStatusOk && decoded.sequence == request->sequence &&
                decoded.message == request->message) {
                 *response = decoded;
+                if(decoded.payload_length > 0) {
+                    memcpy(app->response_payload, decoded.payload, decoded.payload_length);
+                    response->payload = app->response_payload;
+                } else {
+                    response->payload = NULL;
+                }
+                tumovgm_discard_rx(app, consumed);
                 return true;
             }
+            if(status == TumovgmCodecStatusOk) tumovgm_process_event(app, &decoded);
             tumovgm_discard_rx(app, consumed > 0 ? consumed : 1);
         }
+
+        if(tumovgm_receive_into_buffer(app) > 0) continue;
 
         const uint32_t elapsed = furi_get_tick() - start;
         if(elapsed >= timeout_ticks) break;
@@ -357,9 +587,7 @@ static bool tumovgm_probe_stock(TumoVgmApp* app) {
         const uint32_t elapsed = furi_get_tick() - start;
         if(elapsed >= timeout) break;
         const uint32_t flags = furi_thread_flags_wait(
-            TumoVgmWorkerFlagData | TumoVgmWorkerFlagExit,
-            FuriFlagWaitAny,
-            timeout - elapsed);
+            TumoVgmWorkerFlagData | TumoVgmWorkerFlagExit, FuriFlagWaitAny, timeout - elapsed);
         if(flags == (uint32_t)FuriFlagErrorTimeout) continue;
         if(flags & FuriFlagError) return false;
         if(flags & TumoVgmWorkerFlagExit) {
@@ -374,6 +602,30 @@ static bool tumovgm_response_error(const TumovgmFrame* response, TumovgmError er
     return response->kind == TumovgmFrameKindError &&
            response->payload_length >= TumoVgmErrorPayloadSize &&
            tumovgm_read_u16(response->payload) == (uint16_t)error;
+}
+
+static bool tumovgm_query_imu_info(TumoVgmApp* app) {
+    if(app->device.protocol_minor < 2 ||
+       (app->device.capabilities & (UINT64_C(1) << TumovgmCapabilityBitImu)) == 0) {
+        return false;
+    }
+    const TumovgmFrame request = {
+        .major = TUMOVGM_PROTOCOL_MAJOR,
+        .minor = app->device.protocol_minor,
+        .kind = TumovgmFrameKindRequest,
+        .sequence = tumovgm_next_sequence(app),
+        .message = TumovgmMessageImuInfo,
+    };
+    TumovgmFrame response;
+    if(!tumovgm_exchange(app, &request, &response, TumoVgmExchangeTimeoutMs) ||
+       response.kind != TumovgmFrameKindResponse ||
+       response.payload_length != TumoVgmImuInfoPayloadSize) {
+        return false;
+    }
+    app->device.imu_supported = true;
+    app->device.imu_health = response.payload[0];
+    app->device.imu_identity = response.payload[1];
+    return true;
 }
 
 static void tumovgm_probe(TumoVgmApp* app) {
@@ -444,12 +696,68 @@ static void tumovgm_probe(TumoVgmApp* app) {
             app->device.dirty = response.payload[40] != 0;
         }
     }
+    tumovgm_query_imu_info(app);
     tumovgm_set_state(app, TumoVgmStateReady, "Connected");
+}
+
+static bool tumovgm_grant_imu_credits(TumoVgmApp* app, uint16_t credits) {
+    uint8_t payload[TumoVgmStreamCreditPayloadSize] = {0};
+    tumovgm_write_u32(payload, app->device.session_id);
+    tumovgm_write_u16(payload + 4, TumoVgmImuStreamId);
+    tumovgm_write_u16(payload + 6, credits);
+    const TumovgmFrame request = {
+        .major = TUMOVGM_PROTOCOL_MAJOR,
+        .minor = app->device.protocol_minor,
+        .kind = TumovgmFrameKindRequest,
+        .sequence = tumovgm_next_sequence(app),
+        .message = TumovgmMessageStreamCredit,
+        .payload_length = sizeof(payload),
+        .payload = payload,
+    };
+    TumovgmFrame response;
+    if(!tumovgm_exchange(app, &request, &response, TumoVgmExchangeTimeoutMs) ||
+       response.kind != TumovgmFrameKindResponse ||
+       response.payload_length != TumoVgmStreamCreditResponseSize) {
+        return false;
+    }
+    app->device.imu_credits = tumovgm_read_u16(response.payload);
+    return true;
+}
+
+static bool tumovgm_configure_imu(TumoVgmApp* app) {
+    uint8_t payload[TumoVgmImuConfigPayloadSize] = {0};
+    tumovgm_write_u32(payload, app->device.session_id);
+    tumovgm_write_u16(payload + 4, TumoVgmImuRequestedRateHz);
+    payload[6] = TumoVgmImuFlagRawSamples | TumoVgmImuFlagGestures;
+    const TumovgmFrame request = {
+        .major = TUMOVGM_PROTOCOL_MAJOR,
+        .minor = app->device.protocol_minor,
+        .kind = TumovgmFrameKindRequest,
+        .sequence = tumovgm_next_sequence(app),
+        .message = TumovgmMessageImuConfig,
+        .payload_length = sizeof(payload),
+        .payload = payload,
+    };
+    TumovgmFrame response;
+    if(!tumovgm_exchange(app, &request, &response, TumoVgmExchangeTimeoutMs) ||
+       response.kind != TumovgmFrameKindResponse ||
+       response.payload_length != TumoVgmImuConfigResponseSize ||
+       tumovgm_read_u32(response.payload) != app->device.session_id ||
+       response.payload[7] != TumoVgmImuStreamId) {
+        return false;
+    }
+    app->device.imu_rate_hz = tumovgm_read_u16(response.payload + 4);
+    app->device.imu_health = 4;
+    app->device.imu_streaming = tumovgm_grant_imu_credits(app, TumoVgmImuInitialCredits);
+    return app->device.imu_streaming;
 }
 
 static void tumovgm_start_session(TumoVgmApp* app) {
     tumovgm_set_state(app, TumoVgmStateScanning, "Opening session...");
     uint8_t payload[TumoVgmSessionOpenPayloadSize] = {0};
+    const uint64_t requested_capabilities =
+        app->device.imu_supported ? UINT64_C(1) << TumovgmCapabilityBitImu : 0;
+    tumovgm_write_u64(payload, requested_capabilities);
     tumovgm_write_u32(payload + 8, TumoVgmLeaseMs);
     const TumovgmFrame request = {
         .major = TUMOVGM_PROTOCOL_MAJOR,
@@ -465,7 +773,15 @@ static void tumovgm_start_session(TumoVgmApp* app) {
        response.kind == TumovgmFrameKindResponse &&
        response.payload_length == TumoVgmSessionOpenResponseSize) {
         app->device.session_id = tumovgm_read_u32(response.payload);
-        tumovgm_set_state(app, TumoVgmStateSession, "Keepalive active");
+        app->device.imu_page = 0;
+        app->device.imu_streaming = false;
+        app->device.imu_credits = 0;
+        app->device.sample_sequence = 0;
+        app->device.gesture = 0;
+        app->device.gesture_confidence = 0;
+        const bool imu_ready = !app->device.imu_supported || tumovgm_configure_imu(app);
+        tumovgm_set_state(
+            app, TumoVgmStateSession, imu_ready ? "Telemetry active" : "IMU setup failed");
     } else if(!app->exit_requested) {
         app->device.session_id = 0;
         tumovgm_set_state(app, TumoVgmStateError, "Open timed out");
@@ -489,6 +805,8 @@ static bool tumovgm_stop_session(TumoVgmApp* app, uint32_t timeout_ms) {
     const bool success = tumovgm_exchange(app, &request, &response, timeout_ms) &&
                          response.kind == TumovgmFrameKindResponse;
     app->device.session_id = 0;
+    app->device.imu_streaming = false;
+    app->device.imu_credits = 0;
     tumovgm_set_state(
         app,
         success ? TumoVgmStateReady : TumoVgmStateError,
@@ -515,6 +833,17 @@ static bool tumovgm_ping(TumoVgmApp* app) {
            memcmp(response.payload, payload, sizeof(payload)) == 0;
 }
 
+static void tumovgm_maintain_imu_stream(TumoVgmApp* app) {
+    if(!app->device.imu_streaming || app->device.imu_credits > TumoVgmImuCreditLowWatermark) {
+        return;
+    }
+    if(!tumovgm_grant_imu_credits(app, TumoVgmImuInitialCredits)) {
+        app->device.imu_streaming = false;
+        strlcpy(app->device.detail, "IMU stream stopped", sizeof(app->device.detail));
+        tumovgm_refresh_view(app);
+    }
+}
+
 static int32_t tumovgm_worker(void* context) {
     TumoVgmApp* app = context;
     app->worker_id = furi_thread_get_current_id();
@@ -525,28 +854,43 @@ static int32_t tumovgm_worker(void* context) {
         if(flags & TumoVgmWorkerFlagExit) return 0;
     }
     tumovgm_probe(app);
+    uint32_t last_keepalive = furi_get_tick();
 
     while(!app->exit_requested) {
-        const uint32_t timeout = app->device.state == TumoVgmStateSession ?
-                                     furi_ms_to_ticks(TumoVgmKeepaliveMs) :
-                                     FuriWaitForever;
-        const uint32_t flags =
-            furi_thread_flags_wait(TUMOVGM_WORKER_FLAGS, FuriFlagWaitAny, timeout);
+        const uint32_t timeout = app->device.state == TumoVgmStateSession ? furi_ms_to_ticks(100) :
+                                                                            FuriWaitForever;
+        uint32_t flags = furi_thread_flags_wait(TUMOVGM_WORKER_FLAGS, FuriFlagWaitAny, timeout);
         if(flags == (uint32_t)FuriFlagErrorTimeout) {
-            if(app->device.state == TumoVgmStateSession && !tumovgm_ping(app) &&
-               !app->exit_requested) {
-                app->device.session_id = 0;
-                tumovgm_set_state(app, TumoVgmStateError, "Module disconnected");
-            }
-            continue;
+            flags = 0;
         }
         if(flags & FuriFlagError) continue;
         if(flags & TumoVgmWorkerFlagExit) break;
+        if(flags & TumoVgmWorkerFlagData) tumovgm_receive_available(app);
         if(flags & TumoVgmWorkerFlagRetry) tumovgm_probe(app);
-        if(flags & TumoVgmWorkerFlagStart && app->device.state == TumoVgmStateReady)
+        if(flags & TumoVgmWorkerFlagStart && app->device.state == TumoVgmStateReady) {
             tumovgm_start_session(app);
-        if(flags & TumoVgmWorkerFlagStop && app->device.state == TumoVgmStateSession)
+            last_keepalive = furi_get_tick();
+        }
+        if(flags & TumoVgmWorkerFlagNextPage && app->device.state == TumoVgmStateSession) {
+            app->device.imu_page ^= 1;
+            tumovgm_refresh_view(app);
+        }
+        if(flags & TumoVgmWorkerFlagStop && app->device.state == TumoVgmStateSession) {
             tumovgm_stop_session(app, TumoVgmExchangeTimeoutMs);
+        }
+
+        if(app->device.state == TumoVgmStateSession) {
+            tumovgm_maintain_imu_stream(app);
+            const uint32_t now = furi_get_tick();
+            if((uint32_t)(now - last_keepalive) >= furi_ms_to_ticks(TumoVgmKeepaliveMs)) {
+                last_keepalive = now;
+                if(!tumovgm_ping(app) && !app->exit_requested) {
+                    app->device.session_id = 0;
+                    app->device.imu_streaming = false;
+                    tumovgm_set_state(app, TumoVgmStateError, "Module disconnected");
+                }
+            }
+        }
     }
 
     if(app->device.session_id != 0) tumovgm_stop_session(app, 200);
