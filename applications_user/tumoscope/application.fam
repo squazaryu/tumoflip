@@ -10,7 +10,7 @@ App(
     fap_icon="icon.png",
     fap_category="Module One/Signals",
     fap_dist_path="apps/Module One/Signals/tumoscope.fap",
-    fap_version="0.3.0",
+    fap_version="0.3.1",
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip/issues/62",
     fap_description="Three-channel GPIO logic analyzer with DMA capture, trigger, protocol decoding, waveform view, and VCD export.",

@@ -32,6 +32,11 @@ view. Sparse transitions render as digital steps; bins with multiple transitions
 render as a thin activity trace instead of an unreadable solid block. Frequency
 labels are limited to Raw/Edge captures; protocol profiles use signal roles such
 as RX, SDA/SCL, and MOSI/MISO/CLK.
+The waveform is a held one-shot capture rather than a live oscilloscope. It
+opens zoomed around the trigger so Left/Right pan immediately; unavailable pan
+directions are hidden at the capture boundaries. The `HOLD @...` indicator
+shows the current sample offset even when a periodic trace looks similar after
+panning. Up/Down changes zoom.
 
 ## Electrical boundary
 

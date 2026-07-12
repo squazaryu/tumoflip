@@ -13,7 +13,7 @@
 
 #define TAG "TumoScope"
 
-#define TUMOSCOPE_APP_VERSION      "0.3.0"
+#define TUMOSCOPE_APP_VERSION      "0.3.1"
 #define TUMOSCOPE_DATA_DIR         EXT_PATH("apps_data/tumoscope")
 #define TUMOSCOPE_CAPTURE_DIR      TUMOSCOPE_DATA_DIR "/captures"
 #define TUMOSCOPE_EVENT_QUEUE_SIZE 8U
@@ -378,6 +378,19 @@ static void tumoscope_draw_trigger(Canvas* canvas, const TumoScopeApp* app) {
     canvas_draw_triangle(canvas, x - 2U, TUMOSCOPE_GRAPH_TOP, 5, 4, CanvasDirectionBottomToTop);
 }
 
+static size_t tumoscope_wave_visible_samples(const TumoScopeApp* app) {
+    return app->samples_per_pixel * TUMOSCOPE_GRAPH_WIDTH;
+}
+
+static size_t tumoscope_wave_max_offset(const TumoScopeApp* app) {
+    const size_t visible = tumoscope_wave_visible_samples(app);
+    return app->sample_count > visible ? app->sample_count - visible : 0U;
+}
+
+static void tumoscope_wave_clamp_offset(TumoScopeApp* app) {
+    app->wave_offset = MIN(app->wave_offset, tumoscope_wave_max_offset(app));
+}
+
 static void tumoscope_draw_waveform(Canvas* canvas, const TumoScopeApp* app) {
     const TumoScopeDecoderProfile* profile = &tumoscope_decoders[app->decoder_index];
     canvas_set_font(canvas, FontSecondary);
@@ -389,14 +402,9 @@ static void tumoscope_draw_waveform(Canvas* canvas, const TumoScopeApp* app) {
     }
     char status[24];
     if(total_transitions == 0U) {
-        strlcpy(status, "No transitions", sizeof(status));
+        strlcpy(status, "HOLD static", sizeof(status));
     } else {
-        snprintf(
-            status,
-            sizeof(status),
-            "%s x%u",
-            tumoscope_rate_label(tumoscope_rates[app->rate_index]),
-            (unsigned int)app->samples_per_pixel);
+        snprintf(status, sizeof(status), "HOLD @%lu", (unsigned long)app->wave_offset);
     }
     canvas_draw_str_aligned(canvas, 126, 8, AlignRight, AlignBottom, status);
 
@@ -408,9 +416,9 @@ static void tumoscope_draw_waveform(Canvas* canvas, const TumoScopeApp* app) {
     tumoscope_draw_trigger(canvas, app);
 
     canvas_draw_line(canvas, 0, 51, 127, 51);
-    elements_button_left(canvas, "Pan");
+    if(app->wave_offset > 0U) elements_button_left(canvas, "Pan");
     elements_button_center(canvas, "Decode");
-    elements_button_right(canvas, "Pan");
+    if(app->wave_offset < tumoscope_wave_max_offset(app)) elements_button_right(canvas, "Pan");
 }
 
 static void tumoscope_format_decode_summary(
@@ -566,9 +574,13 @@ static void tumoscope_decode_capture(TumoScopeApp* app) {
 }
 
 static void tumoscope_prepare_result(TumoScopeApp* app, const char* status) {
-    app->samples_per_pixel =
+    const size_t fit_samples_per_pixel =
         MAX(1U, (app->sample_count + TUMOSCOPE_GRAPH_WIDTH - 1U) / TUMOSCOPE_GRAPH_WIDTH);
-    app->wave_offset = 0U;
+    app->samples_per_pixel = MAX(1U, fit_samples_per_pixel / 4U);
+    const size_t visible = tumoscope_wave_visible_samples(app);
+    app->wave_offset = app->trigger_sample > visible / 2U ? app->trigger_sample - visible / 2U :
+                                                            0U;
+    tumoscope_wave_clamp_offset(app);
     for(uint8_t channel = 0U; channel < TUMOSCOPE_CHANNEL_COUNT; channel++) {
         tumoscope_analyze_channel(
             app->samples,
@@ -804,20 +816,21 @@ static void tumoscope_handle_setup(TumoScopeApp* app, const InputEvent* input) {
 }
 
 static void tumoscope_handle_waveform(TumoScopeApp* app, const InputEvent* input) {
-    const size_t visible = app->samples_per_pixel * TUMOSCOPE_GRAPH_WIDTH;
+    const size_t visible = tumoscope_wave_visible_samples(app);
     if(input->key == InputKeyUp) {
         app->samples_per_pixel = MAX(1U, app->samples_per_pixel / 2U);
+        tumoscope_wave_clamp_offset(app);
     } else if(input->key == InputKeyDown) {
         app->samples_per_pixel =
             MIN(MAX(1U, (app->sample_count + TUMOSCOPE_GRAPH_WIDTH - 1U) / TUMOSCOPE_GRAPH_WIDTH),
                 app->samples_per_pixel * 2U);
+        tumoscope_wave_clamp_offset(app);
     } else if(input->key == InputKeyLeft) {
         const size_t step = MAX(1U, visible / 4U);
         app->wave_offset = app->wave_offset > step ? app->wave_offset - step : 0U;
     } else if(input->key == InputKeyRight) {
         const size_t step = MAX(1U, visible / 4U);
-        const size_t max_offset = app->sample_count > visible ? app->sample_count - visible : 0U;
-        app->wave_offset = MIN(max_offset, app->wave_offset + step);
+        app->wave_offset = MIN(tumoscope_wave_max_offset(app), app->wave_offset + step);
     } else if(input->key == InputKeyOk) {
         app->screen = TumoScopeScreenDecode;
     } else if(input->key == InputKeyBack) {
