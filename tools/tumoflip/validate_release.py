@@ -95,6 +95,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Field/field_logger.fap",
     "apps/Module One/Signals/signal_workbench.fap",
     "apps/Module One/Signals/tumoscope.fap",
+    "apps/Module One/VGM/tumovgm_bridge.fap",
     "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
     "apps/Module One/BLE/ble_gatt_lab.fap",
     "apps/Module One/BLE/app_bridge_terminal.fap",
@@ -105,6 +106,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
     "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
     "apps/Module One/Labs/tumovm_poc.fap",
+    "apps/Module One/Labs/tumokey_phase_a.fap",
     "apps/Module One/NFC/nfc_ccid_bridge.fap",
     "apps/Module One/NFC/tumocard_os.fap",
 )

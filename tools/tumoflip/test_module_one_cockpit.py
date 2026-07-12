@@ -20,6 +20,8 @@ COCKPIT_FAP_ROUTES = {
     "field_logger": "apps/Module One/Field/field_logger.fap",
     "signal_workbench": "apps/Module One/Signals/signal_workbench.fap",
     "tumoscope": "apps/Module One/Signals/tumoscope.fap",
+    "tumovgm_bridge": "apps/Module One/VGM/tumovgm_bridge.fap",
+    "tumokey_phase_a": "apps/Module One/Labs/tumokey_phase_a.fap",
     "module_one_sensor_logger": (
         "apps/Module One/Sensors BME280/module_one_sensor_logger.fap"
     ),
@@ -53,6 +55,8 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("Field: Logger", self.source)
         self.assertIn("Signals: Workbench", self.source)
         self.assertIn("Signals: TumoScope", self.source)
+        self.assertIn("VGM: Bridge", self.source)
+        self.assertIn("Security: TumoKey A", self.source)
         self.assertIn("NFC: TumoCard OS", self.source)
         self.assertIn("Macros: TumoScript", self.source)
         self.assertIn("System: Acceptance", self.source)
@@ -83,6 +87,14 @@ class ModuleOneCockpitTest(unittest.TestCase):
         )
         self.assertIn(
             'EXT_PATH("apps/Module One/Signals/tumoscope.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/VGM/tumovgm_bridge.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/Labs/tumokey_phase_a.fap")',
             self.source,
         )
         self.assertIn(

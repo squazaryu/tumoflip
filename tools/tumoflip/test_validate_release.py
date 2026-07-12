@@ -195,6 +195,14 @@ class ValidateReleaseTest(unittest.TestCase):
             MODULE_ONE_PACKAGE_FILES,
         )
         self.assertIn(
+            "apps/Module One/VGM/tumovgm_bridge.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
+            "apps/Module One/Labs/tumokey_phase_a.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
             "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
