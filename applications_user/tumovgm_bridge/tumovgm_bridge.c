@@ -186,9 +186,9 @@ static void tumovgm_draw_callback(Canvas* canvas, void* context) {
         }
         canvas_draw_str_aligned(canvas, 64, 50, AlignCenter, AlignTop, line);
     } else {
-        canvas_draw_str_aligned(canvas, 64, 34, AlignCenter, AlignTop, model->detail);
+        canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignTop, model->detail);
         if(model->state == TumoVgmStateStock) {
-            canvas_draw_str_aligned(canvas, 64, 46, AlignCenter, AlignTop, "Install TumoVGM UF2");
+            canvas_draw_str_aligned(canvas, 64, 43, AlignCenter, AlignTop, "Install TumoVGM UF2");
         }
     }
 
