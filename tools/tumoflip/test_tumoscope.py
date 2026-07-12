@@ -55,11 +55,14 @@ class TumoScopeTest(unittest.TestCase):
             "TumoScopeScreenCapture",
             "TumoScopeScreenWaveform",
             "TumoScopeScreenDecode",
-            'elements_button_center(canvas, "Capture")',
+            'profile->demo == TumoScopeDemoNone ? "Capture" : "Run Demo"',
+            '"Run Demo"',
             'elements_button_center(canvas, "Stop")',
             'elements_button_center(canvas, "Decode")',
             'elements_button_right(canvas, "Save")',
             '"$timescale 1 ns $end',
+            '"No transitions / static"',
+            "tumoscope_analyze_channel",
             '"/%s.vcd"',
             '"/%s.txt"',
         ):
@@ -162,6 +165,44 @@ int main(void) {
     assert(tumoscope_sample_level(0x05, 0));
     assert(!tumoscope_sample_level(0x05, 1));
     assert(tumoscope_sample_level(0x05, 2));
+
+    uint8_t demo[1024];
+    TumoScopeChannelStats stats;
+    const uint32_t rates[] = {100000, 250000, 500000, 1000000};
+    for(size_t rate_index = 0; rate_index < sizeof(rates) / sizeof(rates[0]); rate_index++) {
+        const uint32_t rate = rates[rate_index];
+        assert(tumoscope_generate_demo(TumoScopeDemoEdge, demo, sizeof(demo), rate));
+        tumoscope_analyze_channel(demo, sizeof(demo), rate, 0, &stats);
+        assert(stats.frequency_hz == 5000);
+        assert(stats.transitions >= 9);
+        tumoscope_analyze_channel(demo, sizeof(demo), rate, 1, &stats);
+        assert(stats.frequency_hz == 3125);
+        tumoscope_analyze_channel(demo, sizeof(demo), rate, 2, &stats);
+        assert(stats.frequency_hz == 2500);
+    }
+
+    memset(demo, 0, sizeof(demo));
+    tumoscope_analyze_channel(demo, sizeof(demo), 100000, 0, &stats);
+    assert(stats.frequency_hz == 0);
+    assert(stats.transitions == 0);
+
+    for(size_t rate_index = 0; rate_index < sizeof(rates) / sizeof(rates[0]); rate_index++) {
+        const uint32_t rate = rates[rate_index];
+        const uint32_t baud = tumoscope_demo_uart_baud(rate);
+        assert(tumoscope_generate_demo(TumoScopeDemoUart, demo, sizeof(demo), rate));
+        tumoscope_decode_uart(demo, sizeof(demo), rate, baud, 0, &result);
+        assert(result.byte_count >= 3);
+        assert(result.bytes[0] == 0x55);
+        assert(result.bytes[1] == 0xA5);
+        assert(result.bytes[2] == 0x33);
+        assert(result.error_count == 0);
+    }
+
+    assert(tumoscope_generate_demo(TumoScopeDemoI2c, demo, sizeof(demo), 100000));
+    tumoscope_decode_i2c(demo, sizeof(demo), 0, 1, &result);
+    assert(result.byte_count > 0);
+    assert(result.bytes[0] == 0xA0);
+    assert(result.error_count == 0);
     return 0;
 }
 '''

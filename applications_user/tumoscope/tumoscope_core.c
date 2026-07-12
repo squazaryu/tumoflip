@@ -7,6 +7,159 @@ bool tumoscope_sample_level(uint8_t sample, uint8_t channel) {
     return (sample & (1U << channel)) != 0U;
 }
 
+void tumoscope_analyze_channel(
+    const uint8_t* samples,
+    size_t sample_count,
+    uint32_t sample_rate,
+    uint8_t channel,
+    TumoScopeChannelStats* stats) {
+    if(!stats) return;
+    memset(stats, 0, sizeof(*stats));
+    if(!samples || sample_count < 2U || !sample_rate || channel >= TUMOSCOPE_CHANNEL_COUNT) return;
+
+    size_t first_rising = 0U;
+    size_t last_rising = 0U;
+    for(size_t index = 1U; index < sample_count; index++) {
+        const bool previous = tumoscope_sample_level(samples[index - 1U], channel);
+        const bool current = tumoscope_sample_level(samples[index], channel);
+        if(previous == current) continue;
+        stats->transitions++;
+        if(!previous && current) {
+            if(stats->rising_edges == 0U) first_rising = index;
+            last_rising = index;
+            stats->rising_edges++;
+        }
+    }
+
+    if(stats->rising_edges >= 2U && last_rising > first_rising) {
+        stats->frequency_hz = (uint32_t)(((uint64_t)(stats->rising_edges - 1U) * sample_rate +
+                                          (last_rising - first_rising) / 2U) /
+                                         (last_rising - first_rising));
+    }
+}
+
+static void tumoscope_demo_set_level(
+    uint8_t* samples,
+    size_t start,
+    size_t count,
+    uint8_t channel,
+    bool high) {
+    for(size_t index = start; index < start + count; index++) {
+        if(high)
+            samples[index] |= 1U << channel;
+        else
+            samples[index] &= ~(1U << channel);
+    }
+}
+
+static bool
+    tumoscope_generate_edge_demo(uint8_t* samples, size_t sample_count, uint32_t sample_rate) {
+    static const uint32_t frequencies[] = {5000U, 3125U, 2500U};
+    memset(samples, 0, sample_count);
+    for(uint8_t channel = 0U; channel < TUMOSCOPE_CHANNEL_COUNT; channel++) {
+        const size_t half_period = sample_rate / (2U * frequencies[channel]);
+        if(!half_period) return false;
+        for(size_t index = 0U; index < sample_count; index++) {
+            if(((index / half_period) & 1U) != 0U) samples[index] |= 1U << channel;
+        }
+    }
+    return true;
+}
+
+static bool
+    tumoscope_generate_uart_demo(uint8_t* samples, size_t sample_count, uint32_t sample_rate) {
+    const uint32_t baud = tumoscope_demo_uart_baud(sample_rate);
+    const size_t samples_per_bit = sample_rate / baud;
+    if(samples_per_bit < 3U) return false;
+    memset(samples, 0x07, sample_count);
+
+    static const uint8_t bytes[] = {0x55U, 0xA5U, 0x33U};
+    size_t cursor = samples_per_bit * 2U;
+    size_t byte_index = 0U;
+    while(cursor + samples_per_bit * 11U <= sample_count) {
+        const uint8_t value = bytes[byte_index++ % (sizeof(bytes) / sizeof(bytes[0]))];
+        tumoscope_demo_set_level(samples, cursor, samples_per_bit, 0U, false);
+        cursor += samples_per_bit;
+        for(uint8_t bit = 0U; bit < 8U; bit++) {
+            tumoscope_demo_set_level(
+                samples, cursor, samples_per_bit, 0U, (value & (1U << bit)) != 0U);
+            cursor += samples_per_bit;
+        }
+        tumoscope_demo_set_level(samples, cursor, samples_per_bit * 2U, 0U, true);
+        cursor += samples_per_bit * 2U;
+    }
+    return byte_index > 0U;
+}
+
+uint32_t tumoscope_demo_uart_baud(uint32_t sample_rate) {
+    if(sample_rate <= 100000U) return 9600U;
+    if(sample_rate <= 250000U) return 19200U;
+    if(sample_rate <= 500000U) return 38400U;
+    return 115200U;
+}
+
+static bool tumoscope_demo_append_i2c_level(
+    uint8_t* samples,
+    size_t sample_count,
+    size_t* cursor,
+    size_t hold,
+    bool sda,
+    bool scl) {
+    if(*cursor + hold > sample_count) return false;
+    const uint8_t level = (sda ? 1U : 0U) | (scl ? 2U : 0U) | 4U;
+    memset(&samples[*cursor], level, hold);
+    *cursor += hold;
+    return true;
+}
+
+static bool
+    tumoscope_generate_i2c_demo(uint8_t* samples, size_t sample_count, uint32_t sample_rate) {
+    const size_t calculated_hold = (size_t)sample_rate / 50000U;
+    const size_t hold = calculated_hold > 2U ? calculated_hold : 2U;
+    if(sample_count < hold * 24U) return false;
+    memset(samples, 0x07, sample_count);
+
+    size_t cursor = 0U;
+    uint8_t value = 0xA0U;
+    while(cursor + hold * 24U <= sample_count) {
+        if(!tumoscope_demo_append_i2c_level(samples, sample_count, &cursor, hold, true, true) ||
+           !tumoscope_demo_append_i2c_level(samples, sample_count, &cursor, hold, false, true))
+            return false;
+        for(uint8_t bit = 0U; bit < 8U; bit++) {
+            const bool data = (value & (0x80U >> bit)) != 0U;
+            if(!tumoscope_demo_append_i2c_level(
+                   samples, sample_count, &cursor, hold, data, false) ||
+               !tumoscope_demo_append_i2c_level(samples, sample_count, &cursor, hold, data, true))
+                return false;
+        }
+        if(!tumoscope_demo_append_i2c_level(samples, sample_count, &cursor, hold, false, false) ||
+           !tumoscope_demo_append_i2c_level(samples, sample_count, &cursor, hold, false, true) ||
+           !tumoscope_demo_append_i2c_level(samples, sample_count, &cursor, hold, true, true))
+            return false;
+        value++;
+    }
+    return true;
+}
+
+bool tumoscope_generate_demo(
+    TumoScopeDemo demo,
+    uint8_t* samples,
+    size_t sample_count,
+    uint32_t sample_rate) {
+    if(!samples || sample_count < 64U || !sample_rate) return false;
+    switch(demo) {
+    case TumoScopeDemoEdge:
+        return tumoscope_generate_edge_demo(samples, sample_count, sample_rate);
+    case TumoScopeDemoUart:
+        return tumoscope_generate_uart_demo(samples, sample_count, sample_rate);
+    case TumoScopeDemoI2c:
+        return tumoscope_generate_i2c_demo(samples, sample_count, sample_rate);
+    case TumoScopeDemoNone:
+    default:
+        return false;
+    }
+}
+
 static void tumoscope_decode_reset(TumoScopeDecodeResult* result, TumoScopeDecoder decoder) {
     memset(result, 0, sizeof(*result));
     result->decoder = decoder;

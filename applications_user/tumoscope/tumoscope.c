@@ -13,7 +13,7 @@
 
 #define TAG "TumoScope"
 
-#define TUMOSCOPE_APP_VERSION      "0.1.0"
+#define TUMOSCOPE_APP_VERSION      "0.2.0"
 #define TUMOSCOPE_DATA_DIR         EXT_PATH("apps_data/tumoscope")
 #define TUMOSCOPE_CAPTURE_DIR      TUMOSCOPE_DATA_DIR "/captures"
 #define TUMOSCOPE_EVENT_QUEUE_SIZE 8U
@@ -29,6 +29,7 @@ typedef enum {
 
 typedef struct {
     TumoScopeDecoder decoder;
+    TumoScopeDemo demo;
     uint32_t baud;
     const char* label;
     const char* wiring;
@@ -63,6 +64,7 @@ typedef struct {
     size_t trigger_sample;
     size_t wave_offset;
     size_t samples_per_pixel;
+    TumoScopeChannelStats channel_stats[TUMOSCOPE_CHANNEL_COUNT];
     TumoScopeDecodeResult decode;
 } TumoScopeApp;
 
@@ -84,15 +86,18 @@ static const char* const tumoscope_trigger_labels[] = {
     "PC3 low",
 };
 static const TumoScopeDecoderProfile tumoscope_decoders[] = {
-    {TumoScopeDecoderRaw, 0U, "Raw", "PC0 / PC1 / PC3"},
-    {TumoScopeDecoderUart, 9600U, "UART 9.6k", "RX = PC0"},
-    {TumoScopeDecoderUart, 19200U, "UART 19.2k", "RX = PC0"},
-    {TumoScopeDecoderUart, 38400U, "UART 38.4k", "RX = PC0"},
-    {TumoScopeDecoderUart, 57600U, "UART 57.6k", "RX = PC0"},
-    {TumoScopeDecoderUart, 115200U, "UART 115.2k", "RX = PC0"},
-    {TumoScopeDecoderI2c, 0U, "I2C", "SDA=PC0 SCL=PC1"},
-    {TumoScopeDecoderSpiMode0, 0U, "SPI mode 0", "MO=PC0 MI=PC1 CK=PC3"},
-    {TumoScopeDecoderOneWire, 0U, "1-Wire", "DATA = PC0"},
+    {TumoScopeDecoderRaw, TumoScopeDemoNone, 0U, "Live Raw", "PC0 / PC1 / PC3"},
+    {TumoScopeDecoderRaw, TumoScopeDemoEdge, 0U, "Demo Edge", "Synthetic / no GPIO"},
+    {TumoScopeDecoderUart, TumoScopeDemoUart, 9600U, "Demo UART", "Synthetic / no GPIO"},
+    {TumoScopeDecoderI2c, TumoScopeDemoI2c, 0U, "Demo I2C", "Synthetic / no GPIO"},
+    {TumoScopeDecoderUart, TumoScopeDemoNone, 9600U, "UART 9.6k", "RX = PC0"},
+    {TumoScopeDecoderUart, TumoScopeDemoNone, 19200U, "UART 19.2k", "RX = PC0"},
+    {TumoScopeDecoderUart, TumoScopeDemoNone, 38400U, "UART 38.4k", "RX = PC0"},
+    {TumoScopeDecoderUart, TumoScopeDemoNone, 57600U, "UART 57.6k", "RX = PC0"},
+    {TumoScopeDecoderUart, TumoScopeDemoNone, 115200U, "UART 115.2k", "RX = PC0"},
+    {TumoScopeDecoderI2c, TumoScopeDemoNone, 0U, "I2C", "SDA=PC0 SCL=PC1"},
+    {TumoScopeDecoderSpiMode0, TumoScopeDemoNone, 0U, "SPI mode 0", "MO=PC0 MI=PC1 CK=PC3"},
+    {TumoScopeDecoderOneWire, TumoScopeDemoNone, 0U, "1-Wire", "DATA = PC0"},
 };
 
 static const char* tumoscope_rate_label(uint32_t rate) {
@@ -127,10 +132,17 @@ static void tumoscope_draw_selected_row(
 }
 
 static void tumoscope_draw_setup(Canvas* canvas, const TumoScopeApp* app) {
+    const TumoScopeDecoderProfile* profile = &tumoscope_decoders[app->decoder_index];
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 2, 9, "TumoScope");
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str_aligned(canvas, 126, 9, AlignRight, AlignBottom, "PC0/1/3 3.3V");
+    canvas_draw_str_aligned(
+        canvas,
+        126,
+        9,
+        AlignRight,
+        AlignBottom,
+        profile->demo == TumoScopeDemoNone ? "PC0/1/3 3.3V" : "No GPIO used");
 
     char depth[16];
     snprintf(depth, sizeof(depth), "%u samples", (unsigned int)tumoscope_depths[app->depth_index]);
@@ -142,10 +154,14 @@ static void tumoscope_draw_setup(Canvas* canvas, const TumoScopeApp* app) {
         tumoscope_rate_label(tumoscope_rates[app->rate_index]));
     tumoscope_draw_selected_row(canvas, 1U, app->selected_row, "Depth", depth);
     tumoscope_draw_selected_row(
-        canvas, 2U, app->selected_row, "Trigger", tumoscope_trigger_labels[app->trigger_index]);
-    tumoscope_draw_selected_row(
-        canvas, 3U, app->selected_row, "Decoder", tumoscope_decoders[app->decoder_index].label);
-    elements_button_center(canvas, "Capture");
+        canvas,
+        2U,
+        app->selected_row,
+        "Trigger",
+        profile->demo == TumoScopeDemoNone ? tumoscope_trigger_labels[app->trigger_index] :
+                                             "N/A (demo)");
+    tumoscope_draw_selected_row(canvas, 3U, app->selected_row, "Mode", profile->label);
+    elements_button_center(canvas, profile->demo == TumoScopeDemoNone ? "Capture" : "Run Demo");
 }
 
 static void tumoscope_draw_capture(Canvas* canvas, const TumoScopeApp* app) {
@@ -176,16 +192,58 @@ static uint8_t tumoscope_wave_y(uint8_t channel, bool high) {
     return high ? base[channel] - 4U : base[channel] + 2U;
 }
 
+static void tumoscope_format_frequency(
+    const TumoScopeChannelStats* stats,
+    char* output,
+    size_t output_size) {
+    if(stats->frequency_hz >= 1000000U) {
+        snprintf(output, output_size, "%luM", (unsigned long)(stats->frequency_hz / 1000000U));
+    } else if(stats->frequency_hz >= 1000U) {
+        uint32_t whole = stats->frequency_hz / 1000U;
+        uint32_t hundredths = (stats->frequency_hz % 1000U + 5U) / 10U;
+        if(hundredths == 100U) {
+            whole++;
+            hundredths = 0U;
+        }
+        if(hundredths % 10U)
+            snprintf(
+                output, output_size, "%lu.%02luk", (unsigned long)whole, (unsigned long)hundredths);
+        else if(hundredths)
+            snprintf(
+                output,
+                output_size,
+                "%lu.%luk",
+                (unsigned long)whole,
+                (unsigned long)(hundredths / 10U));
+        else
+            snprintf(output, output_size, "%luk", (unsigned long)whole);
+    } else if(stats->frequency_hz > 0U) {
+        snprintf(output, output_size, "%lu", (unsigned long)stats->frequency_hz);
+    } else if(stats->transitions > 0U) {
+        strlcpy(output, "edge", output_size);
+    } else {
+        strlcpy(output, "--", output_size);
+    }
+}
+
 static void tumoscope_draw_waveform(Canvas* canvas, const TumoScopeApp* app) {
     canvas_set_font(canvas, FontSecondary);
     char header[48];
-    snprintf(
-        header,
-        sizeof(header),
-        "%s  %u  x%u",
-        tumoscope_rate_label(tumoscope_rates[app->rate_index]),
-        (unsigned int)app->sample_count,
-        (unsigned int)app->samples_per_pixel);
+    size_t total_transitions = 0U;
+    for(uint8_t channel = 0U; channel < TUMOSCOPE_CHANNEL_COUNT; channel++) {
+        total_transitions += app->channel_stats[channel].transitions;
+    }
+    if(total_transitions == 0U) {
+        strlcpy(header, "No transitions / static", sizeof(header));
+    } else {
+        char pc0[8];
+        char pc1[8];
+        char pc3[8];
+        tumoscope_format_frequency(&app->channel_stats[0], pc0, sizeof(pc0));
+        tumoscope_format_frequency(&app->channel_stats[1], pc1, sizeof(pc1));
+        tumoscope_format_frequency(&app->channel_stats[2], pc3, sizeof(pc3));
+        snprintf(header, sizeof(header), "0:%s 1:%s 3:%s Hz", pc0, pc1, pc3);
+    }
     canvas_draw_str(canvas, 2, 9, header);
 
     static const char* const labels[] = {"0", "1", "3"};
@@ -356,15 +414,19 @@ static void tumoscope_change_index(uint8_t* value, uint8_t count, bool increment
 static void tumoscope_decode_capture(TumoScopeApp* app) {
     const TumoScopeDecoderProfile* profile = &tumoscope_decoders[app->decoder_index];
     switch(profile->decoder) {
-    case TumoScopeDecoderUart:
+    case TumoScopeDecoderUart: {
+        const uint32_t baud = profile->demo == TumoScopeDemoUart ?
+                                  tumoscope_demo_uart_baud(tumoscope_rates[app->rate_index]) :
+                                  profile->baud;
         tumoscope_decode_uart(
             app->samples,
             app->sample_count,
             tumoscope_rates[app->rate_index],
-            profile->baud,
+            baud,
             0U,
             &app->decode);
         break;
+    }
     case TumoScopeDecoderI2c:
         tumoscope_decode_i2c(app->samples, app->sample_count, 0U, 1U, &app->decode);
         break;
@@ -383,15 +445,49 @@ static void tumoscope_decode_capture(TumoScopeApp* app) {
     }
 }
 
+static void tumoscope_prepare_result(TumoScopeApp* app, const char* status) {
+    app->samples_per_pixel =
+        MAX(1U, (app->sample_count + TUMOSCOPE_WAVE_WIDTH - 1U) / TUMOSCOPE_WAVE_WIDTH);
+    app->wave_offset = 0U;
+    for(uint8_t channel = 0U; channel < TUMOSCOPE_CHANNEL_COUNT; channel++) {
+        tumoscope_analyze_channel(
+            app->samples,
+            app->sample_count,
+            tumoscope_rates[app->rate_index],
+            channel,
+            &app->channel_stats[channel]);
+    }
+    tumoscope_decode_capture(app);
+    app->screen = TumoScopeScreenWaveform;
+    strlcpy(app->status, status, sizeof(app->status));
+    notification_message(app->notifications, &sequence_success);
+}
+
+static bool tumoscope_run_demo(TumoScopeApp* app, const TumoScopeDecoderProfile* profile) {
+    app->sample_count = tumoscope_depths[app->depth_index];
+    if(!tumoscope_generate_demo(
+           profile->demo, app->samples, app->sample_count, tumoscope_rates[app->rate_index])) {
+        strlcpy(app->status, "Demo generation failed", sizeof(app->status));
+        notification_message(app->notifications, &sequence_error);
+        return false;
+    }
+    app->trigger_sample = app->sample_count / 4U;
+    tumoscope_prepare_result(app, "Synthetic demo trace");
+    return true;
+}
+
 static bool tumoscope_start_capture(TumoScopeApp* app) {
+    const TumoScopeDecoderProfile* profile = &tumoscope_decoders[app->decoder_index];
+    app->exported = false;
+    app->status[0] = '\0';
+    if(profile->demo != TumoScopeDemoNone) return tumoscope_run_demo(app, profile);
+
     TumoScopeCaptureConfig config = {
         .sample_rate = tumoscope_rates[app->rate_index],
         .sample_count = tumoscope_depths[app->depth_index],
         .trigger = (TumoScopeTrigger)app->trigger_index,
         .pretrigger_percent = 25U,
     };
-    app->exported = false;
-    app->status[0] = '\0';
     if(!tumoscope_capture_start(app->capture, &config)) {
         strlcpy(app->status, "Capture start failed", sizeof(app->status));
         notification_message(app->notifications, &sequence_error);
@@ -418,13 +514,7 @@ static void tumoscope_finish_capture(TumoScopeApp* app) {
         return;
     }
     app->trigger_sample = tumoscope_capture_trigger_index(app->capture);
-    app->samples_per_pixel =
-        MAX(1U, (app->sample_count + TUMOSCOPE_WAVE_WIDTH - 1U) / TUMOSCOPE_WAVE_WIDTH);
-    app->wave_offset = 0U;
-    tumoscope_decode_capture(app);
-    app->screen = TumoScopeScreenWaveform;
-    strlcpy(app->status, "Capture complete", sizeof(app->status));
-    notification_message(app->notifications, &sequence_success);
+    tumoscope_prepare_result(app, "Capture complete");
 }
 
 static bool tumoscope_write(File* file, const char* text) {
@@ -449,7 +539,7 @@ static bool tumoscope_export_vcd(TumoScopeApp* app, const char* path) {
         success = tumoscope_write(
             file,
             "$date Tumoflip TumoScope $end\n"
-            "$version TumoScope 0.1.0 $end\n"
+            "$version TumoScope " TUMOSCOPE_APP_VERSION " $end\n"
             "$timescale 1 ns $end\n"
             "$scope module gpio $end\n"
             "$var wire 1 ! PC0 $end\n"
@@ -487,6 +577,7 @@ static bool tumoscope_export_vcd(TumoScopeApp* app, const char* path) {
 }
 
 static bool tumoscope_export_report(TumoScopeApp* app, const char* path) {
+    const TumoScopeDecoderProfile* profile = &tumoscope_decoders[app->decoder_index];
     File* file = storage_file_alloc(app->storage);
     bool success = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     char first[48];
@@ -502,7 +593,8 @@ static bool tumoscope_export_report(TumoScopeApp* app, const char* path) {
         success = tumoscope_write_format(
             file,
             "Trigger: %s @ %u\n",
-            tumoscope_trigger_labels[app->trigger_index],
+            profile->demo == TumoScopeDemoNone ? tumoscope_trigger_labels[app->trigger_index] :
+                                                 "Synthetic demo",
             (unsigned int)app->trigger_sample);
     if(success)
         success = tumoscope_write_format(
@@ -510,6 +602,15 @@ static bool tumoscope_export_report(TumoScopeApp* app, const char* path) {
     if(success)
         success = tumoscope_write_format(
             file, "Pins: %s\n", tumoscope_decoders[app->decoder_index].wiring);
+    for(uint8_t channel = 0U; success && channel < TUMOSCOPE_CHANNEL_COUNT; channel++) {
+        static const uint8_t pin_numbers[] = {0U, 1U, 3U};
+        success = tumoscope_write_format(
+            file,
+            "PC%u: %lu Hz, %u transitions\n",
+            pin_numbers[channel],
+            (unsigned long)app->channel_stats[channel].frequency_hz,
+            (unsigned int)app->channel_stats[channel].transitions);
+    }
     if(success) success = tumoscope_write_format(file, "%s\n", first);
     if(success) success = tumoscope_write_format(file, "%s\nData:", second);
     char line[16];
@@ -649,7 +750,7 @@ static TumoScopeApp* tumoscope_alloc(void) {
     app->rate_index = 3U;
     app->depth_index = 2U;
     app->trigger_index = 0U;
-    app->decoder_index = 0U;
+    app->decoder_index = 1U;
     strlcpy(app->status, "Ready", sizeof(app->status));
     return app;
 }

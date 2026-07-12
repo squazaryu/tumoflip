@@ -15,6 +15,19 @@ typedef enum {
     TumoScopeDecoderOneWire,
 } TumoScopeDecoder;
 
+typedef enum {
+    TumoScopeDemoNone,
+    TumoScopeDemoEdge,
+    TumoScopeDemoUart,
+    TumoScopeDemoI2c,
+} TumoScopeDemo;
+
+typedef struct {
+    uint32_t frequency_hz;
+    size_t transitions;
+    size_t rising_edges;
+} TumoScopeChannelStats;
+
 typedef struct {
     TumoScopeDecoder decoder;
     uint8_t bytes[TUMOSCOPE_MAX_DECODE_BYTES];
@@ -26,6 +39,21 @@ typedef struct {
 } TumoScopeDecodeResult;
 
 bool tumoscope_sample_level(uint8_t sample, uint8_t channel);
+
+void tumoscope_analyze_channel(
+    const uint8_t* samples,
+    size_t sample_count,
+    uint32_t sample_rate,
+    uint8_t channel,
+    TumoScopeChannelStats* stats);
+
+bool tumoscope_generate_demo(
+    TumoScopeDemo demo,
+    uint8_t* samples,
+    size_t sample_count,
+    uint32_t sample_rate);
+
+uint32_t tumoscope_demo_uart_baud(uint32_t sample_rate);
 
 void tumoscope_decode_uart(
     const uint8_t* samples,
