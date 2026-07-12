@@ -199,6 +199,10 @@ class ValidateReleaseTest(unittest.TestCase):
             MODULE_ONE_PACKAGE_FILES,
         )
         self.assertIn(
+            "apps/Module One/Modules/tumomodule_runtime.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
             "apps/Module One/Labs/tumokey_phase_a.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
@@ -256,6 +260,14 @@ class ValidateReleaseTest(unittest.TestCase):
             "apps_data/tumoscript/scripts/safe_demo.tscr",
             MODULE_ONE_PACKAGE_DATA_FILES,
         )
+        self.assertIn(
+            "apps_data/tumomodule_runtime/modules/bme280.tmod",
+            MODULE_ONE_PACKAGE_DATA_FILES,
+        )
+        self.assertIn(
+            "apps_data/tumomodule_runtime/modules/tumovgm.tmod",
+            MODULE_ONE_PACKAGE_DATA_FILES,
+        )
         sample = (
             REPO_ROOT
             / STATIC_SD_RESOURCES
@@ -268,6 +280,14 @@ class ValidateReleaseTest(unittest.TestCase):
             / "apps_data/tumoscript/scripts/safe_demo.tscr"
         )
         self.assertTrue(tumoscript_sample.is_file(), str(tumoscript_sample))
+        for module_manifest in ("bme280.tmod", "tumovgm.tmod"):
+            sample = (
+                REPO_ROOT
+                / STATIC_SD_RESOURCES
+                / "apps_data/tumomodule_runtime/modules"
+                / module_manifest
+            )
+            self.assertTrue(sample.is_file(), str(sample))
 
     def test_runtime_contract_is_validated_for_release(self) -> None:
         capabilities = runtime_capabilities(REPO_ROOT)

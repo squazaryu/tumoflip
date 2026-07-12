@@ -1,0 +1,11 @@
+Filetype: TumoModule Package
+Version: 1
+Module ID: module_one_bme280
+Name: Module One BME280
+Adapter: bme280_i2c
+Bus: i2c.external
+Minimum API: 88
+Maximum API: 88
+Address: 0
+Baud: 0
+External Power: false

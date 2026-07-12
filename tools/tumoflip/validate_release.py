@@ -96,6 +96,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Signals/signal_workbench.fap",
     "apps/Module One/Signals/tumoscope.fap",
     "apps/Module One/VGM/tumovgm_bridge.fap",
+    "apps/Module One/Modules/tumomodule_runtime.fap",
     "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
     "apps/Module One/BLE/ble_gatt_lab.fap",
     "apps/Module One/BLE/app_bridge_terminal.fap",
@@ -113,6 +114,8 @@ MODULE_ONE_PACKAGE_FILES = (
 MODULE_ONE_PACKAGE_DATA_FILES = (
     "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
     "apps_data/tumoscript/scripts/safe_demo.tscr",
+    "apps_data/tumomodule_runtime/modules/bme280.tmod",
+    "apps_data/tumomodule_runtime/modules/tumovgm.tmod",
 )
 ARF_LEGACY_PATHS = {
     **{
