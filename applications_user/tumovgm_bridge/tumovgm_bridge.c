@@ -333,11 +333,12 @@ static bool tumovgm_exchange(
             TumoVgmWorkerFlagData | TumoVgmWorkerFlagExit,
             FuriFlagWaitAny,
             timeout_ticks - elapsed);
+        if(flags == (uint32_t)FuriFlagErrorTimeout) continue;
+        if(flags & FuriFlagError) return false;
         if(flags & TumoVgmWorkerFlagExit) {
             app->exit_requested = true;
             return false;
         }
-        if((flags & FuriFlagError) && flags != (uint32_t)FuriFlagErrorTimeout) return false;
     }
     return false;
 }
@@ -359,6 +360,8 @@ static bool tumovgm_probe_stock(TumoVgmApp* app) {
             TumoVgmWorkerFlagData | TumoVgmWorkerFlagExit,
             FuriFlagWaitAny,
             timeout - elapsed);
+        if(flags == (uint32_t)FuriFlagErrorTimeout) continue;
+        if(flags & FuriFlagError) return false;
         if(flags & TumoVgmWorkerFlagExit) {
             app->exit_requested = true;
             return false;
@@ -529,7 +532,6 @@ static int32_t tumovgm_worker(void* context) {
                                      FuriWaitForever;
         const uint32_t flags =
             furi_thread_flags_wait(TUMOVGM_WORKER_FLAGS, FuriFlagWaitAny, timeout);
-        if(flags & TumoVgmWorkerFlagExit) break;
         if(flags == (uint32_t)FuriFlagErrorTimeout) {
             if(app->device.state == TumoVgmStateSession && !tumovgm_ping(app) &&
                !app->exit_requested) {
@@ -539,6 +541,7 @@ static int32_t tumovgm_worker(void* context) {
             continue;
         }
         if(flags & FuriFlagError) continue;
+        if(flags & TumoVgmWorkerFlagExit) break;
         if(flags & TumoVgmWorkerFlagRetry) tumovgm_probe(app);
         if(flags & TumoVgmWorkerFlagStart && app->device.state == TumoVgmStateReady)
             tumovgm_start_session(app);
