@@ -116,18 +116,18 @@ static void tumomodule_draw_detail(Canvas* canvas, void* context) {
     canvas_draw_str_aligned(canvas, 64, 16, AlignCenter, AlignTop, status);
 
     if(model->about) {
-        canvas_draw_str(canvas, 3, 32, "Trusted adapters only");
-        canvas_draw_str(canvas, 3, 41, "No native FAL loading");
-        canvas_draw_str(canvas, 3, 49, "v0.1.0  github:#65");
+        canvas_draw_str(canvas, 3, 34, "Trusted adapters only");
+        canvas_draw_str(canvas, 3, 42, "No native FAL loading");
+        canvas_draw_str(canvas, 3, 50, "v0.1.0  github:#65");
     } else {
-        canvas_draw_str(canvas, 3, 32, model->name);
+        canvas_draw_str(canvas, 3, 34, model->name);
         snprintf(line, sizeof(line), "%s / %s", model->adapter, model->bus);
-        canvas_draw_str(canvas, 3, 41, line);
+        canvas_draw_str(canvas, 3, 42, line);
         if(model->detail[0] != '\0') {
-            canvas_draw_str(canvas, 3, 49, model->detail);
+            canvas_draw_str(canvas, 3, 50, model->detail);
         } else {
             snprintf(line, sizeof(line), "Resources %02lX", (unsigned long)model->resources);
-            canvas_draw_str(canvas, 3, 49, line);
+            canvas_draw_str(canvas, 3, 50, line);
         }
     }
 
