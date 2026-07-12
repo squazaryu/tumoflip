@@ -46,6 +46,7 @@ typedef enum {
     ModuleOneCockpitActionLaunchSignalWorkbench,
     ModuleOneCockpitActionLaunchTumoScope,
     ModuleOneCockpitActionLaunchVgmBridge,
+    ModuleOneCockpitActionLaunchTumoModule,
     ModuleOneCockpitActionLaunchTumoKey,
     ModuleOneCockpitActionLaunchSensorLogger,
     ModuleOneCockpitActionLaunchTumoCardOs,
@@ -72,6 +73,7 @@ typedef enum {
     ModuleOneCockpitBlockSensor,
     ModuleOneCockpitBlockSignal,
     ModuleOneCockpitBlockVgm,
+    ModuleOneCockpitBlockModule,
     ModuleOneCockpitBlockBle,
     ModuleOneCockpitBlockMacro,
     ModuleOneCockpitBlockNfc,
@@ -131,6 +133,7 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"Signals: Workbench", ModuleOneCockpitActionLaunchSignalWorkbench},
     {"Signals: TumoScope", ModuleOneCockpitActionLaunchTumoScope},
     {"VGM: Bridge", ModuleOneCockpitActionLaunchVgmBridge},
+    {"Modules: Runtime", ModuleOneCockpitActionLaunchTumoModule},
     {"Security: TumoKey A", ModuleOneCockpitActionLaunchTumoKey},
     {"BME280/I2C: Scan", ModuleOneCockpitActionI2cScan},
     {"Sensors: Logger", ModuleOneCockpitActionLaunchSensorLogger},
@@ -231,6 +234,14 @@ static const ModuleOneCockpitLaunchTarget module_one_cockpit_targets[] = {
         ModuleOneCockpitBlockVgm,
         "TumoVGM Bridge",
         EXT_PATH("apps/Module One/VGM/tumovgm_bridge.fap"),
+        NULL,
+        true,
+    },
+    {
+        ModuleOneCockpitActionLaunchTumoModule,
+        ModuleOneCockpitBlockModule,
+        "TumoModule Runtime",
+        EXT_PATH("apps/Module One/Modules/tumomodule_runtime.fap"),
         NULL,
         true,
     },
@@ -371,6 +382,10 @@ static const char* module_one_cockpit_block_label(ModuleOneCockpitBlock block) {
         return "Sensor";
     case ModuleOneCockpitBlockSignal:
         return "Signals";
+    case ModuleOneCockpitBlockVgm:
+        return "VGM";
+    case ModuleOneCockpitBlockModule:
+        return "Modules";
     case ModuleOneCockpitBlockBle:
         return "BLE";
     case ModuleOneCockpitBlockMacro:

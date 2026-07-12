@@ -1,0 +1,11 @@
+Filetype: TumoModule Package
+Version: 1
+Module ID: tumovgm_rp2040
+Name: TumoVGM RP2040
+Adapter: tumovgm_uart
+Bus: uart.usart
+Minimum API: 88
+Maximum API: 88
+Address: 0
+Baud: 230400
+External Power: false
