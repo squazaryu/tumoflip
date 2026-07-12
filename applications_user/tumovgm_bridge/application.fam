@@ -1,0 +1,18 @@
+App(
+    appid="tumovgm_bridge",
+    name="TumoVGM Bridge",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="tumovgm_bridge_app",
+    requires=["gui", "expansion_start"],
+    sources=["*.c"],
+    stack_size=6 * 1024,
+    icon="A_GPIO_14",
+    fap_icon="icon.png",
+    fap_category="Module One/VGM",
+    fap_dist_path="apps/Module One/VGM/tumovgm_bridge.fap",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/t-vgm-fw/issues/4",
+    fap_description="Detect, inspect, and safely manage sessions with TumoVGM firmware.",
+)
