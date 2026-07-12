@@ -19,6 +19,7 @@ COCKPIT_FAP_ROUTES = {
     "tumoscript": "apps/Module One/Scripts/tumoscript.fap",
     "field_logger": "apps/Module One/Field/field_logger.fap",
     "signal_workbench": "apps/Module One/Signals/signal_workbench.fap",
+    "tumoscope": "apps/Module One/Signals/tumoscope.fap",
     "module_one_sensor_logger": (
         "apps/Module One/Sensors BME280/module_one_sensor_logger.fap"
     ),
@@ -51,6 +52,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("BLE: Terminal", self.source)
         self.assertIn("Field: Logger", self.source)
         self.assertIn("Signals: Workbench", self.source)
+        self.assertIn("Signals: TumoScope", self.source)
         self.assertIn("NFC: TumoCard OS", self.source)
         self.assertIn("Macros: TumoScript", self.source)
         self.assertIn("System: Acceptance", self.source)
@@ -77,6 +79,10 @@ class ModuleOneCockpitTest(unittest.TestCase):
         )
         self.assertIn(
             'EXT_PATH("apps/Module One/Signals/signal_workbench.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/Signals/tumoscope.fap")',
             self.source,
         )
         self.assertIn(
@@ -128,7 +134,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertNotIn("furi_hal_power_enable_otg", self.source)
         self.assertNotIn("furi_hal_power_disable_otg", self.source)
         self.assertIn("Acceptance: export release smoke reports after each flash", self.source)
-        self.assertIn("Signals: use Signal Workbench", self.source)
+        self.assertIn("TumoScope for GPIO capture", self.source)
 
     def test_nested_launches_restore_cockpit_selection(self) -> None:
         self.assertIn("loader_clear_launch_queue(app->loader);", self.source)
