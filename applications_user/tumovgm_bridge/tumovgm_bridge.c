@@ -163,7 +163,7 @@ static void tumovgm_draw_callback(Canvas* canvas, void* context) {
 
     if(model->state == TumoVgmStateReady || model->state == TumoVgmStateSession) {
         canvas_draw_str_aligned(
-            canvas, 64, 30, AlignCenter, AlignTop, model->version[0] ? model->version : "Identity unavailable");
+            canvas, 64, 28, AlignCenter, AlignTop, model->version[0] ? model->version : "Identity unavailable");
         snprintf(
             line,
             sizeof(line),
@@ -171,11 +171,11 @@ static void tumovgm_draw_callback(Canvas* canvas, void* context) {
             model->protocol_major,
             model->protocol_minor,
             model->hardware_target == TumovgmHardwareTargetVgmRp2040 ? "VGM RP2040" : "Unknown HW");
-        canvas_draw_str_aligned(canvas, 64, 40, AlignCenter, AlignTop, line);
+        canvas_draw_str_aligned(canvas, 64, 36, AlignCenter, AlignTop, line);
         if(model->state == TumoVgmStateSession) {
             snprintf(line, sizeof(line), "Session #%lu", (unsigned long)model->session_id);
         } else if(model->capabilities == 0) {
-            snprintf(line, sizeof(line), "Capabilities: none%s", model->dirty ? " DIRTY" : "");
+            snprintf(line, sizeof(line), "Caps: none%s", model->dirty ? " DIRTY" : "");
         } else {
             snprintf(
                 line,
@@ -184,7 +184,7 @@ static void tumovgm_draw_callback(Canvas* canvas, void* context) {
                 (unsigned long)model->capabilities,
                 model->dirty ? " DIRTY" : "");
         }
-        canvas_draw_str_aligned(canvas, 64, 50, AlignCenter, AlignTop, line);
+        canvas_draw_str_aligned(canvas, 64, 44, AlignCenter, AlignTop, line);
     } else {
         canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignTop, model->detail);
         if(model->state == TumoVgmStateStock) {
