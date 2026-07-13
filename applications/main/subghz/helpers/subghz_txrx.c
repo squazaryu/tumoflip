@@ -434,17 +434,15 @@ static void subghz_txrx_rx_end(SubGhzTxRx* instance) {
     subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateCleaningUp);
     if(subghz_worker_is_running(instance->worker)) {
         subghz_worker_stop(instance->worker);
-        subghz_devices_stop_async_rx(instance->radio_device);
     }
+    subghz_devices_stop_async_rx(instance->radio_device);
     if(instance->diversity_rx_active) {
         if(subghz_worker_is_running(instance->diversity_worker)) {
             subghz_worker_stop(instance->diversity_worker);
         }
         subghz_devices_stop_async_rx(instance->diversity_radio_device);
-        subghz_devices_idle(instance->diversity_radio_device);
         instance->diversity_rx_active = false;
     }
-    subghz_devices_idle(instance->radio_device);
     subghz_txrx_speaker_off(instance);
     instance->txrx_state = SubGhzTxRxStateIDLE;
     subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateInitialized);

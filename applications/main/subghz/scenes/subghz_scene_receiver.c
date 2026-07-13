@@ -1,5 +1,6 @@
 #include "../subghz_i.h"
 #include "../subghz_diversity.h"
+#include <applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h>
 #include <dolphin/dolphin.h>
 #include <lib/subghz/protocols/bin_raw.h>
 
@@ -103,6 +104,17 @@ static void subghz_scene_receiver_update_statusbar(void* context) {
 
     subghz_view_receiver_set_radio_device_type(
         subghz->subghz_receiver, subghz_txrx_radio_device_get(subghz->txrx));
+}
+
+static void subghz_scene_receiver_recover_disconnected_external(SubGhz* subghz) {
+    const SubGhzRadioDeviceType device = subghz_txrx_radio_device_get(subghz->txrx);
+    if(device == SubGhzRadioDeviceTypeInternal) return;
+
+    if(!subghz_txrx_radio_device_is_external_connected(
+           subghz->txrx, SUBGHZ_DEVICE_CC1101_EXT_NAME)) {
+        FURI_LOG_W(TAG, "External radio disconnected; falling back to internal");
+        subghz_txrx_radio_device_set(subghz->txrx, SubGhzRadioDeviceTypeInternal);
+    }
 }
 
 void subghz_scene_receiver_callback(SubGhzCustomEvent event, void* context) {
@@ -265,6 +277,7 @@ bool subghz_scene_receiver_on_event(void* context, SceneManagerEvent event) {
             // Stop CC1101 Rx
             subghz->state_notifications = SubGhzNotificationStateIDLE;
             subghz_txrx_stop(subghz->txrx);
+            subghz_scene_receiver_recover_disconnected_external(subghz);
             subghz_txrx_hopper_set_state(subghz->txrx, SubGhzHopperStateOFF);
             subghz_txrx_set_rx_callback(subghz->txrx, NULL, subghz);
 
@@ -308,6 +321,10 @@ bool subghz_scene_receiver_on_event(void* context, SceneManagerEvent event) {
             subghz_txrx_hopper_set_state(subghz->txrx, SubGhzHopperStateOFF);
 
             const SubGhzRadioDeviceType current = subghz_txrx_radio_device_get(subghz->txrx);
+            if(current == SubGhzRadioDeviceTypeInternal) {
+                consumed = true;
+                break;
+            }
             const SubGhzRadioDeviceType requested = current == SubGhzRadioDeviceTypeAuto ?
                                                         SubGhzRadioDeviceTypeExternalCC1101 :
                                                         SubGhzRadioDeviceTypeAuto;

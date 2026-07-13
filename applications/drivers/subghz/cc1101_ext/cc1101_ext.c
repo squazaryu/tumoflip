@@ -425,19 +425,25 @@ void subghz_device_cc1101_ext_reset(void) {
     furi_hal_spi_release(subghz_device_cc1101_ext->spi_bus_handle);
 }
 
-void subghz_device_cc1101_ext_idle(void) {
+static bool subghz_device_cc1101_ext_try_idle(void) {
     furi_hal_spi_acquire(subghz_device_cc1101_ext->spi_bus_handle);
     cc1101_switch_to_idle(subghz_device_cc1101_ext->spi_bus_handle);
-    //waiting for the chip to switch to IDLE mode
-    furi_check(cc1101_wait_status_state(
-        subghz_device_cc1101_ext->spi_bus_handle, CC1101StateIDLE, 10000));
+    const bool idle_ready =
+        cc1101_wait_status_state(subghz_device_cc1101_ext->spi_bus_handle, CC1101StateIDLE, 10000);
 
     furi_hal_gpio_write(SUBGHZ_DEVICE_CC1101_EXT_E07_AMP_GPIO, 0);
-    // Reset GDO2 (!TX/RX) to floating state
-    cc1101_write_reg(
-        subghz_device_cc1101_ext->spi_bus_handle, CC1101_IOCFG2, CC1101IocfgHighImpedance);
+    if(idle_ready) {
+        // Reset GDO2 (!TX/RX) to floating state
+        cc1101_write_reg(
+            subghz_device_cc1101_ext->spi_bus_handle, CC1101_IOCFG2, CC1101IocfgHighImpedance);
+    }
 
     furi_hal_spi_release(subghz_device_cc1101_ext->spi_bus_handle);
+    return idle_ready;
+}
+
+void subghz_device_cc1101_ext_idle(void) {
+    furi_check(subghz_device_cc1101_ext_try_idle());
 }
 
 void subghz_device_cc1101_ext_rx(void) {
@@ -652,8 +658,11 @@ void subghz_device_cc1101_ext_stop_async_rx(void) {
     furi_assert(subghz_device_cc1101_ext->state == SubGhzDeviceCC1101ExtStateAsyncRx);
     subghz_device_cc1101_ext->state = SubGhzDeviceCC1101ExtStateIdle;
 
-    // Shutdown radio
-    subghz_device_cc1101_ext_idle();
+    // A removable external radio may disappear while RX is active. Teardown must still
+    // release the timer, interrupt callback, and GPIO state instead of crashing.
+    if(!subghz_device_cc1101_ext_try_idle()) {
+        FURI_LOG_W(TAG, "CC1101 disconnected while stopping RX");
+    }
 
     FURI_CRITICAL_ENTER();
     furi_hal_bus_disable(FuriHalBusTIM17);
