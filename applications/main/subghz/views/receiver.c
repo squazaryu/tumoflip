@@ -290,7 +290,8 @@ void subghz_view_receiver_draw(Canvas* canvas, SubGhzViewReceiverModel* model) {
     canvas_set_color(canvas, ColorBlack);
     canvas_set_font(canvas, FontSecondary);
 
-    const bool show_diversity_toggle = model->mode == SubGhzViewReceiverModeLive &&
+    const bool show_diversity_toggle = model->device_type != SubGhzRadioDeviceTypeInternal &&
+                                       model->mode == SubGhzViewReceiverModeLive &&
                                        model->history_item == 0 &&
                                        model->bar_show == SubGhzViewReceiverBarShowDefault;
 
@@ -542,7 +543,8 @@ bool subghz_view_receiver_input(InputEvent* event, void* context) {
             subghz_receiver->view,
             SubGhzViewReceiverModel * model,
             {
-                can_toggle_diversity = model->history_item == 0 &&
+                can_toggle_diversity = model->device_type != SubGhzRadioDeviceTypeInternal &&
+                                       model->history_item == 0 &&
                                        model->mode == SubGhzViewReceiverModeLive;
             },
             false);

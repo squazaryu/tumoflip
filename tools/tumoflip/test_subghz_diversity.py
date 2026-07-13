@@ -36,12 +36,39 @@ class SubGhzDiversityTest(unittest.TestCase):
         self.assertIn("elements_button_right", view)
         self.assertIn('SubGhzRadioDeviceTypeAuto ? "Auto" : "Dual"', view)
         self.assertIn("const bool show_diversity_toggle", view)
+        self.assertGreaterEqual(
+            view.count("model->device_type != SubGhzRadioDeviceTypeInternal"), 2
+        )
         self.assertIn("model->history_item == 0", view)
         self.assertIn("if(!show_diversity_toggle)", view)
         self.assertIn("InputKeyRight && event->type == InputTypeShort", view)
         self.assertIn("case SubGhzCustomEventViewReceiverToggleDiversity", scene)
+        self.assertIn("if(current == SubGhzRadioDeviceTypeInternal)", scene)
         self.assertIn("subghz_txrx_set_preset_internal", scene)
         self.assertIn("subghz_txrx_rx_start", scene)
+
+    def test_external_disconnect_is_non_fatal_during_receiver_exit(self) -> None:
+        txrx = (SUBGHZ / "helpers/subghz_txrx.c").read_text(encoding="utf-8")
+        scene = (SUBGHZ / "scenes/subghz_scene_receiver.c").read_text(
+            encoding="utf-8"
+        )
+        driver = (
+            REPO_ROOT
+            / "applications/drivers/subghz/cc1101_ext/cc1101_ext.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("subghz_device_cc1101_ext_try_idle", driver)
+        self.assertIn('FURI_LOG_W(TAG, "CC1101 disconnected while stopping RX")', driver)
+        self.assertIn("subghz_scene_receiver_recover_disconnected_external", scene)
+        self.assertIn(
+            "subghz_txrx_radio_device_set(subghz->txrx, SubGhzRadioDeviceTypeInternal)",
+            scene,
+        )
+        self.assertNotIn(
+            "subghz_devices_stop_async_rx(instance->radio_device);\n"
+            "        subghz_devices_idle(instance->radio_device);",
+            txrx,
+        )
 
     def test_dual_receive_uses_independent_workers_and_decoders(self) -> None:
         internal = (SUBGHZ / "helpers/subghz_txrx_i.h").read_text(encoding="utf-8")
