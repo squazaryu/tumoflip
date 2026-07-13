@@ -1,0 +1,28 @@
+Filetype: Tumo Protocol Profile
+Version: 1
+Name: Demo Pulse Pair
+Profile ID: 035084cd0da9ab62
+Minimum API: 88
+Encoding: pulse-pair
+Polarity: normal
+Frequency: 433920000
+Tolerance: 15
+Preamble count: 8
+Preamble: 402 -402 402 -402 402 -402 402 -402
+Bit count: 13
+Zero high: 395
+Zero low: 1190
+One high: 1216
+One low: 408
+Stable mask: 0x1E00
+Stable value: 0x0A00
+Variable mask: 0x01FF
+Uncertain mask: 0x0000
+Checksum: parity-even-last
+Checksum candidates: parity-even-last
+Confidence: 81
+Ambiguity: none
+Training captures: 4
+Training frames: 8
+Receive only: true
+Review required: true

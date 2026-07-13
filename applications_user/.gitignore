@@ -41,6 +41,8 @@
 !field_logger/**
 !signal_workbench/
 !signal_workbench/**
+!protocol_compiler/
+!protocol_compiler/**
 !ble_gatt_lab/
 !ble_gatt_lab/**
 !app_bridge_terminal/

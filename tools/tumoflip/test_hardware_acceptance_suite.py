@@ -53,6 +53,7 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
             'EXT_PATH("apps/Module One/Diagnostics/runtime_trace_viewer.fap")',
             'EXT_PATH("apps/Module One/Field/field_logger.fap")',
             'EXT_PATH("apps/Module One/Signals/signal_workbench.fap")',
+            'EXT_PATH("apps/Module One/Signals/protocol_compiler.fap")',
             'EXT_PATH("apps/Module One/Sensors BME280/module_one_sensor_logger.fap")',
             'EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap")',
             'EXT_PATH("apps/Module One/BLE/app_bridge_terminal.fap")',
@@ -97,6 +98,10 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
         )
         self.assertIn(
             '"apps/Module One/Signals/signal_workbench.fap"',
+            self.validator,
+        )
+        self.assertIn(
+            '"apps/Module One/Signals/protocol_compiler.fap"',
             self.validator,
         )
         self.assertIn(
