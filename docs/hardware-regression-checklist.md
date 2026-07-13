@@ -165,6 +165,11 @@ are legally allowed to test.
   second increment, disconnect/reconnect BLE, resume the same value, then
   cancel. The on-device node must return to `IDLE` and normal BLE operation
   must remain available.
+- Open TumoFabric Mac Node with USB connected. Its idle probe must not start a
+  session. Start on Flipper and confirm Mac attaches automatically. Change the
+  counter from Flipper, Mac, and iPhone; all three views must converge without
+  changing the BLE owner. Unplug/replug USB and confirm Mac reconnects. Quit the
+  Mac app and confirm qFlipper can immediately reopen the serial connection.
 - Disconnect and reconnect without rebooting the Flipper.
 
 ### NFC

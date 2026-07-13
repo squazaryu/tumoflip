@@ -1,4 +1,5 @@
 #include <bt/bt_service/bt_i.h>
+#include <cli/cli.h>
 #include <furi.h>
 #include <furi_hal_info.h>
 #include <furi_hal_power.h>
@@ -9,17 +10,19 @@
 #include <subghz_radio_broker/subghz_radio_broker.h>
 #include <stdio.h>
 #include <string.h>
+#include <toolbox/args.h>
+#include <toolbox/cli/cli_command.h>
 
-#define TUMOFLIP_RUNTIME_APP_ID            "runtime"
-#define TUMOFLIP_RUNTIME_QUEUE_DEPTH       8U
-#define TUMOFLIP_RUNTIME_STATUS_MAX        160U
-#define TUMOFLIP_RUNTIME_TRACE_DEPTH       8U
-#define TUMOFLIP_RUNTIME_TRACE_MAX         160U
-#define TUMOFLIP_RUNTIME_TWIN_MAX          160U
-#define TUMOFLIP_RUNTIME_FABRIC_MAX        160U
-#define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX 24U
+#define TUMOFLIP_RUNTIME_APP_ID             "runtime"
+#define TUMOFLIP_RUNTIME_QUEUE_DEPTH        8U
+#define TUMOFLIP_RUNTIME_STATUS_MAX         160U
+#define TUMOFLIP_RUNTIME_TRACE_DEPTH        8U
+#define TUMOFLIP_RUNTIME_TRACE_MAX          160U
+#define TUMOFLIP_RUNTIME_TWIN_MAX           160U
+#define TUMOFLIP_RUNTIME_FABRIC_MAX         160U
+#define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX  24U
 #define TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
-#define TUMOFLIP_RUNTIME_CAPABILITIES \
+#define TUMOFLIP_RUNTIME_CAPABILITIES                                       \
     "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;pkg=1;radio=2;sd=1;" \
     "fabric=1;feat=pkg,radio,trace,twin,transfer,fabric"
 
@@ -61,16 +64,121 @@ static void tumoflip_runtime_trace_add(
     char code,
     const char* command,
     bool error);
-static bool tumoflip_runtime_api_get_trace(
-    TumoflipRuntimeApi* api,
-    char* output,
-    size_t output_size);
+static bool
+    tumoflip_runtime_api_get_trace(TumoflipRuntimeApi* api, char* output, size_t output_size);
 static bool tumoflip_runtime_api_get_fabric_state(
     TumoflipRuntimeApi* api,
     TumoflipRuntimeFabricSnapshot* snapshot);
 static bool tumoflip_runtime_api_cancel_fabric(TumoflipRuntimeApi* api);
 static bool tumoflip_runtime_api_open_local_fabric(TumoflipRuntimeApi* api);
 static bool tumoflip_runtime_api_step_local_fabric(TumoflipRuntimeApi* api, int8_t delta);
+
+static void tumoflip_runtime_cli_print_error(const char* error) {
+    printf("FABRIC schema=1;status=error;error=%s\r\n", error);
+}
+
+static void tumoflip_runtime_cli_print_snapshot(TumoflipRuntime* runtime) {
+    TumoflipRuntimeFabricSnapshot snapshot;
+    if(!tumoflip_runtime_api_get_fabric_state(&runtime->api, &snapshot)) {
+        tumoflip_runtime_cli_print_error("runtime");
+        return;
+    }
+
+    printf(
+        "FABRIC schema=1;status=ok;active=%u;owner=%s;seq=%lu;value=%d;persist=ram\r\n",
+        snapshot.active ? 1U : 0U,
+        snapshot.active ? snapshot.owner : "none",
+        (unsigned long)snapshot.last_sequence,
+        snapshot.counter);
+}
+
+static void tumoflip_runtime_cli(PipeSide* pipe, FuriString* args, void* context) {
+    UNUSED(pipe);
+    TumoflipRuntime* runtime = context;
+    FuriString* verb = furi_string_alloc();
+
+    if(!runtime || !args_read_string_and_trim(args, verb)) {
+        tumoflip_runtime_cli_print_error("usage");
+        goto out;
+    }
+
+    const char* command = furi_string_get_cstr(verb);
+    if(strcmp(command, "caps") == 0) {
+        if(args_length(args) != 0U) {
+            tumoflip_runtime_cli_print_error("args");
+        } else {
+            TumoflipRuntimeFabricSnapshot snapshot;
+            if(tumoflip_runtime_api_get_fabric_state(&runtime->api, &snapshot)) {
+                printf(
+                    "FABRIC schema=1;status=ok;node=flipper;transport=usb;"
+                    "ops=state,start,inc,dec,cancel,trace;active=%u;owner=%s\r\n",
+                    snapshot.active ? 1U : 0U,
+                    snapshot.active ? snapshot.owner : "none");
+            } else {
+                tumoflip_runtime_cli_print_error("runtime");
+            }
+        }
+    } else if(strcmp(command, "state") == 0) {
+        if(args_length(args) == 0U) {
+            tumoflip_runtime_cli_print_snapshot(runtime);
+        } else {
+            tumoflip_runtime_cli_print_error("args");
+        }
+    } else if(strcmp(command, "start") == 0) {
+        if(args_length(args) != 0U) {
+            tumoflip_runtime_cli_print_error("args");
+        } else if(!tumoflip_runtime_api_open_local_fabric(&runtime->api)) {
+            tumoflip_runtime_cli_print_error("busy");
+        } else {
+            tumoflip_runtime_trace_add(runtime, 's', "fabric_usb_start", false);
+            tumoflip_runtime_cli_print_snapshot(runtime);
+        }
+    } else if(strcmp(command, "step") == 0) {
+        FuriString* operation = furi_string_alloc();
+        const bool has_operation = args_read_string_and_trim(args, operation);
+        const bool has_extra = args_length(args) != 0U;
+        int8_t delta = 0;
+        if(has_operation && !has_extra) {
+            if(furi_string_cmp_str(operation, "inc") == 0) {
+                delta = 1;
+            } else if(furi_string_cmp_str(operation, "dec") == 0) {
+                delta = -1;
+            }
+        }
+
+        if(delta == 0) {
+            tumoflip_runtime_cli_print_error("args");
+        } else if(!tumoflip_runtime_api_step_local_fabric(&runtime->api, delta)) {
+            tumoflip_runtime_cli_print_error("state");
+        } else {
+            tumoflip_runtime_trace_add(runtime, 's', "fabric_usb_step", false);
+            tumoflip_runtime_cli_print_snapshot(runtime);
+        }
+        furi_string_free(operation);
+    } else if(strcmp(command, "cancel") == 0) {
+        if(args_length(args) != 0U) {
+            tumoflip_runtime_cli_print_error("args");
+        } else if(!tumoflip_runtime_api_cancel_fabric(&runtime->api)) {
+            tumoflip_runtime_cli_print_error("runtime");
+        } else {
+            tumoflip_runtime_cli_print_snapshot(runtime);
+        }
+    } else if(strcmp(command, "trace") == 0) {
+        char trace[TUMOFLIP_RUNTIME_TRACE_MAX];
+        if(args_length(args) != 0U) {
+            tumoflip_runtime_cli_print_error("args");
+        } else if(!tumoflip_runtime_api_get_trace(&runtime->api, trace, sizeof(trace))) {
+            tumoflip_runtime_cli_print_error("runtime");
+        } else {
+            printf("FABRIC schema=1;status=ok;trace=%s\r\n", trace);
+        }
+    } else {
+        tumoflip_runtime_cli_print_error("verb");
+    }
+
+out:
+    furi_string_free(verb);
+}
 
 static void tumoflip_runtime_bridge_callback(const void* message, void* context) {
     TumoflipRuntime* runtime = context;
@@ -134,10 +242,8 @@ static void tumoflip_runtime_trace_add(
     furi_check(furi_mutex_release(runtime->trace_mutex) == FuriStatusOk);
 }
 
-static void tumoflip_runtime_make_trace_payload(
-    TumoflipRuntime* runtime,
-    char* payload,
-    size_t size) {
+static void
+    tumoflip_runtime_make_trace_payload(TumoflipRuntime* runtime, char* payload, size_t size) {
     furi_check(furi_mutex_acquire(runtime->trace_mutex, FuriWaitForever) == FuriStatusOk);
     int written = snprintf(
         payload,
@@ -173,10 +279,8 @@ out:
     furi_check(furi_mutex_release(runtime->trace_mutex) == FuriStatusOk);
 }
 
-static bool tumoflip_runtime_api_get_trace(
-    TumoflipRuntimeApi* api,
-    char* output,
-    size_t output_size) {
+static bool
+    tumoflip_runtime_api_get_trace(TumoflipRuntimeApi* api, char* output, size_t output_size) {
     furi_assert(api);
     furi_assert(output);
     TumoflipRuntime* runtime = api->context;
@@ -242,9 +346,8 @@ static bool tumoflip_runtime_api_step_local_fabric(TumoflipRuntimeApi* api, int8
     return stepped;
 }
 
-static void tumoflip_runtime_handle_fabric(
-    TumoflipRuntime* runtime,
-    const BtAppBridgeEvent* event) {
+static void
+    tumoflip_runtime_handle_fabric(TumoflipRuntime* runtime, const BtAppBridgeEvent* event) {
     char response[TUMOFLIP_RUNTIME_FABRIC_MAX];
     TumoFabricResult result = TumoFabricResultPayload;
 
@@ -259,25 +362,13 @@ static void tumoflip_runtime_handle_fabric(
             sizeof(response));
     } else if(strcmp(event->command, "fabric_state") == 0) {
         result = tumofabric_get_state(
-            &runtime->fabric,
-            event->payload,
-            event->payload_len,
-            response,
-            sizeof(response));
+            &runtime->fabric, event->payload, event->payload_len, response, sizeof(response));
     } else if(strcmp(event->command, "fabric_step") == 0) {
         result = tumofabric_step(
-            &runtime->fabric,
-            event->payload,
-            event->payload_len,
-            response,
-            sizeof(response));
+            &runtime->fabric, event->payload, event->payload_len, response, sizeof(response));
     } else if(strcmp(event->command, "fabric_cancel") == 0) {
         result = tumofabric_cancel(
-            &runtime->fabric,
-            event->payload,
-            event->payload_len,
-            response,
-            sizeof(response));
+            &runtime->fabric, event->payload, event->payload_len, response, sizeof(response));
     }
     furi_check(furi_mutex_release(runtime->fabric_mutex) == FuriStatusOk);
 
@@ -481,6 +572,12 @@ int32_t tumoflip_runtime_srv(void* context) {
     runtime->storage = furi_record_open(RECORD_STORAGE);
     runtime->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
     furi_record_create(RECORD_TUMOFLIP_RUNTIME, &runtime->api);
+
+    CliRegistry* cli = furi_record_open(RECORD_CLI);
+    cli_registry_add_command_ex(
+        cli, "tumofabric", CliCommandFlagParallelSafe, tumoflip_runtime_cli, runtime, 1536U);
+    furi_record_close(RECORD_CLI);
+
     runtime->subscription = furi_pubsub_subscribe(
         bt_app_bridge_get_pubsub(runtime->bt), tumoflip_runtime_bridge_callback, runtime);
 
