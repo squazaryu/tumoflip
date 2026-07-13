@@ -17,7 +17,7 @@
 
 #define TAG "TumoNetBench"
 
-#define TUMONET_BENCH_VERSION    "0.1.0"
+#define TUMONET_BENCH_VERSION    "0.1.2"
 #define TUMONET_BENCH_DATA_DIR   EXT_PATH("apps_data/tumonet_bench")
 #define TUMONET_BENCH_REPORT_DIR TUMONET_BENCH_DATA_DIR "/reports"
 #define TUMONET_BENCH_MAX_RETRY  2U
@@ -286,7 +286,7 @@ static bool tumonet_radio_send_with_retry(
             return true;
         }
         *final_result = result;
-        if(result != TumoNetRadioResultTimeout && result != TumoNetRadioResultCrc) return false;
+        if(!tumonet_radio_result_is_retryable(result)) return false;
         if(attempt < TUMONET_BENCH_MAX_RETRY) {
             app->last_retries++;
             tumonet_model_progress(app, tumonet_radio_result_name(result));

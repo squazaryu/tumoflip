@@ -14,7 +14,9 @@ typedef enum {
     TumoNetRadioResultRegion,
     TumoNetRadioResultInit,
     TumoNetRadioResultTx,
-    TumoNetRadioResultTimeout,
+    TumoNetRadioResultTxStartTimeout,
+    TumoNetRadioResultTxEndTimeout,
+    TumoNetRadioResultRxTimeout,
     TumoNetRadioResultCrc,
     TumoNetRadioResultCancelled,
 } TumoNetRadioResult;
@@ -42,4 +44,5 @@ TumoNetRadioResult tumonet_radio_transfer(
     const volatile bool* cancel_requested);
 
 uint32_t tumonet_radio_frequency(const TumoNetRadio* radio);
+bool tumonet_radio_result_is_retryable(TumoNetRadioResult result);
 const char* tumonet_radio_result_name(TumoNetRadioResult result);
