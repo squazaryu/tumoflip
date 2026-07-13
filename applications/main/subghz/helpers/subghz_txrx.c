@@ -913,10 +913,13 @@ SubGhzRadioDeviceType
                                 radio_device_type == SubGhzRadioDeviceTypeAuto;
     const bool external_was_active = instance->radio_device &&
                                      instance->radio_device_type != SubGhzRadioDeviceTypeInternal;
+    const bool external_connected =
+        wants_external &&
+        (external_was_active ||
+         subghz_txrx_radio_device_is_external_connected(instance, SUBGHZ_DEVICE_CC1101_EXT_NAME));
     bool external_ready = false;
 
-    if(wants_external &&
-       subghz_txrx_radio_device_is_external_connected(instance, SUBGHZ_DEVICE_CC1101_EXT_NAME)) {
+    if(external_connected) {
         subghz_txrx_radio_device_power_on(instance);
         const SubGhzDevice* external = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_EXT_NAME);
         external_ready = external && (external_was_active || subghz_devices_begin(external));

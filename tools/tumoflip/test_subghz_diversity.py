@@ -91,6 +91,12 @@ class SubGhzDiversityTest(unittest.TestCase):
             self.assertIn(required, source)
 
         self.assertIn("if(!external_ready)", source)
+        self.assertIn("const bool external_connected", source)
+        self.assertRegex(
+            source,
+            r"external_was_active\s*\|\|\s*subghz_txrx_radio_device_is_external_connected",
+        )
+        self.assertIn("if(external_connected)", source)
         self.assertIn("SubGhzRadioDeviceTypeInternal", source)
         self.assertIn("subghz_txrx_radio_device_power_off(instance)", source)
 
