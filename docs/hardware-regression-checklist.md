@@ -159,10 +159,12 @@ are legally allowed to test.
 - Send a small Runtime command and verify a response or explicit error frame.
 - Open `Apps -> Module One -> Labs -> TumoFabric Node`. Start the local Counter,
   change it with `-1`/`+1`, reset it, and confirm Back returns without a crash.
-- In Companion `Settings -> Diagnostics -> TumoFabric Counter`, start a remote
-  session, increment once, retry the same sequence without a second increment,
-  disconnect/reconnect BLE, resume the same value, then cancel. The on-device
-  node must return to `IDLE` and normal BLE operation must remain available.
+- Keep Companion `Settings -> Diagnostics -> TumoFabric Counter` open, then
+  start the local Counter on Flipper. Companion must attach automatically
+  without a second Start tap. Increment once, retry the same sequence without a
+  second increment, disconnect/reconnect BLE, resume the same value, then
+  cancel. The on-device node must return to `IDLE` and normal BLE operation
+  must remain available.
 - Disconnect and reconnect without rebooting the Flipper.
 
 ### NFC

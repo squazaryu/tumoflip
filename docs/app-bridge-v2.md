@@ -80,7 +80,8 @@ The system app ID is `runtime`.
   clears it.
 - `hello` implements the first App Bridge v3 session layer documented in
   `docs/app-bridge-v3.md`.
-- `fabric_caps` returns the bounded TumoFabric v1 reference-package contract.
+- `fabric_caps` returns the bounded TumoFabric v1 reference-package contract
+  plus the live `active` and `owner` discovery fields.
   `fabric_open`, `fabric_state`, `fabric_step`, and `fabric_cancel` implement
   the fixed `counter` package described below.
 - An unknown command returns `runtime/error`, sets response and error flags,
@@ -112,7 +113,10 @@ Successful state responses use
 The token supplements the authenticated BLE link but is not a hardware-backed
 node identity. State survives BLE reconnect while the Flipper remains powered;
 reboot and explicit cancel clear it. `TumoFabric Node` provides local offline
-start, increment, decrement, state inspection, and cancellation.
+start, increment, decrement, state inspection, and cancellation. While the
+Companion TumoFabric screen is open, it may poll `fabric_caps` and automatically
+adopt a session only when `active=1;owner=flipper`; an idle probe must not create
+a remote session.
 
 ## App Events
 

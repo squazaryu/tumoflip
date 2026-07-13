@@ -363,6 +363,23 @@ static void
         runtime->session.owner);
 }
 
+static void tumoflip_runtime_make_fabric_capabilities_payload(
+    TumoflipRuntime* runtime,
+    char* payload,
+    size_t size) {
+    furi_check(furi_mutex_acquire(runtime->fabric_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool active = runtime->fabric.active;
+    const char* owner = active ? runtime->fabric.owner : "none";
+    snprintf(
+        payload,
+        size,
+        "schema=1;node=flipper;pkg=counter;ops=inc,dec;resume=1;persist=ram;"
+        "trust=ble-bond;active=%u;owner=%s",
+        active ? 1U : 0U,
+        owner);
+    furi_check(furi_mutex_release(runtime->fabric_mutex) == FuriStatusOk);
+}
+
 static void
     tumoflip_runtime_handle_request(TumoflipRuntime* runtime, const BtAppBridgeEvent* event) {
     const char* command = event->command;
@@ -395,12 +412,9 @@ static void
         tumoflip_runtime_make_twin_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "twin", payload, false);
     } else if(strcmp(command, "fabric_caps") == 0) {
-        tumoflip_runtime_reply(
-            runtime,
-            event->request_id,
-            "fabric_caps",
-            "schema=1;node=flipper;pkg=counter;ops=inc,dec;resume=1;persist=ram;trust=ble-bond",
-            false);
+        char payload[TUMOFLIP_RUNTIME_FABRIC_MAX];
+        tumoflip_runtime_make_fabric_capabilities_payload(runtime, payload, sizeof(payload));
+        tumoflip_runtime_reply(runtime, event->request_id, "fabric_caps", payload, false);
     } else if(
         strcmp(command, "fabric_open") == 0 || strcmp(command, "fabric_state") == 0 ||
         strcmp(command, "fabric_step") == 0 || strcmp(command, "fabric_cancel") == 0) {
