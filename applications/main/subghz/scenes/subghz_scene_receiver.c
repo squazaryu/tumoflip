@@ -1,4 +1,5 @@
 #include "../subghz_i.h"
+#include "../subghz_diversity.h"
 #include <dolphin/dolphin.h>
 #include <lib/subghz/protocols/bin_raw.h>
 
@@ -45,18 +46,31 @@ static void subghz_scene_receiver_update_statusbar(void* context) {
 
 #ifdef SUBGHZ_EXT_PRESET_NAME
         if(subghz_history_get_last_index(subghz->history) > 0) {
-            subghz_txrx_get_frequency_and_modulation(
-                subghz->txrx, frequency_str, modulation_str, false);
+            FuriString* temp_str = furi_string_alloc();
+            subghz_txrx_get_frequency_and_modulation(subghz->txrx, frequency_str, temp_str, false);
+            if(subghz_txrx_radio_device_get(subghz->txrx) == SubGhzRadioDeviceTypeAuto) {
+                furi_string_printf(
+                    modulation_str,
+                    "A%s",
+                    subghz_txrx_radio_device_get_last_rx(subghz->txrx) ==
+                            SubGhzRadioDeviceTypeInternal ?
+                        "I" :
+                        "E");
+            } else {
+                furi_string_set(modulation_str, temp_str);
+            }
+            furi_string_free(temp_str);
         } else {
             FuriString* temp_str = furi_string_alloc();
 
             subghz_txrx_get_frequency_and_modulation(subghz->txrx, frequency_str, temp_str, true);
+            const SubGhzRadioDeviceType device = subghz_txrx_radio_device_get(subghz->txrx);
             furi_string_printf(
                 modulation_str,
                 "%s        Mod: %s",
-                (subghz_txrx_radio_device_get(subghz->txrx) == SubGhzRadioDeviceTypeInternal) ?
-                    "Int" :
-                    "Ext",
+                device == SubGhzRadioDeviceTypeAuto ?
+                    "Auto" :
+                    (device == SubGhzRadioDeviceTypeInternal ? "Int" : "Ext"),
                 furi_string_get_cstr(temp_str));
             furi_string_free(temp_str);
         }
@@ -128,7 +142,13 @@ static void subghz_scene_add_to_history_callback(
                 idx--;
             }
         }
-        if(subghz_history_add_to_history(history, decoder_base, &preset)) {
+        const SubGhzHistoryAddResult add_result = subghz_history_add_to_history_with_source(
+            history,
+            decoder_base,
+            &preset,
+            subghz_txrx_radio_device_get_last_rx(subghz->txrx),
+            subghz_txrx_radio_device_get_last_rx_rssi(subghz->txrx));
+        if(add_result == SubGhzHistoryAddResultAdded) {
             furi_string_reset(item_name);
             furi_string_reset(item_time);
 
@@ -147,6 +167,12 @@ static void subghz_scene_add_to_history_callback(
                 notification_message(subghz->notifications, &sequence_error);
             }
             subghz_rx_key_state_set(subghz, SubGhzRxKeyStateAddKey);
+        } else if(add_result == SubGhzHistoryAddResultUpdated) {
+            const uint16_t last_idx = subghz_history_get_last_index(history) - 1U;
+            subghz_history_get_time_item_menu(history, item_time, last_idx);
+            subghz_view_receiver_update_item_time(
+                subghz->subghz_receiver, last_idx, furi_string_get_cstr(item_time));
+            subghz_scene_receiver_update_statusbar(subghz);
         }
         subghz_receiver_reset(receiver);
         furi_string_free(item_name);
@@ -312,6 +338,12 @@ bool subghz_scene_receiver_on_event(void* context, SceneManagerEvent event) {
         subghz_receiver_rssi(subghz->subghz_receiver, ret_rssi.rssi);
         subghz_protocol_decoder_bin_raw_data_input_rssi(
             (SubGhzProtocolDecoderBinRAW*)subghz_txrx_get_decoder(subghz->txrx), ret_rssi.rssi);
+        SubGhzProtocolDecoderBase* diversity_decoder =
+            subghz_txrx_get_diversity_decoder(subghz->txrx);
+        if(diversity_decoder) {
+            subghz_protocol_decoder_bin_raw_data_input_rssi(
+                (SubGhzProtocolDecoderBinRAW*)diversity_decoder, ret_rssi.rssi);
+        }
 
         switch(subghz->state_notifications) {
         case SubGhzNotificationStateRx:

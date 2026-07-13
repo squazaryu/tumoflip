@@ -6,8 +6,14 @@
 
 const SubGhzProtocolPackReport* subghz_txrx_get_protocol_pack_report(SubGhzTxRx* instance);
 
+typedef struct {
+    SubGhzTxRx* instance;
+    SubGhzRadioDeviceType source;
+} SubGhzTxRxReceiverContext;
+
 struct SubGhzTxRx {
     SubGhzWorker* worker;
+    SubGhzWorker* diversity_worker;
 
     SubGhzRadioBroker* radio_broker;
     SubGhzRadioBrokerLease radio_lease;
@@ -16,8 +22,10 @@ struct SubGhzTxRx {
     SubGhzProtocolPackRegistry* protocol_pack_registry;
     SubGhzProtocolPackGroup protocol_pack_group;
     SubGhzReceiver* receiver;
+    SubGhzReceiver* diversity_receiver;
     SubGhzTransmitter* transmitter;
     SubGhzProtocolDecoderBase* decoder_result;
+    SubGhzProtocolDecoderBase* diversity_decoder_result;
     FlipperFormat* fff_data;
 
     SubGhzRadioPreset* preset;
@@ -34,7 +42,17 @@ struct SubGhzTxRx {
     SubGhzTxRxState txrx_state;
     SubGhzSpeakerState speaker_state;
     const SubGhzDevice* radio_device;
+    const SubGhzDevice* diversity_radio_device;
     SubGhzRadioDeviceType radio_device_type;
+    SubGhzRadioDeviceType last_rx_device_type;
+    float last_rx_rssi;
+    uint32_t last_rx_tick;
+    uint8_t last_rx_hash;
+    bool diversity_rx_active;
+
+    FuriMutex* rx_callback_mutex;
+    SubGhzTxRxReceiverContext primary_receiver_context;
+    SubGhzTxRxReceiverContext diversity_receiver_context;
 
     SubGhzTxRxNeedSaveCallback need_save_callback;
     void* need_save_context;

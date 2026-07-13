@@ -7,7 +7,7 @@ radio clients. It provides:
 - external CC1101 power ownership;
 - preservation of OTG power enabled by another subsystem;
 - detection of an external 5 V rail already supplied by USB VBUS;
-- selected internal/external device status;
+- selected internal/external/dual device status;
 - observable lifecycle status;
 - automatic external-power cleanup when a valid lease is released.
 
@@ -23,6 +23,12 @@ report explicit lifecycle transitions: `probing`, `initialized`, `rx`, `tx`,
 to the internal CC1101 keep their existing behavior.
 USB VBUS is treated as available external power without assigning OTG ownership
 to the active lease, so cleanup only disables boost that the Broker enabled.
+
+The system Sub-GHz app reports `dual` while `Auto Dual` receive is active. It
+uses independent workers and decoders for the internal and external CC1101,
+deduplicates decoded frames in the core receiver history, and falls back to the
+internal radio when the external module is unavailable. Transmission remains
+single-radio and prefers the external CC1101 in this mode.
 
 Classic RollJam is the ARF Sub-GHz Full `RollJam` child module. It owns a Broker
 lease and routes external CC1101 power through the Broker while retaining its

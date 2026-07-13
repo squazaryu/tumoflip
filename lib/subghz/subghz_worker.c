@@ -1,8 +1,11 @@
 #include "subghz_worker.h"
+#include "subghz_worker_i.h"
 
 #include <furi.h>
 
 #define TAG "SubGhzWorker"
+
+#define SUBGHZ_WORKER_DEFAULT_STREAM_CAPACITY 4096U
 
 struct SubGhzWorker {
     FuriThread* thread;
@@ -79,19 +82,24 @@ static int32_t subghz_worker_thread_callback(void* context) {
     return 0;
 }
 
-SubGhzWorker* subghz_worker_alloc(void) {
+SubGhzWorker* subghz_worker_alloc_with_capacity(size_t stream_capacity) {
+    furi_check(stream_capacity > 0);
     SubGhzWorker* instance = malloc(sizeof(SubGhzWorker));
 
     instance->thread =
         furi_thread_alloc_ex("SubGhzWorker", 2048, subghz_worker_thread_callback, instance);
 
     instance->stream =
-        furi_stream_buffer_alloc(sizeof(LevelDuration) * 4096, sizeof(LevelDuration));
+        furi_stream_buffer_alloc(sizeof(LevelDuration) * stream_capacity, sizeof(LevelDuration));
 
     //setting default filter in us
     instance->filter_duration = 30;
 
     return instance;
+}
+
+SubGhzWorker* subghz_worker_alloc(void) {
+    return subghz_worker_alloc_with_capacity(SUBGHZ_WORKER_DEFAULT_STREAM_CAPACITY);
 }
 
 void subghz_worker_free(SubGhzWorker* instance) {
