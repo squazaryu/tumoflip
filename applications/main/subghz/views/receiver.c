@@ -198,6 +198,26 @@ void subghz_view_receiver_add_item_to_menu(
     subghz_view_receiver_update_offset(subghz_receiver);
 }
 
+void subghz_view_receiver_update_item_time(
+    SubGhzViewReceiver* subghz_receiver,
+    uint16_t idx,
+    const char* time) {
+    furi_assert(subghz_receiver);
+    furi_assert(time);
+
+    with_view_model(
+        subghz_receiver->view,
+        SubGhzViewReceiverModel * model,
+        {
+            if(idx < model->history_item) {
+                SubGhzReceiverMenuItem* item =
+                    SubGhzReceiverMenuItemArray_get(model->history->data, idx);
+                if(item) furi_string_set(item->time, time);
+            }
+        },
+        true);
+}
+
 void subghz_view_receiver_add_data_statusbar(
     SubGhzViewReceiver* subghz_receiver,
     const char* frequency_str,

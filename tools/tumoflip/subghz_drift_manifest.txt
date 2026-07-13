@@ -28,7 +28,6 @@ scenes/subghz_scene_delete_raw.c
 scenes/subghz_scene_frequency_analyzer.c
 scenes/subghz_scene_more_raw.c
 scenes/subghz_scene_protocol_pack_info.c
-scenes/subghz_scene_radio_settings.c
 scenes/subghz_scene_saved.c
 scenes/subghz_scene_set_key.c
 scenes/subghz_scene_show_error.c
@@ -38,7 +37,6 @@ subghz_cli.c
 subghz_cli.h
 subghz_dangerous_freq.c
 subghz_history.h
-views/receiver.h
 views/subghz_frequency_analyzer.c
 views/subghz_frequency_analyzer.h
 views/subghz_read_raw.c

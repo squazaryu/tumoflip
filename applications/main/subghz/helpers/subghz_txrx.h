@@ -341,12 +341,36 @@ SubGhzRadioDeviceType
 */
 SubGhzRadioDeviceType subghz_txrx_radio_device_get(SubGhzTxRx* instance);
 
+/**
+ * Return the radio which produced the most recent decoded frame.
+ *
+ * @param instance Pointer to a SubGhzTxRx
+ * @return Internal or external radio source
+ */
+SubGhzRadioDeviceType subghz_txrx_radio_device_get_last_rx(SubGhzTxRx* instance);
+
 /* Get RSSI the selected radio device to use
 *
 * @param instance Pointer to a SubGhzTxRx
 * @return float RSSI
 */
 float subghz_txrx_radio_device_get_rssi(SubGhzTxRx* instance);
+
+/**
+ * Return the RSSI captured with the most recent decoded frame.
+ *
+ * @param instance Pointer to a SubGhzTxRx
+ * @return RSSI in dBm
+ */
+float subghz_txrx_radio_device_get_last_rx_rssi(SubGhzTxRx* instance);
+
+/**
+ * Return the secondary decoder selected by name in dual receive mode.
+ *
+ * @param instance Pointer to a SubGhzTxRx
+ * @return Secondary decoder or NULL outside dual receive mode
+ */
+SubGhzProtocolDecoderBase* subghz_txrx_get_diversity_decoder(SubGhzTxRx* instance);
 
 /* Get name the selected radio device to use
 *

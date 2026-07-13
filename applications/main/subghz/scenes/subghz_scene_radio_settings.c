@@ -3,15 +3,17 @@
 #include <lib/toolbox/value_index.h>
 #include <applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h>
 
-#define RADIO_DEVICE_COUNT 2
+#define RADIO_DEVICE_COUNT 3
 const char* const radio_device_text[RADIO_DEVICE_COUNT] = {
     "Internal",
     "External",
+    "Auto Dual",
 };
 
 const uint32_t radio_device_value[RADIO_DEVICE_COUNT] = {
     SubGhzRadioDeviceTypeInternal,
     SubGhzRadioDeviceTypeExternalCC1101,
+    SubGhzRadioDeviceTypeAuto,
 };
 
 #define ON_OFF_COUNT 2
@@ -84,14 +86,16 @@ static void subghz_scene_radio_settings_set_device(VariableItem* item) {
     SubGhz* subghz = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
 
-    if(!subghz_txrx_radio_device_is_external_connected(
-           subghz->txrx, SUBGHZ_DEVICE_CC1101_EXT_NAME) &&
-       radio_device_value[index] == SubGhzRadioDeviceTypeExternalCC1101) {
-        //ToDo correct if there is more than 1 module
+    if(radio_device_value[index] != SubGhzRadioDeviceTypeInternal &&
+       !subghz_txrx_radio_device_is_external_connected(
+           subghz->txrx, SUBGHZ_DEVICE_CC1101_EXT_NAME)) {
         index = 0;
     }
+    const SubGhzRadioDeviceType actual =
+        subghz_txrx_radio_device_set(subghz->txrx, radio_device_value[index]);
+    index = value_index_uint32(actual, radio_device_value, RADIO_DEVICE_COUNT);
+    variable_item_set_current_value_index(item, index);
     variable_item_set_current_value_text(item, radio_device_text[index]);
-    subghz_txrx_radio_device_set(subghz->txrx, radio_device_value[index]);
 }
 
 static void subghz_scene_radio_settings_set_tx_power(VariableItem* item) {

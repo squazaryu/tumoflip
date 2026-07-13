@@ -1,4 +1,5 @@
 #include "subghz_history.h"
+#include "subghz_diversity.h"
 #include <lib/subghz/receiver.h>
 
 #include <furi.h>
@@ -12,6 +13,8 @@ typedef struct {
     FlipperFormat* flipper_string;
     uint8_t type;
     SubGhzRadioPreset* preset;
+    SubGhzRadioDeviceType source;
+    float rssi;
     DateTime datetime;
 } SubGhzHistoryItem;
 
@@ -176,25 +179,42 @@ void subghz_history_get_text_item_menu(SubGhzHistory* instance, FuriString* outp
 void subghz_history_get_time_item_menu(SubGhzHistory* instance, FuriString* output, uint16_t idx) {
     SubGhzHistoryItem* item = SubGhzHistoryItemArray_get(instance->history->data, idx);
     DateTime* t = &item->datetime;
-    furi_string_printf(output, "%.2d:%.2d:%.2d ", t->hour, t->minute, t->second);
+    if(item->source == SubGhzRadioDeviceTypeAuto) {
+        furi_string_printf(output, "%.2d:%.2d:%.2d ", t->hour, t->minute, t->second);
+        return;
+    }
+    const char* source = item->source == SubGhzRadioDeviceTypeExternalCC1101 ? "E" : "I";
+    furi_string_printf(output, "%.2d:%.2d %s%.0f", t->hour, t->minute, source, (double)item->rssi);
 }
 
-bool subghz_history_add_to_history(
+SubGhzHistoryAddResult subghz_history_add_to_history_with_source(
     SubGhzHistory* instance,
     void* context,
-    SubGhzRadioPreset* preset) {
+    SubGhzRadioPreset* preset,
+    SubGhzRadioDeviceType source,
+    float rssi) {
     furi_assert(instance);
     furi_assert(context);
 
-    if(memmgr_get_free_heap() < SUBGHZ_HISTORY_FREE_HEAP) return false;
-    if(instance->last_index_write >= SUBGHZ_HISTORY_MAX) return false;
+    if(memmgr_get_free_heap() < SUBGHZ_HISTORY_FREE_HEAP) return SubGhzHistoryAddResultRejected;
+    if(instance->last_index_write >= SUBGHZ_HISTORY_MAX) return SubGhzHistoryAddResultRejected;
 
     SubGhzProtocolDecoderBase* decoder_base = context;
     if((instance->code_last_hash_data ==
         subghz_protocol_decoder_base_get_hash_data(decoder_base)) &&
        ((furi_get_tick() - instance->last_update_timestamp) < 500)) {
+        SubGhzHistoryAddResult result = SubGhzHistoryAddResultDuplicate;
+        if(instance->last_index_write > 0) {
+            SubGhzHistoryItem* item = SubGhzHistoryItemArray_get(
+                instance->history->data, instance->last_index_write - 1U);
+            if(item && rssi > item->rssi) {
+                item->source = source;
+                item->rssi = rssi;
+                result = SubGhzHistoryAddResultUpdated;
+            }
+        }
         instance->last_update_timestamp = furi_get_tick();
-        return false;
+        return result;
     }
 
     instance->code_last_hash_data = subghz_protocol_decoder_base_get_hash_data(decoder_base);
@@ -209,6 +229,8 @@ bool subghz_history_add_to_history(
     furi_string_set(item->preset->name, preset->name);
     item->preset->data = preset->data;
     item->preset->data_size = preset->data_size;
+    item->source = source;
+    item->rssi = rssi;
     furi_hal_rtc_get_datetime(&item->datetime);
 
     item->item_str = furi_string_alloc();
@@ -267,5 +289,14 @@ bool subghz_history_add_to_history(
 
     furi_string_free(text);
     instance->last_index_write++;
-    return true;
+    return SubGhzHistoryAddResultAdded;
+}
+
+bool subghz_history_add_to_history(
+    SubGhzHistory* instance,
+    void* context,
+    SubGhzRadioPreset* preset) {
+    return subghz_history_add_to_history_with_source(
+               instance, context, preset, SubGhzRadioDeviceTypeAuto, -127.0f) ==
+           SubGhzHistoryAddResultAdded;
 }
