@@ -14,6 +14,10 @@ from tools.tumoflip.sync_readme_version import (
 class ReadmeVersionSyncTest(unittest.TestCase):
     def test_parse_dist_suffix(self) -> None:
         self.assertEqual(
+            parse_dist_suffix("t-flppr-fw-089-037"),
+            ("t-flppr-fw", "089", "037", None),
+        )
+        self.assertEqual(
             parse_dist_suffix("tmwhflpprarf089-031"),
             ("tmwhflpprarf", "089", "031", None),
         )
@@ -22,13 +26,40 @@ class ReadmeVersionSyncTest(unittest.TestCase):
             ("t-dev", "089", "035", "001"),
         )
 
+    def test_sync_updates_new_stable_version(self) -> None:
+        original = """# tumoflip
+- Firmware version: `t-dev-089-037-033`
+- Release channel: `dev experimental line`
+- Release package: `flipper-z-f7-update-t-dev-089-037-033.tgz`
+- `t-flppr-fw`: Tumowuh Flipper Firmware stable build prefix.
+- `089`: upstream Unleashed base version.
+- `037`: tumoflip internal build version.
+"""
+        updated = sync_readme_text(original, "t-flppr-fw-089-037")
+
+        self.assertIn("Firmware version: `t-flppr-fw-089-037`", updated)
+        self.assertIn("Release channel: `main stable line`", updated)
+        self.assertIn("flipper-z-f7-update-t-flppr-fw-089-037.tgz", updated)
+
+    def test_sync_keeps_legacy_stable_version_supported(self) -> None:
+        original = """# tumoflip
+- Firmware version: `tmwhflpprarf089-036`
+- Release channel: `main stable line`
+- Release package: `flipper-z-f7-update-tmwhflpprarf089-036.tgz`
+- `tmwhflpprarf`: legacy stable prefix kept for existing releases.
+- `089`: upstream Unleashed base version.
+- `036`: tumoflip internal build version.
+"""
+        updated = sync_readme_text(original, "tmwhflpprarf089-036")
+        self.assertEqual(updated, original)
+
     def test_sync_updates_versions_and_release_tag(self) -> None:
         original = """# tumoflip
 - Firmware version: `tmwhflpprarf089-030`
 - Release: `v0.3.0` published release (hardware validation in progress)
 - Release package: `flipper-z-f7-update-tmwhflpprarf089-030.tgz`
 tmwhflpprarf089-030
-- `tmwhflpprarf`: tumoflip firmware name shown as the installed firmware
+- `tmwhflpprarf`: legacy stable prefix kept for existing releases.
 - `089`: upstream Unleashed base version.
 - `030`: tumoflip internal build version.
 - `001`: development iteration inside the tumoflip internal build version.

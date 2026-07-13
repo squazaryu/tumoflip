@@ -37,6 +37,10 @@ class BumpDevVersionTest(unittest.TestCase):
             compute_dev_version("tmwhflpprarf089-036", build="037"),
             "t-dev-089-037-001",
         )
+        self.assertEqual(
+            compute_dev_version("t-flppr-fw-089-037", build="038"),
+            "t-dev-089-038-001",
+        )
 
     def test_updates_options_and_readme_together(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -84,10 +88,10 @@ class BumpDevVersionTest(unittest.TestCase):
     def test_current_dist_suffix_is_tumoflip_version(self) -> None:
         prefix, base, build, iteration = parse_dist_suffix(fbt_options.DIST_SUFFIX)
 
-        self.assertIn(prefix, ("tmwhflpprarf", "t-dev"))
+        self.assertIn(prefix, ("t-flppr-fw", "tmwhflpprarf", "t-dev"))
         self.assertRegex(base, r"^\d{3}$")
         self.assertRegex(build, r"^\d{3}$")
-        if prefix == "tmwhflpprarf":
+        if prefix in ("t-flppr-fw", "tmwhflpprarf"):
             self.assertIsNone(iteration)
         else:
             self.assertRegex(iteration or "", r"^\d{3}$")

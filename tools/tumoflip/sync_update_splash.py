@@ -21,17 +21,25 @@ except ModuleNotFoundError:
     from generate_update_splash import generate_slideshow
 
 
-DEFAULT_TITLE = "TUMOFLIP"
+DEFAULT_TITLE = "T-FLPPR-FW"
 DEV_TITLE = "T-DEV"
-DEFAULT_PREFIX = "tmwhflpprarf"
+DEFAULT_PREFIX = "t-flppr-fw-"
+LEGACY_STABLE_PREFIX = "tmwhflpprarf"
 DEV_SUFFIX_RE = re.compile(r"^t-dev-(?P<version>\d{3}-\d{3}-\d{3})$")
 DEFAULT_OUTPUT_DIR = Path("assets/slideshow/tumoflip_update")
 
 
-def version_from_dist_suffix(dist_suffix: str, prefix: str = DEFAULT_PREFIX) -> str | None:
-    if dist_suffix.startswith(prefix):
-        version = dist_suffix.removeprefix(prefix)
-        return version or None
+def version_from_dist_suffix(
+    dist_suffix: str, prefix: str = DEFAULT_PREFIX
+) -> str | None:
+    stable_prefixes = (prefix,)
+    if prefix == DEFAULT_PREFIX:
+        stable_prefixes += (LEGACY_STABLE_PREFIX,)
+    for stable_prefix in stable_prefixes:
+        if dist_suffix.startswith(stable_prefix):
+            version = dist_suffix.removeprefix(stable_prefix)
+            if re.fullmatch(r"\d{3}-\d{3}", version):
+                return version
 
     dev_match = DEV_SUFFIX_RE.match(dist_suffix)
     if dev_match:
@@ -40,7 +48,9 @@ def version_from_dist_suffix(dist_suffix: str, prefix: str = DEFAULT_PREFIX) -> 
     return None
 
 
-def current_version(dist_suffix: str | None = None, prefix: str = DEFAULT_PREFIX) -> str:
+def current_version(
+    dist_suffix: str | None = None, prefix: str = DEFAULT_PREFIX
+) -> str:
     _, version = current_splash_metadata(dist_suffix, prefix=prefix)
     return version
 
@@ -89,12 +99,15 @@ def sync_update_splash(
     actual_paths = sorted(output_dir.glob("frame_*.png"))
     actual_names = {path.name for path in actual_paths}
     expected_names = set(expected_frames)
-    stale_frames = sorted(path for path in actual_paths if path.name not in expected_names)
+    stale_frames = sorted(
+        path for path in actual_paths if path.name not in expected_names
+    )
     missing_frames = expected_names - actual_names
     changed_frames = [
         path
         for path in actual_paths
-        if path.name in expected_frames and path.read_bytes() != expected_frames[path.name]
+        if path.name in expected_frames
+        and path.read_bytes() != expected_frames[path.name]
     ]
     in_sync = not stale_frames and not missing_frames and not changed_frames
     if check:

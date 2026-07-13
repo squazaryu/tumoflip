@@ -12,9 +12,18 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-README_VERSION_RE = re.compile(r"(?:tmwhflpprarf\d{3}-\d{3}|(?:t-)?dev-\d{3}-\d{3}-\d{3})")
+STABLE_PREFIX = "t-flppr-fw"
+LEGACY_STABLE_PREFIX = "tmwhflpprarf"
+README_VERSION_RE = re.compile(
+    r"(?:t-flppr-fw-\d{3}-\d{3}|tmwhflpprarf\d{3}-\d{3}|(?:t-)?dev-\d{3}-\d{3}-\d{3})"
+)
 DIST_SUFFIX_RE = re.compile(r'DIST_SUFFIX\s*=\s*"([^"]+)"')
-STABLE_VERSION_RE = re.compile(r"^(?P<prefix>tmwhflpprarf)(?P<base>\d{3})-(?P<build>\d{3})$")
+STABLE_VERSION_RE = re.compile(
+    rf"^(?P<prefix>{re.escape(STABLE_PREFIX)})-(?P<base>\d{{3}})-(?P<build>\d{{3}})$"
+)
+LEGACY_STABLE_VERSION_RE = re.compile(
+    rf"^(?P<prefix>{LEGACY_STABLE_PREFIX})(?P<base>\d{{3}})-(?P<build>\d{{3}})$"
+)
 DEV_VERSION_RE = re.compile(
     r"^(?P<prefix>t-dev)-(?P<base>\d{3})-(?P<build>\d{3})-(?P<iteration>\d{3})$"
 )
@@ -34,6 +43,8 @@ def read_dist_suffix(repo_root: Path = REPO_ROOT) -> str:
 
 def parse_dist_suffix(dist_suffix: str) -> tuple[str, str, str, str | None]:
     stable_match = STABLE_VERSION_RE.match(dist_suffix)
+    if not stable_match:
+        stable_match = LEGACY_STABLE_VERSION_RE.match(dist_suffix)
     if stable_match:
         return (
             stable_match.group("prefix"),
@@ -54,7 +65,13 @@ def parse_dist_suffix(dist_suffix: str) -> tuple[str, str, str, str | None]:
     raise ValueError(f"unsupported tumoflip DIST_SUFFIX: {dist_suffix}")
 
 
-def sync_readme_text(text: str, dist_suffix: str, release_tag: str | None = None) -> str:
+def is_stable_prefix(prefix: str) -> bool:
+    return prefix in (STABLE_PREFIX, LEGACY_STABLE_PREFIX)
+
+
+def sync_readme_text(
+    text: str, dist_suffix: str, release_tag: str | None = None
+) -> str:
     prefix, base, build, iteration = parse_dist_suffix(dist_suffix)
     updated = README_VERSION_RE.sub(dist_suffix, text)
 
@@ -73,7 +90,7 @@ def sync_readme_text(text: str, dist_suffix: str, release_tag: str | None = None
         )
 
     expected_channel = (
-        "main stable line" if prefix == "tmwhflpprarf" else "dev experimental line"
+        "main stable line" if is_stable_prefix(prefix) else "dev experimental line"
     )
     updated = re.sub(
         r"- Release channel: `[^`]+`[^\n]*",
@@ -92,23 +109,35 @@ def sync_readme_text(text: str, dist_suffix: str, release_tag: str | None = None
             count=1,
         )
 
-    if prefix == "tmwhflpprarf":
+    if prefix == STABLE_PREFIX:
         expected_prefix_line = (
-            f"- `{prefix}`: tumoflip firmware name shown as the installed firmware"
+            "- `t-flppr-fw`: Tumowuh Flipper Firmware stable build prefix."
+        )
+    elif prefix == LEGACY_STABLE_PREFIX:
+        expected_prefix_line = (
+            "- `tmwhflpprarf`: legacy stable prefix kept for existing releases."
         )
     else:
-        expected_prefix_line = "- `t-dev`: Tumoflip development build prefix for unstable builds."
+        expected_prefix_line = (
+            "- `t-dev`: Tumoflip development build prefix for unstable builds."
+        )
     if expected_prefix_line not in updated:
-        raise ValueError("ReadMe.md version scheme prefix line was not updated as expected")
+        raise ValueError(
+            "ReadMe.md version scheme prefix line was not updated as expected"
+        )
     if f"- `{base}`: upstream Unleashed base version." not in updated:
         raise ValueError("ReadMe.md base version line was not updated as expected")
     if f"- `{build}`: tumoflip internal build version." not in updated:
-        raise ValueError("ReadMe.md internal build version line was not updated as expected")
+        raise ValueError(
+            "ReadMe.md internal build version line was not updated as expected"
+        )
     if iteration and (
         f"- `{iteration}`: development iteration inside the tumoflip internal build version."
         not in updated
     ):
-        raise ValueError("ReadMe.md development iteration line was not updated as expected")
+        raise ValueError(
+            "ReadMe.md development iteration line was not updated as expected"
+        )
 
     return updated
 

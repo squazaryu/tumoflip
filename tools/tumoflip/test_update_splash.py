@@ -7,7 +7,7 @@ import unittest
 import fbt_options
 from PIL import Image
 
-from tools.tumoflip.generate_update_splash import generate_slideshow
+from tools.tumoflip.generate_update_splash import fit_gravity_bold, generate_slideshow
 from tools.tumoflip.sync_update_splash import (
     current_splash_metadata,
     sync_update_splash,
@@ -51,13 +51,13 @@ class UpdateSplashTest(unittest.TestCase):
             self.assertEqual(top_bar_area.getextrema(), (255, 255))
 
     def test_generated_pages_use_friendly_post_install_copy(self) -> None:
-        generator = (
-            REPO_ROOT / "tools/tumoflip/generate_update_splash.py"
-        ).read_text(encoding="utf-8")
+        generator = (REPO_ROOT / "tools/tumoflip/generate_update_splash.py").read_text(
+            encoding="utf-8"
+        )
 
         for phrase in (
             "UNLEASHED {base_version}",
-            "TUMOFLIP FORK",
+            "TUMOWUH FIRMWARE",
             "TUMOFLIP DEV",
             "CUSTOM BUILD",
             "USE WITH CARE",
@@ -73,6 +73,22 @@ class UpdateSplashTest(unittest.TestCase):
     def test_gravity_font_assets_are_vendored(self) -> None:
         for name in ("GravityBold8.ttf", "GravityRegular5.ttf", "README.md"):
             self.assertTrue((GRAVITY_FONT_DIR / name).exists(), name)
+
+    def test_stable_brand_fits_the_display(self) -> None:
+        font = fit_gravity_bold("T-FLPPR-FW", 116)
+        bbox = font.getbbox("T-FLPPR-FW")
+        self.assertLessEqual(bbox[2] - bbox[0], 116)
+        self.assertGreaterEqual(font.size, 12)
+
+        with tempfile.TemporaryDirectory() as directory:
+            frames = generate_slideshow(
+                "T-FLPPR-FW",
+                "089-037",
+                Path(directory),
+            )
+            with Image.open(frames[0]) as frame:
+                top_bar_area = frame.convert("1").crop((0, 0, 128, 18))
+                self.assertEqual(top_bar_area.getextrema(), (255, 255))
 
     def test_sync_update_splash_removes_stale_frames(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -92,6 +108,7 @@ class UpdateSplashTest(unittest.TestCase):
             self.assertTrue(sync_update_splash(splash_dir, check=True))
 
     def test_dist_suffix_version_parser(self) -> None:
+        self.assertEqual(version_from_dist_suffix("t-flppr-fw-089-037"), "089-037")
         self.assertEqual(version_from_dist_suffix("tmwhflpprarf089-031"), "089-031")
         self.assertEqual(version_from_dist_suffix("t-dev-089-035-001"), "089-035-001")
         self.assertIsNone(version_from_dist_suffix("abcdef12"))
@@ -102,8 +119,12 @@ class UpdateSplashTest(unittest.TestCase):
             ("T-DEV", "089-035-001"),
         )
         self.assertEqual(
+            current_splash_metadata("t-flppr-fw-089-037"),
+            ("T-FLPPR-FW", "089-037"),
+        )
+        self.assertEqual(
             current_splash_metadata("tmwhflpprarf089-031"),
-            ("TUMOFLIP", "089-031"),
+            ("T-FLPPR-FW", "089-031"),
         )
 
     def test_fbt_autogenerates_tumoflip_update_splash(self) -> None:

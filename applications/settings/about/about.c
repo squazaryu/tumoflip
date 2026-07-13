@@ -77,7 +77,7 @@ static DialogMessageButton tumoflip_info_screen(DialogsApp* dialogs, DialogMessa
     const Version* ver = furi_hal_version_get_firmware_version();
     FuriString* screen_header = furi_string_alloc_printf(
         "%s\n",
-        ver ? version_get_version(ver) : "tmwhflpprarf");
+        ver ? version_get_version(ver) : "t-flppr-fw");
 
     const char* screen_text = "tumoflip custom build\n"
                               "Base: Unleashed 089\n"
