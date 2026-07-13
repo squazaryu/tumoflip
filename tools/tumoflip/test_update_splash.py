@@ -6,6 +6,7 @@ import unittest
 
 import fbt_options
 from PIL import Image
+from PIL.PngImagePlugin import PngInfo
 
 from tools.tumoflip.generate_update_splash import fit_gravity_bold, generate_slideshow
 from tools.tumoflip.sync_update_splash import (
@@ -106,6 +107,28 @@ class UpdateSplashTest(unittest.TestCase):
                 ["frame_00.png", "frame_01.png", "frame_02.png", "frame_03.png"],
             )
             self.assertTrue(sync_update_splash(splash_dir, check=True))
+
+    def test_sync_keeps_pixel_identical_png_encoding(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            splash_dir = Path(directory)
+            sync_update_splash(splash_dir, dist_suffix=fbt_options.DIST_SUFFIX)
+            frame = splash_dir / "frame_00.png"
+
+            metadata = PngInfo()
+            metadata.add_text("generator", "alternate-pillow-encoding")
+            with Image.open(frame) as image:
+                image.save(frame, pnginfo=metadata)
+            encoded = frame.read_bytes()
+
+            self.assertTrue(
+                sync_update_splash(
+                    splash_dir,
+                    dist_suffix=fbt_options.DIST_SUFFIX,
+                    check=True,
+                )
+            )
+            sync_update_splash(splash_dir, dist_suffix=fbt_options.DIST_SUFFIX)
+            self.assertEqual(frame.read_bytes(), encoded)
 
     def test_dist_suffix_version_parser(self) -> None:
         self.assertEqual(version_from_dist_suffix("t-flppr-fw-089-037"), "089-037")
