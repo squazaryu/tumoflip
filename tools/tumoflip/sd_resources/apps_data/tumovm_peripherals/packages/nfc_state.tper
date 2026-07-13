@@ -1,0 +1,13 @@
+Filetype: TumoVM Peripheral
+Version: 1
+Package ID: nfc_state
+Name: NFC State Token
+Adapter: nfc.type4
+Action: state-v1
+Minimum API: 88
+Maximum API: 88
+Require confirmation: false
+AID size: 5
+AID: F0 54 56 4D 01
+State size: 16
+Initial state: 54 55 4D 4F 56 4D 20 50 45 52 49 50 48 00 00 01

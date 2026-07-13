@@ -1,0 +1,18 @@
+App(
+    appid="tumovm_peripherals",
+    name="TumoVM Peripherals",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="tumovm_peripherals_app",
+    requires=["gui", "storage"],
+    sources=["*.c", "../tumovm_poc/tumovm_core.c"],
+    stack_size=6 * 1024,
+    icon="A_Plugins_14",
+    fap_icon="../tumovm_poc/icon.png",
+    fap_category="Module One/Labs",
+    fap_dist_path="apps/Module One/Labs/tumovm_peripherals.fap",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip/issues/67",
+    fap_description="Bounded SD-defined USB HID and NFC Type 4 peripherals powered by TumoVM.",
+)
