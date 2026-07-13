@@ -56,8 +56,14 @@ static void tumofabric_node_draw_status(Canvas* canvas, const TumoFabricNodeMode
         canvas_set_color(canvas, ColorWhite);
     }
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str_aligned(canvas, 109, 9, AlignCenter, AlignBottom, status);
+    canvas_draw_str_aligned(canvas, 109, 10, AlignCenter, AlignBottom, status);
     canvas_set_color(canvas, ColorBlack);
+}
+
+static void
+    tumofabric_node_draw_row(Canvas* canvas, int32_t y, const char* label, const char* value) {
+    canvas_draw_str(canvas, 2, y, label);
+    canvas_draw_str_aligned(canvas, 126, y, AlignRight, AlignBottom, value);
 }
 
 static void tumofabric_node_draw(Canvas* canvas, void* context) {
@@ -65,50 +71,41 @@ static void tumofabric_node_draw(Canvas* canvas, void* context) {
     canvas_clear(canvas);
 
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 2, 10, "TumoFabric Node");
+    canvas_draw_str(canvas, 2, 10, "TumoFabric");
     tumofabric_node_draw_status(canvas, model);
+    canvas_draw_line(canvas, 0, 14, 127, 14);
 
     if(!model->runtime_ready) {
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str(canvas, 2, 27, "Runtime service unavailable");
-        canvas_draw_str(canvas, 2, 39, "Reboot firmware and retry");
+        tumofabric_node_draw_row(canvas, 28, "Runtime", "Unavailable");
+        tumofabric_node_draw_row(canvas, 41, "Action", "Retry");
         elements_button_left(canvas, "Back");
-        elements_button_right(canvas, "Refresh");
+        elements_button_right(canvas, "Retry");
         return;
     }
 
     const TumoflipRuntimeFabricSnapshot* snapshot = &model->snapshot;
     canvas_set_font(canvas, FontSecondary);
     if(snapshot->active) {
-        char meta[48];
-        snprintf(
-            meta,
-            sizeof(meta),
-            "%s / seq %lu / RAM",
-            snapshot->owner,
-            (unsigned long)snapshot->last_sequence);
-        canvas_draw_str(canvas, 2, 21, meta);
+        char sequence[20];
+        snprintf(sequence, sizeof(sequence), "Seq %lu", (unsigned long)snapshot->last_sequence);
+        tumofabric_node_draw_row(
+            canvas, 25, tumofabric_node_is_local(snapshot) ? "Flipper" : snapshot->owner, sequence);
 
         char value[8];
         snprintf(value, sizeof(value), "%d", snapshot->counter);
         canvas_set_font(canvas, FontBigNumbers);
         canvas_draw_str_aligned(canvas, 64, 47, AlignCenter, AlignBottom, value);
+        canvas_set_font(canvas, FontSecondary);
 
-        if(tumofabric_node_is_local(snapshot)) {
-            elements_button_left(canvas, "-1");
-            elements_button_center(canvas, "Reset");
-            elements_button_right(canvas, "+1");
-        } else {
-            elements_button_left(canvas, "Back");
-            elements_button_center(canvas, "Cancel");
-            elements_button_right(canvas, "Refresh");
-        }
+        elements_button_left(canvas, "-1");
+        elements_button_center(canvas, "Stop");
+        elements_button_right(canvas, "+1");
     } else {
-        canvas_draw_str(canvas, 2, 24, "Fabric Counter is stopped");
-        canvas_draw_str(canvas, 2, 38, "Local mode works offline");
+        tumofabric_node_draw_row(canvas, 28, "Session", "Stopped");
+        tumofabric_node_draw_row(canvas, 41, "State", "RAM only");
         elements_button_left(canvas, "Back");
         elements_button_center(canvas, "Start");
-        elements_button_right(canvas, "Refresh");
     }
 }
 
@@ -124,7 +121,7 @@ static void tumofabric_node_action(TumoFabricNodeApp* app, InputKey key) {
 
     bool action_ok = true;
     if(key == InputKeyLeft) {
-        if(tumofabric_node_is_local(&snapshot)) {
+        if(snapshot.active) {
             action_ok = app->runtime->step_local_fabric &&
                         app->runtime->step_local_fabric(app->runtime, -1);
         } else {
@@ -132,7 +129,7 @@ static void tumofabric_node_action(TumoFabricNodeApp* app, InputKey key) {
             return;
         }
     } else if(key == InputKeyRight) {
-        if(tumofabric_node_is_local(&snapshot)) {
+        if(snapshot.active) {
             action_ok = app->runtime->step_local_fabric &&
                         app->runtime->step_local_fabric(app->runtime, 1);
         }
@@ -146,10 +143,7 @@ static void tumofabric_node_action(TumoFabricNodeApp* app, InputKey key) {
     }
 
     with_view_model(
-        app->view,
-        TumoFabricNodeModel * model,
-        { model->action_ok = action_ok; },
-        false);
+        app->view, TumoFabricNodeModel * model, { model->action_ok = action_ok; }, false);
     tumofabric_node_refresh_model(app);
 }
 

@@ -12,6 +12,7 @@ typedef struct {
     uint32_t token;
     uint32_t last_sequence;
     int16_t counter;
+    int8_t last_delta;
     char owner[TUMOFABRIC_OWNER_MAX + 1U];
 } TumoFabricState;
 
