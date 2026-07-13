@@ -292,6 +292,8 @@ void subghz_view_receiver_draw(Canvas* canvas, SubGhzViewReceiverModel* model) {
 
     if(model->mode == SubGhzViewReceiverModeLive) {
         elements_button_left(canvas, "Config");
+        elements_button_right(
+            canvas, model->device_type == SubGhzRadioDeviceTypeAuto ? "Auto" : "Dual");
         //canvas_draw_line(canvas, 46, 51, 125, 51);
     } else {
         canvas_draw_line(canvas, 2, 52, 125, 52);
@@ -522,6 +524,10 @@ bool subghz_view_receiver_input(InputEvent* event, void* context) {
         consumed = true;
     } else if(event->key == InputKeyLeft && event->type == InputTypeShort) {
         subghz_receiver->callback(SubGhzCustomEventViewReceiverConfig, subghz_receiver->context);
+        consumed = true;
+    } else if(event->key == InputKeyRight && event->type == InputTypeShort) {
+        subghz_receiver->callback(
+            SubGhzCustomEventViewReceiverToggleDiversity, subghz_receiver->context);
         consumed = true;
     } else if(event->key == InputKeyRight && event->type == InputTypeLong) {
         with_view_model(

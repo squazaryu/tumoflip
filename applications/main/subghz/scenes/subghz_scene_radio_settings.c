@@ -3,18 +3,45 @@
 #include <lib/toolbox/value_index.h>
 #include <applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h>
 
-#define RADIO_DEVICE_COUNT 3
+#define RADIO_DEVICE_COUNT 2
 const char* const radio_device_text[RADIO_DEVICE_COUNT] = {
     "Internal",
     "External",
-    "Auto Dual",
 };
 
 const uint32_t radio_device_value[RADIO_DEVICE_COUNT] = {
     SubGhzRadioDeviceTypeInternal,
     SubGhzRadioDeviceTypeExternalCC1101,
-    SubGhzRadioDeviceTypeAuto,
 };
+
+#define RX_MODE_COUNT 2
+const char* const rx_mode_text[RX_MODE_COUNT] = {
+    "AUTO",
+    "DUAL",
+};
+
+typedef enum {
+    SubGhzRadioSettingsIndexModule,
+    SubGhzRadioSettingsIndexRxMode,
+} SubGhzRadioSettingsIndex;
+
+static void subghz_scene_radio_settings_sync_mode(SubGhz* subghz) {
+    VariableItem* mode_item =
+        variable_item_list_get(subghz->variable_item_list, SubGhzRadioSettingsIndexRxMode);
+    const uint8_t mode_index =
+        subghz_txrx_radio_device_get(subghz->txrx) == SubGhzRadioDeviceTypeAuto ? 1U : 0U;
+    variable_item_set_current_value_index(mode_item, mode_index);
+    variable_item_set_current_value_text(mode_item, rx_mode_text[mode_index]);
+}
+
+static void subghz_scene_radio_settings_sync_module(SubGhz* subghz) {
+    VariableItem* module_item =
+        variable_item_list_get(subghz->variable_item_list, SubGhzRadioSettingsIndexModule);
+    const uint8_t module_index =
+        subghz_txrx_radio_device_get(subghz->txrx) == SubGhzRadioDeviceTypeInternal ? 0U : 1U;
+    variable_item_set_current_value_index(module_item, module_index);
+    variable_item_set_current_value_text(module_item, radio_device_text[module_index]);
+}
 
 #define ON_OFF_COUNT 2
 const char* const on_off_text[ON_OFF_COUNT] = {
@@ -96,6 +123,23 @@ static void subghz_scene_radio_settings_set_device(VariableItem* item) {
     index = value_index_uint32(actual, radio_device_value, RADIO_DEVICE_COUNT);
     variable_item_set_current_value_index(item, index);
     variable_item_set_current_value_text(item, radio_device_text[index]);
+    subghz_scene_radio_settings_sync_mode(subghz);
+}
+
+static void subghz_scene_radio_settings_set_rx_mode(VariableItem* item) {
+    SubGhz* subghz = variable_item_get_context(item);
+    const uint8_t requested_index = variable_item_get_current_value_index(item);
+    const SubGhzRadioDeviceType current = subghz_txrx_radio_device_get(subghz->txrx);
+    const SubGhzRadioDeviceType single_device = current == SubGhzRadioDeviceTypeInternal ?
+                                                    SubGhzRadioDeviceTypeInternal :
+                                                    SubGhzRadioDeviceTypeExternalCC1101;
+    const SubGhzRadioDeviceType actual = subghz_txrx_radio_device_set(
+        subghz->txrx, requested_index == 1U ? SubGhzRadioDeviceTypeAuto : single_device);
+
+    const uint8_t actual_index = actual == SubGhzRadioDeviceTypeAuto ? 1U : 0U;
+    variable_item_set_current_value_index(item, actual_index);
+    variable_item_set_current_value_text(item, rx_mode_text[actual_index]);
+    subghz_scene_radio_settings_sync_module(subghz);
 }
 
 static void subghz_scene_radio_settings_set_tx_power(VariableItem* item) {
@@ -171,10 +215,22 @@ void subghz_scene_radio_settings_on_enter(void* context) {
         value_count_device,
         subghz_scene_radio_settings_set_device,
         subghz);
-    value_index = value_index_uint32(
-        subghz_txrx_radio_device_get(subghz->txrx), radio_device_value, value_count_device);
+    const SubGhzRadioDeviceType current_device = subghz_txrx_radio_device_get(subghz->txrx);
+    value_index = current_device == SubGhzRadioDeviceTypeInternal ? 0 : 1;
     variable_item_set_current_value_index(item, value_index);
     variable_item_set_current_value_text(item, radio_device_text[value_index]);
+
+    const bool external_connected = subghz_txrx_radio_device_is_external_connected(
+        subghz->txrx, SUBGHZ_DEVICE_CC1101_EXT_NAME);
+    item = variable_item_list_add(
+        subghz->variable_item_list,
+        "RX Mode",
+        external_connected ? RX_MODE_COUNT : 1U,
+        subghz_scene_radio_settings_set_rx_mode,
+        subghz);
+    value_index = subghz_txrx_radio_device_get(subghz->txrx) == SubGhzRadioDeviceTypeAuto ? 1 : 0;
+    variable_item_set_current_value_index(item, value_index);
+    variable_item_set_current_value_text(item, rx_mode_text[value_index]);
 
     //Add TX Power
     item = variable_item_list_add(
