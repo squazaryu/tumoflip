@@ -132,6 +132,17 @@ are legally allowed to test.
   `proto_pirate`, `rolljam`, `subghz_bruteforcer`, and `arf_status`.
 - Confirm a child FAP crash or exit does not leave the Radio Broker locked.
 - Reopen core `Sub-GHz` after ARF testing and confirm RX starts.
+- With Module One connected, open `Apps -> Module One -> Sub-GHz -> TumoNet
+  Bench` or `Desktop -> Cockpit -> CC1101: TumoNet`. Pair the RAM-only bench
+  nodes, then run `Clean` in both `INT > EXT` and `EXT > INT` directions. Both
+  runs must pass and show non-zero RF TX/RX counters.
+- Run the `Drop`, `Duplicate`, `Replay`, `Corrupt`, `Wrong key`, and `Interrupt`
+  scenarios. Each must reach `PASS` for its expected rejection/recovery result,
+  without a crash or stuck external 5 V supply. Save one report and verify it
+  contains counters but no key, plaintext, ciphertext, or authentication tag.
+- Press `Stop` during an active TumoNet run, then leave with Back. Reopen core
+  `Sub-GHz` and `ARF Sub-GHz Full` to confirm the dual-radio broker lease and
+  both CC1101 devices were released.
 
 ### BLE App Bridge And Runtime
 
