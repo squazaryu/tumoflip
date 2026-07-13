@@ -290,10 +290,12 @@ void subghz_view_receiver_draw(Canvas* canvas, SubGhzViewReceiverModel* model) {
     canvas_set_color(canvas, ColorBlack);
     canvas_set_font(canvas, FontSecondary);
 
+    const bool show_diversity_toggle = model->mode == SubGhzViewReceiverModeLive &&
+                                       model->history_item == 0 &&
+                                       model->bar_show == SubGhzViewReceiverBarShowDefault;
+
     if(model->mode == SubGhzViewReceiverModeLive) {
         elements_button_left(canvas, "Config");
-        elements_button_right(
-            canvas, model->device_type == SubGhzRadioDeviceTypeAuto ? "Auto" : "Dual");
         //canvas_draw_line(canvas, 46, 51, 125, 51);
     } else {
         canvas_draw_line(canvas, 2, 52, 125, 52);
@@ -424,8 +426,10 @@ void subghz_view_receiver_draw(Canvas* canvas, SubGhzViewReceiverModel* model) {
         canvas_draw_str(canvas, 44, 62, frequency_str);
 #ifdef SUBGHZ_EXT_PRESET_NAME
         if(model->history_item == 0 && model->mode == SubGhzViewReceiverModeLive) {
-            canvas_draw_str(
-                canvas, 44 + canvas_string_width(canvas, frequency_str) + 1, 62, "MHz");
+            if(!show_diversity_toggle) {
+                canvas_draw_str(
+                    canvas, 44 + canvas_string_width(canvas, frequency_str) + 1, 62, "MHz");
+            }
             const char* str = furi_string_get_cstr(model->preset_str);
             const uint8_t vertical_offset = 7;
             const uint8_t horizontal_offset = 3;
@@ -441,8 +445,15 @@ void subghz_view_receiver_draw(Canvas* canvas, SubGhzViewReceiverModel* model) {
 #else
         canvas_draw_str(canvas, 79, 62, furi_string_get_cstr(model->preset_str));
 #endif
-        canvas_draw_str(canvas, 96, 62, furi_string_get_cstr(model->history_stat_str));
+        if(!show_diversity_toggle) {
+            canvas_draw_str(canvas, 96, 62, furi_string_get_cstr(model->history_stat_str));
+        }
     } break;
+    }
+
+    if(show_diversity_toggle) {
+        elements_button_right(
+            canvas, model->device_type == SubGhzRadioDeviceTypeAuto ? "Auto" : "Dual");
     }
 }
 
@@ -526,9 +537,20 @@ bool subghz_view_receiver_input(InputEvent* event, void* context) {
         subghz_receiver->callback(SubGhzCustomEventViewReceiverConfig, subghz_receiver->context);
         consumed = true;
     } else if(event->key == InputKeyRight && event->type == InputTypeShort) {
-        subghz_receiver->callback(
-            SubGhzCustomEventViewReceiverToggleDiversity, subghz_receiver->context);
-        consumed = true;
+        bool can_toggle_diversity = false;
+        with_view_model(
+            subghz_receiver->view,
+            SubGhzViewReceiverModel * model,
+            {
+                can_toggle_diversity = model->history_item == 0 &&
+                                       model->mode == SubGhzViewReceiverModeLive;
+            },
+            false);
+        if(can_toggle_diversity) {
+            subghz_receiver->callback(
+                SubGhzCustomEventViewReceiverToggleDiversity, subghz_receiver->context);
+            consumed = true;
+        }
     } else if(event->key == InputKeyRight && event->type == InputTypeLong) {
         with_view_model(
             subghz_receiver->view,
