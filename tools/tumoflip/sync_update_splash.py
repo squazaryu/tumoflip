@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import re
 import sys
 from pathlib import Path
+
+from PIL import Image, UnidentifiedImageError
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -27,6 +30,21 @@ DEFAULT_PREFIX = "t-flppr-fw-"
 LEGACY_STABLE_PREFIX = "tmwhflpprarf"
 DEV_SUFFIX_RE = re.compile(r"^t-dev-(?P<version>\d{3}-\d{3}-\d{3})$")
 DEFAULT_OUTPUT_DIR = Path("assets/slideshow/tumoflip_update")
+
+
+def png_pixels_equal(path: Path, expected: bytes) -> bool:
+    try:
+        with (
+            Image.open(path) as actual,
+            Image.open(io.BytesIO(expected)) as reference,
+        ):
+            return (
+                actual.mode == reference.mode
+                and actual.size == reference.size
+                and actual.tobytes() == reference.tobytes()
+            )
+    except (OSError, UnidentifiedImageError):
+        return False
 
 
 def version_from_dist_suffix(
@@ -107,14 +125,15 @@ def sync_update_splash(
         path
         for path in actual_paths
         if path.name in expected_frames
-        and path.read_bytes() != expected_frames[path.name]
+        and not png_pixels_equal(path, expected_frames[path.name])
     ]
     in_sync = not stale_frames and not missing_frames and not changed_frames
     if check:
         return in_sync
 
-    for name, content in expected_frames.items():
-        (output_dir / name).write_bytes(content)
+    changed_names = {path.name for path in changed_frames}
+    for name in missing_frames | changed_names:
+        (output_dir / name).write_bytes(expected_frames[name])
     for stale_frame in stale_frames:
         stale_frame.unlink()
     return True
