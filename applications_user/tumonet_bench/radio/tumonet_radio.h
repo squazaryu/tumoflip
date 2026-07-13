@@ -7,7 +7,10 @@
 typedef enum {
     TumoNetRadioResultOk,
     TumoNetRadioResultBusy,
+    TumoNetRadioResultExternalPower,
+    TumoNetRadioResultExternalDriver,
     TumoNetRadioResultNoExternal,
+    TumoNetRadioResultExternalBegin,
     TumoNetRadioResultRegion,
     TumoNetRadioResultInit,
     TumoNetRadioResultTx,

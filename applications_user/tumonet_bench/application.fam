@@ -11,7 +11,7 @@ App(
     fap_icon="icon.png",
     fap_category="Module One/Sub-GHz",
     fap_dist_path="apps/Module One/Sub-GHz/tumonet_bench.fap",
-    fap_version="0.1.0",
+    fap_version="0.1.1",
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip/issues/86",
     fap_description="Encrypted dual-radio TumoNet bench for internal and external CC1101.",
