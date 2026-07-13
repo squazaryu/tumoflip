@@ -96,6 +96,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Signals/signal_workbench.fap",
     "apps/Module One/Signals/protocol_compiler.fap",
     "apps/Module One/Signals/tumoscope.fap",
+    "apps/Module One/Sub-GHz/tumonet_bench.fap",
     "apps/Module One/VGM/tumovgm_bridge.fap",
     "apps/Module One/Modules/tumomodule_runtime.fap",
     "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
