@@ -113,7 +113,7 @@ static void subghz_scene_receiver_recover_disconnected_external(SubGhz* subghz) 
     if(!subghz_txrx_radio_device_is_external_connected(
            subghz->txrx, SUBGHZ_DEVICE_CC1101_EXT_NAME)) {
         FURI_LOG_W(TAG, "External radio disconnected; falling back to internal");
-        subghz_txrx_radio_device_set(subghz->txrx, SubGhzRadioDeviceTypeInternal);
+        subghz_txrx_radio_device_fallback_internal(subghz->txrx);
     }
 }
 
@@ -197,6 +197,8 @@ static void subghz_scene_add_to_history_callback(
 void subghz_scene_receiver_on_enter(void* context) {
     SubGhz* subghz = context;
     SubGhzHistory* history = subghz->history;
+
+    subghz_txrx_radio_device_reprobe_preferred(subghz->txrx);
 
     FuriString* item_name = furi_string_alloc();
     FuriString* item_time = furi_string_alloc();
