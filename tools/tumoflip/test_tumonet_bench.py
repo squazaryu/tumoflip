@@ -25,6 +25,9 @@ class TumoNetBenchTest(unittest.TestCase):
         self.assertIn("secret_material=not_exported", source)
         self.assertIn("SubGhzRadioBrokerDeviceDual", radio)
         self.assertIn("FuriHalSubGhzPresetCustom", radio)
+        self.assertIn("TUMONET_RADIO_EXT_SETTLE_MS", radio)
+        self.assertIn("TUMONET_RADIO_EXT_PROBE_ATTEMPTS", radio)
+        self.assertIn("TumoNetRadioResultExternalBegin", radio)
         self.assertIn("does not", docs)
         self.assertIn("independent-node", docs)
 

@@ -3,9 +3,10 @@
 #include <furi_hal_power.h>
 #include <string.h>
 
-#define TAG                                "SubGhzRadioBroker"
-#define SUBGHZ_RADIO_BROKER_POWER_ATTEMPTS 5U
-#define SUBGHZ_RADIO_BROKER_POWER_DELAY_MS 10U
+#define TAG                                      "SubGhzRadioBroker"
+#define SUBGHZ_RADIO_BROKER_POWER_ATTEMPTS       5U
+#define SUBGHZ_RADIO_BROKER_POWER_DELAY_MS       10U
+#define SUBGHZ_RADIO_BROKER_EXTERNAL_VOLTAGE_MIN 4.5f
 
 struct SubGhzRadioBroker {
     FuriMutex* lease_mutex;
@@ -31,12 +32,17 @@ static void subghz_radio_broker_note_error_locked(SubGhzRadioBroker* broker) {
     broker->status.state = SubGhzRadioBrokerStateError;
 }
 
+static bool subghz_radio_broker_external_power_available(void) {
+    return furi_hal_power_is_otg_enabled() ||
+           furi_hal_power_get_usb_voltage() >= SUBGHZ_RADIO_BROKER_EXTERNAL_VOLTAGE_MIN;
+}
+
 static void subghz_radio_broker_power_off_locked(SubGhzRadioBroker* broker) {
     if(broker->owns_external_power && furi_hal_power_is_otg_enabled()) {
         furi_hal_power_disable_otg();
     }
     broker->owns_external_power = false;
-    broker->status.base.external_powered = furi_hal_power_is_otg_enabled();
+    broker->status.base.external_powered = subghz_radio_broker_external_power_available();
 }
 
 bool subghz_radio_broker_acquire(
@@ -110,22 +116,21 @@ bool subghz_radio_broker_external_power_on(
         return false;
     }
 
-    const bool was_enabled = furi_hal_power_is_otg_enabled();
-    for(uint8_t attempt = 0;
-        !furi_hal_power_is_otg_enabled() && attempt < SUBGHZ_RADIO_BROKER_POWER_ATTEMPTS;
+    const bool was_otg_enabled = furi_hal_power_is_otg_enabled();
+    for(uint8_t attempt = 0; !subghz_radio_broker_external_power_available() &&
+                             attempt < SUBGHZ_RADIO_BROKER_POWER_ATTEMPTS;
         attempt++) {
         furi_hal_power_enable_otg();
         furi_delay_ms(SUBGHZ_RADIO_BROKER_POWER_DELAY_MS);
     }
-    const bool enabled = furi_hal_power_is_otg_enabled();
-    broker->owns_external_power |= enabled && !was_enabled;
-    broker->status.base.external_powered = enabled;
+    const bool powered = subghz_radio_broker_external_power_available();
+    broker->owns_external_power |= furi_hal_power_is_otg_enabled() && !was_otg_enabled;
+    broker->status.base.external_powered = powered;
     subghz_radio_broker_set_state_locked(
-        broker,
-        enabled ? SubGhzRadioBrokerStateExternalPowerOn : SubGhzRadioBrokerStateError);
+        broker, powered ? SubGhzRadioBrokerStateExternalPowerOn : SubGhzRadioBrokerStateError);
     furi_mutex_release(broker->state_mutex);
-    if(!enabled) FURI_LOG_E(TAG, "Failed to enable external radio power");
-    return enabled;
+    if(!powered) FURI_LOG_E(TAG, "External radio power is unavailable");
+    return powered;
 }
 
 void subghz_radio_broker_external_power_off(

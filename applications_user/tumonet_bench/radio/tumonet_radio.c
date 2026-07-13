@@ -12,10 +12,13 @@
 
 #define TAG "TumoNetRadio"
 
-#define TUMONET_RADIO_BROKER_TIMEOUT_MS 500U
-#define TUMONET_RADIO_TX_TIMEOUT_MS     150U
-#define TUMONET_RADIO_RX_TIMEOUT_MS     180U
-#define TUMONET_RADIO_MAX_PACKET        60U
+#define TUMONET_RADIO_BROKER_TIMEOUT_MS  500U
+#define TUMONET_RADIO_TX_TIMEOUT_MS      150U
+#define TUMONET_RADIO_RX_TIMEOUT_MS      180U
+#define TUMONET_RADIO_MAX_PACKET         60U
+#define TUMONET_RADIO_EXT_SETTLE_MS      30U
+#define TUMONET_RADIO_EXT_PROBE_DELAY_MS 20U
+#define TUMONET_RADIO_EXT_PROBE_ATTEMPTS 8U
 
 struct TumoNetRadio {
     SubGhzRadioBroker* broker;
@@ -113,25 +116,43 @@ TumoNetRadioResult tumonet_radio_open(TumoNetRadio* radio) {
         radio->broker, &radio->lease, SubGhzRadioBrokerDeviceDual);
     subghz_radio_broker_set_state(radio->broker, &radio->lease, SubGhzRadioBrokerStateProbing);
 
-    if(!subghz_radio_broker_external_power_on(radio->broker, &radio->lease)) {
-        tumonet_radio_close(radio);
-        return TumoNetRadioResultNoExternal;
-    }
-    radio->external_powered = true;
-
     subghz_devices_init();
     radio->registry_initialized = true;
     radio->internal = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
     radio->external = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_EXT_NAME);
-    if(radio->internal == NULL || radio->external == NULL ||
-       !subghz_devices_is_connect(radio->external)) {
+    if(radio->internal == NULL || radio->external == NULL) {
+        FURI_LOG_E(TAG, "CC1101 device registry is incomplete");
+        tumonet_radio_close(radio);
+        return TumoNetRadioResultExternalDriver;
+    }
+
+    if(!subghz_radio_broker_external_power_on(radio->broker, &radio->lease)) {
+        FURI_LOG_E(TAG, "External CC1101 power failed");
+        tumonet_radio_close(radio);
+        return TumoNetRadioResultExternalPower;
+    }
+    radio->external_powered = true;
+    furi_delay_ms(TUMONET_RADIO_EXT_SETTLE_MS);
+
+    bool external_connected = false;
+    for(uint8_t attempt = 0U; attempt < TUMONET_RADIO_EXT_PROBE_ATTEMPTS; attempt++) {
+        if(subghz_devices_is_connect(radio->external)) {
+            external_connected = true;
+            break;
+        }
+        furi_delay_ms(TUMONET_RADIO_EXT_PROBE_DELAY_MS);
+    }
+    if(!external_connected) {
+        FURI_LOG_E(TAG, "External CC1101 probe failed");
         tumonet_radio_close(radio);
         return TumoNetRadioResultNoExternal;
     }
+
     radio->external_begun = true;
     if(!subghz_devices_begin(radio->external)) {
+        FURI_LOG_E(TAG, "External CC1101 begin failed");
         tumonet_radio_close(radio);
-        return TumoNetRadioResultNoExternal;
+        return TumoNetRadioResultExternalBegin;
     }
 
     radio->frequency = tumonet_radio_choose_frequency();
@@ -292,8 +313,14 @@ const char* tumonet_radio_result_name(TumoNetRadioResult result) {
         return "OK";
     case TumoNetRadioResultBusy:
         return "RADIO BUSY";
+    case TumoNetRadioResultExternalPower:
+        return "EXT POWER";
+    case TumoNetRadioResultExternalDriver:
+        return "EXT DRIVER";
     case TumoNetRadioResultNoExternal:
-        return "NO EXT CC1101";
+        return "EXT PROBE";
+    case TumoNetRadioResultExternalBegin:
+        return "EXT BEGIN";
     case TumoNetRadioResultRegion:
         return "NO TX BAND";
     case TumoNetRadioResultInit:
