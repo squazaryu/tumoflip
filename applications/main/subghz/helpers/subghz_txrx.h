@@ -334,6 +334,20 @@ bool subghz_txrx_radio_device_is_external_connected(SubGhzTxRx* instance, const 
 SubGhzRadioDeviceType
     subghz_txrx_radio_device_set(SubGhzTxRx* instance, SubGhzRadioDeviceType radio_device_type);
 
+/* Probe and restore the preferred external radio mode before starting RX.
+*
+* @param instance Pointer to a SubGhzTxRx
+* @return SubGhzRadioDeviceType Type of installed radio device
+*/
+SubGhzRadioDeviceType subghz_txrx_radio_device_reprobe_preferred(SubGhzTxRx* instance);
+
+/* Fall back to the internal radio without overwriting the preferred mode.
+*
+* @param instance Pointer to a SubGhzTxRx
+* @return SubGhzRadioDeviceType Type of installed radio device
+*/
+SubGhzRadioDeviceType subghz_txrx_radio_device_fallback_internal(SubGhzTxRx* instance);
+
 /* Get the selected radio device to use
 *
 * @param instance Pointer to a SubGhzTxRx

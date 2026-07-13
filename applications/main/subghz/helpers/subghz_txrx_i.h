@@ -44,6 +44,7 @@ struct SubGhzTxRx {
     const SubGhzDevice* radio_device;
     const SubGhzDevice* diversity_radio_device;
     SubGhzRadioDeviceType radio_device_type;
+    SubGhzRadioDeviceType preferred_radio_device_type;
     SubGhzRadioDeviceType last_rx_device_type;
     float last_rx_rssi;
     uint32_t last_rx_tick;
