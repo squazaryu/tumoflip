@@ -157,15 +157,17 @@ bool tumofabric_open_local(TumoFabricState* state) {
 }
 
 bool tumofabric_step_local(TumoFabricState* state, int8_t delta) {
-    if(!state->active || strcmp(state->owner, "flipper") != 0 ||
-       (delta != -1 && delta != 1)) {
+    if(!state->active || (delta != -1 && delta != 1)) {
         return false;
     }
 
     const int16_t next = state->counter + delta;
     if(next < TUMOFABRIC_COUNTER_MIN || next > TUMOFABRIC_COUNTER_MAX) return false;
     state->counter = next;
-    state->last_sequence++;
+    if(strcmp(state->owner, "flipper") == 0) {
+        state->last_sequence++;
+        state->last_delta = delta;
+    }
     return true;
 }
 
@@ -189,7 +191,14 @@ TumoFabricResult tumofabric_open(
     }
 
     if(state->active) {
-        if(state->token != token || strcmp(state->owner, owner) != 0) {
+        if(state->token == token && strcmp(state->owner, owner) == 0) {
+            /* Resume the existing remote session. */
+        } else if(strcmp(state->owner, "flipper") == 0) {
+            /* A paired client may adopt a locally-started counter without losing state. */
+            state->session_id = request_id ? request_id : 1U;
+            state->token = token;
+            memcpy(state->owner, owner, strlen(owner) + 1U);
+        } else {
             return TumoFabricResultBusy;
         }
     } else {
@@ -248,7 +257,17 @@ TumoFabricResult tumofabric_step(
     }
     if(!tumofabric_authorized(state, session_id, token)) return TumoFabricResultSession;
 
+    int8_t delta = 0;
+    if(tumofabric_field_equals(&fields[3], "inc")) {
+        delta = 1;
+    } else if(tumofabric_field_equals(&fields[3], "dec")) {
+        delta = -1;
+    } else {
+        return TumoFabricResultPayload;
+    }
+
     if(sequence == state->last_sequence) {
+        if(delta != state->last_delta) return TumoFabricResultSequence;
         return tumofabric_format_state(state, true, response, response_size) ?
                    TumoFabricResultOk :
                    TumoFabricResultPayload;
@@ -256,18 +275,17 @@ TumoFabricResult tumofabric_step(
     if(sequence != state->last_sequence + 1U) return TumoFabricResultSequence;
 
     int16_t next_value = state->counter;
-    if(tumofabric_field_equals(&fields[3], "inc")) {
+    if(delta > 0) {
         if(next_value >= TUMOFABRIC_COUNTER_MAX) return TumoFabricResultRange;
         next_value++;
-    } else if(tumofabric_field_equals(&fields[3], "dec")) {
+    } else {
         if(next_value <= TUMOFABRIC_COUNTER_MIN) return TumoFabricResultRange;
         next_value--;
-    } else {
-        return TumoFabricResultPayload;
     }
 
     state->counter = next_value;
     state->last_sequence = sequence;
+    state->last_delta = delta;
     return tumofabric_format_state(state, false, response, response_size) ?
                TumoFabricResultOk :
                TumoFabricResultPayload;

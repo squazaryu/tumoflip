@@ -93,6 +93,13 @@ int main(void) {
 
     assert(call_step(
                &state,
+               "sid=1234ABCD;token=89ABCDEF;seq=1;op=dec",
+               response,
+               sizeof(response)) == TumoFabricResultSequence);
+    assert(state.counter == 1);
+
+    assert(call_step(
+               &state,
                "sid=1234ABCD;token=89ABCDEF;seq=3;op=inc",
                response,
                sizeof(response)) == TumoFabricResultSequence);
@@ -133,6 +140,28 @@ int main(void) {
     assert(state.counter == 1);
     assert(state.last_sequence == 1U);
     assert(!tumofabric_step_local(&state, 2));
+
+    assert(call_open(
+               &state,
+               0x01020304U,
+               "owner=iphone;pkg=counter;token=A1B2C3D4",
+               response,
+               sizeof(response)) == TumoFabricResultOk);
+    assert(state.session_id == 0x01020304U);
+    assert(state.counter == 1);
+    assert(strcmp(state.owner, "iphone") == 0);
+
+    assert(tumofabric_step_local(&state, 1));
+    assert(state.counter == 2);
+    assert(state.last_sequence == 1U);
+
+    assert(call_step(
+               &state,
+               "sid=01020304;token=A1B2C3D4;seq=2;op=inc",
+               response,
+               sizeof(response)) == TumoFabricResultOk);
+    assert(state.counter == 3);
+    assert(strstr(response, "seq=2;value=3;dup=0") != NULL);
     tumofabric_init(&state);
 
     assert(call_open(
