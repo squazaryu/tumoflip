@@ -118,6 +118,27 @@ Companion TumoFabric screen is open, it may poll `fabric_caps` and automatically
 adopt a session only when `active=1;owner=flipper`; an idle probe must not create
 a remote session.
 
+### TumoFabric USB operator plane
+
+The native Mac node uses the physical USB CLI instead of BLE, so it can remain
+connected while iPhone owns the App Bridge session. The command is intentionally
+bounded and does not provide a general terminal:
+
+- `tumofabric caps`
+- `tumofabric state`
+- `tumofabric start`
+- `tumofabric step inc|dec`
+- `tumofabric cancel`
+- `tumofabric trace`
+
+Every response is one machine-readable line beginning with `FABRIC schema=1`.
+State and capability replies may include `active`, `owner`, `seq`, and `value`,
+but the USB surface must not expose the BLE token or session ID. USB `step`
+uses the local runtime API and therefore does not replace the current BLE owner
+or consume the remote replay sequence. Invalid verbs or arguments return a
+bounded error without changing runtime state. Physical USB presence is the
+operator trust boundary for start, step, and cancel.
+
 ## App Events
 
 FAPs may also emit best-effort events to the paired central. These events use

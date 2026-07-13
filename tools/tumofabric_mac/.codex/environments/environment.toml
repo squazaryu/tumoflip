@@ -1,0 +1,4 @@
+[[actions]]
+name = "Run"
+icon = "play"
+command = "./script/build_and_run.sh --verify"

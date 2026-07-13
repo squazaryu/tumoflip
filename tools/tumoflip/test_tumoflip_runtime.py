@@ -14,7 +14,12 @@ class TumoflipRuntimeTest(unittest.TestCase):
             REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
         ).read_text(encoding="utf-8")
 
-        commands = set(re.findall(r'strcmp\(command, "([^"]+)"\) == 0', runtime))
+        bridge_handler = runtime.split(
+            "static void\n    tumoflip_runtime_handle_request(", 1
+        )[1].split("\nint32_t tumoflip_runtime_srv", 1)[0]
+        commands = set(
+            re.findall(r'strcmp\(command, "([^"]+)"\) == 0', bridge_handler)
+        )
         self.assertEqual(
             commands,
             {
@@ -45,11 +50,13 @@ class TumoflipRuntimeTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("#define TUMOFLIP_RUNTIME_STATUS_MAX", runtime)
-        self.assertIn("TUMOFLIP_RUNTIME_STATUS_MAX        160U", runtime)
-        self.assertIn("#define TUMOFLIP_RUNTIME_TRACE_DEPTH       8U", runtime)
-        self.assertIn("#define TUMOFLIP_RUNTIME_TRACE_MAX         160U", runtime)
-        self.assertIn("#define TUMOFLIP_RUNTIME_TWIN_MAX          160U", runtime)
+        for macro in (
+            "TUMOFLIP_RUNTIME_STATUS_MAX",
+            "TUMOFLIP_RUNTIME_TRACE_MAX",
+            "TUMOFLIP_RUNTIME_TWIN_MAX",
+        ):
+            self.assertRegex(runtime, rf"#define\s+{macro}\s+160U")
+        self.assertRegex(runtime, r"#define\s+TUMOFLIP_RUNTIME_TRACE_DEPTH\s+8U")
         self.assertIn("session=3", runtime)
         self.assertIn("trace=1", runtime)
         self.assertIn("twin=1", runtime)
@@ -231,13 +238,18 @@ class TumoflipRuntimeTest(unittest.TestCase):
         )
 
         for required in (
-            'requires=["bt", "storage", "subghz_radio_broker"]',
+            'requires=["bt", "storage", "subghz_radio_broker", "cli"]',
             'EXT_PATH(".tumoflip/package-state.txt")',
             "storage_sd_status(runtime->storage)",
             "sd=%hhu",
             "pkg=%hhu",
         ):
-            self.assertIn(required, runtime if required != 'requires=["bt", "storage", "subghz_radio_broker"]' else app)
+            self.assertIn(
+                required,
+                runtime
+                if required != 'requires=["bt", "storage", "subghz_radio_broker", "cli"]'
+                else app,
+            )
 
         for required in (
             "sd=1",
@@ -263,8 +275,10 @@ class TumoflipRuntimeTest(unittest.TestCase):
             encoding="utf-8"
         )
 
+        self.assertRegex(
+            runtime, r"#define\s+TUMOFLIP_RUNTIME_SESSION_OWNER_MAX\s+24U"
+        )
         for required in (
-            "#define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX 24U",
             "typedef struct {\n    uint32_t session_id;",
             'strcmp(command, "hello") == 0',
             "chunk",
@@ -283,6 +297,47 @@ class TumoflipRuntimeTest(unittest.TestCase):
         self.assertIn("docs/app-bridge-v3.md", bridge_v2_docs)
         self.assertIn("Runtime `hello`", checklist)
         self.assertIn("`sid` and `bo`", checklist)
+
+    def test_tumofabric_usb_cli_is_bounded_and_documented(self) -> None:
+        runtime = (
+            REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
+        ).read_text(encoding="utf-8")
+        bridge_docs = (REPO_ROOT / "docs/app-bridge-v2.md").read_text(
+            encoding="utf-8"
+        )
+        checklist = (REPO_ROOT / "docs/hardware-regression-checklist.md").read_text(
+            encoding="utf-8"
+        )
+
+        for required in (
+            'cli_registry_add_command_ex(',
+            '"tumofabric"',
+            "CliCommandFlagParallelSafe",
+            'strcmp(command, "caps") == 0',
+            'strcmp(command, "state") == 0',
+            'strcmp(command, "start") == 0',
+            'strcmp(command, "step") == 0',
+            'strcmp(command, "cancel") == 0',
+            'strcmp(command, "trace") == 0',
+            "tumoflip_runtime_api_get_fabric_state",
+            "tumoflip_runtime_api_open_local_fabric",
+            "tumoflip_runtime_api_step_local_fabric",
+            "tumoflip_runtime_api_cancel_fabric",
+            "FABRIC schema=1;status=ok",
+        ):
+            self.assertIn(required, runtime)
+
+        cli_section = runtime.split("static void tumoflip_runtime_cli(", 1)[1]
+        cli_section = cli_section.split("static void tumoflip_runtime_bridge_callback", 1)[0]
+        self.assertNotIn("snapshot.token", cli_section)
+        self.assertNotIn("snapshot.session_id", cli_section)
+        self.assertNotIn("system(", cli_section)
+        self.assertNotIn("popen(", cli_section)
+
+        self.assertIn("### TumoFabric USB operator plane", bridge_docs)
+        self.assertIn("`tumofabric caps`", bridge_docs)
+        self.assertIn("must not expose the BLE token", bridge_docs)
+        self.assertIn("TumoFabric Mac Node", checklist)
 
 
 if __name__ == "__main__":
