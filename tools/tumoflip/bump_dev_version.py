@@ -17,6 +17,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from tools.tumoflip.sync_readme_version import (  # noqa: E402
     DIST_SUFFIX_RE,
+    is_stable_prefix,
     parse_dist_suffix,
     read_dist_suffix,
     sync_readme_text,
@@ -71,13 +72,15 @@ def compute_dev_version(
     if set_suffix:
         return DevVersion.parse(set_suffix).format()
 
-    prefix, current_base, current_build, current_iteration = parse_dist_suffix(current_suffix)
+    prefix, current_base, current_build, current_iteration = parse_dist_suffix(
+        current_suffix
+    )
     new_base = validate_component("base", base) if base else current_base
     new_build = validate_component("build", build) if build else current_build
 
     if iteration:
         new_iteration = validate_component("iteration", iteration)
-    elif prefix == "tmwhflpprarf":
+    elif is_stable_prefix(prefix):
         new_iteration = "001"
     else:
         current = DevVersion(current_base, current_build, current_iteration or "001")

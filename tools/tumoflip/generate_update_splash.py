@@ -248,7 +248,9 @@ def draw_pixel_text(
         cursor += len(glyph[0]) + spacing
 
 
-def pixel_text_width(glyphs: dict[str, tuple[str, ...]], text: str, spacing: int = 1) -> int:
+def pixel_text_width(
+    glyphs: dict[str, tuple[str, ...]], text: str, spacing: int = 1
+) -> int:
     return sum(len(glyphs[char][0]) for char in text) + max(0, len(text) - 1) * spacing
 
 
@@ -275,11 +277,26 @@ def gravity_regular(size: int) -> ImageFont.ImageFont:
     return load_gravity_font(GRAVITY_REGULAR, size)
 
 
+def fit_gravity_bold(
+    text: str,
+    max_width: int,
+    preferred_size: int = 16,
+) -> ImageFont.ImageFont:
+    for size in range(preferred_size, 7, -1):
+        font = gravity_bold(size)
+        bbox = font.getbbox(text)
+        if bbox[2] - bbox[0] <= max_width:
+            return font
+    return gravity_bold(8)
+
+
 def draw_next_button(draw: ImageDraw.ImageDraw) -> None:
     draw_button(draw, "NEXT", (88, 50, 125, 62))
 
 
-def draw_button(draw: ImageDraw.ImageDraw, text: str, button: tuple[int, int, int, int]) -> None:
+def draw_button(
+    draw: ImageDraw.ImageDraw, text: str, button: tuple[int, int, int, int]
+) -> None:
     draw.rectangle(button, outline=0)
 
     font = gravity_bold(8)
@@ -347,7 +364,7 @@ def generate_slideshow(
     else:
         frame_01_lines = (
             (f"UNLEASHED {base_version}", gravity_bold(8), 22),
-            ("TUMOFLIP FORK", gravity_bold(8), 36),
+            ("TUMOWUH FIRMWARE", gravity_bold(8), 36),
         )
         frame_02_lines = (
             ("CUSTOM BUILD", gravity_bold(8), 22),
@@ -380,7 +397,7 @@ def generate(title: str, version: str, output: Path) -> None:
 
     image = Image.new("1", DISPLAY_SIZE, 1)
     draw = ImageDraw.Draw(image)
-    title_font = gravity_bold(16)
+    title_font = fit_gravity_bold(title, 116)
     version_font = gravity_bold(16)
 
     draw_centered_text(draw, title, FIRST_FRAME_SAFE_TOP, title_font)
@@ -414,7 +431,7 @@ def generate_message_frame(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--title", default="TUMOFLIP")
+    parser.add_argument("--title", default="T-FLPPR-FW")
     parser.add_argument("--version", default="089-031")
     parser.add_argument(
         "--output",
