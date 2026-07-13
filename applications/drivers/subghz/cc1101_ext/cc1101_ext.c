@@ -548,12 +548,15 @@ uint32_t subghz_device_cc1101_ext_set_frequency(uint32_t value) {
         cc1101_set_frequency(subghz_device_cc1101_ext->spi_bus_handle, value);
     cc1101_calibrate(subghz_device_cc1101_ext->spi_bus_handle);
 
-    while(true) {
-        CC1101Status status = cc1101_get_status(subghz_device_cc1101_ext->spi_bus_handle);
-        if(status.STATE == CC1101StateIDLE) break;
-    }
+    const bool idle_after_tune =
+        cc1101_wait_status_state(subghz_device_cc1101_ext->spi_bus_handle, CC1101StateIDLE, 10000);
 
     furi_hal_spi_release(subghz_device_cc1101_ext->spi_bus_handle);
+    if(!idle_after_tune) {
+        FURI_LOG_W(TAG, "CC1101 did not become idle after retune");
+        return 0;
+    }
+
     return real_frequency;
 }
 

@@ -386,6 +386,18 @@ static uint32_t subghz_txrx_rx(SubGhzTxRx* instance, uint32_t frequency) {
     subghz_devices_idle(instance->radio_device);
 
     uint32_t value = subghz_devices_set_frequency(instance->radio_device, frequency);
+    if(value == 0U) {
+        if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
+            FURI_LOG_W(TAG, "External radio retune failed, falling back to internal");
+            subghz_txrx_radio_device_fallback_internal(instance);
+            subghz_txrx_begin(instance, instance->preset->data);
+            return subghz_txrx_rx(instance, frequency);
+        }
+
+        FURI_LOG_E(TAG, "Internal radio retune failed");
+        return 0U;
+    }
+
     subghz_devices_flush_rx(instance->radio_device);
     if(instance->radio_device_type == SubGhzRadioDeviceTypeAuto &&
        instance->diversity_radio_device) {

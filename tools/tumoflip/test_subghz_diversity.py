@@ -81,13 +81,46 @@ class SubGhzDiversityTest(unittest.TestCase):
         self.assertIn("subghz_txrx_radio_device_reprobe_preferred", txrx)
         self.assertIn("subghz_txrx_radio_device_is_external_connected", txrx)
         self.assertIn("subghz_txrx_radio_device_fallback_internal", txrx)
+        on_enter = scene[
+            scene.index("void subghz_scene_receiver_on_enter") : scene.index(
+                "bool subghz_scene_receiver_on_event"
+            )
+        ]
+        self.assertIn("subghz_txrx_stop(subghz->txrx);", on_enter)
         self.assertIn(
-            "subghz_txrx_radio_device_reprobe_preferred(subghz->txrx);", scene
+            "subghz_txrx_radio_device_reprobe_preferred(subghz->txrx);", on_enter
         )
         self.assertLess(
-            scene.index("subghz_txrx_radio_device_reprobe_preferred(subghz->txrx);"),
-            scene.index("subghz_txrx_rx_start(subghz->txrx);"),
+            on_enter.index("subghz_txrx_stop(subghz->txrx);"),
+            on_enter.index("subghz_txrx_radio_device_reprobe_preferred(subghz->txrx);"),
         )
+        self.assertLess(
+            on_enter.index("subghz_txrx_radio_device_reprobe_preferred(subghz->txrx);"),
+            on_enter.index("subghz_txrx_rx_start(subghz->txrx);"),
+        )
+
+    def test_external_hopping_timeout_falls_back_without_blocking(self) -> None:
+        txrx = (SUBGHZ / "helpers/subghz_txrx.c").read_text(encoding="utf-8")
+        driver = (
+            REPO_ROOT
+            / "applications/drivers/subghz/cc1101_ext/cc1101_ext.c"
+        ).read_text(encoding="utf-8")
+        set_frequency = driver[
+            driver.index("uint32_t subghz_device_cc1101_ext_set_frequency") : driver.index(
+                "static bool subghz_device_cc1101_ext_start_debug"
+            )
+        ]
+
+        self.assertIn("cc1101_wait_status_state", set_frequency)
+        self.assertIn("if(!idle_after_tune)", set_frequency)
+        self.assertIn("return 0;", set_frequency)
+        self.assertNotIn("while(true)", set_frequency)
+        self.assertIn(
+            'FURI_LOG_W(TAG, "External radio retune failed, falling back to internal")',
+            txrx,
+        )
+        self.assertIn("subghz_txrx_radio_device_fallback_internal(instance);", txrx)
+        self.assertIn("return subghz_txrx_rx(instance, frequency);", txrx)
 
     def test_dual_receive_uses_independent_workers_and_decoders(self) -> None:
         internal = (SUBGHZ / "helpers/subghz_txrx_i.h").read_text(encoding="utf-8")
