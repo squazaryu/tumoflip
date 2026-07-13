@@ -60,12 +60,14 @@ files must not be shared mechanically. Extracting them requires a small explicit
 API first, plus FAP size, heap, and launch/exit validation.
 
 Core `Sub-GHz` radio settings intentionally diverge for issue #92. The core app
-adds `Auto Dual` receive through its Radio Broker lifecycle, while the ARF FAP
-keeps its profile-specific `subghz_txrx` implementation. `Standard Sub-GHz` in
-the ARF Hub launches the core firmware app, so diversity remains available from
-the supported user path without duplicating the core receiver inside a FAP.
-The core receiver view header also diverges to update a deduplicated history
-row when the second radio reports a stronger copy of the same frame.
+keeps module selection separate from `RX Mode: AUTO/DUAL` and provides a direct
+AUTO/DUAL toggle in the Read screen. Dual receive runs through the Radio Broker
+lifecycle, while the ARF FAP keeps its profile-specific `subghz_txrx`
+implementation. `Standard Sub-GHz` in the ARF Hub launches the core firmware
+app, so diversity remains available from the supported user path without
+duplicating the core receiver inside a FAP. The core receiver view header also
+diverges to update a deduplicated history row when the second radio reports a
+stronger copy of the same frame.
 
 ## Shared APIs
 

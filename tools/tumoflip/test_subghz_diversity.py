@@ -9,17 +9,36 @@ SUBGHZ = REPO_ROOT / "applications/main/subghz"
 
 
 class SubGhzDiversityTest(unittest.TestCase):
-    def test_auto_mode_is_a_stock_subghz_radio_option(self) -> None:
+    def test_dual_mode_is_separate_from_the_module_selector(self) -> None:
         types = (SUBGHZ / "helpers/subghz_types.h").read_text(encoding="utf-8")
         settings = (SUBGHZ / "scenes/subghz_scene_radio_settings.c").read_text(
             encoding="utf-8"
         )
 
         self.assertIn("SubGhzRadioDeviceTypeAuto", types)
-        self.assertIn("#define RADIO_DEVICE_COUNT 3", settings)
-        self.assertIn('"Auto Dual"', settings)
+        self.assertIn("#define RADIO_DEVICE_COUNT 2", settings)
+        self.assertIn("#define RX_MODE_COUNT 2", settings)
+        self.assertIn('"RX Mode"', settings)
+        self.assertIn('"AUTO"', settings)
+        self.assertIn('"DUAL"', settings)
+        self.assertNotIn('"Auto Dual"', settings)
         self.assertIn("SubGhzRadioDeviceTypeAuto", settings)
         self.assertIn("subghz_txrx_radio_device_is_external_connected", settings)
+
+    def test_receiver_has_a_direct_auto_dual_toggle(self) -> None:
+        events = (SUBGHZ / "helpers/subghz_custom_event.h").read_text(encoding="utf-8")
+        view = (SUBGHZ / "views/receiver.c").read_text(encoding="utf-8")
+        scene = (SUBGHZ / "scenes/subghz_scene_receiver.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("SubGhzCustomEventViewReceiverToggleDiversity", events)
+        self.assertIn("elements_button_right", view)
+        self.assertIn('SubGhzRadioDeviceTypeAuto ? "Auto" : "Dual"', view)
+        self.assertIn("InputKeyRight && event->type == InputTypeShort", view)
+        self.assertIn("case SubGhzCustomEventViewReceiverToggleDiversity", scene)
+        self.assertIn("subghz_txrx_set_preset_internal", scene)
+        self.assertIn("subghz_txrx_rx_start", scene)
 
     def test_dual_receive_uses_independent_workers_and_decoders(self) -> None:
         internal = (SUBGHZ / "helpers/subghz_txrx_i.h").read_text(encoding="utf-8")
@@ -85,7 +104,7 @@ class SubGhzDiversityTest(unittest.TestCase):
         self.assertIn("item->source = source", history)
         self.assertIn("SubGhzHistoryAddResultUpdated", history)
         self.assertIn('"%.2d:%.2d %s%.0f"', history)
-        self.assertIn('"A%s"', receiver_scene)
+        self.assertIn('"D:%s"', receiver_scene)
         self.assertIn("subghz_view_receiver_update_item_time", receiver_scene)
         self.assertIn("subghz_txrx_get_diversity_decoder", receiver_scene)
 

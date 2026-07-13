@@ -51,7 +51,7 @@ static void subghz_scene_receiver_update_statusbar(void* context) {
             if(subghz_txrx_radio_device_get(subghz->txrx) == SubGhzRadioDeviceTypeAuto) {
                 furi_string_printf(
                     modulation_str,
-                    "A%s",
+                    "D:%s",
                     subghz_txrx_radio_device_get_last_rx(subghz->txrx) ==
                             SubGhzRadioDeviceTypeInternal ?
                         "I" :
@@ -69,7 +69,7 @@ static void subghz_scene_receiver_update_statusbar(void* context) {
                 modulation_str,
                 "%s        Mod: %s",
                 device == SubGhzRadioDeviceTypeAuto ?
-                    "Auto" :
+                    "Dual" :
                     (device == SubGhzRadioDeviceTypeInternal ? "Int" : "Ext"),
                 furi_string_get_cstr(temp_str));
             furi_string_free(temp_str);
@@ -303,6 +303,31 @@ bool subghz_scene_receiver_on_event(void* context, SceneManagerEvent event) {
             }
             consumed = true;
             break;
+        case SubGhzCustomEventViewReceiverToggleDiversity: {
+            subghz->state_notifications = SubGhzNotificationStateRx;
+            subghz_txrx_hopper_set_state(subghz->txrx, SubGhzHopperStateOFF);
+
+            const SubGhzRadioDeviceType current = subghz_txrx_radio_device_get(subghz->txrx);
+            const SubGhzRadioDeviceType requested = current == SubGhzRadioDeviceTypeAuto ?
+                                                        SubGhzRadioDeviceTypeExternalCC1101 :
+                                                        SubGhzRadioDeviceTypeAuto;
+            subghz_txrx_radio_device_set(subghz->txrx, requested);
+            subghz_txrx_set_preset_internal(
+                subghz->txrx,
+                subghz->last_settings->frequency,
+                subghz->last_settings->preset_index,
+                subghz->last_settings->tx_power);
+            furi_check(subghz_txrx_load_decoder_by_name_protocol(
+                subghz->txrx, SUBGHZ_PROTOCOL_BIN_RAW_NAME));
+
+            if(subghz->last_settings->hopping_mode != SubGhzHoppingModeOff) {
+                subghz_txrx_hopper_set_state(subghz->txrx, SubGhzHopperStateRunning);
+            }
+            subghz_txrx_rx_start(subghz->txrx);
+            subghz_scene_receiver_update_statusbar(subghz);
+            consumed = true;
+            break;
+        }
         case SubGhzCustomEventViewReceiverConfig:
             // Actually signals are received but SubGhzNotificationStateRx is not working inside Config Scene
             scene_manager_set_scene_state(

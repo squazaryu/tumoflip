@@ -24,8 +24,10 @@ to the internal CC1101 keep their existing behavior.
 USB VBUS is treated as available external power without assigning OTG ownership
 to the active lease, so cleanup only disables boost that the Broker enabled.
 
-The system Sub-GHz app reports `dual` while `Auto Dual` receive is active. It
-uses independent workers and decoders for the internal and external CC1101,
+The system Sub-GHz app reports `dual` while `RX Mode: DUAL` is active. Radio
+settings keep the preferred module and receive mode as separate controls, and
+the Read screen can switch between AUTO and DUAL directly. Dual mode uses
+independent workers and decoders for the internal and external CC1101,
 deduplicates decoded frames in the core receiver history, and falls back to the
 internal radio when the external module is unavailable. Transmission remains
 single-radio and prefers the external CC1101 in this mode.
