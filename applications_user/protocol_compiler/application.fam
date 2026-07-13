@@ -8,6 +8,7 @@ App(
     stack_size=5 * 1024,
     icon="A_Plugins_14",
     fap_icon="icon.png",
+    fap_icon_assets="icons",
     fap_category="Module One/Signals",
     fap_dist_path="apps/Module One/Signals/protocol_compiler.fap",
     fap_version="0.1.0",
