@@ -273,11 +273,19 @@ ProtocolProfileStatus protocol_profile_capture_load(
     ProtocolProfileStatus status = ProtocolProfileStatusUnsafeProfile;
     do {
         if(!flipper_format_file_open_existing(format, path) ||
-           !flipper_format_read_header(format, header, &version) || version != 1U ||
-           furi_string_cmp_str(header, PROTOCOL_PROFILE_RAW_FILETYPE) != 0 ||
-           !flipper_format_read_uint32(format, "Frequency", &info->frequency_hz, 1U) ||
-           !flipper_format_read_string(format, "Protocol", protocol) ||
-           furi_string_cmp_str(protocol, "RAW") != 0) {
+           !flipper_format_read_header(format, header, &version) || version != 1U) {
+            break;
+        }
+        if(furi_string_cmp_str(header, PROTOCOL_PROFILE_RAW_FILETYPE) != 0) {
+            status = ProtocolProfileStatusUnsupportedCapture;
+            break;
+        }
+        if(!flipper_format_read_uint32(format, "Frequency", &info->frequency_hz, 1U) ||
+           !flipper_format_read_string(format, "Protocol", protocol)) {
+            break;
+        }
+        if(furi_string_cmp_str(protocol, "RAW") != 0) {
+            status = ProtocolProfileStatusUnsupportedCapture;
             break;
         }
 

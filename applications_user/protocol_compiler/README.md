@@ -5,6 +5,10 @@ profiles. The heavy inference step runs on a host with
 `tools/tumoflip/protocol_compiler.py`; the FAP only loads bounded profiles and
 validates saved Sub-GHz RAW captures deterministically.
 
+Inputs must use `Filetype: Flipper SubGhz RAW File` and `Protocol: RAW`.
+Decoded `Flipper SubGhz Key File` records do not contain the original pulse
+stream and therefore cannot be used for profile inference or validation.
+
 Initial schema limits:
 
 - API 88 only;

@@ -25,6 +25,7 @@ typedef enum {
     ProtocolProfileStatusUnsupportedVersion,
     ProtocolProfileStatusApiMismatch,
     ProtocolProfileStatusUnsafeProfile,
+    ProtocolProfileStatusUnsupportedCapture,
     ProtocolProfileStatusNotReceiveOnly,
     ProtocolProfileStatusNoMatch,
     ProtocolProfileStatusStableMismatch,

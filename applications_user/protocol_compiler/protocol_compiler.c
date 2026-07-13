@@ -1,4 +1,5 @@
 #include "protocol_profile_storage.h"
+#include "protocol_compiler_icons.h"
 
 #include <dialogs/dialogs.h>
 #include <furi.h>
@@ -133,7 +134,7 @@ static void protocol_compiler_draw_actions(Canvas* canvas, const ProtocolCompile
     protocol_compiler_draw_menu_row(
         canvas, 36, "Validate packaged demo", app->selected_action == ProtocolCompilerActionDemo);
     protocol_compiler_draw_menu_row(
-        canvas, 47, "Open saved .sub", app->selected_action == ProtocolCompilerActionOpen);
+        canvas, 47, "Open RAW capture", app->selected_action == ProtocolCompilerActionOpen);
     elements_button_left(canvas, "Back");
     elements_button_center(canvas, "Select");
     elements_button_right(canvas, "Info");
@@ -311,7 +312,7 @@ static void protocol_compiler_validate_path(ProtocolCompilerApp* app, const char
 static void protocol_compiler_open_file(ProtocolCompilerApp* app) {
     FuriString* path = furi_string_alloc_set(PROTOCOL_COMPILER_SUBGHZ_DIR);
     DialogsFileBrowserOptions browser_options;
-    dialog_file_browser_set_basic_options(&browser_options, ".sub", NULL);
+    dialog_file_browser_set_basic_options(&browser_options, ".sub", &I_sub1_10px);
     browser_options.base_path = PROTOCOL_COMPILER_SUBGHZ_DIR;
     const bool selected = dialog_file_browser_show(app->dialogs, path, path, &browser_options);
     if(selected) protocol_compiler_validate_path(app, furi_string_get_cstr(path));

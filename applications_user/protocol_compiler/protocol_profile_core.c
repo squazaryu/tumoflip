@@ -222,6 +222,8 @@ const char* protocol_profile_status_name(ProtocolProfileStatus status) {
         return "API mismatch";
     case ProtocolProfileStatusUnsafeProfile:
         return "Unsafe profile";
+    case ProtocolProfileStatusUnsupportedCapture:
+        return "RAW capture required";
     case ProtocolProfileStatusNotReceiveOnly:
         return "RX-only gate failed";
     case ProtocolProfileStatusNoMatch:

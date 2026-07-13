@@ -42,6 +42,7 @@ class ProtocolCompilerFapTest(unittest.TestCase):
             self.manifest,
         )
         self.assertIn('fap_icon="icon.png"', self.manifest)
+        self.assertIn('fap_icon_assets="icons"', self.manifest)
         self.assertTrue((APP_ROOT / "icon.png").is_file())
         self.assertIn('"Signals: Compiler"', cockpit)
         self.assertIn(
@@ -58,6 +59,12 @@ class ProtocolCompilerFapTest(unittest.TestCase):
         for label in ("Prev", "Open", "Next", "Back", "Select", "Info", "Again"):
             self.assertIn(f'"{label}"', self.source)
         self.assertIn("dialog_file_browser_show", self.source)
+        self.assertIn('"Open RAW capture"', self.source)
+        self.assertIn('"protocol_compiler_icons.h"', self.source)
+        self.assertIn("&I_sub1_10px", self.source)
+        self.assertTrue((APP_ROOT / "icons/sub1_10px.png").is_file())
+        self.assertIn("ProtocolProfileStatusUnsupportedCapture", self.storage)
+        self.assertIn('return "RAW capture required";', self.core)
         self.assertIn("protocol_profile_decode", self.source)
         self.assertIn("ProtocolProfileMaximumCapturePulses = 512", (
             APP_ROOT / "protocol_profile_core.h"
