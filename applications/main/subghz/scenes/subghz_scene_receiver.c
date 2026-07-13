@@ -198,6 +198,8 @@ void subghz_scene_receiver_on_enter(void* context) {
     SubGhz* subghz = context;
     SubGhzHistory* history = subghz->history;
 
+    // Config keeps RX alive. Stop it before probing the external radio over SPI.
+    subghz_txrx_stop(subghz->txrx);
     subghz_txrx_radio_device_reprobe_preferred(subghz->txrx);
 
     FuriString* item_name = furi_string_alloc();
