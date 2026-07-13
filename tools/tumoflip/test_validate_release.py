@@ -191,6 +191,10 @@ class ValidateReleaseTest(unittest.TestCase):
             MODULE_ONE_PACKAGE_FILES,
         )
         self.assertIn(
+            "apps/Module One/Signals/protocol_compiler.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
             "apps/Module One/Signals/tumoscope.fap",
             MODULE_ONE_PACKAGE_FILES,
         )

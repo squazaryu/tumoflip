@@ -19,6 +19,7 @@ COCKPIT_FAP_ROUTES = {
     "tumoscript": "apps/Module One/Scripts/tumoscript.fap",
     "field_logger": "apps/Module One/Field/field_logger.fap",
     "signal_workbench": "apps/Module One/Signals/signal_workbench.fap",
+    "protocol_compiler": "apps/Module One/Signals/protocol_compiler.fap",
     "tumoscope": "apps/Module One/Signals/tumoscope.fap",
     "tumovgm_bridge": "apps/Module One/VGM/tumovgm_bridge.fap",
     "tumomodule_runtime": "apps/Module One/Modules/tumomodule_runtime.fap",
@@ -55,6 +56,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("BLE: Terminal", self.source)
         self.assertIn("Field: Logger", self.source)
         self.assertIn("Signals: Workbench", self.source)
+        self.assertIn("Signals: Compiler", self.source)
         self.assertIn("Signals: TumoScope", self.source)
         self.assertIn("VGM: Bridge", self.source)
         self.assertIn("Modules: Runtime", self.source)
@@ -85,6 +87,10 @@ class ModuleOneCockpitTest(unittest.TestCase):
         )
         self.assertIn(
             'EXT_PATH("apps/Module One/Signals/signal_workbench.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/Signals/protocol_compiler.fap")',
             self.source,
         )
         self.assertIn(

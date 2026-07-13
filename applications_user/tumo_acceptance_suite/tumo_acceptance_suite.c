@@ -50,6 +50,7 @@ static const TumoAcceptancePathCheck tumo_acceptance_paths[] = {
     {"Runtime Trace", EXT_PATH("apps/Module One/Diagnostics/runtime_trace_viewer.fap"), true},
     {"Field Logger", EXT_PATH("apps/Module One/Field/field_logger.fap"), true},
     {"Signal Workbench", EXT_PATH("apps/Module One/Signals/signal_workbench.fap"), true},
+    {"Protocol Compiler", EXT_PATH("apps/Module One/Signals/protocol_compiler.fap"), true},
     {"Sensor Logger", EXT_PATH("apps/Module One/Sensors BME280/module_one_sensor_logger.fap"), true},
     {"BLE GATT Lab", EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap"), true},
     {"App Bridge Terminal", EXT_PATH("apps/Module One/BLE/app_bridge_terminal.fap"), true},
