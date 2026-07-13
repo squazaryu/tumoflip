@@ -109,6 +109,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
     "apps/Module One/Labs/tumovm_poc.fap",
     "apps/Module One/Labs/tumovm_peripherals.fap",
+    "apps/Module One/Labs/tumofabric_node.fap",
     "apps/Module One/Labs/tumokey_phase_a.fap",
     "apps/Module One/NFC/nfc_ccid_bridge.fap",
     "apps/Module One/NFC/tumocard_os.fap",
@@ -181,6 +182,7 @@ RUNTIME_REQUIRED_CAPABILITIES = {
     "pkg=1",
     "radio=2",
     "sd=1",
+    "fabric=1",
 }
 RUNTIME_REQUIRED_FEATURES = {
     "pkg",
@@ -188,6 +190,7 @@ RUNTIME_REQUIRED_FEATURES = {
     "trace",
     "transfer",
     "twin",
+    "fabric",
 }
 RUNTIME_REQUIRED_STATUS_FIELDS = (
     "schema=2",

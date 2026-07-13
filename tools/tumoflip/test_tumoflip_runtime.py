@@ -27,9 +27,14 @@ class TumoflipRuntimeTest(unittest.TestCase):
                 "transfer_progress",
                 "transfer_end",
                 "hello",
+                "fabric_caps",
+                "fabric_open",
+                "fabric_state",
+                "fabric_step",
+                "fabric_cancel",
             },
         )
-        self.assertIn("feat=pkg,radio,trace,twin,transfer", runtime)
+        self.assertIn("feat=pkg,radio,trace,twin,transfer,fabric", runtime)
 
     def test_runtime_status_schema_is_documented_and_bounded(self) -> None:
         runtime = (
@@ -48,7 +53,7 @@ class TumoflipRuntimeTest(unittest.TestCase):
         self.assertIn("session=3", runtime)
         self.assertIn("trace=1", runtime)
         self.assertIn("twin=1", runtime)
-        self.assertIn("feat=pkg,radio,trace,twin,transfer", runtime)
+        self.assertIn("feat=pkg,radio,trace,twin,transfer,fabric", runtime)
         self.assertNotIn('"radio_status"', runtime)
         self.assertNotIn("tumoflip_runtime_radio_state_name", runtime)
         self.assertIn('strcmp(command, "status") == 0', runtime)
@@ -129,6 +134,8 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "trace",
             "twin",
             "transfer",
+            "fabric=1",
+            "fabric",
         ):
             self.assertIn(required, capabilities)
 

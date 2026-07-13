@@ -1,0 +1,17 @@
+App(
+    appid="tumofabric_node",
+    name="TumoFabric Node",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="tumofabric_node_app",
+    requires=["gui"],
+    stack_size=3 * 1024,
+    icon="A_Plugins_14",
+    fap_icon="icon.png",
+    fap_category="Module One/Labs",
+    fap_dist_path="apps/Module One/Labs/tumofabric_node.fap",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip/issues/69",
+    fap_description="Local node UI for the bounded TumoFabric Counter reference package.",
+)

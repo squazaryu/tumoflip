@@ -57,3 +57,5 @@
 !tumovm_peripherals/**
 !nfc_ccid_bridge/
 !nfc_ccid_bridge/**
+!tumofabric_node/
+!tumofabric_node/**
