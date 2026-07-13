@@ -39,9 +39,9 @@ The system app ID is `runtime`.
 - `capabilities` returns `runtime/capabilities` with a semicolon-separated
   `key=value` payload. Runtime v2 keeps backward-compatible keys
   `runtime=1`, `fab=2`, and `session=3`, and advertises `status=2`,
-  `trace=1`, `twin=1`, `pkg=1`, `radio=2`, `sd=1`, plus compact feature
+  `trace=1`, `twin=1`, `pkg=1`, `radio=2`, `sd=1`, `fabric=1`, plus compact feature
   flags in `feat`, currently `pkg`, `radio`, `trace`, `twin`, and
-  `transfer`.
+  `transfer`, and `fabric`.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
   `sd`, `pkg`, `sid`, `bo`, `radio`, and `owner`. `sd=1` means the SD card is
@@ -80,6 +80,9 @@ The system app ID is `runtime`.
   clears it.
 - `hello` implements the first App Bridge v3 session layer documented in
   `docs/app-bridge-v3.md`.
+- `fabric_caps` returns the bounded TumoFabric v1 reference-package contract.
+  `fabric_open`, `fabric_state`, `fabric_step`, and `fabric_cancel` implement
+  the fixed `counter` package described below.
 - An unknown command returns `runtime/error`, sets response and error flags,
   and carries `badcmd`.
 - Chunked Runtime requests return `runtime/error` with `chunk`.
@@ -87,6 +90,29 @@ The system app ID is `runtime`.
 Every response carries the request ID of the command. Runtime responses are
 semantic acknowledgements; the acknowledgement-requested flag is reserved for
 future generic delivery acknowledgements.
+
+### TumoFabric Counter v1
+
+TumoFabric v1 proves deterministic work split between Flipper and Companion
+without introducing a general command interpreter. The Flipper owns one
+RAM-backed signed counter in the range `-999...999`; the only remote operations
+are `inc` and `dec`.
+
+- `fabric_open`: `owner=iphone;pkg=counter;token=<8 hex>`. A new token opens a
+  session. Repeating the same owner and token resumes its existing session and
+  value. A different owner or token receives `busy`.
+- `fabric_state`: `sid=<8 hex>;token=<8 hex>` returns the current value.
+- `fabric_step`: `sid=<8 hex>;token=<8 hex>;seq=<decimal>;op=inc|dec`. The next
+  sequence is applied once. Repeating the current sequence returns the same
+  state with `dup=1`; gaps and stale sequences return `seq`.
+- `fabric_cancel`: `sid=<8 hex>;token=<8 hex>` releases and clears the session.
+
+Successful state responses use
+`schema=1;pkg=counter;sid=...;token=...;seq=...;value=...;dup=...;persist=ram`.
+The token supplements the authenticated BLE link but is not a hardware-backed
+node identity. State survives BLE reconnect while the Flipper remains powered;
+reboot and explicit cancel clear it. `TumoFabric Node` provides local offline
+start, increment, decrement, state inspection, and cancellation.
 
 ## App Events
 
