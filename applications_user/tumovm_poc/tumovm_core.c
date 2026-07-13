@@ -84,7 +84,7 @@ bool tumovm_program_validate(const TumoVmProgram* program) {
     if(program->aid_size == 0U || program->aid_size > TUMOVM_AID_MAX) return false;
     if(program->route_count == 0U || program->route_count > TUMOVM_ROUTES_MAX) return false;
     if(program->bytecode_size == 0U || program->bytecode_size > TUMOVM_BYTECODE_MAX) return false;
-    if(!program->capability_nfc_type4 || !program->capability_usb_ccid) return false;
+    if(!program->capability_nfc_type4 && !program->capability_usb_ccid) return false;
 
     for(size_t i = 0; i < program->route_count; i++) {
         const TumoVmRoute* route = &program->routes[i];

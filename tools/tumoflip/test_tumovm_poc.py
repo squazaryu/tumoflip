@@ -59,6 +59,11 @@ static void expect_sw(const uint8_t* response, size_t size, uint16_t sw) {
 int main(void) {
     TumoVmProgram program = make_program();
     assert(tumovm_program_validate(&program));
+    TumoVmProgram nfc_only = make_program();
+    nfc_only.capability_usb_ccid = false;
+    assert(tumovm_program_validate(&nfc_only));
+    nfc_only.capability_nfc_type4 = false;
+    assert(!tumovm_program_validate(&nfc_only));
 
     uint8_t initial[16];
     for(size_t i = 0; i < sizeof(initial); i++) initial[i] = (uint8_t)i;

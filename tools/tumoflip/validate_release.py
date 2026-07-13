@@ -107,6 +107,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
     "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
     "apps/Module One/Labs/tumovm_poc.fap",
+    "apps/Module One/Labs/tumovm_peripherals.fap",
     "apps/Module One/Labs/tumokey_phase_a.fap",
     "apps/Module One/NFC/nfc_ccid_bridge.fap",
     "apps/Module One/NFC/tumocard_os.fap",
@@ -116,6 +117,8 @@ MODULE_ONE_PACKAGE_DATA_FILES = (
     "apps_data/tumoscript/scripts/safe_demo.tscr",
     "apps_data/tumomodule_runtime/modules/bme280.tmod",
     "apps_data/tumomodule_runtime/modules/tumovgm.tmod",
+    "apps_data/tumovm_peripherals/packages/nfc_state.tper",
+    "apps_data/tumovm_peripherals/packages/usb_media.tper",
 )
 ARF_LEGACY_PATHS = {
     **{

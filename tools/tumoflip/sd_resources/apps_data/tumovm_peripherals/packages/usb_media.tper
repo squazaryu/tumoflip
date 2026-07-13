@@ -1,0 +1,9 @@
+Filetype: TumoVM Peripheral
+Version: 1
+Package ID: usb_media
+Name: USB Media Key
+Adapter: usb.hid.consumer
+Action: play_pause
+Minimum API: 88
+Maximum API: 88
+Require confirmation: true
