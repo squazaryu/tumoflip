@@ -117,8 +117,8 @@ bool subghz_radio_broker_external_power_on(
     }
 
     const bool was_otg_enabled = furi_hal_power_is_otg_enabled();
-    for(uint8_t attempt = 0; !subghz_radio_broker_external_power_available() &&
-                             attempt < SUBGHZ_RADIO_BROKER_POWER_ATTEMPTS;
+    for(uint8_t attempt = 0;
+        !furi_hal_power_is_otg_enabled() && attempt < SUBGHZ_RADIO_BROKER_POWER_ATTEMPTS;
         attempt++) {
         furi_hal_power_enable_otg();
         furi_delay_ms(SUBGHZ_RADIO_BROKER_POWER_DELAY_MS);

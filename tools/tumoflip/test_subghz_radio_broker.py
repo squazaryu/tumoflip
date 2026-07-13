@@ -54,6 +54,10 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
         self.assertIn("SUBGHZ_RADIO_BROKER_EXTERNAL_VOLTAGE_MIN", broker)
         self.assertIn("subghz_radio_broker_external_power_available", broker)
         self.assertIn("furi_hal_power_get_usb_voltage()", broker)
+        self.assertRegex(
+            broker,
+            r"for\(uint8_t attempt = 0;\s*!furi_hal_power_is_otg_enabled\(\)",
+        )
         self.assertIn("*status = broker->status.base;", broker)
         self.assertIn("*status = broker->status;", broker)
         self.assertIn("subghz_radio_broker_get_status_v2(runtime->radio_broker", runtime)
