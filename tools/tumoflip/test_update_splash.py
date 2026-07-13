@@ -150,11 +150,13 @@ class UpdateSplashTest(unittest.TestCase):
             ("T-FLPPR-FW", "089-031"),
         )
 
-    def test_fbt_autogenerates_tumoflip_update_splash(self) -> None:
+    def test_fbt_checks_tumoflip_update_splash_without_rewriting_assets(self) -> None:
         sconstruct = (REPO_ROOT / "SConstruct").read_text(encoding="utf-8")
 
         self.assertIn('UPDATE_SPLASH"] == "tumoflip_update"', sconstruct)
         self.assertIn("sync_update_splash.py", sconstruct)
+        self.assertIn("tumoflip-update-splash-${DIST_SUFFIX}.stamp", sconstruct)
+        self.assertIn('"--check"', sconstruct)
         self.assertIn("Depends(selfupdate_dist, update_splash)", sconstruct)
 
 
