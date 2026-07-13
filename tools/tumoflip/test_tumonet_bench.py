@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import re
 import subprocess
 import tempfile
 import unittest
@@ -28,8 +29,17 @@ class TumoNetBenchTest(unittest.TestCase):
         self.assertIn("TUMONET_RADIO_EXT_SETTLE_MS", radio)
         self.assertIn("TUMONET_RADIO_EXT_PROBE_ATTEMPTS", radio)
         self.assertIn("TumoNetRadioResultExternalBegin", radio)
+        self.assertIn("GpioModeInput", radio)
+        self.assertIn("TumoNetRadioResultTxStartTimeout", radio)
+        self.assertIn("TumoNetRadioResultRxTimeout", radio)
         self.assertIn("does not", docs)
         self.assertIn("independent-node", docs)
+
+        manifest_version = re.search(r'fap_version="([^"]+)"', manifest)
+        source_version = re.search(r'#define TUMONET_BENCH_VERSION\s+"([^"]+)"', source)
+        self.assertIsNotNone(manifest_version)
+        self.assertIsNotNone(source_version)
+        self.assertEqual(manifest_version.group(1), source_version.group(1))
 
     def test_core_crypto_and_protocol_on_host(self) -> None:
         with tempfile.TemporaryDirectory(prefix="tumonet-core-") as temp_dir:

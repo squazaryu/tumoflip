@@ -25,6 +25,8 @@ struct TumoNetRadio {
     SubGhzRadioBrokerLease lease;
     const SubGhzDevice* internal;
     const SubGhzDevice* external;
+    const GpioPin* internal_gpio;
+    const GpioPin* external_gpio;
     uint32_t frequency;
     bool lease_acquired;
     bool registry_initialized;
@@ -167,6 +169,15 @@ TumoNetRadioResult tumonet_radio_open(TumoNetRadio* radio) {
     subghz_devices_idle(radio->external);
     subghz_devices_load_preset(radio->internal, FuriHalSubGhzPresetCustom, tumonet_radio_preset);
     subghz_devices_load_preset(radio->external, FuriHalSubGhzPresetCustom, tumonet_radio_preset);
+    radio->internal_gpio = subghz_devices_get_data_gpio(radio->internal);
+    radio->external_gpio = subghz_devices_get_data_gpio(radio->external);
+    if(radio->internal_gpio == NULL || radio->external_gpio == NULL) {
+        FURI_LOG_E(TAG, "CC1101 packet GPIO is unavailable");
+        tumonet_radio_close(radio);
+        return TumoNetRadioResultInit;
+    }
+    furi_hal_gpio_init(radio->internal_gpio, GpioModeInput, GpioPullNo, GpioSpeedLow);
+    furi_hal_gpio_init(radio->external_gpio, GpioModeInput, GpioPullNo, GpioSpeedLow);
     subghz_devices_set_frequency(radio->internal, radio->frequency);
     subghz_devices_set_frequency(radio->external, radio->frequency);
     subghz_devices_flush_rx(radio->internal);
@@ -203,6 +214,8 @@ void tumonet_radio_close(TumoNetRadio* radio) {
         radio->external_begun = false;
         radio->internal = NULL;
         radio->external = NULL;
+        radio->internal_gpio = NULL;
+        radio->external_gpio = NULL;
         subghz_devices_deinit();
         radio->registry_initialized = false;
     }
@@ -241,8 +254,13 @@ TumoNetRadioResult tumonet_radio_transfer(
         direction == TumoNetRadioDirectionInternalToExternal ? radio->internal : radio->external;
     const SubGhzDevice* receiver =
         direction == TumoNetRadioDirectionInternalToExternal ? radio->external : radio->internal;
-    const GpioPin* sender_gpio = subghz_devices_get_data_gpio(sender);
-    if(sender_gpio == NULL) return TumoNetRadioResultInit;
+    const GpioPin* sender_gpio = direction == TumoNetRadioDirectionInternalToExternal ?
+                                     radio->internal_gpio :
+                                     radio->external_gpio;
+    const GpioPin* receiver_gpio = direction == TumoNetRadioDirectionInternalToExternal ?
+                                       radio->external_gpio :
+                                       radio->internal_gpio;
+    if(sender_gpio == NULL || receiver_gpio == NULL) return TumoNetRadioResultInit;
 
     subghz_radio_broker_set_state(radio->broker, &radio->lease, SubGhzRadioBrokerStateRx);
     subghz_devices_idle(sender);
@@ -261,15 +279,21 @@ TumoNetRadioResult tumonet_radio_transfer(
 
     const bool started =
         tumonet_radio_wait_gpio(sender_gpio, true, TUMONET_RADIO_TX_TIMEOUT_MS, cancel_requested);
+    if(!started) {
+        subghz_devices_idle(sender);
+        subghz_devices_idle(receiver);
+        subghz_devices_flush_rx(receiver);
+        return tumonet_radio_cancelled(cancel_requested) ? TumoNetRadioResultCancelled :
+                                                           TumoNetRadioResultTxStartTimeout;
+    }
     const bool finished =
-        started &&
         tumonet_radio_wait_gpio(sender_gpio, false, TUMONET_RADIO_TX_TIMEOUT_MS, cancel_requested);
     subghz_devices_idle(sender);
     if(!finished) {
         subghz_devices_idle(receiver);
         subghz_devices_flush_rx(receiver);
         return tumonet_radio_cancelled(cancel_requested) ? TumoNetRadioResultCancelled :
-                                                           TumoNetRadioResultTimeout;
+                                                           TumoNetRadioResultTxEndTimeout;
     }
 
     const uint32_t deadline = furi_get_tick() + furi_ms_to_ticks(TUMONET_RADIO_RX_TIMEOUT_MS);
@@ -282,9 +306,18 @@ TumoNetRadioResult tumonet_radio_transfer(
         if((int32_t)(furi_get_tick() - deadline) >= 0) {
             subghz_devices_idle(receiver);
             subghz_devices_flush_rx(receiver);
-            return TumoNetRadioResultTimeout;
+            return TumoNetRadioResultRxTimeout;
         }
         furi_delay_tick(1U);
+    }
+
+    if(furi_hal_gpio_read(receiver_gpio) &&
+       !tumonet_radio_wait_gpio(
+           receiver_gpio, false, TUMONET_RADIO_RX_TIMEOUT_MS, cancel_requested)) {
+        subghz_devices_idle(receiver);
+        subghz_devices_flush_rx(receiver);
+        return tumonet_radio_cancelled(cancel_requested) ? TumoNetRadioResultCancelled :
+                                                           TumoNetRadioResultRxTimeout;
     }
 
     if(!subghz_devices_is_rx_data_crc_valid(receiver)) {
@@ -307,6 +340,12 @@ uint32_t tumonet_radio_frequency(const TumoNetRadio* radio) {
     return radio != NULL ? radio->frequency : 0U;
 }
 
+bool tumonet_radio_result_is_retryable(TumoNetRadioResult result) {
+    return result == TumoNetRadioResultTxStartTimeout ||
+           result == TumoNetRadioResultTxEndTimeout || result == TumoNetRadioResultRxTimeout ||
+           result == TumoNetRadioResultCrc;
+}
+
 const char* tumonet_radio_result_name(TumoNetRadioResult result) {
     switch(result) {
     case TumoNetRadioResultOk:
@@ -327,8 +366,12 @@ const char* tumonet_radio_result_name(TumoNetRadioResult result) {
         return "INIT ERROR";
     case TumoNetRadioResultTx:
         return "TX DENIED";
-    case TumoNetRadioResultTimeout:
-        return "RF TIMEOUT";
+    case TumoNetRadioResultTxStartTimeout:
+        return "TX START";
+    case TumoNetRadioResultTxEndTimeout:
+        return "TX END";
+    case TumoNetRadioResultRxTimeout:
+        return "RX WAIT";
     case TumoNetRadioResultCrc:
         return "RF CRC";
     case TumoNetRadioResultCancelled:
