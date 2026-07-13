@@ -97,11 +97,12 @@ if GetOption("fullenv") or any(
 
     if distenv["UPDATE_SPLASH"] == "tumoflip_update":
         update_splash = distenv.Command(
-            "#/assets/slideshow/tumoflip_update/frame_00.png",
+            "#/build/tumoflip-update-splash-${DIST_SUFFIX}.stamp",
             [
                 "#/tools/tumoflip/sync_update_splash.py",
                 "#/tools/tumoflip/generate_update_splash.py",
                 "#/fbt_options.py",
+                *distenv.Glob("#/assets/slideshow/tumoflip_update/frame_*.png"),
             ],
             [
                 [
@@ -109,7 +110,9 @@ if GetOption("fullenv") or any(
                     "${SOURCE}",
                     "--dist-suffix",
                     "${DIST_SUFFIX}",
-                ]
+                    "--check",
+                ],
+                Touch("${TARGET}"),
             ],
         )
     else:
