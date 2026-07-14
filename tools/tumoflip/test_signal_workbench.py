@@ -34,7 +34,7 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_app_migrates_in_place_without_duplicate_fap(self) -> None:
         self.assertIn('appid="signal_workbench"', self.manifest)
         self.assertIn('name="TumoSpectrum"', self.manifest)
-        self.assertIn('fap_version="1.0.0"', self.manifest)
+        self.assertIn('fap_version="1.0.1"', self.manifest)
         self.assertIn('fap_category="Module One/Signals"', self.manifest)
         self.assertIn(
             'fap_dist_path="apps/Module One/Signals/signal_workbench.fap"', self.manifest
@@ -88,6 +88,19 @@ class TumoSpectrumTest(unittest.TestCase):
             'target = "Sub-GHz"',
             'target = "Infrared"',
             "loader_enqueue_launch",
+        ):
+            self.assertIn(required, self.source)
+
+    def test_module_views_keep_their_internal_context(self) -> None:
+        for forbidden in (
+            "view_set_context(text_box_get_view",
+            "view_set_context(text_input_get_view",
+        ):
+            self.assertNotIn(forbidden, self.source)
+        for required in (
+            "tumospectrum_text_previous_menu",
+            "tumospectrum_text_previous_result",
+            "tumospectrum_note_previous",
         ):
             self.assertIn(required, self.source)
 

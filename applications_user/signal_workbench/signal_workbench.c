@@ -81,7 +81,6 @@ struct TumoSpectrumApp {
     char note_buffer[TUMOSPECTRUM_NOTE_SIZE];
     char report_path[TUMOSPECTRUM_PATH_SIZE];
     uint8_t result_page;
-    uint32_t text_return_view;
 };
 
 static const NotificationSequence tumospectrum_sequence_ok = {
@@ -303,8 +302,14 @@ static uint32_t tumospectrum_actions_previous(void* context) {
     return TumoSpectrumViewResult;
 }
 
-static uint32_t tumospectrum_text_previous(void* context) {
-    return ((TumoSpectrumApp*)context)->text_return_view;
+static uint32_t tumospectrum_text_previous_menu(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewMenu;
+}
+
+static uint32_t tumospectrum_text_previous_result(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewResult;
 }
 
 static uint32_t tumospectrum_note_previous(void* context) {
@@ -327,7 +332,10 @@ static void tumospectrum_show_text(
     furi_string_cat(app->text, body ? body : "");
     text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
     text_box_set_focus(app->text_box, TextBoxFocusStart);
-    app->text_return_view = return_view;
+    view_set_previous_callback(
+        text_box_get_view(app->text_box),
+        return_view == TumoSpectrumViewMenu ? tumospectrum_text_previous_menu :
+                                             tumospectrum_text_previous_result);
     view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewText);
 }
 
@@ -424,7 +432,8 @@ static void tumospectrum_menu_callback(void* context, uint32_t index) {
         if(tumospectrum_storage_load_latest(app->storage, app->text)) {
             text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
             text_box_set_focus(app->text_box, TextBoxFocusStart);
-            app->text_return_view = TumoSpectrumViewMenu;
+            view_set_previous_callback(
+                text_box_get_view(app->text_box), tumospectrum_text_previous_menu);
             view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewText);
         } else {
             tumospectrum_show_text(
@@ -595,7 +604,8 @@ static void tumospectrum_action_callback(void* context, uint32_t index) {
             app->text);
         text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
         text_box_set_focus(app->text_box, TextBoxFocusStart);
-        app->text_return_view = TumoSpectrumViewResult;
+        view_set_previous_callback(
+            text_box_get_view(app->text_box), tumospectrum_text_previous_result);
         view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewText);
         break;
     default:
@@ -717,9 +727,8 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
 
     text_box_set_font(app->text_box, TextBoxFontText);
     text_box_set_focus(app->text_box, TextBoxFocusStart);
-    view_set_context(text_box_get_view(app->text_box), app);
-    view_set_previous_callback(text_box_get_view(app->text_box), tumospectrum_text_previous);
-    view_set_context(text_input_get_view(app->note_input), app);
+    view_set_previous_callback(
+        text_box_get_view(app->text_box), tumospectrum_text_previous_menu);
     view_set_previous_callback(text_input_get_view(app->note_input), tumospectrum_note_previous);
 
     view_dispatcher_add_view(app->view_dispatcher, TumoSpectrumViewMenu, submenu_get_view(app->menu));
