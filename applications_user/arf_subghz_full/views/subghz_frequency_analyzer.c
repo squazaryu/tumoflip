@@ -169,7 +169,7 @@ static void subghz_frequency_analyzer_history_frequency_draw(
         if(model->history_frequency_rx_count[i] > 0) {
             snprintf(buffer, sizeof(buffer), "x%d", model->history_frequency_rx_count[i]);
             canvas_draw_str(canvas, current_x + 41, current_y, buffer);
-        } else {
+        } else if(model->history_frequency[i]) {
             canvas_draw_str(canvas, current_x + 41, current_y, "MHz");
         }
 
