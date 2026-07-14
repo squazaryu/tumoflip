@@ -268,9 +268,13 @@ bool subghz_device_cc1101_ext_is_connect(void) {
         subghz_device_cc1101_ext_free();
     } else { // initialized
         furi_hal_spi_acquire(subghz_device_cc1101_ext->spi_bus_handle);
-        uint8_t partnumber = cc1101_get_partnumber(subghz_device_cc1101_ext->spi_bus_handle);
+        const uint8_t partnumber = cc1101_get_partnumber(subghz_device_cc1101_ext->spi_bus_handle);
+        const uint8_t version = cc1101_get_version(subghz_device_cc1101_ext->spi_bus_handle);
         furi_hal_spi_release(subghz_device_cc1101_ext->spi_bus_handle);
-        ret = (partnumber != 0) && (partnumber != 0xFF);
+
+        // Genuine CC1101 reports PARTNUM=0x00. Reject floating/high or
+        // grounded/low SPI responses by validating VERSION as well.
+        ret = (partnumber != 0xFF) && (version != 0x00) && (version != 0xFF);
     }
 
     return ret;
