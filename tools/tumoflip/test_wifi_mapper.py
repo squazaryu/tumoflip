@@ -61,7 +61,7 @@ class WiFiMapperTest(unittest.TestCase):
             manifest,
         )
         self.assertIn('fap_category="Module One/ESP32 Wi-Fi"', manifest)
-        self.assertIn('fap_version="1.0.1"', manifest)
+        self.assertIn('fap_version="1.1.0"', manifest)
         self.assertIn('fap_icon="wifi_mapper_10px.png"', manifest)
         self.assertIn('fap_icon_assets="icons"', manifest)
         self.assertTrue((APP_DIR / "wifi_mapper_10px.png").is_file())
@@ -145,8 +145,8 @@ class WiFiMapperTest(unittest.TestCase):
             source,
         )
         self.assertIn('EXT_PATH("apps_data/wifi_mapper/exports")', source)
-        self.assertIn('wifi_mapper_hint(canvas, x, 62, &I_ButtonCenter_7x7, "Export")', source)
-        self.assertIn('wifi_mapper_hint(canvas, x, 62, &I_ButtonRight_4x7, "Next")', source)
+        self.assertIn('elements_button_center(canvas, "Export")', source)
+        self.assertIn('elements_button_right(canvas, "Next")', source)
         self.assertIn("FuriHalSerialIdUsart", source)
         self.assertIn("#include <expansion/expansion.h>", source)
         self.assertIn("Expansion* expansion;", source)
@@ -169,25 +169,26 @@ class WiFiMapperTest(unittest.TestCase):
             source,
         )
 
-    def test_live_screen_uses_icon_legend_without_bottom_button_overlap(self) -> None:
+    def test_screens_use_standard_soft_buttons(self) -> None:
         source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
 
         self.assertIn('#include "wifi_mapper_icons.h"', source)
-        self.assertIn("static int wifi_mapper_hint(", source)
         self.assertIn('canvas_draw_str(canvas, 0, 10, "TumoSurvey")', source)
-        self.assertIn('wifi_mapper_hint(canvas, x, 62, &I_ButtonLeft_4x7, "Mode")', source)
-        self.assertIn('model->logging ? "Stop" : "Start"', source)
-        self.assertIn('wifi_mapper_hint(canvas, x, 62, &I_ButtonRight_4x7, "Data")', source)
+        self.assertIn('elements_button_left(canvas, "Mode")', source)
+        self.assertIn(
+            'elements_button_center(canvas, model->logging ? "Stop" : "Start")',
+            source,
+        )
+        self.assertIn('elements_button_right(canvas, "Data")', source)
         self.assertIn('if(model->logging) strlcat(chips, "LIVE ", sizeof(chips));', source)
         self.assertIn("static void wifi_mapper_draw_insights(", source)
         self.assertIn("static void wifi_mapper_draw_about(", source)
-        self.assertIn('"TumoSurvey v1.0.1"', source)
+        self.assertIn('"TumoSurvey v1.1.0"', source)
         self.assertIn('"Passive WiFi survey"', source)
         self.assertIn('"squazaryu/tumoflip"', source)
         self.assertNotIn("wifi_mapper_draw_top_action", source)
         self.assertNotIn("canvas_draw_rbox(canvas, 94, 1, 34, 12, 2)", source)
-        self.assertNotIn("elements_button_center(canvas", source)
-        self.assertNotIn("elements_button_right(canvas", source)
+        self.assertNotIn("static int wifi_mapper_hint(", source)
 
     def test_live_relay_contract_is_stable_and_opt_in(self) -> None:
         source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")

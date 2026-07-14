@@ -1829,16 +1829,6 @@ static void wifi_mapper_stop_logging(WiFiMapperApp* app) {
     wifi_mapper_update_model(app);
 }
 
-// Draws a button glyph + label on the text baseline `y`, starting at `x`. Returns
-// the x just past the segment so hints chain left-to-right. The glyph is bottom-
-// aligned to the baseline so it sits like a leading character next to the word.
-static int wifi_mapper_hint(Canvas* canvas, int x, int y, const Icon* icon, const char* label) {
-    canvas_draw_icon(canvas, x, y - icon_get_height(icon), icon);
-    x += icon_get_width(icon) + 2;
-    canvas_draw_str(canvas, x, y, label);
-    return x + canvas_string_width(canvas, label) + 7;
-}
-
 static void wifi_mapper_draw_live(Canvas* canvas, WiFiMapperModel* model) {
     char line[48];
 
@@ -1881,11 +1871,9 @@ static void wifi_mapper_draw_live(Canvas* canvas, WiFiMapperModel* model) {
     canvas_draw_str(canvas, 0, 46, line);
 
     canvas_draw_line(canvas, 0, 50, 127, 50);
-    int x = 0;
-    x = wifi_mapper_hint(canvas, x, 62, &I_ButtonLeft_4x7, "Mode");
-    x = wifi_mapper_hint(
-        canvas, x, 62, &I_ButtonCenter_7x7, model->logging ? "Stop" : "Start");
-    wifi_mapper_hint(canvas, x, 62, &I_ButtonRight_4x7, "Data");
+    elements_button_left(canvas, "Mode");
+    elements_button_center(canvas, model->logging ? "Stop" : "Start");
+    elements_button_right(canvas, "Data");
 }
 
 static void wifi_mapper_draw_insights(Canvas* canvas, WiFiMapperModel* model) {
@@ -1934,23 +1922,21 @@ static void wifi_mapper_draw_insights(Canvas* canvas, WiFiMapperModel* model) {
     } else {
         strlcpy(line, "Waiting for AP data", sizeof(line));
     }
-    canvas_draw_str(canvas, 0, 52, line);
+    canvas_draw_str(canvas, 0, 50, line);
 
-    int x = 0;
-    x = wifi_mapper_hint(canvas, x, 62, &I_Pin_back_arrow_10x8, "Live");
-    x = wifi_mapper_hint(canvas, x, 62, &I_ButtonDown_7x4, "Info");
-    wifi_mapper_hint(canvas, x, 62, &I_ButtonRight_4x7, "Saved");
+    elements_button_left(canvas, "Back");
+    elements_button_center(canvas, "Info");
+    elements_button_right(canvas, "Saved");
 }
 
 static void wifi_mapper_draw_about(Canvas* canvas) {
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 0, 10, "TumoSurvey v1.0.1");
+    canvas_draw_str(canvas, 0, 10, "TumoSurvey v1.1.0");
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, 0, 24, "Passive WiFi survey");
     canvas_draw_str(canvas, 0, 36, "Module One + ESP32");
     canvas_draw_str(canvas, 0, 48, "squazaryu/tumoflip");
-    canvas_draw_line(canvas, 0, 52, 127, 52);
-    wifi_mapper_hint(canvas, 0, 62, &I_Pin_back_arrow_10x8, "Back");
+    elements_button_left(canvas, "Back");
 }
 
 static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
@@ -1994,7 +1980,7 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
                 "best/avg %ld/%ld dBm",
                 (long)model->session.best_rssi,
                 (long)model->session.avg_rssi);
-            canvas_draw_str(canvas, 0, 52, line);
+            canvas_draw_str(canvas, 0, 50, line);
         } else if(model->session_page == WiFiMapperSessionPageSecurity) {
             snprintf(
                 line,
@@ -2016,7 +2002,7 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
                 "Other %lu  %s",
                 (unsigned long)model->session.other_security,
                 wifi_mapper_get_export_mode_label(model->export_mode));
-            canvas_draw_str(canvas, 0, 52, line);
+            canvas_draw_str(canvas, 0, 50, line);
         } else if(model->session_page == WiFiMapperSessionPageChannels) {
             uint8_t shown = 0U;
             line[0] = '\0';
@@ -2049,12 +2035,12 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
                 "Rows %lu  export %lu",
                 (unsigned long)model->session.rows,
                 (unsigned long)model->session.exported);
-            canvas_draw_str(canvas, 0, 52, line);
+            canvas_draw_str(canvas, 0, 50, line);
         } else if(model->session.has_baseline &&
                   (model->session.truncated || model->session.baseline_truncated)) {
             canvas_draw_str(canvas, 0, 32, "AP limit reached");
             canvas_draw_str(canvas, 0, 42, "Full comparison is in");
-            canvas_draw_str(canvas, 0, 52, "Unleashed Companion");
+            canvas_draw_str(canvas, 0, 50, "Unleashed Companion");
         } else if(model->session.has_baseline) {
             snprintf(
                 line,
@@ -2075,7 +2061,7 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
                 "Obs %+ld  WPA3 %+ld",
                 (long)model->session.delta_observations,
                 (long)model->session.delta_wpa3);
-            canvas_draw_str(canvas, 0, 52, line);
+            canvas_draw_str(canvas, 0, 50, line);
         } else {
             canvas_draw_str(canvas, 0, 34, "No earlier baseline");
             canvas_draw_str(canvas, 0, 46, "Record another session");
@@ -2085,11 +2071,9 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
         canvas_draw_str(canvas, 0, 34, "Press Up to analyze latest.");
     }
 
-    canvas_draw_line(canvas, 0, 55, 127, 55);
-    int x = 0;
-    x = wifi_mapper_hint(canvas, x, 62, &I_ButtonLeft_4x7, "Prev");
-    x = wifi_mapper_hint(canvas, x, 62, &I_ButtonCenter_7x7, "Export");
-    wifi_mapper_hint(canvas, x, 62, &I_ButtonRight_4x7, "Next");
+    elements_button_left(canvas, "Prev");
+    elements_button_center(canvas, "Export");
+    elements_button_right(canvas, "Next");
 }
 
 static void wifi_mapper_draw_callback(Canvas* canvas, void* context) {
@@ -2183,7 +2167,7 @@ static bool wifi_mapper_input_callback(InputEvent* event, void* context) {
                 wifi_mapper_analyze_latest_session(app);
             }
             return true;
-        } else if(event->key == InputKeyDown) {
+        } else if((event->key == InputKeyOk) || (event->key == InputKeyDown)) {
             wifi_mapper_switch_screen(app, WiFiMapperScreenAbout);
             return true;
         }
