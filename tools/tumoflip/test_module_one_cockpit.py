@@ -21,7 +21,7 @@ COCKPIT_FAP_ROUTES = {
     "signal_workbench": "apps/Module One/Signals/signal_workbench.fap",
     "protocol_compiler": "apps/Module One/Signals/protocol_compiler.fap",
     "tumoscope": "apps/Module One/Signals/tumoscope.fap",
-    "tumonet_bench": "apps/Module One/Sub-GHz/tumonet_bench.fap",
+    "tumonet_gateway": "apps/Module One/Network/tumonet_gateway.fap",
     "tumovgm_bridge": "apps/Module One/VGM/tumovgm_bridge.fap",
     "tumomodule_runtime": "apps/Module One/Modules/tumomodule_runtime.fap",
     "tumokey_phase_a": "apps/Module One/Labs/tumokey_phase_a.fap",
@@ -59,7 +59,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("Signals: Workbench", self.source)
         self.assertIn("Signals: Compiler", self.source)
         self.assertIn("Signals: TumoScope", self.source)
-        self.assertIn("CC1101: TumoNet", self.source)
+        self.assertIn("Network: TumoNet", self.source)
         self.assertIn("VGM: Bridge", self.source)
         self.assertIn("Modules: Runtime", self.source)
         self.assertIn("Security: TumoKey A", self.source)
@@ -100,7 +100,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
             self.source,
         )
         self.assertIn(
-            'EXT_PATH("apps/Module One/Sub-GHz/tumonet_bench.fap")',
+            'EXT_PATH("apps/Module One/Network/tumonet_gateway.fap")',
             self.source,
         )
         self.assertIn(
