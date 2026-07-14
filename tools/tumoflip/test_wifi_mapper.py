@@ -61,7 +61,7 @@ class WiFiMapperTest(unittest.TestCase):
             manifest,
         )
         self.assertIn('fap_category="Module One/ESP32 Wi-Fi"', manifest)
-        self.assertIn('fap_version="1.0.0"', manifest)
+        self.assertIn('fap_version="1.0.1"', manifest)
         self.assertIn('fap_icon="wifi_mapper_10px.png"', manifest)
         self.assertIn('fap_icon_assets="icons"', manifest)
         self.assertTrue((APP_DIR / "wifi_mapper_10px.png").is_file())
@@ -131,7 +131,12 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn("WIFI_MAPPER_MAX_EXPORT_FEATURES", source)
         self.assertIn("WiFiMapperSessionScratch* scratch = malloc", source)
         self.assertIn("WiFiMapperExportScratch* scratch = malloc", source)
-        self.assertIn('furi_thread_alloc_ex("WiFiMapperRx", 2048', source)
+        self.assertIn(
+            'furi_thread_alloc_ex("WiFiMapperRx", 3 * 1024',
+            source,
+        )
+        self.assertNotIn("const WiFiMapperInsights insights = app->insights", source)
+        self.assertNotIn("const WiFiMapperSessionStats session = app->session", source)
         self.assertNotIn("char fields[WIFI_MAPPER_CSV_FIELDS]", source)
         self.assertIn("wifi_mapper_send_active_scan_command", source)
         self.assertIn('EXT_PATH("apps_data/wifi_mapper/sessions")', source)
@@ -176,7 +181,7 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn('if(model->logging) strlcat(chips, "LIVE ", sizeof(chips));', source)
         self.assertIn("static void wifi_mapper_draw_insights(", source)
         self.assertIn("static void wifi_mapper_draw_about(", source)
-        self.assertIn('"TumoSurvey v1.0.0"', source)
+        self.assertIn('"TumoSurvey v1.0.1"', source)
         self.assertIn('"Passive WiFi survey"', source)
         self.assertIn('"squazaryu/tumoflip"', source)
         self.assertNotIn("wifi_mapper_draw_top_action", source)
