@@ -1,10 +1,19 @@
+#include "tumospectrum_analysis.h"
+#include "tumospectrum_parser.h"
+#include "tumospectrum_storage.h"
+#include "signal_workbench_icons.h"
+
+#include <bt/bt_service/bt.h>
+#include <dialogs/dialogs.h>
 #include <furi.h>
-#include <furi_hal_gpio.h>
-#include <furi_hal_rtc.h>
+#include <gui/elements.h>
 #include <gui/gui.h>
 #include <gui/modules/submenu.h>
 #include <gui/modules/text_box.h>
+#include <gui/modules/text_input.h>
+#include <gui/view.h>
 #include <gui/view_dispatcher.h>
+#include <loader/loader.h>
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
 #include <storage/storage.h>
@@ -13,777 +22,737 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SIGNAL_WORKBENCH_DATA_DIR EXT_PATH("apps_data/signal_workbench")
-#define SIGNAL_WORKBENCH_IR_DIR EXT_PATH("infrared")
-#define SIGNAL_WORKBENCH_RF_NOTEBOOK_CSV \
-    EXT_PATH("apps_data/arf_subghz_full/notebook/observations.csv")
-
-#define SIGNAL_WORKBENCH_PATH_SIZE 128U
-#define SIGNAL_WORKBENCH_IR_BUFFER_SIZE 8192U
-#define SIGNAL_WORKBENCH_IR_TIMING_LIMIT 256U
-#define SIGNAL_WORKBENCH_IR_PREVIEW_COUNT 8U
-#define SIGNAL_WORKBENCH_LINE_SIZE 192U
-#define SIGNAL_WORKBENCH_GPIO_CYCLES 8U
-#define SIGNAL_WORKBENCH_GPIO_HIGH_US 500U
-#define SIGNAL_WORKBENCH_GPIO_LOW_US 500U
+#define TUMOSPECTRUM_SUBGHZ_DIR EXT_PATH("subghz")
+#define TUMOSPECTRUM_INFRARED_DIR EXT_PATH("infrared")
+#define TUMOSPECTRUM_SCOPE_DIR EXT_PATH("apps_data/tumoscope/captures")
+#define TUMOSPECTRUM_BRIDGE_APP_ID "signal_workbench"
+#define TUMOSPECTRUM_BRIDGE_COMMAND "report"
 
 typedef enum {
-    SignalWorkbenchViewMenu,
-    SignalWorkbenchViewText,
-} SignalWorkbenchView;
+    TumoSpectrumViewMenu,
+    TumoSpectrumViewResult,
+    TumoSpectrumViewActions,
+    TumoSpectrumViewText,
+    TumoSpectrumViewNote,
+} TumoSpectrumView;
 
 typedef enum {
-    SignalWorkbenchActionInspectIr,
-    SignalWorkbenchActionRfNotebook,
-    SignalWorkbenchActionGpioProfile,
-    SignalWorkbenchActionRunGpioPulse,
-    SignalWorkbenchActionExport,
-    SignalWorkbenchActionAbout,
-} SignalWorkbenchAction;
+    TumoSpectrumMenuOpenSubGhz,
+    TumoSpectrumMenuOpenInfrared,
+    TumoSpectrumMenuOpenScope,
+    TumoSpectrumMenuImportAnalyzer,
+    TumoSpectrumMenuNotebook,
+    TumoSpectrumMenuAbout,
+} TumoSpectrumMenuAction;
+
+typedef enum {
+    TumoSpectrumActionNote,
+    TumoSpectrumActionSave,
+    TumoSpectrumActionCompare,
+    TumoSpectrumActionHandoff,
+    TumoSpectrumActionCompanion,
+    TumoSpectrumActionDetails,
+} TumoSpectrumResultAction;
+
+typedef struct TumoSpectrumApp TumoSpectrumApp;
 
 typedef struct {
-    bool found;
-    bool truncated;
-    bool frequency_present;
-    bool duty_present;
-    bool type_present;
-    char path[SIGNAL_WORKBENCH_PATH_SIZE];
-    char type[16];
-    uint64_t file_size;
-    uint32_t frequency;
-    float duty_cycle;
-    uint32_t timing_count;
-    uint32_t clipped_count;
-    uint32_t preview[SIGNAL_WORKBENCH_IR_PREVIEW_COUNT];
-    uint32_t preview_count;
-    uint32_t min_us;
-    uint32_t max_us;
-    uint64_t total_us;
-} SignalWorkbenchIrReport;
+    TumoSpectrumApp* app;
+    uint8_t page;
+} TumoSpectrumResultModel;
 
-typedef struct {
-    bool found;
-    char source[16];
-    char frequency_hz[16];
-    char rssi_dbm[16];
-    char radio[16];
-    char note[48];
-} SignalWorkbenchRfObservation;
-
-typedef struct {
+struct TumoSpectrumApp {
     Gui* gui;
     Storage* storage;
+    DialogsApp* dialogs;
+    Loader* loader;
+    Bt* bt;
     NotificationApp* notification;
     ViewDispatcher* view_dispatcher;
-    Submenu* submenu;
+    Submenu* menu;
+    Submenu* actions;
+    View* result_view;
     TextBox* text_box;
+    TextInput* note_input;
     FuriString* text;
-    SignalWorkbenchIrReport last_ir;
-    SignalWorkbenchRfObservation last_rf;
-    bool gpio_pulse_ran;
-} SignalWorkbenchApp;
+    TumoSpectrumCapture capture;
+    TumoSpectrumCapture compared;
+    TumoSpectrumComparison comparison;
+    char note_buffer[TUMOSPECTRUM_NOTE_SIZE];
+    char report_path[TUMOSPECTRUM_PATH_SIZE];
+    uint8_t result_page;
+    uint32_t text_return_view;
+};
 
-static const NotificationSequence signal_workbench_sequence_ok = {
+static const NotificationSequence tumospectrum_sequence_ok = {
     &message_display_backlight_on,
     &message_green_255,
     &message_delay_10,
     NULL,
 };
 
-static const NotificationSequence signal_workbench_sequence_error = {
+static const NotificationSequence tumospectrum_sequence_error = {
     &message_display_backlight_on,
     &message_red_255,
     &message_delay_10,
     NULL,
 };
 
-static bool signal_workbench_mkdir(Storage* storage, const char* path) {
-    const FS_Error error = storage_common_mkdir(storage, path);
-    return (error == FSE_OK) || (error == FSE_EXIST);
+static void tumospectrum_refresh_result(TumoSpectrumApp* app) {
+    with_view_model(
+        app->result_view,
+        TumoSpectrumResultModel * model,
+        {
+            model->app = app;
+            model->page = app->result_page;
+        },
+        true);
 }
 
-static void signal_workbench_format_filename_timestamp(char* output, size_t output_size) {
-    DateTime now;
-    furi_hal_rtc_get_datetime(&now);
-    snprintf(
-        output,
-        output_size,
-        "%04u%02u%02u_%02u%02u%02u",
-        now.year,
-        now.month,
-        now.day,
-        now.hour,
-        now.minute,
-        now.second);
-}
-
-static void signal_workbench_append_iso_timestamp(FuriString* output) {
-    DateTime now;
-    furi_hal_rtc_get_datetime(&now);
-    furi_string_cat_printf(
-        output,
-        "%04u-%02u-%02uT%02u:%02u:%02u",
-        now.year,
-        now.month,
-        now.day,
-        now.hour,
-        now.minute,
-        now.second);
-}
-
-static bool signal_workbench_has_extension(const char* name, const char* extension) {
-    const char* dot = strrchr(name, '.');
-    return dot && strcmp(dot, extension) == 0;
-}
-
-static bool signal_workbench_find_latest_ir(
-    Storage* storage,
-    char* output,
-    size_t output_size,
-    uint64_t* file_size) {
-    File* directory = storage_file_alloc(storage);
-    FileInfo file_info;
-    char name[96];
-    char latest_name[96] = "";
-    uint64_t latest_size = 0;
-    bool found = false;
-
-    if(storage_dir_open(directory, SIGNAL_WORKBENCH_IR_DIR)) {
-        while(storage_dir_read(directory, &file_info, name, sizeof(name))) {
-            if(file_info_is_dir(&file_info) || !signal_workbench_has_extension(name, ".ir")) {
-                continue;
-            }
-            if(!found || strcmp(name, latest_name) > 0) {
-                strlcpy(latest_name, name, sizeof(latest_name));
-                latest_size = file_info.size;
-                found = true;
-            }
-        }
-        storage_dir_close(directory);
-    }
-
-    storage_file_free(directory);
-
-    if(found) {
-        snprintf(output, output_size, SIGNAL_WORKBENCH_IR_DIR "/%s", latest_name);
-        if(file_size) {
-            *file_size = latest_size;
-        }
-    }
-
-    return found;
-}
-
-static size_t signal_workbench_read_file_bounded(
-    Storage* storage,
-    const char* path,
-    char* buffer,
-    size_t buffer_size,
-    bool* truncated) {
-    FileInfo info = {0};
-    size_t bytes_read = 0;
-
-    if(buffer_size == 0U) {
-        return 0;
-    }
-
-    buffer[0] = '\0';
-    if(truncated) {
-        *truncated = false;
-    }
-
-    if(storage_common_stat(storage, path, &info) == FSE_OK && truncated) {
-        *truncated = info.size >= buffer_size;
-    }
-
-    File* file = storage_file_alloc(storage);
-    if(storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
-        bytes_read = storage_file_read(file, buffer, buffer_size - 1U);
-        buffer[bytes_read] = '\0';
-        if(truncated && bytes_read == (buffer_size - 1U)) {
-            *truncated = true;
-        }
-    }
-
-    storage_file_close(file);
-    storage_file_free(file);
-    return bytes_read;
-}
-
-static const char* signal_workbench_skip_spaces(const char* cursor) {
-    while((*cursor == ' ') || (*cursor == '\t')) {
-        cursor++;
-    }
-    return cursor;
-}
-
-static bool signal_workbench_parse_token(
-    const char* buffer,
-    const char* key,
-    char* output,
-    size_t output_size) {
-    const char* cursor = strstr(buffer, key);
-    if(!cursor) {
-        return false;
-    }
-
-    cursor += strlen(key);
-    cursor = signal_workbench_skip_spaces(cursor);
-
-    size_t index = 0;
-    while(*cursor && (*cursor != '\n') && (*cursor != '\r') && (index + 1U < output_size)) {
-        output[index++] = *cursor++;
-    }
-    output[index] = '\0';
-    return index > 0U;
-}
-
-static bool signal_workbench_parse_u32(
-    const char* buffer,
-    const char* key,
-    uint32_t* output) {
-    char token[24];
-    if(!signal_workbench_parse_token(buffer, key, token, sizeof(token))) {
-        return false;
-    }
-
-    char* end = NULL;
-    const unsigned long parsed = strtoul(token, &end, 10);
-    if(end == token) {
-        return false;
-    }
-
-    *output = (uint32_t)parsed;
-    return true;
-}
-
-static bool signal_workbench_parse_float(
-    const char* buffer,
-    const char* key,
-    float* output) {
-    char token[24];
-    if(!signal_workbench_parse_token(buffer, key, token, sizeof(token))) {
-        return false;
-    }
-
-    char* end = NULL;
-    const float parsed = strtof(token, &end);
-    if(end == token) {
-        return false;
-    }
-
-    *output = parsed;
-    return true;
-}
-
-static void signal_workbench_add_timing(SignalWorkbenchIrReport* report, uint32_t timing) {
-    if(report->timing_count >= SIGNAL_WORKBENCH_IR_TIMING_LIMIT) {
-        report->clipped_count++;
-        return;
-    }
-
-    if(report->preview_count < SIGNAL_WORKBENCH_IR_PREVIEW_COUNT) {
-        report->preview[report->preview_count++] = timing;
-    }
-
-    if(report->timing_count == 0U || timing < report->min_us) {
-        report->min_us = timing;
-    }
-    if(timing > report->max_us) {
-        report->max_us = timing;
-    }
-
-    report->total_us += timing;
-    report->timing_count++;
-}
-
-static void signal_workbench_parse_timings_from_key(
-    const char* buffer,
-    const char* key,
-    SignalWorkbenchIrReport* report) {
-    const char* cursor = strstr(buffer, key);
-    if(!cursor) {
-        return;
-    }
-
-    cursor += strlen(key);
-    while(*cursor && (*cursor != '\n') && (*cursor != '\r')) {
-        cursor = signal_workbench_skip_spaces(cursor);
-        while(*cursor == ',') {
-            cursor++;
-            cursor = signal_workbench_skip_spaces(cursor);
-        }
-
-        if(!*cursor || (*cursor == '\n') || (*cursor == '\r')) {
-            break;
-        }
-
-        char* end = NULL;
-        long parsed = strtol(cursor, &end, 10);
-        if(end == cursor) {
-            break;
-        }
-
-        if(parsed < 0) {
-            parsed = -parsed;
-        }
-        signal_workbench_add_timing(report, (uint32_t)parsed);
-        cursor = end;
+static const char* tumospectrum_badge(TumoSpectrumCaptureType type) {
+    switch(type) {
+    case TumoSpectrumCaptureSubGhzRaw:
+        return "SUB RAW";
+    case TumoSpectrumCaptureSubGhzDecoded:
+        return "SUB KEY";
+    case TumoSpectrumCaptureInfraredRaw:
+        return "IR RAW";
+    case TumoSpectrumCaptureInfraredParsed:
+        return "IR KEY";
+    case TumoSpectrumCaptureTumoScope:
+        return "GPIO";
+    case TumoSpectrumCaptureFrequencyObservation:
+        return "RF NOTE";
+    default:
+        return "EMPTY";
     }
 }
 
-static void signal_workbench_analyze_ir(SignalWorkbenchApp* app, SignalWorkbenchIrReport* report) {
-    memset(report, 0, sizeof(SignalWorkbenchIrReport));
-
-    uint64_t file_size = 0;
-    report->found = signal_workbench_find_latest_ir(
-        app->storage, report->path, sizeof(report->path), &file_size);
-    report->file_size = file_size;
-    if(!report->found) {
-        return;
-    }
-
-    char* buffer = malloc(SIGNAL_WORKBENCH_IR_BUFFER_SIZE);
-    if(!buffer) {
-        report->truncated = true;
-        return;
-    }
-
-    signal_workbench_read_file_bounded(
-        app->storage,
-        report->path,
-        buffer,
-        SIGNAL_WORKBENCH_IR_BUFFER_SIZE,
-        &report->truncated);
-
-    report->type_present =
-        signal_workbench_parse_token(buffer, "type:", report->type, sizeof(report->type));
-    report->frequency_present =
-        signal_workbench_parse_u32(buffer, "frequency:", &report->frequency);
-    report->duty_present = signal_workbench_parse_float(buffer, "duty_cycle:", &report->duty_cycle);
-    signal_workbench_parse_timings_from_key(buffer, "data:", report);
-    signal_workbench_parse_timings_from_key(buffer, "RAW_Data:", report);
-
-    free(buffer);
+static void tumospectrum_draw_badge(Canvas* canvas, const char* text) {
+    canvas_draw_rframe(canvas, 80, 0, 48, 13, 2);
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(canvas, 104, 10, AlignCenter, AlignBottom, text);
 }
 
-static void signal_workbench_csv_read_field(const char** cursor, char* output, size_t output_size) {
-    size_t index = 0;
-    while(**cursor && (**cursor != ',') && (**cursor != '\n') && (**cursor != '\r')) {
-        if(index + 1U < output_size) {
-            output[index++] = **cursor;
-        }
-        (*cursor)++;
-    }
-    output[index] = '\0';
-    if(**cursor == ',') {
-        (*cursor)++;
-    }
-}
-
-static bool signal_workbench_parse_rf_line(
-    const char* line,
-    SignalWorkbenchRfObservation* observation) {
-    memset(observation, 0, sizeof(SignalWorkbenchRfObservation));
-    if(!line || !line[0] || strncmp(line, "timestamp,", 10) == 0) {
-        return false;
-    }
-
-    char ignored[32];
-    const char* cursor = line;
-    signal_workbench_csv_read_field(&cursor, ignored, sizeof(ignored));
-    signal_workbench_csv_read_field(&cursor, observation->source, sizeof(observation->source));
-    signal_workbench_csv_read_field(
-        &cursor, observation->frequency_hz, sizeof(observation->frequency_hz));
-    signal_workbench_csv_read_field(&cursor, observation->rssi_dbm, sizeof(observation->rssi_dbm));
-    signal_workbench_csv_read_field(&cursor, ignored, sizeof(ignored));
-    signal_workbench_csv_read_field(&cursor, ignored, sizeof(ignored));
-    signal_workbench_csv_read_field(&cursor, observation->radio, sizeof(observation->radio));
-    signal_workbench_csv_read_field(&cursor, ignored, sizeof(ignored));
-    signal_workbench_csv_read_field(&cursor, ignored, sizeof(ignored));
-    signal_workbench_csv_read_field(&cursor, ignored, sizeof(ignored));
-    signal_workbench_csv_read_field(&cursor, ignored, sizeof(ignored));
-    signal_workbench_csv_read_field(&cursor, observation->note, sizeof(observation->note));
-
-    observation->found = observation->frequency_hz[0] != '\0';
-    return observation->found;
-}
-
-static bool signal_workbench_read_latest_rf_observation(
-    SignalWorkbenchApp* app,
-    SignalWorkbenchRfObservation* observation) {
-    File* file = storage_file_alloc(app->storage);
-    bool found = false;
-    char current[SIGNAL_WORKBENCH_LINE_SIZE];
-    char latest[SIGNAL_WORKBENCH_LINE_SIZE];
-    size_t current_len = 0;
-    current[0] = '\0';
-    latest[0] = '\0';
-
-    if(storage_file_open(file, SIGNAL_WORKBENCH_RF_NOTEBOOK_CSV, FSAM_READ, FSOM_OPEN_EXISTING)) {
-        char ch;
-        while(storage_file_read(file, &ch, 1) == 1) {
-            if((ch == '\n') || (ch == '\r')) {
-                current[current_len] = '\0';
-                if(current_len > 0U && strncmp(current, "timestamp,", 10) != 0) {
-                    strlcpy(latest, current, sizeof(latest));
-                    found = true;
-                }
-                current_len = 0;
-                current[0] = '\0';
-            } else if(current_len + 1U < sizeof(current)) {
-                current[current_len++] = ch;
-            }
-        }
-        if(current_len > 0U) {
-            current[current_len] = '\0';
-            if(strncmp(current, "timestamp,", 10) != 0) {
-                strlcpy(latest, current, sizeof(latest));
-                found = true;
-            }
-        }
-    }
-
-    storage_file_close(file);
-    storage_file_free(file);
-    return found && signal_workbench_parse_rf_line(latest, observation);
-}
-
-static bool signal_workbench_write_text_file(
-    Storage* storage,
-    const char* path,
-    const char* text) {
-    File* file = storage_file_alloc(storage);
-    bool ok = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS);
-    if(ok) {
-        const size_t size = strlen(text);
-        ok = storage_file_write(file, text, size) == size;
-        storage_file_sync(file);
-    }
-    storage_file_close(file);
-    storage_file_free(file);
-    return ok;
-}
-
-static void signal_workbench_append_ir_report(
-    FuriString* output,
-    const SignalWorkbenchIrReport* report) {
-    furi_string_cat(output, "IR RAW\n");
-    if(!report->found) {
-        furi_string_cat_printf(
-            output,
-            "Status: missing\n"
-            "Path scanned: %s\n\n",
-            SIGNAL_WORKBENCH_IR_DIR);
-        return;
-    }
-
-    furi_string_cat_printf(
-        output,
-        "Path: %s\n"
-        "File size: %lu bytes\n"
-        "Read limit: %u bytes\n"
-        "Truncated: %s\n"
-        "Type: %s\n"
-        "Frequency: %s%lu Hz\n"
-        "Duty: %s%u.%02u\n"
-        "Timings counted: %lu\n"
-        "Timings clipped: %lu\n",
-        report->path,
-        (unsigned long)report->file_size,
-        SIGNAL_WORKBENCH_IR_BUFFER_SIZE,
-        report->truncated ? "yes" : "no",
-        report->type_present ? report->type : "unknown",
-        report->frequency_present ? "" : "missing/",
-        (unsigned long)report->frequency,
-        report->duty_present ? "" : "missing/",
-        (unsigned int)report->duty_cycle,
-        (unsigned int)((report->duty_cycle - (float)((unsigned int)report->duty_cycle)) * 100.0f),
-        (unsigned long)report->timing_count,
-        (unsigned long)report->clipped_count);
-
-    if(report->timing_count > 0U) {
-        const uint32_t avg_us = (uint32_t)(report->total_us / report->timing_count);
-        furi_string_cat_printf(
-            output,
-            "Min/Avg/Max: %lu/%lu/%lu us\n"
-            "Total preview duration: %lu us\n"
-            "Preview:",
-            (unsigned long)report->min_us,
-            (unsigned long)avg_us,
-            (unsigned long)report->max_us,
-            (unsigned long)report->total_us);
-        for(uint32_t i = 0; i < report->preview_count; i++) {
-            furi_string_cat_printf(output, " %lu", (unsigned long)report->preview[i]);
-        }
-        furi_string_cat(output, "\n\n");
+static void tumospectrum_draw_summary(Canvas* canvas, const TumoSpectrumCapture* capture) {
+    char line[64];
+    canvas_set_font(canvas, FontSecondary);
+    snprintf(line, sizeof(line), "Name: %.18s", capture->name[0] ? capture->name : "--");
+    canvas_draw_str(canvas, 2, 25, line);
+    if(capture->frequency_hz >= 1000000U) {
+        snprintf(
+            line,
+            sizeof(line),
+            "Freq: %lu.%03lu MHz",
+            (unsigned long)(capture->frequency_hz / 1000000U),
+            (unsigned long)((capture->frequency_hz % 1000000U) / 1000U));
+    } else if(capture->frequency_hz > 0U) {
+        snprintf(line, sizeof(line), "Freq: %lu Hz", (unsigned long)capture->frequency_hz);
     } else {
-        furi_string_cat(output, "Timings: none found in bounded window\n\n");
+        strlcpy(line, "Freq: --", sizeof(line));
+    }
+    canvas_draw_str(canvas, 2, 36, line);
+    snprintf(
+        line,
+        sizeof(line),
+        "%s: %.17s",
+        capture->protocol[0] ? "Protocol" : "Status",
+        capture->protocol[0] ? capture->protocol : tumospectrum_status_name(capture->status));
+    canvas_draw_str(canvas, 2, 47, line);
+}
+
+static void tumospectrum_draw_stats(Canvas* canvas, const TumoSpectrumCapture* capture) {
+    char line[64];
+    const TumoSpectrumAnalysis* analysis = &capture->analysis;
+    canvas_set_font(canvas, FontSecondary);
+    snprintf(
+        line,
+        sizeof(line),
+        "Pulse: %lu%s  Burst: %u",
+        (unsigned long)analysis->count,
+        capture->truncated ? "+" : "",
+        analysis->burst_count);
+    canvas_draw_str(canvas, 2, 23, line);
+    snprintf(
+        line,
+        sizeof(line),
+        "Min/Avg/Max %lu/%lu/%lu us",
+        (unsigned long)analysis->minimum_us,
+        (unsigned long)analysis->average_us,
+        (unsigned long)analysis->maximum_us);
+    canvas_draw_str(canvas, 2, 33, line);
+    snprintf(
+        line,
+        sizeof(line),
+        "Duration %llu us  Repeat %u%%",
+        (unsigned long long)analysis->duration_us,
+        analysis->repeat_score);
+    canvas_draw_str(canvas, 2, 43, line);
+    snprintf(line, sizeof(line), "Candidate: %.18s", analysis->candidate);
+    canvas_draw_str(canvas, 2, 51, line);
+}
+
+static void tumospectrum_draw_histogram(Canvas* canvas, const TumoSpectrumCapture* capture) {
+    const TumoSpectrumAnalysis* analysis = &capture->analysis;
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str(canvas, 2, 23, "Pulse / gap distribution");
+    canvas_draw_line(canvas, 8, 49, 120, 49);
+    for(size_t index = 0U; index < TUMOSPECTRUM_HISTOGRAM_BUCKETS; index++) {
+        const uint8_t height = (uint8_t)(analysis->histogram[index] * 22U / 100U);
+        const uint8_t x = (uint8_t)(10U + index * 14U);
+        if(height > 0U) canvas_draw_box(canvas, x, (uint8_t)(48U - height), 9, height);
     }
 }
 
-static void signal_workbench_append_rf_report(
-    FuriString* output,
-    const SignalWorkbenchRfObservation* observation) {
-    furi_string_cat(output, "Receive-only RF Context\n");
-    furi_string_cat_printf(output, "Source: %s\n", SIGNAL_WORKBENCH_RF_NOTEBOOK_CSV);
-    if(!observation->found) {
-        furi_string_cat(output, "Status: no ARF Frequency Analyzer notebook row\n\n");
+static void tumospectrum_draw_comparison(Canvas* canvas, const TumoSpectrumApp* app) {
+    char line[64];
+    canvas_set_font(canvas, FontSecondary);
+    if(!app->comparison.compatible) {
+        canvas_draw_str(canvas, 2, 29, "No compatible comparison");
+        canvas_draw_str(canvas, 2, 41, "Actions > Compare capture");
         return;
     }
-
-    furi_string_cat_printf(
-        output,
-        "Last row: %s\n"
-        "Frequency: %s Hz\n"
-        "RSSI: %s dBm\n"
-        "Radio: %s\n"
-        "Note: %s\n\n",
-        observation->source,
-        observation->frequency_hz,
-        observation->rssi_dbm,
-        observation->radio,
-        observation->note);
+    snprintf(
+        line,
+        sizeof(line),
+        "%s  Similarity %u%%",
+        app->comparison.likely_same ? "Likely same" : "Different",
+        app->comparison.overall_similarity);
+    canvas_draw_str(canvas, 2, 25, line);
+    snprintf(
+        line,
+        sizeof(line),
+        "Histogram %u%%  dF %+ld Hz",
+        app->comparison.histogram_similarity,
+        (long)app->comparison.frequency_delta_hz);
+    canvas_draw_str(canvas, 2, 36, line);
+    snprintf(
+        line,
+        sizeof(line),
+        "dPulse %+ld  dTime %+ld%%",
+        (long)app->comparison.pulse_delta,
+        (long)app->comparison.duration_delta_percent);
+    canvas_draw_str(canvas, 2, 47, line);
 }
 
-static void signal_workbench_append_gpio_profile(FuriString* output, bool ran) {
-    const uint32_t period_us = SIGNAL_WORKBENCH_GPIO_HIGH_US + SIGNAL_WORKBENCH_GPIO_LOW_US;
-    const uint32_t total_us = period_us * SIGNAL_WORKBENCH_GPIO_CYCLES;
-    furi_string_cat_printf(
-        output,
-        "GPIO Pulse Profile\n"
-        "Pin: gpio_ext_pc0\n"
-        "Frequency: 1000 Hz\n"
-        "Cycles: %u\n"
-        "High/Low: %u/%u us\n"
-        "Total: %lu us\n"
-        "Bounded: yes\n"
-        "Restores: GpioModeAnalog\n"
-        "Last run: %s\n\n",
-        SIGNAL_WORKBENCH_GPIO_CYCLES,
-        SIGNAL_WORKBENCH_GPIO_HIGH_US,
-        SIGNAL_WORKBENCH_GPIO_LOW_US,
-        (unsigned long)total_us,
-        ran ? "yes" : "no");
+static void tumospectrum_result_draw(Canvas* canvas, void* context) {
+    const TumoSpectrumResultModel* model = context;
+    const TumoSpectrumApp* app = model->app;
+    const TumoSpectrumCapture* capture = &app->capture;
+    canvas_clear(canvas);
+    canvas_set_font(canvas, FontPrimary);
+    canvas_draw_str(canvas, 2, 11, "TumoSpectrum");
+    tumospectrum_draw_badge(canvas, tumospectrum_badge(capture->type));
+    canvas_draw_line(canvas, 0, 15, 127, 15);
+
+    if(capture->status != TumoSpectrumStatusOk) {
+        canvas_set_font(canvas, FontSecondary);
+        canvas_draw_str(canvas, 4, 30, tumospectrum_status_name(capture->status));
+        canvas_draw_str(canvas, 4, 43, "File was not modified");
+    } else if(model->page == 0U) {
+        tumospectrum_draw_summary(canvas, capture);
+    } else if(model->page == 1U && tumospectrum_type_has_timings(capture->type)) {
+        tumospectrum_draw_stats(canvas, capture);
+    } else if(model->page == 2U && tumospectrum_type_has_timings(capture->type)) {
+        tumospectrum_draw_histogram(canvas, capture);
+    } else {
+        tumospectrum_draw_comparison(canvas, app);
+    }
+
+    elements_button_left(canvas, "Prev");
+    elements_button_center(canvas, capture->status == TumoSpectrumStatusOk ? "Actions" : "Menu");
+    elements_button_right(canvas, "Next");
 }
 
-static void signal_workbench_build_report(SignalWorkbenchApp* app, FuriString* output) {
-    furi_string_reset(output);
-    furi_string_cat(output, "Signal Workbench\n");
-    furi_string_cat(output, "Generated: ");
-    signal_workbench_append_iso_timestamp(output);
-    furi_string_cat(output, "\n\n");
-    signal_workbench_append_ir_report(output, &app->last_ir);
-    signal_workbench_append_rf_report(output, &app->last_rf);
-    signal_workbench_append_gpio_profile(output, app->gpio_pulse_ran);
-    furi_string_cat(
-        output,
-        "Safety\n"
-        "Sub-GHz is receive-only metadata imported from the ARF notebook.\n"
-        "This app does not own CC1101 and does not transmit Sub-GHz.\n");
+static uint8_t tumospectrum_page_count(const TumoSpectrumCapture* capture) {
+    return tumospectrum_type_has_timings(capture->type) ? 4U : 2U;
 }
 
-static void signal_workbench_show_text(SignalWorkbenchApp* app) {
-    text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
-    view_dispatcher_switch_to_view(app->view_dispatcher, SignalWorkbenchViewText);
+static void tumospectrum_build_actions(TumoSpectrumApp* app);
+
+static bool tumospectrum_result_input(InputEvent* event, void* context) {
+    TumoSpectrumApp* app = context;
+    if(event->type != InputTypeShort) return false;
+    const uint8_t page_count = tumospectrum_page_count(&app->capture);
+    if(event->key == InputKeyLeft) {
+        app->result_page = app->result_page == 0U ? page_count - 1U : app->result_page - 1U;
+    } else if(event->key == InputKeyRight) {
+        app->result_page = (uint8_t)((app->result_page + 1U) % page_count);
+    } else if(event->key == InputKeyOk) {
+        if(app->capture.status == TumoSpectrumStatusOk) {
+            tumospectrum_build_actions(app);
+            view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewActions);
+        } else {
+            view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewMenu);
+        }
+        return true;
+    } else {
+        return false;
+    }
+    tumospectrum_refresh_result(app);
+    return true;
 }
 
-static void signal_workbench_run_ir_inspect(SignalWorkbenchApp* app) {
-    signal_workbench_analyze_ir(app, &app->last_ir);
+static uint32_t tumospectrum_result_previous(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewMenu;
+}
+
+static uint32_t tumospectrum_actions_previous(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewResult;
+}
+
+static uint32_t tumospectrum_text_previous(void* context) {
+    return ((TumoSpectrumApp*)context)->text_return_view;
+}
+
+static uint32_t tumospectrum_note_previous(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewResult;
+}
+
+static bool tumospectrum_back(void* context) {
+    view_dispatcher_stop(((TumoSpectrumApp*)context)->view_dispatcher);
+    return true;
+}
+
+static void tumospectrum_show_text(
+    TumoSpectrumApp* app,
+    const char* title,
+    const char* body,
+    uint32_t return_view) {
     furi_string_reset(app->text);
-    furi_string_cat(app->text, "IR Inspect\n\n");
-    signal_workbench_append_ir_report(app->text, &app->last_ir);
+    if(title && title[0]) furi_string_cat_printf(app->text, "%s\n\n", title);
+    furi_string_cat(app->text, body ? body : "");
+    text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
+    text_box_set_focus(app->text_box, TextBoxFocusStart);
+    app->text_return_view = return_view;
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewText);
+}
+
+static TumoSpectrumStatus tumospectrum_parse_selected(
+    TumoSpectrumApp* app,
+    TumoSpectrumCaptureType requested,
+    const char* path,
+    TumoSpectrumCapture* destination) {
+    if(requested == TumoSpectrumCaptureSubGhzRaw ||
+       requested == TumoSpectrumCaptureSubGhzDecoded) {
+        return tumospectrum_parse_subghz(app->storage, path, destination);
+    }
+    if(requested == TumoSpectrumCaptureInfraredRaw ||
+       requested == TumoSpectrumCaptureInfraredParsed) {
+        return tumospectrum_parse_infrared(app->storage, path, destination);
+    }
+    if(requested == TumoSpectrumCaptureTumoScope) {
+        return tumospectrum_parse_tumoscope(app->storage, path, destination);
+    }
+    return TumoSpectrumStatusUnsupported;
+}
+
+static bool tumospectrum_select_file(
+    TumoSpectrumApp* app,
+    TumoSpectrumCaptureType requested,
+    TumoSpectrumCapture* destination) {
+    const char* extension = NULL;
+    const char* base_path = NULL;
+    const Icon* icon = NULL;
+    if(requested == TumoSpectrumCaptureSubGhzRaw ||
+       requested == TumoSpectrumCaptureSubGhzDecoded) {
+        extension = ".sub";
+        base_path = TUMOSPECTRUM_SUBGHZ_DIR;
+        icon = &I_sub1_10px;
+    } else if(requested == TumoSpectrumCaptureInfraredRaw ||
+              requested == TumoSpectrumCaptureInfraredParsed) {
+        extension = ".ir";
+        base_path = TUMOSPECTRUM_INFRARED_DIR;
+        icon = &I_ir_10px;
+    } else {
+        extension = ".vcd";
+        base_path = TUMOSPECTRUM_SCOPE_DIR;
+        icon = &I_file_10px;
+    }
+
+    FuriString* path = furi_string_alloc_set(base_path);
+    DialogsFileBrowserOptions options;
+    dialog_file_browser_set_basic_options(&options, extension, icon);
+    options.base_path = base_path;
+    const bool selected = dialog_file_browser_show(app->dialogs, path, path, &options);
+    if(selected) {
+        tumospectrum_parse_selected(app, requested, furi_string_get_cstr(path), destination);
+    }
+    furi_string_free(path);
+    return selected;
+}
+
+static void tumospectrum_open_capture(TumoSpectrumApp* app, TumoSpectrumCaptureType requested) {
+    if(!tumospectrum_select_file(app, requested, &app->capture)) return;
+    memset(&app->compared, 0, sizeof(app->compared));
+    memset(&app->comparison, 0, sizeof(app->comparison));
+    app->report_path[0] = '\0';
+    app->result_page = 0U;
+    tumospectrum_refresh_result(app);
     notification_message(
         app->notification,
-        app->last_ir.found ? &signal_workbench_sequence_ok : &signal_workbench_sequence_error);
+        app->capture.status == TumoSpectrumStatusOk ? &tumospectrum_sequence_ok :
+                                                     &tumospectrum_sequence_error);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewResult);
 }
 
-static void signal_workbench_run_rf_notebook(SignalWorkbenchApp* app) {
-    memset(&app->last_rf, 0, sizeof(app->last_rf));
-    signal_workbench_read_latest_rf_observation(app, &app->last_rf);
-    furi_string_reset(app->text);
-    signal_workbench_append_rf_report(app->text, &app->last_rf);
-}
-
-static void signal_workbench_build_gpio_profile(SignalWorkbenchApp* app) {
-    furi_string_reset(app->text);
-    signal_workbench_append_gpio_profile(app->text, app->gpio_pulse_ran);
-}
-
-static void signal_workbench_run_gpio_pulse(SignalWorkbenchApp* app) {
-    furi_hal_gpio_init_simple(&gpio_ext_pc0, GpioModeOutputPushPull);
-    for(uint32_t i = 0; i < SIGNAL_WORKBENCH_GPIO_CYCLES; i++) {
-        furi_hal_gpio_write(&gpio_ext_pc0, true);
-        furi_delay_us(SIGNAL_WORKBENCH_GPIO_HIGH_US);
-        furi_hal_gpio_write(&gpio_ext_pc0, false);
-        furi_delay_us(SIGNAL_WORKBENCH_GPIO_LOW_US);
-    }
-    furi_hal_gpio_write(&gpio_ext_pc0, false);
-    furi_hal_gpio_init_simple(&gpio_ext_pc0, GpioModeAnalog);
-
-    app->gpio_pulse_ran = true;
-    furi_string_reset(app->text);
-    furi_string_cat(app->text, "GPIO Pulse\n\n");
-    signal_workbench_append_gpio_profile(app->text, true);
-    notification_message(app->notification, &signal_workbench_sequence_ok);
-}
-
-static void signal_workbench_export_report(SignalWorkbenchApp* app) {
-    signal_workbench_analyze_ir(app, &app->last_ir);
-    memset(&app->last_rf, 0, sizeof(app->last_rf));
-    signal_workbench_read_latest_rf_observation(app, &app->last_rf);
-
-    FuriString* report = furi_string_alloc();
-    signal_workbench_build_report(app, report);
-
-    char timestamp[32];
-    char path[SIGNAL_WORKBENCH_PATH_SIZE];
-    signal_workbench_format_filename_timestamp(timestamp, sizeof(timestamp));
-    snprintf(path, sizeof(path), SIGNAL_WORKBENCH_DATA_DIR "/signal_%s.txt", timestamp);
-
-    const bool dir_ok = signal_workbench_mkdir(app->storage, SIGNAL_WORKBENCH_DATA_DIR);
-    const bool write_ok =
-        dir_ok && signal_workbench_write_text_file(app->storage, path, furi_string_get_cstr(report));
-
-    furi_string_reset(app->text);
-    furi_string_cat_printf(
-        app->text,
-        "Signal Workbench Export\n\n"
-        "Result: %s\n"
-        "Path:\n%s\n\n",
-        write_ok ? "saved" : (dir_ok ? "write failed" : "mkdir failed"),
-        path);
-    furi_string_cat(app->text, report);
-    notification_message(
-        app->notification, write_ok ? &signal_workbench_sequence_ok : &signal_workbench_sequence_error);
-    furi_string_free(report);
-}
-
-static void signal_workbench_build_about(SignalWorkbenchApp* app) {
-    furi_string_reset(app->text);
-    furi_string_cat(
-        app->text,
-        "Signal Workbench\n\n"
-        "Bounded workspace for saved signal inspection.\n\n"
-        "IR: reads the latest file in /ext/infrared and summarizes RAW timing metadata.\n"
-        "RF: imports the latest receive-only ARF Frequency Analyzer notebook row.\n"
-        "GPIO: explicit short PC0 pulse profile only.");
-}
-
-static void signal_workbench_menu_callback(void* context, uint32_t index) {
-    SignalWorkbenchApp* app = context;
-
+static void tumospectrum_menu_callback(void* context, uint32_t index) {
+    TumoSpectrumApp* app = context;
     switch(index) {
-    case SignalWorkbenchActionInspectIr:
-        signal_workbench_run_ir_inspect(app);
+    case TumoSpectrumMenuOpenSubGhz:
+        tumospectrum_open_capture(app, TumoSpectrumCaptureSubGhzRaw);
         break;
-    case SignalWorkbenchActionRfNotebook:
-        signal_workbench_run_rf_notebook(app);
+    case TumoSpectrumMenuOpenInfrared:
+        tumospectrum_open_capture(app, TumoSpectrumCaptureInfraredRaw);
         break;
-    case SignalWorkbenchActionGpioProfile:
-        signal_workbench_build_gpio_profile(app);
+    case TumoSpectrumMenuOpenScope:
+        tumospectrum_open_capture(app, TumoSpectrumCaptureTumoScope);
         break;
-    case SignalWorkbenchActionRunGpioPulse:
-        signal_workbench_run_gpio_pulse(app);
+    case TumoSpectrumMenuImportAnalyzer:
+        tumospectrum_import_frequency_observation(app->storage, &app->capture);
+        memset(&app->comparison, 0, sizeof(app->comparison));
+        app->report_path[0] = '\0';
+        app->result_page = 0U;
+        tumospectrum_refresh_result(app);
+        view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewResult);
         break;
-    case SignalWorkbenchActionExport:
-        signal_workbench_export_report(app);
+    case TumoSpectrumMenuNotebook:
+        furi_string_reset(app->text);
+        if(tumospectrum_storage_load_latest(app->storage, app->text)) {
+            text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
+            text_box_set_focus(app->text_box, TextBoxFocusStart);
+            app->text_return_view = TumoSpectrumViewMenu;
+            view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewText);
+        } else {
+            tumospectrum_show_text(
+                app,
+                "Notebook",
+                "No saved observations.\n\nOpen a capture, choose Actions, add a note and save a report.",
+                TumoSpectrumViewMenu);
+        }
         break;
-    case SignalWorkbenchActionAbout:
-        signal_workbench_build_about(app);
+    case TumoSpectrumMenuAbout:
+        tumospectrum_show_text(
+            app,
+            "TumoSpectrum 1.0",
+            "Read-only signal research workspace.\n\n"
+            "Supports Sub-GHz RAW/key files, IR RAW/parsed remotes, TumoScope VCD and Frequency Analyzer notes.\n\n"
+            "Files are validated with bounded parsers and never modified. Replay is delegated to stock apps.\n\n"
+            "github.com/squazaryu/tumoflip\nIssue #105",
+            TumoSpectrumViewMenu);
         break;
     default:
-        furi_string_reset(app->text);
-        furi_string_cat(app->text, "Unsupported action.\n");
         break;
     }
-
-    signal_workbench_show_text(app);
 }
 
-static bool signal_workbench_back_callback(void* context) {
-    view_dispatcher_stop(((SignalWorkbenchApp*)context)->view_dispatcher);
-    return true;
+static bool tumospectrum_save_report(TumoSpectrumApp* app) {
+    const bool success = tumospectrum_storage_save(
+        app->storage,
+        &app->capture,
+        app->comparison.compatible ? &app->compared : NULL,
+        app->comparison.compatible ? &app->comparison : NULL,
+        app->report_path,
+        sizeof(app->report_path));
+    notification_message(
+        app->notification, success ? &tumospectrum_sequence_ok : &tumospectrum_sequence_error);
+    return success;
 }
 
-static uint32_t signal_workbench_text_previous_callback(void* context) {
-    UNUSED(context);
-    return SignalWorkbenchViewMenu;
+static void tumospectrum_note_done(void* context) {
+    TumoSpectrumApp* app = context;
+    strlcpy(app->capture.note, app->note_buffer, sizeof(app->capture.note));
+    app->report_path[0] = '\0';
+    tumospectrum_refresh_result(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewResult);
 }
 
-static SignalWorkbenchApp* signal_workbench_alloc(void) {
-    SignalWorkbenchApp* app = malloc(sizeof(SignalWorkbenchApp));
+static void tumospectrum_begin_note(TumoSpectrumApp* app) {
+    strlcpy(app->note_buffer, app->capture.note, sizeof(app->note_buffer));
+    text_input_reset(app->note_input);
+    text_input_set_header_text(app->note_input, "Observation note");
+    text_input_set_result_callback(
+        app->note_input,
+        tumospectrum_note_done,
+        app,
+        app->note_buffer,
+        sizeof(app->note_buffer),
+        false);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewNote);
+}
+
+static void tumospectrum_compare_capture(TumoSpectrumApp* app) {
+    if(!tumospectrum_select_file(app, app->capture.type, &app->compared)) return;
+    app->comparison = tumospectrum_compare(&app->capture, &app->compared);
+    app->report_path[0] = '\0';
+    if(!app->comparison.compatible) {
+        tumospectrum_show_text(
+            app,
+            "Compare",
+            "Captures are not compatible.\n\nUse two RAW captures from the same signal family.",
+            TumoSpectrumViewResult);
+        notification_message(app->notification, &tumospectrum_sequence_error);
+        return;
+    }
+    app->result_page = 3U;
+    tumospectrum_refresh_result(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewResult);
+}
+
+static void tumospectrum_handoff(TumoSpectrumApp* app) {
+    const char* target = NULL;
+    if(app->capture.type == TumoSpectrumCaptureSubGhzRaw ||
+       app->capture.type == TumoSpectrumCaptureSubGhzDecoded) {
+        target = "Sub-GHz";
+    } else if(app->capture.type == TumoSpectrumCaptureInfraredRaw ||
+              app->capture.type == TumoSpectrumCaptureInfraredParsed) {
+        target = "Infrared";
+    }
+    if(!target) return;
+
+    loader_clear_launch_queue(app->loader);
+    loader_enqueue_launch(
+        app->loader, target, app->capture.path, LoaderDeferredLaunchFlagGui);
+    FuriString* self_path = furi_string_alloc();
+    if(loader_get_application_launch_path(app->loader, self_path)) {
+        loader_enqueue_launch(
+            app->loader,
+            furi_string_get_cstr(self_path),
+            NULL,
+            LoaderDeferredLaunchFlagGui);
+    }
+    furi_string_free(self_path);
+    view_dispatcher_stop(app->view_dispatcher);
+}
+
+static bool tumospectrum_send_companion(TumoSpectrumApp* app) {
+    if(!app->report_path[0] && !tumospectrum_save_report(app)) return false;
+    const char* filename = strrchr(app->report_path, '/');
+    filename = filename ? filename + 1U : app->report_path;
+    char payload[BT_APP_BRIDGE_V2_PAYLOAD_LEN_MAX + 1U];
+    const int length = snprintf(
+        payload,
+        sizeof(payload),
+        "schema=1;file=%s;type=%s;freq=%lu;sim=%u",
+        filename,
+        tumospectrum_badge(app->capture.type),
+        (unsigned long)app->capture.frequency_hz,
+        app->comparison.compatible ? app->comparison.overall_similarity : 0U);
+    return length > 0 && (size_t)length < sizeof(payload) &&
+           bt_app_bridge_send_text_v2(
+               app->bt,
+               TUMOSPECTRUM_BRIDGE_APP_ID,
+               TUMOSPECTRUM_BRIDGE_COMMAND,
+               0U,
+               0U,
+               payload);
+}
+
+static void tumospectrum_action_callback(void* context, uint32_t index) {
+    TumoSpectrumApp* app = context;
+    switch(index) {
+    case TumoSpectrumActionNote:
+        tumospectrum_begin_note(app);
+        break;
+    case TumoSpectrumActionSave: {
+        const bool success = tumospectrum_save_report(app);
+        char body[256];
+        snprintf(
+            body,
+            sizeof(body),
+            "%s\n\n%s",
+            success ? "Report and notebook saved." : "Could not save report.",
+            success ? app->report_path : "Check SD card.");
+        tumospectrum_show_text(app, "Save Report", body, TumoSpectrumViewResult);
+        break;
+    }
+    case TumoSpectrumActionCompare:
+        tumospectrum_compare_capture(app);
+        break;
+    case TumoSpectrumActionHandoff:
+        tumospectrum_handoff(app);
+        break;
+    case TumoSpectrumActionCompanion: {
+        const bool success = tumospectrum_send_companion(app);
+        notification_message(
+            app->notification, success ? &tumospectrum_sequence_ok : &tumospectrum_sequence_error);
+        tumospectrum_show_text(
+            app,
+            "Companion",
+            success ? "Report announced over FAB2.\n\nOpen TumoSpectrum in Companion to fetch and visualize the saved JSON report."
+                    : "Report is saved, but no FAB2 link accepted the announcement.",
+            TumoSpectrumViewResult);
+        break;
+    }
+    case TumoSpectrumActionDetails:
+        tumospectrum_storage_build_text(
+            &app->capture,
+            app->comparison.compatible ? &app->compared : NULL,
+            app->comparison.compatible ? &app->comparison : NULL,
+            app->text);
+        text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
+        text_box_set_focus(app->text_box, TextBoxFocusStart);
+        app->text_return_view = TumoSpectrumViewResult;
+        view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewText);
+        break;
+    default:
+        break;
+    }
+}
+
+static void tumospectrum_build_actions(TumoSpectrumApp* app) {
+    submenu_reset(app->actions);
+    submenu_set_header(app->actions, "TumoSpectrum Actions");
+    submenu_add_item(
+        app->actions,
+        app->capture.note[0] ? "Edit Note" : "Add Note",
+        TumoSpectrumActionNote,
+        tumospectrum_action_callback,
+        app);
+    submenu_add_item(
+        app->actions,
+        "Save Report",
+        TumoSpectrumActionSave,
+        tumospectrum_action_callback,
+        app);
+    if(tumospectrum_type_has_timings(app->capture.type)) {
+        submenu_add_item(
+            app->actions,
+            "Compare Capture",
+            TumoSpectrumActionCompare,
+            tumospectrum_action_callback,
+            app);
+    }
+    if(tumospectrum_type_can_handoff(app->capture.type)) {
+        submenu_add_item(
+            app->actions,
+            app->capture.type == TumoSpectrumCaptureSubGhzRaw ||
+                    app->capture.type == TumoSpectrumCaptureSubGhzDecoded ?
+                "Open in Sub-GHz" :
+                "Open in Infrared",
+            TumoSpectrumActionHandoff,
+            tumospectrum_action_callback,
+            app);
+    }
+    submenu_add_item(
+        app->actions,
+        "Send to Companion",
+        TumoSpectrumActionCompanion,
+        tumospectrum_action_callback,
+        app);
+    submenu_add_item(
+        app->actions,
+        "Full Details",
+        TumoSpectrumActionDetails,
+        tumospectrum_action_callback,
+        app);
+}
+
+static TumoSpectrumApp* tumospectrum_alloc(void) {
+    TumoSpectrumApp* app = malloc(sizeof(*app));
+    if(!app) return NULL;
+    memset(app, 0, sizeof(*app));
+
     app->gui = furi_record_open(RECORD_GUI);
     app->storage = furi_record_open(RECORD_STORAGE);
+    app->dialogs = furi_record_open(RECORD_DIALOGS);
+    app->loader = furi_record_open(RECORD_LOADER);
+    app->bt = furi_record_open(RECORD_BT);
     app->notification = furi_record_open(RECORD_NOTIFICATION);
     app->view_dispatcher = view_dispatcher_alloc();
-    app->submenu = submenu_alloc();
+    app->menu = submenu_alloc();
+    app->actions = submenu_alloc();
+    app->result_view = view_alloc();
     app->text_box = text_box_alloc();
+    app->note_input = text_input_alloc();
     app->text = furi_string_alloc();
-    memset(&app->last_ir, 0, sizeof(app->last_ir));
-    memset(&app->last_rf, 0, sizeof(app->last_rf));
-    app->gpio_pulse_ran = false;
 
     view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
-    view_dispatcher_set_navigation_event_callback(
-        app->view_dispatcher, signal_workbench_back_callback);
+    view_dispatcher_set_navigation_event_callback(app->view_dispatcher, tumospectrum_back);
+    view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
 
-    submenu_set_header(app->submenu, "Signal Workbench");
+    submenu_set_header(app->menu, "TumoSpectrum");
     submenu_add_item(
-        app->submenu,
-        "IR: Inspect Latest",
-        SignalWorkbenchActionInspectIr,
-        signal_workbench_menu_callback,
+        app->menu,
+        "Open Sub-GHz",
+        TumoSpectrumMenuOpenSubGhz,
+        tumospectrum_menu_callback,
         app);
     submenu_add_item(
-        app->submenu,
-        "RF: Notebook Row",
-        SignalWorkbenchActionRfNotebook,
-        signal_workbench_menu_callback,
+        app->menu,
+        "Open Infrared",
+        TumoSpectrumMenuOpenInfrared,
+        tumospectrum_menu_callback,
         app);
     submenu_add_item(
-        app->submenu,
-        "GPIO: Profile",
-        SignalWorkbenchActionGpioProfile,
-        signal_workbench_menu_callback,
+        app->menu,
+        "Open TumoScope",
+        TumoSpectrumMenuOpenScope,
+        tumospectrum_menu_callback,
         app);
     submenu_add_item(
-        app->submenu,
-        "GPIO: Run Pulse PC0",
-        SignalWorkbenchActionRunGpioPulse,
-        signal_workbench_menu_callback,
+        app->menu,
+        "Import Analyzer",
+        TumoSpectrumMenuImportAnalyzer,
+        tumospectrum_menu_callback,
         app);
     submenu_add_item(
-        app->submenu,
-        "Export Report",
-        SignalWorkbenchActionExport,
-        signal_workbench_menu_callback,
+        app->menu,
+        "Notebook",
+        TumoSpectrumMenuNotebook,
+        tumospectrum_menu_callback,
         app);
     submenu_add_item(
-        app->submenu, "About", SignalWorkbenchActionAbout, signal_workbench_menu_callback, app);
+        app->menu, "About", TumoSpectrumMenuAbout, tumospectrum_menu_callback, app);
+
+    view_allocate_model(app->result_view, ViewModelTypeLocking, sizeof(TumoSpectrumResultModel));
+    view_set_context(app->result_view, app);
+    view_set_draw_callback(app->result_view, tumospectrum_result_draw);
+    view_set_input_callback(app->result_view, tumospectrum_result_input);
+    view_set_previous_callback(app->result_view, tumospectrum_result_previous);
+    view_set_previous_callback(submenu_get_view(app->actions), tumospectrum_actions_previous);
 
     text_box_set_font(app->text_box, TextBoxFontText);
     text_box_set_focus(app->text_box, TextBoxFocusStart);
-    view_set_previous_callback(
-        text_box_get_view(app->text_box), signal_workbench_text_previous_callback);
+    view_set_context(text_box_get_view(app->text_box), app);
+    view_set_previous_callback(text_box_get_view(app->text_box), tumospectrum_text_previous);
+    view_set_context(text_input_get_view(app->note_input), app);
+    view_set_previous_callback(text_input_get_view(app->note_input), tumospectrum_note_previous);
 
+    view_dispatcher_add_view(app->view_dispatcher, TumoSpectrumViewMenu, submenu_get_view(app->menu));
     view_dispatcher_add_view(
-        app->view_dispatcher, SignalWorkbenchViewMenu, submenu_get_view(app->submenu));
+        app->view_dispatcher, TumoSpectrumViewResult, app->result_view);
     view_dispatcher_add_view(
-        app->view_dispatcher, SignalWorkbenchViewText, text_box_get_view(app->text_box));
-    view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
-    view_dispatcher_switch_to_view(app->view_dispatcher, SignalWorkbenchViewMenu);
+        app->view_dispatcher, TumoSpectrumViewActions, submenu_get_view(app->actions));
+    view_dispatcher_add_view(
+        app->view_dispatcher, TumoSpectrumViewText, text_box_get_view(app->text_box));
+    view_dispatcher_add_view(
+        app->view_dispatcher, TumoSpectrumViewNote, text_input_get_view(app->note_input));
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewMenu);
+    tumospectrum_storage_prepare(app->storage);
     return app;
 }
 
-static void signal_workbench_free(SignalWorkbenchApp* app) {
-    view_dispatcher_remove_view(app->view_dispatcher, SignalWorkbenchViewText);
-    view_dispatcher_remove_view(app->view_dispatcher, SignalWorkbenchViewMenu);
+static void tumospectrum_free(TumoSpectrumApp* app) {
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewNote);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewText);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewActions);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewResult);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewMenu);
+    text_input_free(app->note_input);
     text_box_free(app->text_box);
-    submenu_free(app->submenu);
+    view_free(app->result_view);
+    submenu_free(app->actions);
+    submenu_free(app->menu);
     view_dispatcher_free(app->view_dispatcher);
     furi_string_free(app->text);
     furi_record_close(RECORD_NOTIFICATION);
+    furi_record_close(RECORD_BT);
+    furi_record_close(RECORD_LOADER);
+    furi_record_close(RECORD_DIALOGS);
     furi_record_close(RECORD_STORAGE);
     furi_record_close(RECORD_GUI);
     free(app);
@@ -791,8 +760,9 @@ static void signal_workbench_free(SignalWorkbenchApp* app) {
 
 int32_t signal_workbench_app(void* context) {
     UNUSED(context);
-    SignalWorkbenchApp* app = signal_workbench_alloc();
+    TumoSpectrumApp* app = tumospectrum_alloc();
+    if(!app) return -1;
     view_dispatcher_run(app->view_dispatcher);
-    signal_workbench_free(app);
+    tumospectrum_free(app);
     return 0;
 }

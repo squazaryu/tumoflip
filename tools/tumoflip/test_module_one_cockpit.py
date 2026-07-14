@@ -56,7 +56,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("BLE: GATT Lab", self.source)
         self.assertIn("BLE: Terminal", self.source)
         self.assertIn("Field: Logger", self.source)
-        self.assertIn("Signals: Workbench", self.source)
+        self.assertIn("Signals: TumoSpectrum", self.source)
         self.assertIn("Signals: Compiler", self.source)
         self.assertIn("Signals: TumoScope", self.source)
         self.assertIn("Network: TumoNet", self.source)

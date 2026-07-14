@@ -134,7 +134,7 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"Macros: Deck", ModuleOneCockpitActionLaunchMacroDeck},
     {"Macros: TumoScript", ModuleOneCockpitActionLaunchTumoScript},
     {"Field: Logger", ModuleOneCockpitActionLaunchFieldLogger},
-    {"Signals: Workbench", ModuleOneCockpitActionLaunchSignalWorkbench},
+    {"Signals: TumoSpectrum", ModuleOneCockpitActionLaunchSignalWorkbench},
     {"Signals: Compiler", ModuleOneCockpitActionLaunchProtocolCompiler},
     {"Signals: TumoScope", ModuleOneCockpitActionLaunchTumoScope},
     {"VGM: Bridge", ModuleOneCockpitActionLaunchVgmBridge},
