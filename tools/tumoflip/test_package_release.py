@@ -509,6 +509,41 @@ class PackageReleaseTest(unittest.TestCase):
                 manifest["cleanup"],
             )
 
+    def test_package_only_release_retires_legacy_wifi_mapping_app(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo, build, resources = prepare_package_tree(Path(directory))
+            stale_visible = resources / "apps/Module One/ESP32 Wi-Fi/wifi_map.fap"
+            write_file(stale_visible, b"legacy wifi mapping")
+
+            manifest = build_package_release(
+                repo,
+                build,
+                repo / "dist/f7-C/f7-update-tmwhflpprarf089-031",
+                package_id="retire-legacy-wifi-map",
+                target_release_tag="v0.3.1",
+            )
+
+            self.assertFalse(stale_visible.exists())
+            module_entries = {
+                entry["target"]: entry for entry in manifest["packages"]["module_one"]
+            }
+            self.assertIn(
+                "/ext/apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
+                module_entries,
+            )
+            self.assertNotIn(
+                "/ext/apps/Module One/ESP32 Wi-Fi/wifi_map.fap",
+                module_entries,
+            )
+            self.assertIn(
+                {
+                    "group": "module_one",
+                    "legacy": "/ext/apps/Module One/ESP32 Wi-Fi/wifi_map.fap",
+                    "canonical": "/ext/apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
+                },
+                manifest["cleanup"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
