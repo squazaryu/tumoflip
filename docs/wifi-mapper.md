@@ -1,12 +1,10 @@
-# WiFi Mapper
+# TumoSurvey Network Explorer
 
-`WiFi Mapper` is a Module One ESP32 Wi-Fi external app. It is intentionally a
-small passive UART logger: the Flipper sends ESP32 Marauder-compatible scan
-commands, records UART output, and stores each received printable line as CSV
-on SD. `Scan All` is the default mode because it is supported by the current
-Module One ESP32 Wi-Fi app set; `Scan AP` remains available for Marauder builds
-that expose `scanap`. `Wardrive` sends `wardrive -serial` and records GPS fields
-when the ESP32/Marauder output includes them.
+`TumoSurvey` is the product form of the existing `wifi_mapper` Module One app.
+It remains a passive UART scanner, but adds bounded live channel/security
+insights, atomic sessions, saved-session navigation, GeoJSON export, and an
+automatic Companion live relay while a survey is recording. The app ID and
+`/ext/apps_data/wifi_mapper` paths remain unchanged for compatibility.
 
 It does not send deauth, beacon spam, PMKID sniffing, evil portal, or packet
 capture commands. Those stay out of this app so the first mapping layer is safe
@@ -35,33 +33,41 @@ GeoJSON exports are written to:
 
 ## Controls
 
-- `OK`: start or stop logging with the selected scan mode.
-- Hold `OK`: open the latest session summary.
-- `Left` / `Right`: switch between `Scan All`, `Scan AP`, and `Wardrive`.
-- `Up`: send the selected scan command.
-- `Down`: send `stopscan`.
-- Hold `Down`: toggle the opt-in Companion live BLE relay.
+- `OK`: start or stop a survey with the selected mode.
+- `Left` or `Up`: change mode while idle.
+- `Right`: open live channel/security insights. From there, `Down` opens About.
+- Hold `OK`: open saved sessions.
+- Hold `Down`: manually override the automatic Companion live relay.
 - `Back`: exit.
 
 ## Session Summary
 
-Hold `OK` on the live screen to open `Last Session`. The app reads the newest
-`wifi_*.csv` file from the sessions directory and shows:
+Hold `OK` on the live screen to open saved sessions. The app reads compatible
+`wifi_*.csv` files and shows four pages:
 
 - total parsed AP rows;
-- unique BSSID count, capped in-app to the first 64 unique BSSIDs;
+- unique BSSID count, capped to a bounded in-memory set with a visible `+` when
+  additional networks were observed;
 - GPS-tagged row count;
 - mapped unique BSSID count for clean exports;
 - duplicate GPS sample count;
 - best and average RSSI;
-- busiest detected channel.
+- Open/Legacy/WPA2/WPA3 counts;
+- per-channel counts and the busiest detected channel;
+- bounded deltas against the immediately preceding session. If either session
+  exceeds the on-device AP limit, the screen directs full comparison to the
+  Companion instead of presenting misleading partial deltas.
 
 On the session screen:
 
-- `OK`: export the newest session as GeoJSON.
-- `Right`: switch export mode between `Clean` and `Raw`.
-- `Up`: refresh the summary.
+- `Left` / `Right`: previous or next session.
+- `Up` / `Down`: change Summary/Security/Channels/Baseline page.
+- `OK`: export the selected session as GeoJSON.
+- Hold `OK`: switch export mode between `Clean` and `Raw`.
 - `Back`: return to the live logger.
+
+The active CSV is first written as `*.csv.part`, synced, and atomically renamed
+to `*.csv` on Stop. Interrupted partial sessions are not shown as completed.
 
 `Clean` export groups GPS rows by BSSID and writes one point per detected
 network using the best RSSI sample as the map location. It includes `samples`,
@@ -80,18 +86,20 @@ The iOS companion can read GeoJSON exports from:
 /ext/apps_data/wifi_mapper/exports
 ```
 
-Open the `WiFi` tab and use `WiFi Mapper` to view clean or raw exports on a map.
+Open `TumoSurvey` from the WiFi tile to view live networks, the iPhone-GPS map,
+or clean/raw exports.
 The companion parser keeps the Flipper export format simple: coordinates come
 from GeoJSON `Point` geometry, while `ssid`, `bssid`, `auth`, `channel`, RSSI,
 `samples`, and tick metadata stay in feature properties.
 
 ## Companion Live Relay
 
-Hold `Down` on the live screen to arm or disable live BLE relay for the current
-WiFi Mapper app session. The relay is not persisted and is never started in the
-background; the on-screen `BLE` marker is shown while it is armed.
+Starting a survey automatically arms live BLE relay; Stop flushes pending data
+and disables it. The relay is not persisted and is never started in the
+background. Hold `Down` remains a session-local manual override, and the
+on-screen `BLE` marker shows the current state.
 
-When armed, printable UART lines from the ESP32 are relayed over App Bridge v2
+While armed, printable UART lines from the ESP32 are relayed over App Bridge v2
 as best-effort events:
 
 - app ID: `wifi_mapper`
@@ -101,6 +109,12 @@ as best-effort events:
 - chunk index/count: `0/1`
 - payload: UTF-8 text containing one or more raw UART lines separated by `\n`
 - payload limit: `150` bytes per event, below the FAB2 `160` byte cap
+
+The companion also receives `wifi_mapper/survey_start` when a local session
+begins and `wifi_mapper/survey_stop` after buffered lines are flushed and the
+session is committed. Both events carry a compact
+`schema=1;mode=...;file=...;aps=...;obs=...` payload, so live dashboards can
+reset and close a session without guessing from BLE timing gaps.
 
 Long individual lines are clipped to the relay payload limit. Multiple short
 lines may be coalesced into one event to reduce pressure on the shared BLE/RPC
@@ -147,5 +161,5 @@ GeoJSON export path.
 Some SD app bundles include a separate `WiFi Mapping` FAP. The current bundled
 binary appears to be a raw USB/UART logger based on an echo worker and writes to
 `/ext/apps_data/wifi_map/wifi_map_data.csv`. It does not expose enough metadata
-to be treated as the canonical tumoflip mapper, so tumoflip keeps `WiFi Mapper`
-as its own small, auditable logger.
+to be treated as the canonical tumoflip mapper, so TumoSurvey remains the
+auditable product while retaining the compatible `wifi_mapper` app ID.

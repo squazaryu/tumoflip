@@ -145,10 +145,11 @@ FAPs may also emit best-effort events to the paired central. These events use
 the same FAB2 frame format but are not Runtime command responses unless the
 response flag is set.
 
-### WiFi Mapper live relay
+### TumoSurvey live relay
 
-`WiFi Mapper` can relay live ESP32 scan output to the iOS Companion after the
-user explicitly arms it on the Flipper.
+`TumoSurvey` relays live ESP32 scan output to the iOS Companion while a survey
+is active. Starting a survey is the explicit user action that arms the relay;
+Stop flushes pending data and disables it.
 
 | Field | Value |
 |---|---|
@@ -160,10 +161,15 @@ user explicitly arms it on the Flipper.
 | Payload | UTF-8 text with one or more raw UART lines separated by `\n` |
 | Payload limit | `150` bytes |
 
-The relay is opt-in, session-local, and best-effort. It does not request
+Session boundaries use the same App ID with `survey_start` and `survey_stop`
+commands. Their payload is
+`schema=1;mode=<n>;file=<csv>;aps=<n>;obs=<n>`; the start event begins with zero
+counts and the stop event reports the final bounded survey counters.
+
+The relay is active-session-only and best-effort. It does not request
 acknowledgements and it does not replay missed events. If the phone is
 disconnected or App Bridge is disabled, the firmware may drop the event while
-continuing to write the local WiFi Mapper CSV log.
+continuing to write the local TumoSurvey CSV log.
 
 ### BLE GATT Lab diagnostics
 
