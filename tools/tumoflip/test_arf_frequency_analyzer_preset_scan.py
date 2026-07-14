@@ -73,6 +73,7 @@ class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
             'else {\n            canvas_draw_str(canvas, current_x + 41, current_y, "MHz");',
             view,
         )
+        self.assertNotIn("const uint8_t icon_x = 119", view)
 
 
 if __name__ == "__main__":

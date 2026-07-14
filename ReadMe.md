@@ -105,8 +105,8 @@ The four-page post-update splash screen is generated automatically from
 - Added receive-only Preset Scan to ARF Frequency Analyzer. It ranks the
   available modulation presets at the selected frequency and can open the
   system Sub-GHz Receiver with the chosen preset.
-- Removed repeated `MHz` labels from empty Frequency Analyzer history slots so
-  the right column no longer looks visually overlaid.
+- Removed repeated `MHz` labels from empty Frequency Analyzer history slots and
+  the overlapping feedback glyph from the right column.
 - Added the receive-only Protocol Compiler toolchain: host-side `.tproto`
   inference from repeated Sub-GHz RAW captures and bounded validation on Flipper.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.

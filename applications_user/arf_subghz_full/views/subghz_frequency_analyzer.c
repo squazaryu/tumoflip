@@ -324,22 +324,6 @@ void subghz_frequency_analyzer_draw(Canvas* canvas, SubGhzFrequencyAnalyzerModel
     canvas_draw_icon(canvas, 96, 15, &I_MHz_25x11);
 
     canvas_set_color(canvas, ColorBlack);
-    canvas_set_font(canvas, FontSecondary);
-    const uint8_t icon_x = 119;
-    switch(model->feedback_level) {
-    case SubGHzFrequencyAnalyzerFeedbackLevelAll:
-        canvas_draw_icon(canvas, icon_x, 30, &I_Volup_8x6);
-        break;
-    case SubGHzFrequencyAnalyzerFeedbackLevelVibro:
-        canvas_draw_icon(canvas, icon_x, 30, &I_Voldwn_6x6);
-        break;
-    case SubGHzFrequencyAnalyzerFeedbackLevelMute:
-        canvas_draw_icon(canvas, icon_x, 30, &I_Voldwn_6x6);
-        canvas_set_color(canvas, ColorWhite);
-        canvas_draw_box(canvas, 123, 30, 2, 6);
-        canvas_set_color(canvas, ColorBlack);
-        break;
-    }
 
     // Buttons hint
     canvas_set_font(canvas, FontSecondary);
