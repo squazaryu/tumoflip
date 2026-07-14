@@ -5,6 +5,13 @@ This app is the development proof for
 an authorized physical ISO14443-4A card presented to Flipper as an app-local
 USB CCID reader on macOS.
 
+The product host for this transport is
+[TumoCard Studio](https://github.com/squazaryu/tumocard-studio). It performs
+automatic PC/SC discovery, bounded public AID inspection, an auditable APDU
+timeline, and redacted report export. Its client-side policy accepts only
+SELECT, READ BINARY, GET RESPONSE, and GET DATA instructions; state-changing
+APDUs are rejected before PC/SC transmission.
+
 The USB worker and NFC poller communicate through a bounded mailbox. NFC radio
 operations only run inside the NFC callback. APDU payloads are never written to
 logs or storage; the screen retains only header metadata, length, result, and
