@@ -239,11 +239,11 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertIn('"Save"', view)
         self.assertIn('"RX"', view)
         self.assertIn("I_ButtonCenter_7x7", view)
-        self.assertIn("const size_t button_height = 9", view)
-        self.assertIn("const int32_t rx_right_margin = 14", view)
-        self.assertIn("button_y + button_height / 2 + 1", view)
-        self.assertIn("canvas_draw_box(canvas, save_x, button_y, save_width, button_height)", view)
-        self.assertIn("canvas_draw_box(canvas, rx_x, button_y, rx_width, button_height)", view)
+        self.assertIn("subghz_frequency_analyzer_draw_top_button", view)
+        self.assertIn("const size_t height = 9", view)
+        self.assertIn('subghz_frequency_analyzer_draw_top_button(canvas, 2, 41, "Save"', view)
+        self.assertIn('subghz_frequency_analyzer_draw_top_button(canvas, 96, 30, "RX"', view)
+        self.assertIn("canvas_draw_box(canvas, x, y, width, height)", view)
         self.assertIn("canvas_draw_str_aligned", view)
         self.assertNotIn("tag_x", view)
         self.assertNotIn('"OK Log"', view)
@@ -265,13 +265,10 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertIn("SubGhzCustomEventViewFreqAnalOkLong", scene)
         self.assertIn("scene_manager_next_scene(subghz->scene_manager, SubGhzSceneReceiver)", scene)
 
-    def test_core_and_arf_frequency_analyzers_share_the_tumoflip_ui(self) -> None:
+    def test_core_and_arf_frequency_analyzers_share_notebook_storage(self) -> None:
         shared_files = (
             "helpers/subghz_frequency_notebook.c",
             "helpers/subghz_frequency_notebook.h",
-            "scenes/subghz_scene_frequency_analyzer.c",
-            "views/subghz_frequency_analyzer.c",
-            "views/subghz_frequency_analyzer.h",
         )
         drift_manifest = (
             REPO_ROOT / "tools/tumoflip/subghz_drift_manifest.txt"
@@ -294,6 +291,32 @@ class ArfSubGhzFullTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("void subghz_ensure_frequency_analyzer_view", core_app)
         self.assertIn("void subghz_ensure_frequency_analyzer_view", core_header)
+
+    def test_preset_scan_is_an_intentional_arf_extension(self) -> None:
+        arf_only_files = (
+            "helpers/subghz_frequency_analyzer_worker.c",
+            "helpers/subghz_frequency_analyzer_worker.h",
+            "scenes/subghz_scene_frequency_analyzer.c",
+            "views/subghz_frequency_analyzer.c",
+            "views/subghz_frequency_analyzer.h",
+        )
+        drift_manifest = (
+            REPO_ROOT / "tools/tumoflip/subghz_drift_manifest.txt"
+        ).read_text(encoding="utf-8")
+        worker = (
+            REPO_ROOT
+            / "applications_user/arf_subghz_full/helpers/subghz_frequency_analyzer_worker.c"
+        ).read_text(encoding="utf-8")
+        scene = (
+            REPO_ROOT
+            / "applications_user/arf_subghz_full/scenes/subghz_scene_frequency_analyzer.c"
+        ).read_text(encoding="utf-8")
+
+        for relative in arf_only_files:
+            with self.subTest(relative=relative):
+                self.assertNotIn(relative, drift_manifest)
+        self.assertIn("subghz_frequency_analyzer_worker_set_preset_callback", worker)
+        self.assertIn("SubGhzCustomEventViewFreqAnalPresetRx", scene)
 
 
 if __name__ == "__main__":
