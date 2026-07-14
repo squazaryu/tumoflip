@@ -98,15 +98,16 @@ void tumonet_radio_free(TumoNetRadio* radio) {
     free(radio);
 }
 
-TumoNetRadioResult tumonet_radio_open(TumoNetRadio* radio) {
+TumoNetRadioResult tumonet_radio_open_with_owner(TumoNetRadio* radio, const char* owner) {
     if(radio == NULL) return TumoNetRadioResultInit;
     if(radio->open) return TumoNetRadioResultOk;
+    if(owner == NULL || owner[0] == '\0') return TumoNetRadioResultInit;
 
     radio->broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
     if(radio->broker == NULL) return TumoNetRadioResultInit;
     if(!subghz_radio_broker_acquire(
            radio->broker,
-           "tumonet_bench",
+           owner,
            furi_ms_to_ticks(TUMONET_RADIO_BROKER_TIMEOUT_MS),
            &radio->lease)) {
         furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
@@ -188,6 +189,10 @@ TumoNetRadioResult tumonet_radio_open(TumoNetRadio* radio) {
     subghz_radio_broker_set_state(radio->broker, &radio->lease, SubGhzRadioBrokerStateInitialized);
     radio->open = true;
     return TumoNetRadioResultOk;
+}
+
+TumoNetRadioResult tumonet_radio_open(TumoNetRadio* radio) {
+    return tumonet_radio_open_with_owner(radio, "tumonet_bench");
 }
 
 void tumonet_radio_close(TumoNetRadio* radio) {

@@ -32,6 +32,7 @@ TumoNetRadio* tumonet_radio_alloc(void);
 void tumonet_radio_free(TumoNetRadio* radio);
 
 TumoNetRadioResult tumonet_radio_open(TumoNetRadio* radio);
+TumoNetRadioResult tumonet_radio_open_with_owner(TumoNetRadio* radio, const char* owner);
 void tumonet_radio_close(TumoNetRadio* radio);
 
 TumoNetRadioResult tumonet_radio_transfer(
