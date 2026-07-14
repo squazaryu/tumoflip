@@ -63,6 +63,18 @@ class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
         self.assertIn("if(open_receiver)", subghz_app)
         self.assertIn("SubGhzSceneReceiver", subghz_app)
 
+    def test_empty_history_slots_do_not_repeat_mhz_suffix(self) -> None:
+        view = (ARF_ROOT / "views/subghz_frequency_analyzer.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("else if(model->history_frequency[i])", view)
+        self.assertNotIn(
+            'else {\n            canvas_draw_str(canvas, current_x + 41, current_y, "MHz");',
+            view,
+        )
+        self.assertNotIn("const uint8_t icon_x = 119", view)
+
 
 if __name__ == "__main__":
     unittest.main()
