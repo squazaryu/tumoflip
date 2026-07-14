@@ -291,47 +291,28 @@ static void wifi_mapper_write_clean_geojson_feature(
 
 static void wifi_mapper_update_model(WiFiMapperApp* app) {
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
-    const WiFiMapperScreen screen = app->screen;
-    const WiFiMapperSessionPage session_page = app->session_page;
-    const bool logging = app->logging;
-    const bool uart_ready = app->uart_ready;
-    const bool ble_relay = app->ble_relay;
-    const WiFiMapperScanMode scan_mode = app->scan_mode;
-    const WiFiMapperExportMode export_mode = app->export_mode;
-    const WiFiMapperSessionStats session = app->session;
-    const WiFiMapperInsights insights = app->insights;
-    const uint32_t lines = app->lines;
-    const uint32_t wifi_records = app->wifi_records;
-    const uint32_t errors = app->errors;
-    char status[sizeof(app->status)];
-    char file_name[sizeof(app->file_name)];
-    char last_line[sizeof(app->last_line)];
-    strlcpy(status, app->status, sizeof(status));
-    strlcpy(file_name, app->file_name, sizeof(file_name));
-    strlcpy(last_line, app->last_line, sizeof(last_line));
-    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
-
     with_view_model(
         app->view,
         WiFiMapperModel * model,
         {
-            model->screen = screen;
-            model->session_page = session_page;
-            model->logging = logging;
-            model->uart_ready = uart_ready;
-            model->ble_relay = ble_relay;
-            model->scan_mode = scan_mode;
-            model->export_mode = export_mode;
-            model->session = session;
-            model->insights = insights;
-            model->lines = lines;
-            model->wifi_records = wifi_records;
-            model->errors = errors;
-            strlcpy(model->status, status, sizeof(model->status));
-            strlcpy(model->file_name, file_name, sizeof(model->file_name));
-            strlcpy(model->last_line, last_line, sizeof(model->last_line));
+            model->screen = app->screen;
+            model->session_page = app->session_page;
+            model->logging = app->logging;
+            model->uart_ready = app->uart_ready;
+            model->ble_relay = app->ble_relay;
+            model->scan_mode = app->scan_mode;
+            model->export_mode = app->export_mode;
+            model->session = app->session;
+            model->insights = app->insights;
+            model->lines = app->lines;
+            model->wifi_records = app->wifi_records;
+            model->errors = app->errors;
+            strlcpy(model->status, app->status, sizeof(model->status));
+            strlcpy(model->file_name, app->file_name, sizeof(model->file_name));
+            strlcpy(model->last_line, app->last_line, sizeof(model->last_line));
         },
         true);
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
 }
 
 static void wifi_mapper_switch_screen(WiFiMapperApp* app, WiFiMapperScreen screen) {
@@ -1963,7 +1944,7 @@ static void wifi_mapper_draw_insights(Canvas* canvas, WiFiMapperModel* model) {
 
 static void wifi_mapper_draw_about(Canvas* canvas) {
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 0, 10, "TumoSurvey v1.0.0");
+    canvas_draw_str(canvas, 0, 10, "TumoSurvey v1.0.1");
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, 0, 24, "Passive WiFi survey");
     canvas_draw_str(canvas, 0, 36, "Module One + ESP32");
@@ -2364,7 +2345,8 @@ static WiFiMapperApp* wifi_mapper_alloc(void) {
     view_dispatcher_add_view(app->view_dispatcher, 0, app->view);
     view_dispatcher_switch_to_view(app->view_dispatcher, 0);
 
-    app->worker_thread = furi_thread_alloc_ex("WiFiMapperRx", 2048, wifi_mapper_worker, app);
+    app->worker_thread =
+        furi_thread_alloc_ex("WiFiMapperRx", 3 * 1024, wifi_mapper_worker, app);
     furi_thread_start(app->worker_thread);
 
     expansion_disable(app->expansion);
