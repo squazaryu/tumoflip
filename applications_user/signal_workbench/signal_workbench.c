@@ -208,7 +208,7 @@ static void tumospectrum_draw_comparison(Canvas* canvas, const TumoSpectrumApp* 
     canvas_set_font(canvas, FontSecondary);
     if(!app->comparison.compatible) {
         canvas_draw_str(canvas, 2, 29, "No compatible comparison");
-        canvas_draw_str(canvas, 2, 41, "Actions > Compare capture");
+        canvas_draw_str(canvas, 2, 41, "Select second RAW");
         return;
     }
     snprintf(
@@ -258,16 +258,19 @@ static void tumospectrum_result_draw(Canvas* canvas, void* context) {
         tumospectrum_draw_comparison(canvas, app);
     }
 
+    const bool compare_page =
+        tumospectrum_type_has_timings(capture->type) && model->page == 3U;
     elements_button_left(canvas, "Prev");
     elements_button_center(canvas, capture->status == TumoSpectrumStatusOk ? "Actions" : "Menu");
-    elements_button_right(canvas, "Next");
+    elements_button_right(canvas, compare_page ? "Compare" : "Next");
 }
 
 static uint8_t tumospectrum_page_count(const TumoSpectrumCapture* capture) {
-    return tumospectrum_type_has_timings(capture->type) ? 4U : 2U;
+    return tumospectrum_type_has_timings(capture->type) ? 4U : 1U;
 }
 
 static void tumospectrum_build_actions(TumoSpectrumApp* app);
+static void tumospectrum_compare_capture(TumoSpectrumApp* app);
 
 static bool tumospectrum_result_input(InputEvent* event, void* context) {
     TumoSpectrumApp* app = context;
@@ -276,6 +279,10 @@ static bool tumospectrum_result_input(InputEvent* event, void* context) {
     if(event->key == InputKeyLeft) {
         app->result_page = app->result_page == 0U ? page_count - 1U : app->result_page - 1U;
     } else if(event->key == InputKeyRight) {
+        if(tumospectrum_type_has_timings(app->capture.type) && app->result_page == 3U) {
+            tumospectrum_compare_capture(app);
+            return true;
+        }
         app->result_page = (uint8_t)((app->result_page + 1U) % page_count);
     } else if(event->key == InputKeyOk) {
         if(app->capture.status == TumoSpectrumStatusOk) {
