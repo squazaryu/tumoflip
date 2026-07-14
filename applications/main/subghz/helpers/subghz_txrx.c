@@ -991,17 +991,18 @@ SubGhzRadioDeviceType subghz_txrx_radio_device_reprobe_preferred(SubGhzTxRx* ins
                    subghz_txrx_radio_device_apply(instance, SubGhzRadioDeviceTypeInternal);
     }
 
-    const bool external_connected =
-        subghz_txrx_radio_device_is_external_connected(instance, SUBGHZ_DEVICE_CC1101_EXT_NAME);
-    if(!external_connected) {
-        return instance->radio_device_type == SubGhzRadioDeviceTypeInternal ?
-                   instance->radio_device_type :
-                   subghz_txrx_radio_device_apply(instance, SubGhzRadioDeviceTypeInternal);
+    if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
+        const bool external_connected = subghz_txrx_radio_device_is_external_connected(
+            instance, SUBGHZ_DEVICE_CC1101_EXT_NAME);
+        if(external_connected) {
+            return instance->radio_device_type;
+        }
+
+        FURI_LOG_W(TAG, "External live probe failed, retrying cold");
+        subghz_txrx_radio_device_apply(instance, SubGhzRadioDeviceTypeInternal);
     }
 
-    return instance->radio_device_type == SubGhzRadioDeviceTypeInternal ?
-               subghz_txrx_radio_device_apply(instance, preferred) :
-               instance->radio_device_type;
+    return subghz_txrx_radio_device_apply(instance, preferred);
 }
 
 SubGhzRadioDeviceType subghz_txrx_radio_device_fallback_internal(SubGhzTxRx* instance) {

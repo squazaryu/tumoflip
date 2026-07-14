@@ -117,6 +117,30 @@ class SubGhzDiversityTest(unittest.TestCase):
         self.assertIn("(version != 0xFF)", probe)
         self.assertNotIn("(partnumber != 0)", probe)
 
+    def test_failed_live_probe_reinitializes_the_preferred_external_radio(self) -> None:
+        txrx = (SUBGHZ / "helpers/subghz_txrx.c").read_text(encoding="utf-8")
+        reprobe = txrx[
+            txrx.index("SubGhzRadioDeviceType subghz_txrx_radio_device_reprobe_preferred") :
+            txrx.index("SubGhzRadioDeviceType subghz_txrx_radio_device_fallback_internal")
+        ]
+
+        live_failure = reprobe.index(
+            'FURI_LOG_W(TAG, "External live probe failed, retrying cold")'
+        )
+        teardown = reprobe.index(
+            "subghz_txrx_radio_device_apply(instance, SubGhzRadioDeviceTypeInternal);",
+            live_failure,
+        )
+        cold_restore = reprobe.index(
+            "return subghz_txrx_radio_device_apply(instance, preferred);"
+        )
+
+        self.assertIn(
+            "instance->radio_device_type != SubGhzRadioDeviceTypeInternal", reprobe
+        )
+        self.assertLess(live_failure, teardown)
+        self.assertLess(teardown, cold_restore)
+
     def test_external_hopping_timeout_falls_back_without_blocking(self) -> None:
         txrx = (SUBGHZ / "helpers/subghz_txrx.c").read_text(encoding="utf-8")
         driver = (
