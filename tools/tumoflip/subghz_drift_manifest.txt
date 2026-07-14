@@ -8,8 +8,6 @@
 # code or have already diverged from the core app.
 helpers/subghz_chat.c
 helpers/subghz_chat.h
-helpers/subghz_frequency_analyzer_worker.c
-helpers/subghz_frequency_analyzer_worker.h
 helpers/subghz_frequency_notebook.c
 helpers/subghz_frequency_notebook.h
 helpers/subghz_threshold_rssi.c
@@ -25,7 +23,6 @@ scenes/subghz_scene.h
 scenes/subghz_scene_decode_raw.c
 scenes/subghz_scene_delete.c
 scenes/subghz_scene_delete_raw.c
-scenes/subghz_scene_frequency_analyzer.c
 scenes/subghz_scene_more_raw.c
 scenes/subghz_scene_protocol_pack_info.c
 scenes/subghz_scene_saved.c
@@ -37,8 +34,6 @@ subghz_cli.c
 subghz_cli.h
 subghz_dangerous_freq.c
 subghz_history.h
-views/subghz_frequency_analyzer.c
-views/subghz_frequency_analyzer.h
 views/subghz_read_raw.c
 views/subghz_read_raw.h
 views/transmitter.h
