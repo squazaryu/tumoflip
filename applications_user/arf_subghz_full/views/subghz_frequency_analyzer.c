@@ -25,6 +25,11 @@ typedef enum {
     SubGhzFrequencyAnalyzerStatusIDLE,
 } SubGhzFrequencyAnalyzerStatus;
 
+typedef enum {
+    SubGhzFrequencyAnalyzerModeFrequency,
+    SubGhzFrequencyAnalyzerModePreset,
+} SubGhzFrequencyAnalyzerMode;
+
 struct SubGhzFrequencyAnalyzer {
     View* view;
     SubGhzFrequencyAnalyzerWorker* worker;
@@ -40,6 +45,11 @@ struct SubGhzFrequencyAnalyzer {
     bool show_frame;
     SubGhzFrequencyAnalyzerObservation last_observation;
     SubGhzFrequencyAnalyzerNotebookTag notebook_tag;
+    SubGhzFrequencyAnalyzerMode mode;
+    uint32_t preset_frequency;
+    size_t preset_selected_rank;
+    size_t preset_result_count;
+    bool preset_scan_complete;
 };
 
 typedef struct {
@@ -57,6 +67,18 @@ typedef struct {
     bool show_frame;
     bool is_ext_radio;
     SubGhzFrequencyAnalyzerNotebookTag notebook_tag;
+    SubGhzFrequencyAnalyzerMode mode;
+    uint32_t preset_frequency;
+    size_t preset_completed;
+    size_t preset_total;
+    size_t preset_selected_rank;
+    size_t preset_result_count;
+    bool preset_scan_complete;
+    bool preset_result_valid;
+    char preset_name[SUBGHZ_FREQUENCY_ANALYZER_PRESET_NAME_MAX];
+    float preset_peak_rssi;
+    float preset_average_rssi;
+    float preset_noise_floor;
 } SubGhzFrequencyAnalyzerModel;
 
 void subghz_frequency_analyzer_set_callback(
@@ -157,53 +179,118 @@ static void subghz_frequency_analyzer_history_frequency_draw(
     }
 }
 
-static void subghz_frequency_analyzer_draw_action_hint(
-    Canvas* canvas) {
-    const size_t button_height = 9;
-    const int32_t button_y = 1;
-    const int32_t rx_right_margin = 14;
-    const size_t horizontal_padding = 3;
-    const int32_t icon_h_offset = 3;
-    const Icon* icon = &I_ButtonCenter_7x7;
-
-    const char* save_label = "Save";
-    const char* rx_label = "RX";
-    const int32_t icon_width_with_offset = icon_get_width(icon) + icon_h_offset;
-    const size_t save_width =
-        canvas_string_width(canvas, save_label) + horizontal_padding * 2 + icon_width_with_offset;
-    const size_t rx_width =
-        canvas_string_width(canvas, rx_label) + horizontal_padding * 2 + icon_width_with_offset;
-    const int32_t save_x = 2;
-    const int32_t rx_x = canvas_width(canvas) - rx_width - rx_right_margin;
-    const int32_t icon_y =
-        button_y + ((int32_t)button_height - (int32_t)icon_get_height(icon)) / 2;
-    const int32_t text_y = button_y + button_height / 2 + 1;
-
-    canvas_draw_box(canvas, save_x, button_y, save_width, button_height);
-    canvas_draw_box(canvas, rx_x, button_y, rx_width, button_height);
-
+static void subghz_frequency_analyzer_draw_top_button(
+    Canvas* canvas,
+    int32_t x,
+    size_t width,
+    const char* label,
+    const Icon* icon) {
+    const int32_t y = 1;
+    const size_t height = 9;
+    canvas_draw_box(canvas, x, y, width, height);
     canvas_invert_color(canvas);
-    canvas_draw_icon(canvas, save_x + horizontal_padding, icon_y, icon);
-    canvas_draw_str_aligned(
-        canvas,
-        save_x + horizontal_padding + icon_width_with_offset,
-        text_y,
-        AlignLeft,
-        AlignCenter,
-        save_label);
-    canvas_draw_icon(canvas, rx_x + horizontal_padding, icon_y, icon);
-    canvas_draw_str_aligned(
-        canvas,
-        rx_x + horizontal_padding + icon_width_with_offset,
-        text_y,
-        AlignLeft,
-        AlignCenter,
-        rx_label);
+
+    if(icon) {
+        const size_t content_width = icon_get_width(icon) + 2 + canvas_string_width(canvas, label);
+        const int32_t content_x = x + ((int32_t)width - (int32_t)content_width) / 2;
+        const int32_t icon_y = y + ((int32_t)height - (int32_t)icon_get_height(icon)) / 2;
+        canvas_draw_icon(canvas, content_x, icon_y, icon);
+        canvas_draw_str_aligned(
+            canvas, content_x + icon_get_width(icon) + 2, 6, AlignLeft, AlignCenter, label);
+    } else {
+        canvas_draw_str_aligned(canvas, x + width / 2, 6, AlignCenter, AlignCenter, label);
+    }
     canvas_invert_color(canvas);
+}
+
+static void subghz_frequency_analyzer_draw_action_hint(Canvas* canvas) {
+    subghz_frequency_analyzer_draw_top_button(canvas, 2, 41, "Save", &I_ButtonCenter_7x7);
+    subghz_frequency_analyzer_draw_top_button(canvas, 45, 42, "Scan", &I_ButtonUp_7x4);
+    subghz_frequency_analyzer_draw_top_button(canvas, 96, 30, "RX", &I_ButtonCenter_7x7);
+}
+
+static int16_t subghz_frequency_analyzer_dbm_to_int(float dbm) {
+    return dbm >= 0.0f ? (int16_t)(dbm + 0.5f) : (int16_t)(dbm - 0.5f);
+}
+
+static void subghz_frequency_analyzer_draw_preset_scan(
+    Canvas* canvas,
+    SubGhzFrequencyAnalyzerModel* model) {
+    char buffer[64];
+    canvas_set_color(canvas, ColorBlack);
+    canvas_set_font(canvas, FontSecondary);
+    subghz_frequency_analyzer_draw_top_button(canvas, 2, 42, "Freq", &I_ButtonUp_7x4);
+    subghz_frequency_analyzer_draw_top_button(canvas, 91, 35, "Scan", &I_ButtonDown_7x4);
+
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "%03ld.%03ld MHz",
+        model->preset_frequency / 1000000 % 1000,
+        model->preset_frequency / 1000 % 1000);
+    canvas_draw_str(canvas, 2, 21, buffer);
+    canvas_draw_str_aligned(
+        canvas, 126, 21, AlignRight, AlignBottom, model->is_ext_radio ? "EXT" : "INT");
+    canvas_draw_line(canvas, 2, 24, 125, 24);
+
+    if(!model->preset_scan_complete) {
+        snprintf(
+            buffer,
+            sizeof(buffer),
+            "Scanning %lu/%lu",
+            (unsigned long)model->preset_completed,
+            (unsigned long)model->preset_total);
+        canvas_draw_str(canvas, 4, 36, buffer);
+        canvas_draw_str_aligned(
+            canvas,
+            124,
+            36,
+            AlignRight,
+            AlignBottom,
+            model->preset_result_valid ? model->preset_name : "Preparing");
+        elements_frame(canvas, 8, 43, 112, 8);
+        if(model->preset_total > 0) {
+            const size_t width = (108U * model->preset_completed) / model->preset_total;
+            if(width > 0) canvas_draw_box(canvas, 10, 45, width, 4);
+        }
+        canvas_draw_str_aligned(canvas, 64, 61, AlignCenter, AlignBottom, "Back cancels");
+        return;
+    }
+
+    if(!model->preset_result_valid) {
+        canvas_draw_str_aligned(canvas, 64, 39, AlignCenter, AlignBottom, "No presets available");
+        elements_button_center(canvas, "Scan");
+        return;
+    }
+
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "%lu/%lu  %s",
+        (unsigned long)(model->preset_selected_rank + 1),
+        (unsigned long)model->preset_result_count,
+        model->preset_name);
+    canvas_draw_str_aligned(canvas, 64, 36, AlignCenter, AlignBottom, buffer);
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "A %d  P %d  N %d dBm",
+        subghz_frequency_analyzer_dbm_to_int(model->preset_average_rssi),
+        subghz_frequency_analyzer_dbm_to_int(model->preset_peak_rssi),
+        subghz_frequency_analyzer_dbm_to_int(model->preset_noise_floor));
+    canvas_draw_str_aligned(canvas, 64, 48, AlignCenter, AlignBottom, buffer);
+    elements_button_left(canvas, "Prev");
+    elements_button_center(canvas, "RX");
+    elements_button_right(canvas, "Next");
 }
 
 void subghz_frequency_analyzer_draw(Canvas* canvas, SubGhzFrequencyAnalyzerModel* model) {
     char buffer[64] = {0};
+
+    if(model->mode == SubGhzFrequencyAnalyzerModePreset) {
+        subghz_frequency_analyzer_draw_preset_scan(canvas, model);
+        return;
+    }
 
     // Action hint: short OK saves/logs, long OK opens Receiver on the selected frequency.
     canvas_set_color(canvas, ColorBlack);
@@ -241,15 +328,15 @@ void subghz_frequency_analyzer_draw(Canvas* canvas, SubGhzFrequencyAnalyzerModel
     const uint8_t icon_x = 119;
     switch(model->feedback_level) {
     case SubGHzFrequencyAnalyzerFeedbackLevelAll:
-        canvas_draw_icon(canvas, icon_x, 1, &I_Volup_8x6);
+        canvas_draw_icon(canvas, icon_x, 30, &I_Volup_8x6);
         break;
     case SubGHzFrequencyAnalyzerFeedbackLevelVibro:
-        canvas_draw_icon(canvas, icon_x, 1, &I_Voldwn_6x6);
+        canvas_draw_icon(canvas, icon_x, 30, &I_Voldwn_6x6);
         break;
     case SubGHzFrequencyAnalyzerFeedbackLevelMute:
-        canvas_draw_icon(canvas, icon_x, 1, &I_Voldwn_6x6);
+        canvas_draw_icon(canvas, icon_x, 30, &I_Voldwn_6x6);
         canvas_set_color(canvas, ColorWhite);
-        canvas_draw_box(canvas, 123, 1, 2, 6);
+        canvas_draw_box(canvas, 123, 30, 2, 6);
         canvas_set_color(canvas, ColorBlack);
         break;
     }
@@ -314,6 +401,134 @@ static bool subghz_frequency_analyzer_prepare_observation(
     return true;
 }
 
+static bool
+    subghz_frequency_analyzer_show_preset_rank(SubGhzFrequencyAnalyzer* instance, size_t rank) {
+    SubGhzFrequencyAnalyzerPresetResult result;
+    if(!subghz_frequency_analyzer_worker_get_preset_result(instance->worker, rank, &result)) {
+        return false;
+    }
+
+    instance->preset_selected_rank = rank;
+    with_view_model(
+        instance->view,
+        SubGhzFrequencyAnalyzerModel * model,
+        {
+            model->preset_selected_rank = rank;
+            model->preset_result_count = instance->preset_result_count;
+            model->preset_result_valid = true;
+            strlcpy(model->preset_name, result.preset_name, sizeof(model->preset_name));
+            model->preset_peak_rssi = result.peak_rssi;
+            model->preset_average_rssi = result.average_rssi;
+            model->preset_noise_floor = result.noise_floor;
+        },
+        true);
+    return true;
+}
+
+static void subghz_frequency_analyzer_preset_callback(
+    void* context,
+    const SubGhzFrequencyAnalyzerPresetProgress* progress) {
+    SubGhzFrequencyAnalyzer* instance = context;
+    furi_assert(instance);
+    furi_assert(progress);
+
+    if(progress->complete) {
+        instance->preset_scan_complete = true;
+        instance->preset_result_count =
+            subghz_frequency_analyzer_worker_get_preset_result_count(instance->worker);
+        instance->preset_selected_rank = 0;
+    }
+
+    with_view_model(
+        instance->view,
+        SubGhzFrequencyAnalyzerModel * model,
+        {
+            model->preset_frequency = progress->frequency;
+            model->preset_completed = progress->completed;
+            model->preset_total = progress->total;
+            model->preset_scan_complete = progress->complete;
+            model->preset_result_count = instance->preset_result_count;
+            model->preset_selected_rank = instance->preset_selected_rank;
+            model->preset_result_valid = progress->valid;
+            model->is_ext_radio = subghz_txrx_radio_device_get(instance->txrx) !=
+                                  SubGhzRadioDeviceTypeInternal;
+            if(progress->valid) {
+                strlcpy(
+                    model->preset_name, progress->result.preset_name, sizeof(model->preset_name));
+                model->preset_peak_rssi = progress->result.peak_rssi;
+                model->preset_average_rssi = progress->result.average_rssi;
+                model->preset_noise_floor = progress->result.noise_floor;
+            }
+        },
+        true);
+
+    if(progress->complete && instance->preset_result_count > 0) {
+        subghz_frequency_analyzer_show_preset_rank(instance, 0);
+    }
+}
+
+static void subghz_frequency_analyzer_start_preset_scan(
+    SubGhzFrequencyAnalyzer* instance,
+    uint32_t frequency) {
+    if(subghz_frequency_analyzer_worker_is_running(instance->worker)) {
+        subghz_frequency_analyzer_worker_stop(instance->worker);
+    }
+
+    instance->mode = SubGhzFrequencyAnalyzerModePreset;
+    instance->preset_frequency = frequency;
+    instance->preset_scan_complete = false;
+    instance->preset_result_count = 0;
+    instance->preset_selected_rank = 0;
+    subghz_frequency_analyzer_worker_set_mode(
+        instance->worker, SubGhzFrequencyAnalyzerWorkerModePreset, frequency);
+    with_view_model(
+        instance->view,
+        SubGhzFrequencyAnalyzerModel * model,
+        {
+            model->mode = SubGhzFrequencyAnalyzerModePreset;
+            model->preset_frequency = frequency;
+            model->preset_completed = 0;
+            model->preset_total = 0;
+            model->preset_selected_rank = 0;
+            model->preset_result_count = 0;
+            model->preset_scan_complete = false;
+            model->preset_result_valid = false;
+            model->preset_name[0] = '\0';
+        },
+        true);
+    subghz_frequency_analyzer_worker_start(instance->worker);
+}
+
+static void subghz_frequency_analyzer_start_frequency_scan(SubGhzFrequencyAnalyzer* instance) {
+    if(subghz_frequency_analyzer_worker_is_running(instance->worker)) {
+        subghz_frequency_analyzer_worker_stop(instance->worker);
+    }
+    instance->mode = SubGhzFrequencyAnalyzerModeFrequency;
+    subghz_frequency_analyzer_worker_set_mode(
+        instance->worker, SubGhzFrequencyAnalyzerWorkerModeFrequency, 0);
+    with_view_model(
+        instance->view,
+        SubGhzFrequencyAnalyzerModel * model,
+        { model->mode = SubGhzFrequencyAnalyzerModeFrequency; },
+        true);
+    subghz_frequency_analyzer_worker_start(instance->worker);
+}
+
+static uint32_t subghz_frequency_analyzer_get_scan_frequency(SubGhzFrequencyAnalyzer* instance) {
+    uint32_t frequency = subghz_txrx_get_preset(instance->txrx).frequency;
+    with_view_model(
+        instance->view,
+        SubGhzFrequencyAnalyzerModel * model,
+        {
+            SubGhzFrequencyAnalyzerObservation observation;
+            if(subghz_frequency_analyzer_prepare_observation(instance, model, &observation)) {
+                frequency = observation.frequency;
+            }
+        },
+        false);
+    return frequency;
+}
+
 bool subghz_frequency_analyzer_input(InputEvent* event, void* context) {
     furi_assert(context);
     SubGhzFrequencyAnalyzer* instance = (SubGhzFrequencyAnalyzer*)context;
@@ -321,6 +536,49 @@ bool subghz_frequency_analyzer_input(InputEvent* event, void* context) {
     bool need_redraw = false;
     if(event->key == InputKeyBack) {
         return need_redraw;
+    }
+
+    if(event->type == InputTypeShort && event->key == InputKeyUp) {
+        if(instance->mode == SubGhzFrequencyAnalyzerModePreset) {
+            subghz_frequency_analyzer_start_frequency_scan(instance);
+        } else {
+            subghz_frequency_analyzer_start_preset_scan(
+                instance, subghz_frequency_analyzer_get_scan_frequency(instance));
+        }
+        return true;
+    }
+
+    if(instance->mode == SubGhzFrequencyAnalyzerModePreset) {
+        if(event->type == InputTypeShort && event->key == InputKeyDown) {
+            subghz_frequency_analyzer_start_preset_scan(instance, instance->preset_frequency);
+        } else if(
+            instance->preset_scan_complete && instance->preset_result_count == 0 &&
+            event->type == InputTypeShort && event->key == InputKeyOk) {
+            subghz_frequency_analyzer_start_preset_scan(instance, instance->preset_frequency);
+        } else if(
+            instance->preset_scan_complete && instance->preset_result_count > 0 &&
+            (event->type == InputTypePress || event->type == InputTypeRepeat) &&
+            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+            size_t rank = instance->preset_selected_rank;
+            if(event->key == InputKeyLeft) {
+                rank = rank == 0 ? instance->preset_result_count - 1 : rank - 1;
+            } else {
+                rank = (rank + 1) % instance->preset_result_count;
+            }
+            subghz_frequency_analyzer_show_preset_rank(instance, rank);
+        } else if(
+            instance->preset_scan_complete && instance->preset_result_count > 0 &&
+            (event->type == InputTypeShort || event->type == InputTypeLong) &&
+            event->key == InputKeyOk) {
+            instance->callback(SubGhzCustomEventViewFreqAnalPresetRx, instance->context);
+        } else if(event->type == InputTypeLong && event->key == InputKeyUp) {
+            if(instance->feedback_level == SubGHzFrequencyAnalyzerFeedbackLevelAll) {
+                instance->feedback_level = SubGHzFrequencyAnalyzerFeedbackLevelMute;
+            } else {
+                instance->feedback_level--;
+            }
+        }
+        return true;
     }
 
     bool is_press_or_repeat = (event->type == InputTypePress) || (event->type == InputTypeRepeat);
@@ -341,7 +599,7 @@ bool subghz_frequency_analyzer_input(InputEvent* event, void* context) {
         subghz_frequency_analyzer_worker_set_trigger_level(instance->worker, trigger_level);
         FURI_LOG_D(TAG, "trigger = %.1f", (double)trigger_level);
         need_redraw = true;
-    } else if(event->type == InputTypePress && event->key == InputKeyUp) {
+    } else if(event->type == InputTypeLong && event->key == InputKeyUp) {
         if(instance->feedback_level == SubGHzFrequencyAnalyzerFeedbackLevelAll) {
             instance->feedback_level = SubGHzFrequencyAnalyzerFeedbackLevelMute;
         } else {
@@ -545,14 +803,18 @@ void subghz_frequency_analyzer_enter(void* context) {
         instance->worker,
         (SubGhzFrequencyAnalyzerWorkerPairCallback)subghz_frequency_analyzer_pair_callback,
         instance);
-
-    subghz_frequency_analyzer_worker_start(instance->worker);
+    subghz_frequency_analyzer_worker_set_preset_callback(
+        instance->worker, subghz_frequency_analyzer_preset_callback, instance);
 
     instance->rssi_last = 0;
     instance->selected_index = 0;
     instance->max_index = 0;
     instance->show_frame = false;
     instance->notebook_tag = SubGhzFrequencyAnalyzerNotebookTagField;
+    instance->mode = SubGhzFrequencyAnalyzerModeFrequency;
+    instance->preset_scan_complete = false;
+    instance->preset_result_count = 0;
+    instance->preset_selected_rank = 0;
     //subghz_frequency_analyzer_worker_set_trigger_level(instance->worker, RSSI_MIN);
 
     with_view_model(
@@ -578,8 +840,18 @@ void subghz_frequency_analyzer_enter(void* context) {
             model->is_ext_radio =
                 (subghz_txrx_radio_device_get(instance->txrx) != SubGhzRadioDeviceTypeInternal);
             model->notebook_tag = instance->notebook_tag;
+            model->mode = SubGhzFrequencyAnalyzerModeFrequency;
+            model->preset_frequency = subghz_txrx_get_preset(instance->txrx).frequency;
+            model->preset_completed = 0;
+            model->preset_total = 0;
+            model->preset_selected_rank = 0;
+            model->preset_result_count = 0;
+            model->preset_scan_complete = false;
+            model->preset_result_valid = false;
+            model->preset_name[0] = '\0';
         },
         true);
+    subghz_frequency_analyzer_worker_start(instance->worker);
 }
 
 void subghz_frequency_analyzer_exit(void* context) {
@@ -596,7 +868,7 @@ void subghz_frequency_analyzer_exit(void* context) {
 }
 
 SubGhzFrequencyAnalyzer* subghz_frequency_analyzer_alloc(SubGhzTxRx* txrx) {
-    SubGhzFrequencyAnalyzer* instance = malloc(sizeof(SubGhzFrequencyAnalyzer));
+    SubGhzFrequencyAnalyzer* instance = calloc(1, sizeof(SubGhzFrequencyAnalyzer));
 
     instance->feedback_level = SubGHzFrequencyAnalyzerFeedbackLevelMute;
     instance->notebook_tag = SubGhzFrequencyAnalyzerNotebookTagField;
@@ -648,6 +920,26 @@ bool subghz_frequency_analyzer_get_observation(
 
     *observation = instance->last_observation;
     return observation->valid;
+}
+
+bool subghz_frequency_analyzer_get_selected_preset(
+    SubGhzFrequencyAnalyzer* instance,
+    uint32_t* frequency,
+    uint32_t* preset_index) {
+    furi_assert(instance);
+    furi_assert(frequency);
+    furi_assert(preset_index);
+
+    SubGhzFrequencyAnalyzerPresetResult result;
+    if(instance->mode != SubGhzFrequencyAnalyzerModePreset || !instance->preset_scan_complete ||
+       !subghz_frequency_analyzer_worker_get_preset_result(
+           instance->worker, instance->preset_selected_rank, &result)) {
+        return false;
+    }
+
+    *frequency = instance->preset_frequency;
+    *preset_index = result.preset_index;
+    return true;
 }
 
 SubGHzFrequencyAnalyzerFeedbackLevel subghz_frequency_analyzer_feedback_level(

@@ -356,12 +356,8 @@ void subghz_free(SubGhz* subghz, bool alloc_for_tx_only) {
 }
 
 int32_t subghz_app(void* p) {
-    bool alloc_for_tx;
-    if(p && strlen(p)) {
-        alloc_for_tx = true;
-    } else {
-        alloc_for_tx = false;
-    }
+    const bool open_receiver = p && strcmp(p, "receiver") == 0;
+    const bool alloc_for_tx = p && strlen(p) && !open_receiver;
 
     SubGhz* subghz = subghz_alloc(alloc_for_tx);
 
@@ -375,7 +371,22 @@ int32_t subghz_app(void* p) {
     if(p && strlen(p)) {
         uint32_t rpc_ctx = 0;
 
-        if(sscanf(p, "RPC %lX", &rpc_ctx) == 1) {
+        if(open_receiver) {
+            view_dispatcher_attach_to_gui(
+                subghz->view_dispatcher, subghz->gui, ViewDispatcherTypeFullscreen);
+            furi_string_set(subghz->file_path, SUBGHZ_APP_FOLDER);
+            if(subghz_txrx_is_database_loaded(subghz->txrx)) {
+                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneStart);
+                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneReceiver);
+            } else {
+                scene_manager_set_scene_state(
+                    subghz->scene_manager, SubGhzSceneShowError, SubGhzCustomEventManagerSet);
+                furi_string_set(
+                    subghz->error_str,
+                    "No SD card or\ndatabase found.\nSome app function\nmay be reduced.");
+                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneShowError);
+            }
+        } else if(sscanf(p, "RPC %lX", &rpc_ctx) == 1) {
             subghz->rpc_ctx = (void*)rpc_ctx;
             rpc_system_app_set_callback(subghz->rpc_ctx, subghz_rpc_command_callback, subghz);
             rpc_system_app_send_started(subghz->rpc_ctx);
