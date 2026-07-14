@@ -99,6 +99,24 @@ class SubGhzDiversityTest(unittest.TestCase):
             on_enter.index("subghz_txrx_rx_start(subghz->txrx);"),
         )
 
+    def test_live_external_probe_accepts_cc1101_partnum_zero(self) -> None:
+        driver = (
+            REPO_ROOT
+            / "applications/drivers/subghz/cc1101_ext/cc1101_ext.c"
+        ).read_text(encoding="utf-8")
+        probe = driver[
+            driver.index("bool subghz_device_cc1101_ext_is_connect") : driver.index(
+                "void subghz_device_cc1101_ext_sleep"
+            )
+        ]
+
+        self.assertIn("cc1101_get_partnumber", probe)
+        self.assertIn("cc1101_get_version", probe)
+        self.assertIn("(partnumber != 0xFF)", probe)
+        self.assertIn("(version != 0x00)", probe)
+        self.assertIn("(version != 0xFF)", probe)
+        self.assertNotIn("(partnumber != 0)", probe)
+
     def test_external_hopping_timeout_falls_back_without_blocking(self) -> None:
         txrx = (SUBGHZ / "helpers/subghz_txrx.c").read_text(encoding="utf-8")
         driver = (
