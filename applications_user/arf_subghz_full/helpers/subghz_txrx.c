@@ -631,8 +631,8 @@ void subghz_txrx_preset_hopper_update(SubGhzTxRx* instance, float stay_threshold
             instance->preset_hopper_idx = 0;
         }
 
-        size_t actual_preset_idx = subghz_setting_get_hopper_preset_index(
-            instance->setting, instance->preset_hopper_idx);
+        size_t actual_preset_idx =
+            subghz_setting_get_hopper_preset_index(instance->setting, instance->preset_hopper_idx);
 
         if(instance->txrx_state == SubGhzTxRxStateRx) {
             subghz_txrx_rx_end(instance);
@@ -699,8 +699,7 @@ void subghz_txrx_combined_hopper_update(SubGhzTxRx* instance, float stay_thresho
     }
 
     size_t frequency_count = subghz_setting_get_hopper_frequency_count(instance->setting);
-    size_t configured_preset_count =
-        subghz_setting_get_hopper_preset_count(instance->setting);
+    size_t configured_preset_count = subghz_setting_get_hopper_preset_count(instance->setting);
     size_t preset_count = configured_preset_count > 0 ?
                               configured_preset_count :
                               subghz_setting_get_preset_count(instance->setting);
@@ -724,8 +723,8 @@ void subghz_txrx_combined_hopper_update(SubGhzTxRx* instance, float stay_thresho
                                    subghz_setting_get_hopper_preset_index(
                                        instance->setting, hopper_plan.preset_hopper_index) :
                                    hopper_plan.preset_hopper_index;
-    uint32_t frequency = subghz_setting_get_hopper_frequency(
-        instance->setting, hopper_plan.frequency_index);
+    uint32_t frequency =
+        subghz_setting_get_hopper_frequency(instance->setting, hopper_plan.frequency_index);
 
     if(instance->txrx_state == SubGhzTxRxStateRx) {
         subghz_txrx_rx_end(instance);
@@ -753,9 +752,7 @@ void subghz_txrx_preset_hopper_set_state(SubGhzTxRx* instance, SubGhzPresetHoppe
     if(state == SubGhzPresetHopperStateRunning) {
         subghz_devices_reset(instance->radio_device);
         subghz_devices_load_preset(
-            instance->radio_device,
-            FuriHalSubGhzPresetCustom,
-            instance->preset->data);
+            instance->radio_device, FuriHalSubGhzPresetCustom, instance->preset->data);
     }
 }
 
@@ -976,6 +973,46 @@ const char* subghz_txrx_radio_device_get_name(SubGhzTxRx* instance) {
 bool subghz_txrx_radio_device_is_frequency_valid(SubGhzTxRx* instance, uint32_t frequency) {
     furi_assert(instance);
     return subghz_devices_is_frequency_valid(instance->radio_device, frequency);
+}
+
+bool subghz_txrx_analyzer_begin(SubGhzTxRx* instance, size_t preset_index, uint32_t frequency) {
+    furi_assert(instance);
+
+    SubGhzSetting* setting = instance->setting;
+    if(preset_index >= subghz_setting_get_preset_count(setting) ||
+       !subghz_devices_is_frequency_valid(instance->radio_device, frequency)) {
+        return false;
+    }
+
+    if(instance->radio_device_type == SubGhzRadioDeviceTypeExternalCC1101 &&
+       !subghz_devices_is_connect(instance->radio_device)) {
+        subghz_txrx_radio_device_set(instance, SubGhzRadioDeviceTypeInternal);
+        if(!subghz_devices_is_frequency_valid(instance->radio_device, frequency)) return false;
+    }
+
+    subghz_txrx_stop(instance);
+    subghz_devices_reset(instance->radio_device);
+    subghz_devices_idle(instance->radio_device);
+    subghz_devices_load_preset(
+        instance->radio_device,
+        FuriHalSubGhzPresetCustom,
+        subghz_setting_get_preset_data(setting, preset_index));
+    subghz_devices_set_frequency(instance->radio_device, frequency);
+    subghz_devices_flush_rx(instance->radio_device);
+    subghz_devices_set_rx(instance->radio_device);
+    instance->txrx_state = SubGhzTxRxStateRx;
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateRx);
+    return true;
+}
+
+void subghz_txrx_analyzer_end(SubGhzTxRx* instance) {
+    furi_assert(instance);
+
+    if(instance->txrx_state == SubGhzTxRxStateRx) {
+        subghz_devices_idle(instance->radio_device);
+        instance->txrx_state = SubGhzTxRxStateIDLE;
+        subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateInitialized);
+    }
 }
 
 bool subghz_txrx_radio_device_is_tx_allowed(SubGhzTxRx* instance, uint32_t frequency) {

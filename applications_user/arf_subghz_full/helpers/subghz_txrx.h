@@ -365,6 +365,21 @@ const char* subghz_txrx_radio_device_get_name(SubGhzTxRx* instance);
 */
 bool subghz_txrx_radio_device_is_frequency_valid(SubGhzTxRx* instance, uint32_t frequency);
 
+/** Start a synchronous RX probe for analyzer measurements.
+ *
+ * The probe uses the currently selected radio device and a preset from the
+ * active Sub-GHz settings. It does not start the decoder worker.
+ *
+ * @param instance Pointer to a SubGhzTxRx
+ * @param preset_index Preset index in SubGhzSetting
+ * @param frequency Frequency in Hz
+ * @return true when the selected device entered RX mode
+ */
+bool subghz_txrx_analyzer_begin(SubGhzTxRx* instance, size_t preset_index, uint32_t frequency);
+
+/** Stop a synchronous analyzer probe and leave the radio idle. */
+void subghz_txrx_analyzer_end(SubGhzTxRx* instance);
+
 bool subghz_txrx_radio_device_is_tx_allowed(SubGhzTxRx* instance, uint32_t frequency);
 
 void subghz_txrx_set_debug_pin_state(SubGhzTxRx* instance, bool state);
