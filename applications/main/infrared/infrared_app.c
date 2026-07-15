@@ -580,8 +580,9 @@ int32_t infrared_app(void* p) {
 
     bool is_remote_loaded = false;
     bool is_rpc_mode = false;
+    const bool open_capture_raw = p && strcmp(p, "tumospectrum_raw") == 0;
 
-    if(p && strlen(p)) {
+    if(p && strlen(p) && !open_capture_raw) {
         uint32_t rpc_ctx = 0;
         if(sscanf(p, "RPC %lX", &rpc_ctx) == 1) {
             infrared->rpc_ctx = (void*)rpc_ctx;
@@ -617,7 +618,12 @@ int32_t infrared_app(void* p) {
     } else {
         view_dispatcher_attach_to_gui(
             infrared->view_dispatcher, infrared->gui, ViewDispatcherTypeFullscreen);
-        if(is_remote_loaded) { //-V547
+        if(open_capture_raw) {
+            infrared_worker_rx_enable_signal_decoding(infrared->worker, false);
+            infrared->app_state.is_learning_new_remote = true;
+            scene_manager_next_scene(infrared->scene_manager, InfraredSceneStart);
+            scene_manager_next_scene(infrared->scene_manager, InfraredSceneLearn);
+        } else if(is_remote_loaded) { //-V547
             scene_manager_next_scene(infrared->scene_manager, InfraredSceneRemote);
         } else {
             scene_manager_next_scene(infrared->scene_manager, InfraredSceneStart);
