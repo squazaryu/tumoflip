@@ -12,8 +12,8 @@ App(
     fap_icon_assets="icons",
     fap_category="Module One/Signals",
     fap_dist_path="apps/Module One/Signals/signal_workbench.fap",
-    fap_version="1.0.2",
+    fap_version="2.0.0",
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip",
-    fap_description="Read-only signal research workspace with strict Sub-GHz, Infrared and TumoScope parsers, timing analysis, comparison, notebook reports and Companion visualization.",
+    fap_description="Signal research workspace with stock-app RAW capture, bounded multi-capture timing inference, comparison, notebook reports and Companion visualization.",
 )
