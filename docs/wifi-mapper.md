@@ -103,12 +103,15 @@ reports exact bounded entries by BSSID:
 In the result browser, `Left`/`Right` changes the item and `Up`/`Down` changes
 the category. `Locate` is available for current entries, but not for `Gone`.
 
-Locator uses the existing passive `scanap` UART command and only updates for
-the selected BSSID. It shows current and peak RSSI plus a bounded
+Locator uses the supported passive `scanall` UART command and filters parsed
+observations to the selected BSSID. It shows current and peak RSSI plus a bounded
 `Warmer`/`Colder`/`Steady` trend. `Stop`, `Back`, and app exit send `stopscan`
 before returning to the normal survey flow. If either snapshot exceeds the
 32-AP Inspector limit, the UI marks the comparison as partial rather than
 claiming the result is exhaustive.
+
+Current Marauder builds no longer expose the older AP-only `scanap` command,
+so the main survey selector contains only `Scan All` and `Wardrive`.
 
 ## Companion Map
 
