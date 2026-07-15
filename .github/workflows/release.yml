@@ -153,7 +153,7 @@ jobs:
 
           notes = f"""## {version}
 
-          Experimental Tumoflip build based on Unleashed 089. Some features may be unstable; report regressions in Issues.
+          Stable Tumoflip release based on Unleashed 089. Report regressions in Issues.
 
           ### Automated release assets
 
