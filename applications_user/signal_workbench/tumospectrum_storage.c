@@ -869,9 +869,12 @@ bool tumospectrum_storage_load_latest_set(Storage* storage, TumoSpectrumCaptureS
                    format, "Checksum confidence", &checksum_confidence, 1U) ||
                bit_count > TUMOSPECTRUM_MAX_BITS || stable_bits > TUMOSPECTRUM_MAX_BITS ||
                changing_bits > TUMOSPECTRUM_MAX_BITS || unknown_bits > TUMOSPECTRUM_MAX_BITS ||
-               counter_start > UINT8_MAX || counter_length > UINT8_MAX ||
-               counter_confidence > 100U || checksum_start > UINT8_MAX ||
-               checksum_confidence > 100U) {
+               counter_direction > TumoSpectrumCounterDecrementing || counter_start > UINT8_MAX ||
+               counter_length > UINT8_MAX || counter_confidence > 100U ||
+               checksum_start > UINT8_MAX || checksum_confidence > 100U ||
+               checksum_candidates >
+                   (TumoSpectrumChecksumXor8 | TumoSpectrumChecksumSum8 |
+                    TumoSpectrumChecksumCrc8Poly07 | TumoSpectrumChecksumCrc8Poly31)) {
                 break;
             }
             inference->bit_count = (uint8_t)bit_count;
