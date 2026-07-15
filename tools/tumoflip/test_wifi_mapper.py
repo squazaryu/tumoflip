@@ -15,9 +15,46 @@ except ImportError:
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = REPO_ROOT / "applications_user/wifi_mapper"
+FIXTURE_DIR = REPO_ROOT / "tools/tumoflip/fixtures/wifi_mapper"
 
 
 class WiFiMapperTest(unittest.TestCase):
+    def test_inspector_core_host_contract(self) -> None:
+        compiler = shutil.which("cc") or shutil.which("clang")
+        if compiler is None:
+            self.skipTest("No host C compiler")
+
+        with tempfile.TemporaryDirectory() as directory:
+            executable = Path(directory) / "wifi_mapper_inspector_host_test"
+            subprocess.run(
+                [
+                    compiler,
+                    "-std=c11",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    "-I",
+                    str(APP_DIR),
+                    str(APP_DIR / "wifi_mapper_inspector.c"),
+                    str(REPO_ROOT / "tools/tumoflip/wifi_mapper_inspector_host_test.c"),
+                    "-o",
+                    str(executable),
+                ],
+                check=True,
+                cwd=REPO_ROOT,
+            )
+            result = subprocess.run(
+                [
+                    str(executable),
+                    str(FIXTURE_DIR / "baseline.csv"),
+                    str(FIXTURE_DIR / "current.csv"),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertIn("wifi_mapper_inspector_host_test: PASS", result.stdout)
+
     def test_insights_core_host_contract(self) -> None:
         compiler = shutil.which("cc") or shutil.which("clang")
         if compiler is None:
@@ -61,7 +98,7 @@ class WiFiMapperTest(unittest.TestCase):
             manifest,
         )
         self.assertIn('fap_category="Module One/ESP32 Wi-Fi"', manifest)
-        self.assertIn('fap_version="1.1.0"', manifest)
+        self.assertIn('fap_version="1.2.0"', manifest)
         self.assertIn('fap_icon="wifi_mapper_10px.png"', manifest)
         self.assertIn('fap_icon_assets="icons"', manifest)
         self.assertTrue((APP_DIR / "wifi_mapper_10px.png").is_file())
@@ -77,10 +114,16 @@ class WiFiMapperTest(unittest.TestCase):
     def test_uart_logger_uses_passive_scan_commands(self) -> None:
         source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
 
-        self.assertIn("#define WIFI_MAPPER_SCAN_ALL_COMMAND \"scanall\\r\\n\"", source)
-        self.assertIn("#define WIFI_MAPPER_SCAN_AP_COMMAND  \"scanap\\r\\n\"", source)
-        self.assertIn("#define WIFI_MAPPER_WARDRIVE_COMMAND \"wardrive -serial\\r\\n\"", source)
-        self.assertIn("#define WIFI_MAPPER_STOP_COMMAND \"stopscan\\r\\n\"", source)
+        for macro, command in (
+            ("WIFI_MAPPER_SCAN_ALL_COMMAND", "scanall"),
+            ("WIFI_MAPPER_SCAN_AP_COMMAND", "scanap"),
+            ("WIFI_MAPPER_WARDRIVE_COMMAND", "wardrive -serial"),
+            ("WIFI_MAPPER_STOP_COMMAND", "stopscan"),
+        ):
+            self.assertRegex(
+                source,
+                rf'#define\s+{macro}\s+"{re.escape(command)}\\r\\n"',
+            )
         self.assertIn("WiFiMapperScanModeAll", source)
         self.assertIn("WiFiMapperScanModeWardrive", source)
         self.assertIn("WiFiMapperExportModeClean", source)
@@ -106,6 +149,18 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn("wifi_mapper_write_escaped_json", source)
         self.assertIn("wifi_mapper_find_latest_session", source)
         self.assertIn("wifi_mapper_find_adjacent_session", source)
+        self.assertIn("WiFiMapperScreenInspector", source)
+        self.assertIn("WiFiMapperScreenInspectorList", source)
+        self.assertIn("WiFiMapperScreenLocator", source)
+        self.assertIn("WIFI_MAPPER_BASELINE_PATH", source)
+        self.assertIn("wifi_mapper_read_baseline_reference", source)
+        self.assertIn("wifi_mapper_write_baseline_reference", source)
+        self.assertIn('"No AP data to pin"', source)
+        self.assertIn("wifi_mapper_read_inspector_snapshot", source)
+        self.assertIn("wifi_mapper_inspector_compare", source)
+        self.assertIn("wifi_mapper_locator_start", source)
+        self.assertIn("wifi_mapper_locator_stop", source)
+        self.assertIn("WIFI_MAPPER_SCAN_AP_COMMAND", source)
         self.assertIn("wifi_mapper_select_adjacent_session", source)
         self.assertIn("wifi_mapper_parse_marauder_ap_line", source)
         self.assertIn("wifi_mapper_parse_marauder_wardrive_line", source)
@@ -145,7 +200,10 @@ class WiFiMapperTest(unittest.TestCase):
             source,
         )
         self.assertIn('EXT_PATH("apps_data/wifi_mapper/exports")', source)
-        self.assertIn('elements_button_center(canvas, "Export")', source)
+        self.assertIn(
+            'model->session_page == WiFiMapperSessionPageBaseline ? "Inspect" : "Export"',
+            source,
+        )
         self.assertIn('elements_button_right(canvas, "Next")', source)
         self.assertIn("FuriHalSerialIdUsart", source)
         self.assertIn("#include <expansion/expansion.h>", source)
@@ -183,9 +241,17 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn('if(model->logging) strlcat(chips, "LIVE ", sizeof(chips));', source)
         self.assertIn("static void wifi_mapper_draw_insights(", source)
         self.assertIn("static void wifi_mapper_draw_about(", source)
-        self.assertIn('"TumoSurvey v1.1.0"', source)
-        self.assertIn('"Passive WiFi survey"', source)
+        self.assertIn('"TumoSurvey v1.2.0"', source)
+        self.assertIn('"Survey + AP Inspector"', source)
         self.assertIn('"squazaryu/tumoflip"', source)
+        self.assertIn('elements_button_left(canvas, "Set Base")', source)
+        self.assertIn('elements_button_center(canvas, "Changes")', source)
+        self.assertIn('elements_button_right(canvas, "All")', source)
+        self.assertIn('elements_button_center(canvas, "Locate")', source)
+        self.assertIn(
+            'elements_button_center(canvas, model->locator_running ? "Stop" : "Start")',
+            source,
+        )
         self.assertNotIn("wifi_mapper_draw_top_action", source)
         self.assertNotIn("canvas_draw_rbox(canvas, 94, 1, 34, 12, 2)", source)
         self.assertNotIn("static int wifi_mapper_hint(", source)
@@ -194,10 +260,22 @@ class WiFiMapperTest(unittest.TestCase):
         source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
 
         self.assertIn("#include <bt/bt_service/bt.h>", source)
-        self.assertIn('#define WIFI_MAPPER_RELAY_APP_ID      "wifi_mapper"', source)
-        self.assertIn('#define WIFI_MAPPER_RELAY_COMMAND     "live_line"', source)
-        self.assertIn('#define WIFI_MAPPER_RELAY_START_COMMAND "survey_start"', source)
-        self.assertIn('#define WIFI_MAPPER_RELAY_STOP_COMMAND  "survey_stop"', source)
+        self.assertRegex(
+            source,
+            r'#define\s+WIFI_MAPPER_RELAY_APP_ID\s+"wifi_mapper"',
+        )
+        self.assertRegex(
+            source,
+            r'#define\s+WIFI_MAPPER_RELAY_COMMAND\s+"live_line"',
+        )
+        self.assertRegex(
+            source,
+            r'#define\s+WIFI_MAPPER_RELAY_START_COMMAND\s+"survey_start"',
+        )
+        self.assertRegex(
+            source,
+            r'#define\s+WIFI_MAPPER_RELAY_STOP_COMMAND\s+"survey_stop"',
+        )
         self.assertIn("bt_app_bridge_send_text_v2(", source)
         self.assertIn("app->bt = furi_record_open(RECORD_BT);", source)
         self.assertIn("furi_record_close(RECORD_BT);", source)
@@ -269,6 +347,17 @@ class WiFiMapperTest(unittest.TestCase):
 
         for term in forbidden_terms:
             self.assertNotIn(term, source)
+
+    def test_inspector_contract_is_documented(self) -> None:
+        document = (REPO_ROOT / "docs/wifi-mapper.md").read_text(encoding="utf-8")
+
+        self.assertIn("## Survey Inspector", document)
+        self.assertIn("/ext/apps_data/wifi_mapper/baseline.txt", document)
+        self.assertIn("`New`", document)
+        self.assertIn("`Gone`", document)
+        self.assertIn("`Changed`", document)
+        self.assertIn("RSSI Locator", document)
+        self.assertIn("32-AP Inspector limit", document)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@
 #include <gui/elements.h>
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
-#include "wifi_mapper_icons.h"   // generated from icons/ (fap_icon_assets)
+#include "wifi_mapper_icons.h" // generated from icons/ (fap_icon_assets)
 
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
@@ -14,6 +14,7 @@
 #include <expansion/expansion.h>
 
 #include "wifi_mapper_insights.h"
+#include "wifi_mapper_inspector.h"
 
 #include <ctype.h>
 #include <stdint.h>
@@ -23,41 +24,42 @@
 
 #define TAG "WiFiMapper"
 
-#define WIFI_MAPPER_BAUDRATE       115200
-#define WIFI_MAPPER_RX_BUFFER_SIZE 2048U
-#define WIFI_MAPPER_LINE_SIZE      160U
-#define WIFI_MAPPER_PATH_SIZE      128U
-#define WIFI_MAPPER_SESSION_LINE_SIZE 256U
-#define WIFI_MAPPER_LAST_LINE_SIZE 48U
-#define WIFI_MAPPER_BSSID_SIZE     18U
-#define WIFI_MAPPER_SSID_SIZE      64U
-#define WIFI_MAPPER_AUTH_SIZE      24U
-#define WIFI_MAPPER_GEO_SIZE       16U
-#define WIFI_MAPPER_FILE_NAME_SIZE 48U
-#define WIFI_MAPPER_MAX_UNIQUE     64U
+#define WIFI_MAPPER_BAUDRATE            115200
+#define WIFI_MAPPER_RX_BUFFER_SIZE      2048U
+#define WIFI_MAPPER_LINE_SIZE           160U
+#define WIFI_MAPPER_PATH_SIZE           128U
+#define WIFI_MAPPER_SESSION_LINE_SIZE   256U
+#define WIFI_MAPPER_LAST_LINE_SIZE      48U
+#define WIFI_MAPPER_BSSID_SIZE          18U
+#define WIFI_MAPPER_SSID_SIZE           64U
+#define WIFI_MAPPER_AUTH_SIZE           24U
+#define WIFI_MAPPER_GEO_SIZE            16U
+#define WIFI_MAPPER_FILE_NAME_SIZE      48U
+#define WIFI_MAPPER_MAX_UNIQUE          64U
 #define WIFI_MAPPER_MAX_EXPORT_FEATURES WIFI_MAPPER_MAX_UNIQUE
-#define WIFI_MAPPER_CHANNEL_BUCKETS 15U
-#define WIFI_MAPPER_CSV_FIELD_SIZE 64U
+#define WIFI_MAPPER_CHANNEL_BUCKETS     15U
+#define WIFI_MAPPER_CSV_FIELD_SIZE      64U
 
-#define WIFI_MAPPER_DATA_DIR     EXT_PATH("apps_data/wifi_mapper")
-#define WIFI_MAPPER_SESSIONS_DIR EXT_PATH("apps_data/wifi_mapper/sessions")
-#define WIFI_MAPPER_EXPORTS_DIR  EXT_PATH("apps_data/wifi_mapper/exports")
+#define WIFI_MAPPER_DATA_DIR         EXT_PATH("apps_data/wifi_mapper")
+#define WIFI_MAPPER_SESSIONS_DIR     EXT_PATH("apps_data/wifi_mapper/sessions")
+#define WIFI_MAPPER_EXPORTS_DIR      EXT_PATH("apps_data/wifi_mapper/exports")
+#define WIFI_MAPPER_BASELINE_PATH    EXT_PATH("apps_data/wifi_mapper/baseline.txt")
 #define WIFI_MAPPER_SCAN_ALL_COMMAND "scanall\r\n"
 #define WIFI_MAPPER_SCAN_AP_COMMAND  "scanap\r\n"
 #define WIFI_MAPPER_WARDRIVE_COMMAND "wardrive -serial\r\n"
-#define WIFI_MAPPER_STOP_COMMAND "stopscan\r\n"
+#define WIFI_MAPPER_STOP_COMMAND     "stopscan\r\n"
 
 // Opt-in live relay for Companion Live WiFi scan. The payload is one or more
 // raw printable UART lines separated by '\n' and sent as a single FAB2 frame:
 // app_id "wifi_mapper", command "live_line", request_id 0, flags 0.
 // Keep the payload below the App Bridge v2 160-byte cap; long single lines are
 // clipped rather than dropped so the phone still receives a useful sample.
-#define WIFI_MAPPER_RELAY_APP_ID      "wifi_mapper"
-#define WIFI_MAPPER_RELAY_COMMAND     "live_line"
+#define WIFI_MAPPER_RELAY_APP_ID        "wifi_mapper"
+#define WIFI_MAPPER_RELAY_COMMAND       "live_line"
 #define WIFI_MAPPER_RELAY_START_COMMAND "survey_start"
 #define WIFI_MAPPER_RELAY_STOP_COMMAND  "survey_stop"
-#define WIFI_MAPPER_RELAY_PAYLOAD_MAX 150U
-#define WIFI_MAPPER_RELAY_FLUSH_MS    120U
+#define WIFI_MAPPER_RELAY_PAYLOAD_MAX   150U
+#define WIFI_MAPPER_RELAY_FLUSH_MS      120U
 
 typedef enum {
     WiFiMapperEventReserved = (1 << 0),
@@ -82,6 +84,9 @@ typedef enum {
     WiFiMapperScreenInsights,
     WiFiMapperScreenSession,
     WiFiMapperScreenAbout,
+    WiFiMapperScreenInspector,
+    WiFiMapperScreenInspectorList,
+    WiFiMapperScreenLocator,
 } WiFiMapperScreen;
 
 typedef enum {
@@ -190,22 +195,30 @@ typedef struct {
     uint8_t buffer[64];
 } WiFiMapperExportScratch;
 
+typedef struct {
+    char line[WIFI_MAPPER_SESSION_LINE_SIZE];
+    uint8_t buffer[64];
+} WiFiMapperInspectorReadScratch;
+
 static const WiFiMapperScanModeConfig wifi_mapper_scan_modes[WiFiMapperScanModeCount] = {
-    [WiFiMapperScanModeAll] = {
-        .label = "Scan All",
-        .command = WIFI_MAPPER_SCAN_ALL_COMMAND,
-        .sent_status = "scanall sent",
-    },
-    [WiFiMapperScanModeAp] = {
-        .label = "Scan AP",
-        .command = WIFI_MAPPER_SCAN_AP_COMMAND,
-        .sent_status = "scanap sent",
-    },
-    [WiFiMapperScanModeWardrive] = {
-        .label = "Wardrive",
-        .command = WIFI_MAPPER_WARDRIVE_COMMAND,
-        .sent_status = "wardrive sent",
-    },
+    [WiFiMapperScanModeAll] =
+        {
+            .label = "Scan All",
+            .command = WIFI_MAPPER_SCAN_ALL_COMMAND,
+            .sent_status = "scanall sent",
+        },
+    [WiFiMapperScanModeAp] =
+        {
+            .label = "Scan AP",
+            .command = WIFI_MAPPER_SCAN_AP_COMMAND,
+            .sent_status = "scanap sent",
+        },
+    [WiFiMapperScanModeWardrive] =
+        {
+            .label = "Wardrive",
+            .command = WIFI_MAPPER_WARDRIVE_COMMAND,
+            .sent_status = "wardrive sent",
+        },
 };
 
 typedef struct {
@@ -224,6 +237,26 @@ typedef struct {
     char status[24];
     char file_name[WIFI_MAPPER_FILE_NAME_SIZE];
     char last_line[WIFI_MAPPER_LAST_LINE_SIZE];
+    bool inspector_loaded;
+    bool inspector_has_baseline;
+    bool inspector_partial;
+    size_t inspector_new_count;
+    size_t inspector_changed_count;
+    size_t inspector_gone_count;
+    WiFiMapperInspectorCategory inspector_category;
+    size_t inspector_index;
+    size_t inspector_item_count;
+    bool inspector_has_item;
+    WiFiMapperInspectorAp inspector_item;
+    char inspector_status[24];
+    char baseline_file_name[WIFI_MAPPER_FILE_NAME_SIZE];
+    char current_file_name[WIFI_MAPPER_FILE_NAME_SIZE];
+    bool locator_running;
+    bool locator_seen;
+    int32_t locator_rssi;
+    int32_t locator_peak_rssi;
+    WiFiMapperLocatorTrend locator_trend;
+    uint32_t locator_samples;
 } WiFiMapperModel;
 
 typedef struct {
@@ -262,6 +295,22 @@ typedef struct {
     char status[24];
     char file_name[WIFI_MAPPER_FILE_NAME_SIZE];
     char last_line[WIFI_MAPPER_LAST_LINE_SIZE];
+    WiFiMapperInspectorComparison* inspector;
+    WiFiMapperInspectorCategory inspector_category;
+    size_t inspector_index;
+    char inspector_status[24];
+    char baseline_file_name[WIFI_MAPPER_FILE_NAME_SIZE];
+    char inspector_current_file_name[WIFI_MAPPER_FILE_NAME_SIZE];
+    bool inspector_loaded;
+    bool inspector_has_baseline;
+    bool locator_running;
+    bool locator_seen;
+    int32_t locator_rssi;
+    int32_t locator_peak_rssi;
+    int32_t locator_previous_rssi;
+    WiFiMapperLocatorTrend locator_trend;
+    uint32_t locator_samples;
+    char locator_bssid[WIFI_MAPPER_BSSID_SIZE];
 } WiFiMapperApp;
 
 static const NotificationSequence sequence_wifi_mapper_rx = {
@@ -291,6 +340,17 @@ static void wifi_mapper_write_clean_geojson_feature(
 
 static void wifi_mapper_update_model(WiFiMapperApp* app) {
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    size_t inspector_item_count = 0U;
+    const WiFiMapperInspectorAp* inspector_item = NULL;
+    bool inspector_partial = false;
+    if(app->inspector) {
+        inspector_item_count =
+            wifi_mapper_inspector_category_count(app->inspector, app->inspector_category);
+        inspector_item = wifi_mapper_inspector_category_get(
+            app->inspector, app->inspector_category, app->inspector_index);
+        inspector_partial = (app->inspector->baseline.overflow_count > 0U) ||
+                            (app->inspector->current.overflow_count > 0U);
+    }
     with_view_model(
         app->view,
         WiFiMapperModel * model,
@@ -310,6 +370,37 @@ static void wifi_mapper_update_model(WiFiMapperApp* app) {
             strlcpy(model->status, app->status, sizeof(model->status));
             strlcpy(model->file_name, app->file_name, sizeof(model->file_name));
             strlcpy(model->last_line, app->last_line, sizeof(model->last_line));
+            model->inspector_loaded = app->inspector_loaded;
+            model->inspector_has_baseline = app->inspector_has_baseline;
+            model->inspector_partial = inspector_partial;
+            model->inspector_new_count = app->inspector ? app->inspector->new_count : 0U;
+            model->inspector_changed_count = app->inspector ? app->inspector->changed_count : 0U;
+            model->inspector_gone_count = app->inspector ? app->inspector->gone_count : 0U;
+            model->inspector_category = app->inspector_category;
+            model->inspector_index = app->inspector_index;
+            model->inspector_item_count = inspector_item_count;
+            model->inspector_has_item = inspector_item != NULL;
+            if(inspector_item) {
+                model->inspector_item = *inspector_item;
+            } else {
+                memset(&model->inspector_item, 0, sizeof(model->inspector_item));
+            }
+            strlcpy(
+                model->inspector_status, app->inspector_status, sizeof(model->inspector_status));
+            strlcpy(
+                model->baseline_file_name,
+                app->baseline_file_name,
+                sizeof(model->baseline_file_name));
+            strlcpy(
+                model->current_file_name,
+                app->inspector_current_file_name,
+                sizeof(model->current_file_name));
+            model->locator_running = app->locator_running;
+            model->locator_seen = app->locator_seen;
+            model->locator_rssi = app->locator_rssi;
+            model->locator_peak_rssi = app->locator_peak_rssi;
+            model->locator_trend = app->locator_trend;
+            model->locator_samples = app->locator_samples;
         },
         true);
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
@@ -348,8 +439,8 @@ static void wifi_mapper_send_command(WiFiMapperApp* app, const char* command) {
     furi_hal_serial_tx_wait_complete(app->serial_handle);
 }
 
-static const WiFiMapperScanModeConfig* wifi_mapper_get_scan_mode_config(
-    WiFiMapperScanMode scan_mode) {
+static const WiFiMapperScanModeConfig*
+    wifi_mapper_get_scan_mode_config(WiFiMapperScanMode scan_mode) {
     if(scan_mode >= WiFiMapperScanModeCount) {
         scan_mode = WiFiMapperScanModeAll;
     }
@@ -370,9 +461,8 @@ static void wifi_mapper_set_status(WiFiMapperApp* app, const char* status) {
 
 static void wifi_mapper_toggle_export_mode(WiFiMapperApp* app) {
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
-    app->export_mode = app->export_mode == WiFiMapperExportModeClean ?
-                           WiFiMapperExportModeRaw :
-                           WiFiMapperExportModeClean;
+    app->export_mode = app->export_mode == WiFiMapperExportModeClean ? WiFiMapperExportModeRaw :
+                                                                       WiFiMapperExportModeClean;
     strlcpy(
         app->session.status,
         wifi_mapper_get_export_mode_label(app->export_mode),
@@ -462,8 +552,7 @@ static bool wifi_mapper_open_log(WiFiMapperApp* app) {
     wifi_mapper_make_log_path(app);
     app->log_file = storage_file_alloc(app->storage);
     storage_common_remove(app->storage, app->log_temp_path);
-    if(!storage_file_open(
-           app->log_file, app->log_temp_path, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+    if(!storage_file_open(app->log_file, app->log_temp_path, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
         storage_file_free(app->log_file);
         app->log_file = NULL;
         return false;
@@ -575,8 +664,7 @@ static bool wifi_mapper_geo_coordinates_valid(const char* latitude, const char* 
     }
 
     // Marauder reports 0/0 while the GPS has no fix. Do not map that as a real point.
-    if((lat > -0.000001f) && (lat < 0.000001f) && (lon > -0.000001f) &&
-       (lon < 0.000001f)) {
+    if((lat > -0.000001f) && (lat < 0.000001f) && (lon > -0.000001f) && (lon < 0.000001f)) {
         return false;
     }
 
@@ -611,10 +699,7 @@ static const char* wifi_mapper_find_mac(const char* text) {
     return NULL;
 }
 
-static bool wifi_mapper_csv_read_field(
-    const char** cursor,
-    char* value,
-    size_t value_size) {
+static bool wifi_mapper_csv_read_field(const char** cursor, char* value, size_t value_size) {
     size_t offset = 0;
     bool quoted = false;
 
@@ -655,9 +740,7 @@ static bool wifi_mapper_csv_read_field(
     return true;
 }
 
-static bool wifi_mapper_parse_marauder_ap_line(
-    const char* line,
-    WiFiMapperRecord* record) {
+static bool wifi_mapper_parse_marauder_ap_line(const char* line, WiFiMapperRecord* record) {
     const char* cursor = line;
     int32_t rssi = 0;
     int32_t channel = 0;
@@ -675,8 +758,7 @@ static bool wifi_mapper_parse_marauder_ap_line(
         cursor++;
     }
 
-    if(!wifi_mapper_parse_i32(&cursor, &channel) || (channel < 0) ||
-       (channel > UINT8_MAX)) {
+    if(!wifi_mapper_parse_i32(&cursor, &channel) || (channel < 0) || (channel > UINT8_MAX)) {
         return false;
     }
 
@@ -707,9 +789,7 @@ static bool wifi_mapper_parse_marauder_ap_line(
     return true;
 }
 
-static bool wifi_mapper_parse_marauder_wardrive_line(
-    const char* line,
-    WiFiMapperRecord* record) {
+static bool wifi_mapper_parse_marauder_wardrive_line(const char* line, WiFiMapperRecord* record) {
     const char* cursor = line;
     char field[WIFI_MAPPER_CSV_FIELD_SIZE];
     char bssid_copy[WIFI_MAPPER_BSSID_SIZE];
@@ -773,9 +853,7 @@ static bool wifi_mapper_parse_marauder_wardrive_line(
     return true;
 }
 
-static bool wifi_mapper_parse_structured_wifi_line(
-    const char* line,
-    WiFiMapperRecord* record) {
+static bool wifi_mapper_parse_structured_wifi_line(const char* line, WiFiMapperRecord* record) {
     const char* cursor = line;
     char field[WIFI_MAPPER_CSV_FIELD_SIZE];
 
@@ -814,8 +892,7 @@ static bool wifi_mapper_parse_structured_wifi_line(
     record->is_wifi = true;
     record->type = "wifi";
     record->channel = (uint8_t)channel;
-    record->has_location =
-        wifi_mapper_geo_coordinates_valid(record->latitude, record->longitude);
+    record->has_location = wifi_mapper_geo_coordinates_valid(record->latitude, record->longitude);
     return true;
 }
 
@@ -842,8 +919,7 @@ static WiFiMapperRecord wifi_mapper_parse_record(const char* line) {
 static bool wifi_mapper_name_ends_with(const char* name, const char* suffix) {
     const size_t name_len = strlen(name);
     const size_t suffix_len = strlen(suffix);
-    return (name_len >= suffix_len) &&
-           (strcmp(name + name_len - suffix_len, suffix) == 0);
+    return (name_len >= suffix_len) && (strcmp(name + name_len - suffix_len, suffix) == 0);
 }
 
 static bool wifi_mapper_is_session_file_name(const char* name) {
@@ -1027,14 +1103,12 @@ static void wifi_mapper_parse_session_line(
         stats->best_rssi = rssi;
     }
 
-    wifi_mapper_insights_observe(
-        &scratch->insights, bssid, ssid, auth, channel, rssi);
+    wifi_mapper_insights_observe(&scratch->insights, bssid, ssid, auth, channel, rssi);
     UNUSED(tick_ms);
 }
 
-static void wifi_mapper_store_session_stats(
-    WiFiMapperApp* app,
-    const WiFiMapperSessionStats* stats) {
+static void
+    wifi_mapper_store_session_stats(WiFiMapperApp* app, const WiFiMapperSessionStats* stats) {
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
     app->session = *stats;
     app->screen = WiFiMapperScreenSession;
@@ -1114,8 +1188,8 @@ static void wifi_mapper_read_session_stats(
             scratch->insights.channel_counts,
             sizeof(stats->channel_counts));
         strlcpy(stats->status, "Last session", sizeof(stats->status));
-        stats->top_channel = wifi_mapper_insights_busiest_channel(
-            &scratch->insights, &stats->top_channel_count);
+        stats->top_channel =
+            wifi_mapper_insights_busiest_channel(&scratch->insights, &stats->top_channel_count);
     } else {
         strlcpy(stats->status, "No AP rows", sizeof(stats->status));
     }
@@ -1140,8 +1214,7 @@ static void wifi_mapper_analyze_session(WiFiMapperApp* app, const char* file_nam
                     stats.baseline_file_name,
                     baseline.file_name,
                     sizeof(stats.baseline_file_name));
-                stats.delta_unique =
-                    (int32_t)stats.unique - (int32_t)baseline.unique;
+                stats.delta_unique = (int32_t)stats.unique - (int32_t)baseline.unique;
                 stats.delta_observations =
                     (int32_t)stats.observations - (int32_t)baseline.observations;
                 stats.delta_open = (int32_t)stats.open - (int32_t)baseline.open;
@@ -1175,8 +1248,7 @@ static void wifi_mapper_select_adjacent_session(WiFiMapperApp* app, int directio
         wifi_mapper_analyze_latest_session(app);
         return;
     }
-    if(wifi_mapper_find_adjacent_session(
-           app, current, direction, adjacent, sizeof(adjacent))) {
+    if(wifi_mapper_find_adjacent_session(app, current, direction, adjacent, sizeof(adjacent))) {
         wifi_mapper_analyze_session(app, adjacent);
     } else {
         furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
@@ -1187,6 +1259,332 @@ static void wifi_mapper_select_adjacent_session(WiFiMapperApp* app, int directio
         furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
         wifi_mapper_update_model(app);
     }
+}
+
+static bool wifi_mapper_read_baseline_reference(
+    WiFiMapperApp* app,
+    char* file_name,
+    size_t file_name_size) {
+    if(!file_name || (file_name_size == 0U)) return false;
+    file_name[0] = '\0';
+
+    File* file = storage_file_alloc(app->storage);
+    if(!storage_file_open(file, WIFI_MAPPER_BASELINE_PATH, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        storage_file_free(file);
+        return false;
+    }
+
+    const size_t bytes_read = storage_file_read(file, file_name, file_name_size - 1U);
+    storage_file_close(file);
+    storage_file_free(file);
+    file_name[bytes_read] = '\0';
+    file_name[strcspn(file_name, "\r\n")] = '\0';
+    if(!wifi_mapper_is_session_file_name(file_name)) {
+        file_name[0] = '\0';
+        return false;
+    }
+
+    char path[WIFI_MAPPER_PATH_SIZE];
+    snprintf(path, sizeof(path), WIFI_MAPPER_SESSIONS_DIR "/%s", file_name);
+    if(storage_common_stat(app->storage, path, NULL) != FSE_OK) {
+        file_name[0] = '\0';
+        return false;
+    }
+    return true;
+}
+
+static bool wifi_mapper_write_baseline_reference(WiFiMapperApp* app, const char* file_name) {
+    if(!wifi_mapper_is_session_file_name(file_name)) return false;
+
+    storage_common_mkdir(app->storage, WIFI_MAPPER_DATA_DIR);
+    File* file = storage_file_alloc(app->storage);
+    if(!storage_file_open(file, WIFI_MAPPER_BASELINE_PATH, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+        storage_file_free(file);
+        return false;
+    }
+
+    const size_t length = strlen(file_name);
+    const bool written = storage_file_write(file, file_name, length) == length;
+    const bool synced = written && storage_file_sync(file);
+    storage_file_close(file);
+    storage_file_free(file);
+    return synced;
+}
+
+static void
+    wifi_mapper_inspector_parse_line(WiFiMapperInspectorSnapshot* snapshot, const char* line) {
+    if(strncmp(line, "tick_ms,", 8) == 0) return;
+
+    uint32_t tick_ms = 0U;
+    int32_t rssi = 0;
+    uint8_t channel = 0U;
+    char bssid[WIFI_MAPPER_BSSID_SIZE];
+    char ssid[WIFI_MAPPER_SSID_SIZE];
+    char auth[WIFI_MAPPER_AUTH_SIZE];
+    bool has_location = false;
+    if(!wifi_mapper_parse_csv_ap_row(
+           line,
+           &tick_ms,
+           &rssi,
+           &channel,
+           bssid,
+           sizeof(bssid),
+           ssid,
+           sizeof(ssid),
+           auth,
+           sizeof(auth),
+           &has_location)) {
+        return;
+    }
+
+    wifi_mapper_inspector_snapshot_observe(snapshot, bssid, ssid, auth, channel, rssi);
+    UNUSED(tick_ms);
+    UNUSED(has_location);
+}
+
+static bool wifi_mapper_read_inspector_snapshot(
+    WiFiMapperApp* app,
+    const char* file_name,
+    WiFiMapperInspectorSnapshot* snapshot) {
+    wifi_mapper_inspector_snapshot_reset(snapshot);
+    if(!wifi_mapper_is_session_file_name(file_name)) return false;
+
+    WiFiMapperInspectorReadScratch* scratch = malloc(sizeof(WiFiMapperInspectorReadScratch));
+    if(!scratch) return false;
+    memset(scratch, 0, sizeof(*scratch));
+
+    char path[WIFI_MAPPER_PATH_SIZE];
+    snprintf(path, sizeof(path), WIFI_MAPPER_SESSIONS_DIR "/%s", file_name);
+    File* file = storage_file_alloc(app->storage);
+    if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        storage_file_free(file);
+        free(scratch);
+        return false;
+    }
+
+    size_t line_len = 0U;
+    size_t bytes_read = 0U;
+    while((bytes_read = storage_file_read(file, scratch->buffer, sizeof(scratch->buffer))) > 0U) {
+        for(size_t index = 0U; index < bytes_read; index++) {
+            const char data = (char)scratch->buffer[index];
+            if((data == '\r') || (data == '\n')) {
+                if(line_len > 0U) {
+                    scratch->line[line_len] = '\0';
+                    wifi_mapper_inspector_parse_line(snapshot, scratch->line);
+                    line_len = 0U;
+                }
+            } else if(line_len < (sizeof(scratch->line) - 1U)) {
+                scratch->line[line_len++] = data;
+            }
+        }
+    }
+    if(line_len > 0U) {
+        scratch->line[line_len] = '\0';
+        wifi_mapper_inspector_parse_line(snapshot, scratch->line);
+    }
+
+    storage_file_close(file);
+    storage_file_free(file);
+    free(scratch);
+    return snapshot->count > 0U;
+}
+
+static void wifi_mapper_open_inspector(WiFiMapperApp* app) {
+    char current_file[WIFI_MAPPER_FILE_NAME_SIZE] = "";
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    strlcpy(current_file, app->session.file_name, sizeof(current_file));
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    WiFiMapperInspectorComparison* comparison = malloc(sizeof(*comparison));
+    if(!comparison) {
+        wifi_mapper_set_status(app, "Inspector memory");
+        return;
+    }
+    memset(comparison, 0, sizeof(*comparison));
+
+    const bool current_loaded =
+        wifi_mapper_read_inspector_snapshot(app, current_file, &comparison->current);
+    char baseline_file[WIFI_MAPPER_FILE_NAME_SIZE] = "";
+    const bool baseline_reference =
+        wifi_mapper_read_baseline_reference(app, baseline_file, sizeof(baseline_file));
+    const bool baseline_loaded =
+        baseline_reference &&
+        wifi_mapper_read_inspector_snapshot(app, baseline_file, &comparison->baseline);
+    if(baseline_loaded) wifi_mapper_inspector_compare(comparison);
+
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    WiFiMapperInspectorComparison* previous = app->inspector;
+    app->inspector = comparison;
+    app->inspector_loaded = current_loaded;
+    app->inspector_has_baseline = baseline_loaded;
+    app->inspector_category = WiFiMapperInspectorCategoryNew;
+    app->inspector_index = 0U;
+    app->screen = WiFiMapperScreenInspector;
+    strlcpy(
+        app->inspector_current_file_name, current_file, sizeof(app->inspector_current_file_name));
+    strlcpy(app->baseline_file_name, baseline_file, sizeof(app->baseline_file_name));
+    strlcpy(
+        app->inspector_status,
+        !current_loaded ?
+            "Current unreadable" :
+        !baseline_loaded ?
+            "Set a baseline" :
+            ((comparison->baseline.overflow_count || comparison->current.overflow_count) ?
+                 "Partial comparison" :
+                 "Comparison ready"),
+        sizeof(app->inspector_status));
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+    free(previous);
+    wifi_mapper_update_model(app);
+}
+
+static void wifi_mapper_pin_current_baseline(WiFiMapperApp* app) {
+    char current_file[WIFI_MAPPER_FILE_NAME_SIZE] = "";
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    const bool current_loaded = app->inspector_loaded;
+    strlcpy(current_file, app->inspector_current_file_name, sizeof(current_file));
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    if(!current_loaded) {
+        furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+        strlcpy(app->inspector_status, "No AP data to pin", sizeof(app->inspector_status));
+        furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+        wifi_mapper_update_model(app);
+        return;
+    }
+
+    if(!wifi_mapper_write_baseline_reference(app, current_file)) {
+        furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+        strlcpy(app->inspector_status, "Baseline write error", sizeof(app->inspector_status));
+        furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+        wifi_mapper_update_model(app);
+        return;
+    }
+
+    wifi_mapper_open_inspector(app);
+}
+
+static void
+    wifi_mapper_open_inspector_list(WiFiMapperApp* app, WiFiMapperInspectorCategory category) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    app->inspector_category = category;
+    app->inspector_index = 0U;
+    app->screen = WiFiMapperScreenInspectorList;
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+    wifi_mapper_update_model(app);
+}
+
+static void wifi_mapper_open_first_inspector_change(WiFiMapperApp* app) {
+    WiFiMapperInspectorCategory category = WiFiMapperInspectorCategoryNew;
+    bool has_changes = false;
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    if(app->inspector) {
+        if(app->inspector->new_count > 0U) {
+            category = WiFiMapperInspectorCategoryNew;
+            has_changes = true;
+        } else if(app->inspector->changed_count > 0U) {
+            category = WiFiMapperInspectorCategoryChanged;
+            has_changes = true;
+        } else if(app->inspector->gone_count > 0U) {
+            category = WiFiMapperInspectorCategoryGone;
+            has_changes = true;
+        }
+    }
+    if(!has_changes) {
+        strlcpy(app->inspector_status, "No AP changes", sizeof(app->inspector_status));
+    }
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    if(has_changes) {
+        wifi_mapper_open_inspector_list(app, category);
+    } else {
+        wifi_mapper_update_model(app);
+    }
+}
+
+static void wifi_mapper_inspector_change_item(WiFiMapperApp* app, int direction) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    const size_t count =
+        app->inspector ?
+            wifi_mapper_inspector_category_count(app->inspector, app->inspector_category) :
+            0U;
+    if(count > 0U) {
+        if(direction < 0) {
+            app->inspector_index = app->inspector_index == 0U ? count - 1U :
+                                                                app->inspector_index - 1U;
+        } else {
+            app->inspector_index = (app->inspector_index + 1U) % count;
+        }
+    }
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+    wifi_mapper_update_model(app);
+}
+
+static void wifi_mapper_inspector_change_category(WiFiMapperApp* app, int direction) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    int category = (int)app->inspector_category + direction;
+    if(category < 0) category = (int)WiFiMapperInspectorCategoryCount - 1;
+    if(category >= (int)WiFiMapperInspectorCategoryCount) category = 0;
+    app->inspector_category = (WiFiMapperInspectorCategory)category;
+    app->inspector_index = 0U;
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+    wifi_mapper_update_model(app);
+}
+
+static void wifi_mapper_locator_open(WiFiMapperApp* app) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    const WiFiMapperInspectorAp* item =
+        app->inspector ? wifi_mapper_inspector_category_get(
+                             app->inspector, app->inspector_category, app->inspector_index) :
+                         NULL;
+    if(item && wifi_mapper_inspector_category_is_locatable(app->inspector_category)) {
+        strlcpy(app->locator_bssid, item->bssid, sizeof(app->locator_bssid));
+        app->locator_running = false;
+        app->locator_seen = false;
+        app->locator_rssi = -100;
+        app->locator_peak_rssi = -100;
+        app->locator_previous_rssi = -100;
+        app->locator_trend = WiFiMapperLocatorTrendWaiting;
+        app->locator_samples = 0U;
+        app->screen = WiFiMapperScreenLocator;
+    } else {
+        strlcpy(app->inspector_status, "Gone AP cannot scan", sizeof(app->inspector_status));
+    }
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+    wifi_mapper_update_model(app);
+}
+
+static void wifi_mapper_locator_start(WiFiMapperApp* app) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    const bool can_start = app->serial_handle && !app->logging && app->locator_bssid[0];
+    if(can_start) {
+        app->locator_running = true;
+        app->locator_seen = false;
+        app->locator_rssi = -100;
+        app->locator_peak_rssi = -100;
+        app->locator_previous_rssi = -100;
+        app->locator_trend = WiFiMapperLocatorTrendWaiting;
+        app->locator_samples = 0U;
+    } else {
+        strlcpy(
+            app->inspector_status,
+            app->logging ? "Stop survey first" : "UART not ready",
+            sizeof(app->inspector_status));
+    }
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    if(can_start) wifi_mapper_send_command(app, WIFI_MAPPER_SCAN_AP_COMMAND);
+    wifi_mapper_update_model(app);
+}
+
+static void wifi_mapper_locator_stop(WiFiMapperApp* app) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    const bool was_running = app->locator_running;
+    app->locator_running = false;
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    if(was_running) wifi_mapper_send_command(app, WIFI_MAPPER_STOP_COMMAND);
+    wifi_mapper_update_model(app);
 }
 
 static bool wifi_mapper_make_export_name(
@@ -1212,9 +1610,8 @@ static bool wifi_mapper_make_export_name(
     return true;
 }
 
-static WiFiMapperExportAggregate* wifi_mapper_find_export_aggregate(
-    WiFiMapperExportScratch* scratch,
-    const char* bssid) {
+static WiFiMapperExportAggregate*
+    wifi_mapper_find_export_aggregate(WiFiMapperExportScratch* scratch, const char* bssid) {
     for(uint32_t i = 0; i < scratch->aggregate_count; i++) {
         if(strcmp(scratch->aggregates[i].row.bssid, bssid) == 0) {
             return &scratch->aggregates[i];
@@ -1227,8 +1624,7 @@ static WiFiMapperExportAggregate* wifi_mapper_find_export_aggregate(
 static void wifi_mapper_add_clean_export_row(
     WiFiMapperExportScratch* scratch,
     const WiFiMapperExportRow* row) {
-    WiFiMapperExportAggregate* aggregate =
-        wifi_mapper_find_export_aggregate(scratch, row->bssid);
+    WiFiMapperExportAggregate* aggregate = wifi_mapper_find_export_aggregate(scratch, row->bssid);
 
     if(!aggregate) {
         if(scratch->aggregate_count >= WIFI_MAPPER_MAX_EXPORT_FEATURES) {
@@ -1303,8 +1699,7 @@ static uint32_t wifi_mapper_export_csv_to_geojson(
         if(!storage_file_open(csv_file, csv_path, FSAM_READ, FSOM_OPEN_EXISTING)) {
             break;
         }
-        if(!storage_file_open(
-               geojson_file, geojson_path, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+        if(!storage_file_open(geojson_file, geojson_path, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
             break;
         }
 
@@ -1313,8 +1708,8 @@ static uint32_t wifi_mapper_export_csv_to_geojson(
 
         size_t line_len = 0;
         size_t bytes_read = 0;
-        while((bytes_read = storage_file_read(
-                   csv_file, scratch->buffer, sizeof(scratch->buffer))) > 0U) {
+        while((bytes_read =
+                   storage_file_read(csv_file, scratch->buffer, sizeof(scratch->buffer))) > 0U) {
             for(size_t i = 0; i < bytes_read; i++) {
                 const char data = (char)scratch->buffer[i];
                 if((data == '\r') || (data == '\n')) {
@@ -1372,8 +1767,7 @@ static void wifi_mapper_export_latest_session(WiFiMapperApp* app) {
 
     if((!session_name[0] &&
         !wifi_mapper_find_latest_session(app, session_name, sizeof(session_name))) ||
-       !wifi_mapper_make_export_name(
-           session_name, export_mode, export_name, sizeof(export_name))) {
+       !wifi_mapper_make_export_name(session_name, export_mode, export_name, sizeof(export_name))) {
         strlcpy(stats.status, "No sessions", sizeof(stats.status));
         wifi_mapper_store_session_stats(app, &stats);
         return;
@@ -1389,7 +1783,7 @@ static void wifi_mapper_export_latest_session(WiFiMapperApp* app) {
     strlcpy(
         app->session.status,
         exported > 0U ? (export_mode == WiFiMapperExportModeRaw ? "Raw saved" : "Clean saved") :
-                         "No GPS rows",
+                        "No GPS rows",
         sizeof(app->session.status));
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
     wifi_mapper_update_model(app);
@@ -1566,9 +1960,8 @@ static void wifi_mapper_write_clean_geojson_feature(
     storage_file_write(file, ",\"auth\":", 8);
     wifi_mapper_write_escaped_json(file, row->auth);
 
-    const int32_t avg_rssi = aggregate->samples ?
-                                 (aggregate->rssi_sum / (int32_t)aggregate->samples) :
-                                 row->rssi;
+    const int32_t avg_rssi =
+        aggregate->samples ? (aggregate->rssi_sum / (int32_t)aggregate->samples) : row->rssi;
     snprintf(
         buffer,
         sizeof(buffer),
@@ -1595,9 +1988,8 @@ static void wifi_mapper_write_log_record(
     const WiFiMapperRecord* record,
     const char* line) {
     char prefix[48];
-    if(record->is_wifi &&
-       ((strcmp(record->type, "ap") == 0) || (strcmp(record->type, "wardrive") == 0) ||
-        record->has_location)) {
+    if(record->is_wifi && ((strcmp(record->type, "ap") == 0) ||
+                           (strcmp(record->type, "wardrive") == 0) || record->has_location)) {
         snprintf(
             prefix,
             sizeof(prefix),
@@ -1622,12 +2014,7 @@ static void wifi_mapper_write_log_record(
         wifi_mapper_write_escaped_csv(file, record->accuracy);
         storage_file_write(file, ",", 1);
     } else {
-        snprintf(
-            prefix,
-            sizeof(prefix),
-            "%lu,%s,,,,,,,,,,",
-            (unsigned long)tick_ms,
-            record->type);
+        snprintf(prefix, sizeof(prefix), "%lu,%s,,,,,,,,,,", (unsigned long)tick_ms, record->type);
         storage_file_write(file, prefix, strlen(prefix));
     }
 
@@ -1648,8 +2035,7 @@ static void wifi_mapper_relay_flush_locked(WiFiMapperApp* app) {
             app->bt, WIFI_MAPPER_RELAY_APP_ID, WIFI_MAPPER_RELAY_COMMAND, 0, 0, app->relay_buffer);
     }
     app->relay_buffer_len = 0U;
-    app->relay_last_send_ms =
-        (furi_get_tick() * 1000U) / furi_kernel_get_tick_frequency();
+    app->relay_last_send_ms = (furi_get_tick() * 1000U) / furi_kernel_get_tick_frequency();
 }
 
 // Must be called with app->mutex held. State events let Companion delimit live
@@ -1668,8 +2054,7 @@ static void wifi_mapper_relay_state_locked(WiFiMapperApp* app, const char* comma
         app->file_name,
         (unsigned long)app->insights.unique_count,
         (unsigned long)app->insights.observations);
-    bt_app_bridge_send_text_v2(
-        app->bt, WIFI_MAPPER_RELAY_APP_ID, command, 0, 0, payload);
+    bt_app_bridge_send_text_v2(app->bt, WIFI_MAPPER_RELAY_APP_ID, command, 0, 0, payload);
 }
 
 // Must be called with app->mutex held. Lines are coalesced into fewer BLE
@@ -1736,8 +2121,7 @@ static void wifi_mapper_log_line(WiFiMapperApp* app, const char* line) {
 
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
     if(app->logging && app->log_file) {
-        const uint32_t tick_ms = (furi_get_tick() * 1000U) /
-                                 furi_kernel_get_tick_frequency();
+        const uint32_t tick_ms = (furi_get_tick() * 1000U) / furi_kernel_get_tick_frequency();
         wifi_mapper_write_log_record(app->log_file, tick_ms, &record, line);
     }
     if(app->ble_relay) {
@@ -1748,12 +2132,21 @@ static void wifi_mapper_log_line(WiFiMapperApp* app, const char* line) {
     if(record.is_wifi) {
         app->wifi_records++;
         wifi_mapper_insights_observe(
-            &app->insights,
-            record.bssid,
-            record.ssid,
-            record.auth,
-            record.channel,
-            record.rssi);
+            &app->insights, record.bssid, record.ssid, record.auth, record.channel, record.rssi);
+        if(app->locator_running && app->locator_bssid[0] &&
+           (strcasecmp(record.bssid, app->locator_bssid) == 0)) {
+            const bool had_previous = app->locator_seen;
+            const int32_t previous_rssi = app->locator_rssi;
+            app->locator_previous_rssi = previous_rssi;
+            app->locator_rssi = record.rssi;
+            if(!had_previous || (record.rssi > app->locator_peak_rssi)) {
+                app->locator_peak_rssi = record.rssi;
+            }
+            app->locator_trend =
+                wifi_mapper_locator_trend(had_previous, previous_rssi, record.rssi);
+            app->locator_seen = true;
+            app->locator_samples++;
+        }
     }
     strlcpy(app->last_line, line, sizeof(app->last_line));
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
@@ -1822,8 +2215,9 @@ static void wifi_mapper_stop_logging(WiFiMapperApp* app) {
     app->logging = false;
     strlcpy(
         app->status,
-        app->errors > errors_before_commit ? "Commit error" :
-        (app->uart_ready ? "Session saved" : "UART not ready"),
+        app->errors > errors_before_commit ?
+            "Commit error" :
+            (app->uart_ready ? "Session saved" : "UART not ready"),
         sizeof(app->status));
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
     wifi_mapper_update_model(app);
@@ -1879,8 +2273,7 @@ static void wifi_mapper_draw_live(Canvas* canvas, WiFiMapperModel* model) {
 static void wifi_mapper_draw_insights(Canvas* canvas, WiFiMapperModel* model) {
     char line[48];
     uint32_t busiest_count = 0U;
-    const uint8_t busiest =
-        wifi_mapper_insights_busiest_channel(&model->insights, &busiest_count);
+    const uint8_t busiest = wifi_mapper_insights_busiest_channel(&model->insights, &busiest_count);
 
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 0, 10, "Survey Insights");
@@ -1931,10 +2324,10 @@ static void wifi_mapper_draw_insights(Canvas* canvas, WiFiMapperModel* model) {
 
 static void wifi_mapper_draw_about(Canvas* canvas) {
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 0, 10, "TumoSurvey v1.1.0");
+    canvas_draw_str(canvas, 0, 10, "TumoSurvey v1.2.0");
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 0, 24, "Passive WiFi survey");
-    canvas_draw_str(canvas, 0, 36, "Module One + ESP32");
+    canvas_draw_str(canvas, 0, 24, "Survey + AP Inspector");
+    canvas_draw_str(canvas, 0, 36, "Module One / API 88");
     canvas_draw_str(canvas, 0, 48, "squazaryu/tumoflip");
     elements_button_left(canvas, "Back");
 }
@@ -2006,8 +2399,7 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
         } else if(model->session_page == WiFiMapperSessionPageChannels) {
             uint8_t shown = 0U;
             line[0] = '\0';
-            for(uint8_t channel = 1U;
-                channel < WIFI_MAPPER_INSIGHTS_CHANNEL_COUNT && shown < 3U;
+            for(uint8_t channel = 1U; channel < WIFI_MAPPER_INSIGHTS_CHANNEL_COUNT && shown < 3U;
                 channel++) {
                 if(model->session.channel_counts[channel] == 0U) continue;
                 char item[16];
@@ -2036,17 +2428,14 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
                 (unsigned long)model->session.rows,
                 (unsigned long)model->session.exported);
             canvas_draw_str(canvas, 0, 50, line);
-        } else if(model->session.has_baseline &&
-                  (model->session.truncated || model->session.baseline_truncated)) {
+        } else if(
+            model->session.has_baseline &&
+            (model->session.truncated || model->session.baseline_truncated)) {
             canvas_draw_str(canvas, 0, 32, "AP limit reached");
             canvas_draw_str(canvas, 0, 42, "Full comparison is in");
             canvas_draw_str(canvas, 0, 50, "Unleashed Companion");
         } else if(model->session.has_baseline) {
-            snprintf(
-                line,
-                sizeof(line),
-                "vs %.19s",
-                model->session.baseline_file_name);
+            snprintf(line, sizeof(line), "vs %.19s", model->session.baseline_file_name);
             canvas_draw_str(canvas, 0, 32, line);
             snprintf(
                 line,
@@ -2072,8 +2461,133 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
     }
 
     elements_button_left(canvas, "Prev");
-    elements_button_center(canvas, "Export");
+    elements_button_center(
+        canvas, model->session_page == WiFiMapperSessionPageBaseline ? "Inspect" : "Export");
     elements_button_right(canvas, "Next");
+}
+
+static const char* wifi_mapper_short_session_name(const char* file_name) {
+    if(!file_name) return "-";
+    return strncmp(file_name, "wifi_", 5) == 0 ? file_name + 5 : file_name;
+}
+
+static void wifi_mapper_draw_inspector(Canvas* canvas, WiFiMapperModel* model) {
+    char line[48];
+
+    canvas_set_font(canvas, FontPrimary);
+    canvas_draw_str(canvas, 0, 10, "Survey Inspector");
+    canvas_set_font(canvas, FontSecondary);
+
+    snprintf(
+        line,
+        sizeof(line),
+        "Base %.19s",
+        model->inspector_has_baseline ? wifi_mapper_short_session_name(model->baseline_file_name) :
+                                        "not set");
+    canvas_draw_str(canvas, 0, 21, line);
+    snprintf(
+        line, sizeof(line), "Now  %.19s", wifi_mapper_short_session_name(model->current_file_name));
+    canvas_draw_str(canvas, 0, 31, line);
+    snprintf(
+        line,
+        sizeof(line),
+        "New %u  Gone %u  Chg %u",
+        (unsigned int)model->inspector_new_count,
+        (unsigned int)model->inspector_gone_count,
+        (unsigned int)model->inspector_changed_count);
+    canvas_draw_str(canvas, 0, 42, line);
+    canvas_draw_str(canvas, 0, 50, model->inspector_status);
+
+    elements_button_left(canvas, "Set Base");
+    elements_button_center(canvas, "Changes");
+    elements_button_right(canvas, "All");
+}
+
+static void wifi_mapper_draw_inspector_list(Canvas* canvas, WiFiMapperModel* model) {
+    char line[48];
+
+    canvas_set_font(canvas, FontPrimary);
+    snprintf(
+        line,
+        sizeof(line),
+        "%s %u/%u",
+        wifi_mapper_inspector_category_label(model->inspector_category),
+        model->inspector_has_item ? (unsigned int)model->inspector_index + 1U : 0U,
+        (unsigned int)model->inspector_item_count);
+    canvas_draw_str(canvas, 0, 10, line);
+    canvas_set_font(canvas, FontSecondary);
+
+    if(model->inspector_has_item) {
+        snprintf(
+            line,
+            sizeof(line),
+            "%.20s",
+            model->inspector_item.ssid[0] ? model->inspector_item.ssid : "Hidden SSID");
+        canvas_draw_str(canvas, 0, 21, line);
+        canvas_draw_str(canvas, 0, 31, model->inspector_item.bssid);
+        snprintf(
+            line,
+            sizeof(line),
+            "Ch %u  %.12s",
+            model->inspector_item.channel,
+            model->inspector_item.auth[0] ? model->inspector_item.auth : "Unknown");
+        canvas_draw_str(canvas, 0, 41, line);
+        snprintf(
+            line,
+            sizeof(line),
+            "best %ld  last %ld dBm",
+            (long)model->inspector_item.best_rssi,
+            (long)model->inspector_item.last_rssi);
+        canvas_draw_str(canvas, 0, 50, line);
+    } else {
+        canvas_draw_str(canvas, 0, 25, "No entries in category");
+        canvas_draw_str(canvas, 0, 38, "Up/Down changes view");
+    }
+
+    elements_button_left(canvas, "Prev");
+    if(model->inspector_has_item &&
+       wifi_mapper_inspector_category_is_locatable(model->inspector_category)) {
+        elements_button_center(canvas, "Locate");
+    }
+    elements_button_right(canvas, "Next");
+}
+
+static void wifi_mapper_draw_locator(Canvas* canvas, WiFiMapperModel* model) {
+    char line[48];
+    const uint8_t strength = wifi_mapper_locator_strength_percent(model->locator_rssi);
+
+    canvas_set_font(canvas, FontPrimary);
+    canvas_draw_str(canvas, 0, 10, "RSSI Locator");
+    canvas_set_font(canvas, FontSecondary);
+    const char* state = model->locator_running ? "RUN" : "IDLE";
+    canvas_draw_str(canvas, 128 - canvas_string_width(canvas, state), 10, state);
+
+    snprintf(
+        line,
+        sizeof(line),
+        "%.20s",
+        model->inspector_item.ssid[0] ? model->inspector_item.ssid : "Hidden SSID");
+    canvas_draw_str(canvas, 0, 21, line);
+    canvas_draw_str(canvas, 0, 31, model->inspector_item.bssid);
+    if(model->locator_seen) {
+        snprintf(
+            line,
+            sizeof(line),
+            "%ld dBm  peak %ld  %s",
+            (long)model->locator_rssi,
+            (long)model->locator_peak_rssi,
+            wifi_mapper_locator_trend_label(model->locator_trend));
+    } else {
+        strlcpy(
+            line,
+            model->locator_running ? "Waiting for selected AP" : "Ready to scan",
+            sizeof(line));
+    }
+    canvas_draw_str(canvas, 0, 43, line);
+    elements_progress_bar(canvas, 0, 47, 128, (float)strength / 100.0f);
+
+    elements_button_left(canvas, "Back");
+    elements_button_center(canvas, model->locator_running ? "Stop" : "Start");
 }
 
 static void wifi_mapper_draw_callback(Canvas* canvas, void* context) {
@@ -2083,6 +2597,12 @@ static void wifi_mapper_draw_callback(Canvas* canvas, void* context) {
 
     if(model->screen == WiFiMapperScreenSession) {
         wifi_mapper_draw_session(canvas, model);
+    } else if(model->screen == WiFiMapperScreenInspector) {
+        wifi_mapper_draw_inspector(canvas, model);
+    } else if(model->screen == WiFiMapperScreenInspectorList) {
+        wifi_mapper_draw_inspector_list(canvas, model);
+    } else if(model->screen == WiFiMapperScreenLocator) {
+        wifi_mapper_draw_locator(canvas, model);
     } else if(model->screen == WiFiMapperScreenAbout) {
         wifi_mapper_draw_about(canvas);
     } else if(model->screen == WiFiMapperScreenInsights) {
@@ -2112,6 +2632,68 @@ static bool wifi_mapper_input_callback(InputEvent* event, void* context) {
     const bool logging = app->logging;
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
 
+    if(screen == WiFiMapperScreenLocator) {
+        if(event->type != InputTypeShort) return false;
+        if(event->key == InputKeyOk) {
+            furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+            const bool running = app->locator_running;
+            furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+            if(running) {
+                wifi_mapper_locator_stop(app);
+            } else {
+                wifi_mapper_locator_start(app);
+            }
+            return true;
+        } else if((event->key == InputKeyBack) || (event->key == InputKeyLeft)) {
+            wifi_mapper_locator_stop(app);
+            wifi_mapper_switch_screen(app, WiFiMapperScreenInspectorList);
+            return true;
+        }
+        return false;
+    }
+
+    if(screen == WiFiMapperScreenInspectorList) {
+        if(event->type != InputTypeShort) return false;
+        if(event->key == InputKeyLeft) {
+            wifi_mapper_inspector_change_item(app, -1);
+            return true;
+        } else if(event->key == InputKeyRight) {
+            wifi_mapper_inspector_change_item(app, 1);
+            return true;
+        } else if(event->key == InputKeyUp) {
+            wifi_mapper_inspector_change_category(app, -1);
+            return true;
+        } else if(event->key == InputKeyDown) {
+            wifi_mapper_inspector_change_category(app, 1);
+            return true;
+        } else if(event->key == InputKeyOk) {
+            wifi_mapper_locator_open(app);
+            return true;
+        } else if(event->key == InputKeyBack) {
+            wifi_mapper_switch_screen(app, WiFiMapperScreenInspector);
+            return true;
+        }
+        return false;
+    }
+
+    if(screen == WiFiMapperScreenInspector) {
+        if(event->type != InputTypeShort) return false;
+        if(event->key == InputKeyLeft) {
+            wifi_mapper_pin_current_baseline(app);
+            return true;
+        } else if(event->key == InputKeyOk) {
+            wifi_mapper_open_first_inspector_change(app);
+            return true;
+        } else if(event->key == InputKeyRight) {
+            wifi_mapper_open_inspector_list(app, WiFiMapperInspectorCategoryCurrent);
+            return true;
+        } else if(event->key == InputKeyBack) {
+            wifi_mapper_switch_screen(app, WiFiMapperScreenSession);
+            return true;
+        }
+        return false;
+    }
+
     if(screen == WiFiMapperScreenSession) {
         if((event->type == InputTypeLong) && (event->key == InputKeyOk)) {
             wifi_mapper_toggle_export_mode(app);
@@ -2127,7 +2709,14 @@ static bool wifi_mapper_input_callback(InputEvent* event, void* context) {
             wifi_mapper_change_session_page(app, 1);
             return true;
         } else if(event->key == InputKeyOk) {
-            wifi_mapper_export_latest_session(app);
+            furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+            const WiFiMapperSessionPage session_page = app->session_page;
+            furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+            if(session_page == WiFiMapperSessionPageBaseline) {
+                wifi_mapper_open_inspector(app);
+            } else {
+                wifi_mapper_export_latest_session(app);
+            }
             return true;
         } else if(event->key == InputKeyLeft) {
             wifi_mapper_select_adjacent_session(app, -1);
@@ -2239,10 +2828,8 @@ static void wifi_mapper_process_byte(WiFiMapperApp* app, char data) {
     }
 }
 
-static void wifi_mapper_on_irq_cb(
-    FuriHalSerialHandle* handle,
-    FuriHalSerialRxEvent event,
-    void* context) {
+static void
+    wifi_mapper_on_irq_cb(FuriHalSerialHandle* handle, FuriHalSerialRxEvent event, void* context) {
     UNUSED(handle);
     WiFiMapperApp* app = context;
     WiFiMapperEvent flags = 0;
@@ -2308,6 +2895,11 @@ static WiFiMapperApp* wifi_mapper_alloc(void) {
     memset(app, 0, sizeof(WiFiMapperApp));
     app->scan_mode = WiFiMapperScanModeAll;
     strlcpy(app->status, "Scan All", sizeof(app->status));
+    strlcpy(app->inspector_status, "Open a saved session", sizeof(app->inspector_status));
+    app->locator_rssi = -100;
+    app->locator_peak_rssi = -100;
+    app->locator_previous_rssi = -100;
+    app->locator_trend = WiFiMapperLocatorTrendWaiting;
 
     app->mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     app->rx_stream = furi_stream_buffer_alloc(WIFI_MAPPER_RX_BUFFER_SIZE, 1);
@@ -2329,8 +2921,7 @@ static WiFiMapperApp* wifi_mapper_alloc(void) {
     view_dispatcher_add_view(app->view_dispatcher, 0, app->view);
     view_dispatcher_switch_to_view(app->view_dispatcher, 0);
 
-    app->worker_thread =
-        furi_thread_alloc_ex("WiFiMapperRx", 3 * 1024, wifi_mapper_worker, app);
+    app->worker_thread = furi_thread_alloc_ex("WiFiMapperRx", 3 * 1024, wifi_mapper_worker, app);
     furi_thread_start(app->worker_thread);
 
     expansion_disable(app->expansion);
@@ -2360,6 +2951,7 @@ static WiFiMapperApp* wifi_mapper_alloc(void) {
 static void wifi_mapper_free(WiFiMapperApp* app) {
     furi_assert(app);
 
+    wifi_mapper_locator_stop(app);
     wifi_mapper_stop_logging(app);
 
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
@@ -2388,6 +2980,8 @@ static void wifi_mapper_free(WiFiMapperApp* app) {
 
     furi_stream_buffer_free(app->rx_stream);
     furi_mutex_free(app->mutex);
+
+    free(app->inspector);
 
     furi_record_close(RECORD_GUI);
     furi_record_close(RECORD_NOTIFICATION);

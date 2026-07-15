@@ -2,8 +2,9 @@
 
 `TumoSurvey` is the product form of the existing `wifi_mapper` Module One app.
 It remains a passive UART scanner, but adds bounded live channel/security
-insights, atomic sessions, saved-session navigation, GeoJSON export, and an
-automatic Companion live relay while a survey is recording. The app ID and
+insights, atomic sessions, saved-session navigation, pinned site baselines,
+exact bounded AP change lists, an RSSI Locator, GeoJSON export, and an automatic
+Companion live relay while a survey is recording. The app ID and
 `/ext/apps_data/wifi_mapper` paths remain unchanged for compatibility.
 
 It does not send deauth, beacon spam, PMKID sniffing, evil portal, or packet
@@ -63,6 +64,7 @@ On the session screen:
 - `Left` / `Right`: previous or next session.
 - `Up` / `Down`: change Summary/Security/Channels/Baseline page.
 - `OK`: export the selected session as GeoJSON.
+- `OK` on the Baseline page: open Survey Inspector instead of exporting.
 - Hold `OK`: switch export mode between `Clean` and `Raw`.
 - `Back`: return to the live logger.
 
@@ -77,6 +79,36 @@ features include only AP rows that have valid latitude and longitude, so normal
 `Scan All` sessions without GPS data can produce `No GPS rows`.
 Marauder/ESP32 rows with `0,0` coordinates are treated as "GPS has no fix" and
 are not exported as map points.
+
+## Survey Inspector
+
+Open a completed session, move to its Baseline page, and press `Inspect`.
+Inspector keeps the selected session as `Now` and compares it with a pinned
+baseline stored at:
+
+```text
+/ext/apps_data/wifi_mapper/baseline.txt
+```
+
+The reference contains only a validated `wifi_*.csv` file name. `Set Base`
+pins the selected completed session and survives an app restart. Inspector then
+reports exact bounded entries by BSSID:
+
+- `New`: present now but absent from the baseline;
+- `Gone`: present in the baseline but absent now;
+- `Changed`: the same BSSID changed SSID, security text, or channel;
+- `Current`: every AP in the selected current session.
+
+`Changes` opens the first non-empty change category and `All` opens `Current`.
+In the result browser, `Left`/`Right` changes the item and `Up`/`Down` changes
+the category. `Locate` is available for current entries, but not for `Gone`.
+
+Locator uses the existing passive `scanap` UART command and only updates for
+the selected BSSID. It shows current and peak RSSI plus a bounded
+`Warmer`/`Colder`/`Steady` trend. `Stop`, `Back`, and app exit send `stopscan`
+before returning to the normal survey flow. If either snapshot exceeds the
+32-AP Inspector limit, the UI marks the comparison as partial rather than
+claiming the result is exhaustive.
 
 ## Companion Map
 
