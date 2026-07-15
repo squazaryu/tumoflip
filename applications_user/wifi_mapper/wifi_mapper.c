@@ -2280,14 +2280,14 @@ static void wifi_mapper_draw_insights(Canvas* canvas, WiFiMapperModel* model) {
         (unsigned long)model->insights.unique_count,
         model->insights.overflow_count > 0U ? "+" : "",
         (unsigned long)model->insights.observations);
-    canvas_draw_str(canvas, 0, 22, line);
+    canvas_draw_str(canvas, 0, 21, line);
     snprintf(
         line,
         sizeof(line),
         "Open %lu  Legacy %lu",
         (unsigned long)model->insights.security_counts[WiFiMapperSecurityOpen],
         (unsigned long)model->insights.security_counts[WiFiMapperSecurityLegacy]);
-    canvas_draw_str(canvas, 0, 32, line);
+    canvas_draw_str(canvas, 0, 30, line);
     snprintf(
         line,
         sizeof(line),
@@ -2295,7 +2295,7 @@ static void wifi_mapper_draw_insights(Canvas* canvas, WiFiMapperModel* model) {
         (unsigned long)model->insights.security_counts[WiFiMapperSecurityWpa2],
         (unsigned long)model->insights.security_counts[WiFiMapperSecurityWpa3],
         (unsigned long)model->insights.security_counts[WiFiMapperSecurityOther]);
-    canvas_draw_str(canvas, 0, 42, line);
+    canvas_draw_str(canvas, 0, 39, line);
     if(model->insights.has_strongest) {
         snprintf(
             line,
@@ -2307,7 +2307,7 @@ static void wifi_mapper_draw_insights(Canvas* canvas, WiFiMapperModel* model) {
     } else {
         strlcpy(line, "Waiting for AP data", sizeof(line));
     }
-    canvas_draw_str(canvas, 0, 50, line);
+    canvas_draw_str(canvas, 0, 48, line);
 
     elements_button_left(canvas, "Back");
     elements_button_center(canvas, "Info");
@@ -2316,11 +2316,11 @@ static void wifi_mapper_draw_insights(Canvas* canvas, WiFiMapperModel* model) {
 
 static void wifi_mapper_draw_about(Canvas* canvas) {
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 0, 10, "TumoSurvey v1.2.1");
+    canvas_draw_str(canvas, 0, 10, "TumoSurvey v1.2.2");
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 0, 24, "Survey + AP Inspector");
-    canvas_draw_str(canvas, 0, 36, "Module One / API 88");
-    canvas_draw_str(canvas, 0, 48, "squazaryu/tumoflip");
+    canvas_draw_str(canvas, 0, 22, "Survey + AP Inspector");
+    canvas_draw_str(canvas, 0, 34, "Module One / API 88");
+    canvas_draw_str(canvas, 0, 46, "squazaryu/tumoflip");
     elements_button_left(canvas, "Back");
 }
 
@@ -2341,7 +2341,7 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
 
     if(model->session.loaded) {
         if(model->session.file_name[0]) {
-            canvas_draw_str(canvas, 0, 21, model->session.file_name);
+            canvas_draw_str(canvas, 0, 20, model->session.file_name);
         }
         if(model->session_page == WiFiMapperSessionPageSummary) {
             snprintf(
@@ -2351,21 +2351,21 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
                 (unsigned long)model->session.aps,
                 (unsigned long)model->session.unique,
                 model->session.truncated ? "+" : "");
-            canvas_draw_str(canvas, 0, 32, line);
+            canvas_draw_str(canvas, 0, 30, line);
             snprintf(
                 line,
                 sizeof(line),
                 "GPS %lu  mapped %lu",
                 (unsigned long)model->session.located,
                 (unsigned long)model->session.mapped);
-            canvas_draw_str(canvas, 0, 42, line);
+            canvas_draw_str(canvas, 0, 39, line);
             snprintf(
                 line,
                 sizeof(line),
                 "best/avg %ld/%ld dBm",
                 (long)model->session.best_rssi,
                 (long)model->session.avg_rssi);
-            canvas_draw_str(canvas, 0, 50, line);
+            canvas_draw_str(canvas, 0, 48, line);
         } else if(model->session_page == WiFiMapperSessionPageSecurity) {
             snprintf(
                 line,
@@ -2373,21 +2373,21 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
                 "Open %lu  Legacy %lu",
                 (unsigned long)model->session.open,
                 (unsigned long)model->session.legacy);
-            canvas_draw_str(canvas, 0, 32, line);
+            canvas_draw_str(canvas, 0, 30, line);
             snprintf(
                 line,
                 sizeof(line),
                 "WPA2 %lu  WPA3 %lu",
                 (unsigned long)model->session.wpa2,
                 (unsigned long)model->session.wpa3);
-            canvas_draw_str(canvas, 0, 42, line);
+            canvas_draw_str(canvas, 0, 39, line);
             snprintf(
                 line,
                 sizeof(line),
                 "Other %lu  %s",
                 (unsigned long)model->session.other_security,
                 wifi_mapper_get_export_mode_label(model->export_mode));
-            canvas_draw_str(canvas, 0, 50, line);
+            canvas_draw_str(canvas, 0, 48, line);
         } else if(model->session_page == WiFiMapperSessionPageChannels) {
             uint8_t shown = 0U;
             line[0] = '\0';
@@ -2405,47 +2405,47 @@ static void wifi_mapper_draw_session(Canvas* canvas, WiFiMapperModel* model) {
                 strlcat(line, item, sizeof(line));
                 shown++;
             }
-            canvas_draw_str(canvas, 0, 32, shown > 0U ? line : "No channel data");
+            canvas_draw_str(canvas, 0, 30, shown > 0U ? line : "No channel data");
             snprintf(
                 line,
                 sizeof(line),
                 "Top channel %u x%lu",
                 model->session.top_channel,
                 (unsigned long)model->session.top_channel_count);
-            canvas_draw_str(canvas, 0, 42, line);
+            canvas_draw_str(canvas, 0, 39, line);
             snprintf(
                 line,
                 sizeof(line),
                 "Rows %lu  export %lu",
                 (unsigned long)model->session.rows,
                 (unsigned long)model->session.exported);
-            canvas_draw_str(canvas, 0, 50, line);
+            canvas_draw_str(canvas, 0, 48, line);
         } else if(
             model->session.has_baseline &&
             (model->session.truncated || model->session.baseline_truncated)) {
-            canvas_draw_str(canvas, 0, 32, "AP limit reached");
-            canvas_draw_str(canvas, 0, 42, "Full comparison is in");
-            canvas_draw_str(canvas, 0, 50, "Unleashed Companion");
+            canvas_draw_str(canvas, 0, 30, "AP limit reached");
+            canvas_draw_str(canvas, 0, 39, "Full comparison is in");
+            canvas_draw_str(canvas, 0, 48, "Unleashed Companion");
         } else if(model->session.has_baseline) {
             snprintf(line, sizeof(line), "vs %.19s", model->session.baseline_file_name);
-            canvas_draw_str(canvas, 0, 32, line);
+            canvas_draw_str(canvas, 0, 30, line);
             snprintf(
                 line,
                 sizeof(line),
                 "AP %+ld  Open %+ld",
                 (long)model->session.delta_unique,
                 (long)model->session.delta_open);
-            canvas_draw_str(canvas, 0, 42, line);
+            canvas_draw_str(canvas, 0, 39, line);
             snprintf(
                 line,
                 sizeof(line),
                 "Obs %+ld  WPA3 %+ld",
                 (long)model->session.delta_observations,
                 (long)model->session.delta_wpa3);
-            canvas_draw_str(canvas, 0, 50, line);
+            canvas_draw_str(canvas, 0, 48, line);
         } else {
-            canvas_draw_str(canvas, 0, 34, "No earlier baseline");
-            canvas_draw_str(canvas, 0, 46, "Record another session");
+            canvas_draw_str(canvas, 0, 32, "No earlier baseline");
+            canvas_draw_str(canvas, 0, 44, "Record another session");
         }
     } else {
         canvas_draw_str(canvas, 0, 24, model->session.status);
@@ -2476,10 +2476,10 @@ static void wifi_mapper_draw_inspector(Canvas* canvas, WiFiMapperModel* model) {
         "Base %.19s",
         model->inspector_has_baseline ? wifi_mapper_short_session_name(model->baseline_file_name) :
                                         "not set");
-    canvas_draw_str(canvas, 0, 21, line);
+    canvas_draw_str(canvas, 0, 20, line);
     snprintf(
         line, sizeof(line), "Now  %.19s", wifi_mapper_short_session_name(model->current_file_name));
-    canvas_draw_str(canvas, 0, 31, line);
+    canvas_draw_str(canvas, 0, 30, line);
     snprintf(
         line,
         sizeof(line),
@@ -2487,10 +2487,10 @@ static void wifi_mapper_draw_inspector(Canvas* canvas, WiFiMapperModel* model) {
         (unsigned int)model->inspector_new_count,
         (unsigned int)model->inspector_gone_count,
         (unsigned int)model->inspector_changed_count);
-    canvas_draw_str(canvas, 0, 42, line);
-    canvas_draw_str(canvas, 0, 50, model->inspector_status);
+    canvas_draw_str(canvas, 0, 40, line);
+    canvas_draw_str(canvas, 0, 48, model->inspector_status);
 
-    elements_button_left(canvas, "Set Base");
+    elements_button_left(canvas, "Pin");
     elements_button_center(canvas, "Changes");
     elements_button_right(canvas, "All");
 }
@@ -2515,22 +2515,22 @@ static void wifi_mapper_draw_inspector_list(Canvas* canvas, WiFiMapperModel* mod
             sizeof(line),
             "%.20s",
             model->inspector_item.ssid[0] ? model->inspector_item.ssid : "Hidden SSID");
-        canvas_draw_str(canvas, 0, 21, line);
-        canvas_draw_str(canvas, 0, 31, model->inspector_item.bssid);
+        canvas_draw_str(canvas, 0, 20, line);
+        canvas_draw_str(canvas, 0, 30, model->inspector_item.bssid);
         snprintf(
             line,
             sizeof(line),
             "Ch %u  %.12s",
             model->inspector_item.channel,
             model->inspector_item.auth[0] ? model->inspector_item.auth : "Unknown");
-        canvas_draw_str(canvas, 0, 41, line);
+        canvas_draw_str(canvas, 0, 40, line);
         snprintf(
             line,
             sizeof(line),
             "best %ld  last %ld dBm",
             (long)model->inspector_item.best_rssi,
             (long)model->inspector_item.last_rssi);
-        canvas_draw_str(canvas, 0, 50, line);
+        canvas_draw_str(canvas, 0, 48, line);
     } else {
         canvas_draw_str(canvas, 0, 25, "No entries in category");
         canvas_draw_str(canvas, 0, 38, "Up/Down changes view");
@@ -2559,8 +2559,8 @@ static void wifi_mapper_draw_locator(Canvas* canvas, WiFiMapperModel* model) {
         sizeof(line),
         "%.20s",
         model->inspector_item.ssid[0] ? model->inspector_item.ssid : "Hidden SSID");
-    canvas_draw_str(canvas, 0, 21, line);
-    canvas_draw_str(canvas, 0, 31, model->inspector_item.bssid);
+    canvas_draw_str(canvas, 0, 20, line);
+    canvas_draw_str(canvas, 0, 29, model->inspector_item.bssid);
     if(model->locator_seen) {
         snprintf(
             line,
@@ -2575,8 +2575,8 @@ static void wifi_mapper_draw_locator(Canvas* canvas, WiFiMapperModel* model) {
             model->locator_running ? "Waiting for selected AP" : "Ready to scan",
             sizeof(line));
     }
-    canvas_draw_str(canvas, 0, 43, line);
-    elements_progress_bar(canvas, 0, 47, 128, (float)strength / 100.0f);
+    canvas_draw_str(canvas, 0, 39, line);
+    elements_progress_bar(canvas, 0, 42, 128, (float)strength / 100.0f);
 
     elements_button_left(canvas, "Back");
     elements_button_center(canvas, model->locator_running ? "Stop" : "Start");

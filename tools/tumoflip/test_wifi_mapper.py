@@ -99,8 +99,8 @@ class WiFiMapperTest(unittest.TestCase):
             manifest,
         )
         self.assertIn('fap_category="Module One/ESP32 Wi-Fi"', manifest)
-        self.assertIn('fap_version="1.2.1"', manifest)
-        self.assertIn('"TumoSurvey v1.2.1"', source)
+        self.assertIn('fap_version="1.2.2"', manifest)
+        self.assertIn('"TumoSurvey v1.2.2"', source)
         self.assertIn('fap_icon="wifi_mapper_10px.png"', manifest)
         self.assertIn('fap_icon_assets="icons"', manifest)
         self.assertTrue((APP_DIR / "wifi_mapper_10px.png").is_file())
@@ -247,10 +247,10 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn('if(model->logging) strlcat(chips, "LIVE ", sizeof(chips));', source)
         self.assertIn("static void wifi_mapper_draw_insights(", source)
         self.assertIn("static void wifi_mapper_draw_about(", source)
-        self.assertIn('"TumoSurvey v1.2.1"', source)
+        self.assertIn('"TumoSurvey v1.2.2"', source)
         self.assertIn('"Survey + AP Inspector"', source)
         self.assertIn('"squazaryu/tumoflip"', source)
-        self.assertIn('elements_button_left(canvas, "Set Base")', source)
+        self.assertIn('elements_button_left(canvas, "Pin")', source)
         self.assertIn('elements_button_center(canvas, "Changes")', source)
         self.assertIn('elements_button_right(canvas, "All")', source)
         self.assertIn('elements_button_center(canvas, "Locate")', source)
@@ -258,6 +258,13 @@ class WiFiMapperTest(unittest.TestCase):
             'elements_button_center(canvas, model->locator_running ? "Stop" : "Start")',
             source,
         )
+        self.assertIn(
+            "elements_progress_bar(canvas, 0, 42, 128, (float)strength / 100.0f)",
+            source,
+        )
+        self.assertNotIn("canvas_draw_str(canvas, 0, 50", source)
+        self.assertNotIn('elements_button_left(canvas, "Set Base")', source)
+        self.assertNotIn('"TumoSurvey v1.2.1"', source)
         self.assertNotIn("wifi_mapper_draw_top_action", source)
         self.assertNotIn("canvas_draw_rbox(canvas, 94, 1, 34, 12, 2)", source)
         self.assertNotIn("static int wifi_mapper_hint(", source)
