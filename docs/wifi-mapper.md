@@ -90,8 +90,9 @@ baseline stored at:
 /ext/apps_data/wifi_mapper/baseline.txt
 ```
 
-The reference contains only a validated `wifi_*.csv` file name. `Set Base`
-pins the selected completed session and survives an app restart. Inspector then
+The reference contains only a validated `wifi_*.csv` file name. The `Pin`
+button stores the selected completed session and survives an app restart.
+Inspector then
 reports exact bounded entries by BSSID:
 
 - `New`: present now but absent from the baseline;
