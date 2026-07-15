@@ -1,0 +1,5 @@
+tick_ms,type,rssi,channel,bssid,ssid,auth,lat,lon,alt,accuracy,raw
+2000,ap,-62,1,aa:00:00:00:00:01,Stable,WPA2,,,,,fixture
+2100,ap,-55,1,AA:00:00:00:00:01,Stable,WPA2,,,,,fixture
+2200,ap,-60,11,aa:00:00:00:00:02,Changed,WPA3,,,,,fixture
+2300,ap,-48,3,aa:00:00:00:00:04,New,OPEN,,,,,fixture
