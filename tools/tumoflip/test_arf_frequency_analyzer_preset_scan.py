@@ -59,8 +59,13 @@ class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
 
         subghz_app = SUBGHZ_APP.read_text(encoding="utf-8")
         self.assertIn('strcmp(p, "receiver") == 0', subghz_app)
+        self.assertIn('strcmp(p, "tumospectrum_raw") == 0', subghz_app)
         self.assertIn("const bool alloc_for_tx = p && strlen(p) && !open_receiver", subghz_app)
-        self.assertIn("if(open_receiver)", subghz_app)
+        self.assertIn("if(open_receiver || open_capture_raw)", subghz_app)
+        self.assertIn(
+            "open_capture_raw ? SubGhzSceneReadRAW : SubGhzSceneReceiver",
+            subghz_app,
+        )
         self.assertIn("SubGhzSceneReceiver", subghz_app)
 
     def test_empty_history_slots_do_not_repeat_mhz_suffix(self) -> None:
