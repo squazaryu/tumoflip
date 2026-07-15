@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
+import json
 import tempfile
 import unittest
 
@@ -10,6 +11,7 @@ from PIL.PngImagePlugin import PngInfo
 
 from tools.tumoflip.generate_update_splash import fit_gravity_bold, generate_slideshow
 from tools.tumoflip.sync_update_splash import (
+    MANIFEST_NAME,
     current_splash_metadata,
     sync_update_splash,
     version_from_dist_suffix,
@@ -30,14 +32,19 @@ class UpdateSplashTest(unittest.TestCase):
 
     def test_update_splash_matches_current_firmware_version(self) -> None:
         title, version = current_splash_metadata(fbt_options.DIST_SUFFIX)
+        self.assertTrue(
+            sync_update_splash(
+                SPLASH_DIR,
+                dist_suffix=fbt_options.DIST_SUFFIX,
+                check=True,
+            )
+        )
 
-        with tempfile.TemporaryDirectory() as directory:
-            expected_dir = Path(directory)
-            expected_frames = generate_slideshow(title, version, expected_dir)
-
-            for expected in expected_frames:
-                actual = SPLASH_DIR / expected.name
-                self.assertPngPixelsEqual(actual, expected)
+        manifest = json.loads(
+            (SPLASH_DIR / MANIFEST_NAME).read_text(encoding="utf-8")
+        )
+        self.assertEqual(manifest["title"], title)
+        self.assertEqual(manifest["version"], version)
 
     def test_update_splash_has_expected_pages(self) -> None:
         frames = sorted(path.name for path in SPLASH_DIR.glob("frame_*.png"))
@@ -134,6 +141,25 @@ class UpdateSplashTest(unittest.TestCase):
             )
             sync_update_splash(splash_dir, dist_suffix=fbt_options.DIST_SUFFIX)
             self.assertEqual(frame.read_bytes(), encoded)
+
+    def test_sync_check_rejects_changed_pixels(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            splash_dir = Path(directory)
+            sync_update_splash(splash_dir, dist_suffix=fbt_options.DIST_SUFFIX)
+            frame = splash_dir / "frame_00.png"
+
+            with Image.open(frame) as image:
+                changed = image.copy()
+            changed.putpixel((0, 0), 0)
+            changed.save(frame)
+
+            self.assertFalse(
+                sync_update_splash(
+                    splash_dir,
+                    dist_suffix=fbt_options.DIST_SUFFIX,
+                    check=True,
+                )
+            )
 
     def test_dist_suffix_version_parser(self) -> None:
         self.assertEqual(version_from_dist_suffix("t-flppr-fw-089-037"), "089-037")

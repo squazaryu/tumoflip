@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
+import json
 import os
 import re
 import sys
@@ -30,6 +32,9 @@ DEFAULT_PREFIX = "t-flppr-fw-"
 LEGACY_STABLE_PREFIX = "tmwhflpprarf"
 DEV_SUFFIX_RE = re.compile(r"^t-dev-(?P<version>\d{3}-\d{3}-\d{3})$")
 DEFAULT_OUTPUT_DIR = Path("assets/slideshow/tumoflip_update")
+MANIFEST_NAME = "manifest.json"
+MANIFEST_SCHEMA = 1
+EXPECTED_FRAME_NAMES = tuple(f"frame_{index:02}.png" for index in range(4))
 
 
 def png_pixels_equal(path: Path, expected: bytes) -> bool:
@@ -45,6 +50,70 @@ def png_pixels_equal(path: Path, expected: bytes) -> bool:
             )
     except (OSError, UnidentifiedImageError):
         return False
+
+
+def png_pixel_metadata(path: Path) -> dict[str, object] | None:
+    try:
+        with Image.open(path) as image:
+            pixels = image.tobytes()
+            return {
+                "mode": image.mode,
+                "size": list(image.size),
+                "pixels_sha256": hashlib.sha256(pixels).hexdigest(),
+            }
+    except (OSError, UnidentifiedImageError):
+        return None
+
+
+def splash_manifest(
+    output_dir: Path,
+    title: str,
+    version: str,
+) -> dict[str, object]:
+    frames: dict[str, object] = {}
+    for name in EXPECTED_FRAME_NAMES:
+        metadata = png_pixel_metadata(output_dir / name)
+        if metadata is None:
+            raise ValueError(f"cannot read generated update splash frame: {name}")
+        frames[name] = metadata
+    return {
+        "schema": MANIFEST_SCHEMA,
+        "title": title,
+        "version": version,
+        "frames": frames,
+    }
+
+
+def manifest_matches(
+    output_dir: Path,
+    title: str,
+    version: str,
+) -> bool:
+    manifest_path = output_dir / MANIFEST_NAME
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+
+    if (
+        manifest.get("schema") != MANIFEST_SCHEMA
+        or manifest.get("title") != title
+        or manifest.get("version") != version
+    ):
+        return False
+
+    frames = manifest.get("frames")
+    if not isinstance(frames, dict) or set(frames) != set(EXPECTED_FRAME_NAMES):
+        return False
+
+    actual_names = {path.name for path in output_dir.glob("frame_*.png")}
+    if actual_names != set(EXPECTED_FRAME_NAMES):
+        return False
+
+    return all(
+        png_pixel_metadata(output_dir / name) == frames[name]
+        for name in EXPECTED_FRAME_NAMES
+    )
 
 
 def version_from_dist_suffix(
@@ -107,6 +176,12 @@ def sync_update_splash(
     title, version = current_splash_metadata(dist_suffix, title=title)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # The committed frames are canonical. TTF rasterization differs slightly
+    # between FreeType builds, so release checks validate their reviewed pixel
+    # hashes instead of regenerating text on the CI host.
+    if check:
+        return manifest_matches(output_dir, title, version)
+
     import tempfile
 
     with tempfile.TemporaryDirectory() as directory:
@@ -116,7 +191,7 @@ def sync_update_splash(
 
     actual_paths = sorted(output_dir.glob("frame_*.png"))
     actual_names = {path.name for path in actual_paths}
-    expected_names = set(expected_frames)
+    expected_names = set(EXPECTED_FRAME_NAMES)
     stale_frames = sorted(
         path for path in actual_paths if path.name not in expected_names
     )
@@ -127,15 +202,17 @@ def sync_update_splash(
         if path.name in expected_frames
         and not png_pixels_equal(path, expected_frames[path.name])
     ]
-    in_sync = not stale_frames and not missing_frames and not changed_frames
-    if check:
-        return in_sync
-
     changed_names = {path.name for path in changed_frames}
     for name in missing_frames | changed_names:
         (output_dir / name).write_bytes(expected_frames[name])
     for stale_frame in stale_frames:
         stale_frame.unlink()
+
+    manifest = splash_manifest(output_dir, title, version)
+    (output_dir / MANIFEST_NAME).write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return True
 
 

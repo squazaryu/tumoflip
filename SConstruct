@@ -102,6 +102,7 @@ if GetOption("fullenv") or any(
                 "#/tools/tumoflip/sync_update_splash.py",
                 "#/tools/tumoflip/generate_update_splash.py",
                 "#/fbt_options.py",
+                "#/assets/slideshow/tumoflip_update/manifest.json",
                 *distenv.Glob("#/assets/slideshow/tumoflip_update/frame_*.png"),
             ],
             [
