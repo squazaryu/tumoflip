@@ -44,7 +44,7 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_app_migrates_in_place_without_duplicate_fap(self) -> None:
         self.assertIn('appid="signal_workbench"', self.manifest)
         self.assertIn('name="TumoSpectrum"', self.manifest)
-        self.assertIn('fap_version="2.0.0"', self.manifest)
+        self.assertIn('fap_version="2.1.0"', self.manifest)
         self.assertIn('fap_category="Module One/Signals"', self.manifest)
         self.assertIn(
             'fap_dist_path="apps/Module One/Signals/signal_workbench.fap"', self.manifest
@@ -91,6 +91,10 @@ class TumoSpectrumTest(unittest.TestCase):
             "TumoSpectrumReplayChanging",
             "tumospectrum_inference_reference_frame",
             "tumospectrum_inference_encoding",
+            "TUMOSPECTRUM_MAX_BITS",
+            "tumospectrum_inference_find_counter",
+            "tumospectrum_inference_find_checksums",
+            "TumoSpectrumChecksumCrc8Poly31",
         ):
             self.assertIn(required, self.inference)
 
@@ -120,6 +124,10 @@ class TumoSpectrumTest(unittest.TestCase):
             "loader_enqueue_launch",
             "tumospectrum_infer_captures",
             "tumospectrum_storage_save_set",
+            '"Open Source in Sub-GHz"',
+            '"Open Source in Infrared"',
+            "TumoSpectrumReplayStaticLike",
+            "TUMOSPECTRUM_LATEST_SET_ARG",
         ):
             self.assertIn(required, self.source)
 
@@ -172,6 +180,10 @@ class TumoSpectrumTest(unittest.TestCase):
             '"schema\\\":2',
             '"app\\\":\\\"TumoSpectrum',
             '"kind\\\":\\\"capture_set',
+            '"bitstream\\\":{',
+            '"fields\\\":[',
+            '"counter\\\":{',
+            '"checksum\\\":{',
             "TUMOSPECTRUM_NOTEBOOK_CSV",
             "tumospectrum_write_file",
             "storage_common_rename",
@@ -270,6 +282,22 @@ class TumoSpectrumTest(unittest.TestCase):
                 tumospectrum_analyze(capture);
             }
 
+            static size_t encode_bytes(
+                const uint8_t* bytes,
+                size_t byte_count,
+                int32_t* timings) {
+                size_t count = 0U;
+                for(size_t byte = 0U; byte < byte_count; byte++) {
+                    for(uint8_t bit = 0U; bit < 8U; bit++) {
+                        const bool value = (bytes[byte] & (uint8_t)(0x80U >> bit)) != 0U;
+                        timings[count++] = value ? 1200 : 400;
+                        timings[count++] = value ? -400 : -1200;
+                    }
+                }
+                timings[count++] = -8000;
+                return count;
+            }
+
             int main(void) {
                 const int32_t first[] = {
                     400, -1200, 1200, -400, 400, -1200, 1200, -400, -8000,
@@ -292,6 +320,9 @@ class TumoSpectrumTest(unittest.TestCase):
                 assert(inference.replay_class == TumoSpectrumReplayStaticLike);
                 assert(inference.encoding == TumoSpectrumEncodingPulsePair);
                 assert(inference.cluster_count == 2U);
+                assert(inference.bit_count == 4U);
+                assert(inference.stable_bits == 4U);
+                assert(inference.changing_bits == 0U);
 
                 const int32_t changing[] = {
                     1200, -400, 400, -1200, 1200, -400, 400, -1200, -8000,
@@ -302,6 +333,26 @@ class TumoSpectrumTest(unittest.TestCase):
                 assert(inference.compatible);
                 assert(inference.stable_percent < 90U);
                 assert(inference.replay_class == TumoSpectrumReplayChanging);
+                assert(inference.changing_bits > 0U);
+
+                const uint8_t payloads[3][3] = {
+                    {0x5A, 0x10, 0x4A},
+                    {0x5A, 0x11, 0x4B},
+                    {0x5A, 0x12, 0x48},
+                };
+                int32_t encoded[3][49] = {0};
+                for(size_t sample = 0U; sample < 3U; sample++) {
+                    const size_t count = encode_bytes(payloads[sample], 3U, encoded[sample]);
+                    make_capture(&captures[sample], encoded[sample], count);
+                }
+                inference = tumospectrum_infer_captures(captures, 3U);
+                assert(inference.compatible);
+                assert(inference.bit_count == 24U);
+                assert(inference.counter_direction == TumoSpectrumCounterIncrementing);
+                assert(inference.counter_start == 14U);
+                assert(inference.counter_length == 2U);
+                assert((inference.checksum_candidates & TumoSpectrumChecksumXor8) != 0U);
+                assert(inference.checksum_start == 16U);
 
                 inference = tumospectrum_infer_captures(captures, 2U);
                 assert(inference.compatible);
