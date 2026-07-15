@@ -60,7 +60,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --user Pillow
+          python3 -m pip install --user Pillow heatshrink2==0.13.0
 
       - name: Check README release metadata
         shell: bash
