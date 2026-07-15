@@ -2316,7 +2316,7 @@ static void wifi_mapper_draw_insights(Canvas* canvas, WiFiMapperModel* model) {
 
 static void wifi_mapper_draw_about(Canvas* canvas) {
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 0, 10, "TumoSurvey v1.2.0");
+    canvas_draw_str(canvas, 0, 10, "TumoSurvey v1.2.1");
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, 0, 24, "Survey + AP Inspector");
     canvas_draw_str(canvas, 0, 36, "Module One / API 88");

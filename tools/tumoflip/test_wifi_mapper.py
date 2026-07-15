@@ -89,6 +89,7 @@ class WiFiMapperTest(unittest.TestCase):
 
     def test_app_is_external_module_one_fap(self) -> None:
         manifest = (APP_DIR / "application.fam").read_text(encoding="utf-8")
+        source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
 
         self.assertIn('appid="wifi_mapper"', manifest)
         self.assertIn('name="TumoSurvey"', manifest)
@@ -99,6 +100,7 @@ class WiFiMapperTest(unittest.TestCase):
         )
         self.assertIn('fap_category="Module One/ESP32 Wi-Fi"', manifest)
         self.assertIn('fap_version="1.2.1"', manifest)
+        self.assertIn('"TumoSurvey v1.2.1"', source)
         self.assertIn('fap_icon="wifi_mapper_10px.png"', manifest)
         self.assertIn('fap_icon_assets="icons"', manifest)
         self.assertTrue((APP_DIR / "wifi_mapper_10px.png").is_file())
@@ -245,7 +247,7 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn('if(model->logging) strlcat(chips, "LIVE ", sizeof(chips));', source)
         self.assertIn("static void wifi_mapper_draw_insights(", source)
         self.assertIn("static void wifi_mapper_draw_about(", source)
-        self.assertIn('"TumoSurvey v1.2.0"', source)
+        self.assertIn('"TumoSurvey v1.2.1"', source)
         self.assertIn('"Survey + AP Inspector"', source)
         self.assertIn('"squazaryu/tumoflip"', source)
         self.assertIn('elements_button_left(canvas, "Set Base")', source)
