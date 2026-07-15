@@ -45,7 +45,6 @@
 #define WIFI_MAPPER_EXPORTS_DIR      EXT_PATH("apps_data/wifi_mapper/exports")
 #define WIFI_MAPPER_BASELINE_PATH    EXT_PATH("apps_data/wifi_mapper/baseline.txt")
 #define WIFI_MAPPER_SCAN_ALL_COMMAND "scanall\r\n"
-#define WIFI_MAPPER_SCAN_AP_COMMAND  "scanap\r\n"
 #define WIFI_MAPPER_WARDRIVE_COMMAND "wardrive -serial\r\n"
 #define WIFI_MAPPER_STOP_COMMAND     "stopscan\r\n"
 
@@ -74,7 +73,6 @@ typedef enum {
 
 typedef enum {
     WiFiMapperScanModeAll,
-    WiFiMapperScanModeAp,
     WiFiMapperScanModeWardrive,
     WiFiMapperScanModeCount,
 } WiFiMapperScanMode;
@@ -206,12 +204,6 @@ static const WiFiMapperScanModeConfig wifi_mapper_scan_modes[WiFiMapperScanModeC
             .label = "Scan All",
             .command = WIFI_MAPPER_SCAN_ALL_COMMAND,
             .sent_status = "scanall sent",
-        },
-    [WiFiMapperScanModeAp] =
-        {
-            .label = "Scan AP",
-            .command = WIFI_MAPPER_SCAN_AP_COMMAND,
-            .sent_status = "scanap sent",
         },
     [WiFiMapperScanModeWardrive] =
         {
@@ -1573,7 +1565,7 @@ static void wifi_mapper_locator_start(WiFiMapperApp* app) {
     }
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
 
-    if(can_start) wifi_mapper_send_command(app, WIFI_MAPPER_SCAN_AP_COMMAND);
+    if(can_start) wifi_mapper_send_command(app, WIFI_MAPPER_SCAN_ALL_COMMAND);
     wifi_mapper_update_model(app);
 }
 

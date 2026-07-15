@@ -98,7 +98,7 @@ class WiFiMapperTest(unittest.TestCase):
             manifest,
         )
         self.assertIn('fap_category="Module One/ESP32 Wi-Fi"', manifest)
-        self.assertIn('fap_version="1.2.0"', manifest)
+        self.assertIn('fap_version="1.2.1"', manifest)
         self.assertIn('fap_icon="wifi_mapper_10px.png"', manifest)
         self.assertIn('fap_icon_assets="icons"', manifest)
         self.assertTrue((APP_DIR / "wifi_mapper_10px.png").is_file())
@@ -116,7 +116,6 @@ class WiFiMapperTest(unittest.TestCase):
 
         for macro, command in (
             ("WIFI_MAPPER_SCAN_ALL_COMMAND", "scanall"),
-            ("WIFI_MAPPER_SCAN_AP_COMMAND", "scanap"),
             ("WIFI_MAPPER_WARDRIVE_COMMAND", "wardrive -serial"),
             ("WIFI_MAPPER_STOP_COMMAND", "stopscan"),
         ):
@@ -126,6 +125,8 @@ class WiFiMapperTest(unittest.TestCase):
             )
         self.assertIn("WiFiMapperScanModeAll", source)
         self.assertIn("WiFiMapperScanModeWardrive", source)
+        self.assertNotIn("WiFiMapperScanModeAp", source)
+        self.assertNotIn("scanap", source.casefold())
         self.assertIn("WiFiMapperExportModeClean", source)
         self.assertIn("WiFiMapperExportModeRaw", source)
         self.assertIn("WiFiMapperScreenSession", source)
@@ -160,7 +161,10 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn("wifi_mapper_inspector_compare", source)
         self.assertIn("wifi_mapper_locator_start", source)
         self.assertIn("wifi_mapper_locator_stop", source)
-        self.assertIn("WIFI_MAPPER_SCAN_AP_COMMAND", source)
+        self.assertIn(
+            "if(can_start) wifi_mapper_send_command(app, WIFI_MAPPER_SCAN_ALL_COMMAND);",
+            source,
+        )
         self.assertIn("wifi_mapper_select_adjacent_session", source)
         self.assertIn("wifi_mapper_parse_marauder_ap_line", source)
         self.assertIn("wifi_mapper_parse_marauder_wardrive_line", source)

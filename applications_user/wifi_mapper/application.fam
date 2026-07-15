@@ -6,7 +6,7 @@ App(
     requires=["gui", "storage", "notification", "bt", "expansion_start"],
     stack_size=4 * 1024,
     fap_category="Module One/ESP32 Wi-Fi",
-    fap_version="1.2.0",
+    fap_version="1.2.1",
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip",
     fap_description="Module One network survey with pinned baselines, exact bounded AP changes, RSSI Locator, atomic sessions, GeoJSON export, and Companion live relay.",
