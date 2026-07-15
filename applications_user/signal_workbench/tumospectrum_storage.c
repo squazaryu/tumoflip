@@ -139,6 +139,81 @@ static const char* tumospectrum_capture_name(const TumoSpectrumCapture* capture)
     return separator ? separator + 1U : capture->path;
 }
 
+static bool tumospectrum_validate_persisted_inference(const TumoSpectrumInference* inference) {
+    if(inference->bit_count > TUMOSPECTRUM_MAX_BITS ||
+       (uint16_t)inference->stable_bits + inference->changing_bits + inference->unknown_bits !=
+           inference->bit_count ||
+       inference->counter_direction > TumoSpectrumCounterDecrementing ||
+       inference->checksum_candidates >
+           (TumoSpectrumChecksumXor8 | TumoSpectrumChecksumSum8 | TumoSpectrumChecksumCrc8Poly07 |
+            TumoSpectrumChecksumCrc8Poly31)) {
+        return false;
+    }
+    uint8_t stable = 0U;
+    uint8_t changing = 0U;
+    for(size_t index = 0U; index < inference->bit_count; index++) {
+        const bool stable_bit = tumospectrum_bitset_get(inference->stable_mask, index);
+        const bool changing_bit = tumospectrum_bitset_get(inference->changing_mask, index);
+        const bool known_bit = tumospectrum_bitset_get(inference->known_mask, index);
+        if(stable_bit && changing_bit) return false;
+        if(known_bit != (stable_bit || changing_bit)) return false;
+        stable += stable_bit ? 1U : 0U;
+        changing += changing_bit ? 1U : 0U;
+    }
+    if(stable != inference->stable_bits || changing != inference->changing_bits) return false;
+    if(inference->counter_direction != TumoSpectrumCounterNone &&
+       (inference->counter_length < 2U ||
+        inference->counter_length > TUMOSPECTRUM_COUNTER_MAX_BITS ||
+        (uint16_t)inference->counter_start + inference->counter_length > inference->bit_count)) {
+        return false;
+    }
+    if(inference->checksum_candidates != 0U &&
+       ((uint16_t)inference->checksum_start + 8U > inference->bit_count)) {
+        return false;
+    }
+    return true;
+}
+
+static void tumospectrum_append_bit_string(
+    FuriString* output,
+    const TumoSpectrumInference* inference,
+    bool pattern) {
+    furi_string_push_back(output, '"');
+    for(size_t index = 0U; index < inference->bit_count; index++) {
+        char value = '?';
+        if(tumospectrum_bitset_get(inference->stable_mask, index)) {
+            value = tumospectrum_bitset_get(inference->reference_bits, index) ? '1' : '0';
+        } else if(tumospectrum_bitset_get(inference->changing_mask, index)) {
+            value = pattern ?
+                        '*' :
+                        (tumospectrum_bitset_get(inference->reference_bits, index) ? '1' : '0');
+        }
+        furi_string_push_back(output, value);
+    }
+    furi_string_push_back(output, '"');
+}
+
+static void tumospectrum_append_checksum_json(FuriString* output, uint8_t candidates) {
+    const struct {
+        uint8_t flag;
+        const char* name;
+    } names[] = {
+        {TumoSpectrumChecksumXor8, "xor8"},
+        {TumoSpectrumChecksumSum8, "sum8"},
+        {TumoSpectrumChecksumCrc8Poly07, "crc8-07"},
+        {TumoSpectrumChecksumCrc8Poly31, "crc8-31"},
+    };
+    furi_string_push_back(output, '[');
+    bool first = true;
+    for(size_t index = 0U; index < sizeof(names) / sizeof(names[0]); index++) {
+        if((candidates & names[index].flag) == 0U) continue;
+        if(!first) furi_string_push_back(output, ',');
+        tumospectrum_append_json_string(output, names[index].name);
+        first = false;
+    }
+    furi_string_push_back(output, ']');
+}
+
 static void
     tumospectrum_build_set_json(const TumoSpectrumCaptureSet* capture_set, FuriString* output) {
     char timestamp[32];
@@ -182,7 +257,43 @@ static void
             index == 0U ? "" : ",",
             (unsigned long)capture_set->inference.clusters_us[index]);
     }
-    furi_string_cat(output, "]},\"samples\":[");
+    furi_string_cat(output, "],\"bitstream\":{\"bit_count\":");
+    furi_string_cat_printf(output, "%u,\"reference\":", capture_set->inference.bit_count);
+    tumospectrum_append_bit_string(output, &capture_set->inference, false);
+    furi_string_cat(output, ",\"pattern\":");
+    tumospectrum_append_bit_string(output, &capture_set->inference, true);
+    furi_string_cat_printf(
+        output,
+        ",\"stable_bits\":%u,\"changing_bits\":%u,\"unknown_bits\":%u},\"fields\":[",
+        capture_set->inference.stable_bits,
+        capture_set->inference.changing_bits,
+        capture_set->inference.unknown_bits);
+    for(uint8_t index = 0U; index < capture_set->inference.field_count; index++) {
+        const TumoSpectrumField* field = &capture_set->inference.fields[index];
+        furi_string_cat_printf(output, "%s{\"kind\":", index == 0U ? "" : ",");
+        tumospectrum_append_json_string(output, tumospectrum_field_kind_name(field->kind));
+        furi_string_cat_printf(
+            output, ",\"start\":%u,\"length\":%u}", field->start, field->length);
+    }
+    furi_string_cat_printf(
+        output,
+        "],\"counter\":{\"found\":%s,\"direction\":",
+        capture_set->inference.counter_direction == TumoSpectrumCounterNone ? "false" : "true");
+    tumospectrum_append_json_string(
+        output, tumospectrum_counter_direction_name(capture_set->inference.counter_direction));
+    furi_string_cat_printf(
+        output,
+        ",\"start\":%u,\"length\":%u,\"confidence\":%u},\"checksum\":{\"candidates\":",
+        capture_set->inference.counter_start,
+        capture_set->inference.counter_length,
+        capture_set->inference.counter_confidence);
+    tumospectrum_append_checksum_json(output, capture_set->inference.checksum_candidates);
+    furi_string_cat_printf(
+        output,
+        ",\"start\":%u,\"length\":%u,\"confidence\":%u}},\"samples\":[",
+        capture_set->inference.checksum_start,
+        capture_set->inference.checksum_candidates == 0U ? 0U : 8U,
+        capture_set->inference.checksum_confidence);
     for(size_t index = 0U; index < capture_set->sample_count; index++) {
         if(index > 0U) furi_string_push_back(output, ',');
         tumospectrum_append_json_string(
@@ -213,10 +324,21 @@ static bool tumospectrum_storage_write_set_file(
     uint32_t stable_points = capture_set->inference.stable_points;
     uint32_t changing_points = capture_set->inference.changing_points;
     uint32_t cluster_count = capture_set->inference.cluster_count;
+    uint32_t bit_count = capture_set->inference.bit_count;
+    uint32_t stable_bits = capture_set->inference.stable_bits;
+    uint32_t changing_bits = capture_set->inference.changing_bits;
+    uint32_t unknown_bits = capture_set->inference.unknown_bits;
+    uint32_t counter_direction = capture_set->inference.counter_direction;
+    uint32_t counter_start = capture_set->inference.counter_start;
+    uint32_t counter_length = capture_set->inference.counter_length;
+    uint32_t counter_confidence = capture_set->inference.counter_confidence;
+    uint32_t checksum_candidates = capture_set->inference.checksum_candidates;
+    uint32_t checksum_start = capture_set->inference.checksum_start;
+    uint32_t checksum_confidence = capture_set->inference.checksum_confidence;
     bool success = false;
     do {
         if(!flipper_format_file_open_always(format, temporary) ||
-           !flipper_format_write_header_cstr(format, "TumoSpectrum Capture Set", 1U) ||
+           !flipper_format_write_header_cstr(format, "TumoSpectrum Capture Set", 2U) ||
            !flipper_format_write_string_cstr(format, "Device", capture_set->device_label) ||
            !flipper_format_write_string_cstr(format, "Control", capture_set->control_label) ||
            !flipper_format_write_uint32(format, "Capture type", &capture_type, 1U) ||
@@ -248,6 +370,33 @@ static bool tumospectrum_storage_write_set_file(
         if(cluster_count > 0U &&
            !flipper_format_write_uint32(
                format, "Clusters us", capture_set->inference.clusters_us, cluster_count)) {
+            success = false;
+            break;
+        }
+        if(!flipper_format_write_uint32(format, "Bit count", &bit_count, 1U) ||
+           !flipper_format_write_uint32(format, "Stable bits", &stable_bits, 1U) ||
+           !flipper_format_write_uint32(format, "Changing bits", &changing_bits, 1U) ||
+           !flipper_format_write_uint32(format, "Unknown bits", &unknown_bits, 1U) ||
+           !flipper_format_write_uint32(format, "Counter direction", &counter_direction, 1U) ||
+           !flipper_format_write_uint32(format, "Counter start", &counter_start, 1U) ||
+           !flipper_format_write_uint32(format, "Counter length", &counter_length, 1U) ||
+           !flipper_format_write_uint32(format, "Counter confidence", &counter_confidence, 1U) ||
+           !flipper_format_write_uint32(format, "Checksum candidates", &checksum_candidates, 1U) ||
+           !flipper_format_write_uint32(format, "Checksum start", &checksum_start, 1U) ||
+           !flipper_format_write_uint32(format, "Checksum confidence", &checksum_confidence, 1U)) {
+            success = false;
+            break;
+        }
+        const size_t bitset_size = (bit_count + 7U) / 8U;
+        if(bitset_size > 0U &&
+           (!flipper_format_write_hex(
+                format, "Reference bits", capture_set->inference.reference_bits, bitset_size) ||
+            !flipper_format_write_hex(
+                format, "Known mask", capture_set->inference.known_mask, bitset_size) ||
+            !flipper_format_write_hex(
+                format, "Stable mask", capture_set->inference.stable_mask, bitset_size) ||
+            !flipper_format_write_hex(
+                format, "Changing mask", capture_set->inference.changing_mask, bitset_size))) {
             success = false;
             break;
         }
@@ -493,7 +642,49 @@ void tumospectrum_storage_build_set_text(
         furi_string_cat_printf(
             output, " %lu", (unsigned long)capture_set->inference.clusters_us[index]);
     }
-    furi_string_cat(output, " us\n\nSamples:\n");
+    furi_string_cat_printf(
+        output,
+        " us\nBits: %u (stable %u, changing %u, unknown %u)\nPattern: ",
+        capture_set->inference.bit_count,
+        capture_set->inference.stable_bits,
+        capture_set->inference.changing_bits,
+        capture_set->inference.unknown_bits);
+    for(size_t index = 0U; index < capture_set->inference.bit_count; index++) {
+        char value = '?';
+        if(tumospectrum_bitset_get(capture_set->inference.stable_mask, index)) {
+            value = tumospectrum_bitset_get(capture_set->inference.reference_bits, index) ? '1' :
+                                                                                            '0';
+        } else if(tumospectrum_bitset_get(capture_set->inference.changing_mask, index)) {
+            value = '*';
+        }
+        furi_string_push_back(output, value);
+    }
+    furi_string_cat(output, "\nFields:");
+    for(uint8_t index = 0U; index < capture_set->inference.field_count; index++) {
+        const TumoSpectrumField* field = &capture_set->inference.fields[index];
+        furi_string_cat_printf(
+            output,
+            " %s[%u:%u]",
+            tumospectrum_field_kind_name(field->kind),
+            field->start,
+            field->length);
+    }
+    furi_string_cat_printf(
+        output,
+        "\nCounter candidate: %s",
+        tumospectrum_counter_direction_name(capture_set->inference.counter_direction));
+    if(capture_set->inference.counter_direction != TumoSpectrumCounterNone) {
+        furi_string_cat_printf(
+            output,
+            " [%u:%u], %u%%",
+            capture_set->inference.counter_start,
+            capture_set->inference.counter_length,
+            capture_set->inference.counter_confidence);
+    }
+    char checksum[48];
+    tumospectrum_format_checksum_candidates(
+        capture_set->inference.checksum_candidates, checksum, sizeof(checksum));
+    furi_string_cat_printf(output, "\nChecksum candidates: %s\n\nSamples:\n", checksum);
     for(size_t index = 0U; index < capture_set->sample_count; index++) {
         furi_string_cat_printf(
             output,
@@ -573,10 +764,22 @@ bool tumospectrum_storage_load_latest_set(Storage* storage, TumoSpectrumCaptureS
     uint32_t stable_points = 0U;
     uint32_t changing_points = 0U;
     uint32_t cluster_count = 0U;
+    uint32_t bit_count = 0U;
+    uint32_t stable_bits = 0U;
+    uint32_t changing_bits = 0U;
+    uint32_t unknown_bits = 0U;
+    uint32_t counter_direction = 0U;
+    uint32_t counter_start = 0U;
+    uint32_t counter_length = 0U;
+    uint32_t counter_confidence = 0U;
+    uint32_t checksum_candidates = 0U;
+    uint32_t checksum_start = 0U;
+    uint32_t checksum_confidence = 0U;
     bool success = false;
     do {
         if(!flipper_format_file_open_existing(format, TUMOSPECTRUM_LATEST_SET) ||
-           !flipper_format_read_header(format, header, &version) || version != 1U ||
+           !flipper_format_read_header(format, header, &version) ||
+           (version != 1U && version != 2U) ||
            furi_string_cmp_str(header, "TumoSpectrum Capture Set") != 0 ||
            !flipper_format_read_string(format, "Device", value)) {
             break;
@@ -649,6 +852,53 @@ bool tumospectrum_storage_load_latest_set(Storage* storage, TumoSpectrumCaptureS
            !flipper_format_read_uint32(
                format, "Clusters us", inference->clusters_us, cluster_count)) {
             break;
+        }
+        if(version >= 2U) {
+            if(!flipper_format_read_uint32(format, "Bit count", &bit_count, 1U) ||
+               !flipper_format_read_uint32(format, "Stable bits", &stable_bits, 1U) ||
+               !flipper_format_read_uint32(format, "Changing bits", &changing_bits, 1U) ||
+               !flipper_format_read_uint32(format, "Unknown bits", &unknown_bits, 1U) ||
+               !flipper_format_read_uint32(format, "Counter direction", &counter_direction, 1U) ||
+               !flipper_format_read_uint32(format, "Counter start", &counter_start, 1U) ||
+               !flipper_format_read_uint32(format, "Counter length", &counter_length, 1U) ||
+               !flipper_format_read_uint32(format, "Counter confidence", &counter_confidence, 1U) ||
+               !flipper_format_read_uint32(
+                   format, "Checksum candidates", &checksum_candidates, 1U) ||
+               !flipper_format_read_uint32(format, "Checksum start", &checksum_start, 1U) ||
+               !flipper_format_read_uint32(
+                   format, "Checksum confidence", &checksum_confidence, 1U) ||
+               bit_count > TUMOSPECTRUM_MAX_BITS || stable_bits > TUMOSPECTRUM_MAX_BITS ||
+               changing_bits > TUMOSPECTRUM_MAX_BITS || unknown_bits > TUMOSPECTRUM_MAX_BITS ||
+               counter_start > UINT8_MAX || counter_length > UINT8_MAX ||
+               counter_confidence > 100U || checksum_start > UINT8_MAX ||
+               checksum_confidence > 100U) {
+                break;
+            }
+            inference->bit_count = (uint8_t)bit_count;
+            inference->stable_bits = (uint8_t)stable_bits;
+            inference->changing_bits = (uint8_t)changing_bits;
+            inference->unknown_bits = (uint8_t)unknown_bits;
+            inference->counter_direction = (TumoSpectrumCounterDirection)counter_direction;
+            inference->counter_start = (uint8_t)counter_start;
+            inference->counter_length = (uint8_t)counter_length;
+            inference->counter_confidence = (uint8_t)counter_confidence;
+            inference->checksum_candidates = (uint8_t)checksum_candidates;
+            inference->checksum_start = (uint8_t)checksum_start;
+            inference->checksum_confidence = (uint8_t)checksum_confidence;
+            const size_t bitset_size = (bit_count + 7U) / 8U;
+            if(bitset_size > 0U &&
+               (!flipper_format_read_hex(
+                    format, "Reference bits", inference->reference_bits, bitset_size) ||
+                !flipper_format_read_hex(
+                    format, "Known mask", inference->known_mask, bitset_size) ||
+                !flipper_format_read_hex(
+                    format, "Stable mask", inference->stable_mask, bitset_size) ||
+                !flipper_format_read_hex(
+                    format, "Changing mask", inference->changing_mask, bitset_size))) {
+                break;
+            }
+            if(!tumospectrum_validate_persisted_inference(inference)) break;
+            tumospectrum_inference_rebuild_fields(inference);
         }
         capture_set->inferred = true;
         success = true;
