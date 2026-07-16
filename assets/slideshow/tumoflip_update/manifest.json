@@ -2,7 +2,7 @@
   "frames": {
     "frame_00.png": {
       "mode": "1",
-      "pixels_sha256": "df5c8b68c64ce08dedd2234e0bac35c6ff7b2f7bc0073d78e015ef2a6d0a887c",
+      "pixels_sha256": "c0a0c3af8a26e7202c75bdd3e0b751071ba0760a2ed70fd890c7f0dba9407fcf",
       "size": [
         128,
         64
@@ -10,7 +10,7 @@
     },
     "frame_01.png": {
       "mode": "1",
-      "pixels_sha256": "2062386084e49767ed234a7cf89750e42378c60a4556c39e3280a29e1c58ebdc",
+      "pixels_sha256": "f858958eabb73c75415c5fbb2bbc5bb58483bef7d676d54f5b9ed3f5b9544d49",
       "size": [
         128,
         64
@@ -18,7 +18,7 @@
     },
     "frame_02.png": {
       "mode": "1",
-      "pixels_sha256": "a65b84a0a636638f068f9a057b334381adcebc1722c42b73168b6dbf92ae3ef8",
+      "pixels_sha256": "1069184cb0c2ab7bbba9140f085e85df4311b6fc13fa66ac164909a363ee93d4",
       "size": [
         128,
         64
@@ -34,6 +34,6 @@
     }
   },
   "schema": 1,
-  "title": "T-FLPPR-FW",
-  "version": "089-037"
+  "title": "T-DEV",
+  "version": "089-038-001"
 }
