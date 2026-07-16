@@ -7,6 +7,7 @@
 
 #define DESKTOP_PROFILE_PATH        EXT_PATH("apps_data/tumoflip_customization/desktop_profile.txt")
 #define DESKTOP_PROFILE_RELOAD_PATH EXT_PATH("apps_data/tumoflip_customization/reload.flag")
+#define DESKTOP_PACK_MANIFEST_PATH  EXT_PATH("apps_data/tumoflip_customization/animation_packs.txt")
 
 typedef enum {
     DesktopProfileOrderRandom,
@@ -25,6 +26,7 @@ void desktop_profile_free(DesktopProfile* profile);
 
 bool desktop_profile_equal(const DesktopProfile* left, const DesktopProfile* right);
 bool desktop_profile_is_active(const DesktopProfile* profile);
+bool desktop_profile_selects_all(const DesktopProfile* profile);
 bool desktop_profile_contains(const DesktopProfile* profile, const char* animation_name);
 
 DesktopProfileOrder desktop_profile_get_order(const DesktopProfile* profile);

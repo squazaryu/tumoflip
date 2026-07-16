@@ -9,8 +9,9 @@
 #define TAG "DesktopProfile"
 
 #define DESKTOP_PROFILE_FILETYPE             "Tumoflip Desktop Profile"
-#define DESKTOP_PROFILE_VERSION              1U
-#define DESKTOP_PROFILE_MAX_ANIMATIONS       128U
+#define DESKTOP_PROFILE_VERSION_LEGACY       1U
+#define DESKTOP_PROFILE_VERSION              2U
+#define DESKTOP_PROFILE_MAX_ANIMATIONS       320U
 #define DESKTOP_PROFILE_MAX_ANIMATION_NAME   96U
 #define DESKTOP_PROFILE_MAX_COLLECTION_BYTES 64U
 #define DESKTOP_PROFILE_MIN_DURATION_SECONDS 5U
@@ -19,12 +20,14 @@
 
 struct DesktopProfile {
     bool enabled;
+    bool selection_all;
     DesktopProfileOrder order;
     DesktopProfileTiming timing;
     uint32_t duration_seconds;
     char* collection;
     size_t animation_count;
-    char* animations[DESKTOP_PROFILE_MAX_ANIMATIONS];
+    size_t animation_capacity;
+    char** animations;
 };
 
 static DesktopProfile* desktop_profile_alloc(void) {
@@ -44,6 +47,7 @@ void desktop_profile_free(DesktopProfile* profile) {
     for(size_t i = 0; i < profile->animation_count; ++i) {
         free(profile->animations[i]);
     }
+    free(profile->animations);
     free(profile);
 }
 
@@ -82,6 +86,17 @@ static bool desktop_profile_add_animation(DesktopProfile* profile, const char* n
 
     if(desktop_profile_contains(profile, name)) return false;
 
+    if(profile->animation_count == profile->animation_capacity) {
+        size_t next_capacity = profile->animation_capacity * 2U;
+        if(next_capacity == 0U) next_capacity = 16U;
+        const size_t bounded_capacity =
+            MIN(next_capacity, (size_t)DESKTOP_PROFILE_MAX_ANIMATIONS);
+        char** animations = realloc(profile->animations, bounded_capacity * sizeof(char*));
+        if(!animations) return false;
+        profile->animations = animations;
+        profile->animation_capacity = bounded_capacity;
+    }
+
     profile->animations[profile->animation_count++] = strdup(name);
     return true;
 }
@@ -94,7 +109,10 @@ static bool desktop_profile_parse(DesktopProfile* profile, FlipperFormat* file) 
     do {
         if(!flipper_format_read_header(file, value, &version)) break;
         if(furi_string_cmp_str(value, DESKTOP_PROFILE_FILETYPE) != 0) break;
-        if(version != DESKTOP_PROFILE_VERSION) break;
+        if((version != DESKTOP_PROFILE_VERSION_LEGACY) &&
+           (version != DESKTOP_PROFILE_VERSION)) {
+            break;
+        }
 
         flipper_format_set_strict_mode(file, false);
 
@@ -142,6 +160,20 @@ static bool desktop_profile_parse(DesktopProfile* profile, FlipperFormat* file) 
             break;
         }
 
+        if(version == DESKTOP_PROFILE_VERSION) {
+            if(!flipper_format_rewind(file) ||
+               !flipper_format_read_string(file, "Selection", value)) {
+                break;
+            }
+            if(furi_string_cmp_str(value, "Explicit") == 0) {
+                profile->selection_all = false;
+            } else if(furi_string_cmp_str(value, "All") == 0) {
+                profile->selection_all = true;
+            } else {
+                break;
+            }
+        }
+
         bool animations_valid = true;
         if(!flipper_format_rewind(file)) break;
         while(flipper_format_read_string(file, "Animation", value)) {
@@ -152,8 +184,11 @@ static bool desktop_profile_parse(DesktopProfile* profile, FlipperFormat* file) 
         }
         if(!animations_valid) break;
 
+        if(profile->selection_all && (profile->animation_count != 0U)) break;
+
         if(profile->enabled &&
-           ((profile->animation_count == 0U) || (strlen(profile->collection) == 0U))) {
+           ((!profile->selection_all && (profile->animation_count == 0U)) ||
+            (strlen(profile->collection) == 0U))) {
             break;
         }
 
@@ -195,7 +230,8 @@ bool desktop_profile_equal(const DesktopProfile* left, const DesktopProfile* rig
     furi_assert(left);
     furi_assert(right);
 
-    if((left->enabled != right->enabled) || (left->order != right->order) ||
+    if((left->enabled != right->enabled) || (left->selection_all != right->selection_all) ||
+       (left->order != right->order) ||
        (left->timing != right->timing) || (left->duration_seconds != right->duration_seconds) ||
        (left->animation_count != right->animation_count) ||
        (strcmp(left->collection, right->collection) != 0)) {
@@ -210,17 +246,24 @@ bool desktop_profile_equal(const DesktopProfile* left, const DesktopProfile* rig
 
 bool desktop_profile_is_active(const DesktopProfile* profile) {
     furi_assert(profile);
-    return profile->enabled && (profile->animation_count > 0U);
+    return profile->enabled && (profile->selection_all || (profile->animation_count > 0U));
 }
 
 bool desktop_profile_contains(const DesktopProfile* profile, const char* animation_name) {
     furi_assert(profile);
     furi_assert(animation_name);
 
+    if(profile->selection_all) return true;
+
     for(size_t i = 0; i < profile->animation_count; ++i) {
         if(strcmp(profile->animations[i], animation_name) == 0) return true;
     }
     return false;
+}
+
+bool desktop_profile_selects_all(const DesktopProfile* profile) {
+    furi_assert(profile);
+    return profile->selection_all;
 }
 
 DesktopProfileOrder desktop_profile_get_order(const DesktopProfile* profile) {

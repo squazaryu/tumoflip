@@ -548,6 +548,24 @@ static uint32_t animation_manager_filter_animation_list(
 static StorageAnimation* animation_manager_select_sequential(
     AnimationManager* animation_manager,
     StorageAnimationList_t* animation_list) {
+    if(desktop_profile_selects_all(animation_manager->desktop_profile)) {
+        const size_t animation_count = StorageAnimationList_size(*animation_list);
+        if(animation_count == 0U) return NULL;
+
+        const size_t selected_index =
+            animation_manager->profile_sequential_index % animation_count;
+        size_t index = 0U;
+        for
+            M_EACH(item, *animation_list, StorageAnimationList_t) {
+                if(index++ == selected_index) {
+                    animation_manager->profile_sequential_index =
+                        (selected_index + 1U) % animation_count;
+                    return *item;
+                }
+            }
+        return NULL;
+    }
+
     const size_t profile_count =
         desktop_profile_get_animation_count(animation_manager->desktop_profile);
     if(profile_count == 0U) return NULL;

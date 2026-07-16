@@ -8,6 +8,7 @@
 
 #include "animation_manager.h"
 #include "animation_storage.h"
+#include "desktop_profile.h"
 #include <assets_dolphin_internal.h>
 #include <assets_dolphin_blocking.h>
 
@@ -21,12 +22,14 @@ static void animation_storage_free_frames(BubbleAnimation* animation);
 static void animation_storage_free_animation(BubbleAnimation** storage_animation);
 static BubbleAnimation* animation_storage_load_animation(const char* name);
 
-static bool animation_storage_load_single_manifest_info(
+static bool animation_storage_load_single_manifest_info_from(
     StorageAnimationManifestInfo* manifest_info,
-    const char* name) {
+    const char* name,
+    const char* manifest_path) {
     furi_assert(manifest_info);
 
     bool result = false;
+    manifest_info->name = NULL;
     Storage* storage = furi_record_open(RECORD_STORAGE);
     FlipperFormat* file = flipper_format_file_alloc(storage);
     flipper_format_set_strict_mode(file, true);
@@ -36,12 +39,10 @@ static bool animation_storage_load_single_manifest_info(
     do {
         uint32_t u32value;
         if(FSE_OK != storage_sd_status(storage)) break;
-        if(!flipper_format_file_open_existing(file, ANIMATION_MANIFEST_FILE)) break;
+        if(!flipper_format_file_open_existing(file, manifest_path)) break;
 
         if(!flipper_format_read_header(file, read_string, &u32value)) break;
         if(furi_string_cmp_str(read_string, "Flipper Animation Manifest")) break;
-
-        manifest_info->name = NULL;
 
         /* skip other animation names */
         flipper_format_set_strict_mode(file, false);
@@ -68,6 +69,7 @@ static bool animation_storage_load_single_manifest_info(
 
     if(!result && manifest_info->name) {
         free((void*)manifest_info->name);
+        manifest_info->name = NULL;
     }
     furi_string_free(read_string);
     flipper_format_free(file);
@@ -77,9 +79,19 @@ static bool animation_storage_load_single_manifest_info(
     return result;
 }
 
-void animation_storage_fill_animation_list(StorageAnimationList_t* animation_list) {
-    furi_assert(sizeof(StorageAnimationList_t) == sizeof(void*));
-    furi_assert(!StorageAnimationList_size(*animation_list));
+static bool animation_storage_list_contains(
+    StorageAnimationList_t* animation_list,
+    const char* name) {
+    for
+        M_EACH(item, *animation_list, StorageAnimationList_t) {
+            if(strcmp(animation_storage_get_meta(*item)->name, name) == 0) return true;
+        }
+    return false;
+}
+
+static void animation_storage_append_manifest(
+    StorageAnimationList_t* animation_list,
+    const char* manifest_path) {
 
     Storage* storage = furi_record_open(RECORD_STORAGE);
     FlipperFormat* file = flipper_format_file_alloc(storage);
@@ -93,7 +105,7 @@ void animation_storage_fill_animation_list(StorageAnimationList_t* animation_lis
         StorageAnimation* storage_animation = NULL;
 
         if(FSE_OK != storage_sd_status(storage)) break;
-        if(!flipper_format_file_open_existing(file, ANIMATION_MANIFEST_FILE)) break;
+        if(!flipper_format_file_open_existing(file, manifest_path)) break;
         if(!flipper_format_read_header(file, read_string, &u32value)) break;
         if(furi_string_cmp_str(read_string, "Flipper Animation Manifest")) break;
         do {
@@ -116,7 +128,13 @@ void animation_storage_fill_animation_list(StorageAnimationList_t* animation_lis
             if(!flipper_format_read_uint32(file, "Weight", &u32value, 1)) break;
             storage_animation->manifest_info.weight = u32value;
 
-            StorageAnimationList_push_back(*animation_list, storage_animation);
+            if(animation_storage_list_contains(
+                   animation_list, storage_animation->manifest_info.name)) {
+                animation_storage_free_storage_animation(&storage_animation);
+            } else {
+                StorageAnimationList_push_back(*animation_list, storage_animation);
+            }
+            storage_animation = NULL;
         } while(1);
 
         animation_storage_free_storage_animation(&storage_animation);
@@ -125,12 +143,20 @@ void animation_storage_fill_animation_list(StorageAnimationList_t* animation_lis
     furi_string_free(read_string);
     flipper_format_free(file);
 
+    furi_record_close(RECORD_STORAGE);
+}
+
+void animation_storage_fill_animation_list(StorageAnimationList_t* animation_list) {
+    furi_assert(sizeof(StorageAnimationList_t) == sizeof(void*));
+    furi_assert(!StorageAnimationList_size(*animation_list));
+
+    animation_storage_append_manifest(animation_list, ANIMATION_MANIFEST_FILE);
+    animation_storage_append_manifest(animation_list, DESKTOP_PACK_MANIFEST_PATH);
+
     // add hard-coded animations
     for(size_t i = 0; i < dolphin_internal_size; ++i) {
         StorageAnimationList_push_back(*animation_list, (StorageAnimation*)&dolphin_internal[i]);
     }
-
-    furi_record_close(RECORD_STORAGE);
 }
 
 StorageAnimation* animation_storage_find_animation(const char* name) {
@@ -158,10 +184,15 @@ StorageAnimation* animation_storage_find_animation(const char* name) {
     if(!storage_animation) {
         storage_animation = malloc(sizeof(StorageAnimation));
         storage_animation->external = true;
+        storage_animation->animation = NULL;
+        storage_animation->manifest_info.name = NULL;
 
-        bool result = false;
-        result =
-            animation_storage_load_single_manifest_info(&storage_animation->manifest_info, name);
+        bool result = animation_storage_load_single_manifest_info_from(
+            &storage_animation->manifest_info, name, ANIMATION_MANIFEST_FILE);
+        if(!result) {
+            result = animation_storage_load_single_manifest_info_from(
+                &storage_animation->manifest_info, name, DESKTOP_PACK_MANIFEST_PATH);
+        }
         if(result) {
             storage_animation->animation = animation_storage_load_animation(name);
             result = !!storage_animation->animation;
