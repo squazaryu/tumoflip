@@ -491,6 +491,8 @@ static void power_loader_callback(const void* message, void* context) {
     } else if(event->type == LoaderEventTypeNoMoreAppsInQueue) {
         power->app_running = false;
         power_auto_poweroff_arm(power);
+        // Refresh status bar state that may have changed while an app hid it.
+        view_port_update(power->battery_view_port);
     }
 }
 
