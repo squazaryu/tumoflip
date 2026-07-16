@@ -15,6 +15,8 @@
 
 #define TAG "AnimationManager"
 
+#define PROFILE_RELOAD_DEBOUNCE_MS 100U
+
 #define HARDCODED_ANIMATION_NAME   "L1_Tv_128x47"
 #define NO_SD_ANIMATION_NAME       "L1_NoSd_128x49"
 #define BAD_BATTERY_ANIMATION_NAME "L1_BadBattery_128x47"
@@ -39,6 +41,7 @@ struct AnimationManager {
     BubbleAnimationView* animation_view;
     OneShotView* one_shot_view;
     FuriTimer* idle_animation_timer;
+    FuriTimer* profile_reload_timer;
     StorageAnimation* current_animation;
     AnimationManagerInteractCallback interact_callback;
     AnimationManagerSetNewIdleAnimationCallback new_idle_callback;
@@ -132,13 +135,20 @@ static void animation_manager_storage_callback(const void* message, void* contex
             break;
         }
         animation_manager->profile_reload_pending = true;
-        if(animation_manager->check_blocking_callback) {
-            animation_manager->check_blocking_callback(animation_manager->context);
-        }
+        furi_timer_start(
+            animation_manager->profile_reload_timer, furi_ms_to_ticks(PROFILE_RELOAD_DEBOUNCE_MS));
         break;
 
     default:
         break;
+    }
+}
+
+static void animation_manager_profile_reload_timer_callback(void* context) {
+    furi_assert(context);
+    AnimationManager* animation_manager = context;
+    if(animation_manager->check_blocking_callback) {
+        animation_manager->check_blocking_callback(animation_manager->context);
     }
 }
 
@@ -340,6 +350,8 @@ AnimationManager* animation_manager_alloc(void) {
 
     animation_manager->idle_animation_timer =
         furi_timer_alloc(animation_manager_timer_callback, FuriTimerTypeOnce, animation_manager);
+    animation_manager->profile_reload_timer = furi_timer_alloc(
+        animation_manager_profile_reload_timer_callback, FuriTimerTypeOnce, animation_manager);
     bubble_animation_view_set_interact_callback(
         animation_manager->animation_view, animation_manager_interact_callback, animation_manager);
 
@@ -379,6 +391,7 @@ void animation_manager_free(AnimationManager* animation_manager) {
     View* animation_view = bubble_animation_get_view(animation_manager->animation_view);
     view_stack_remove_view(animation_manager->view_stack, animation_view);
     bubble_animation_view_free(animation_manager->animation_view);
+    furi_timer_free(animation_manager->profile_reload_timer);
     furi_timer_free(animation_manager->idle_animation_timer);
 }
 
