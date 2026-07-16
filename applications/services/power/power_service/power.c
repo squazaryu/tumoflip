@@ -490,7 +490,6 @@ static void power_loader_callback(const void* message, void* context) {
         // arm timer if some apps was not loaded or was stoped
     } else if(event->type == LoaderEventTypeNoMoreAppsInQueue) {
         power->app_running = false;
-        power->gauge_recovery_pending = true;
         power_auto_poweroff_arm(power);
     }
 }
@@ -601,15 +600,7 @@ static void power_tick_callback(void* context) {
     Power* power = context;
 
     // Update data from gauge and charger
-    bool need_refresh = power_update_info(power);
-    if(power->gauge_recovery_pending && !power->app_running) {
-        power->gauge_recovery_pending = false;
-        if(!power->info.gauge_is_ok) {
-            FURI_LOG_W(TAG, "Recovering fuel gauge after application exit");
-            furi_hal_power_gauge_reinit();
-            need_refresh |= power_update_info(power);
-        }
-    }
+    const bool need_refresh = power_update_info(power);
     // Check low battery level
     power_check_low_battery(power);
     // Check and notify about charging state
@@ -675,7 +666,6 @@ static Power* power_alloc(void) {
     // State initialization
     power->power_off_timeout = POWER_OFF_TIMEOUT_S;
     power->show_battery_low_warning = true;
-    power->gauge_recovery_pending = false;
 
     // Load UI settings
     DesktopSettings* settings = malloc(sizeof(DesktopSettings));
