@@ -9,11 +9,12 @@
 #include <gui/view.h>
 #include <gui/icon_i.h>
 #include <input/input.h>
-#include <toolbox/compress.h>
 #include <stdint.h>
 #include <core/dangerous_defines.h>
 
-#define ACTIVE_SHIFT 2
+#define ACTIVE_SHIFT                              2
+#define BUBBLE_ANIMATION_RESUME_PREVIEW_MAX_BYTES (4U * 1024U)
+#define COMPRESS_ICON_HEADER_SIZE                 4U
 
 typedef struct {
     const BubbleAnimation* current;
@@ -267,6 +268,18 @@ static void bubble_animation_timer_callback(void* context) {
     }
 }
 
+static size_t bubble_animation_frame_data_size(const uint8_t* frame, size_t bitmap_size) {
+    furi_assert(frame);
+
+    if(frame[0] == 0U) {
+        return bitmap_size + 1U;
+    }
+
+    uint16_t compressed_size = 0U;
+    memcpy(&compressed_size, &frame[2], sizeof(compressed_size));
+    return COMPRESS_ICON_HEADER_SIZE + compressed_size;
+}
+
 static Icon* bubble_animation_clone_preview(const BubbleAnimation* animation) {
     furi_assert(animation);
     const Icon* icon_orig = &animation->icon_animation;
@@ -276,32 +289,35 @@ static Icon* bubble_animation_clone_preview(const BubbleAnimation* animation) {
                                                                animation->active_frames;
     furi_assert(preview_frames > 0U);
 
-    uint8_t frame_indices[2] = {animation->frame_order[0], 0U};
-    uint8_t frame_count = 1U;
-    for(uint8_t i = 1U; i < preview_frames; ++i) {
-        if(animation->frame_order[i] != frame_indices[0]) {
-            frame_indices[1] = animation->frame_order[i];
-            frame_count = 2U;
+    const size_t bitmap_size = ROUND_UP_TO(icon_orig->width, 8) * icon_orig->height;
+    size_t preview_size = 0U;
+    uint8_t frame_count = 0U;
+    for(uint8_t i = 0U; i < preview_frames; ++i) {
+        const uint8_t source_index = animation->frame_order[i];
+        furi_assert(source_index < icon_orig->frame_count);
+        const size_t frame_size =
+            bubble_animation_frame_data_size(icon_orig->frames[source_index], bitmap_size);
+        if(frame_count &&
+           ((preview_size + frame_size) > BUBBLE_ANIMATION_RESUME_PREVIEW_MAX_BYTES)) {
             break;
         }
+        preview_size += frame_size;
+        ++frame_count;
     }
+    furi_assert(frame_count > 0U);
 
     Icon* icon_clone = malloc(sizeof(Icon));
     memcpy(icon_clone, icon_orig, sizeof(Icon));
 
     icon_clone->frames = malloc(sizeof(uint8_t*) * frame_count);
-    const size_t bitmap_size = ROUND_UP_TO(icon_orig->width, 8) * icon_orig->height;
-    CompressIcon* decoder = compress_icon_alloc(bitmap_size);
     for(uint8_t i = 0U; i < frame_count; ++i) {
-        uint8_t* bitmap = NULL;
-        compress_icon_decode(decoder, icon_orig->frames[frame_indices[i]], &bitmap);
-
-        uint8_t* frame = malloc(bitmap_size + 1U);
-        frame[0] = 0U;
-        memcpy(&frame[1], bitmap, bitmap_size);
+        const uint8_t source_index = animation->frame_order[i];
+        const uint8_t* source_frame = icon_orig->frames[source_index];
+        const size_t frame_size = bubble_animation_frame_data_size(source_frame, bitmap_size);
+        uint8_t* frame = malloc(frame_size);
+        memcpy(frame, source_frame, frame_size);
         FURI_CONST_ASSIGN_PTR(icon_clone->frames[i], frame);
     }
-    compress_icon_free(decoder);
     FURI_CONST_ASSIGN(icon_clone->frame_count, frame_count);
 
     return icon_clone;
@@ -449,8 +465,14 @@ void bubble_animation_unfreeze(BubbleAnimationView* view) {
 
     BubbleAnimationViewModel* model = view_get_model(view->view);
     furi_assert(model->freeze_frame);
-    bubble_animation_release_frame(&model->freeze_frame);
     furi_assert(model->current);
+    const uint8_t playback_frames = model->current->passive_frames ?
+                                        model->current->passive_frames :
+                                        model->current->active_frames;
+    if(playback_frames) {
+        model->current_frame = model->freeze_frame_index % playback_frames;
+    }
+    bubble_animation_release_frame(&model->freeze_frame);
     frame_rate = model->current->icon_animation.frame_rate;
     view_commit_model(view->view, true);
 
