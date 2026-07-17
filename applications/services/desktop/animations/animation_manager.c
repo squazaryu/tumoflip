@@ -714,6 +714,7 @@ void animation_manager_load_and_continue_animation(AnimationManager* animation_m
         (animation_manager->state == AnimationManagerStateFreezedIdle) ||
         (animation_manager->state == AnimationManagerStateFreezedBlocked));
 
+    bubble_animation_start_resume_preview(animation_manager->animation_view);
     const bool profile_changed = animation_manager_reload_profile(animation_manager);
 
     if(animation_manager->state == AnimationManagerStateFreezedBlocked) {
