@@ -82,6 +82,13 @@ View* bubble_animation_get_view(BubbleAnimationView* view);
 void bubble_animation_freeze(BubbleAnimationView* view);
 
 /**
+ * Animate the small in-memory preview while the full animation is restored.
+ *
+ * @view        bubble animation view instance
+ */
+void bubble_animation_start_resume_preview(BubbleAnimationView* view);
+
+/**
  * Starts bubble animation after freezing.
  *
  * @view        bubble animation view instance
