@@ -83,7 +83,8 @@ def sync_readme_text(
     )
     if iteration:
         updated = re.sub(
-            r"- `\d{3}`: development iteration inside the tumoflip internal build version\.",
+            r"- (?:`\d{3}`: development iteration inside the tumoflip internal build version|"
+            r"`<iteration>`: monotonically increasing revision used only by `t-dev` builds)\.",
             f"- `{iteration}`: development iteration inside the tumoflip internal build version.",
             updated,
             count=1,
