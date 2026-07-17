@@ -263,7 +263,8 @@ static bool power_update_info(Power* power) {
     };
 
     const bool need_refresh = (power->info.charge != info.charge) ||
-                              (power->info.is_charging != info.is_charging);
+                              (power->info.is_charging != info.is_charging) ||
+                              (power->info.gauge_is_ok != info.gauge_is_ok);
     power->info = info;
     return need_refresh;
 }

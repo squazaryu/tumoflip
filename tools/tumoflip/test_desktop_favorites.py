@@ -34,6 +34,24 @@ class DesktopFavoritesTest(unittest.TestCase):
         )
         self.assertNotIn('#define JS_RUNNER_APP "JS Runner"', source)
 
+    def test_profile_file_close_does_not_dispatch_from_storage_callback(self) -> None:
+        source = (
+            REPO_ROOT
+            / "applications/services/desktop/animations/animation_manager.c"
+        ).read_text(encoding="utf-8")
+
+        file_close_case = source.split("case StorageEventTypeFileClose:", 1)[1].split(
+            "default:", 1
+        )[0]
+        self.assertIn("animation_manager->profile_reload_pending = true", file_close_case)
+        self.assertIn("furi_timer_start(", file_close_case)
+        self.assertNotIn("check_blocking_callback", file_close_case)
+
+        timer_callback = source.split(
+            "static void animation_manager_profile_reload_timer_callback", 1
+        )[1].split("static void", 1)[0]
+        self.assertIn("check_blocking_callback", timer_callback)
+
 
 if __name__ == "__main__":
     unittest.main()
