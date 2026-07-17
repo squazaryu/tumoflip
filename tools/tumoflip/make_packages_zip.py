@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build tumoflip-packages.zip from a schema-v2 manifest + the resources tree.
 
-The companion iOS app (squazaryu/unleashed-companion, issue #8) installs SD package
+The companion iOS app (squazaryu/TumoCompanion) installs SD package
 files atomically (stage -> verify -> rename, with rollback). It reads the manifest and
 needs the raw file bytes. Rather than have the app decode the firmware's heatshrink
 (HSDS) resources archive, we publish a plain DEFLATE zip containing exactly the
