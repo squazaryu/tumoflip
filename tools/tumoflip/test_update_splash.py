@@ -64,9 +64,15 @@ class UpdateSplashTest(unittest.TestCase):
             self.assertEqual(gap.getextrema(), (255, 255))
 
     def test_dev_first_page_separates_title_and_version(self) -> None:
-        with Image.open(SPLASH_DIR / "frame_00.png") as frame:
-            title_version_gap = frame.convert("1").crop((0, 34, 128, 37))
-            self.assertEqual(title_version_gap.getextrema(), (255, 255))
+        with tempfile.TemporaryDirectory() as directory:
+            frame = generate_slideshow(
+                "T-DEV",
+                "089-038-003",
+                Path(directory),
+            )[0]
+            with Image.open(frame) as image:
+                title_version_gap = image.convert("1").crop((0, 34, 128, 37))
+                self.assertEqual(title_version_gap.getextrema(), (255, 255))
 
     def test_generated_pages_use_friendly_post_install_copy(self) -> None:
         generator = (REPO_ROOT / "tools/tumoflip/generate_update_splash.py").read_text(
