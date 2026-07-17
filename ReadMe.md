@@ -56,7 +56,7 @@ t-dev-<unleashed>-<build>-<iteration>
 - `t-dev`: Tumoflip development build prefix for unstable builds.
 - `089`: upstream Unleashed base version.
 - `039`: tumoflip internal build version.
-- `<iteration>`: monotonically increasing revision used only by `t-dev` builds.
+- `002`: development iteration inside the tumoflip internal build version.
 
 `main` should only receive builds that are stable enough to publish as tagged
 releases. Active firmware work lands on `dev` first. When the Unleashed base
@@ -98,6 +98,8 @@ The four-page post-update splash screen is generated automatically from
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
   `t-flppr-fw-089-039`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
+- Keeps a bounded compressed Desktop animation preview while external FAPs exit,
+  reducing the visible SD reload pause without retaining the full wallpaper in RAM.
 - Added `RX Mode: AUTO/DUAL` and a direct Read-screen toggle to the system
   Sub-GHz app. With an external CC1101 connected, both radios decode
   independently and duplicate frames are merged while retaining the stronger

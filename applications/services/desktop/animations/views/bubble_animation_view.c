@@ -12,7 +12,9 @@
 #include <stdint.h>
 #include <core/dangerous_defines.h>
 
-#define ACTIVE_SHIFT 2
+#define ACTIVE_SHIFT                              2
+#define BUBBLE_ANIMATION_RESUME_PREVIEW_MAX_BYTES (4U * 1024U)
+#define COMPRESS_ICON_HEADER_SIZE                 4U
 
 typedef struct {
     const BubbleAnimation* current;
@@ -24,6 +26,7 @@ typedef struct {
     uint8_t active_shift;
     uint32_t active_ended_at;
     Icon* freeze_frame;
+    uint8_t freeze_frame_index;
 } BubbleAnimationViewModel;
 
 struct BubbleAnimationView {
@@ -62,7 +65,13 @@ static void bubble_animation_draw_callback(Canvas* canvas, void* model_) {
 
     if(model->freeze_frame) {
         uint8_t y_offset = canvas_height(canvas) - icon_get_height(model->freeze_frame);
-        canvas_draw_icon(canvas, 0, y_offset, model->freeze_frame);
+        canvas_draw_bitmap(
+            canvas,
+            0,
+            y_offset,
+            icon_get_width(model->freeze_frame),
+            icon_get_height(model->freeze_frame),
+            icon_get_frame_data(model->freeze_frame, model->freeze_frame_index));
         return;
     }
 
@@ -235,11 +244,20 @@ static void bubble_animation_timer_callback(void* context) {
 
     BubbleAnimationViewModel* model = view_get_model(view->view);
 
+    if(model->freeze_frame) {
+        const uint8_t frame_count = icon_get_frame_count(model->freeze_frame);
+        if(frame_count > 1U) {
+            model->freeze_frame_index = (model->freeze_frame_index + 1U) % frame_count;
+        }
+        view_commit_model(view->view, true);
+        return;
+    }
+
     if(model->active_shift > 0) {
         activate = (--model->active_shift == 0);
     }
 
-    if(!model->freeze_frame && !activate) {
+    if(!activate) {
         bubble_animation_next_frame(model);
     }
 
@@ -250,28 +268,57 @@ static void bubble_animation_timer_callback(void* context) {
     }
 }
 
-/* always freeze first passive frame, because
- * animation is always activated at unfreezing and played
- * passive frame first, and 2 frames after - active
- */
-static Icon* bubble_animation_clone_first_frame(const Icon* icon_orig) {
-    furi_assert(icon_orig);
+static size_t bubble_animation_frame_data_size(const uint8_t* frame, size_t bitmap_size) {
+    furi_assert(frame);
+
+    if(frame[0] == 0U) {
+        return bitmap_size + 1U;
+    }
+
+    uint16_t compressed_size = 0U;
+    memcpy(&compressed_size, &frame[2], sizeof(compressed_size));
+    return COMPRESS_ICON_HEADER_SIZE + compressed_size;
+}
+
+static Icon* bubble_animation_clone_preview(const BubbleAnimation* animation) {
+    furi_assert(animation);
+    const Icon* icon_orig = &animation->icon_animation;
     furi_assert(icon_orig->frames);
-    furi_assert(icon_orig->frames[0]);
+    furi_assert(animation->frame_order);
+    const uint8_t preview_frames = animation->passive_frames ? animation->passive_frames :
+                                                               animation->active_frames;
+    furi_assert(preview_frames > 0U);
+
+    const size_t bitmap_size = ROUND_UP_TO(icon_orig->width, 8) * icon_orig->height;
+    size_t preview_size = 0U;
+    uint8_t frame_count = 0U;
+    for(uint8_t i = 0U; i < preview_frames; ++i) {
+        const uint8_t source_index = animation->frame_order[i];
+        furi_assert(source_index < icon_orig->frame_count);
+        const size_t frame_size =
+            bubble_animation_frame_data_size(icon_orig->frames[source_index], bitmap_size);
+        if(frame_count &&
+           ((preview_size + frame_size) > BUBBLE_ANIMATION_RESUME_PREVIEW_MAX_BYTES)) {
+            break;
+        }
+        preview_size += frame_size;
+        ++frame_count;
+    }
+    furi_assert(frame_count > 0U);
 
     Icon* icon_clone = malloc(sizeof(Icon));
     memcpy(icon_clone, icon_orig, sizeof(Icon));
 
-    icon_clone->frames = malloc(sizeof(uint8_t*));
-    /* icon bitmap can be either compressed or not. It is compressed if
-     * compressed size is less than original, so max size for bitmap is
-     * uncompressed (width * height) + 1 byte (in uncompressed case)
-     * for compressed header
-     */
-    size_t max_bitmap_size = ROUND_UP_TO(icon_orig->width, 8) * icon_orig->height + 1;
-    FURI_CONST_ASSIGN_PTR(icon_clone->frames[0], malloc(max_bitmap_size));
-    memcpy((void*)icon_clone->frames[0], icon_orig->frames[0], max_bitmap_size);
-    FURI_CONST_ASSIGN(icon_clone->frame_count, 1);
+    icon_clone->frames = malloc(sizeof(uint8_t*) * frame_count);
+    for(uint8_t i = 0U; i < frame_count; ++i) {
+        const uint8_t source_index = animation->frame_order[i];
+        const uint8_t* source_frame = icon_orig->frames[source_index];
+        const size_t frame_size = bubble_animation_frame_data_size(source_frame, bitmap_size);
+        uint8_t* frame = malloc(frame_size);
+        memcpy(frame, source_frame, frame_size);
+        FURI_CONST_ASSIGN_PTR(icon_clone->frames[i], frame);
+    }
+    FURI_CONST_ASSIGN(icon_clone->frame_count, frame_count);
 
     return icon_clone;
 }
@@ -280,7 +327,9 @@ static void bubble_animation_release_frame(Icon** icon) {
     furi_assert(icon);
     furi_assert(*icon);
 
-    free((void*)(*icon)->frames[0]);
+    for(uint8_t i = 0U; i < (*icon)->frame_count; ++i) {
+        free((void*)(*icon)->frames[i]);
+    }
     free((void*)(*icon)->frames);
     free(*icon);
     *icon = NULL;
@@ -372,9 +421,12 @@ void bubble_animation_view_set_animation(
     model->current_bubble = bubble_animation_pick_bubble(model, false);
     model->current_frame = 0;
     model->active_cycle = 0;
+    const bool frozen = model->freeze_frame != NULL;
     view_commit_model(view->view, true);
 
-    furi_timer_start(view->timer, 1000 / new_animation->icon_animation.frame_rate);
+    if(!frozen) {
+        furi_timer_start(view->timer, 1000 / new_animation->icon_animation.frame_rate);
+    }
 }
 
 void bubble_animation_freeze(BubbleAnimationView* view) {
@@ -383,20 +435,44 @@ void bubble_animation_freeze(BubbleAnimationView* view) {
     BubbleAnimationViewModel* model = view_get_model(view->view);
     furi_assert(model->current);
     furi_assert(!model->freeze_frame);
-    model->freeze_frame = bubble_animation_clone_first_frame(&model->current->icon_animation);
+    model->freeze_frame = bubble_animation_clone_preview(model->current);
+    model->freeze_frame_index = 0U;
     model->current = NULL;
     view_commit_model(view->view, false);
     furi_timer_stop(view->timer);
+}
+
+void bubble_animation_start_resume_preview(BubbleAnimationView* view) {
+    furi_assert(view);
+
+    BubbleAnimationViewModel* model = view_get_model(view->view);
+    furi_assert(model->freeze_frame);
+    model->freeze_frame_index = 0U;
+    const uint8_t frame_count = icon_get_frame_count(model->freeze_frame);
+    const uint8_t frame_rate = model->freeze_frame->frame_rate;
+    view_commit_model(view->view, true);
+
+    if((frame_count > 1U) && frame_rate) {
+        furi_timer_start(view->timer, 1000U / frame_rate);
+    }
 }
 
 void bubble_animation_unfreeze(BubbleAnimationView* view) {
     furi_assert(view);
     uint8_t frame_rate;
 
+    furi_timer_stop(view->timer);
+
     BubbleAnimationViewModel* model = view_get_model(view->view);
     furi_assert(model->freeze_frame);
-    bubble_animation_release_frame(&model->freeze_frame);
     furi_assert(model->current);
+    const uint8_t playback_frames = model->current->passive_frames ?
+                                        model->current->passive_frames :
+                                        model->current->active_frames;
+    if(playback_frames) {
+        model->current_frame = model->freeze_frame_index % playback_frames;
+    }
+    bubble_animation_release_frame(&model->freeze_frame);
     frame_rate = model->current->icon_animation.frame_rate;
     view_commit_model(view->view, true);
 
