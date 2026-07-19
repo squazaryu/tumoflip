@@ -270,6 +270,14 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertIn(
                 {
                     "group": "module_one",
+                    "legacy": "/ext/apps/Module One/Diagnostics/module_one_cockpit.fap",
+                    "canonical": "/ext/apps/Module One/Diagnostics/cockpit.fap",
+                },
+                manifest["cleanup"],
+            )
+            self.assertIn(
+                {
+                    "group": "module_one",
                     "legacy": "/ext/apps/Module One/module_one_cockpit.fap",
                     "canonical": "/ext/apps/Module One/Diagnostics/cockpit.fap",
                 },

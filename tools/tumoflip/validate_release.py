@@ -162,6 +162,8 @@ ARF_LEGACY_PATHS = {
 MODULE_ONE_LEGACY_PATHS = {
     "/ext/apps/Module One/ESP32 Wi-Fi/wifi_map.fap":
         "/ext/apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
+    "/ext/apps/Module One/Diagnostics/module_one_cockpit.fap":
+        "/ext/apps/Module One/Diagnostics/cockpit.fap",
     "/ext/apps/Module One/module_one_cockpit.fap":
         "/ext/apps/Module One/Diagnostics/cockpit.fap",
     "/ext/apps/Module One/tumo_acceptance_suite.fap":
