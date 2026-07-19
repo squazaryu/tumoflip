@@ -97,6 +97,7 @@ App(
         "helpers/subghz_txrx.c",
         "helpers/subghz_preset_delta.c",
         "helpers/subghz_threshold_rssi.c",
+        "helpers/subghz_button_labels.c",
         "scenes/subghz_scene.c",
         "scenes/subghz_scene_start.c",
         "scenes/subghz_scene_show_error.c",

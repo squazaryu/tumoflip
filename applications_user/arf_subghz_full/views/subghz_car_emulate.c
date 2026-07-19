@@ -17,11 +17,11 @@ typedef struct {
     char     preset[12];
     bool     is_transmitting;
     uint8_t  anim_frame;
-    char     label_ok[12];
-    char     label_up[12];
-    char     label_down[12];
-    char     label_left[12];
-    char     label_right[12];
+    char     label_ok[16];
+    char     label_up[16];
+    char     label_down[16];
+    char     label_left[16];
+    char     label_right[16];
 } SubGhzCarEmulateViewModel;
 
 /* ── Handle ─────────────────────────────────────────────────────────────── */
@@ -79,7 +79,7 @@ static void subghz_car_emulate_view_draw(Canvas* canvas, void* model_ptr) {
     const uint8_t font_h = canvas_current_font_height(canvas);
 
     /* Centre  → UNLOCK (OK button) */
-    {
+    if(m->label_ok[0]) {
         const char* lbl        = m->label_ok;
         uint8_t     w          = (uint8_t)(canvas_string_width(canvas, lbl) + 8U);
         canvas_draw_rbox(canvas, 64 - w / 2, 45 - font_h / 2, w, font_h, 3);
@@ -89,7 +89,7 @@ static void subghz_car_emulate_view_draw(Canvas* canvas, void* model_ptr) {
     }
 
     /* Up → LOCK */
-    {
+    if(m->label_up[0]) {
         const char* lbl        = m->label_up;
         uint8_t     w          = (uint8_t)(canvas_string_width(canvas, lbl) + 8U);
         canvas_draw_rbox(canvas, 64 - w / 2, 33 - font_h / 2, w, font_h, 3);
@@ -99,7 +99,7 @@ static void subghz_car_emulate_view_draw(Canvas* canvas, void* model_ptr) {
     }
 
     /* Left → PANIC */
-    {
+    if(m->label_left[0]) {
         const char* lbl = m->label_left;
         uint8_t     w   = (uint8_t)(canvas_string_width(canvas, lbl) + 8U);
         canvas_draw_rbox(canvas, 0, 46 - font_h / 2, w, font_h, 3);
@@ -109,7 +109,7 @@ static void subghz_car_emulate_view_draw(Canvas* canvas, void* model_ptr) {
     }
 
     /* Right → generic extra */
-    {
+    if(m->label_right[0]) {
         const char* lbl = m->label_right;
         uint8_t     w   = (uint8_t)(canvas_string_width(canvas, lbl) + 8U);
         canvas_draw_rbox(canvas, 127 - w, 46 - font_h / 2, w, font_h, 3);
@@ -119,7 +119,7 @@ static void subghz_car_emulate_view_draw(Canvas* canvas, void* model_ptr) {
     }
 
     /* Down → BOOT */
-    {
+    if(m->label_down[0]) {
         const char* lbl = m->label_down;
         uint8_t     w   = (uint8_t)(canvas_string_width(canvas, lbl) + 8U);
         canvas_draw_rbox(canvas, 64 - w / 2, 57 - font_h / 2, w, font_h, 3);
@@ -259,6 +259,11 @@ void subghz_car_emulate_view_set_labels(
             strncpy(m->label_down,  down  ? down  : "",  sizeof(m->label_down)  - 1);
             strncpy(m->label_left,  left  ? left  : "",  sizeof(m->label_left)  - 1);
             strncpy(m->label_right, right ? right : "",  sizeof(m->label_right) - 1);
+            m->label_ok[sizeof(m->label_ok) - 1] = '\0';
+            m->label_up[sizeof(m->label_up) - 1] = '\0';
+            m->label_down[sizeof(m->label_down) - 1] = '\0';
+            m->label_left[sizeof(m->label_left) - 1] = '\0';
+            m->label_right[sizeof(m->label_right) - 1] = '\0';
         },
         true);
 }

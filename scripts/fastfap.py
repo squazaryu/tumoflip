@@ -4,6 +4,7 @@ import os
 import struct
 import subprocess
 import tempfile
+import time
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -14,6 +15,17 @@ from fbt.sdk.hashes import gnu_sym_hash
 from flipper.app import App
 
 VERSION = 1
+
+
+def replace_file_with_retry(source: str, target: str, attempts: int = 50) -> None:
+    for attempt in range(attempts):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.1)
 
 
 @dataclass
@@ -136,10 +148,15 @@ class Main(App):
                 )
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            for section in sections:
+            current_fap_path = fap_path
+
+            for section_index, section in enumerate(sections):
                 data = serialize_relsection_data(section.data)
                 hash_name = hashlib.md5(section.name.encode()).hexdigest()
-                filename = f"{temp_dir}/{hash_name}.bin"
+                filename = os.path.join(temp_dir, f"{section_index}_{hash_name}.bin")
+                patched_fap_path = os.path.join(
+                    temp_dir, f"{section_index}_{hash_name}.fap"
+                )
 
                 if os.path.isfile(filename):
                     self.logger.error(f"File {filename} already exists")
@@ -153,7 +170,8 @@ class Main(App):
                         objcopy_path,
                         "--add-section",
                         f"{section.name}={filename}",
-                        fap_path,
+                        current_fap_path,
+                        patched_fap_path,
                     ],
                     check=True,
                 )
@@ -161,6 +179,11 @@ class Main(App):
                 if exit_code.returncode != 0:
                     self.logger.error("objcopy failed")
                     return 1
+
+                current_fap_path = patched_fap_path
+
+            if current_fap_path != fap_path:
+                replace_file_with_retry(current_fap_path, fap_path)
 
         return 0
 
