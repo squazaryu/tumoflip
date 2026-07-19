@@ -171,7 +171,7 @@ uint8_t subghz_last_settings_protocol_filter_count(const SubGhzLastSettings* ins
 }
 
 SubGhzLastSettings* subghz_last_settings_alloc(void) {
-    SubGhzLastSettings* instance = malloc(sizeof(SubGhzLastSettings));
+    SubGhzLastSettings* instance = calloc(1, sizeof(SubGhzLastSettings));
     return instance;
 }
 

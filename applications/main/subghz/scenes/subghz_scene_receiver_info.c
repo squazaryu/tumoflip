@@ -1,5 +1,6 @@
 #include "../subghz_i.h"
 
+#include <flipper_format/flipper_format_i.h>
 #include <lib/subghz/blocks/custom_btn.h>
 
 #include "applications/main/subghz/helpers/subghz_txrx_i.h"
@@ -20,6 +21,9 @@ void subghz_scene_receiver_info_callback(GuiButtonType result, InputType type, v
     } else if((result == GuiButtonTypeRight) && (type == InputTypeShort)) {
         view_dispatcher_send_custom_event(
             subghz->view_dispatcher, SubGhzCustomEventSceneReceiverInfoSave);
+    } else if((result == GuiButtonTypeLeft) && (type == InputTypeShort)) {
+        view_dispatcher_send_custom_event(
+            subghz->view_dispatcher, SubGhzCustomEventSceneReceiverInfoTxFullDpad);
     }
 }
 
@@ -101,6 +105,12 @@ void subghz_scene_receiver_info_draw_widget(SubGhz* subghz) {
                 "Send",
                 subghz_scene_receiver_info_callback,
                 subghz);
+            widget_add_button_element(
+                subghz->widget,
+                GuiButtonTypeLeft,
+                "Full",
+                subghz_scene_receiver_info_callback,
+                subghz);
         }
     } else {
         widget_add_icon_element(subghz->widget, 83, 22, &I_WarningDolphinFlip_45x42);
@@ -175,6 +185,28 @@ bool subghz_scene_receiver_info_on_event(void* context, SceneManagerEvent event)
                 subghz->save_datetime_set = true;
                 scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSaveName);
             }
+            return true;
+        } else if(event.event == SubGhzCustomEventSceneReceiverInfoTxFullDpad) {
+            subghz->state_notifications = SubGhzNotificationStateIDLE;
+            subghz_txrx_hopper_set_state(subghz->txrx, SubGhzHopperStateOFF);
+            subghz_txrx_stop(subghz->txrx);
+
+            if(!subghz_scene_receiver_info_update_parser(subghz)) {
+                return false;
+            }
+
+            FlipperFormat* history_data =
+                subghz_history_get_raw_data(subghz->history, subghz->idx_menu_chosen);
+            FlipperFormat* tx_data = subghz_txrx_get_fff_data(subghz->txrx);
+            Stream* source = flipper_format_get_raw_stream(history_data);
+            Stream* destination = flipper_format_get_raw_stream(tx_data);
+
+            stream_seek(source, 0, StreamOffsetFromStart);
+            stream_clean(destination);
+            stream_copy_full(source, destination);
+            stream_seek(destination, 0, StreamOffsetFromStart);
+
+            scene_manager_next_scene(subghz->scene_manager, SubGhzSceneTransmitter);
             return true;
         }
     } else if(event.type == SceneManagerEventTypeTick) {

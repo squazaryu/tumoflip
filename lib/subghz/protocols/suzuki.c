@@ -494,7 +494,7 @@ LevelDuration subghz_protocol_encoder_suzuki_yield(void *context)
 
     if (++instance->encoder.front == instance->encoder.size_upload)
     {
-        instance->encoder.repeat--;
+        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
         instance->encoder.front = 0;
     }
 
