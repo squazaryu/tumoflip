@@ -57,6 +57,11 @@ bool subghz_frequency_analyzer_get_observation(
     SubGhzFrequencyAnalyzer* instance,
     SubGhzFrequencyAnalyzerObservation* observation);
 
+bool subghz_frequency_analyzer_get_selected_preset(
+    SubGhzFrequencyAnalyzer* instance,
+    uint32_t* frequency,
+    uint32_t* preset_index);
+
 SubGHzFrequencyAnalyzerFeedbackLevel subghz_frequency_analyzer_feedback_level(
     SubGhzFrequencyAnalyzer* instance,
     SubGHzFrequencyAnalyzerFeedbackLevel level,

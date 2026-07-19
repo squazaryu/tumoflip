@@ -67,7 +67,6 @@ class ValidateReleaseTest(unittest.TestCase):
         self.assertEqual(
             ARF_VISIBLE_APP_IDS,
             {
-                "arf_frequency_analyzer",
                 "arf_subghz_full",
                 "garage_door_remote",
                 "keeloq_keystore_decryptor",

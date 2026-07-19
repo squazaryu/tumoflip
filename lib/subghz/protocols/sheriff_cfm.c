@@ -282,10 +282,16 @@ static bool subghz_protocol_encoder_sheriff_cfm_get_upload(
     uint8_t btn) {
     furi_check(instance);
 
-    if((instance->generic.cnt + 1) > 0xFFFF) {
-        instance->generic.cnt = 0;
+    uint32_t override_cnt = 0;
+    if(subghz_block_generic_global_counter_override_get(&override_cnt)) {
+        instance->generic.cnt = override_cnt & 0xFFFF;
     } else {
-        instance->generic.cnt += 1;
+        uint32_t mult = furi_hal_subghz_get_rolling_counter_mult();
+        if((instance->generic.cnt + mult) > 0xFFFF) {
+            instance->generic.cnt = 0;
+        } else {
+            instance->generic.cnt += mult;
+        }
     }
 
     uint32_t fix = (uint32_t)(instance->generic.data >> 32);
@@ -388,10 +394,29 @@ SubGhzProtocolStatus
         subghz_custom_btn_set_max(4);
 
         uint8_t selected_btn = cfm_get_btn_code(instance->generic.btn);
+        subghz_block_generic_global_button_override_get(&selected_btn);
 
         if(!subghz_protocol_encoder_sheriff_cfm_get_upload(instance, selected_btn)) {
             break;
         }
+
+        uint8_t key_data[sizeof(uint64_t)] = {0};
+        for(size_t i = 0; i < sizeof(uint64_t); i++) {
+            key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> (i * 8)) & 0xFF;
+        }
+        flipper_format_rewind(flipper_format);
+        flipper_format_insert_or_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t));
+
+        uint32_t model = (uint32_t)instance->model;
+        flipper_format_rewind(flipper_format);
+        flipper_format_insert_or_update_uint32(flipper_format, "Model", &model, 1);
+
+        uint32_t btn = instance->generic.btn;
+        flipper_format_rewind(flipper_format);
+        flipper_format_insert_or_update_uint32(flipper_format, "Btn", &btn, 1);
+
+        flipper_format_rewind(flipper_format);
+        flipper_format_insert_or_update_uint32(flipper_format, "Cnt", &instance->generic.cnt, 1);
 
         instance->encoder.is_running = true;
         instance->encoder.front = 0;
@@ -418,7 +443,7 @@ LevelDuration subghz_protocol_encoder_sheriff_cfm_yield(void* context) {
     LevelDuration ret = instance->encoder.upload[instance->encoder.front];
 
     if(++instance->encoder.front == instance->encoder.size_upload) {
-        instance->encoder.repeat--;
+        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
         instance->encoder.front = 0;
     }
 

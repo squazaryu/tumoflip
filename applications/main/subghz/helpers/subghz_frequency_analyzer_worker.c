@@ -7,6 +7,9 @@
 #define TAG "SubghzFrequencyAnalyzerWorker"
 
 #define SUBGHZ_FREQUENCY_ANALYZER_THRESHOLD -97.0f
+#define PRESET_SCAN_SAMPLE_COUNT            10U
+#define PRESET_SCAN_SAMPLE_DELAY_MS         12U
+#define PRESET_SCAN_MAX_RESULTS             32U
 
 static const uint8_t subghz_preset_ook_58khz[][2] = {
     {CC1101_MDMCFG4, 0b11110111}, // Rx BW filter is 58.035714kHz
@@ -27,11 +30,19 @@ struct SubGhzFrequencyAnalyzerWorker {
     uint8_t sample_hold_counter;
     FrequencyRSSI frequency_rssi_buf;
     SubGhzSetting* setting;
+    SubGhzTxRx* txrx;
+
+    SubGhzFrequencyAnalyzerWorkerMode mode;
+    uint32_t preset_frequency;
+    SubGhzFrequencyAnalyzerPresetResult* preset_results;
+    size_t preset_result_capacity;
+    size_t preset_result_count;
 
     float filVal;
     float trigger_level;
 
     SubGhzFrequencyAnalyzerWorkerPairCallback pair_callback;
+    SubGhzFrequencyAnalyzerWorkerPresetCallback preset_callback;
     void* context;
 };
 
@@ -66,7 +77,7 @@ static uint32_t subghz_frequency_analyzer_worker_expRunningAverageAdaptive(
  * @param context
  * @return exit code
  */
-static int32_t subghz_frequency_analyzer_worker_thread(void* context) {
+static int32_t subghz_frequency_analyzer_worker_frequency_thread(void* context) {
     SubGhzFrequencyAnalyzerWorker* instance = context;
 
     FrequencyRSSI frequency_rssi = {
@@ -265,15 +276,126 @@ static int32_t subghz_frequency_analyzer_worker_thread(void* context) {
     return 0;
 }
 
+static void
+    subghz_frequency_analyzer_worker_sort_preset_results(SubGhzFrequencyAnalyzerWorker* instance) {
+    for(size_t i = 1; i < instance->preset_result_count; i++) {
+        SubGhzFrequencyAnalyzerPresetResult candidate = instance->preset_results[i];
+        size_t position = i;
+        while(position > 0 && instance->preset_results[position - 1].score < candidate.score) {
+            instance->preset_results[position] = instance->preset_results[position - 1];
+            position--;
+        }
+        instance->preset_results[position] = candidate;
+    }
+}
+
+static void subghz_frequency_analyzer_worker_report_preset(
+    SubGhzFrequencyAnalyzerWorker* instance,
+    size_t completed,
+    size_t total,
+    bool complete,
+    const SubGhzFrequencyAnalyzerPresetResult* result) {
+    if(!instance->preset_callback) return;
+
+    SubGhzFrequencyAnalyzerPresetProgress progress = {
+        .frequency = instance->preset_frequency,
+        .completed = completed,
+        .total = total,
+        .complete = complete,
+        .valid = result != NULL,
+    };
+    if(result) progress.result = *result;
+    instance->preset_callback(instance->context, &progress);
+}
+
+static int32_t subghz_frequency_analyzer_worker_preset_thread(void* context) {
+    SubGhzFrequencyAnalyzerWorker* instance = context;
+    const size_t preset_count = instance->preset_result_capacity;
+    instance->preset_result_count = 0;
+
+    if(instance->preset_frequency == 0 || preset_count == 0) {
+        subghz_frequency_analyzer_worker_report_preset(instance, 0, preset_count, true, NULL);
+        return 0;
+    }
+
+    for(size_t preset_index = 0; preset_index < preset_count && instance->worker_running;
+        preset_index++) {
+        if(!subghz_txrx_analyzer_begin(instance->txrx, preset_index, instance->preset_frequency)) {
+            continue;
+        }
+
+        float peak_rssi = -127.0f;
+        float noise_floor = 0.0f;
+        float rssi_sum = 0.0f;
+        size_t sample_count = 0;
+        for(size_t sample = 0; sample < PRESET_SCAN_SAMPLE_COUNT && instance->worker_running;
+            sample++) {
+            furi_delay_ms(PRESET_SCAN_SAMPLE_DELAY_MS);
+            const float rssi = subghz_txrx_radio_device_get_rssi(instance->txrx);
+            if(sample_count == 0 || rssi < noise_floor) noise_floor = rssi;
+            if(rssi > peak_rssi) peak_rssi = rssi;
+            rssi_sum += rssi;
+            sample_count++;
+        }
+        subghz_txrx_analyzer_end(instance->txrx);
+
+        if(!instance->worker_running || sample_count == 0) break;
+
+        SubGhzFrequencyAnalyzerPresetResult* result =
+            &instance->preset_results[instance->preset_result_count++];
+        result->preset_index = preset_index;
+        strlcpy(
+            result->preset_name,
+            subghz_setting_get_preset_name(instance->setting, preset_index),
+            sizeof(result->preset_name));
+        result->peak_rssi = peak_rssi;
+        result->average_rssi = rssi_sum / sample_count;
+        result->noise_floor = noise_floor;
+        result->score = result->average_rssi + (peak_rssi - result->average_rssi) * 0.35f;
+
+        subghz_frequency_analyzer_worker_report_preset(
+            instance, preset_index + 1, preset_count, false, result);
+    }
+
+    subghz_txrx_analyzer_end(instance->txrx);
+    if(!instance->worker_running) return 0;
+
+    subghz_frequency_analyzer_worker_sort_preset_results(instance);
+    const SubGhzFrequencyAnalyzerPresetResult* best =
+        instance->preset_result_count > 0 ? &instance->preset_results[0] : NULL;
+    subghz_frequency_analyzer_worker_report_preset(
+        instance, preset_count, preset_count, true, best);
+    return 0;
+}
+
+static int32_t subghz_frequency_analyzer_worker_thread(void* context) {
+    SubGhzFrequencyAnalyzerWorker* instance = context;
+    if(instance->mode == SubGhzFrequencyAnalyzerWorkerModePreset) {
+        return subghz_frequency_analyzer_worker_preset_thread(context);
+    }
+    return subghz_frequency_analyzer_worker_frequency_thread(context);
+}
+
 SubGhzFrequencyAnalyzerWorker* subghz_frequency_analyzer_worker_alloc(void* context) {
     furi_assert(context);
-    SubGhzFrequencyAnalyzerWorker* instance = malloc(sizeof(SubGhzFrequencyAnalyzerWorker));
+    SubGhzFrequencyAnalyzerWorker* instance = calloc(1, sizeof(SubGhzFrequencyAnalyzerWorker));
 
     instance->thread = furi_thread_alloc_ex(
         "SubGhzFAWorker", 2048, subghz_frequency_analyzer_worker_thread, instance);
     SubGhz* subghz = context;
-    instance->setting = subghz_txrx_get_setting(subghz->txrx);
+    instance->txrx = subghz->txrx;
+    instance->setting = subghz_txrx_get_setting(instance->txrx);
     instance->trigger_level = subghz->last_settings->frequency_analyzer_trigger;
+    instance->mode = SubGhzFrequencyAnalyzerWorkerModeFrequency;
+    instance->preset_frequency = subghz->last_settings->frequency;
+    instance->preset_result_capacity = subghz_setting_get_preset_count(instance->setting);
+    if(instance->preset_result_capacity > PRESET_SCAN_MAX_RESULTS) {
+        instance->preset_result_capacity = PRESET_SCAN_MAX_RESULTS;
+    }
+    if(instance->preset_result_capacity > 0) {
+        instance->preset_results =
+            calloc(instance->preset_result_capacity, sizeof(SubGhzFrequencyAnalyzerPresetResult));
+    }
     //instance->trigger_level = SUBGHZ_FREQUENCY_ANALYZER_THRESHOLD;
     return instance;
 }
@@ -282,6 +404,7 @@ void subghz_frequency_analyzer_worker_free(SubGhzFrequencyAnalyzerWorker* instan
     furi_assert(instance);
 
     furi_thread_free(instance->thread);
+    free(instance->preset_results);
     free(instance);
 }
 
@@ -295,11 +418,51 @@ void subghz_frequency_analyzer_worker_set_pair_callback(
     instance->context = context;
 }
 
+void subghz_frequency_analyzer_worker_set_preset_callback(
+    SubGhzFrequencyAnalyzerWorker* instance,
+    SubGhzFrequencyAnalyzerWorkerPresetCallback callback,
+    void* context) {
+    furi_assert(instance);
+    furi_assert(context);
+    instance->preset_callback = callback;
+    instance->context = context;
+}
+
+void subghz_frequency_analyzer_worker_set_mode(
+    SubGhzFrequencyAnalyzerWorker* instance,
+    SubGhzFrequencyAnalyzerWorkerMode mode,
+    uint32_t frequency) {
+    furi_assert(instance);
+    furi_assert(!instance->worker_running);
+    instance->mode = mode;
+    if(frequency > 0) instance->preset_frequency = frequency;
+}
+
+size_t subghz_frequency_analyzer_worker_get_preset_result_count(
+    SubGhzFrequencyAnalyzerWorker* instance) {
+    furi_assert(instance);
+    return instance->preset_result_count;
+}
+
+bool subghz_frequency_analyzer_worker_get_preset_result(
+    SubGhzFrequencyAnalyzerWorker* instance,
+    size_t rank,
+    SubGhzFrequencyAnalyzerPresetResult* result) {
+    furi_assert(instance);
+    furi_assert(result);
+    if(rank >= instance->preset_result_count) return false;
+    *result = instance->preset_results[rank];
+    return true;
+}
+
 void subghz_frequency_analyzer_worker_start(SubGhzFrequencyAnalyzerWorker* instance) {
     furi_assert(instance);
     furi_assert(!instance->worker_running);
 
     instance->worker_running = true;
+    if(instance->mode == SubGhzFrequencyAnalyzerWorkerModePreset) {
+        instance->preset_result_count = 0;
+    }
 
     furi_thread_start(instance->thread);
 }

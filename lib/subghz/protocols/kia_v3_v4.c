@@ -124,6 +124,8 @@ static uint8_t kia_v3_v4_calculate_crc(uint8_t* bytes) {
     return crc & 0x0F;
 }
 
+static uint8_t kia_v3_v4_btn_to_custom(uint8_t btn);
+
 static bool kia_v3_v4_process_buffer(SubGhzProtocolDecoderKiaV3V4* instance) {
     if(instance->raw_bit_count < 68) {
         return false;
@@ -175,7 +177,7 @@ static bool kia_v3_v4_process_buffer(SubGhzProtocolDecoderKiaV3V4* instance) {
     instance->decoder.decode_count_bit = 68;
 
     if(subghz_custom_btn_get_original() == 0) {
-        subghz_custom_btn_set_original(instance->generic.btn);
+        subghz_custom_btn_set_original(kia_v3_v4_btn_to_custom(instance->generic.btn));
     }
     subghz_custom_btn_set_max(5);
 
@@ -219,6 +221,17 @@ static const char* subghz_protocol_kia_v3_v4_get_name_button(uint8_t btn) {
     case 0x4: return "Panic";
     case 0x8: return "Horn";
     default:  return "Unknown";
+    }
+}
+
+static uint8_t kia_v3_v4_btn_to_custom(uint8_t btn) {
+    switch(btn) {
+    case 0x1: return 1;
+    case 0x2: return 2;
+    case 0x3: return 3;
+    case 0x4: return 4;
+    case 0x8: return 5;
+    default:  return 1;
     }
 }
 
@@ -520,7 +533,7 @@ SubGhzProtocolStatus
         }
 
         if(subghz_custom_btn_get_original() == 0) {
-            subghz_custom_btn_set_original(instance->btn);
+            subghz_custom_btn_set_original(kia_v3_v4_btn_to_custom(instance->btn));
         }
         subghz_custom_btn_set_max(5);
 
@@ -531,14 +544,21 @@ SubGhzProtocolStatus
             selected_btn = subghz_custom_btn_get();
         }
 
-        if(selected_btn == 5) {
+        if(subghz_block_generic_global_button_override_get(&selected_btn)) {
+            instance->btn = selected_btn;
+        } else if(selected_btn == 5) {
             instance->btn = 0x8;
         } else if(selected_btn >= 1 && selected_btn <= 4) {
             instance->btn = selected_btn;
         }
 
-        uint32_t mult = furi_hal_subghz_get_rolling_counter_mult();
-        instance->cnt = (instance->cnt + mult) & 0xFFFF;
+        uint32_t override_cnt = 0;
+        if(subghz_block_generic_global_counter_override_get(&override_cnt)) {
+            instance->cnt = override_cnt & 0xFFFF;
+        } else {
+            uint32_t mult = furi_hal_subghz_get_rolling_counter_mult();
+            instance->cnt = (instance->cnt + mult) & 0xFFFF;
+        }
 
         instance->generic.btn = instance->btn;
         instance->generic.cnt = instance->cnt;
@@ -582,6 +602,13 @@ SubGhzProtocolStatus
         }
         uint32_t crc_to_write = instance->crc;
         flipper_format_update_uint32(flipper_format, "CRC", &crc_to_write, 1);
+
+        uint32_t btn_to_write = instance->generic.btn;
+        flipper_format_rewind(flipper_format);
+        flipper_format_insert_or_update_uint32(flipper_format, "Btn", &btn_to_write, 1);
+
+        flipper_format_rewind(flipper_format);
+        flipper_format_insert_or_update_uint32(flipper_format, "Cnt", &instance->generic.cnt, 1);
 
         instance->encoder.is_running = true;
         instance->encoder.front = 0;
@@ -648,7 +675,7 @@ LevelDuration subghz_protocol_encoder_kia_v3_v4_yield(void* context) {
         instance->crc_iter = (uint8_t)((instance->crc_iter + 1U) & 0x0FU);
         subghz_protocol_encoder_kia_v3_v4_patch_crc(instance);
         instance->encoder.front = 0;
-        instance->encoder.repeat--;
+        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
         if(instance->bursts_sent < 16U) {
             instance->bursts_sent++;
         }
@@ -931,7 +958,7 @@ SubGhzProtocolStatus
         }
 
         if(subghz_custom_btn_get_original() == 0) {
-            subghz_custom_btn_set_original(instance->generic.btn);
+            subghz_custom_btn_set_original(kia_v3_v4_btn_to_custom(instance->generic.btn));
         }
         subghz_custom_btn_set_max(5);
 

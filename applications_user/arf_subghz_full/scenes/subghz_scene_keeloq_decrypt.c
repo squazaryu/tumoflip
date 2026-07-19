@@ -211,12 +211,15 @@ bool subghz_scene_keeloq_decrypt_on_event(void* context, SceneManagerEvent event
             if(!subghz->keeloq_keys_manager) {
                 subghz->keeloq_keys_manager = subghz_keeloq_keys_alloc();
             }
+            uint16_t learning_type = ctx->recovered_type ?
+                                         ctx->recovered_type :
+                                         KEELOQ_LEARNING_SIMPLE;
             char key_name[24];
             snprintf(key_name, sizeof(key_name), "BF_%07lX", ctx->serial);
             subghz_keeloq_keys_add(
                 subghz->keeloq_keys_manager,
                 ctx->recovered_mfkey,
-                KEELOQ_LEARNING_SIMPLE,
+                learning_type,
                 key_name);
             subghz_keeloq_keys_save(subghz->keeloq_keys_manager);
 
@@ -226,7 +229,7 @@ bool subghz_scene_keeloq_decrypt_on_event(void* context, SceneManagerEvent event
             SubGhzKey* entry = SubGhzKeyArray_push_raw(*env_arr);
             entry->name = furi_string_alloc_set(key_name);
             entry->key = ctx->recovered_mfkey;
-            entry->type = KEELOQ_LEARNING_SIMPLE;
+            entry->type = learning_type;
             return true;
 
         } else if(event.event == KL_DECRYPT_EVENT_REJECTED) {

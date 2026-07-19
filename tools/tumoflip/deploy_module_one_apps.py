@@ -59,10 +59,6 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
     arf_subghz_full_src = repo_root / build_dir / ".extapps" / "arf_subghz_full.fap"
     copy_file(arf_subghz_full_src, arf_tools_dir / "arf_subghz_full.fap")
     copy_file(
-        repo_root / build_dir / ".extapps" / "arf_frequency_analyzer.fap",
-        arf_tools_dir / "arf_frequency_analyzer.fap",
-    )
-    copy_file(
         repo_root / build_dir / ".extapps" / "subghz_raw_edit.fap",
         arf_tools_dir / "subghz_raw_edit.fap",
     )
@@ -91,7 +87,6 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
         )
 
     expected_visible = {
-        "arf_frequency_analyzer.fap",
         "arf_subghz_full.fap",
         "garage_door_remote.fap",
         "keeloq_keystore_decryptor.fap",
@@ -100,9 +95,12 @@ def deploy_arf_tools(repo_root: Path, sd_root: Path, build_dir: Path) -> None:
     for old_app in arf_tools_dir.glob("*.fap"):
         if old_app.name not in expected_visible:
             old_app.unlink()
-    stale_analyzer = modules_dir / "arf_frequency_analyzer.fap"
-    if stale_analyzer.exists():
-        stale_analyzer.unlink()
+    for stale_analyzer in (
+        arf_tools_dir / "arf_frequency_analyzer.fap",
+        modules_dir / "arf_frequency_analyzer.fap",
+    ):
+        if stale_analyzer.exists():
+            stale_analyzer.unlink()
     expected_modules = {target_filename for _, target_filename in module_extapps}
     for old_module in modules_dir.glob("*.fap"):
         if old_module.name not in expected_modules:

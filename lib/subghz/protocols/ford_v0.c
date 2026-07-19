@@ -364,7 +364,7 @@ LevelDuration subghz_protocol_encoder_ford_v0_yield(void* context) {
     LevelDuration ret = instance->encoder.upload[instance->encoder.front];
     
     if(++instance->encoder.front == instance->encoder.size_upload) {
-        instance->encoder.repeat--;
+        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
         instance->encoder.front = 0;
     }
     
@@ -438,12 +438,18 @@ SubGhzProtocolStatus subghz_protocol_encoder_ford_v0_deserialize(void* context, 
     }
     subghz_custom_btn_set_max(3);
     
-    instance->count = (instance->count + furi_hal_subghz_get_rolling_counter_mult()) & 0xFFFFF;
+    uint32_t override_cnt = 0;
+    if(subghz_block_generic_global_counter_override_get(&override_cnt)) {
+        instance->count = override_cnt & 0xFFFFF;
+    } else {
+        instance->count = (instance->count + furi_hal_subghz_get_rolling_counter_mult()) & 0xFFFFF;
+    }
     
     uint8_t btn = subghz_custom_btn_get() == SUBGHZ_CUSTOM_BTN_OK ?
                       subghz_custom_btn_get_original() :
                       subghz_custom_btn_get();
     instance->button = ford_v0_get_button_code(btn);
+    subghz_block_generic_global_button_override_get(&instance->button);
 
     uint8_t new_chk = 0;
     encode_ford_v0(instance->generic.data, instance->serial, instance->button, instance->count, &new_chk, &instance->key1);
@@ -459,6 +465,8 @@ SubGhzProtocolStatus subghz_protocol_encoder_ford_v0_deserialize(void* context, 
     flipper_format_update_hex(flipper_format, "Key", key_data, 8);
     flipper_format_update_uint32(flipper_format, "CheckSum", (uint32_t[]){new_chk}, 1);
     flipper_format_update_uint32(flipper_format, "CRC", (uint32_t[]){new_crc}, 1);
+    flipper_format_insert_or_update_uint32(flipper_format, "Btn", (uint32_t[]){instance->button}, 1);
+    flipper_format_insert_or_update_uint32(flipper_format, "Cnt", &instance->count, 1);
 
     instance->encoder.is_running = true;
     return SubGhzProtocolStatusOk;

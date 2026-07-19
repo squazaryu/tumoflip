@@ -9,6 +9,8 @@
 
 typedef uint8_t ProgMode;
 
+uint8_t subghz_custom_btn_get_max(void);
+
 void subghz_custom_btn_set_prog_mode(ProgMode prog_mode);
 
 ProgMode subghz_custom_btn_get_prog_mode(void);

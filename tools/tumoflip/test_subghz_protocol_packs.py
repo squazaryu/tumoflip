@@ -8,6 +8,24 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class SubGhzProtocolPackTest(unittest.TestCase):
+    def test_last_settings_defaults_start_from_zeroed_memory(self) -> None:
+        paths = (
+            REPO_ROOT / "applications/main/subghz/subghz_last_settings.c",
+            REPO_ROOT / "applications_user/arf_subghz_full/subghz_last_settings.c",
+        )
+
+        for path in paths:
+            with self.subTest(path=path):
+                source = path.read_text(encoding="utf-8")
+                self.assertIn(
+                    "calloc(1, sizeof(SubGhzLastSettings))",
+                    source,
+                )
+                self.assertNotIn(
+                    "malloc(sizeof(SubGhzLastSettings))",
+                    source,
+                )
+
     def test_receiver_config_shows_runtime_pack_status(self) -> None:
         receiver_config = (
             REPO_ROOT / "applications/main/subghz/scenes/subghz_scene_receiver_config.c"

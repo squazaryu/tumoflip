@@ -307,10 +307,16 @@ static bool subghz_protocol_encoder_scher_khan_get_upload(
 
     // For 51-bit dynamic: rebuild data with new button and incremented counter
     if(instance->generic.data_count_bit == 51) {
-        if((instance->generic.cnt + 1) > 0xFFFF) {
-            instance->generic.cnt = 0;
+        uint32_t override_cnt = 0;
+        if(subghz_block_generic_global_counter_override_get(&override_cnt)) {
+            instance->generic.cnt = override_cnt & 0xFFFF;
         } else {
-            instance->generic.cnt += 1;
+            uint32_t mult = furi_hal_subghz_get_rolling_counter_mult();
+            if((instance->generic.cnt + mult) > 0xFFFF) {
+                instance->generic.cnt = 0;
+            } else {
+                instance->generic.cnt += mult;
+            }
         }
 
         uint64_t upper = instance->generic.data & 0x7FFFFFFF0000ULL;
@@ -320,10 +326,16 @@ static bool subghz_protocol_encoder_scher_khan_get_upload(
     }
 
     if(instance->generic.data_count_bit == 57) {
-        if((instance->generic.cnt + 1) > 0xFFFF) {
-            instance->generic.cnt = 0;
+        uint32_t override_cnt = 0;
+        if(subghz_block_generic_global_counter_override_get(&override_cnt)) {
+            instance->generic.cnt = override_cnt & 0xFFFF;
         } else {
-            instance->generic.cnt += 1;
+            uint32_t mult = furi_hal_subghz_get_rolling_counter_mult();
+            if((instance->generic.cnt + mult) > 0xFFFF) {
+                instance->generic.cnt = 0;
+            } else {
+                instance->generic.cnt += mult;
+            }
         }
 
         uint8_t kb[7];
@@ -581,6 +593,7 @@ SubGhzProtocolStatus
         instance->protocol_name = pname;
 
         uint8_t selected_btn = scher_khan_get_btn_code(instance->generic.btn);
+        subghz_block_generic_global_button_override_get(&selected_btn);
 
         FURI_LOG_I(TAG,
             "Building upload: original_btn=0x%02X, selected_btn=0x%02X, bits=%d",
@@ -622,7 +635,7 @@ LevelDuration subghz_protocol_encoder_scher_khan_yield(void* context) {
     LevelDuration ret = instance->encoder.upload[instance->encoder.front];
 
     if(++instance->encoder.front == instance->encoder.size_upload) {
-        instance->encoder.repeat--;
+        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
         instance->encoder.front = 0;
     }
 

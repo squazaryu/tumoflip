@@ -399,6 +399,62 @@ static void ford_v2_encoder_refresh_data_from_raw(SubGhzProtocolEncoderFordV2* i
     }
 }
 
+static void ford_v2_encoder_set_button_code(
+    SubGhzProtocolEncoderFordV2* instance,
+    uint8_t new_code) {
+    if(!ford_v2_button_is_valid(new_code)) return;
+
+    instance->raw_bytes[6] = new_code;
+    instance->raw_bytes[7] =
+        (instance->raw_bytes[7] & 0x7FU) | (uint8_t)(ford_v2_uint8_parity(new_code) << 7);
+    ford_v2_encoder_refresh_data_from_raw(instance);
+    instance->generic.btn = new_code;
+}
+
+static void ford_v2_encoder_set_counter(
+    SubGhzProtocolEncoderFordV2* instance,
+    uint16_t cnt) {
+    cnt &= 0x7FFFU;
+    instance->raw_bytes[7] =
+        (instance->raw_bytes[7] & 0x80U) | (uint8_t)((cnt >> 9) & 0x7FU);
+    instance->raw_bytes[8] = (uint8_t)((cnt >> 1) & 0xFFU);
+    instance->raw_bytes[9] =
+        (instance->raw_bytes[9] & 0x7FU) | (uint8_t)((cnt & 1U) << 7);
+    ford_v2_encoder_refresh_data_from_raw(instance);
+    instance->generic.cnt = cnt;
+}
+
+static void ford_v2_encoder_update_flipper_format(
+    SubGhzProtocolEncoderFordV2* instance,
+    FlipperFormat* flipper_format) {
+    flipper_format_rewind(flipper_format);
+    flipper_format_insert_or_update_hex(
+        flipper_format, "Key", instance->raw_bytes, FORD_V2_KEY_BYTE_COUNT);
+
+    flipper_format_rewind(flipper_format);
+    flipper_format_insert_or_update_uint32(
+        flipper_format, "Serial", &instance->generic.serial, 1);
+
+    uint32_t btn = instance->generic.btn;
+    flipper_format_rewind(flipper_format);
+    flipper_format_insert_or_update_uint32(flipper_format, "Btn", &btn, 1);
+
+    uint32_t cnt = instance->generic.cnt;
+    flipper_format_rewind(flipper_format);
+    flipper_format_insert_or_update_uint32(flipper_format, "Cnt", &cnt, 1);
+
+    uint32_t tail31 = (((uint32_t)(instance->raw_bytes[9] & 0x7FU)) << 24) |
+                      ((uint32_t)instance->raw_bytes[10] << 16) |
+                      ((uint32_t)instance->raw_bytes[11] << 8) |
+                      (uint32_t)instance->raw_bytes[12];
+    flipper_format_rewind(flipper_format);
+    flipper_format_insert_or_update_uint32(flipper_format, "Tail31", &tail31, 1);
+
+    flipper_format_rewind(flipper_format);
+    flipper_format_insert_or_update_hex(
+        flipper_format, "TailRaw", &instance->raw_bytes[8], FORD_V2_TAIL_RAW_BYTE_COUNT);
+}
+
 static inline void ford_v2_encoder_emit_manchester_bit(
     SubGhzProtocolEncoderFordV2* instance,
     bool bit) {
@@ -490,17 +546,14 @@ static SubGhzProtocolStatus ford_v2_encoder_deserialize_validate_and_pack(
         (((uint16_t)instance->raw_bytes[8]) << 1) |
         ((uint16_t)(instance->raw_bytes[9] >> 7)));
 
-    cnt = (cnt + 1U) & 0x7FFFU;
+    uint32_t override_cnt = 0;
+    if(subghz_block_generic_global_counter_override_get(&override_cnt)) {
+        cnt = override_cnt & 0x7FFFU;
+    } else {
+        cnt = (cnt + furi_hal_subghz_get_rolling_counter_mult()) & 0x7FFFU;
+    }
 
-    // raw_bytes[7] bits [6:0] = cnt[14:8], bit[7] = parity(btn)
-    instance->raw_bytes[7] = (instance->raw_bytes[7] & 0x80U) |
-                             (uint8_t)((cnt >> 9) & 0x7FU);
-    instance->raw_bytes[8] = (uint8_t)((cnt >> 1) & 0xFFU);
-    // raw_bytes[9] bit[7] = cnt[0], bits[6:0] = tail
-    instance->raw_bytes[9] = (instance->raw_bytes[9] & 0x7FU) |
-                             (uint8_t)((cnt & 1U) << 7);
-
-    ford_v2_encoder_refresh_data_from_raw(instance);
+    ford_v2_encoder_set_counter(instance, cnt);
 
     instance->generic.btn = instance->raw_bytes[6];
     instance->generic.serial =
@@ -566,17 +619,13 @@ SubGhzProtocolStatus
     if(ret == SubGhzProtocolStatusOk) {
         ford_v2_custom_btn_init(instance->raw_bytes[6]);
 
-        uint8_t btn_sel = subghz_custom_btn_get();
-        if(btn_sel != SUBGHZ_CUSTOM_BTN_OK) {
-            uint8_t new_code = ford_v2_custom_btn_to_code(btn_sel);
-            if(ford_v2_button_is_valid(new_code)) {
-                instance->raw_bytes[6] = new_code;
-                const uint8_t k7_msb =
-                    (uint8_t)(ford_v2_uint8_parity(new_code) << 7);
-                instance->raw_bytes[7] =
-                    (instance->raw_bytes[7] & 0x7FU) | k7_msb;
-                ford_v2_encoder_refresh_data_from_raw(instance);
-                instance->generic.btn = new_code;
+        uint8_t new_code = 0;
+        if(subghz_block_generic_global_button_override_get(&new_code)) {
+            ford_v2_encoder_set_button_code(instance, new_code);
+        } else {
+            uint8_t btn_sel = subghz_custom_btn_get();
+            if(btn_sel != SUBGHZ_CUSTOM_BTN_OK) {
+                ford_v2_encoder_set_button_code(instance, ford_v2_custom_btn_to_code(btn_sel));
             }
         }
 
@@ -586,6 +635,7 @@ SubGhzProtocolStatus
                 (instance->extra_data << 8) | (uint64_t)instance->raw_bytes[8U + i];
         }
 
+        ford_v2_encoder_update_flipper_format(instance, flipper_format);
         ford_v2_encoder_deserialize_apply_repeat(instance, flipper_format);
         ford_v2_encoder_build_upload(instance);
         instance->encoder.is_running = true;
@@ -615,7 +665,7 @@ LevelDuration subghz_protocol_encoder_ford_v2_yield(void* context) {
 
     if(++instance->encoder.front == instance->encoder.size_upload) {
         instance->encoder.front = 0U;
-        instance->encoder.repeat--;
+        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
     }
 
     return ret;

@@ -118,6 +118,15 @@ void subghz_txrx_get_frequency_and_modulation(
 SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat* flipper_format);
 
 /**
+ * Rebuild protocol data without starting TX.
+ *
+ * @param instance Pointer to a SubGhzTxRx
+ * @param flipper_format Pointer to a FlipperFormat
+ * @return bool True when encoder deserialization updated protocol data successfully
+ */
+bool subghz_txrx_rebuild_from_fff(SubGhzTxRx* instance, FlipperFormat* flipper_format);
+
+/**
  * Start RX CC1101
  * 
  * @param instance Pointer to a SubGhzTxRx
@@ -399,6 +408,15 @@ const char* subghz_txrx_radio_device_get_name(SubGhzTxRx* instance);
 * @return bool True if the frequency is valid
 */
 bool subghz_txrx_radio_device_is_frequency_valid(SubGhzTxRx* instance, uint32_t frequency);
+
+/** Start a bounded receive-only analyzer probe with the selected preset. */
+bool subghz_txrx_analyzer_begin(
+    SubGhzTxRx* instance,
+    size_t preset_index,
+    uint32_t frequency);
+
+/** Stop a receive-only analyzer probe and leave the selected radio idle. */
+void subghz_txrx_analyzer_end(SubGhzTxRx* instance);
 
 bool subghz_txrx_radio_device_is_tx_allowed(SubGhzTxRx* instance, uint32_t frequency);
 

@@ -14,12 +14,46 @@ void subghz_scene_saved_menu_submenu_callback(void* context, uint32_t index) {
 
 void subghz_scene_saved_menu_on_enter(void* context) {
     SubGhz* subghz = context;
-    submenu_add_item(
-        subghz->submenu,
-        "Emulate",
-        SubmenuIndexEmulate,
-        subghz_scene_saved_menu_submenu_callback,
-        subghz);
+    FlipperFormat* fff = subghz_txrx_get_fff_data(subghz->txrx);
+    bool is_psa_encrypted = false;
+    bool has_signal_editor = false;
+
+    if(fff) {
+        FuriString* protocol = furi_string_alloc();
+        flipper_format_rewind(fff);
+        if(flipper_format_read_string(fff, "Protocol", protocol)) {
+            has_signal_editor = !furi_string_equal_str(protocol, "RAW");
+            if(furi_string_equal_str(protocol, "PSA GROUP")) {
+                FuriString* type = furi_string_alloc();
+                flipper_format_rewind(fff);
+                if(!flipper_format_read_string(fff, "Type", type) ||
+                   furi_string_equal_str(type, "00")) {
+                    is_psa_encrypted = true;
+                    has_signal_editor = false;
+                }
+                furi_string_free(type);
+            }
+        }
+        furi_string_free(protocol);
+    }
+
+    if(!is_psa_encrypted) {
+        submenu_add_item(
+            subghz->submenu,
+            "Emulate",
+            SubmenuIndexEmulate,
+            subghz_scene_saved_menu_submenu_callback,
+            subghz);
+
+        if(has_signal_editor) {
+            submenu_add_item(
+                subghz->submenu,
+                "Signal Editor",
+                SubmenuIndexSignalSettings,
+                subghz_scene_saved_menu_submenu_callback,
+                subghz);
+        }
+    }
 
     submenu_add_item(
         subghz->submenu,
@@ -34,15 +68,6 @@ void subghz_scene_saved_menu_on_enter(void* context) {
         SubmenuIndexDelete,
         subghz_scene_saved_menu_submenu_callback,
         subghz);
-
-    if(furi_hal_rtc_is_flag_set(FuriHalRtcFlagDebug)) {
-        submenu_add_item(
-            subghz->submenu,
-            "Signal Settings",
-            SubmenuIndexSignalSettings,
-            subghz_scene_saved_menu_submenu_callback,
-            subghz);
-    };
 
     submenu_set_selected_item(
         subghz->submenu,

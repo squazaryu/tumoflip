@@ -131,6 +131,12 @@ static void subghz_scene_add_to_history_callback(
     SubGhz* subghz = context;
 
     // The check can be moved to /lib/subghz/receiver.c, but may result in false positives
+    if(subghz_last_settings_protocol_filter_contains(
+           subghz->last_settings, decoder_base->protocol->name)) {
+        FURI_LOG_D(TAG, "%s filtered by protocol OFF list", decoder_base->protocol->name);
+        return;
+    }
+
     if((decoder_base->protocol->flag & subghz->ignore_filter) == 0) {
         SubGhzHistory* history = subghz->history;
         FuriString* item_name = furi_string_alloc();

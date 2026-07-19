@@ -479,7 +479,7 @@ class PackageReleaseTest(unittest.TestCase):
                 manifest["cleanup"],
             )
 
-    def test_package_only_release_removes_module_one_frequency_analyzer_copy(self) -> None:
+    def test_package_only_release_retires_external_frequency_analyzers(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo, build, resources = prepare_package_tree(Path(directory))
             stale_visible = resources / "apps/Module One/Sub-GHz/freq_analyzer_ext.fap"
@@ -495,7 +495,7 @@ class PackageReleaseTest(unittest.TestCase):
 
             self.assertFalse(stale_visible.exists())
             arf_entries = {entry["target"]: entry for entry in manifest["packages"]["arf"]}
-            self.assertIn("/ext/apps/ARF Tools/arf_frequency_analyzer.fap", arf_entries)
+            self.assertNotIn("/ext/apps/ARF Tools/arf_frequency_analyzer.fap", arf_entries)
             self.assertNotIn(
                 "/ext/apps/Module One/Sub-GHz/freq_analyzer_ext.fap",
                 arf_entries,
@@ -504,7 +504,7 @@ class PackageReleaseTest(unittest.TestCase):
                 {
                     "group": "arf",
                     "legacy": "/ext/apps/Module One/Sub-GHz/freq_analyzer_ext.fap",
-                    "canonical": "/ext/apps/ARF Tools/arf_frequency_analyzer.fap",
+                    "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
                 },
                 manifest["cleanup"],
             )
