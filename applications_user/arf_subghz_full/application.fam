@@ -118,40 +118,6 @@ App(
 )
 
 App(
-    appid="arf_frequency_analyzer",
-    name="ARF Frequency Analyzer",
-    apptype=FlipperAppType.EXTERNAL,
-    targets=["f7"],
-    cdefines=["APP_SUBGHZ", "ARF_PROFILE_FA"],
-    entry_point="subghz_app",
-    sources=[
-        "subghz.c",
-        "subghz_i.c",
-        "subghz_last_settings.c",
-        "helpers/subghz_txrx.c",
-        "helpers/subghz_preset_delta.c",
-        "helpers/subghz_threshold_rssi.c",
-        "helpers/subghz_frequency_analyzer_worker.c",
-        "helpers/subghz_frequency_notebook.c",
-        "scenes/subghz_scene.c",
-        "scenes/subghz_scene_start.c",
-        "scenes/subghz_scene_show_error.c",
-        "scenes/subghz_scene_frequency_analyzer.c",
-        "views/subghz_frequency_analyzer.c",
-    ],
-    requires=[
-        "gui",
-        "dialogs",
-        "subghz_radio_broker",
-    ],
-    icon="A_Sub1ghz_14",
-    stack_size=4 * 1024,
-    fap_libs=["assets", "hwdrivers"],
-    fap_icon="icon.png",
-    fap_category="ARF Tools",
-)
-
-App(
     appid="arf_psa_decrypt",
     name="ARF PSA Decrypt",
     apptype=FlipperAppType.EXTERNAL,

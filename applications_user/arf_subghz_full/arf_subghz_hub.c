@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define ARF_TOOLS_PATH   EXT_PATH("apps/ARF Tools/")
 #define ARF_MODULES_PATH EXT_PATH("apps_data/arf_subghz_full/modules/")
 
 typedef struct {
@@ -25,7 +24,7 @@ typedef struct {
 
 static const ArfSubGhzHubItem arf_subghz_hub_items[] = {
     {.label = "Standard Sub-GHz", .target = "Sub-GHz"},
-    {.label = "Frequency Analyzer", .target = ARF_TOOLS_PATH "arf_frequency_analyzer.fap"},
+    {.label = "Frequency Analyzer", .target = "Sub-GHz", .args = "frequency_analyzer"},
     {.label = "ARF KeeLoq", .target = ARF_MODULES_PATH "arf_keeloq.fap"},
     {.label = "ARF Counter BF", .target = ARF_MODULES_PATH "arf_counter_bf.fap"},
     {.label = "ARF Car Emulate", .target = ARF_MODULES_PATH "arf_car_emulate.fap"},

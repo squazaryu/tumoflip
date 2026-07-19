@@ -358,7 +358,9 @@ void subghz_free(SubGhz* subghz, bool alloc_for_tx_only) {
 int32_t subghz_app(void* p) {
     const bool open_receiver = p && strcmp(p, "receiver") == 0;
     const bool open_capture_raw = p && strcmp(p, "tumospectrum_raw") == 0;
-    const bool alloc_for_tx = p && strlen(p) && !open_receiver && !open_capture_raw;
+    const bool open_frequency_analyzer = p && strcmp(p, "frequency_analyzer") == 0;
+    const bool alloc_for_tx =
+        p && strlen(p) && !open_receiver && !open_capture_raw && !open_frequency_analyzer;
 
     SubGhz* subghz = subghz_alloc(alloc_for_tx);
 
@@ -372,15 +374,22 @@ int32_t subghz_app(void* p) {
     if(p && strlen(p)) {
         uint32_t rpc_ctx = 0;
 
-        if(open_receiver || open_capture_raw) {
+        if(open_receiver || open_capture_raw || open_frequency_analyzer) {
             view_dispatcher_attach_to_gui(
                 subghz->view_dispatcher, subghz->gui, ViewDispatcherTypeFullscreen);
             furi_string_set(subghz->file_path, SUBGHZ_APP_FOLDER);
             if(subghz_txrx_is_database_loaded(subghz->txrx)) {
                 scene_manager_next_scene(subghz->scene_manager, SubGhzSceneStart);
-                scene_manager_next_scene(
-                    subghz->scene_manager,
-                    open_capture_raw ? SubGhzSceneReadRAW : SubGhzSceneReceiver);
+                if(open_frequency_analyzer) {
+                    subghz_ensure_frequency_analyzer_view(subghz);
+                    scene_manager_next_scene(
+                        subghz->scene_manager, SubGhzSceneFrequencyAnalyzer);
+                    dolphin_deed(DolphinDeedSubGhzFrequencyAnalyzer);
+                } else {
+                    scene_manager_next_scene(
+                        subghz->scene_manager,
+                        open_capture_raw ? SubGhzSceneReadRAW : SubGhzSceneReceiver);
+                }
             } else {
                 scene_manager_set_scene_state(
                     subghz->scene_manager, SubGhzSceneShowError, SubGhzCustomEventManagerSet);

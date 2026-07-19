@@ -400,6 +400,15 @@ const char* subghz_txrx_radio_device_get_name(SubGhzTxRx* instance);
 */
 bool subghz_txrx_radio_device_is_frequency_valid(SubGhzTxRx* instance, uint32_t frequency);
 
+/** Start a bounded receive-only analyzer probe with the selected preset. */
+bool subghz_txrx_analyzer_begin(
+    SubGhzTxRx* instance,
+    size_t preset_index,
+    uint32_t frequency);
+
+/** Stop a receive-only analyzer probe and leave the selected radio idle. */
+void subghz_txrx_analyzer_end(SubGhzTxRx* instance);
+
 bool subghz_txrx_radio_device_is_tx_allowed(SubGhzTxRx* instance, uint32_t frequency);
 
 void subghz_txrx_set_debug_pin_state(SubGhzTxRx* instance, bool state);
