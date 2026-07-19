@@ -95,8 +95,7 @@ static uint16_t mixer_decode(uint32_t encrypted) {
     return (s0 + (s1 << 8)) & 0xFFFF;
 }
 
-static __attribute__((unused)) uint32_t mixer_encode(
-    uint32_t serial, uint16_t counter, uint8_t button) {
+static uint32_t mixer_encode(uint32_t serial, uint16_t counter, uint8_t button) {
     uint8_t s0 = (uint8_t)(((serial >> 8) & 0x0FU) | ((button & 0x0FU) << 4));
     uint8_t s1 = (uint8_t)((counter >> 8) & 0xFFU);
     uint8_t s2 = (uint8_t)(serial & 0xFFU);
@@ -154,6 +153,17 @@ static __attribute__((unused)) uint32_t mixer_encode(
     }
 
     return ((uint32_t)s0 << 24) | ((uint32_t)s2 << 16) | ((uint32_t)s1 << 8) | (uint32_t)s3;
+}
+
+static uint64_t kia_v5_encode_data(uint32_t serial, uint16_t counter, uint8_t button) {
+    serial &= 0x0FFFFFFFU;
+    button &= 0x0FU;
+
+    const uint32_t encrypted = mixer_encode(serial, counter, button);
+    const uint64_t yek =
+        ((uint64_t)button << 60) | ((uint64_t)serial << 32) | (uint64_t)encrypted;
+
+    return bit_reverse_64(yek);
 }
 
 struct SubGhzProtocolDecoderKiaV5 {
@@ -326,6 +336,8 @@ SubGhzProtocolStatus
         }
         subghz_custom_btn_set_max(4);
 
+        instance->generic.data = kia_v5_encode_data(
+            instance->generic.serial, instance->generic.cnt, instance->generic.btn);
         instance->replay_data = instance->generic.data;
         instance->replay_crc  = kia_v5_calculate_crc(instance->replay_data);
 
@@ -675,10 +687,13 @@ SubGhzProtocolStatus
     furi_assert(context);
     SubGhzProtocolDecoderKiaV5* instance = context;
 
-    SubGhzProtocolStatus ret = subghz_block_generic_deserialize_check_count_bit(
-        &instance->generic,
-        flipper_format,
-        subghz_protocol_kia_v5_const.min_count_bit_for_found);
+    SubGhzProtocolStatus ret = subghz_block_generic_deserialize(&instance->generic, flipper_format);
+
+    if((ret == SubGhzProtocolStatusOk) &&
+       (instance->generic.data_count_bit <
+        subghz_protocol_kia_v5_const.min_count_bit_for_found)) {
+        ret = SubGhzProtocolStatusErrorParserBitCount;
+    }
 
     if(ret == SubGhzProtocolStatusOk) {
         flipper_format_rewind(flipper_format);
