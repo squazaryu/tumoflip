@@ -69,6 +69,22 @@ void subghz_ensure_frequency_analyzer_view(SubGhz* subghz) {
     }
 }
 
+void subghz_ensure_receiver_view(SubGhz* subghz) {
+    furi_assert(subghz);
+
+    if(!subghz->subghz_receiver) {
+        subghz->subghz_receiver = subghz_view_receiver_alloc();
+        view_dispatcher_add_view(
+            subghz->view_dispatcher,
+            SubGhzViewIdReceiver,
+            subghz_view_receiver_get_view(subghz->subghz_receiver));
+    }
+
+    if(!subghz->history) {
+        subghz->history = subghz_history_alloc();
+    }
+}
+
 /*
 static void subghz_load_custom_presets(SubGhzSetting* setting) {
     furi_assert(setting);
