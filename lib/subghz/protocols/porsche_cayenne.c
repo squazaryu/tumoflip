@@ -422,12 +422,14 @@ SubGhzProtocolStatus subghz_protocol_decoder_porsche_cayenne_deserialize(
     return ret;
 }
 
+static uint8_t porsche_cayenne_btn_to_custom(uint8_t btn);
+
 void subghz_protocol_decoder_porsche_cayenne_get_string(void* context, FuriString* output) {
     furi_check(context);
     SubGhzProtocolDecoderPorscheCayenne* instance = context;
 
     if(subghz_custom_btn_get_original() == 0) {
-        subghz_custom_btn_set_original(instance->generic.btn);
+        subghz_custom_btn_set_original(porsche_cayenne_btn_to_custom(instance->generic.btn));
     }
     subghz_custom_btn_set_max(4);
 
@@ -456,16 +458,37 @@ void subghz_protocol_decoder_porsche_cayenne_get_string(void* context, FuriStrin
 // ENCODER
 // =============================================================================
 
+static uint8_t porsche_cayenne_custom_to_btn(uint8_t custom_btn, uint8_t fallback_btn) {
+    switch(custom_btn) {
+    case SUBGHZ_CUSTOM_BTN_UP: return 0x01; // Lock
+    case SUBGHZ_CUSTOM_BTN_DOWN: return 0x02; // Unlock
+    case SUBGHZ_CUSTOM_BTN_LEFT: return 0x04; // Trunk
+    case SUBGHZ_CUSTOM_BTN_RIGHT: return 0x08; // Open
+    default: return fallback_btn;
+    }
+}
+
+static uint8_t porsche_cayenne_btn_to_custom(uint8_t btn) {
+    switch(btn) {
+    case 0x01: return SUBGHZ_CUSTOM_BTN_UP;
+    case 0x02: return SUBGHZ_CUSTOM_BTN_DOWN;
+    case 0x04: return SUBGHZ_CUSTOM_BTN_LEFT;
+    case 0x08: return SUBGHZ_CUSTOM_BTN_RIGHT;
+    default: return SUBGHZ_CUSTOM_BTN_OK;
+    }
+}
+
 static uint8_t porsche_cayenne_get_btn_code(void) {
+    uint8_t override_btn = 0;
+    if(subghz_block_generic_global_button_override_get(&override_btn)) {
+        return override_btn;
+    }
+
     uint8_t custom_btn  = subghz_custom_btn_get();
-    uint8_t original_btn = subghz_custom_btn_get_original();
+    uint8_t original_btn = porsche_cayenne_custom_to_btn(
+        subghz_custom_btn_get_original(), 0x01);
     if(custom_btn == SUBGHZ_CUSTOM_BTN_OK) return original_btn;
-    // Map d-pad buttons to common VAG key codes
-    if(custom_btn == SUBGHZ_CUSTOM_BTN_UP)    return 0x01; // Lock
-    if(custom_btn == SUBGHZ_CUSTOM_BTN_DOWN)  return 0x02; // Unlock
-    if(custom_btn == SUBGHZ_CUSTOM_BTN_LEFT)  return 0x04; // Trunk
-    if(custom_btn == SUBGHZ_CUSTOM_BTN_RIGHT) return 0x08; // Open
-    return original_btn;
+    return porsche_cayenne_custom_to_btn(custom_btn, original_btn);
 }
 
 static void porsche_cayenne_build_upload(SubGhzProtocolEncoderPorscheCayenne* instance) {
@@ -483,6 +506,7 @@ static void porsche_cayenne_build_upload(SubGhzProtocolEncoderPorscheCayenne* in
     uint32_t serial = instance->generic.serial & 0xFFFFFF;
     uint8_t  btn    = porsche_cayenne_get_btn_code();
     uint16_t cnt    = (uint16_t)instance->generic.cnt;
+    instance->generic.btn = btn;
 
     size_t idx = 0;
     LevelDuration* up = instance->encoder.upload;
@@ -522,8 +546,9 @@ static void porsche_cayenne_build_upload(SubGhzProtocolEncoderPorscheCayenne* in
     instance->encoder.size_upload = idx;
     instance->encoder.front       = 0;
 
-    // Advance stored counter by 4 (one per frame)
-    instance->generic.cnt = (uint16_t)(cnt + 4);
+    if(furi_hal_subghz_get_rolling_counter_mult() != 0) {
+        instance->generic.cnt = (uint16_t)(cnt + 4);
+    }
 }
 
 void* subghz_protocol_encoder_porsche_cayenne_alloc(SubGhzEnvironment* environment) {
@@ -582,9 +607,14 @@ SubGhzProtocolStatus subghz_protocol_encoder_porsche_cayenne_deserialize(
             break;
         }
 
+        uint32_t override_cnt = 0;
+        if(subghz_block_generic_global_counter_override_get(&override_cnt)) {
+            instance->generic.cnt = override_cnt & 0xFFFF;
+        }
+
         // Apply custom button if set
         if(subghz_custom_btn_get_original() == 0) {
-            subghz_custom_btn_set_original(instance->generic.btn);
+            subghz_custom_btn_set_original(porsche_cayenne_btn_to_custom(instance->generic.btn));
         }
         subghz_custom_btn_set_max(4);
 
@@ -595,6 +625,13 @@ SubGhzProtocolStatus subghz_protocol_encoder_porsche_cayenne_deserialize(
         flipper_format_rewind(flipper_format);
         uint32_t new_cnt = instance->generic.cnt;
         flipper_format_insert_or_update_uint32(flipper_format, "Counter", &new_cnt, 1);
+
+        flipper_format_rewind(flipper_format);
+        flipper_format_insert_or_update_uint32(flipper_format, "Cnt", &new_cnt, 1);
+
+        flipper_format_rewind(flipper_format);
+        uint32_t new_btn = instance->generic.btn;
+        flipper_format_insert_or_update_uint32(flipper_format, "Btn", &new_btn, 1);
 
         instance->encoder.is_running = true;
         ret = SubGhzProtocolStatusOk;
@@ -621,7 +658,7 @@ LevelDuration subghz_protocol_encoder_porsche_cayenne_yield(void* context) {
     LevelDuration ret = instance->encoder.upload[instance->encoder.front];
 
     if(++instance->encoder.front == instance->encoder.size_upload) {
-        instance->encoder.repeat--;
+        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
         instance->encoder.front = 0;
     }
 

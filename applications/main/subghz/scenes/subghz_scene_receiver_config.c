@@ -11,6 +11,7 @@ enum SubGhzSettingIndex {
     SubGhzSettingIndexHoppingRSSI,
     SubGhzSettingIndexProtocolPack,
     SubGhzSettingIndexProtocolPackInfo,
+    SubGhzSettingIndexProtocolFilter,
     SubGhzSettingIndexBinRAW,
     SubGhzSettingIndexIgnoreReversRB2,
     SubGhzSettingIndexIgnoreAlarms,
@@ -344,6 +345,8 @@ static void subghz_scene_receiver_config_var_list_enter_callback(void* context, 
     SubGhz* subghz = context;
     if(index == SubGhzSettingIndexProtocolPackInfo) {
         scene_manager_next_scene(subghz->scene_manager, SubGhzSceneProtocolPackInfo);
+    } else if(index == SubGhzSettingIndexProtocolFilter) {
+        scene_manager_next_scene(subghz->scene_manager, SubGhzSceneProtocolList);
     } else if(index == SubGhzSettingIndexLock) {
         view_dispatcher_send_custom_event(
             subghz->view_dispatcher, SubGhzCustomEventSceneSettingLock);
@@ -371,6 +374,7 @@ static void subghz_scene_receiver_config_var_list_enter_callback(void* context, 
         subghz->last_settings->ignore_filter = subghz->ignore_filter;
         subghz->last_settings->filter = subghz->filter;
         subghz->last_settings->delete_old_signals = false;
+        subghz->last_settings->protocol_filter[0] = '\0';
         subghz->last_settings->tx_power = subghz->tx_power = 0;
         subghz_txrx_speaker_set_state(subghz->txrx, speaker_value[default_index]);
 
@@ -467,6 +471,17 @@ void subghz_scene_receiver_config_on_enter(void* context) {
 
         item = variable_item_list_add(subghz->variable_item_list, "Pack Status", 1, NULL, NULL);
         subghz_scene_receiver_config_update_protocol_pack_status(item, subghz);
+
+        item = variable_item_list_add(subghz->variable_item_list, "Protocols", 1, NULL, NULL);
+        const uint8_t protocol_filter_count =
+            subghz_last_settings_protocol_filter_count(subghz->last_settings);
+        if(protocol_filter_count == 0) {
+            variable_item_set_current_value_text(item, "All ON");
+        } else {
+            static char filter_count_text[8];
+            snprintf(filter_count_text, sizeof(filter_count_text), "%u OFF", protocol_filter_count);
+            variable_item_set_current_value_text(item, filter_count_text);
+        }
 
         SubGhzHoppingMode hopping_mode = subghz_scene_receiver_config_get_hopping_mode(subghz);
         if(hopping_mode == SubGhzHoppingModeFrequency ||

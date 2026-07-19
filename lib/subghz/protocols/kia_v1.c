@@ -174,7 +174,7 @@ LevelDuration subghz_protocol_encoder_kia_v1_yield(void* context) {
     LevelDuration ret = instance->encoder.upload[instance->encoder.front];
 
     if(++instance->encoder.front == instance->encoder.size_upload) {
-        instance->encoder.repeat--;
+        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
         instance->encoder.front = 0;
     }
 
@@ -289,8 +289,10 @@ SubGhzProtocolStatus subghz_protocol_encoder_kia_v1_deserialize(void* context, F
         }
         subghz_custom_btn_set_max(4);
         
-        // Incrementa counter
-        if(instance->generic.cnt < 0xFFF) {
+        uint32_t override_cnt = 0;
+        if(subghz_block_generic_global_counter_override_get(&override_cnt)) {
+            instance->generic.cnt = override_cnt & 0xFFF;
+        } else if(instance->generic.cnt < 0xFFF) {
             instance->generic.cnt += furi_hal_subghz_get_rolling_counter_mult();
             if(instance->generic.cnt > 0xFFF) {
                 instance->generic.cnt = 0;
@@ -301,7 +303,9 @@ SubGhzProtocolStatus subghz_protocol_encoder_kia_v1_deserialize(void* context, F
         
         // Gestione bottoni custom
         uint8_t btn = subghz_custom_btn_get();
-        if(btn != SUBGHZ_CUSTOM_BTN_OK) {
+        if(subghz_block_generic_global_button_override_get(&btn)) {
+            instance->generic.btn = btn;
+        } else if(btn != SUBGHZ_CUSTOM_BTN_OK) {
             instance->generic.btn = btn;
         }
         
@@ -324,10 +328,17 @@ SubGhzProtocolStatus subghz_protocol_encoder_kia_v1_deserialize(void* context, F
             ret = SubGhzProtocolStatusErrorParserKey;
             break;
         }
+
+        uint32_t temp_btn = instance->generic.btn;
+        flipper_format_rewind(flipper_format);
+        flipper_format_insert_or_update_uint32(flipper_format, "Btn", &temp_btn, 1);
+
+        flipper_format_rewind(flipper_format);
+        flipper_format_insert_or_update_uint32(flipper_format, "Cnt", &instance->generic.cnt, 1);
         
         instance->encoder.is_running = true;
         ret = SubGhzProtocolStatusOk;
-        
+
     } while(false);
     
     return ret;

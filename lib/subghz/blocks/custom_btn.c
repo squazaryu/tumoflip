@@ -23,6 +23,10 @@ uint8_t subghz_custom_btn_get(void) {
     return custom_btn_id;
 }
 
+uint8_t subghz_custom_btn_get_max(void) {
+    return custom_btn_max_btns;
+}
+
 void subghz_custom_btn_set_original(uint8_t btn_code) {
     custom_btn_original = btn_code;
 }
