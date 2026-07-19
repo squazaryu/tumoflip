@@ -2,6 +2,7 @@
 
 #include <furi/core/log.h>
 #include <subghz/types.h>
+#include <dolphin/dolphin.h>
 #include <lib/toolbox/path.h>
 #include <float_tools.h>
 #include "subghz_i.h"
