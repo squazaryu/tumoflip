@@ -118,6 +118,15 @@ void subghz_txrx_get_frequency_and_modulation(
 SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat* flipper_format);
 
 /**
+ * Rebuild protocol data without starting TX.
+ *
+ * @param instance Pointer to a SubGhzTxRx
+ * @param flipper_format Pointer to a FlipperFormat
+ * @return bool True when encoder deserialization updated protocol data successfully
+ */
+bool subghz_txrx_rebuild_from_fff(SubGhzTxRx* instance, FlipperFormat* flipper_format);
+
+/**
  * Start RX CC1101
  * 
  * @param instance Pointer to a SubGhzTxRx

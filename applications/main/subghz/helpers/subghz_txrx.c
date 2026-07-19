@@ -561,6 +561,49 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
     return ret;
 }
 
+bool subghz_txrx_rebuild_from_fff(SubGhzTxRx* instance, FlipperFormat* flipper_format) {
+    furi_assert(instance);
+    furi_assert(flipper_format);
+
+    subghz_txrx_stop(instance);
+
+    bool rebuilt = false;
+    FuriString* temp_str = furi_string_alloc();
+    SubGhzTransmitter* transmitter = NULL;
+
+    do {
+        if(!flipper_format_rewind(flipper_format)) {
+            FURI_LOG_E(TAG, "Rewind error");
+            break;
+        }
+        if(!flipper_format_read_string(flipper_format, "Protocol", temp_str)) {
+            FURI_LOG_E(TAG, "Missing Protocol");
+            break;
+        }
+
+        transmitter =
+            subghz_transmitter_alloc_init(instance->environment, furi_string_get_cstr(temp_str));
+        if(!transmitter) {
+            FURI_LOG_E(TAG, "Protocol not found");
+            break;
+        }
+
+        rebuilt =
+            subghz_transmitter_deserialize(transmitter, flipper_format) == SubGhzProtocolStatusOk;
+        if(!rebuilt) {
+            FURI_LOG_E(TAG, "Protocol rebuild failed");
+            break;
+        }
+    } while(false);
+
+    if(transmitter) {
+        subghz_transmitter_free(transmitter);
+    }
+    furi_string_free(temp_str);
+
+    return rebuilt;
+}
+
 void subghz_txrx_rx_start(SubGhzTxRx* instance) {
     furi_assert(instance);
     subghz_txrx_stop(instance);
