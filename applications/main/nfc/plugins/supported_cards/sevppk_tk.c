@@ -325,9 +325,8 @@ static bool sev_tk_read(Nfc* nfc, NfcDevice* device) {
         error = mf_classic_poller_sync_read(nfc, &keys, data);
         if(error != MfClassicErrorNotPresent) {
             nfc_device_set_data(device, NfcProtocolMfClassic, data);
-            // Plus 2K SL1: a targeted read only covers the ticket sectors, so a full-card read
-            // never completes; accept a partial read and let parse() validate the key.
-            is_read = (error == MfClassicErrorNone || error == MfClassicErrorPartialRead);
+            // Let the normal recovery flow continue when a partial read missed the ticket data.
+            is_read = mf_classic_is_read_success_for_sector(error, data, 19);
         }
     }
 
