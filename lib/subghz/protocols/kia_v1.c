@@ -113,7 +113,7 @@ static void subghz_protocol_kia_v1_check_remote_controller(SubGhzProtocolDecoder
         crc = kia_v1_crc4(char_data, 6, 1);
     }
 
-    instance->crc = cnt_high << 4 | crc;
+    instance->crc = crc;
     instance->crc_check = (crc == (instance->generic.data & 0xF));
     
     // Imposta bottoni custom
