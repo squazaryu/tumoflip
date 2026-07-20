@@ -6,6 +6,7 @@
 #include <lib/subghz/subghz_keystore.h>
 #include <lib/subghz/subghz_file_encoder_worker.h>
 #include <lib/subghz/protocols/protocol_items.h>
+#include <lib/subghz/protocols/kia_v1.h>
 #include <flipper_format/flipper_format_i.h>
 #include <lib/subghz/devices/devices.h>
 #include <lib/subghz/devices/cc1101_configs.h>
@@ -913,6 +914,28 @@ MU_TEST(subghz_encoder_hollarm_test) {
         "Test encoder " SUBGHZ_PROTOCOL_HOLLARM_NAME " error\r\n");
 }
 
+MU_TEST(subghz_decoder_kia_v1_crc_metadata_test) {
+    static const uint8_t key[] = {0x00, 0x12, 0x34, 0x56, 0x78, 0x01, 0x23, 0x6F};
+    uint32_t bit_count = 57;
+    FlipperFormat* flipper_format = flipper_format_string_alloc();
+    void* decoder = subghz_protocol_decoder_kia_v1_alloc(environment_handler);
+    FuriString* output = furi_string_alloc();
+
+    mu_check(flipper_format_write_uint32(flipper_format, "Bit", &bit_count, 1));
+    mu_check(flipper_format_write_hex(flipper_format, "Key", key, sizeof(key)));
+    mu_assert_int_eq(
+        SubGhzProtocolStatusOk,
+        subghz_protocol_decoder_kia_v1_deserialize(decoder, flipper_format));
+
+    subghz_protocol_decoder_kia_v1_get_string(decoder, output);
+    mu_assert_int_not_eq(FURI_STRING_FAILURE, furi_string_search_str(output, "CRC:0F (OK)"));
+    mu_assert_int_eq(FURI_STRING_FAILURE, furi_string_search_str(output, "CRC:6F"));
+
+    furi_string_free(output);
+    subghz_protocol_decoder_kia_v1_free(decoder);
+    flipper_format_free(flipper_format);
+}
+
 MU_TEST(subghz_encoder_reversrb2_test) {
     mu_assert(
         subghz_encoder_test(EXT_PATH("unit_tests/subghz/revers_rb2.sub")),
@@ -1025,6 +1048,8 @@ MU_TEST_SUITE(subghz) {
     MU_RUN_TEST(subghz_encoder_hollarm_test);
     MU_RUN_TEST(subghz_encoder_reversrb2_test);
     MU_RUN_TEST(subghz_encoder_legrand_test);
+
+    MU_RUN_TEST(subghz_decoder_kia_v1_crc_metadata_test);
 
     MU_RUN_TEST(subghz_random_test);
     subghz_test_deinit();
