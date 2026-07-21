@@ -132,6 +132,16 @@ class SubGhzWardrivingTest(unittest.TestCase):
         ):
             self.assertIn(required, txrx_source)
 
+    def test_fw_packages_include_the_field_app(self) -> None:
+        release_validator = (
+            REPO_ROOT / "tools/tumoflip/validate_release.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            'resources / "apps/Sub-GHz/subghz_wardriving.fap"',
+            release_validator,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

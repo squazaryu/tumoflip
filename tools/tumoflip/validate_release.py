@@ -591,6 +591,7 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
         "base": [
             resources / "apps/Bluetooth/claude_buddy.fap",
             resources / "apps/Bluetooth/flipper_companion.fap",
+            resources / "apps/Sub-GHz/subghz_wardriving.fap",
             resources / "apps/Tools/ai_dashboard.fap",
             resources / "apps/Tools/flipper_relay.fap",
             resources / "apps/Tools/quac.fap",
