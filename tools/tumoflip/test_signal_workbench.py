@@ -60,7 +60,8 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_app_migrates_in_place_without_duplicate_fap(self) -> None:
         self.assertIn('appid="signal_workbench"', self.manifest)
         self.assertIn('name="TumoSpectrum"', self.manifest)
-        self.assertIn('fap_version="2.3.0"', self.manifest)
+        self.assertIn('fap_version="2.4.0"', self.manifest)
+        self.assertIn('"TumoSpectrum 2.4"', self.source)
         self.assertIn('fap_category="Module One/Signals"', self.manifest)
         self.assertIn(
             'fap_dist_path="apps/Module One/Signals/signal_workbench.fap"', self.manifest
@@ -147,9 +148,38 @@ class TumoSpectrumTest(unittest.TestCase):
             "TUMOSPECTRUM_LATEST_SET_ARG",
             "TUMOSPECTRUM_PROFILES_ARG",
             'elements_button_center(canvas, listening ? "Stop" : "Start")',
-            'elements_button_right(canvas, "Demo")',
+            '"Demo" : "Delete"',
+            "protocol_profile_package_delete",
+            'dialog_message_set_buttons(message, "Delete", NULL, "Keep")',
+            'if(!tumospectrum_protocol_has_demo(package)) elements_button_right(canvas, "Delete")',
         ):
             self.assertIn(required, self.source)
+
+    def test_profile_delete_is_bounded_and_demo_is_protected(self) -> None:
+        profile_storage = (
+            APP_DIR / "protocol_profile_storage.c"
+        ).read_text(encoding="utf-8")
+        profile_header = (
+            APP_DIR / "protocol_profile_storage.h"
+        ).read_text(encoding="utf-8")
+        for required in (
+            'PROTOCOL_PROFILE_DEMO_FILENAME  "demo_pulse_pair.tproto"',
+            "protocol_profile_filename_safe",
+            "strchr(filename, '/')",
+            "strchr(filename, '\\\\')",
+            'strstr(filename, "..")',
+            "file_info_is_dir(&info)",
+            "storage_common_remove(storage, path) == FSE_OK",
+        ):
+            self.assertIn(required, profile_header + profile_storage)
+        self.assertIn(
+            "if(package == NULL || tumospectrum_protocol_has_demo(package)) return;",
+            self.source,
+        )
+        self.assertIn(
+            "strcmp(package->filename, PROTOCOL_PROFILE_DEMO_FILENAME) == 0",
+            self.source,
+        )
 
     def test_live_capture_uses_structured_snapshot_and_stock_receivers(self) -> None:
         for required in (

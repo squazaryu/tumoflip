@@ -7,6 +7,7 @@
 #define PROTOCOL_PROFILE_DATA_DIR       EXT_PATH("apps_data/signal_workbench")
 #define PROTOCOL_PROFILE_DIRECTORY      PROTOCOL_PROFILE_DATA_DIR "/profiles"
 #define PROTOCOL_PROFILE_DEMO_DIRECTORY PROTOCOL_PROFILE_DATA_DIR "/demo"
+#define PROTOCOL_PROFILE_DEMO_FILENAME  "demo_pulse_pair.tproto"
 #define PROTOCOL_PROFILE_DEMO_CAPTURE   PROTOCOL_PROFILE_DEMO_DIRECTORY "/validation.sub"
 #define PROTOCOL_PROFILE_OBSERVATIONS   PROTOCOL_PROFILE_DATA_DIR "/protocol_observations.csv"
 
@@ -33,6 +34,8 @@ bool protocol_profile_package_save(
     const ProtocolProfilePackage* package,
     char* saved_path,
     size_t saved_path_size);
+
+bool protocol_profile_package_delete(Storage* storage, const ProtocolProfilePackage* package);
 
 ProtocolProfileStatus protocol_profile_capture_load(
     Storage* storage,
