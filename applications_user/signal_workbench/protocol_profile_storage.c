@@ -16,6 +16,22 @@
     PROTOCOL_PROFILE_DATA_DIR "/protocol_observations.previous.csv"
 
 static bool protocol_profile_has_extension(const char* filename, const char* extension);
+static bool protocol_profile_id_valid(const char* profile_id);
+
+static const char* protocol_profile_checksum_format(ProtocolProfileChecksum checksum) {
+    switch(checksum) {
+    case ProtocolProfileChecksumParityEvenLast:
+        return "parity-even-last";
+    case ProtocolProfileChecksumParityOddLast:
+        return "parity-odd-last";
+    case ProtocolProfileChecksumXor8Last:
+        return "xor8-last";
+    case ProtocolProfileChecksumSum8Last:
+        return "sum8-last";
+    default:
+        return "none";
+    }
+}
 
 static bool protocol_profile_mkdir(Storage* storage, const char* path) {
     const FS_Error error = storage_common_mkdir(storage, path);
@@ -64,6 +80,168 @@ bool protocol_profile_storage_prepare(Storage* storage) {
     protocol_profile_migrate_legacy_profiles(storage);
     protocol_profile_copy_if_missing(
         storage, PROTOCOL_PROFILE_LEGACY_DEMO, PROTOCOL_PROFILE_DEMO_CAPTURE);
+    return true;
+}
+
+static void protocol_profile_filename_slug(const char* name, char* slug, size_t slug_size) {
+    size_t used = 0U;
+    bool separator = false;
+    for(size_t index = 0U; name[index] != '\0' && used + 1U < slug_size; index++) {
+        unsigned char value = (unsigned char)name[index];
+        if(value >= 'A' && value <= 'Z') value = (unsigned char)(value - 'A' + 'a');
+        if((value >= 'a' && value <= 'z') || (value >= '0' && value <= '9')) {
+            slug[used++] = (char)value;
+            separator = false;
+        } else if(!separator && used > 0U) {
+            slug[used++] = '_';
+            separator = true;
+        }
+    }
+    while(used > 0U && slug[used - 1U] == '_')
+        used--;
+    if(used == 0U) {
+        strlcpy(slug, "profile", slug_size);
+        return;
+    }
+    slug[used] = '\0';
+}
+
+bool protocol_profile_package_save(
+    Storage* storage,
+    const ProtocolProfilePackage* package,
+    char* saved_path,
+    size_t saved_path_size) {
+    if(storage == NULL || package == NULL || package->status != ProtocolProfileStatusOk ||
+       package->name[0] == '\0' || !protocol_profile_id_valid(package->profile_id) ||
+       package->training_captures == 0U || package->training_frames == 0U ||
+       protocol_profile_validate(&package->profile, package->profile.minimum_api) !=
+           ProtocolProfileStatusOk ||
+       !protocol_profile_storage_prepare(storage)) {
+        return false;
+    }
+
+    char slug[25];
+    protocol_profile_filename_slug(package->name, slug, sizeof(slug));
+    char filename[ProtocolProfileFilenameSize];
+    const int filename_length =
+        snprintf(filename, sizeof(filename), "%s_%s.tproto", slug, package->profile_id);
+    char path[160];
+    char temporary[168];
+    char backup[168];
+    const int path_length =
+        snprintf(path, sizeof(path), PROTOCOL_PROFILE_DIRECTORY "/%s", filename);
+    const int temporary_length = snprintf(temporary, sizeof(temporary), "%s.tmp", path);
+    const int backup_length = snprintf(backup, sizeof(backup), "%s.bak", path);
+    if(filename_length <= 0 || (size_t)filename_length >= sizeof(filename) || path_length <= 0 ||
+       (size_t)path_length >= sizeof(path) || temporary_length <= 0 ||
+       (size_t)temporary_length >= sizeof(temporary) || backup_length <= 0 ||
+       (size_t)backup_length >= sizeof(backup)) {
+        return false;
+    }
+
+    char masks[4][19];
+    snprintf(
+        masks[0], sizeof(masks[0]), "0x%016llX", (unsigned long long)package->profile.stable_mask);
+    snprintf(
+        masks[1], sizeof(masks[1]), "0x%016llX", (unsigned long long)package->profile.stable_value);
+    snprintf(
+        masks[2],
+        sizeof(masks[2]),
+        "0x%016llX",
+        (unsigned long long)package->profile.variable_mask);
+    snprintf(
+        masks[3],
+        sizeof(masks[3]),
+        "0x%016llX",
+        (unsigned long long)package->profile.uncertain_mask);
+    const uint32_t minimum_api = package->profile.minimum_api;
+    const uint32_t frequency = package->profile.frequency_hz;
+    const uint32_t tolerance = package->profile.tolerance_percent;
+    const uint32_t prefix_count = package->profile.prefix_count;
+    const uint32_t bit_count = package->profile.bit_count;
+    const uint32_t zero_high = package->profile.zero_high_us;
+    const uint32_t zero_low = package->profile.zero_low_us;
+    const uint32_t one_high = package->profile.one_high_us;
+    const uint32_t one_low = package->profile.one_low_us;
+    const uint32_t confidence = package->profile.confidence;
+    const uint32_t training_captures = package->training_captures;
+    const uint32_t training_frames = package->training_frames;
+    const bool receive_only = package->profile.receive_only;
+    const bool review_required = package->profile.review_required;
+
+    storage_common_remove(storage, temporary);
+    FlipperFormat* format = flipper_format_file_alloc(storage);
+    bool success = false;
+    do {
+        if(!flipper_format_file_open_always(format, temporary) ||
+           !flipper_format_write_header_cstr(
+               format, PROTOCOL_PROFILE_FILETYPE, ProtocolProfileVersion) ||
+           !flipper_format_write_string_cstr(format, "Name", package->name) ||
+           !flipper_format_write_string_cstr(format, "Profile ID", package->profile_id) ||
+           !flipper_format_write_uint32(format, "Minimum API", &minimum_api, 1U) ||
+           !flipper_format_write_string_cstr(format, "Encoding", "pulse-pair") ||
+           !flipper_format_write_string_cstr(
+               format, "Polarity", package->profile.inverted ? "inverted" : "normal") ||
+           !flipper_format_write_uint32(format, "Frequency", &frequency, 1U) ||
+           !flipper_format_write_uint32(format, "Tolerance", &tolerance, 1U) ||
+           !flipper_format_write_uint32(format, "Preamble count", &prefix_count, 1U)) {
+            break;
+        }
+        if(prefix_count > 0U &&
+           !flipper_format_write_int32(
+               format, "Preamble", package->profile.prefix, package->profile.prefix_count)) {
+            break;
+        }
+        if(!flipper_format_write_uint32(format, "Bit count", &bit_count, 1U) ||
+           !flipper_format_write_uint32(format, "Zero high", &zero_high, 1U) ||
+           !flipper_format_write_uint32(format, "Zero low", &zero_low, 1U) ||
+           !flipper_format_write_uint32(format, "One high", &one_high, 1U) ||
+           !flipper_format_write_uint32(format, "One low", &one_low, 1U) ||
+           !flipper_format_write_string_cstr(format, "Stable mask", masks[0]) ||
+           !flipper_format_write_string_cstr(format, "Stable value", masks[1]) ||
+           !flipper_format_write_string_cstr(format, "Variable mask", masks[2]) ||
+           !flipper_format_write_string_cstr(format, "Uncertain mask", masks[3]) ||
+           !flipper_format_write_string_cstr(
+               format, "Checksum", protocol_profile_checksum_format(package->profile.checksum)) ||
+           !flipper_format_write_string_cstr(
+               format,
+               "Checksum candidates",
+               protocol_profile_checksum_format(package->profile.checksum)) ||
+           !flipper_format_write_uint32(format, "Confidence", &confidence, 1U) ||
+           !flipper_format_write_string_cstr(format, "Ambiguity", package->ambiguity) ||
+           !flipper_format_write_uint32(format, "Training captures", &training_captures, 1U) ||
+           !flipper_format_write_uint32(format, "Training frames", &training_frames, 1U) ||
+           !flipper_format_write_bool(format, "Receive only", &receive_only, 1U) ||
+           !flipper_format_write_bool(format, "Review required", &review_required, 1U)) {
+            break;
+        }
+        success = flipper_format_file_close(format);
+    } while(false);
+    flipper_format_free(format);
+    if(!success) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    FileInfo temporary_info = {0};
+    if(storage_common_stat(storage, temporary, &temporary_info) != FSE_OK ||
+       temporary_info.size == 0U || temporary_info.size > ProtocolProfileMaximumFileSize) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+
+    storage_common_remove(storage, backup);
+    const bool had_profile = storage_file_exists(storage, path);
+    if(had_profile && storage_common_rename(storage, path, backup) != FSE_OK) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    if(storage_common_rename(storage, temporary, path) != FSE_OK) {
+        storage_common_remove(storage, temporary);
+        if(had_profile) storage_common_rename(storage, backup, path);
+        return false;
+    }
+    storage_common_remove(storage, backup);
+    if(saved_path != NULL && saved_path_size > 0U) strlcpy(saved_path, path, saved_path_size);
     return true;
 }
 

@@ -2,6 +2,7 @@
 #include "tumospectrum_capture_flow.h"
 #include "tumospectrum_inference.h"
 #include "tumospectrum_parser.h"
+#include "tumospectrum_profile_builder.h"
 #include "tumospectrum_protocol_runtime.h"
 #include "tumospectrum_storage.h"
 #include "signal_workbench_icons.h"
@@ -26,13 +27,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TUMOSPECTRUM_SUBGHZ_DIR     EXT_PATH("subghz")
-#define TUMOSPECTRUM_INFRARED_DIR   EXT_PATH("infrared")
-#define TUMOSPECTRUM_SCOPE_DIR      EXT_PATH("apps_data/tumoscope/captures")
-#define TUMOSPECTRUM_BRIDGE_APP_ID  "signal_workbench"
-#define TUMOSPECTRUM_BRIDGE_COMMAND "report"
-#define TUMOSPECTRUM_LATEST_SET_ARG "tumospectrum_latest_set"
-#define TUMOSPECTRUM_PROFILES_ARG   "tumospectrum_profiles"
+#define TUMOSPECTRUM_SUBGHZ_DIR      EXT_PATH("subghz")
+#define TUMOSPECTRUM_INFRARED_DIR    EXT_PATH("infrared")
+#define TUMOSPECTRUM_SCOPE_DIR       EXT_PATH("apps_data/tumoscope/captures")
+#define TUMOSPECTRUM_BRIDGE_APP_ID   "signal_workbench"
+#define TUMOSPECTRUM_BRIDGE_COMMAND  "report"
+#define TUMOSPECTRUM_LATEST_SET_ARG  "tumospectrum_latest_set"
+#define TUMOSPECTRUM_PROFILES_ARG    "tumospectrum_profiles"
 #define TUMOSPECTRUM_DEMO_PROFILE_ID "035084cd0da9ab62"
 
 typedef enum {
@@ -44,6 +45,7 @@ typedef enum {
     TumoSpectrumViewCaptureSet,
     TumoSpectrumViewSetActions,
     TumoSpectrumViewSetInput,
+    TumoSpectrumViewProfileName,
     TumoSpectrumViewProfileMenu,
     TumoSpectrumViewProtocol,
 } TumoSpectrumView;
@@ -73,6 +75,7 @@ typedef enum {
 } TumoSpectrumResultAction;
 
 typedef enum {
+    TumoSpectrumSetActionCreateProfile,
     TumoSpectrumSetActionCompanion,
     TumoSpectrumSetActionHandoff,
     TumoSpectrumSetActionDetails,
@@ -116,6 +119,7 @@ struct TumoSpectrumApp {
     TextBox* text_box;
     TextInput* note_input;
     TextInput* set_input;
+    TextInput* profile_name_input;
     FuriString* text;
     TumoSpectrumCapture capture;
     TumoSpectrumCapture compared;
@@ -125,6 +129,7 @@ struct TumoSpectrumApp {
     TumoSpectrumCaptureSet capture_set;
     TumoSpectrumSetInputStage set_input_stage;
     char set_input_buffer[TUMOSPECTRUM_SET_LABEL_SIZE];
+    char profile_name_buffer[ProtocolProfileNameSize];
     char set_profile_path[TUMOSPECTRUM_PATH_SIZE];
     char set_report_path[TUMOSPECTRUM_PATH_SIZE];
     TumoSpectrumProtocolRuntime* protocol_runtime;
@@ -369,6 +374,7 @@ static void tumospectrum_capture_set_infer(TumoSpectrumApp* app);
 static void tumospectrum_capture_set_show_details(TumoSpectrumApp* app);
 static void tumospectrum_capture_set_send(TumoSpectrumApp* app);
 static void tumospectrum_capture_set_build_actions(TumoSpectrumApp* app);
+static void tumospectrum_capture_set_begin_profile(TumoSpectrumApp* app);
 static void tumospectrum_handoff_capture(
     TumoSpectrumApp* app,
     const TumoSpectrumCapture* capture,
@@ -786,6 +792,11 @@ static uint32_t tumospectrum_set_input_previous(void* context) {
     return TumoSpectrumViewMenu;
 }
 
+static uint32_t tumospectrum_profile_name_previous(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewSetActions;
+}
+
 static bool tumospectrum_back(void* context) {
     TumoSpectrumApp* app = context;
     tumospectrum_protocol_runtime_stop(app->protocol_runtime);
@@ -1039,6 +1050,9 @@ static void tumospectrum_capture_set_send(TumoSpectrumApp* app) {
 static void tumospectrum_capture_set_action_callback(void* context, uint32_t index) {
     TumoSpectrumApp* app = context;
     switch(index) {
+    case TumoSpectrumSetActionCreateProfile:
+        tumospectrum_capture_set_begin_profile(app);
+        break;
     case TumoSpectrumSetActionCompanion:
         tumospectrum_capture_set_send(app);
         break;
@@ -1060,6 +1074,16 @@ static void tumospectrum_capture_set_action_callback(void* context, uint32_t ind
 static void tumospectrum_capture_set_build_actions(TumoSpectrumApp* app) {
     submenu_reset(app->set_actions);
     submenu_set_header(app->set_actions, "Capture Set Actions");
+    if(app->capture_set.type == TumoSpectrumCaptureSubGhzRaw && app->capture_set.inferred &&
+       app->capture_set.inference.compatible &&
+       app->capture_set.sample_count >= TUMOSPECTRUM_SET_MIN_SAMPLES) {
+        submenu_add_item(
+            app->set_actions,
+            "Create Live Profile",
+            TumoSpectrumSetActionCreateProfile,
+            tumospectrum_capture_set_action_callback,
+            app);
+    }
     submenu_add_item(
         app->set_actions,
         "Send to Companion",
@@ -1082,6 +1106,84 @@ static void tumospectrum_capture_set_build_actions(TumoSpectrumApp* app) {
         TumoSpectrumSetActionDetails,
         tumospectrum_capture_set_action_callback,
         app);
+}
+
+static void tumospectrum_capture_set_profile_done(void* context) {
+    TumoSpectrumApp* app = context;
+    ProtocolProfilePackage built = {0};
+    const TumoSpectrumProfileBuildStatus build_status = tumospectrum_profile_builder_build(
+        &app->capture_set, app->profile_name_buffer, app->current_api, &built);
+    if(build_status != TumoSpectrumProfileBuildOk) {
+        notification_message(app->notification, &tumospectrum_sequence_error);
+        tumospectrum_show_text(
+            app,
+            "Profile Rejected",
+            tumospectrum_profile_builder_status_name(build_status),
+            TumoSpectrumViewCaptureSet);
+        return;
+    }
+
+    char saved_path[TUMOSPECTRUM_PATH_SIZE];
+    if(!protocol_profile_package_save(app->storage, &built, saved_path, sizeof(saved_path))) {
+        notification_message(app->notification, &tumospectrum_sequence_error);
+        tumospectrum_show_text(
+            app,
+            "Save Failed",
+            "The profile is valid, but its atomic SD save failed. Check the SD card and retry.",
+            TumoSpectrumViewCaptureSet);
+        return;
+    }
+
+    tumospectrum_open_protocol_profiles(app);
+    size_t selected = app->protocol_package_count;
+    for(size_t index = 0U; index < app->protocol_package_count; index++) {
+        if(strcmp(app->protocol_packages[index].profile_id, built.profile_id) == 0) {
+            selected = index;
+            break;
+        }
+    }
+    if(selected >= app->protocol_package_count) {
+        notification_message(app->notification, &tumospectrum_sequence_error);
+        tumospectrum_show_text(
+            app,
+            "Reload Failed",
+            "The profile was saved, but could not be reopened. Check the Profiles folder.",
+            TumoSpectrumViewCaptureSet);
+        return;
+    }
+
+    app->selected_protocol_package = selected;
+    app->has_protocol_observation = false;
+    app->protocol_demo_result = false;
+    app->protocol_result_status = ProtocolProfileStatusNoMatch;
+    tumospectrum_protocol_runtime_start(
+        app->protocol_runtime,
+        &app->protocol_packages[selected],
+        app->current_api,
+        tumospectrum_protocol_observation_callback,
+        app);
+    tumospectrum_refresh_protocol(app);
+    notification_message(app->notification, &tumospectrum_sequence_ok);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewProtocol);
+}
+
+static void tumospectrum_capture_set_begin_profile(TumoSpectrumApp* app) {
+    snprintf(
+        app->profile_name_buffer,
+        sizeof(app->profile_name_buffer),
+        "%.14s %.14s",
+        app->capture_set.device_label[0] ? app->capture_set.device_label : "Device",
+        app->capture_set.control_label[0] ? app->capture_set.control_label : "Control");
+    text_input_reset(app->profile_name_input);
+    text_input_set_header_text(app->profile_name_input, "Live profile name");
+    text_input_set_result_callback(
+        app->profile_name_input,
+        tumospectrum_capture_set_profile_done,
+        app,
+        app->profile_name_buffer,
+        sizeof(app->profile_name_buffer),
+        false);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewProfileName);
 }
 
 static void tumospectrum_set_input_done(void* context) {
@@ -1226,12 +1328,12 @@ static void tumospectrum_menu_callback(void* context, uint32_t index) {
     case TumoSpectrumMenuAbout:
         tumospectrum_show_text(
             app,
-            "TumoSpectrum 2.2",
-            "Live capture, protocol profiles and multi-capture signal research workspace.\n\n"
+            "TumoSpectrum 2.3",
+            "Autonomous capture, profile building and multi-capture signal research workspace.\n\n"
             "Protocol Profiles performs bounded receive-only decoding on Flipper and logs changed observations to SD.\n\n"
-            "Capture sets compare three or four RAW recordings to identify timing clusters and stable or changing regions.\n\n"
+            "A Sub-GHz capture set can build a receive-only live profile from three or four RAW recordings without a computer.\n\n"
             "Source files are never modified. Static-like is not a cryptographic or replay guarantee. Replay stays in stock apps.\n\n"
-            "github.com/squazaryu/tumoflip\nIssues #123 / #153",
+            "github.com/squazaryu/tumoflip\nIssues #123 / #153 / #155",
             TumoSpectrumViewMenu);
         break;
     default:
@@ -1472,6 +1574,7 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     app->text_box = text_box_alloc();
     app->note_input = text_input_alloc();
     app->set_input = text_input_alloc();
+    app->profile_name_input = text_input_alloc();
     app->text = furi_string_alloc();
 
     view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
@@ -1568,6 +1671,8 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     view_set_previous_callback(text_input_get_view(app->note_input), tumospectrum_note_previous);
     view_set_previous_callback(
         text_input_get_view(app->set_input), tumospectrum_set_input_previous);
+    view_set_previous_callback(
+        text_input_get_view(app->profile_name_input), tumospectrum_profile_name_previous);
 
     view_dispatcher_add_view(
         app->view_dispatcher, TumoSpectrumViewMenu, submenu_get_view(app->menu));
@@ -1584,6 +1689,10 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
         app->view_dispatcher, TumoSpectrumViewSetActions, submenu_get_view(app->set_actions));
     view_dispatcher_add_view(
         app->view_dispatcher, TumoSpectrumViewSetInput, text_input_get_view(app->set_input));
+    view_dispatcher_add_view(
+        app->view_dispatcher,
+        TumoSpectrumViewProfileName,
+        text_input_get_view(app->profile_name_input));
     view_dispatcher_add_view(
         app->view_dispatcher, TumoSpectrumViewProfileMenu, submenu_get_view(app->profile_menu));
     view_dispatcher_add_view(app->view_dispatcher, TumoSpectrumViewProtocol, app->protocol_view);
@@ -1603,6 +1712,7 @@ static void tumospectrum_free(TumoSpectrumApp* app) {
     tumospectrum_protocol_runtime_stop(app->protocol_runtime);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewProtocol);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewProfileMenu);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewProfileName);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewSetInput);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewSetActions);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewCaptureSet);
@@ -1611,6 +1721,7 @@ static void tumospectrum_free(TumoSpectrumApp* app) {
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewActions);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewResult);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewMenu);
+    text_input_free(app->profile_name_input);
     text_input_free(app->set_input);
     text_input_free(app->note_input);
     text_box_free(app->text_box);
