@@ -17,6 +17,7 @@ try:
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
+        md5,
         sha256,
     )
 except ImportError:
@@ -28,6 +29,7 @@ except ImportError:
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
+        md5,
         sha256,
     )
 
@@ -216,6 +218,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertFalse((resources / "apps/Scripts/js_app.fap").exists())
             wifi_entry = module_entries["apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap"]
             self.assertEqual(wifi_entry["sha256"], sha256(extapp_wifi))
+            self.assertEqual(wifi_entry["md5"], md5(extapp_wifi))
             ir_lab_entry = module_entries["apps/Module One/IR Blaster/tumo_ir_lab.fap"]
             self.assertEqual(ir_lab_entry["sha256"], sha256(extapp_ir_lab))
             cockpit_entry = module_entries[

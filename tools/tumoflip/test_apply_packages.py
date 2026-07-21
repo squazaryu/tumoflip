@@ -7,10 +7,10 @@ from pathlib import Path
 
 try:
     from .apply_packages import PACKAGE_STATE_FILE, PackageError, apply_packages
-    from .validate_release import manifest_release_id, sha256
+    from .validate_release import manifest_release_id, md5, sha256
 except ImportError:
     from apply_packages import PACKAGE_STATE_FILE, PackageError, apply_packages
-    from validate_release import manifest_release_id, sha256
+    from validate_release import manifest_release_id, md5, sha256
 
 
 class ApplyPackagesTest(unittest.TestCase):
@@ -40,6 +40,7 @@ class ApplyPackagesTest(unittest.TestCase):
                         "target": "/ext/apps/ARF Tools/arf_status.fap",
                         "bytes": source.stat().st_size,
                         "sha256": sha256(source),
+                        "md5": md5(source),
                     }
                 ]
             },
@@ -64,6 +65,10 @@ class ApplyPackagesTest(unittest.TestCase):
             )
             self.assertFalse((sd / "apps/ARF Tools/ARF Status.fap").exists())
             self.assertEqual(state["groups"], ["arf"])
+            self.assertEqual(
+                state["files"][0]["md5"],
+                md5(resources / "apps/ARF Tools/arf_status.fap"),
+            )
             self.assertTrue((sd / ".tumoflip/install-state.json").is_file())
             package_state = sd / ".tumoflip" / PACKAGE_STATE_FILE
             self.assertTrue(package_state.is_file())
@@ -99,6 +104,28 @@ class ApplyPackagesTest(unittest.TestCase):
             with self.assertRaises(PackageError):
                 apply_packages(manifest, resources, sd)
             self.assertFalse((sd / "apps/ARF Tools/arf_status.fap").exists())
+
+    def test_bad_optional_md5_is_rejected_before_install(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            manifest_path, resources, sd = self.make_fixture(Path(directory))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["packages"]["arf"][0]["md5"] = "0" * 32
+            manifest.pop("release_id")
+            manifest["release_id"] = manifest_release_id(manifest)
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(PackageError, "Package source MD5 mismatch"):
+                apply_packages(manifest_path, resources, sd)
+
+    def test_schema_two_manifest_without_md5_remains_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            manifest_path, resources, sd = self.make_fixture(Path(directory))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["packages"]["arf"][0].pop("md5")
+            manifest.pop("release_id")
+            manifest["release_id"] = manifest_release_id(manifest)
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            state = apply_packages(manifest_path, resources, sd)
+            self.assertNotIn("md5", state["files"][0])
 
 
 if __name__ == "__main__":

@@ -296,6 +296,14 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def md5(path: Path) -> str:
+    digest = hashlib.md5()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def crc32(path: Path) -> int:
     checksum = 0
     with path.open("rb") as stream:
@@ -479,6 +487,7 @@ def sync_extapp_package_exports(build_dir: Path, resources: Path) -> list[dict[s
                 "target": relative,
                 "bytes": target.stat().st_size,
                 "sha256": sha256(target),
+                "md5": md5(target),
             }
         )
     prune_legacy_resource_exports(resources)
@@ -633,6 +642,7 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
                     "target": f"/ext/{relative}",
                     "bytes": path.stat().st_size,
                     "sha256": sha256(path),
+                    "md5": md5(path),
                 }
             )
         result[group] = entries
