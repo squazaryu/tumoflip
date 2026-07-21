@@ -69,7 +69,7 @@ def expected_outputs() -> dict[Path, str]:
         training_text = capture_text(pulses)
         outputs[path] = training_text
         outputs[
-            base / "sd_resources" / "subghz" / "TumoSpectrum Demo" / f"train_{index}.sub"
+            base / "sd_resources" / "subghz" / "TumoSpectrum Samples" / f"train_{index}.sub"
         ] = training_text
         captures.append(RawCapture(path=path, frequency_hz=433920000, pulses=pulses))
 

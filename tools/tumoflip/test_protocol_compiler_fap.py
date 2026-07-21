@@ -60,7 +60,7 @@ class ProtocolProfilesIntegrationTest(unittest.TestCase):
             '"apps_data/signal_workbench/demo/validation.sub"', validator
         )
         self.assertIn(
-            '"subghz/TumoSpectrum Demo/train_0.sub"',
+            '"subghz/TumoSpectrum Samples/train_0.sub"',
             validator,
         )
         self.assertIn(

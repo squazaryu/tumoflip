@@ -285,10 +285,10 @@ class ValidateReleaseTest(unittest.TestCase):
         )
         for path in (
             "apps_data/signal_workbench/demo/validation.sub",
-            "subghz/TumoSpectrum Demo/train_0.sub",
-            "subghz/TumoSpectrum Demo/train_1.sub",
-            "subghz/TumoSpectrum Demo/train_2.sub",
-            "subghz/TumoSpectrum Demo/train_3.sub",
+            "subghz/TumoSpectrum Samples/train_0.sub",
+            "subghz/TumoSpectrum Samples/train_1.sub",
+            "subghz/TumoSpectrum Samples/train_2.sub",
+            "subghz/TumoSpectrum Samples/train_3.sub",
         ):
             self.assertIn(path, MODULE_ONE_PACKAGE_DATA_FILES)
         sample = (
