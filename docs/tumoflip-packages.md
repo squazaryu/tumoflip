@@ -11,17 +11,25 @@ artifact hashes, and SD files grouped as:
   `WiFi Mapper`)
 - `protocol_packs`
 
-Every SD entry contains its source path, `/ext` target path, byte size, and
-SHA-256. The release validator also emits `tumoflip-packages.zip`, containing
-exactly those source files. Unleashed Companion uses both assets for verified,
-transactional SD installation and rollback; the firmware updater continues to
-install its normal resource archive independently.
+Every SD entry contains its source path, `/ext` target path, byte size, SHA-256,
+and a lowercase MD5 used for low-cost device-side reconciliation. SHA-256 remains
+the integrity digest. The release validator also emits
+`tumoflip-packages.zip`, containing exactly those source files. Unleashed
+Companion uses both assets for verified, transactional SD installation and
+rollback; the firmware updater continues to install its normal resource archive
+independently.
 
 The manifest also includes a content-addressed `release_id` and a `cleanup`
 list. A package client must verify every staged SHA-256 before replacing files,
 and may remove a legacy path only after its canonical replacement is present.
 Legacy cleanup deliberately remains host-side so a one-time SD migration does
 not consume constrained firmware flash on every device.
+
+The `md5` field is optional for schema v2 compatibility. A client may use it to
+adopt files installed by the firmware resource updater only after every file in
+the selected group matches its manifest digest. Presence-only checks and partial
+group matches must remain `Need update`. Manifests without `md5` retain the
+conservative transaction-ledger behavior.
 
 Run after building the updater. This writes both the manifest and package ZIP:
 
