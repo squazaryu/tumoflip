@@ -18,6 +18,21 @@
 static bool protocol_profile_has_extension(const char* filename, const char* extension);
 static bool protocol_profile_id_valid(const char* profile_id);
 
+static bool protocol_profile_filename_safe(const char* filename) {
+    if(filename == NULL) return false;
+    size_t length = 0U;
+    while(length < ProtocolProfileFilenameSize && filename[length] != '\0')
+        length++;
+    if(length <= strlen(".tproto") || length >= ProtocolProfileFilenameSize ||
+       !protocol_profile_has_extension(filename, ".tproto") ||
+       strcmp(filename, PROTOCOL_PROFILE_DEMO_FILENAME) == 0 ||
+       strchr(filename, '/') != NULL || strchr(filename, '\\') != NULL ||
+       strstr(filename, "..") != NULL) {
+        return false;
+    }
+    return true;
+}
+
 static const char* protocol_profile_checksum_format(ProtocolProfileChecksum checksum) {
     switch(checksum) {
     case ProtocolProfileChecksumParityEvenLast:
@@ -243,6 +258,24 @@ bool protocol_profile_package_save(
     storage_common_remove(storage, backup);
     if(saved_path != NULL && saved_path_size > 0U) strlcpy(saved_path, path, saved_path_size);
     return true;
+}
+
+bool protocol_profile_package_delete(Storage* storage, const ProtocolProfilePackage* package) {
+    if(storage == NULL || package == NULL ||
+       !protocol_profile_filename_safe(package->filename)) {
+        return false;
+    }
+
+    char path[160];
+    const int path_length =
+        snprintf(path, sizeof(path), PROTOCOL_PROFILE_DIRECTORY "/%s", package->filename);
+    if(path_length <= 0 || (size_t)path_length >= sizeof(path)) return false;
+
+    FileInfo info = {0};
+    if(storage_common_stat(storage, path, &info) != FSE_OK || file_info_is_dir(&info)) {
+        return false;
+    }
+    return storage_common_remove(storage, path) == FSE_OK;
 }
 
 static bool protocol_profile_has_extension(const char* filename, const char* extension) {

@@ -375,6 +375,7 @@ static void tumospectrum_capture_set_show_details(TumoSpectrumApp* app);
 static void tumospectrum_capture_set_send(TumoSpectrumApp* app);
 static void tumospectrum_capture_set_build_actions(TumoSpectrumApp* app);
 static void tumospectrum_capture_set_begin_profile(TumoSpectrumApp* app);
+static void tumospectrum_open_protocol_profiles(TumoSpectrumApp* app);
 static void tumospectrum_handoff_capture(
     TumoSpectrumApp* app,
     const TumoSpectrumCapture* capture,
@@ -466,7 +467,9 @@ static const ProtocolProfilePackage* tumospectrum_selected_protocol(const TumoSp
 }
 
 static bool tumospectrum_protocol_has_demo(const ProtocolProfilePackage* package) {
-    return package != NULL && strcmp(package->profile_id, TUMOSPECTRUM_DEMO_PROFILE_ID) == 0;
+    return package != NULL &&
+           (strcmp(package->profile_id, TUMOSPECTRUM_DEMO_PROFILE_ID) == 0 ||
+            strcmp(package->filename, PROTOCOL_PROFILE_DEMO_FILENAME) == 0);
 }
 
 static const char* tumospectrum_protocol_status_short(ProtocolProfileStatus status) {
@@ -555,6 +558,7 @@ static void tumospectrum_protocol_draw(Canvas* canvas, void* context) {
         canvas_draw_str(canvas, 2, 36, protocol_profile_status_name(package->status));
         canvas_draw_str(canvas, 2, 47, "Check profile / API");
         elements_button_left(canvas, "Back");
+        if(!tumospectrum_protocol_has_demo(package)) elements_button_right(canvas, "Delete");
         return;
     }
 
@@ -604,8 +608,36 @@ static void tumospectrum_protocol_draw(Canvas* canvas, void* context) {
     }
     elements_button_left(canvas, "Back");
     elements_button_center(canvas, listening ? "Stop" : "Start");
-    if(!listening && tumospectrum_protocol_has_demo(package)) {
-        elements_button_right(canvas, "Demo");
+    if(!listening) {
+        elements_button_right(
+            canvas, tumospectrum_protocol_has_demo(package) ? "Demo" : "Delete");
+    }
+}
+
+static void tumospectrum_protocol_delete(TumoSpectrumApp* app) {
+    const ProtocolProfilePackage* package = tumospectrum_selected_protocol(app);
+    if(package == NULL || tumospectrum_protocol_has_demo(package)) return;
+
+    char prompt[64];
+    snprintf(
+        prompt,
+        sizeof(prompt),
+        "Delete %.18s?",
+        package->name[0] ? package->name : package->filename);
+    DialogMessage* message = dialog_message_alloc();
+    dialog_message_set_header(message, "Delete profile?", 64, 4, AlignCenter, AlignTop);
+    dialog_message_set_text(message, prompt, 64, 26, AlignCenter, AlignCenter);
+    dialog_message_set_buttons(message, "Delete", NULL, "Keep");
+    const DialogMessageButton result = dialog_message_show(app->dialogs, message);
+    dialog_message_free(message);
+    if(result != DialogMessageButtonLeft) return;
+
+    if(protocol_profile_package_delete(app->storage, package)) {
+        notification_message(app->notification, &tumospectrum_sequence_ok);
+        tumospectrum_open_protocol_profiles(app);
+    } else {
+        notification_message(app->notification, &tumospectrum_sequence_error);
+        dialog_message_show_storage_error(app->dialogs, "Cannot delete\nprofile");
     }
 }
 
@@ -684,9 +716,12 @@ static bool tumospectrum_protocol_input(InputEvent* event, void* context) {
         tumospectrum_refresh_protocol(app);
         return true;
     }
-    if(event->key == InputKeyRight && !listening &&
-       tumospectrum_protocol_has_demo(tumospectrum_selected_protocol(app))) {
-        tumospectrum_protocol_demo(app);
+    if(event->key == InputKeyRight && !listening) {
+        if(tumospectrum_protocol_has_demo(tumospectrum_selected_protocol(app))) {
+            tumospectrum_protocol_demo(app);
+        } else {
+            tumospectrum_protocol_delete(app);
+        }
         return true;
     }
     return false;
@@ -1328,7 +1363,7 @@ static void tumospectrum_menu_callback(void* context, uint32_t index) {
     case TumoSpectrumMenuAbout:
         tumospectrum_show_text(
             app,
-            "TumoSpectrum 2.3",
+            "TumoSpectrum 2.4",
             "Autonomous capture, profile building and multi-capture signal research workspace.\n\n"
             "Protocol Profiles performs bounded receive-only decoding on Flipper and logs changed observations to SD.\n\n"
             "A Sub-GHz capture set can build a receive-only live profile from three or four RAW recordings without a computer.\n\n"

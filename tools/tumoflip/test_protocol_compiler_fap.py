@@ -92,7 +92,7 @@ class ProtocolProfilesIntegrationTest(unittest.TestCase):
             'elements_button_center(canvas, listening ? "Stop" : "Start")',
             self.source,
         )
-        self.assertIn('elements_button_right(canvas, "Demo")', self.source)
+        self.assertIn('"Demo" : "Delete"', self.source)
         self.assertIn("tumospectrum_protocol_has_demo(package)", self.source)
         self.assertIn("protocol_profile_observation_append", self.source)
 
