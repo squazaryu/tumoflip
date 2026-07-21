@@ -58,7 +58,7 @@ def capture_text(pulses: tuple[int, ...]) -> str:
 def expected_outputs() -> dict[Path, str]:
     base = Path(__file__).resolve().parent
     corpus = base / "protocol_corpus" / "demo_pulse_pair"
-    package = base / "sd_resources" / "apps_data" / "protocol_compiler"
+    package = base / "sd_resources" / "apps_data" / "signal_workbench"
     values = (0x500, 0x5FF, 0x555, 0x5AA)
     jitters = (-12, 8, -5, 14)
     captures: list[RawCapture] = []

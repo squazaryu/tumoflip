@@ -2,12 +2,14 @@
 #include "tumospectrum_capture_flow.h"
 #include "tumospectrum_inference.h"
 #include "tumospectrum_parser.h"
+#include "tumospectrum_protocol_runtime.h"
 #include "tumospectrum_storage.h"
 #include "signal_workbench_icons.h"
 
 #include <bt/bt_service/bt.h>
 #include <dialogs/dialogs.h>
 #include <furi.h>
+#include <furi_hal_info.h>
 #include <gui/elements.h>
 #include <gui/gui.h>
 #include <gui/modules/submenu.h>
@@ -30,6 +32,8 @@
 #define TUMOSPECTRUM_BRIDGE_APP_ID  "signal_workbench"
 #define TUMOSPECTRUM_BRIDGE_COMMAND "report"
 #define TUMOSPECTRUM_LATEST_SET_ARG "tumospectrum_latest_set"
+#define TUMOSPECTRUM_PROFILES_ARG   "tumospectrum_profiles"
+#define TUMOSPECTRUM_DEMO_PROFILE_ID "035084cd0da9ab62"
 
 typedef enum {
     TumoSpectrumViewMenu,
@@ -40,6 +44,8 @@ typedef enum {
     TumoSpectrumViewCaptureSet,
     TumoSpectrumViewSetActions,
     TumoSpectrumViewSetInput,
+    TumoSpectrumViewProfileMenu,
+    TumoSpectrumViewProtocol,
 } TumoSpectrumView;
 
 typedef enum {
@@ -52,6 +58,7 @@ typedef enum {
     TumoSpectrumMenuLatestSet,
     TumoSpectrumMenuOpenScope,
     TumoSpectrumMenuImportAnalyzer,
+    TumoSpectrumMenuProtocolProfiles,
     TumoSpectrumMenuNotebook,
     TumoSpectrumMenuAbout,
 } TumoSpectrumMenuAction;
@@ -87,6 +94,10 @@ typedef struct {
     TumoSpectrumApp* app;
 } TumoSpectrumSetModel;
 
+typedef struct {
+    TumoSpectrumApp* app;
+} TumoSpectrumProtocolModel;
+
 struct TumoSpectrumApp {
     Gui* gui;
     Storage* storage;
@@ -98,8 +109,10 @@ struct TumoSpectrumApp {
     Submenu* menu;
     Submenu* actions;
     Submenu* set_actions;
+    Submenu* profile_menu;
     View* result_view;
     View* capture_set_view;
+    View* protocol_view;
     TextBox* text_box;
     TextInput* note_input;
     TextInput* set_input;
@@ -114,6 +127,15 @@ struct TumoSpectrumApp {
     char set_input_buffer[TUMOSPECTRUM_SET_LABEL_SIZE];
     char set_profile_path[TUMOSPECTRUM_PATH_SIZE];
     char set_report_path[TUMOSPECTRUM_PATH_SIZE];
+    TumoSpectrumProtocolRuntime* protocol_runtime;
+    ProtocolProfilePackage protocol_packages[ProtocolProfileMaximumProfiles];
+    TumoSpectrumProtocolObservation protocol_observation;
+    size_t protocol_package_count;
+    size_t selected_protocol_package;
+    uint32_t current_api;
+    ProtocolProfileStatus protocol_result_status;
+    bool has_protocol_observation;
+    bool protocol_demo_result;
     uint8_t result_page;
 };
 
@@ -145,6 +167,11 @@ static void tumospectrum_refresh_result(TumoSpectrumApp* app) {
 static void tumospectrum_refresh_set(TumoSpectrumApp* app) {
     with_view_model(
         app->capture_set_view, TumoSpectrumSetModel * model, { model->app = app; }, true);
+}
+
+static void tumospectrum_refresh_protocol(TumoSpectrumApp* app) {
+    with_view_model(
+        app->protocol_view, TumoSpectrumProtocolModel * model, { model->app = app; }, true);
 }
 
 static const char* tumospectrum_badge(TumoSpectrumCaptureType type) {
@@ -427,6 +454,298 @@ static bool tumospectrum_capture_set_input(InputEvent* event, void* context) {
     return false;
 }
 
+static const ProtocolProfilePackage* tumospectrum_selected_protocol(const TumoSpectrumApp* app) {
+    if(app->selected_protocol_package >= app->protocol_package_count) return NULL;
+    return &app->protocol_packages[app->selected_protocol_package];
+}
+
+static bool tumospectrum_protocol_has_demo(const ProtocolProfilePackage* package) {
+    return package != NULL && strcmp(package->profile_id, TUMOSPECTRUM_DEMO_PROFILE_ID) == 0;
+}
+
+static const char* tumospectrum_protocol_status_short(ProtocolProfileStatus status) {
+    switch(status) {
+    case ProtocolProfileStatusOk:
+        return "Match";
+    case ProtocolProfileStatusUnsupportedVersion:
+        return "Bad version";
+    case ProtocolProfileStatusApiMismatch:
+        return "API mismatch";
+    case ProtocolProfileStatusUnsafeProfile:
+        return "Unsafe profile";
+    case ProtocolProfileStatusUnsupportedCapture:
+        return "RAW only";
+    case ProtocolProfileStatusNotReceiveOnly:
+        return "RX gate failed";
+    case ProtocolProfileStatusStableMismatch:
+        return "Stable mismatch";
+    case ProtocolProfileStatusChecksumMismatch:
+        return "Checksum fail";
+    case ProtocolProfileStatusNoMatch:
+        return "No match";
+    case ProtocolProfileStatusInvalidArgument:
+    default:
+        return "Invalid input";
+    }
+}
+
+static void tumospectrum_protocol_observation_callback(
+    const TumoSpectrumProtocolObservation* observation,
+    void* context) {
+    TumoSpectrumApp* app = context;
+    app->protocol_observation = *observation;
+    app->protocol_result_status = ProtocolProfileStatusOk;
+    app->has_protocol_observation = true;
+    app->protocol_demo_result = false;
+    const ProtocolProfilePackage* package = tumospectrum_selected_protocol(app);
+    if(package != NULL && (observation->match_count == 1U || observation->changed_mask != 0U)) {
+        protocol_profile_observation_append(
+            app->storage,
+            package,
+            &observation->decode,
+            observation->changed_mask,
+            observation->match_count);
+    }
+    tumospectrum_refresh_protocol(app);
+}
+
+static void tumospectrum_protocol_draw(Canvas* canvas, void* context) {
+    const TumoSpectrumProtocolModel* model = context;
+    const TumoSpectrumApp* app = model->app;
+    const ProtocolProfilePackage* package = tumospectrum_selected_protocol(app);
+    const bool listening = tumospectrum_protocol_runtime_is_listening(app->protocol_runtime);
+    const int32_t rssi_dbm = (int32_t)tumospectrum_protocol_runtime_rssi(app->protocol_runtime);
+    char line[64];
+    char badge[8];
+
+    canvas_clear(canvas);
+    canvas_set_font(canvas, FontPrimary);
+    canvas_draw_str(canvas, 2, 11, "Protocol RX");
+    const char* badge_text = "READY";
+    if(listening && app->has_protocol_observation) {
+        const uint32_t visible_count = app->protocol_observation.match_count > 999U ?
+                                           999U :
+                                           app->protocol_observation.match_count;
+        snprintf(badge, sizeof(badge), "L#%lu", (unsigned long)visible_count);
+        badge_text = badge;
+    } else if(listening) {
+        badge_text = "LIVE";
+    } else if(app->protocol_demo_result) {
+        badge_text = "DEMO";
+    }
+    tumospectrum_draw_badge(canvas, badge_text);
+    canvas_draw_line(canvas, 0, 15, 127, 15);
+    canvas_set_font(canvas, FontSecondary);
+
+    if(package == NULL) {
+        canvas_draw_str(canvas, 2, 29, "No .tproto profiles");
+        canvas_draw_str(canvas, 2, 41, "Install FW Packages");
+        elements_button_left(canvas, "Back");
+        return;
+    }
+    snprintf(line, sizeof(line), "%.20s", package->name[0] ? package->name : package->filename);
+    canvas_draw_str(canvas, 2, 23, line);
+    if(package->status != ProtocolProfileStatusOk) {
+        canvas_draw_str(canvas, 2, 36, protocol_profile_status_name(package->status));
+        canvas_draw_str(canvas, 2, 47, "Check profile / API");
+        elements_button_left(canvas, "Back");
+        return;
+    }
+
+    snprintf(
+        line,
+        sizeof(line),
+        "%lu.%03luM %ub %lddB",
+        (unsigned long)(package->profile.frequency_hz / 1000000U),
+        (unsigned long)((package->profile.frequency_hz / 1000U) % 1000U),
+        package->profile.bit_count,
+        (long)rssi_dbm);
+    canvas_draw_str(canvas, 2, 32, line);
+    if(app->has_protocol_observation) {
+        const uint8_t digits = (uint8_t)((app->protocol_observation.decode.bit_count + 3U) / 4U);
+        snprintf(
+            line,
+            sizeof(line),
+            "V 0x%0*llX",
+            digits,
+            (unsigned long long)app->protocol_observation.decode.value);
+        canvas_draw_str(canvas, 2, 41, line);
+        snprintf(
+            line,
+            sizeof(line),
+            "D 0x%0*llX",
+            digits,
+            (unsigned long long)app->protocol_observation.changed_mask);
+        canvas_draw_str(canvas, 2, 50, line);
+    } else {
+        const ProtocolProfileStatus decode_status =
+            listening ? tumospectrum_protocol_runtime_decode_status(app->protocol_runtime) :
+                        app->protocol_result_status;
+        canvas_draw_str(
+            canvas,
+            2,
+            41,
+            listening ? "Waiting for match..." :
+                        tumospectrum_protocol_radio_status_name(
+                            tumospectrum_protocol_runtime_status(app->protocol_runtime)));
+        snprintf(
+            line,
+            sizeof(line),
+            "%s P%u",
+            tumospectrum_protocol_status_short(decode_status),
+            tumospectrum_protocol_runtime_pulse_count(app->protocol_runtime));
+        canvas_draw_str(canvas, 2, 50, line);
+    }
+    elements_button_left(canvas, "Back");
+    elements_button_center(canvas, listening ? "Stop" : "Start");
+    if(!listening && tumospectrum_protocol_has_demo(package)) {
+        elements_button_right(canvas, "Demo");
+    }
+}
+
+static void tumospectrum_protocol_demo(TumoSpectrumApp* app) {
+    const ProtocolProfilePackage* package = tumospectrum_selected_protocol(app);
+    if(package == NULL || package->status != ProtocolProfileStatusOk ||
+       !tumospectrum_protocol_has_demo(package)) {
+        return;
+    }
+
+    int32_t* pulses = malloc(sizeof(int32_t) * ProtocolProfileMaximumCapturePulses);
+    if(pulses == NULL) {
+        app->protocol_result_status = ProtocolProfileStatusInvalidArgument;
+        app->has_protocol_observation = false;
+        app->protocol_demo_result = true;
+        tumospectrum_refresh_protocol(app);
+        return;
+    }
+    ProtocolProfileCaptureInfo capture_info = {0};
+    ProtocolProfileDecodeResult decode = {0};
+    ProtocolProfileStatus status = protocol_profile_capture_load(
+        app->storage,
+        PROTOCOL_PROFILE_DEMO_CAPTURE,
+        pulses,
+        ProtocolProfileMaximumCapturePulses,
+        &capture_info);
+    if(status == ProtocolProfileStatusOk && package->profile.frequency_hz > 0U &&
+       capture_info.frequency_hz != package->profile.frequency_hz) {
+        status = ProtocolProfileStatusNoMatch;
+    } else if(status == ProtocolProfileStatusOk) {
+        status = protocol_profile_decode(
+            &package->profile, app->current_api, pulses, capture_info.pulse_count, &decode);
+    }
+    free(pulses);
+    app->protocol_result_status = status;
+    app->protocol_demo_result = true;
+    app->has_protocol_observation = status == ProtocolProfileStatusOk;
+    if(app->has_protocol_observation) {
+        app->protocol_observation = (TumoSpectrumProtocolObservation){
+            .decode = decode,
+            .changed_mask = 0U,
+            .match_count = 1U,
+        };
+    }
+    notification_message(
+        app->notification,
+        status == ProtocolProfileStatusOk ? &tumospectrum_sequence_ok :
+                                            &tumospectrum_sequence_error);
+    tumospectrum_refresh_protocol(app);
+}
+
+static bool tumospectrum_protocol_input(InputEvent* event, void* context) {
+    TumoSpectrumApp* app = context;
+    if(event->type != InputTypeShort) return false;
+    const bool listening = tumospectrum_protocol_runtime_is_listening(app->protocol_runtime);
+    if(event->key == InputKeyBack || event->key == InputKeyLeft) {
+        tumospectrum_protocol_runtime_stop(app->protocol_runtime);
+        view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewProfileMenu);
+        return true;
+    }
+    if(event->key == InputKeyOk) {
+        if(listening) {
+            tumospectrum_protocol_runtime_stop(app->protocol_runtime);
+        } else {
+            const ProtocolProfilePackage* package = tumospectrum_selected_protocol(app);
+            app->has_protocol_observation = false;
+            app->protocol_demo_result = false;
+            app->protocol_result_status = ProtocolProfileStatusNoMatch;
+            tumospectrum_protocol_runtime_start(
+                app->protocol_runtime,
+                package,
+                app->current_api,
+                tumospectrum_protocol_observation_callback,
+                app);
+        }
+        tumospectrum_refresh_protocol(app);
+        return true;
+    }
+    if(event->key == InputKeyRight && !listening &&
+       tumospectrum_protocol_has_demo(tumospectrum_selected_protocol(app))) {
+        tumospectrum_protocol_demo(app);
+        return true;
+    }
+    return false;
+}
+
+static uint32_t tumospectrum_protocol_previous(void* context) {
+    TumoSpectrumApp* app = context;
+    tumospectrum_protocol_runtime_stop(app->protocol_runtime);
+    return TumoSpectrumViewProfileMenu;
+}
+
+static void tumospectrum_protocol_profile_callback(void* context, uint32_t index) {
+    TumoSpectrumApp* app = context;
+    app->selected_protocol_package = index;
+    app->has_protocol_observation = false;
+    app->protocol_demo_result = false;
+    const ProtocolProfilePackage* package = tumospectrum_selected_protocol(app);
+    app->protocol_result_status = package != NULL ? package->status :
+                                                    ProtocolProfileStatusInvalidArgument;
+    tumospectrum_refresh_protocol(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewProtocol);
+}
+
+static void tumospectrum_open_protocol_profiles(TumoSpectrumApp* app) {
+    tumospectrum_protocol_runtime_stop(app->protocol_runtime);
+    app->protocol_package_count = protocol_profile_packages_load(
+        app->storage, app->current_api, app->protocol_packages, ProtocolProfileMaximumProfiles);
+    submenu_reset(app->profile_menu);
+    submenu_set_header(app->profile_menu, "Protocol Profiles");
+    if(app->protocol_package_count == 0U) {
+        submenu_add_item(
+            app->profile_menu,
+            "No profiles installed",
+            ProtocolProfileMaximumProfiles,
+            tumospectrum_protocol_profile_callback,
+            app);
+    } else {
+        for(size_t index = 0U; index < app->protocol_package_count; index++) {
+            const ProtocolProfilePackage* package = &app->protocol_packages[index];
+            char label[48];
+            snprintf(
+                label,
+                sizeof(label),
+                "%s%s",
+                package->name[0] ? package->name : package->filename,
+                package->status == ProtocolProfileStatusOk ? "" : " [blocked]");
+            submenu_add_item(
+                app->profile_menu,
+                label,
+                (uint32_t)index,
+                tumospectrum_protocol_profile_callback,
+                app);
+        }
+    }
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewProfileMenu);
+}
+
+static void tumospectrum_tick(void* context) {
+    TumoSpectrumApp* app = context;
+    if(tumospectrum_protocol_runtime_is_listening(app->protocol_runtime)) {
+        tumospectrum_protocol_runtime_tick(app->protocol_runtime);
+        tumospectrum_refresh_protocol(app);
+    }
+}
+
 static uint32_t tumospectrum_result_previous(void* context) {
     UNUSED(context);
     return TumoSpectrumViewMenu;
@@ -468,7 +787,9 @@ static uint32_t tumospectrum_set_input_previous(void* context) {
 }
 
 static bool tumospectrum_back(void* context) {
-    view_dispatcher_stop(((TumoSpectrumApp*)context)->view_dispatcher);
+    TumoSpectrumApp* app = context;
+    tumospectrum_protocol_runtime_stop(app->protocol_runtime);
+    view_dispatcher_stop(app->view_dispatcher);
     return true;
 }
 
@@ -883,6 +1204,9 @@ static void tumospectrum_menu_callback(void* context, uint32_t index) {
         tumospectrum_refresh_result(app);
         view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewResult);
         break;
+    case TumoSpectrumMenuProtocolProfiles:
+        tumospectrum_open_protocol_profiles(app);
+        break;
     case TumoSpectrumMenuNotebook:
         furi_string_reset(app->text);
         if(tumospectrum_storage_load_latest(app->storage, app->text)) {
@@ -902,11 +1226,12 @@ static void tumospectrum_menu_callback(void* context, uint32_t index) {
     case TumoSpectrumMenuAbout:
         tumospectrum_show_text(
             app,
-            "TumoSpectrum 2.0",
-            "Live capture and multi-capture signal research workspace.\n\n"
+            "TumoSpectrum 2.2",
+            "Live capture, protocol profiles and multi-capture signal research workspace.\n\n"
+            "Protocol Profiles performs bounded receive-only decoding on Flipper and logs changed observations to SD.\n\n"
             "Capture sets compare three or four RAW recordings to identify timing clusters and stable or changing regions.\n\n"
             "Source files are never modified. Static-like is not a cryptographic or replay guarantee. Replay stays in stock apps.\n\n"
-            "github.com/squazaryu/tumoflip\nIssue #123",
+            "github.com/squazaryu/tumoflip\nIssues #123 / #153",
             TumoSpectrumViewMenu);
         break;
     default:
@@ -1124,6 +1449,11 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     TumoSpectrumApp* app = malloc(sizeof(*app));
     if(!app) return NULL;
     memset(app, 0, sizeof(*app));
+    app->protocol_runtime = tumospectrum_protocol_runtime_alloc();
+    if(app->protocol_runtime == NULL) {
+        free(app);
+        return NULL;
+    }
 
     app->gui = furi_record_open(RECORD_GUI);
     app->storage = furi_record_open(RECORD_STORAGE);
@@ -1135,8 +1465,10 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     app->menu = submenu_alloc();
     app->actions = submenu_alloc();
     app->set_actions = submenu_alloc();
+    app->profile_menu = submenu_alloc();
     app->result_view = view_alloc();
     app->capture_set_view = view_alloc();
+    app->protocol_view = view_alloc();
     app->text_box = text_box_alloc();
     app->note_input = text_input_alloc();
     app->set_input = text_input_alloc();
@@ -1144,6 +1476,7 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
 
     view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
     view_dispatcher_set_navigation_event_callback(app->view_dispatcher, tumospectrum_back);
+    view_dispatcher_set_tick_event_callback(app->view_dispatcher, tumospectrum_tick, 100U);
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
 
     submenu_set_header(app->menu, "TumoSpectrum");
@@ -1198,6 +1531,12 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
         tumospectrum_menu_callback,
         app);
     submenu_add_item(
+        app->menu,
+        "Protocol Profiles",
+        TumoSpectrumMenuProtocolProfiles,
+        tumospectrum_menu_callback,
+        app);
+    submenu_add_item(
         app->menu, "Notebook", TumoSpectrumMenuNotebook, tumospectrum_menu_callback, app);
     submenu_add_item(app->menu, "About", TumoSpectrumMenuAbout, tumospectrum_menu_callback, app);
 
@@ -1214,6 +1553,14 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     view_set_previous_callback(submenu_get_view(app->actions), tumospectrum_actions_previous);
     view_set_previous_callback(
         submenu_get_view(app->set_actions), tumospectrum_set_actions_previous);
+    view_set_previous_callback(
+        submenu_get_view(app->profile_menu), tumospectrum_text_previous_menu);
+    view_allocate_model(
+        app->protocol_view, ViewModelTypeLocking, sizeof(TumoSpectrumProtocolModel));
+    view_set_context(app->protocol_view, app);
+    view_set_draw_callback(app->protocol_view, tumospectrum_protocol_draw);
+    view_set_input_callback(app->protocol_view, tumospectrum_protocol_input);
+    view_set_previous_callback(app->protocol_view, tumospectrum_protocol_previous);
 
     text_box_set_font(app->text_box, TextBoxFontText);
     text_box_set_focus(app->text_box, TextBoxFocusStart);
@@ -1237,12 +1584,25 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
         app->view_dispatcher, TumoSpectrumViewSetActions, submenu_get_view(app->set_actions));
     view_dispatcher_add_view(
         app->view_dispatcher, TumoSpectrumViewSetInput, text_input_get_view(app->set_input));
+    view_dispatcher_add_view(
+        app->view_dispatcher, TumoSpectrumViewProfileMenu, submenu_get_view(app->profile_menu));
+    view_dispatcher_add_view(app->view_dispatcher, TumoSpectrumViewProtocol, app->protocol_view);
     view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewMenu);
     tumospectrum_storage_prepare(app->storage);
+    protocol_profile_storage_prepare(app->storage);
+    uint16_t api_major = 0U;
+    uint16_t api_minor = 0U;
+    furi_hal_info_get_api_version(&api_major, &api_minor);
+    UNUSED(api_minor);
+    app->current_api = api_major;
+    app->protocol_result_status = ProtocolProfileStatusNoMatch;
     return app;
 }
 
 static void tumospectrum_free(TumoSpectrumApp* app) {
+    tumospectrum_protocol_runtime_stop(app->protocol_runtime);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewProtocol);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewProfileMenu);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewSetInput);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewSetActions);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewCaptureSet);
@@ -1254,10 +1614,12 @@ static void tumospectrum_free(TumoSpectrumApp* app) {
     text_input_free(app->set_input);
     text_input_free(app->note_input);
     text_box_free(app->text_box);
+    view_free(app->protocol_view);
     view_free(app->capture_set_view);
     view_free(app->result_view);
     submenu_free(app->set_actions);
     submenu_free(app->actions);
+    submenu_free(app->profile_menu);
     submenu_free(app->menu);
     view_dispatcher_free(app->view_dispatcher);
     furi_string_free(app->text);
@@ -1267,6 +1629,7 @@ static void tumospectrum_free(TumoSpectrumApp* app) {
     furi_record_close(RECORD_DIALOGS);
     furi_record_close(RECORD_STORAGE);
     furi_record_close(RECORD_GUI);
+    tumospectrum_protocol_runtime_free(app->protocol_runtime);
     free(app);
 }
 
@@ -1275,6 +1638,8 @@ int32_t signal_workbench_app(void* context) {
     if(!app) return -1;
     if(context && strcmp(context, TUMOSPECTRUM_LATEST_SET_ARG) == 0) {
         tumospectrum_open_latest_set(app);
+    } else if(context && strcmp(context, TUMOSPECTRUM_PROFILES_ARG) == 0) {
+        tumospectrum_open_protocol_profiles(app);
     } else {
         tumospectrum_resume_capture(app);
     }

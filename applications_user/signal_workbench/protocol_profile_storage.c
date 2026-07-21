@@ -1,6 +1,7 @@
 #include "protocol_profile_storage.h"
 
 #include <flipper_format/flipper_format.h>
+#include <furi_hal_rtc.h>
 
 #include <errno.h>
 #include <limits.h>
@@ -8,8 +9,63 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PROTOCOL_PROFILE_FILETYPE     "Tumo Protocol Profile"
-#define PROTOCOL_PROFILE_RAW_FILETYPE "Flipper SubGhz RAW File"
+#define PROTOCOL_PROFILE_FILETYPE              "Tumo Protocol Profile"
+#define PROTOCOL_PROFILE_RAW_FILETYPE          "Flipper SubGhz RAW File"
+#define PROTOCOL_PROFILE_OBSERVATIONS_MAX_SIZE (64U * 1024U)
+#define PROTOCOL_PROFILE_OBSERVATIONS_PREVIOUS \
+    PROTOCOL_PROFILE_DATA_DIR "/protocol_observations.previous.csv"
+
+static bool protocol_profile_has_extension(const char* filename, const char* extension);
+
+static bool protocol_profile_mkdir(Storage* storage, const char* path) {
+    const FS_Error error = storage_common_mkdir(storage, path);
+    return error == FSE_OK || error == FSE_EXIST;
+}
+
+static void protocol_profile_copy_if_missing(
+    Storage* storage,
+    const char* source,
+    const char* destination) {
+    if(storage_common_stat(storage, destination, NULL) == FSE_OK ||
+       storage_common_stat(storage, source, NULL) != FSE_OK) {
+        return;
+    }
+    storage_common_copy(storage, source, destination);
+}
+
+static void protocol_profile_migrate_legacy_profiles(Storage* storage) {
+    File* directory = storage_file_alloc(storage);
+    FileInfo info;
+    char filename[ProtocolProfileFilenameSize];
+    if(storage_dir_open(directory, PROTOCOL_PROFILE_LEGACY_DIRECTORY)) {
+        while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
+            if(file_info_is_dir(&info) || info.size == 0U ||
+               info.size > ProtocolProfileMaximumFileSize ||
+               !protocol_profile_has_extension(filename, ".tproto")) {
+                continue;
+            }
+            char source[192];
+            char destination[192];
+            snprintf(source, sizeof(source), PROTOCOL_PROFILE_LEGACY_DIRECTORY "/%s", filename);
+            snprintf(destination, sizeof(destination), PROTOCOL_PROFILE_DIRECTORY "/%s", filename);
+            protocol_profile_copy_if_missing(storage, source, destination);
+        }
+        storage_dir_close(directory);
+    }
+    storage_file_free(directory);
+}
+
+bool protocol_profile_storage_prepare(Storage* storage) {
+    if(storage == NULL || !protocol_profile_mkdir(storage, PROTOCOL_PROFILE_DATA_DIR) ||
+       !protocol_profile_mkdir(storage, PROTOCOL_PROFILE_DIRECTORY) ||
+       !protocol_profile_mkdir(storage, PROTOCOL_PROFILE_DEMO_DIRECTORY)) {
+        return false;
+    }
+    protocol_profile_migrate_legacy_profiles(storage);
+    protocol_profile_copy_if_missing(
+        storage, PROTOCOL_PROFILE_LEGACY_DEMO, PROTOCOL_PROFILE_DEMO_CAPTURE);
+    return true;
+}
 
 static bool protocol_profile_has_extension(const char* filename, const char* extension) {
     const char* dot = strrchr(filename, '.');
@@ -32,7 +88,12 @@ static bool protocol_profile_copy_bounded(
     size_t destination_size) {
     const size_t length = furi_string_size(source);
     if(length == 0U || length >= destination_size) return false;
-    strlcpy(destination, furi_string_get_cstr(source), destination_size);
+    const char* text = furi_string_get_cstr(source);
+    for(size_t index = 0U; index < length; index++) {
+        const unsigned char value = (unsigned char)text[index];
+        if(value < 0x20U || value > 0x7EU || value == '"') return false;
+    }
+    strlcpy(destination, text, destination_size);
     return true;
 }
 
@@ -207,6 +268,7 @@ size_t protocol_profile_packages_load(
     ProtocolProfilePackage* packages,
     size_t capacity) {
     if(storage == NULL || packages == NULL || capacity == 0U) return 0U;
+    protocol_profile_storage_prepare(storage);
     const size_t bounded_capacity =
         capacity < ProtocolProfileMaximumProfiles ? capacity : ProtocolProfileMaximumProfiles;
     memset(packages, 0, sizeof(*packages) * bounded_capacity);
@@ -343,4 +405,63 @@ ProtocolProfileStatus protocol_profile_capture_load(
     furi_string_free(header);
     flipper_format_free(format);
     return status;
+}
+
+bool protocol_profile_observation_append(
+    Storage* storage,
+    const ProtocolProfilePackage* package,
+    const ProtocolProfileDecodeResult* result,
+    uint64_t changed_mask,
+    uint32_t match_count) {
+    if(storage == NULL || package == NULL || result == NULL ||
+       package->status != ProtocolProfileStatusOk || !protocol_profile_storage_prepare(storage)) {
+        return false;
+    }
+
+    FileInfo info = {0};
+    if(storage_common_stat(storage, PROTOCOL_PROFILE_OBSERVATIONS, &info) == FSE_OK &&
+       info.size >= PROTOCOL_PROFILE_OBSERVATIONS_MAX_SIZE) {
+        storage_common_remove(storage, PROTOCOL_PROFILE_OBSERVATIONS_PREVIOUS);
+        storage_common_rename(
+            storage, PROTOCOL_PROFILE_OBSERVATIONS, PROTOCOL_PROFILE_OBSERVATIONS_PREVIOUS);
+    }
+
+    const bool write_header = storage_common_stat(storage, PROTOCOL_PROFILE_OBSERVATIONS, NULL) !=
+                              FSE_OK;
+    File* file = storage_file_alloc(storage);
+    bool success =
+        storage_file_open(file, PROTOCOL_PROFILE_OBSERVATIONS, FSAM_WRITE, FSOM_OPEN_APPEND);
+    if(success && write_header) {
+        static const char header[] =
+            "timestamp,profile_id,name,frequency_hz,bits,value,changed_mask,matches\n";
+        success = storage_file_write(file, header, sizeof(header) - 1U) == sizeof(header) - 1U;
+    }
+    if(success) {
+        DateTime now;
+        furi_hal_rtc_get_datetime(&now);
+        char line[256];
+        const int length = snprintf(
+            line,
+            sizeof(line),
+            "%04u-%02u-%02uT%02u:%02u:%02u,%s,\"%.31s\",%lu,%u,0x%016llX,0x%016llX,%lu\n",
+            now.year,
+            now.month,
+            now.day,
+            now.hour,
+            now.minute,
+            now.second,
+            package->profile_id,
+            package->name,
+            (unsigned long)package->profile.frequency_hz,
+            result->bit_count,
+            (unsigned long long)result->value,
+            (unsigned long long)changed_mask,
+            (unsigned long)match_count);
+        success = length > 0 && (size_t)length < sizeof(line) &&
+                  storage_file_write(file, line, (size_t)length) == (size_t)length;
+    }
+    if(success) success = storage_file_sync(file);
+    storage_file_close(file);
+    storage_file_free(file);
+    return success;
 }

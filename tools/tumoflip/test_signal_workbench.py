@@ -44,7 +44,7 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_app_migrates_in_place_without_duplicate_fap(self) -> None:
         self.assertIn('appid="signal_workbench"', self.manifest)
         self.assertIn('name="TumoSpectrum"', self.manifest)
-        self.assertIn('fap_version="2.1.0"', self.manifest)
+        self.assertIn('fap_version="2.2.0"', self.manifest)
         self.assertIn('fap_category="Module One/Signals"', self.manifest)
         self.assertIn(
             'fap_dist_path="apps/Module One/Signals/signal_workbench.fap"', self.manifest
@@ -109,6 +109,7 @@ class TumoSpectrumTest(unittest.TestCase):
             '"New Infrared Set"',
             '"Latest Capture Set"',
             '"Open TumoScope"',
+            '"Protocol Profiles"',
             '"Compare Capture"',
             '"Send to Companion"',
             'elements_button_left(canvas, "Prev")',
@@ -128,6 +129,9 @@ class TumoSpectrumTest(unittest.TestCase):
             '"Open Source in Infrared"',
             "TumoSpectrumReplayStaticLike",
             "TUMOSPECTRUM_LATEST_SET_ARG",
+            "TUMOSPECTRUM_PROFILES_ARG",
+            'elements_button_center(canvas, listening ? "Stop" : "Start")',
+            'elements_button_right(canvas, "Demo")',
         ):
             self.assertIn(required, self.source)
 
@@ -164,10 +168,14 @@ class TumoSpectrumTest(unittest.TestCase):
             self.assertIn(required, self.source)
 
     def test_app_never_transmits_directly(self) -> None:
-        combined = self.source + self.parser + self.analysis + self.storage
+        runtime = (APP_DIR / "tumospectrum_protocol_runtime.c").read_text(
+            encoding="utf-8"
+        )
+        combined = self.source + self.parser + self.analysis + self.storage + runtime
         for forbidden in (
             "furi_hal_subghz",
             "subghz_txrx_tx_start",
+            "subghz_devices_start_async_tx",
             "infrared_send",
             "infrared_signal_transmit",
             "GpioModeOutputPushPull",
