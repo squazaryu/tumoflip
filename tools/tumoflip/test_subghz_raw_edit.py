@@ -17,6 +17,7 @@ class SubGhzRawEditTest(unittest.TestCase):
         self.assertIn('name="Sub-GHz RAW Edit"', manifest)
         self.assertIn('fap_category="ARF Tools"', manifest)
         self.assertIn("Lechnio; tumoflip integration", manifest)
+        self.assertIn('fap_version="1.7"', manifest)
         self.assertNotIn("fap_dist_path", manifest)
 
     def test_raw_edit_is_source_only_import(self) -> None:
@@ -52,9 +53,9 @@ class SubGhzRawEditTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         for definition in (
-            "#define MERGE_GAP_DEFAULT_MS 15",
+            "#define MERGE_GAP_DEFAULT_MS 100",
             "#define MERGE_GAP_MIN_MS 1",
-            "#define MERGE_GAP_MAX_MS 32",
+            "#define MERGE_GAP_MAX_MS 1000",
             "#define MERGE_REPEAT_DEFAULT 1",
             "#define MERGE_REPEAT_MIN 1",
             "#define MERGE_REPEAT_MAX 64",
@@ -66,17 +67,30 @@ class SubGhzRawEditTest(unittest.TestCase):
         self.assertIn("Merge gap", readme)
         self.assertIn("Merge repeat", readme)
 
-    def test_merge_uses_exact_separator_and_dynamic_path_storage(self) -> None:
+    def test_merge_preserves_long_and_native_gaps(self) -> None:
         source = (
             REPO_ROOT / "applications_user/subghz_raw_edit/subghz_raw_edit.c"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("static void merge_separator(SubData *dst)", source)
-        self.assertIn(
-            "dst->data[dst->count - 1] = (int16_t)gap;",
-            source,
-        )
-        self.assertIn("bool skip_lead = add_separator;", source)
+        self.assertIn("static bool push_duration(SubData *sd, int32_t value)", source)
+        self.assertIn("static size_t duration_samples(int32_t value)", source)
+        self.assertIn("static bool merge_separator(SubData *dst)", source)
+        self.assertIn("MergeJoinManual", source)
+        self.assertIn("MergeJoinNative", source)
+        self.assertIn("return push_duration(dst, -(g_merge_gap_ms * 1000));", source)
+        self.assertNotIn("(int16_t)gap", source)
+
+        clamp = 32000
+        for milliseconds, expected_chunks in ((1, 1), (100, 4), (1000, 32)):
+            microseconds = milliseconds * 1000
+            chunks = (microseconds + clamp - 1) // clamp
+            self.assertEqual(chunks, expected_chunks)
+
+    def test_merge_uses_dynamic_path_storage(self) -> None:
+        source = (
+            REPO_ROOT / "applications_user/subghz_raw_edit/subghz_raw_edit.c"
+        ).read_text(encoding="utf-8")
+
         self.assertIn("uint8_t *pbuf = safe_malloc(pcap);", source)
         self.assertIn("uint8_t *np = safe_realloc(pbuf, newcap);", source)
         self.assertIn("free(pbuf);", source)
@@ -88,17 +102,13 @@ class SubGhzRawEditTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("size_t copies = (size_t)g_merge_repeat;", source)
-        self.assertIn("gaps > MAX_SAMPLES - total", source)
-        self.assertIn("over_cap = cnt > remaining / copies;", source)
-        self.assertIn("extra = cnt * copies + gaps;", source)
-        self.assertIn(
-            "bool over_ram = !over_cap &&",
-            source,
-        )
-        self.assertIn(
-            "newtotal * sizeof(int16_t) + LOAD_HEAP_RESERVE > memmgr_get_free_heap()",
-            source,
-        )
+        self.assertIn("static bool checked_size_add", source)
+        self.assertIn("static bool checked_size_mul", source)
+        self.assertIn("static bool merge_estimate_samples", source)
+        self.assertIn("static bool merge_peak_fits_heap", source)
+        self.assertIn("next_temporary_samples", source)
+        self.assertIn("return ok && appended_signal;", source)
+        self.assertIn("No output was saved.", source)
 
     def test_release_and_deploy_include_raw_edit_as_visible_app(self) -> None:
         validate = (REPO_ROOT / "tools/tumoflip/validate_release.py").read_text(

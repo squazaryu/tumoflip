@@ -67,17 +67,19 @@ visually, on the device.
     Save.
   - *Undo* reverts the last cut. It is greyed out (struck through) when there is
     nothing to undo.
-- **Memory-safe.** Long silence gaps are clamped to fit a compact `int16`
-  buffer, the buffer grows in small chunks and shrinks to the file's real size
-  after loading. If there genuinely isn't enough free RAM, you get a clear
-  "reboot and try again" message instead of a crash.
+- **Memory-safe.** Each compact `int16` sample remains bounded, while levels
+  longer than 32 ms are preserved as consecutive same-level chunks. The buffer
+  grows only up to the sample limit and keeps a heap reserve. If a load or merge
+  cannot fit, the app reports the limit instead of saving partial output.
 - **Clean output.** The saved frame is aligned to start on a pulse and end on a
   gap, with the original `Frequency` and `Preset` preserved.
   There is also an option to auto normalize jitter quirks which makes the signal even more clean.
-- **Controlled merge.** `Merge .sub files` can repeat each selected signal and
-  place one exact silence separator between copies. In `Config`, **Merge gap**
-  accepts 1-32 ms and **Merge repeat** accepts 1-64 copies. The app checks the
-  resulting sample count and free heap before allocating the output buffer.
+- **Controlled merge.** `Merge .sub files` can repeat each selected signal.
+  Repeats keep the signal's native synchronization gap; a configurable manual
+  separator is used only between different files. In `Config`, **Merge gap**
+  accepts 1-1000 ms and **Merge repeat** accepts 1-64 copies. The app checks
+  overflow, sample count, output RAM and decoded-file temporary RAM before
+  allocating the output buffer.
 
   Note:
   Some signal receivers will reject a signal if it's "too clean" due to a built-in security layer.
@@ -203,9 +205,9 @@ RAW_Data: 257 -926 637 -526 ...
   cut and gated on free RAM: if there isn't enough, the cut is declined with a
   "Low memory" message instead of going ahead, so you never lose the ability to
   undo and never crash mid-cut.
-- Durations are clamped to +/-32 ms so the capture fits a compact buffer. This
-  only ever touches inter-frame silence; the signal pulses themselves
-  (hundreds of microseconds) are stored exactly.
+- Each stored chunk is limited to +/-32 ms. Longer levels, including manual
+  merge gaps up to 1000 ms, are split into consecutive chunks with the same
+  sign, preserving the full duration without introducing false waveform edges.
 - Up to ~24000 samples (about 47 KB) per file; larger captures are truncated
   rather than failing. A real frame is only a few hundred samples, so this is
   plenty in practice.
