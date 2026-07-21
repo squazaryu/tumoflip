@@ -93,7 +93,6 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Diagnostics/runtime_trace_viewer.fap",
     "apps/Module One/Field/field_logger.fap",
     "apps/Module One/Signals/signal_workbench.fap",
-    "apps/Module One/Signals/protocol_compiler.fap",
     "apps/Module One/Signals/tumoscope.fap",
     "apps/Module One/Network/tumonet_gateway.fap",
     "apps/Module One/Sub-GHz/tumonet_bench.fap",
@@ -122,8 +121,8 @@ MODULE_ONE_PACKAGE_DATA_FILES = (
     "apps_data/tumomodule_runtime/modules/tumovgm.tmod",
     "apps_data/tumovm_peripherals/packages/nfc_state.tper",
     "apps_data/tumovm_peripherals/packages/usb_media.tper",
-    "apps_data/protocol_compiler/profiles/demo_pulse_pair.tproto",
-    "apps_data/protocol_compiler/demo/validation.sub",
+    "apps_data/signal_workbench/profiles/demo_pulse_pair.tproto",
+    "apps_data/signal_workbench/demo/validation.sub",
 )
 ARF_LEGACY_PATHS = {
     **{
@@ -170,6 +169,8 @@ MODULE_ONE_LEGACY_PATHS = {
         "/ext/apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
     "/ext/apps/Module One/module_one_sensor_logger.fap":
         "/ext/apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
+    "/ext/apps/Module One/Signals/protocol_compiler.fap":
+        "/ext/apps/Module One/Signals/signal_workbench.fap",
 }
 BASE_LEGACY_PATHS = {
     "/ext/apps/Scripts/js_app.fap": "/ext/apps/Bluetooth/flipper_companion.fap",

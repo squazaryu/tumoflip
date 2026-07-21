@@ -189,7 +189,7 @@ class ValidateReleaseTest(unittest.TestCase):
             "apps/Module One/Signals/signal_workbench.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
-        self.assertIn(
+        self.assertNotIn(
             "apps/Module One/Signals/protocol_compiler.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
@@ -277,6 +277,14 @@ class ValidateReleaseTest(unittest.TestCase):
         )
         self.assertIn(
             "apps_data/tumomodule_runtime/modules/tumovgm.tmod",
+            MODULE_ONE_PACKAGE_DATA_FILES,
+        )
+        self.assertIn(
+            "apps_data/signal_workbench/profiles/demo_pulse_pair.tproto",
+            MODULE_ONE_PACKAGE_DATA_FILES,
+        )
+        self.assertIn(
+            "apps_data/signal_workbench/demo/validation.sub",
             MODULE_ONE_PACKAGE_DATA_FILES,
         )
         sample = (

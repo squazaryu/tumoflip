@@ -44,7 +44,7 @@ typedef enum {
     ModuleOneCockpitActionLaunchTumoScript,
     ModuleOneCockpitActionLaunchFieldLogger,
     ModuleOneCockpitActionLaunchSignalWorkbench,
-    ModuleOneCockpitActionLaunchProtocolCompiler,
+    ModuleOneCockpitActionLaunchProtocolProfiles,
     ModuleOneCockpitActionLaunchTumoScope,
     ModuleOneCockpitActionLaunchVgmBridge,
     ModuleOneCockpitActionLaunchTumoModule,
@@ -135,7 +135,7 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"Macros: TumoScript", ModuleOneCockpitActionLaunchTumoScript},
     {"Field: Logger", ModuleOneCockpitActionLaunchFieldLogger},
     {"Signals: TumoSpectrum", ModuleOneCockpitActionLaunchSignalWorkbench},
-    {"Signals: Compiler", ModuleOneCockpitActionLaunchProtocolCompiler},
+    {"Signals: Profiles", ModuleOneCockpitActionLaunchProtocolProfiles},
     {"Signals: TumoScope", ModuleOneCockpitActionLaunchTumoScope},
     {"VGM: Bridge", ModuleOneCockpitActionLaunchVgmBridge},
     {"Modules: Runtime", ModuleOneCockpitActionLaunchTumoModule},
@@ -230,11 +230,11 @@ static const ModuleOneCockpitLaunchTarget module_one_cockpit_targets[] = {
         true,
     },
     {
-        ModuleOneCockpitActionLaunchProtocolCompiler,
+        ModuleOneCockpitActionLaunchProtocolProfiles,
         ModuleOneCockpitBlockSignal,
-        "Protocol Compiler",
-        EXT_PATH("apps/Module One/Signals/protocol_compiler.fap"),
-        NULL,
+        "TumoSpectrum Profiles",
+        EXT_PATH("apps/Module One/Signals/signal_workbench.fap"),
+        "tumospectrum_profiles",
         true,
     },
     {
@@ -627,7 +627,7 @@ static void module_one_cockpit_build_report(ModuleOneCockpitApp* app, FuriString
         "ESP32: use UART/AT or WiFi Mapper\n"
         "BLE: use GATT Lab or App Bridge Terminal for App Bridge diagnostics\n"
         "Macros: use Macro Deck or TumoScript for local action sequences\n"
-        "Signals: use Compiler for .tproto validation or TumoScope for GPIO capture\n"
+        "Signals: use TumoSpectrum Profiles for live .tproto RX or TumoScope for GPIO capture\n"
         "Acceptance: export release smoke reports after each flash\n"
         "GPS/BME280: use Sensor Logger\n"
         "NRF24: passive detection is not implemented yet\n"

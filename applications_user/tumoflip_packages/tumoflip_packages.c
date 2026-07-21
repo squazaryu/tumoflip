@@ -121,6 +121,8 @@ static const TumoLegacyPath tumo_legacy_paths[] = {
      "/ext/apps/Module One/Sensors BME280/module_one_sensor_logger.fap"},
     {"/ext/apps/Module One/tumo_acceptance_suite.fap",
      "/ext/apps/Module One/Diagnostics/tumo_acceptance_suite.fap"},
+    {"/ext/apps/Module One/Signals/protocol_compiler.fap",
+     "/ext/apps/Module One/Signals/signal_workbench.fap"},
 };
 
 typedef struct {
