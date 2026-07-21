@@ -3,6 +3,7 @@
 #include <toolbox/stream/stream.h>
 #include <flipper_format/flipper_format.h>
 #include <flipper_format/flipper_format_i.h>
+#include <float_tools.h>
 
 #include <furi.h>
 
@@ -40,9 +41,9 @@ struct SubGhzHistory {
 };
 
 SubGhzHistory* subghz_wardriving_history_alloc(void) {
-    SubGhzHistory* instance = malloc(sizeof(SubGhzHistory));
+    SubGhzHistory* instance = calloc(1, sizeof(SubGhzHistory));
     instance->tmp_string = furi_string_alloc();
-    instance->history = malloc(sizeof(SubGhzHistoryStruct));
+    instance->history = calloc(1, sizeof(SubGhzHistoryStruct));
     SubGhzHistoryItemArray_init(instance->history->data);
     return instance;
 }
@@ -317,14 +318,16 @@ bool subghz_wardriving_history_add_to_history(
             FURI_LOG_E(TAG, "Seek 2 failed");
             break;
         }
-        // Insert Lat and Lon at the right place
-        if(!stream_insert_format(stream, "Lat: %f\n", (double)latitude)) {
-            FURI_LOG_E(TAG, "Unable to add Lat");
-            break;
-        }
-        if(!stream_insert_format(stream, "Lon: %f\n", (double)longitude)) {
-            FURI_LOG_E(TAG, "Unable to add Lon");
-            break;
+        // Keep ordinary .sub files valid when GPS is disabled or has no fix.
+        if(!isnanf(latitude) && !isnanf(longitude)) {
+            if(!stream_insert_format(stream, "Lat: %f\n", (double)latitude)) {
+                FURI_LOG_E(TAG, "Unable to add Lat");
+                break;
+            }
+            if(!stream_insert_format(stream, "Lon: %f\n", (double)longitude)) {
+                FURI_LOG_E(TAG, "Unable to add Lon");
+                break;
+            }
         }
     } while(false);
 

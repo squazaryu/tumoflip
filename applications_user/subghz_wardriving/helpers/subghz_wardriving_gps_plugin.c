@@ -120,10 +120,14 @@ SubGhzGPS* subghz_gps_plugin_init(SubGhzGpsProtocol protocol, uint32_t baudrate)
             SubGhzGPS* subghz_gps, SubGhzGpsProtocol protocol, uint32_t baudrate) =
             app_descriptor->entry_point;
 
-        SubGhzGPS* subghz_gps = malloc(sizeof(SubGhzGPS));
+        SubGhzGPS* subghz_gps = calloc(1, sizeof(SubGhzGPS));
         subghz_gps->plugin_app = plugin_app;
         subghz_gps->baudrate = baudrate;
         subghz_gps_init(subghz_gps, protocol, baudrate);
+        if(!subghz_gps->serial_handle) {
+            free(subghz_gps);
+            break;
+        }
         return subghz_gps;
 
     } while(false);
@@ -157,8 +161,7 @@ SubGhzGPS* subghz_gps_apply(SubGhzGPS* current, SubGhzGpsProtocol protocol, uint
 
     if(current) {
         bool matches = current->protocol == protocol;
-        if(matches &&
-           (protocol == SubGhzGpsProtocolNmea || protocol == SubGhzGpsProtocolUbox)) {
+        if(matches && (protocol == SubGhzGpsProtocolNmea || protocol == SubGhzGpsProtocolUbox)) {
             matches = current->baudrate == resolved_baud;
         }
         if(matches) return current;

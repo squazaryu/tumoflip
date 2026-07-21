@@ -20,7 +20,7 @@ struct SubGhzGPS {
     FlipperApplication* plugin_app;
     FuriThread* thread;
     FuriStreamBuffer* rx_stream;
-    uint8_t rx_buf[RX_BUF_SIZE];
+    uint8_t rx_buf[RX_BUF_SIZE + 1];
     FuriHalSerialHandle* serial_handle;
     SubGhzGpsProtocol protocol;
     uint32_t baudrate;
@@ -33,6 +33,7 @@ struct SubGhzGPS {
     uint8_t fix_second;
     uint8_t fix_minute;
     uint8_t fix_hour;
+    uint32_t fix_timestamp;
 
     void (*deinit)(SubGhzGPS* subghz_gps);
 };

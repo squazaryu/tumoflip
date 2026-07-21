@@ -5,6 +5,7 @@ App(
     targets=["f7"],
     entry_point="subghz_app",
     stack_size=3 * 1024,
+    requires=["subghz_radio_broker"],
     fap_libs=["assets", "hwdrivers"],
     fap_icon="icon.png",
     fap_icon_assets="ex_icons",

@@ -26,7 +26,7 @@
 #define SUBGHZ_LAST_SETTING_FIELD_TX_POWER          "TXPower"
 
 SubGhzLastSettings* subghz_wardriving_last_settings_alloc(void) {
-    SubGhzLastSettings* instance = malloc(sizeof(SubGhzLastSettings));
+    SubGhzLastSettings* instance = calloc(1, sizeof(SubGhzLastSettings));
     return instance;
 }
 

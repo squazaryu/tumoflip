@@ -269,9 +269,7 @@ void subghz_scene_receiver_on_enter(void* context) {
 
     if(subghz_rx_key_state_get(subghz) == SubGhzRxKeyStateIDLE) {
         subghz->gps = subghz_gps_apply(
-            subghz->gps,
-            subghz->last_settings->gps_protocol,
-            subghz->last_settings->gps_baudrate);
+            subghz->gps, subghz->last_settings->gps_protocol, subghz->last_settings->gps_baudrate);
 
         subghz_wardriving_txrx_set_preset_internal(
             subghz->txrx,
@@ -517,15 +515,15 @@ bool subghz_scene_receiver_on_event(void* context, SceneManagerEvent event) {
                 subghz_wardriving_txrx_radio_device_get_rssi(subghz->txrx));
 
             if(subghz->gps) {
-                DateTime datetime;
-                furi_hal_rtc_get_datetime(&datetime);
-                if((datetime.second - subghz->gps->fix_second) > 15) {
+                uint32_t now = furi_hal_rtc_get_timestamp();
+                if(subghz->gps->fix_timestamp && (now - subghz->gps->fix_timestamp) > 15) {
                     subghz->gps->latitude = NAN;
                     subghz->gps->longitude = NAN;
                     subghz->gps->satellites = 0;
                     subghz->gps->fix_hour = 0;
                     subghz->gps->fix_minute = 0;
                     subghz->gps->fix_second = 0;
+                    subghz->gps->fix_timestamp = 0;
                 }
                 subghz_scene_receiver_update_statusbar(subghz);
             }

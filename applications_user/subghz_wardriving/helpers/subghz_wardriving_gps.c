@@ -11,39 +11,64 @@ typedef enum {
 
 #define WORKER_ALL_RX_EVENTS (WorkerEvtStop | WorkerEvtRxDone)
 
+static void subghz_gps_update_fix(
+    SubGhzGPS* subghz_gps,
+    float latitude,
+    float longitude,
+    int satellites,
+    uint8_t hour,
+    uint8_t minute,
+    uint8_t second) {
+    subghz_gps->latitude = latitude;
+    subghz_gps->longitude = longitude;
+    if(satellites >= 0) subghz_gps->satellites = satellites;
+    subghz_gps->fix_hour = hour;
+    subghz_gps->fix_minute = minute;
+    subghz_gps->fix_second = second;
+    subghz_gps->fix_timestamp = furi_hal_rtc_get_timestamp();
+}
+
 static void subghz_gps_uart_parse_nmea(SubGhzGPS* subghz_gps, char* line) {
     switch(minmea_sentence_id(line, false)) {
     case MINMEA_SENTENCE_RMC: {
         struct minmea_sentence_rmc frame;
-        if(minmea_parse_rmc(&frame, line)) {
-            subghz_gps->latitude = minmea_tocoord(&frame.latitude);
-            subghz_gps->longitude = minmea_tocoord(&frame.longitude);
-            subghz_gps->fix_second = frame.time.seconds;
-            subghz_gps->fix_minute = frame.time.minutes;
-            subghz_gps->fix_hour = frame.time.hours;
+        if(minmea_parse_rmc(&frame, line) && frame.valid) {
+            subghz_gps_update_fix(
+                subghz_gps,
+                minmea_tocoord(&frame.latitude),
+                minmea_tocoord(&frame.longitude),
+                -1,
+                frame.time.hours,
+                frame.time.minutes,
+                frame.time.seconds);
         }
     } break;
 
     case MINMEA_SENTENCE_GGA: {
         struct minmea_sentence_gga frame;
-        if(minmea_parse_gga(&frame, line)) {
-            subghz_gps->latitude = minmea_tocoord(&frame.latitude);
-            subghz_gps->longitude = minmea_tocoord(&frame.longitude);
-            subghz_gps->satellites = frame.satellites_tracked;
-            subghz_gps->fix_second = frame.time.seconds;
-            subghz_gps->fix_minute = frame.time.minutes;
-            subghz_gps->fix_hour = frame.time.hours;
+        if(minmea_parse_gga(&frame, line) && frame.fix_quality > 0) {
+            subghz_gps_update_fix(
+                subghz_gps,
+                minmea_tocoord(&frame.latitude),
+                minmea_tocoord(&frame.longitude),
+                frame.satellites_tracked,
+                frame.time.hours,
+                frame.time.minutes,
+                frame.time.seconds);
         }
     } break;
 
     case MINMEA_SENTENCE_GLL: {
         struct minmea_sentence_gll frame;
-        if(minmea_parse_gll(&frame, line)) {
-            subghz_gps->latitude = minmea_tocoord(&frame.latitude);
-            subghz_gps->longitude = minmea_tocoord(&frame.longitude);
-            subghz_gps->fix_second = frame.time.seconds;
-            subghz_gps->fix_minute = frame.time.minutes;
-            subghz_gps->fix_hour = frame.time.hours;
+        if(minmea_parse_gll(&frame, line) && frame.status == MINMEA_GLL_STATUS_DATA_VALID) {
+            subghz_gps_update_fix(
+                subghz_gps,
+                minmea_tocoord(&frame.latitude),
+                minmea_tocoord(&frame.longitude),
+                -1,
+                frame.time.hours,
+                frame.time.minutes,
+                frame.time.seconds);
         }
     } break;
 
@@ -69,13 +94,9 @@ static void subghz_gps_uart_on_irq_cb(
 static void subghz_gps_uart_parse_ubox(SubGhzGPS* subghz_gps, const uint8_t* data, size_t len) {
     UboxPvt pvt;
     for(size_t i = 0; i < len; i++) {
-        if(ubox_rx_byte(&subghz_gps->ubox, data[i], &pvt)) {
-            subghz_gps->latitude = pvt.lat * 1e-7f;
-            subghz_gps->longitude = pvt.lon * 1e-7f;
-            subghz_gps->satellites = pvt.sats;
-            subghz_gps->fix_hour = pvt.hour;
-            subghz_gps->fix_minute = pvt.min;
-            subghz_gps->fix_second = pvt.sec;
+        if(ubox_rx_byte(&subghz_gps->ubox, data[i], &pvt) && pvt.valid) {
+            subghz_gps_update_fix(
+                subghz_gps, pvt.lat * 1e-7f, pvt.lon * 1e-7f, pvt.sats, pvt.hour, pvt.min, pvt.sec);
         }
     }
 }
@@ -88,7 +109,10 @@ static int32_t subghz_gps_uart_worker(void* context) {
     while(1) {
         uint32_t events =
             furi_thread_flags_wait(WORKER_ALL_RX_EVENTS, FuriFlagWaitAny, FuriWaitForever);
-        furi_check((events & FuriFlagError) == 0);
+        if(events & FuriFlagError) {
+            FURI_LOG_E("SubGhzWarDrivingGPS", "UART worker flag error: %lu", events);
+            break;
+        }
 
         if(events & WorkerEvtStop) {
             break;
@@ -116,8 +140,8 @@ static int32_t subghz_gps_uart_worker(void* context) {
 
                 char* current_line = (char*)subghz_gps->rx_buf;
                 while(true) {
-                    while(*current_line == '\0' &&
-                          current_line < (char*)subghz_gps->rx_buf + rx_offset) {
+                    while(current_line < (char*)subghz_gps->rx_buf + rx_offset &&
+                          *current_line == '\0') {
                         current_line++;
                     }
 
@@ -128,10 +152,13 @@ static int32_t subghz_gps_uart_worker(void* context) {
                         current_line = next_line + 1;
                     } else {
                         if(current_line > (char*)subghz_gps->rx_buf) {
+                            size_t remaining =
+                                (char*)subghz_gps->rx_buf + rx_offset - current_line;
+                            memmove(subghz_gps->rx_buf, current_line, remaining);
+                            rx_offset = remaining;
+                        } else if(rx_offset == RX_BUF_SIZE) {
+                            FURI_LOG_W("SubGhzWarDrivingGPS", "Dropping oversized NMEA sentence");
                             rx_offset = 0;
-                            while(*current_line) {
-                                subghz_gps->rx_buf[rx_offset++] = *(current_line++);
-                            }
                         }
                         break;
                     }
@@ -146,16 +173,20 @@ static int32_t subghz_gps_uart_worker(void* context) {
 static void subghz_gps_deinit(SubGhzGPS* subghz_gps) {
     furi_assert(subghz_gps);
 
-    furi_thread_flags_set(furi_thread_get_id(subghz_gps->thread), WorkerEvtStop);
-    furi_thread_join(subghz_gps->thread);
+    if(subghz_gps->thread) {
+        furi_thread_flags_set(furi_thread_get_id(subghz_gps->thread), WorkerEvtStop);
+        furi_thread_join(subghz_gps->thread);
+    }
 
-    furi_hal_serial_async_rx_stop(subghz_gps->serial_handle);
-    furi_hal_serial_deinit(subghz_gps->serial_handle);
-    furi_hal_serial_control_release(subghz_gps->serial_handle);
+    if(subghz_gps->serial_handle) {
+        furi_hal_serial_async_rx_stop(subghz_gps->serial_handle);
+        furi_hal_serial_deinit(subghz_gps->serial_handle);
+        furi_hal_serial_control_release(subghz_gps->serial_handle);
+    }
 
-    furi_thread_free(subghz_gps->thread);
+    if(subghz_gps->thread) furi_thread_free(subghz_gps->thread);
 
-    furi_stream_buffer_free(subghz_gps->rx_stream);
+    if(subghz_gps->rx_stream) furi_stream_buffer_free(subghz_gps->rx_stream);
 }
 
 static void subghz_gps_init(SubGhzGPS* subghz_gps, SubGhzGpsProtocol protocol, uint32_t baudrate) {
@@ -165,9 +196,17 @@ static void subghz_gps_init(SubGhzGPS* subghz_gps, SubGhzGpsProtocol protocol, u
     subghz_gps->fix_hour = 0;
     subghz_gps->fix_minute = 0;
     subghz_gps->fix_second = 0;
+    subghz_gps->fix_timestamp = 0;
+    subghz_gps->deinit = &subghz_gps_deinit;
 
     subghz_gps->protocol = protocol;
     ubox_rx_init(&subghz_gps->ubox);
+
+    subghz_gps->serial_handle = furi_hal_serial_control_acquire(UART_CH);
+    if(!subghz_gps->serial_handle) {
+        FURI_LOG_E("SubGhzWarDrivingGPS", "UART is busy");
+        return;
+    }
 
     subghz_gps->rx_stream = furi_stream_buffer_alloc(RX_BUF_SIZE, 1);
 
@@ -175,14 +214,10 @@ static void subghz_gps_init(SubGhzGPS* subghz_gps, SubGhzGpsProtocol protocol, u
         furi_thread_alloc_ex("SubGhzGPSWorker", 1024, subghz_gps_uart_worker, subghz_gps);
     furi_thread_start(subghz_gps->thread);
 
-    subghz_gps->serial_handle = furi_hal_serial_control_acquire(UART_CH);
-    furi_check(subghz_gps->serial_handle);
     furi_hal_serial_init(subghz_gps->serial_handle, baudrate);
 
     furi_hal_serial_async_rx_start(
         subghz_gps->serial_handle, subghz_gps_uart_on_irq_cb, subghz_gps, false);
-
-    subghz_gps->deinit = &subghz_gps_deinit;
 }
 
 static const FlipperAppPluginDescriptor plugin_descriptor = {

@@ -29,7 +29,7 @@ void subghz_tick_event_callback(void* context) {
 }
 
 SubGhz* subghz_alloc() {
-    SubGhz* subghz = malloc(sizeof(SubGhz));
+    SubGhz* subghz = calloc(1, sizeof(SubGhz));
 
     expansion_disable(furi_record_open(RECORD_EXPANSION));
     furi_record_close(RECORD_EXPANSION);
@@ -121,6 +121,7 @@ SubGhz* subghz_alloc() {
     subghz->last_settings = subghz_wardriving_last_settings_alloc();
     size_t preset_count = subghz_setting_get_preset_count(setting);
     subghz_wardriving_last_settings_load(subghz->last_settings, preset_count);
+    subghz->tx_power = subghz->last_settings->tx_power;
     // Make sure we select a frequency available in loaded setting configuration
     uint32_t last_frequency = subghz->last_settings->frequency;
     size_t count = subghz_setting_get_frequency_count(setting);
@@ -155,8 +156,6 @@ SubGhz* subghz_alloc() {
     subghz->remove_duplicates = subghz->last_settings->remove_duplicates;
     subghz->ignore_filter = subghz->last_settings->ignore_filter;
     subghz->filter = subghz->last_settings->filter;
-    subghz->tx_power = subghz->last_settings->tx_power;
-
     subghz_wardriving_txrx_receiver_set_filter(subghz->txrx, subghz->filter);
     subghz_wardriving_txrx_set_need_save_callback(subghz->txrx, subghz_save_to_file, subghz);
 
