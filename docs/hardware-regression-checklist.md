@@ -125,6 +125,8 @@ are legally allowed to test.
   confirm it exits cleanly and do not share `/ext/keystore_decrypted.txt`.
 - Launch `Garage Door Remote`, enter/exit its receive views, and confirm core
   `Sub-GHz` can still receive afterward.
+- In `Garage Door Remote`, start AM receive and confirm a known sample from the
+  expanded protocol registry is recognized when suitable hardware is available.
 - Launch `RollJam` from `ARF Sub-GHz Full`, back out without capture/transmit,
   and confirm core `Sub-GHz` can still receive afterward.
 - Launch and exit every packaged ARF child FAP:
