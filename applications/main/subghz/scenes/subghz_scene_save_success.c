@@ -24,6 +24,12 @@ bool subghz_scene_save_success_on_event(void* context, SceneManagerEvent event) 
     SubGhz* subghz = context;
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == SubGhzCustomEventSceneSaveSuccess) {
+            if(subghz->return_to_launcher) {
+                scene_manager_stop(subghz->scene_manager);
+                view_dispatcher_stop(subghz->view_dispatcher);
+                return true;
+            }
+
             if(!scene_manager_has_previous_scene(subghz->scene_manager, SubGhzSceneDecodeRAW)) {
                 if(!scene_manager_search_and_switch_to_previous_scene(
                        subghz->scene_manager, SubGhzSceneReceiver)) {

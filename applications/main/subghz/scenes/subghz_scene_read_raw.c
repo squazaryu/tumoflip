@@ -158,12 +158,17 @@ bool subghz_scene_read_raw_on_event(void* context, SceneManagerEvent event) {
                 } else {
                     subghz_txrx_set_default_preset(subghz->txrx, subghz->last_settings->frequency);
                 }
-                if(!scene_manager_search_and_switch_to_previous_scene(
-                       subghz->scene_manager, SubGhzSceneSaved)) {
+                if(subghz->return_to_launcher) {
+                    scene_manager_stop(subghz->scene_manager);
+                    view_dispatcher_stop(subghz->view_dispatcher);
+                } else {
                     if(!scene_manager_search_and_switch_to_previous_scene(
-                           subghz->scene_manager, SubGhzSceneStart)) {
-                        scene_manager_stop(subghz->scene_manager);
-                        view_dispatcher_stop(subghz->view_dispatcher);
+                           subghz->scene_manager, SubGhzSceneSaved)) {
+                        if(!scene_manager_search_and_switch_to_previous_scene(
+                               subghz->scene_manager, SubGhzSceneStart)) {
+                            scene_manager_stop(subghz->scene_manager);
+                            view_dispatcher_stop(subghz->view_dispatcher);
+                        }
                     }
                 }
             }

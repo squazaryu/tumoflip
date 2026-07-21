@@ -26,9 +26,14 @@ bool infrared_scene_learn_done_on_event(void* context, SceneManagerEvent event) 
 
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == InfraredCustomEventTypePopupClosed) {
-            if(!scene_manager_search_and_switch_to_previous_scene(
-                   infrared->scene_manager, InfraredSceneRemote)) {
-                scene_manager_next_scene(infrared->scene_manager, InfraredSceneRemote);
+            if(infrared->app_state.return_to_launcher) {
+                scene_manager_stop(infrared->scene_manager);
+                view_dispatcher_stop(infrared->view_dispatcher);
+            } else {
+                if(!scene_manager_search_and_switch_to_previous_scene(
+                       infrared->scene_manager, InfraredSceneRemote)) {
+                    scene_manager_next_scene(infrared->scene_manager, InfraredSceneRemote);
+                }
             }
             consumed = true;
         }

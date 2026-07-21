@@ -19,6 +19,14 @@ STORAGE_SOURCE = APP_DIR / "tumospectrum_storage.c"
 APP_MANIFEST = APP_DIR / "application.fam"
 SUBGHZ_SOURCE = REPO_ROOT / "applications/main/subghz/subghz.c"
 INFRARED_SOURCE = REPO_ROOT / "applications/main/infrared/infrared_app.c"
+SUBGHZ_INTERNAL = REPO_ROOT / "applications/main/subghz/subghz_i.h"
+SUBGHZ_READ_RAW = REPO_ROOT / "applications/main/subghz/scenes/subghz_scene_read_raw.c"
+SUBGHZ_NEED_SAVING = REPO_ROOT / "applications/main/subghz/scenes/subghz_scene_need_saving.c"
+SUBGHZ_SAVE_SUCCESS = REPO_ROOT / "applications/main/subghz/scenes/subghz_scene_save_success.c"
+INFRARED_INTERNAL = REPO_ROOT / "applications/main/infrared/infrared_app_i.h"
+INFRARED_LEARN = REPO_ROOT / "applications/main/infrared/scenes/infrared_scene_learn.c"
+INFRARED_ASK_BACK = REPO_ROOT / "applications/main/infrared/scenes/infrared_scene_ask_back.c"
+INFRARED_LEARN_DONE = REPO_ROOT / "applications/main/infrared/scenes/infrared_scene_learn_done.c"
 COCKPIT_SOURCE = REPO_ROOT / "applications_user/module_one_cockpit/module_one_cockpit.c"
 ACCEPTANCE_SOURCE = REPO_ROOT / "applications_user/tumo_acceptance_suite/tumo_acceptance_suite.c"
 VALIDATOR = REPO_ROOT / "tools/tumoflip/validate_release.py"
@@ -37,6 +45,14 @@ class TumoSpectrumTest(unittest.TestCase):
         cls.manifest = APP_MANIFEST.read_text(encoding="utf-8")
         cls.subghz = SUBGHZ_SOURCE.read_text(encoding="utf-8")
         cls.infrared = INFRARED_SOURCE.read_text(encoding="utf-8")
+        cls.subghz_internal = SUBGHZ_INTERNAL.read_text(encoding="utf-8")
+        cls.subghz_read_raw = SUBGHZ_READ_RAW.read_text(encoding="utf-8")
+        cls.subghz_need_saving = SUBGHZ_NEED_SAVING.read_text(encoding="utf-8")
+        cls.subghz_save_success = SUBGHZ_SAVE_SUCCESS.read_text(encoding="utf-8")
+        cls.infrared_internal = INFRARED_INTERNAL.read_text(encoding="utf-8")
+        cls.infrared_learn = INFRARED_LEARN.read_text(encoding="utf-8")
+        cls.infrared_ask_back = INFRARED_ASK_BACK.read_text(encoding="utf-8")
+        cls.infrared_learn_done = INFRARED_LEARN_DONE.read_text(encoding="utf-8")
         cls.cockpit = COCKPIT_SOURCE.read_text(encoding="utf-8")
         cls.acceptance = ACCEPTANCE_SOURCE.read_text(encoding="utf-8")
         cls.validator = VALIDATOR.read_text(encoding="utf-8")
@@ -153,6 +169,29 @@ class TumoSpectrumTest(unittest.TestCase):
         self.assertIn("SubGhzSceneReadRAW", self.subghz)
         self.assertIn("InfraredSceneLearn", self.infrared)
         self.assertIn("infrared_worker_rx_enable_signal_decoding", self.infrared)
+
+    def test_stock_capture_apps_resume_tumospectrum_without_changing_normal_back(self) -> None:
+        self.assertIn("bool return_to_launcher;", self.subghz_internal)
+        self.assertIn("subghz->return_to_launcher = open_capture_raw;", self.subghz)
+        self.assertIn("if(subghz->return_to_launcher)", self.subghz_read_raw)
+        self.assertIn('"Exit to TumoSpectrum?"', self.subghz_need_saving)
+        self.assertIn("if(subghz->return_to_launcher)", self.subghz_save_success)
+        self.assertIn("bool return_to_launcher;", self.infrared_internal)
+        self.assertIn(
+            "infrared->app_state.return_to_launcher = open_capture_raw;", self.infrared
+        )
+        self.assertIn("infrared->app_state.return_to_launcher", self.infrared_learn)
+        self.assertIn('"Exit to TumoSpectrum?"', self.infrared_ask_back)
+        self.assertIn("infrared->app_state.return_to_launcher", self.infrared_learn_done)
+        for source in (
+            self.subghz_read_raw,
+            self.subghz_need_saving,
+            self.subghz_save_success,
+            self.infrared_learn,
+            self.infrared_ask_back,
+            self.infrared_learn_done,
+        ):
+            self.assertIn("view_dispatcher_stop", source)
 
     def test_module_views_keep_their_internal_context(self) -> None:
         for forbidden in (
