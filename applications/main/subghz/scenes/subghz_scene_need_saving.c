@@ -16,7 +16,13 @@ void subghz_scene_need_saving_on_enter(void* context) {
     SubGhz* subghz = context;
 
     widget_add_string_multiline_element(
-        subghz->widget, 64, 13, AlignCenter, AlignCenter, FontPrimary, "Exit to Sub-GHz Menu?");
+        subghz->widget,
+        64,
+        13,
+        AlignCenter,
+        AlignCenter,
+        FontPrimary,
+        subghz->return_to_launcher ? "Exit to TumoSpectrum?" : "Exit to Sub-GHz Menu?");
     widget_add_string_multiline_element(
         subghz->widget,
         64,
@@ -58,8 +64,13 @@ bool subghz_scene_need_saving_on_event(void* context, SceneManagerEvent event) {
 
                 subghz_txrx_set_preset(
                     subghz->txrx, "AM650", subghz->last_settings->frequency, NULL, 0);
-                scene_manager_search_and_switch_to_previous_scene(
-                    subghz->scene_manager, SubGhzSceneStart);
+                if(subghz->return_to_launcher) {
+                    scene_manager_stop(subghz->scene_manager);
+                    view_dispatcher_stop(subghz->view_dispatcher);
+                } else {
+                    scene_manager_search_and_switch_to_previous_scene(
+                        subghz->scene_manager, SubGhzSceneStart);
+                }
             } else {
                 scene_manager_previous_scene(subghz->scene_manager);
             }

@@ -9,7 +9,9 @@ void infrared_scene_ask_back_on_enter(void* context) {
     InfraredApp* infrared = context;
     DialogEx* dialog_ex = infrared->dialog_ex;
 
-    if(infrared->app_state.is_learning_new_remote) {
+    if(infrared->app_state.return_to_launcher) {
+        dialog_ex_set_header(dialog_ex, "Exit to TumoSpectrum?", 64, 11, AlignCenter, AlignTop);
+    } else if(infrared->app_state.is_learning_new_remote) {
         dialog_ex_set_header(dialog_ex, "Exit to Infrared Menu?", 64, 11, AlignCenter, AlignTop);
     } else {
         dialog_ex_set_header(dialog_ex, "Exit to Remote Menu?", 64, 11, AlignCenter, AlignTop);
@@ -36,7 +38,10 @@ bool infrared_scene_ask_back_on_event(void* context, SceneManagerEvent event) {
         consumed = true;
     } else if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == DialogExResultLeft) {
-            if(infrared->app_state.is_learning_new_remote) {
+            if(infrared->app_state.return_to_launcher) {
+                scene_manager_stop(scene_manager);
+                view_dispatcher_stop(infrared->view_dispatcher);
+            } else if(infrared->app_state.is_learning_new_remote) {
                 scene_manager_search_and_switch_to_previous_scene(
                     scene_manager, InfraredSceneStart);
             } else {

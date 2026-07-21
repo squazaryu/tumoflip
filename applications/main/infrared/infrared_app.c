@@ -152,6 +152,7 @@ static InfraredApp* infrared_alloc(void) {
 
     InfraredAppState* app_state = &infrared->app_state;
     app_state->is_learning_new_remote = false;
+    app_state->return_to_launcher = false;
     app_state->is_debug_enabled = furi_hal_rtc_is_flag_set(FuriHalRtcFlagDebug);
     app_state->edit_target = InfraredEditTargetNone;
     app_state->edit_mode = InfraredEditModeNone;
@@ -581,6 +582,7 @@ int32_t infrared_app(void* p) {
     bool is_remote_loaded = false;
     bool is_rpc_mode = false;
     const bool open_capture_raw = p && strcmp(p, "tumospectrum_raw") == 0;
+    infrared->app_state.return_to_launcher = open_capture_raw;
 
     if(p && strlen(p) && !open_capture_raw) {
         uint32_t rpc_ctx = 0;

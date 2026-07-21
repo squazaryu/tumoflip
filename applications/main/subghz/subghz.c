@@ -122,6 +122,7 @@ static void subghz_load_custom_presets(SubGhzSetting* setting) {
 
 SubGhz* subghz_alloc(bool alloc_for_tx_only) {
     SubGhz* subghz = malloc(sizeof(SubGhz));
+    subghz->return_to_launcher = false;
 
     subghz->file_path = furi_string_alloc();
     subghz->file_path_tmp = furi_string_alloc();
@@ -380,6 +381,7 @@ int32_t subghz_app(void* p) {
         p && strlen(p) && !open_receiver && !open_capture_raw && !open_frequency_analyzer;
 
     SubGhz* subghz = subghz_alloc(alloc_for_tx);
+    subghz->return_to_launcher = open_capture_raw;
 
     if(alloc_for_tx) {
         subghz->raw_send_only = true;
