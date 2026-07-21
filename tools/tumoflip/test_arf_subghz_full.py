@@ -45,6 +45,14 @@ class ArfSubGhzFullTest(unittest.TestCase):
             },
         )
         self.assertIn('.target = "Sub-GHz"', start_scene)
+        self.assertIn(
+            '#define SUBGHZ_WARDRIVING_PATH EXT_PATH("apps/Sub-GHz/subghz_wardriving.fap")',
+            start_scene,
+        )
+        self.assertIn(
+            '{.label = "Sub-GHz Wardriving", .target = SUBGHZ_WARDRIVING_PATH}',
+            start_scene,
+        )
         self.assertNotIn("#define ARF_STANDARD_PATH", start_scene)
         self.assertNotIn("arf_subghz_standard.fap", start_scene)
         self.assertNotIn('appid="arf_subghz_standard"', app_manifests)
