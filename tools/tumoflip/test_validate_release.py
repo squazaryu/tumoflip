@@ -283,10 +283,14 @@ class ValidateReleaseTest(unittest.TestCase):
             "apps_data/signal_workbench/profiles/demo_pulse_pair.tproto",
             MODULE_ONE_PACKAGE_DATA_FILES,
         )
-        self.assertIn(
+        for path in (
             "apps_data/signal_workbench/demo/validation.sub",
-            MODULE_ONE_PACKAGE_DATA_FILES,
-        )
+            "subghz/TumoSpectrum Demo/train_0.sub",
+            "subghz/TumoSpectrum Demo/train_1.sub",
+            "subghz/TumoSpectrum Demo/train_2.sub",
+            "subghz/TumoSpectrum Demo/train_3.sub",
+        ):
+            self.assertIn(path, MODULE_ONE_PACKAGE_DATA_FILES)
         sample = (
             REPO_ROOT
             / STATIC_SD_RESOURCES

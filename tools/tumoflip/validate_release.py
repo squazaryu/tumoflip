@@ -123,6 +123,10 @@ MODULE_ONE_PACKAGE_DATA_FILES = (
     "apps_data/tumovm_peripherals/packages/usb_media.tper",
     "apps_data/signal_workbench/profiles/demo_pulse_pair.tproto",
     "apps_data/signal_workbench/demo/validation.sub",
+    "subghz/TumoSpectrum Demo/train_0.sub",
+    "subghz/TumoSpectrum Demo/train_1.sub",
+    "subghz/TumoSpectrum Demo/train_2.sub",
+    "subghz/TumoSpectrum Demo/train_3.sub",
 )
 ARF_LEGACY_PATHS = {
     **{

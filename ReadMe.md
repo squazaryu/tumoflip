@@ -110,8 +110,9 @@ The four-page post-update splash screen is generated automatically from
   system Sub-GHz Receiver with the chosen preset.
 - Removed repeated `MHz` labels from empty Frequency Analyzer history slots and
   the overlapping feedback glyph from the right column.
-- Added the receive-only Protocol Compiler toolchain: host-side `.tproto`
-  inference from repeated Sub-GHz RAW captures and bounded validation on Flipper.
+- Added autonomous receive-only protocol profiles: TumoSpectrum can infer a
+  bounded `.tproto` profile from three or four Sub-GHz RAW captures directly on
+  Flipper, save it atomically to SD, and start live decoding without a computer.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.
 - Replaced the Desktop OK menu `Sub-GHz Remote` shortcut with the `ARF Tools`
   folder while keeping the normal `Sub-GHz` entry on the standard core app.

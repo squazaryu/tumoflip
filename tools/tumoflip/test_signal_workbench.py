@@ -44,7 +44,7 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_app_migrates_in_place_without_duplicate_fap(self) -> None:
         self.assertIn('appid="signal_workbench"', self.manifest)
         self.assertIn('name="TumoSpectrum"', self.manifest)
-        self.assertIn('fap_version="2.2.0"', self.manifest)
+        self.assertIn('fap_version="2.3.0"', self.manifest)
         self.assertIn('fap_category="Module One/Signals"', self.manifest)
         self.assertIn(
             'fap_dist_path="apps/Module One/Signals/signal_workbench.fap"', self.manifest
@@ -198,7 +198,8 @@ class TumoSpectrumTest(unittest.TestCase):
             "tumospectrum_append_json_string",
         ):
             self.assertIn(required, self.storage)
-        self.assertIn('TUMOSPECTRUM_BRIDGE_COMMAND "report"', self.source)
+        self.assertIn("TUMOSPECTRUM_BRIDGE_COMMAND", self.source)
+        self.assertIn('"report"', self.source)
         self.assertIn("bt_app_bridge_send_text_v2", self.source)
         self.assertIn("BT_APP_BRIDGE_V2_PAYLOAD_LEN_MAX", self.source)
 

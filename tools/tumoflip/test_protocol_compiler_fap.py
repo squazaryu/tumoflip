@@ -34,6 +34,9 @@ class ProtocolProfilesIntegrationTest(unittest.TestCase):
         cls.storage_header = (APP_ROOT / "protocol_profile_storage.h").read_text(
             encoding="utf-8"
         )
+        cls.builder = (APP_ROOT / "tumospectrum_profile_builder.c").read_text(
+            encoding="utf-8"
+        )
         cls.manifest = (APP_ROOT / "application.fam").read_text(encoding="utf-8")
 
     def test_standalone_fap_is_replaced_by_tumospectrum_route(self) -> None:
@@ -55,6 +58,10 @@ class ProtocolProfilesIntegrationTest(unittest.TestCase):
         )
         self.assertIn(
             '"apps_data/signal_workbench/demo/validation.sub"', validator
+        )
+        self.assertIn(
+            '"subghz/TumoSpectrum Demo/train_0.sub"',
+            validator,
         )
         self.assertIn(
             '"/ext/apps/Module One/Signals/protocol_compiler.fap"', validator
@@ -100,6 +107,22 @@ class ProtocolProfilesIntegrationTest(unittest.TestCase):
         self.assertIn("PROTOCOL_PROFILE_OBSERVATIONS_MAX_SIZE", self.storage)
         self.assertIn("protocol_observations.previous.csv", self.storage)
         self.assertIn("value < 0x20U || value > 0x7EU || value == '\"'", self.storage)
+
+    def test_on_device_builder_is_bounded_atomic_and_receive_only(self) -> None:
+        self.assertIn('"Create Live Profile"', self.source)
+        self.assertIn("tumospectrum_profile_builder_build", self.source)
+        self.assertIn("protocol_profile_package_save", self.source)
+        self.assertIn("TUMOSPECTRUM_SET_MIN_SAMPLES", self.builder)
+        self.assertIn("ProtocolProfileMaximumBits", self.builder)
+        self.assertIn(".receive_only = true", self.builder)
+        self.assertIn(".review_required = true", self.builder)
+        self.assertIn("storage_common_rename(storage, temporary, path)", self.storage)
+        for forbidden in (
+            "start_async_tx",
+            "subghz_transmitter",
+            "furi_hal_subghz_start_async_tx",
+        ):
+            self.assertNotIn(forbidden, self.builder)
 
     def test_demo_artifacts_are_deterministic_and_validate(self) -> None:
         subprocess.run(
@@ -170,6 +193,51 @@ class ProtocolProfilesIntegrationTest(unittest.TestCase):
             )
             self.assertEqual(run.returncode, 0, run.stdout)
             self.assertIn("protocol_profile_core_host_test: PASS", run.stdout)
+
+    def test_portable_profile_builder_with_sanitizers(self) -> None:
+        compiler = os.environ.get("CC") or shutil.which("cc")
+        if not compiler:
+            self.skipTest("host C compiler is unavailable")
+        with tempfile.TemporaryDirectory() as directory_name:
+            executable = Path(directory_name) / "tumospectrum_profile_builder_host_test"
+            build = subprocess.run(
+                [
+                    compiler,
+                    "-std=c11",
+                    "-O1",
+                    "-g",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    "-pedantic",
+                    "-fsanitize=address,undefined",
+                    "-fno-omit-frame-pointer",
+                    str(APP_ROOT / "protocol_profile_core.c"),
+                    str(APP_ROOT / "tumospectrum_profile_builder.c"),
+                    str(REPO_ROOT / "tools/tumoflip/tumospectrum_profile_builder_host_test.c"),
+                    "-o",
+                    str(executable),
+                ],
+                cwd=REPO_ROOT,
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
+            self.assertEqual(build.returncode, 0, build.stdout)
+            environment = os.environ.copy()
+            environment.setdefault("ASAN_OPTIONS", "detect_leaks=0:halt_on_error=1")
+            run = subprocess.run(
+                [str(executable)],
+                cwd=REPO_ROOT,
+                env=environment,
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
+            self.assertEqual(run.returncode, 0, run.stdout)
+            self.assertIn("tumospectrum_profile_builder_host_test: PASS", run.stdout)
 
 
 if __name__ == "__main__":
