@@ -7,7 +7,25 @@
 #include <float_tools.h>
 #include "subghz_i.h"
 
+#include <stdlib.h>
+
 #define TAG "SubGhzApp"
+
+static bool
+    subghz_parse_tumospectrum_capture_frequency(const char* argument, uint32_t* frequency) {
+    static const char prefix[] = "tumospectrum_raw:";
+    if(!argument || !frequency || strncmp(argument, prefix, sizeof(prefix) - 1U) != 0) {
+        return false;
+    }
+
+    char* end = NULL;
+    const unsigned long parsed = strtoul(argument + sizeof(prefix) - 1U, &end, 10);
+    if(end == argument + sizeof(prefix) - 1U || *end != '\0' || parsed > UINT32_MAX) {
+        return false;
+    }
+    *frequency = (uint32_t)parsed;
+    return true;
+}
 
 bool subghz_custom_event_callback(void* context, uint32_t event) {
     furi_assert(context);
@@ -374,14 +392,25 @@ void subghz_free(SubGhz* subghz, bool alloc_for_tx_only) {
 }
 
 int32_t subghz_app(void* p) {
+    uint32_t capture_frequency = 0U;
+    const bool open_capture_at_frequency =
+        subghz_parse_tumospectrum_capture_frequency(p, &capture_frequency);
     const bool open_receiver = p && strcmp(p, "receiver") == 0;
-    const bool open_capture_raw = p && strcmp(p, "tumospectrum_raw") == 0;
+    const bool open_capture_raw = (p && strcmp(p, "tumospectrum_raw") == 0) ||
+                                  open_capture_at_frequency;
     const bool open_frequency_analyzer = p && strcmp(p, "frequency_analyzer") == 0;
-    const bool alloc_for_tx =
-        p && strlen(p) && !open_receiver && !open_capture_raw && !open_frequency_analyzer;
+    const bool alloc_for_tx = p && strlen(p) && !open_receiver && !open_capture_raw &&
+                              !open_frequency_analyzer;
 
     SubGhz* subghz = subghz_alloc(alloc_for_tx);
     subghz->return_to_launcher = open_capture_raw;
+
+    if(open_capture_at_frequency &&
+       subghz_txrx_radio_device_is_frequency_valid(subghz->txrx, capture_frequency)) {
+        subghz->last_settings->frequency = capture_frequency;
+        subghz->last_settings->hopping_mode = SubGhzHoppingModeOff;
+        subghz_last_settings_save(subghz->last_settings);
+    }
 
     if(alloc_for_tx) {
         subghz->raw_send_only = true;
@@ -401,8 +430,7 @@ int32_t subghz_app(void* p) {
                 scene_manager_next_scene(subghz->scene_manager, SubGhzSceneStart);
                 if(open_frequency_analyzer) {
                     subghz_ensure_frequency_analyzer_view(subghz);
-                    scene_manager_next_scene(
-                        subghz->scene_manager, SubGhzSceneFrequencyAnalyzer);
+                    scene_manager_next_scene(subghz->scene_manager, SubGhzSceneFrequencyAnalyzer);
                     dolphin_deed(DolphinDeedSubGhzFrequencyAnalyzer);
                 } else {
                     scene_manager_next_scene(

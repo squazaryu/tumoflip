@@ -113,6 +113,9 @@ The four-page post-update splash screen is generated automatically from
 - Added autonomous receive-only protocol profiles: TumoSpectrum can infer a
   bounded `.tproto` profile from three or four Sub-GHz RAW captures directly on
   Flipper, save it atomically to SD, and start live decoding without a computer.
+- Added TumoSpectrum Band Map with a bounded spectrum/waterfall, noise-floor and
+  peak history, Internal/External CC1101 selection, and a stock-compatible Smart
+  Capture path from a selected carrier to an on-device `.tproto` profile.
 - Added `8/1` Module One folder after Apps in the Desktop OK menu.
 - Replaced the Desktop OK menu `Sub-GHz Remote` shortcut with the `ARF Tools`
   folder while keeping the normal `Sub-GHz` entry on the standard core app.
