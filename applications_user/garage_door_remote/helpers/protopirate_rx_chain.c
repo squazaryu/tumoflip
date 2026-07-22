@@ -1,6 +1,8 @@
 // helpers/protopirate_rx_chain.c
 #include "protopirate_rx_chain.h"
 
+#include <lib/subghz/subghz_protocol_registry.h>
+
 #if defined(ENABLE_DUAL_RX_SCENE) || defined(ENABLE_SHIELD_RX_SCENE)
 
 #include <furi.h>
@@ -152,9 +154,8 @@ static uint8_t protopirate_rx_chain_select_bandwidth_bits(
 }
 
 static const char* protopirate_rx_chain_plugin_path(ProtoPirateProtocolRegistryFilter filter) {
-    return (filter == ProtoPirateProtocolRegistryFilterFM) ?
-               APP_ASSETS_PATH("plugins/garage_door_remote_fm_plugin.fal") :
-               APP_ASSETS_PATH("plugins/garage_door_remote_am_plugin.fal");
+    furi_check(filter == ProtoPirateProtocolRegistryFilterFM);
+    return APP_ASSETS_PATH("plugins/garage_door_remote_fm_plugin.fal");
 }
 
 ProtoPirateRxChain* protopirate_rx_chain_alloc(char label) {
@@ -569,7 +570,11 @@ bool protopirate_rx_chain_init_receiver(ProtoPirateRxChain* chain) {
         }
     }
 
-    if(!chain->plugin) {
+    if(!chain->registry && chain->filter == ProtoPirateProtocolRegistryFilterAM) {
+        chain->registry = &subghz_protocol_registry;
+    }
+
+    if(!chain->registry) {
         CompositeApiResolver* resolver = composite_api_resolver_alloc();
         if(!resolver) {
             FURI_LOG_E(TAG, "[%c] Failed to allocate plugin resolver", chain->label);

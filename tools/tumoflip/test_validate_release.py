@@ -67,7 +67,6 @@ class ValidateReleaseTest(unittest.TestCase):
         self.assertEqual(
             ARF_VISIBLE_APP_IDS,
             {
-                "arf_frequency_analyzer",
                 "arf_subghz_full",
                 "garage_door_remote",
                 "keeloq_keystore_decryptor",
@@ -190,7 +189,7 @@ class ValidateReleaseTest(unittest.TestCase):
             "apps/Module One/Signals/signal_workbench.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
-        self.assertIn(
+        self.assertNotIn(
             "apps/Module One/Signals/protocol_compiler.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
@@ -280,6 +279,18 @@ class ValidateReleaseTest(unittest.TestCase):
             "apps_data/tumomodule_runtime/modules/tumovgm.tmod",
             MODULE_ONE_PACKAGE_DATA_FILES,
         )
+        self.assertIn(
+            "apps_data/signal_workbench/profiles/demo_pulse_pair.tproto",
+            MODULE_ONE_PACKAGE_DATA_FILES,
+        )
+        for path in (
+            "apps_data/signal_workbench/demo/validation.sub",
+            "subghz/TumoSpectrum Samples/train_0.sub",
+            "subghz/TumoSpectrum Samples/train_1.sub",
+            "subghz/TumoSpectrum Samples/train_2.sub",
+            "subghz/TumoSpectrum Samples/train_3.sub",
+        ):
+            self.assertIn(path, MODULE_ONE_PACKAGE_DATA_FILES)
         sample = (
             REPO_ROOT
             / STATIC_SD_RESOURCES

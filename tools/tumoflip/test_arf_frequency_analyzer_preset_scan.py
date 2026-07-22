@@ -6,16 +6,16 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ARF_ROOT = REPO_ROOT / "applications_user/arf_subghz_full"
+CORE_ROOT = REPO_ROOT / "applications/main/subghz"
 SUBGHZ_APP = REPO_ROOT / "applications/main/subghz/subghz.c"
 
 
 class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
     def test_scan_is_dynamic_bounded_and_receive_only(self) -> None:
-        worker = (ARF_ROOT / "helpers/subghz_frequency_analyzer_worker.c").read_text(
+        worker = (CORE_ROOT / "helpers/subghz_frequency_analyzer_worker.c").read_text(
             encoding="utf-8"
         )
-        probe = (ARF_ROOT / "helpers/subghz_txrx.c").read_text(encoding="utf-8")
+        probe = (CORE_ROOT / "helpers/subghz_txrx.c").read_text(encoding="utf-8")
 
         self.assertIn("subghz_setting_get_preset_count(instance->setting)", worker)
         self.assertIn("PRESET_SCAN_MAX_RESULTS", worker)
@@ -39,10 +39,10 @@ class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
         self.assertIn("SubGhzRadioDeviceTypeInternal", probe)
 
     def test_ranked_result_can_handoff_to_standard_receiver(self) -> None:
-        view = (ARF_ROOT / "views/subghz_frequency_analyzer.c").read_text(
+        view = (CORE_ROOT / "views/subghz_frequency_analyzer.c").read_text(
             encoding="utf-8"
         )
-        scene = (ARF_ROOT / "scenes/subghz_scene_frequency_analyzer.c").read_text(
+        scene = (CORE_ROOT / "scenes/subghz_scene_frequency_analyzer.c").read_text(
             encoding="utf-8"
         )
 
@@ -53,15 +53,18 @@ class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
 
         self.assertIn("subghz_frequency_analyzer_get_selected_preset", scene)
         self.assertIn("subghz_txrx_set_preset_internal", scene)
-        self.assertIn('loader_enqueue_launch(loader, "Sub-GHz", "receiver"', scene)
-        self.assertIn("ARF_SUBGHZ_HUB_PATH", scene)
-        self.assertIn("loader_clear_launch_queue", scene)
+        self.assertIn("subghz_scene_frequency_analyzer_open_receiver", scene)
+        self.assertIn("SubGhzSceneReceiver", scene)
 
         subghz_app = SUBGHZ_APP.read_text(encoding="utf-8")
         self.assertIn('strcmp(p, "receiver") == 0', subghz_app)
         self.assertIn('strcmp(p, "tumospectrum_raw") == 0', subghz_app)
-        self.assertIn("const bool alloc_for_tx = p && strlen(p) && !open_receiver", subghz_app)
-        self.assertIn("if(open_receiver || open_capture_raw)", subghz_app)
+        self.assertIn('strcmp(p, "frequency_analyzer") == 0', subghz_app)
+        self.assertIn("!open_frequency_analyzer", subghz_app)
+        self.assertIn(
+            "if(open_receiver || open_capture_raw || open_frequency_analyzer)",
+            subghz_app,
+        )
         self.assertIn(
             "open_capture_raw ? SubGhzSceneReadRAW : SubGhzSceneReceiver",
             subghz_app,
@@ -69,7 +72,7 @@ class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
         self.assertIn("SubGhzSceneReceiver", subghz_app)
 
     def test_empty_history_slots_do_not_repeat_mhz_suffix(self) -> None:
-        view = (ARF_ROOT / "views/subghz_frequency_analyzer.c").read_text(
+        view = (CORE_ROOT / "views/subghz_frequency_analyzer.c").read_text(
             encoding="utf-8"
         )
 

@@ -1358,7 +1358,7 @@ LevelDuration subghz_protocol_encoder_vag_yield(void* context) {
 
     if(instance->front >= instance->size_upload) {
         instance->front = 0;
-        instance->repeat--;
+        if(!subghz_block_generic_global.endless_tx) instance->repeat--;
     }
 
     return ret;

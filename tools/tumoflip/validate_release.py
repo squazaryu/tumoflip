@@ -56,7 +56,6 @@ PROTOCOL_PACKS = {
     "protocol_vag.fal",
 }
 ARF_VISIBLE_APP_IDS = {
-    "arf_frequency_analyzer",
     "arf_subghz_full",
     "garage_door_remote",
     "keeloq_keystore_decryptor",
@@ -94,7 +93,6 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Diagnostics/runtime_trace_viewer.fap",
     "apps/Module One/Field/field_logger.fap",
     "apps/Module One/Signals/signal_workbench.fap",
-    "apps/Module One/Signals/protocol_compiler.fap",
     "apps/Module One/Signals/tumoscope.fap",
     "apps/Module One/Network/tumonet_gateway.fap",
     "apps/Module One/Sub-GHz/tumonet_bench.fap",
@@ -123,8 +121,12 @@ MODULE_ONE_PACKAGE_DATA_FILES = (
     "apps_data/tumomodule_runtime/modules/tumovgm.tmod",
     "apps_data/tumovm_peripherals/packages/nfc_state.tper",
     "apps_data/tumovm_peripherals/packages/usb_media.tper",
-    "apps_data/protocol_compiler/profiles/demo_pulse_pair.tproto",
-    "apps_data/protocol_compiler/demo/validation.sub",
+    "apps_data/signal_workbench/profiles/demo_pulse_pair.tproto",
+    "apps_data/signal_workbench/demo/validation.sub",
+    "subghz/TumoSpectrum Samples/train_0.sub",
+    "subghz/TumoSpectrum Samples/train_1.sub",
+    "subghz/TumoSpectrum Samples/train_2.sub",
+    "subghz/TumoSpectrum Samples/train_3.sub",
 )
 ARF_LEGACY_PATHS = {
     **{
@@ -140,14 +142,17 @@ ARF_LEGACY_PATHS = {
     "/ext/apps/ARF Tools/ARF KeeLoq.fap": ARF_MODULE_PATHS["arf_keeloq"],
     "/ext/apps/ARF Tools/ARF Counter BF.fap": ARF_MODULE_PATHS["arf_counter_bf"],
     "/ext/apps/ARF Tools/ARF Car Emulate.fap": ARF_MODULE_PATHS["arf_car_emulate"],
+    "/ext/apps/ARF Tools/arf_frequency_analyzer.fap": ARF_VISIBLE_PATHS[
+        "arf_subghz_full"
+    ],
     "/ext/apps/ARF Tools/ARF Frequency Analyzer.fap": ARF_VISIBLE_PATHS[
-        "arf_frequency_analyzer"
+        "arf_subghz_full"
     ],
     "/ext/apps/Module One/Sub-GHz/freq_analyzer_ext.fap": ARF_VISIBLE_PATHS[
-        "arf_frequency_analyzer"
+        "arf_subghz_full"
     ],
     f"{ARF_MODULE_ROOT}/arf_frequency_analyzer.fap": ARF_VISIBLE_PATHS[
-        "arf_frequency_analyzer"
+        "arf_subghz_full"
     ],
     f"{ARF_MODULE_ROOT}/arf_subghz_standard.fap": ARF_VISIBLE_PATHS["arf_subghz_full"],
     "/ext/apps/ARF Tools/arf_subghz_standard.fap": ARF_VISIBLE_PATHS["arf_subghz_full"],
@@ -160,12 +165,16 @@ ARF_LEGACY_PATHS = {
 MODULE_ONE_LEGACY_PATHS = {
     "/ext/apps/Module One/ESP32 Wi-Fi/wifi_map.fap":
         "/ext/apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
+    "/ext/apps/Module One/Diagnostics/module_one_cockpit.fap":
+        "/ext/apps/Module One/Diagnostics/cockpit.fap",
     "/ext/apps/Module One/module_one_cockpit.fap":
         "/ext/apps/Module One/Diagnostics/cockpit.fap",
     "/ext/apps/Module One/tumo_acceptance_suite.fap":
         "/ext/apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
     "/ext/apps/Module One/module_one_sensor_logger.fap":
         "/ext/apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
+    "/ext/apps/Module One/Signals/protocol_compiler.fap":
+        "/ext/apps/Module One/Signals/signal_workbench.fap",
 }
 BASE_LEGACY_PATHS = {
     "/ext/apps/Scripts/js_app.fap": "/ext/apps/Bluetooth/flipper_companion.fap",
@@ -281,6 +290,14 @@ def little_endian_hex(value: str) -> int:
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def md5(path: Path) -> str:
+    digest = hashlib.md5()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
@@ -470,6 +487,7 @@ def sync_extapp_package_exports(build_dir: Path, resources: Path) -> list[dict[s
                 "target": relative,
                 "bytes": target.stat().st_size,
                 "sha256": sha256(target),
+                "md5": md5(target),
             }
         )
     prune_legacy_resource_exports(resources)
@@ -587,6 +605,7 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
         "base": [
             resources / "apps/Bluetooth/claude_buddy.fap",
             resources / "apps/Bluetooth/flipper_companion.fap",
+            resources / "apps/Sub-GHz/subghz_wardriving.fap",
             resources / "apps/Tools/ai_dashboard.fap",
             resources / "apps/Tools/flipper_relay.fap",
             resources / "apps/Tools/quac.fap",
@@ -623,6 +642,7 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
                     "target": f"/ext/{relative}",
                     "bytes": path.stat().st_size,
                     "sha256": sha256(path),
+                    "md5": md5(path),
                 }
             )
         result[group] = entries

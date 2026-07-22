@@ -2,6 +2,7 @@
 
 #include <furi/core/log.h>
 #include <subghz/types.h>
+#include <dolphin/dolphin.h>
 #include <lib/toolbox/path.h>
 #include <float_tools.h>
 #include "subghz_i.h"
@@ -69,6 +70,22 @@ void subghz_ensure_frequency_analyzer_view(SubGhz* subghz) {
     }
 }
 
+void subghz_ensure_receiver_view(SubGhz* subghz) {
+    furi_assert(subghz);
+
+    if(!subghz->subghz_receiver) {
+        subghz->subghz_receiver = subghz_view_receiver_alloc();
+        view_dispatcher_add_view(
+            subghz->view_dispatcher,
+            SubGhzViewIdReceiver,
+            subghz_view_receiver_get_view(subghz->subghz_receiver));
+    }
+
+    if(!subghz->history) {
+        subghz->history = subghz_history_alloc();
+    }
+}
+
 /*
 static void subghz_load_custom_presets(SubGhzSetting* setting) {
     furi_assert(setting);
@@ -105,6 +122,7 @@ static void subghz_load_custom_presets(SubGhzSetting* setting) {
 
 SubGhz* subghz_alloc(bool alloc_for_tx_only) {
     SubGhz* subghz = malloc(sizeof(SubGhz));
+    subghz->return_to_launcher = false;
 
     subghz->file_path = furi_string_alloc();
     subghz->file_path_tmp = furi_string_alloc();
@@ -358,9 +376,12 @@ void subghz_free(SubGhz* subghz, bool alloc_for_tx_only) {
 int32_t subghz_app(void* p) {
     const bool open_receiver = p && strcmp(p, "receiver") == 0;
     const bool open_capture_raw = p && strcmp(p, "tumospectrum_raw") == 0;
-    const bool alloc_for_tx = p && strlen(p) && !open_receiver && !open_capture_raw;
+    const bool open_frequency_analyzer = p && strcmp(p, "frequency_analyzer") == 0;
+    const bool alloc_for_tx =
+        p && strlen(p) && !open_receiver && !open_capture_raw && !open_frequency_analyzer;
 
     SubGhz* subghz = subghz_alloc(alloc_for_tx);
+    subghz->return_to_launcher = open_capture_raw;
 
     if(alloc_for_tx) {
         subghz->raw_send_only = true;
@@ -372,15 +393,22 @@ int32_t subghz_app(void* p) {
     if(p && strlen(p)) {
         uint32_t rpc_ctx = 0;
 
-        if(open_receiver || open_capture_raw) {
+        if(open_receiver || open_capture_raw || open_frequency_analyzer) {
             view_dispatcher_attach_to_gui(
                 subghz->view_dispatcher, subghz->gui, ViewDispatcherTypeFullscreen);
             furi_string_set(subghz->file_path, SUBGHZ_APP_FOLDER);
             if(subghz_txrx_is_database_loaded(subghz->txrx)) {
                 scene_manager_next_scene(subghz->scene_manager, SubGhzSceneStart);
-                scene_manager_next_scene(
-                    subghz->scene_manager,
-                    open_capture_raw ? SubGhzSceneReadRAW : SubGhzSceneReceiver);
+                if(open_frequency_analyzer) {
+                    subghz_ensure_frequency_analyzer_view(subghz);
+                    scene_manager_next_scene(
+                        subghz->scene_manager, SubGhzSceneFrequencyAnalyzer);
+                    dolphin_deed(DolphinDeedSubGhzFrequencyAnalyzer);
+                } else {
+                    scene_manager_next_scene(
+                        subghz->scene_manager,
+                        open_capture_raw ? SubGhzSceneReadRAW : SubGhzSceneReceiver);
+                }
             } else {
                 scene_manager_set_scene_state(
                     subghz->scene_manager, SubGhzSceneShowError, SubGhzCustomEventManagerSet);

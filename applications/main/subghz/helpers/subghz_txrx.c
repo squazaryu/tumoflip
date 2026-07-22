@@ -561,6 +561,49 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
     return ret;
 }
 
+bool subghz_txrx_rebuild_from_fff(SubGhzTxRx* instance, FlipperFormat* flipper_format) {
+    furi_assert(instance);
+    furi_assert(flipper_format);
+
+    subghz_txrx_stop(instance);
+
+    bool rebuilt = false;
+    FuriString* temp_str = furi_string_alloc();
+    SubGhzTransmitter* transmitter = NULL;
+
+    do {
+        if(!flipper_format_rewind(flipper_format)) {
+            FURI_LOG_E(TAG, "Rewind error");
+            break;
+        }
+        if(!flipper_format_read_string(flipper_format, "Protocol", temp_str)) {
+            FURI_LOG_E(TAG, "Missing Protocol");
+            break;
+        }
+
+        transmitter =
+            subghz_transmitter_alloc_init(instance->environment, furi_string_get_cstr(temp_str));
+        if(!transmitter) {
+            FURI_LOG_E(TAG, "Protocol not found");
+            break;
+        }
+
+        rebuilt =
+            subghz_transmitter_deserialize(transmitter, flipper_format) == SubGhzProtocolStatusOk;
+        if(!rebuilt) {
+            FURI_LOG_E(TAG, "Protocol rebuild failed");
+            break;
+        }
+    } while(false);
+
+    if(transmitter) {
+        subghz_transmitter_free(transmitter);
+    }
+    furi_string_free(temp_str);
+
+    return rebuilt;
+}
+
 void subghz_txrx_rx_start(SubGhzTxRx* instance) {
     furi_assert(instance);
     subghz_txrx_stop(instance);
@@ -1044,6 +1087,45 @@ const char* subghz_txrx_radio_device_get_name(SubGhzTxRx* instance) {
 bool subghz_txrx_radio_device_is_frequency_valid(SubGhzTxRx* instance, uint32_t frequency) {
     furi_assert(instance);
     return subghz_devices_is_frequency_valid(instance->radio_device, frequency);
+}
+
+bool subghz_txrx_analyzer_begin(SubGhzTxRx* instance, size_t preset_index, uint32_t frequency) {
+    furi_assert(instance);
+
+    if(preset_index >= subghz_setting_get_preset_count(instance->setting) ||
+       !subghz_devices_is_frequency_valid(instance->radio_device, frequency)) {
+        return false;
+    }
+
+    if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal &&
+       !subghz_devices_is_connect(instance->radio_device)) {
+        subghz_txrx_radio_device_fallback_internal(instance);
+        if(!subghz_devices_is_frequency_valid(instance->radio_device, frequency)) return false;
+    }
+
+    subghz_txrx_stop(instance);
+    subghz_devices_reset(instance->radio_device);
+    subghz_devices_idle(instance->radio_device);
+    subghz_devices_load_preset(
+        instance->radio_device,
+        FuriHalSubGhzPresetCustom,
+        subghz_setting_get_preset_data(instance->setting, preset_index));
+    subghz_devices_set_frequency(instance->radio_device, frequency);
+    subghz_devices_flush_rx(instance->radio_device);
+    subghz_devices_set_rx(instance->radio_device);
+    instance->txrx_state = SubGhzTxRxStateRx;
+    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateRx);
+    return true;
+}
+
+void subghz_txrx_analyzer_end(SubGhzTxRx* instance) {
+    furi_assert(instance);
+
+    if(instance->txrx_state == SubGhzTxRxStateRx) {
+        subghz_devices_idle(instance->radio_device);
+        instance->txrx_state = SubGhzTxRxStateIDLE;
+        subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateInitialized);
+    }
 }
 
 bool subghz_txrx_radio_device_is_tx_allowed(SubGhzTxRx* instance, uint32_t frequency) {

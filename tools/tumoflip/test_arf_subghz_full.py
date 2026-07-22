@@ -45,6 +45,14 @@ class ArfSubGhzFullTest(unittest.TestCase):
             },
         )
         self.assertIn('.target = "Sub-GHz"', start_scene)
+        self.assertIn(
+            '#define SUBGHZ_WARDRIVING_PATH EXT_PATH("apps/Sub-GHz/subghz_wardriving.fap")',
+            start_scene,
+        )
+        self.assertIn(
+            '{.label = "Sub-GHz Wardriving", .target = SUBGHZ_WARDRIVING_PATH}',
+            start_scene,
+        )
         self.assertNotIn("#define ARF_STANDARD_PATH", start_scene)
         self.assertNotIn("arf_subghz_standard.fap", start_scene)
         self.assertNotIn('appid="arf_subghz_standard"', app_manifests)
@@ -185,45 +193,43 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertIn("loading_get_view(loader->loading)", enqueue_body)
         self.assertIn("view_holder_send_to_front(loader->view_holder)", enqueue_body)
 
-    def test_frequency_analyzer_fap_starts_directly(self) -> None:
+    def test_frequency_analyzer_uses_core_launch_contract(self) -> None:
         manifest = (
             REPO_ROOT / "applications_user/arf_subghz_full/application.fam"
         ).read_text(encoding="utf-8")
         app = (
-            REPO_ROOT / "applications_user/arf_subghz_full/subghz.c"
+            REPO_ROOT / "applications/main/subghz/subghz.c"
         ).read_text(encoding="utf-8")
         hub = (
             REPO_ROOT / "applications_user/arf_subghz_full/arf_subghz_hub.c"
         ).read_text(encoding="utf-8")
 
-        frequency_app = re.search(
-            r'App\(\s+appid="arf_frequency_analyzer".*?\n\)', manifest, re.S
-        )
-        self.assertIsNotNone(frequency_app)
-        self.assertNotIn("fap_dist_path", frequency_app.group(0))
-        self.assertIn('fap_category="ARF Tools"', frequency_app.group(0))
-        self.assertIn(
-            "scene_manager_next_scene(subghz->scene_manager, SubGhzSceneFrequencyAnalyzer);",
+        self.assertNotIn('appid="arf_frequency_analyzer"', manifest)
+        self.assertIn('strcmp(p, "frequency_analyzer") == 0', app)
+        self.assertIn("open_frequency_analyzer", app)
+        self.assertRegex(
             app,
+            r"scene_manager_next_scene\(\s*subghz->scene_manager,\s*"
+            r"SubGhzSceneFrequencyAnalyzer\s*\);",
         )
-        self.assertIn('EXT_PATH("apps/ARF Tools/")', hub)
         self.assertIn(
-            'ARF_TOOLS_PATH "arf_frequency_analyzer.fap"',
+            '{.label = "Frequency Analyzer", .target = "Sub-GHz", .args = "frequency_analyzer"}',
             hub,
         )
+        self.assertNotIn("arf_frequency_analyzer.fap", hub)
 
     def test_frequency_analyzer_notebook_has_short_tags(self) -> None:
         header = (
             REPO_ROOT
-            / "applications_user/arf_subghz_full/views/subghz_frequency_analyzer.h"
+            / "applications/main/subghz/views/subghz_frequency_analyzer.h"
         ).read_text(encoding="utf-8")
         view = (
             REPO_ROOT
-            / "applications_user/arf_subghz_full/views/subghz_frequency_analyzer.c"
+            / "applications/main/subghz/views/subghz_frequency_analyzer.c"
         ).read_text(encoding="utf-8")
         notebook = (
             REPO_ROOT
-            / "applications_user/arf_subghz_full/helpers/subghz_frequency_notebook.c"
+            / "applications/main/subghz/helpers/subghz_frequency_notebook.c"
         ).read_text(encoding="utf-8")
 
         self.assertIn("SubGhzFrequencyAnalyzerNotebookTagField", header)
@@ -254,11 +260,11 @@ class ArfSubGhzFullTest(unittest.TestCase):
     def test_frequency_analyzer_long_ok_keeps_receiver_shortcut(self) -> None:
         scene = (
             REPO_ROOT
-            / "applications_user/arf_subghz_full/scenes/subghz_scene_frequency_analyzer.c"
+            / "applications/main/subghz/scenes/subghz_scene_frequency_analyzer.c"
         ).read_text(encoding="utf-8")
         view = (
             REPO_ROOT
-            / "applications_user/arf_subghz_full/views/subghz_frequency_analyzer.c"
+            / "applications/main/subghz/views/subghz_frequency_analyzer.c"
         ).read_text(encoding="utf-8")
 
         self.assertIn("SubGhzCustomEventViewFreqAnalOkLong", view)
@@ -267,8 +273,13 @@ class ArfSubGhzFullTest(unittest.TestCase):
 
     def test_core_and_arf_frequency_analyzers_share_notebook_storage(self) -> None:
         shared_files = (
+            "helpers/subghz_frequency_analyzer_worker.c",
+            "helpers/subghz_frequency_analyzer_worker.h",
             "helpers/subghz_frequency_notebook.c",
             "helpers/subghz_frequency_notebook.h",
+            "scenes/subghz_scene_frequency_analyzer.c",
+            "views/subghz_frequency_analyzer.c",
+            "views/subghz_frequency_analyzer.h",
         )
         drift_manifest = (
             REPO_ROOT / "tools/tumoflip/subghz_drift_manifest.txt"
@@ -292,8 +303,8 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertIn("void subghz_ensure_frequency_analyzer_view", core_app)
         self.assertIn("void subghz_ensure_frequency_analyzer_view", core_header)
 
-    def test_preset_scan_is_an_intentional_arf_extension(self) -> None:
-        arf_only_files = (
+    def test_preset_scan_is_shared_with_the_canonical_core_analyzer(self) -> None:
+        shared_files = (
             "helpers/subghz_frequency_analyzer_worker.c",
             "helpers/subghz_frequency_analyzer_worker.h",
             "scenes/subghz_scene_frequency_analyzer.c",
@@ -305,16 +316,19 @@ class ArfSubGhzFullTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         worker = (
             REPO_ROOT
-            / "applications_user/arf_subghz_full/helpers/subghz_frequency_analyzer_worker.c"
+            / "applications/main/subghz/helpers/subghz_frequency_analyzer_worker.c"
         ).read_text(encoding="utf-8")
         scene = (
             REPO_ROOT
-            / "applications_user/arf_subghz_full/scenes/subghz_scene_frequency_analyzer.c"
+            / "applications/main/subghz/scenes/subghz_scene_frequency_analyzer.c"
         ).read_text(encoding="utf-8")
 
-        for relative in arf_only_files:
+        for relative in shared_files:
             with self.subTest(relative=relative):
-                self.assertNotIn(relative, drift_manifest)
+                self.assertIn(relative, drift_manifest)
+                core = REPO_ROOT / "applications/main/subghz" / relative
+                arf = REPO_ROOT / "applications_user/arf_subghz_full" / relative
+                self.assertEqual(core.read_bytes(), arf.read_bytes())
         self.assertIn("subghz_frequency_analyzer_worker_set_preset_callback", worker)
         self.assertIn("SubGhzCustomEventViewFreqAnalPresetRx", scene)
 

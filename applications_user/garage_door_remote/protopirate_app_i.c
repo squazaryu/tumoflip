@@ -1,5 +1,7 @@
 // protopirate_app_i.c
 #include "protopirate_app_i.h"
+
+#include <lib/subghz/subghz_protocol_registry.h>
 #include "protocols/protocol_items.h"
 #include <loader/firmware_api/firmware_api.h>
 #include <stdio.h>
@@ -82,9 +84,8 @@ void protopirate_selected_capture_release_scratch(ProtoPirateApp* app) {
 }
 
 static const char* protopirate_get_registry_plugin_path(ProtoPirateProtocolRegistryFilter filter) {
-    return (filter == ProtoPirateProtocolRegistryFilterFM) ?
-               APP_ASSETS_PATH("plugins/garage_door_remote_fm_plugin.fal") :
-               APP_ASSETS_PATH("plugins/garage_door_remote_am_plugin.fal");
+    furi_check(filter == ProtoPirateProtocolRegistryFilterFM);
+    return APP_ASSETS_PATH("plugins/garage_door_remote_fm_plugin.fal");
 }
 
 static void protopirate_unload_protocol_plugin(ProtoPirateTxRx* txrx) {
@@ -145,6 +146,16 @@ static bool protopirate_ensure_protocol_registry_plugin(
     if(!app->txrx->environment) {
         FURI_LOG_E(TAG, "Cannot load protocol plugin without radio environment");
         return false;
+    }
+
+    if(filter == ProtoPirateProtocolRegistryFilterAM) {
+        if(app->txrx->protocol_plugin || app->txrx->protocol_plugin_manager ||
+           app->txrx->plugin_resolver) {
+            protopirate_unload_protocol_plugin(app->txrx);
+        }
+        app->txrx->protocol_registry_filter = filter;
+        *registry = &subghz_protocol_registry;
+        return true;
     }
 
     if(app->txrx->protocol_plugin && app->txrx->protocol_plugin->registry &&
@@ -218,7 +229,7 @@ bool protopirate_refresh_protocol_registry(ProtoPirateApp* app, bool ensure_rece
 
     ProtoPirateProtocolRegistryFilter filter = protopirate_get_protocol_registry_filter_for_preset(
         app->txrx->preset->data, app->txrx->preset->data_size);
-    bool filter_changed = !app->txrx->protocol_plugin ||
+    bool filter_changed = !app->txrx->protocol_registry ||
                           (app->txrx->protocol_registry_filter != filter);
 
     if(filter_changed) {
@@ -282,7 +293,7 @@ bool protopirate_apply_protocol_registry_for_preset_data(
     ProtoPirateProtocolRegistryFilter filter =
         protopirate_get_protocol_registry_filter_for_preset(preset_data, preset_data_size);
 
-    bool filter_changed = !app->txrx->protocol_plugin ||
+    bool filter_changed = !app->txrx->protocol_registry ||
                           (app->txrx->protocol_registry_filter != filter);
 
     if(filter_changed) {

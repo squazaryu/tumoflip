@@ -170,9 +170,8 @@ static bool troika_read(Nfc* nfc, NfcDevice* device) {
 
         nfc_device_set_data(device, NfcProtocolMfClassic, data);
 
-        // Plus 2K SL1 is a 32-sector card but we hold keys only for the lower sectors, so the read
-        // comes back partial; accept it and let parse() validate the key.
-        is_read = (error == MfClassicErrorNone || error == MfClassicErrorPartialRead);
+        // Let the normal recovery flow continue when a partial read missed the parser data.
+        is_read = mf_classic_is_read_success_for_sector(error, data, cfg.data_sector);
     } while(false);
 
     mf_classic_free(data);

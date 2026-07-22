@@ -82,6 +82,7 @@ typedef enum {
  */
 typedef struct {
     bool is_learning_new_remote; /**< Learning new remote or adding to an existing one. */
+    bool return_to_launcher; /**< Exit the capture-only flow back to its queued launcher. */
     bool is_debug_enabled; /**< Whether to enable or disable debugging features. */
     bool is_transmitting; /**< Whether a signal is currently being transmitted. */
     bool is_otg_enabled; /**< Whether OTG power (external 5V) is enabled. */

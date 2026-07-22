@@ -25,7 +25,8 @@ RollJam entry. The remaining child FAPs are stored in
 - frequency analyzer through a dedicated visible FAP;
 - RAW `.sub` trimming and cleanup through Sub-GHz RAW Edit;
 - KeeLoq keystore decrypt/export through KeeLoq Keystore Decryptor;
-- garage/gate capture and emulate workflows through Garage Door Remote;
+- garage/gate capture and emulate workflows through Garage Door Remote, with
+  the expanded ARF `dev-b681cc91` AM set resolved from the API 88 core registry;
 - classic RollJam app through the RollJam child entry;
 - radio and external CC1101 settings through the core Sub-GHz app;
 - receiver settings and live Protocol Pack switching;

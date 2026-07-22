@@ -2,7 +2,7 @@
   "frames": {
     "frame_00.png": {
       "mode": "1",
-      "pixels_sha256": "eb2c766d9a0bd545f7d0566d19c262e07d01d66df408a4310a188bcab57cb498",
+      "pixels_sha256": "e706470cb3addc06f81ca29da9c420156f6568aeb26f5b654f2119a1e8617d18",
       "size": [
         128,
         64
@@ -35,5 +35,5 @@
   },
   "schema": 1,
   "title": "T-FLPPR-FW",
-  "version": "089-039"
+  "version": "089-040"
 }

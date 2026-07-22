@@ -58,7 +58,7 @@ def capture_text(pulses: tuple[int, ...]) -> str:
 def expected_outputs() -> dict[Path, str]:
     base = Path(__file__).resolve().parent
     corpus = base / "protocol_corpus" / "demo_pulse_pair"
-    package = base / "sd_resources" / "apps_data" / "protocol_compiler"
+    package = base / "sd_resources" / "apps_data" / "signal_workbench"
     values = (0x500, 0x5FF, 0x555, 0x5AA)
     jitters = (-12, 8, -5, 14)
     captures: list[RawCapture] = []
@@ -66,7 +66,11 @@ def expected_outputs() -> dict[Path, str]:
     for index, (value, jitter) in enumerate(zip(values, jitters, strict=True)):
         pulses = capture_pulses(value, jitter)
         path = corpus / "train" / f"train_{index}.sub"
-        outputs[path] = capture_text(pulses)
+        training_text = capture_text(pulses)
+        outputs[path] = training_text
+        outputs[
+            base / "sd_resources" / "subghz" / "TumoSpectrum Samples" / f"train_{index}.sub"
+        ] = training_text
         captures.append(RawCapture(path=path, frequency_hz=433920000, pulses=pulses))
 
     validation_pulses = capture_pulses(0x53C, 6)

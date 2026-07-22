@@ -29,7 +29,7 @@
 #define SUBGHZ_LAST_SETTING_FIELD_PROTOCOL_FILTER                   "ProtocolFilter"
 
 SubGhzLastSettings* subghz_last_settings_alloc(void) {
-    SubGhzLastSettings* instance = malloc(sizeof(SubGhzLastSettings));
+    SubGhzLastSettings* instance = calloc(1, sizeof(SubGhzLastSettings));
     return instance;
 }
 

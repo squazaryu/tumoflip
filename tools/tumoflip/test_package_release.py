@@ -17,6 +17,7 @@ try:
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
+        md5,
         sha256,
     )
 except ImportError:
@@ -28,6 +29,7 @@ except ImportError:
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         PROTOCOL_PACKS,
+        md5,
         sha256,
     )
 
@@ -61,6 +63,7 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
         "apps/Scripts/js_app.fap",
         "apps/Bluetooth/claude_buddy.fap",
         "apps/Bluetooth/flipper_companion.fap",
+        "apps/Sub-GHz/subghz_wardriving.fap",
         "apps/Tools/ai_dashboard.fap",
         "apps/Tools/flipper_relay.fap",
         "apps/Tools/quac.fap",
@@ -209,11 +212,13 @@ class PackageReleaseTest(unittest.TestCase):
             }
             self.assertNotIn("apps/Scripts/js_app.fap", base_entries)
             self.assertIn("apps/Bluetooth/claude_buddy.fap", base_entries)
+            self.assertIn("apps/Sub-GHz/subghz_wardriving.fap", base_entries)
             self.assertNotIn("apps_data/js_app/plugins/js_gui.fal", base_entries)
             self.assertNotIn("apps_data/js_app/plugins/js_subghz.fal", base_entries)
             self.assertFalse((resources / "apps/Scripts/js_app.fap").exists())
             wifi_entry = module_entries["apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap"]
             self.assertEqual(wifi_entry["sha256"], sha256(extapp_wifi))
+            self.assertEqual(wifi_entry["md5"], md5(extapp_wifi))
             ir_lab_entry = module_entries["apps/Module One/IR Blaster/tumo_ir_lab.fap"]
             self.assertEqual(ir_lab_entry["sha256"], sha256(extapp_ir_lab))
             cockpit_entry = module_entries[
@@ -270,6 +275,14 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertIn(
                 {
                     "group": "module_one",
+                    "legacy": "/ext/apps/Module One/Diagnostics/module_one_cockpit.fap",
+                    "canonical": "/ext/apps/Module One/Diagnostics/cockpit.fap",
+                },
+                manifest["cleanup"],
+            )
+            self.assertIn(
+                {
+                    "group": "module_one",
                     "legacy": "/ext/apps/Module One/module_one_cockpit.fap",
                     "canonical": "/ext/apps/Module One/Diagnostics/cockpit.fap",
                 },
@@ -309,6 +322,10 @@ class PackageReleaseTest(unittest.TestCase):
                 )
                 self.assertNotIn(
                     "apps_data/js_app/plugins/js_subghz.fal",
+                    archive.namelist(),
+                )
+                self.assertIn(
+                    "apps/Sub-GHz/subghz_wardriving.fap",
                     archive.namelist(),
                 )
                 self.assertIn(
@@ -479,7 +496,7 @@ class PackageReleaseTest(unittest.TestCase):
                 manifest["cleanup"],
             )
 
-    def test_package_only_release_removes_module_one_frequency_analyzer_copy(self) -> None:
+    def test_package_only_release_retires_external_frequency_analyzers(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo, build, resources = prepare_package_tree(Path(directory))
             stale_visible = resources / "apps/Module One/Sub-GHz/freq_analyzer_ext.fap"
@@ -495,7 +512,7 @@ class PackageReleaseTest(unittest.TestCase):
 
             self.assertFalse(stale_visible.exists())
             arf_entries = {entry["target"]: entry for entry in manifest["packages"]["arf"]}
-            self.assertIn("/ext/apps/ARF Tools/arf_frequency_analyzer.fap", arf_entries)
+            self.assertNotIn("/ext/apps/ARF Tools/arf_frequency_analyzer.fap", arf_entries)
             self.assertNotIn(
                 "/ext/apps/Module One/Sub-GHz/freq_analyzer_ext.fap",
                 arf_entries,
@@ -504,7 +521,7 @@ class PackageReleaseTest(unittest.TestCase):
                 {
                     "group": "arf",
                     "legacy": "/ext/apps/Module One/Sub-GHz/freq_analyzer_ext.fap",
-                    "canonical": "/ext/apps/ARF Tools/arf_frequency_analyzer.fap",
+                    "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
                 },
                 manifest["cleanup"],
             )

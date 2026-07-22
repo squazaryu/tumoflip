@@ -697,9 +697,8 @@ static bool plantain_read(Nfc* nfc, NfcDevice* device) {
 
         nfc_device_set_data(device, NfcProtocolMfClassic, data);
 
-        // Plus 2K SL1: we key all 32 sectors but some may be unreadable, so accept a partial read
-        // and let parse() validate the key.
-        is_read = (error == MfClassicErrorNone || error == MfClassicErrorPartialRead);
+        // Let the normal recovery flow continue when a partial read missed the parser data.
+        is_read = mf_classic_is_read_success_for_sector(error, data, cfg.data_sector);
     } while(false);
 
     mf_classic_free(data);

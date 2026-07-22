@@ -70,17 +70,38 @@ static const char* psa_button_name(uint8_t btn) {
     }
 }
 
+static uint8_t psa_btn_to_custom(uint8_t btn) {
+    switch(btn) {
+    case 0x0:
+        return SUBGHZ_CUSTOM_BTN_UP;
+    case 0x1:
+        return SUBGHZ_CUSTOM_BTN_DOWN;
+    case 0x2:
+        return SUBGHZ_CUSTOM_BTN_LEFT;
+    default:
+        return SUBGHZ_CUSTOM_BTN_OK;
+    }
+}
+
+static uint8_t psa_custom_to_btn(uint8_t custom_btn, uint8_t fallback_btn) {
+    switch(custom_btn) {
+    case SUBGHZ_CUSTOM_BTN_UP:
+        return 0x0; // Lock
+    case SUBGHZ_CUSTOM_BTN_DOWN:
+        return 0x1; // Unlock
+    case SUBGHZ_CUSTOM_BTN_LEFT:
+    case SUBGHZ_CUSTOM_BTN_RIGHT:
+        return 0x2; // Trunk
+    default:
+        return fallback_btn;
+    }
+}
+
 static uint8_t psa_get_btn_code(void) {
     uint8_t custom_btn = subghz_custom_btn_get();
-    uint8_t original_raw = subghz_custom_btn_get_original();
-    // 0xFF is sentinel for PSA btn 0x0 (Lock)
-    uint8_t original_btn = (original_raw == 0xFF) ? 0x0 : original_raw;
-    if(custom_btn == SUBGHZ_CUSTOM_BTN_OK)    return original_btn;
-    if(custom_btn == SUBGHZ_CUSTOM_BTN_UP)    return 0x0; // Lock
-    if(custom_btn == SUBGHZ_CUSTOM_BTN_DOWN)  return 0x1; // Unlock
-    if(custom_btn == SUBGHZ_CUSTOM_BTN_LEFT)  return 0x2; // Trunk
-    if(custom_btn == SUBGHZ_CUSTOM_BTN_RIGHT) return 0x2; // Trunk
-    return original_btn;
+    uint8_t original_btn = psa_custom_to_btn(subghz_custom_btn_get_original(), 0x0);
+    if(custom_btn == SUBGHZ_CUSTOM_BTN_OK) return original_btn;
+    return psa_custom_to_btn(custom_btn, original_btn);
 }
 
 typedef enum {
@@ -1390,7 +1411,7 @@ void subghz_protocol_decoder_psa_get_string(void* context, FuriString* output) {
 
     if(instance->decrypted == 0x50 && instance->decrypted_type != 0) {
         // Always update original button when loading a new file
-        subghz_custom_btn_set_original(instance->generic.btn == 0 ? 0xFF : instance->generic.btn);
+        subghz_custom_btn_set_original(psa_btn_to_custom(instance->generic.btn));
         subghz_custom_btn_set_max(4);
         uint8_t display_btn = psa_get_btn_code();
         if(instance->decrypted_type == 0x23) {
@@ -1762,7 +1783,10 @@ SubGhzProtocolStatus subghz_protocol_encoder_psa_deserialize(void* context, Flip
                 counter = (counter << 4) | nibble;
             }
         } else {
-            has_decrypted_data = false;
+            flipper_format_rewind(flipper_format);
+            if(!flipper_format_read_uint32(flipper_format, "Cnt", &counter, 1)) {
+                has_decrypted_data = false;
+            }
         }
 
         flipper_format_rewind(flipper_format);
@@ -1779,7 +1803,13 @@ SubGhzProtocolStatus subghz_protocol_encoder_psa_deserialize(void* context, Flip
             }
             button = (uint8_t)(btn_val & 0xFF);
         } else {
-            has_decrypted_data = false;
+            uint32_t btn_val = 0;
+            flipper_format_rewind(flipper_format);
+            if(flipper_format_read_uint32(flipper_format, "Btn", &btn_val, 1)) {
+                button = (uint8_t)(btn_val & 0xFF);
+            } else {
+                has_decrypted_data = false;
+            }
         }
 
         flipper_format_rewind(flipper_format);
@@ -1849,14 +1879,20 @@ SubGhzProtocolStatus subghz_protocol_encoder_psa_deserialize(void* context, Flip
             // Setup custom button system
             // Save original button from FILE before any d-pad remapping
             uint8_t file_btn = button; // 'button' was read directly from file above
-            subghz_custom_btn_set_original(file_btn == 0 ? 0xFF : file_btn);
+            subghz_custom_btn_set_original(psa_btn_to_custom(file_btn));
             subghz_custom_btn_set_max(4);
-            instance->button = psa_get_btn_code();
+            if(!subghz_block_generic_global_button_override_get(&instance->button)) {
+                instance->button = psa_get_btn_code();
+            }
             FURI_LOG_I("PSA_ENC", "file_btn=%02X custom=%02X result=%02X orig=%02X", file_btn, subghz_custom_btn_get(), instance->button, subghz_custom_btn_get_original());
             
-            // Increment counter
-            uint32_t mult = furi_hal_subghz_get_rolling_counter_mult();
-            instance->counter = (instance->counter + mult) & 0xFFFFFFFF;
+            uint32_t override_cnt = 0;
+            if(subghz_block_generic_global_counter_override_get(&override_cnt)) {
+                instance->counter = override_cnt;
+            } else {
+                uint32_t mult = furi_hal_subghz_get_rolling_counter_mult();
+                instance->counter = (instance->counter + mult) & 0xFFFFFFFF;
+            }
                         
             psa_encoder_build_upload(instance);
             
@@ -1879,7 +1915,12 @@ SubGhzProtocolStatus subghz_protocol_encoder_psa_deserialize(void* context, Flip
                         (unsigned int)((instance->counter >> 8) & 0xFF),
                         (unsigned int)(instance->counter & 0xFF));
             }
-            flipper_format_update_string_cstr(flipper_format, "Cnt", cnt_str);
+            flipper_format_insert_or_update_string_cstr(flipper_format, "Cnt", cnt_str);
+
+            char btn_str[8];
+            snprintf(btn_str, sizeof(btn_str), "%02X", (unsigned int)instance->button);
+            flipper_format_rewind(flipper_format);
+            flipper_format_insert_or_update_string_cstr(flipper_format, "Btn", btn_str);
             
             char key_str[32];
             uint64_t key1 = ((uint64_t)instance->key1_high << 32) | instance->key1_low;
@@ -1892,6 +1933,7 @@ SubGhzProtocolStatus subghz_protocol_encoder_psa_deserialize(void* context, Flip
                     (unsigned int)((key1 >> 16) & 0xFF),
                     (unsigned int)((key1 >> 8) & 0xFF),
                     (unsigned int)(key1 & 0xFF));
+            flipper_format_rewind(flipper_format);
             flipper_format_update_string_cstr(flipper_format, "Key", key_str);
             
             char key2_str[32];
@@ -1899,6 +1941,7 @@ SubGhzProtocolStatus subghz_protocol_encoder_psa_deserialize(void* context, Flip
                     0, 0, 0, 0, 0, 0,
                     (unsigned int)((instance->key2_low >> 8) & 0xFF),
                     (unsigned int)(instance->key2_low & 0xFF));
+            flipper_format_rewind(flipper_format);
             flipper_format_update_string_cstr(flipper_format, "Key_2", key2_str);
             
             
@@ -1932,7 +1975,7 @@ LevelDuration subghz_protocol_encoder_psa_yield(void* context) {
     instance->encoder.front++;
     if(instance->encoder.front >= instance->encoder.size_upload) {
         instance->encoder.front = 0;
-        instance->encoder.repeat--;
+        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
         if(instance->encoder.repeat <= 0) instance->is_running = false;
     }
     return ret;

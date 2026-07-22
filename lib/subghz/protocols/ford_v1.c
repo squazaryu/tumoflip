@@ -1278,8 +1278,9 @@ LevelDuration subghz_protocol_encoder_ford_v1_yield(void* context) {
             "Encoder yield: finished one full %lu-word frame (all %u bursts); repeats_left=%u",
             (unsigned long)instance->encoder.size_upload,
             (unsigned)FORD_V1_ENC_BURST_COUNT,
-            (unsigned)instance->encoder.repeat - 1U);
-        instance->encoder.repeat--;
+            subghz_block_generic_global.endless_tx ? (unsigned)instance->encoder.repeat :
+                                                     (unsigned)instance->encoder.repeat - 1U);
+        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
         instance->encoder.front = 0;
     } else if(instance->encoder.front <= 4U) {
         uint32_t raw_word;

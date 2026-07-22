@@ -3,6 +3,7 @@
 #include <furi_hal.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <storage/storage.h>
 #include <lib/subghz/types.h>
 #include <lib/subghz/protocols/plugin_registry.h>
@@ -13,6 +14,7 @@
 #define SUBGHZ_LAST_SETTING_DEFAULT_PRESET                    1
 #define SUBGHZ_LAST_SETTING_DEFAULT_FREQUENCY                 433920000
 #define SUBGHZ_LAST_SETTING_FREQUENCY_ANALYZER_FEEDBACK_LEVEL 2
+#define SUBGHZ_LAST_SETTINGS_PROTOCOL_FILTER_SIZE             1024
 
 typedef enum {
     SubGhzHoppingModeOff,
@@ -37,7 +39,21 @@ typedef struct {
     uint8_t protocol_pack_group;
     bool leds_and_amp;
     uint8_t tx_power;
+    char protocol_filter[SUBGHZ_LAST_SETTINGS_PROTOCOL_FILTER_SIZE];
 } SubGhzLastSettings;
+
+bool subghz_last_settings_protocol_filter_contains(
+    const SubGhzLastSettings* instance,
+    const char* protocol);
+
+bool subghz_last_settings_protocol_filter_normalize(SubGhzLastSettings* instance);
+
+bool subghz_last_settings_protocol_filter_set(
+    SubGhzLastSettings* instance,
+    const char* protocol,
+    bool disabled);
+
+uint8_t subghz_last_settings_protocol_filter_count(const SubGhzLastSettings* instance);
 
 SubGhzLastSettings* subghz_last_settings_alloc(void);
 

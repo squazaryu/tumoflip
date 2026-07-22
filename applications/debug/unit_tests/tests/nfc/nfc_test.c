@@ -208,6 +208,44 @@ MU_TEST(mf_classic_4k_7b_file_test) {
     nfc_file_test_with_generator(NfcDataGeneratorTypeMfClassic4k_7b);
 }
 
+MU_TEST(mf_classic_partial_read_required_sector_test) {
+    MfClassicData* data = mf_classic_alloc();
+    data->type = MfClassicType1k;
+
+    const uint8_t sector = 4;
+    mu_assert(
+        mf_classic_is_read_success_for_sector(MfClassicErrorNone, data, sector),
+        "Complete read must be accepted");
+    mu_assert(
+        !mf_classic_is_read_success_for_sector(MfClassicErrorPartialRead, data, sector),
+        "Partial read without required sector must be rejected");
+
+    MfClassicBlock block = {};
+    const uint8_t first_block = mf_classic_get_first_block_num_of_sector(sector);
+    const uint8_t block_count = mf_classic_get_blocks_num_in_sector(sector);
+    for(uint8_t i = 0; i < block_count; ++i) {
+        mf_classic_set_block_read(data, first_block + i, &block);
+    }
+    mu_assert(
+        !mf_classic_is_read_success_for_sector(MfClassicErrorPartialRead, data, sector),
+        "Partial read without sector keys must be rejected");
+
+    mf_classic_set_key_found(data, sector, MfClassicKeyTypeA, 0);
+    mu_assert(
+        !mf_classic_is_read_success_for_sector(MfClassicErrorPartialRead, data, sector),
+        "Partial read with one sector key must be rejected");
+
+    mf_classic_set_key_found(data, sector, MfClassicKeyTypeB, 0);
+    mu_assert(
+        mf_classic_is_read_success_for_sector(MfClassicErrorPartialRead, data, sector),
+        "Partial read with the complete required sector must be accepted");
+    mu_assert(
+        !mf_classic_is_read_success_for_sector(MfClassicErrorAuth, data, sector),
+        "Non-read errors must be rejected");
+
+    mf_classic_free(data);
+}
+
 MU_TEST(iso14443_3a_reader) {
     Nfc* poller = nfc_alloc();
     Nfc* listener = nfc_alloc();
@@ -1065,6 +1103,7 @@ MU_TEST_SUITE(nfc) {
     MU_RUN_TEST(mf_classic_1k_7b_file_test);
     MU_RUN_TEST(mf_classic_4k_4b_file_test);
     MU_RUN_TEST(mf_classic_4k_7b_file_test);
+    MU_RUN_TEST(mf_classic_partial_read_required_sector_test);
 
     MU_RUN_TEST(mf_classic_reader);
     MU_RUN_TEST(mf_classic_write);

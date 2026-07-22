@@ -206,11 +206,18 @@ void subghz_protocol_encoder_star_line_free(void* context) {
 static bool
     subghz_protocol_star_line_gen_data(SubGhzProtocolEncoderStarLine* instance, uint8_t btn) {
 
-    if((instance->generic.cnt + 1) > 0xFFFF) {
-        instance->generic.cnt = 0;
+    uint32_t override_cnt = 0;
+    if(subghz_block_generic_global_counter_override_get(&override_cnt)) {
+        instance->generic.cnt = override_cnt & 0xFFFF;
     } else {
-        instance->generic.cnt += 1;
+        uint32_t mult = furi_hal_subghz_get_rolling_counter_mult();
+        if((instance->generic.cnt + mult) > 0xFFFF) {
+            instance->generic.cnt = 0;
+        } else {
+            instance->generic.cnt += mult;
+        }
     }
+    instance->generic.btn = btn;
 
     uint32_t fix = btn << 24 | instance->generic.serial;
     uint32_t decrypt = btn << 24 | (instance->generic.serial & 0xFF) << 16 | instance->generic.cnt;
@@ -520,6 +527,7 @@ SubGhzProtocolStatus
             &instance->generic, instance->keystore, &instance->manufacture_name);
 
         uint8_t selected_btn = star_line_get_btn_code(instance->generic.btn);
+        subghz_block_generic_global_button_override_get(&selected_btn);
         subghz_protocol_encoder_star_line_get_upload(instance, selected_btn);
 
         subghz_protocol_encoder_star_line_serialize(instance, flipper_format);
@@ -556,7 +564,7 @@ LevelDuration subghz_protocol_encoder_star_line_yield(void* context) {
     LevelDuration ret = instance->encoder.upload[instance->encoder.front];
 
     if(++instance->encoder.front == instance->encoder.size_upload) {
-        instance->encoder.repeat--;
+        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
         instance->encoder.front = 0;
     }
 

@@ -32,6 +32,30 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def md5(path: Path) -> str:
+    digest = hashlib.md5()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_optional_md5(path: Path, entry: dict[str, object], stage: str) -> None:
+    expected = entry.get("md5")
+    if expected is None:
+        return
+    valid = (
+        isinstance(expected, str)
+        and len(expected) == 32
+        and expected == expected.lower()
+        and all(character in "0123456789abcdef" for character in expected)
+    )
+    if not valid:
+        raise PackageError(f"Package MD5 is invalid: {path}")
+    if md5(path) != expected:
+        raise PackageError(f"{stage} MD5 mismatch: {path}")
+
+
 def load_manifest(path: Path) -> dict[str, object]:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if manifest.get("schema") != 2:
@@ -87,6 +111,7 @@ def verify_sources(
             raise PackageError(f"Package source size mismatch: {source}")
         if sha256(source) != entry["sha256"]:
             raise PackageError(f"Package source SHA-256 mismatch: {source}")
+        verify_optional_md5(source, entry, "Package source")
         ext_relative(str(entry["target"]))
 
 
@@ -160,6 +185,7 @@ def apply_packages(
             shutil.copy2(safe_source(resources_root, str(entry["source"])), staged)
             if sha256(staged) != entry["sha256"]:
                 raise PackageError(f"Staged SHA-256 mismatch: {staged}")
+            verify_optional_md5(staged, entry, "Staged")
     except Exception:
         shutil.rmtree(staging_root, ignore_errors=True)
         shutil.rmtree(rollback_root, ignore_errors=True)
@@ -203,6 +229,7 @@ def apply_packages(
             target = sd_root / ext_relative(str(entry["target"]))
             if sha256(target) != entry["sha256"]:
                 raise PackageError(f"Installed SHA-256 mismatch: {target}")
+            verify_optional_md5(target, entry, "Installed")
 
         state = {
             "schema": 1,
@@ -210,7 +237,11 @@ def apply_packages(
             "transaction": transaction,
             "groups": selected_groups,
             "files": [
-                {"target": entry["target"], "sha256": entry["sha256"]}
+                {
+                    "target": entry["target"],
+                    "sha256": entry["sha256"],
+                    **({"md5": entry["md5"]} if "md5" in entry else {}),
+                }
                 for _, entry in entries
             ],
             "rollback": f"/.tumoflip/rollback/{transaction}",

@@ -225,6 +225,21 @@ void mf_classic_set_block_read(MfClassicData* data, uint8_t block_num, MfClassic
 
 bool mf_classic_is_sector_read(const MfClassicData* data, uint8_t sector_num);
 
+/**
+ * @brief Check whether a card read contains the sector required by a consumer.
+ *
+ * A complete read is always usable. A partial read is usable only when the
+ * required sector, including both keys and every block, was read.
+ */
+static inline bool mf_classic_is_read_success_for_sector(
+    MfClassicError error,
+    const MfClassicData* data,
+    uint8_t sector_num) {
+    return (error == MfClassicErrorNone) ||
+           ((error == MfClassicErrorPartialRead) &&
+            mf_classic_is_sector_read(data, sector_num));
+}
+
 void mf_classic_get_read_sectors_and_keys(
     const MfClassicData* data,
     uint8_t* sectors_read,

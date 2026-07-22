@@ -7,7 +7,7 @@ App(
     requires=["gui", "subghz_radio_broker"],
     stack_size=4 * 1024,
     fap_description="Capture and emulate garage and gate remote signals from Sub-GHz",
-    fap_version="2.6",
+    fap_version="2.7",
     fap_icon="images/protopirate_10px.png",
     fap_category="ARF Tools",
     fap_author="D4C1 Labs; tumoflip integration",
@@ -44,39 +44,6 @@ App(
         "protocols/protocols_common.c",
         "protocols/keys.c",
     ],
-)
-
-App(
-    appid="garage_door_remote_am_plugin",
-    apptype=FlipperAppType.PLUGIN,
-    entry_point="protopirate_am_plugin_ep",
-    requires=["garage_door_remote"],
-    sources=[
-        "protocols/plugins/protopirate_am_plugin.c",
-        "protocols/protocols_common.c",
-        "protocols/keys.c",
-        "protocols/alutech_at_4n.c",
-        "protocols/beninca_arc.c",
-        "protocols/came.c",
-        "protocols/came_atomo.c",
-        "protocols/came_twee.c",
-        "protocols/chamberlain_code.c",
-        "protocols/clemsa.c",
-        "protocols/dooya.c",
-        "protocols/faac_slh.c",
-        "protocols/gate_tx.c",
-        "protocols/hormann.c",
-        "protocols/keeloq.c",
-        "protocols/linear.c",
-        "protocols/linear_delta3.c",
-        "protocols/megacode.c",
-        "protocols/nice_flo.c",
-        "protocols/nice_flor_s.c",
-        "protocols/princeton.c",
-        "protocols/somfy_keytis.c",
-        "protocols/somfy_telis.c",
-    ],
-    fal_embedded=True,
 )
 
 App(

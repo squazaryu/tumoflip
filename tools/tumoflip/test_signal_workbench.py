@@ -19,6 +19,14 @@ STORAGE_SOURCE = APP_DIR / "tumospectrum_storage.c"
 APP_MANIFEST = APP_DIR / "application.fam"
 SUBGHZ_SOURCE = REPO_ROOT / "applications/main/subghz/subghz.c"
 INFRARED_SOURCE = REPO_ROOT / "applications/main/infrared/infrared_app.c"
+SUBGHZ_INTERNAL = REPO_ROOT / "applications/main/subghz/subghz_i.h"
+SUBGHZ_READ_RAW = REPO_ROOT / "applications/main/subghz/scenes/subghz_scene_read_raw.c"
+SUBGHZ_NEED_SAVING = REPO_ROOT / "applications/main/subghz/scenes/subghz_scene_need_saving.c"
+SUBGHZ_SAVE_SUCCESS = REPO_ROOT / "applications/main/subghz/scenes/subghz_scene_save_success.c"
+INFRARED_INTERNAL = REPO_ROOT / "applications/main/infrared/infrared_app_i.h"
+INFRARED_LEARN = REPO_ROOT / "applications/main/infrared/scenes/infrared_scene_learn.c"
+INFRARED_ASK_BACK = REPO_ROOT / "applications/main/infrared/scenes/infrared_scene_ask_back.c"
+INFRARED_LEARN_DONE = REPO_ROOT / "applications/main/infrared/scenes/infrared_scene_learn_done.c"
 COCKPIT_SOURCE = REPO_ROOT / "applications_user/module_one_cockpit/module_one_cockpit.c"
 ACCEPTANCE_SOURCE = REPO_ROOT / "applications_user/tumo_acceptance_suite/tumo_acceptance_suite.c"
 VALIDATOR = REPO_ROOT / "tools/tumoflip/validate_release.py"
@@ -37,6 +45,14 @@ class TumoSpectrumTest(unittest.TestCase):
         cls.manifest = APP_MANIFEST.read_text(encoding="utf-8")
         cls.subghz = SUBGHZ_SOURCE.read_text(encoding="utf-8")
         cls.infrared = INFRARED_SOURCE.read_text(encoding="utf-8")
+        cls.subghz_internal = SUBGHZ_INTERNAL.read_text(encoding="utf-8")
+        cls.subghz_read_raw = SUBGHZ_READ_RAW.read_text(encoding="utf-8")
+        cls.subghz_need_saving = SUBGHZ_NEED_SAVING.read_text(encoding="utf-8")
+        cls.subghz_save_success = SUBGHZ_SAVE_SUCCESS.read_text(encoding="utf-8")
+        cls.infrared_internal = INFRARED_INTERNAL.read_text(encoding="utf-8")
+        cls.infrared_learn = INFRARED_LEARN.read_text(encoding="utf-8")
+        cls.infrared_ask_back = INFRARED_ASK_BACK.read_text(encoding="utf-8")
+        cls.infrared_learn_done = INFRARED_LEARN_DONE.read_text(encoding="utf-8")
         cls.cockpit = COCKPIT_SOURCE.read_text(encoding="utf-8")
         cls.acceptance = ACCEPTANCE_SOURCE.read_text(encoding="utf-8")
         cls.validator = VALIDATOR.read_text(encoding="utf-8")
@@ -44,7 +60,8 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_app_migrates_in_place_without_duplicate_fap(self) -> None:
         self.assertIn('appid="signal_workbench"', self.manifest)
         self.assertIn('name="TumoSpectrum"', self.manifest)
-        self.assertIn('fap_version="2.1.0"', self.manifest)
+        self.assertIn('fap_version="2.4.0"', self.manifest)
+        self.assertIn('"TumoSpectrum 2.4"', self.source)
         self.assertIn('fap_category="Module One/Signals"', self.manifest)
         self.assertIn(
             'fap_dist_path="apps/Module One/Signals/signal_workbench.fap"', self.manifest
@@ -109,6 +126,7 @@ class TumoSpectrumTest(unittest.TestCase):
             '"New Infrared Set"',
             '"Latest Capture Set"',
             '"Open TumoScope"',
+            '"Protocol Profiles"',
             '"Compare Capture"',
             '"Send to Companion"',
             'elements_button_left(canvas, "Prev")',
@@ -128,8 +146,40 @@ class TumoSpectrumTest(unittest.TestCase):
             '"Open Source in Infrared"',
             "TumoSpectrumReplayStaticLike",
             "TUMOSPECTRUM_LATEST_SET_ARG",
+            "TUMOSPECTRUM_PROFILES_ARG",
+            'elements_button_center(canvas, listening ? "Stop" : "Start")',
+            '"Demo" : "Delete"',
+            "protocol_profile_package_delete",
+            'dialog_message_set_buttons(message, "Delete", NULL, "Keep")',
+            'if(!tumospectrum_protocol_has_demo(package)) elements_button_right(canvas, "Delete")',
         ):
             self.assertIn(required, self.source)
+
+    def test_profile_delete_is_bounded_and_demo_is_protected(self) -> None:
+        profile_storage = (
+            APP_DIR / "protocol_profile_storage.c"
+        ).read_text(encoding="utf-8")
+        profile_header = (
+            APP_DIR / "protocol_profile_storage.h"
+        ).read_text(encoding="utf-8")
+        for required in (
+            'PROTOCOL_PROFILE_DEMO_FILENAME  "demo_pulse_pair.tproto"',
+            "protocol_profile_filename_safe",
+            "strchr(filename, '/')",
+            "strchr(filename, '\\\\')",
+            'strstr(filename, "..")',
+            "file_info_is_dir(&info)",
+            "storage_common_remove(storage, path) == FSE_OK",
+        ):
+            self.assertIn(required, profile_header + profile_storage)
+        self.assertIn(
+            "if(package == NULL || tumospectrum_protocol_has_demo(package)) return;",
+            self.source,
+        )
+        self.assertIn(
+            "strcmp(package->filename, PROTOCOL_PROFILE_DEMO_FILENAME) == 0",
+            self.source,
+        )
 
     def test_live_capture_uses_structured_snapshot_and_stock_receivers(self) -> None:
         for required in (
@@ -150,6 +200,29 @@ class TumoSpectrumTest(unittest.TestCase):
         self.assertIn("InfraredSceneLearn", self.infrared)
         self.assertIn("infrared_worker_rx_enable_signal_decoding", self.infrared)
 
+    def test_stock_capture_apps_resume_tumospectrum_without_changing_normal_back(self) -> None:
+        self.assertIn("bool return_to_launcher;", self.subghz_internal)
+        self.assertIn("subghz->return_to_launcher = open_capture_raw;", self.subghz)
+        self.assertIn("if(subghz->return_to_launcher)", self.subghz_read_raw)
+        self.assertIn('"Exit to TumoSpectrum?"', self.subghz_need_saving)
+        self.assertIn("if(subghz->return_to_launcher)", self.subghz_save_success)
+        self.assertIn("bool return_to_launcher;", self.infrared_internal)
+        self.assertIn(
+            "infrared->app_state.return_to_launcher = open_capture_raw;", self.infrared
+        )
+        self.assertIn("infrared->app_state.return_to_launcher", self.infrared_learn)
+        self.assertIn('"Exit to TumoSpectrum?"', self.infrared_ask_back)
+        self.assertIn("infrared->app_state.return_to_launcher", self.infrared_learn_done)
+        for source in (
+            self.subghz_read_raw,
+            self.subghz_need_saving,
+            self.subghz_save_success,
+            self.infrared_learn,
+            self.infrared_ask_back,
+            self.infrared_learn_done,
+        ):
+            self.assertIn("view_dispatcher_stop", source)
+
     def test_module_views_keep_their_internal_context(self) -> None:
         for forbidden in (
             "view_set_context(text_box_get_view",
@@ -164,10 +237,14 @@ class TumoSpectrumTest(unittest.TestCase):
             self.assertIn(required, self.source)
 
     def test_app_never_transmits_directly(self) -> None:
-        combined = self.source + self.parser + self.analysis + self.storage
+        runtime = (APP_DIR / "tumospectrum_protocol_runtime.c").read_text(
+            encoding="utf-8"
+        )
+        combined = self.source + self.parser + self.analysis + self.storage + runtime
         for forbidden in (
             "furi_hal_subghz",
             "subghz_txrx_tx_start",
+            "subghz_devices_start_async_tx",
             "infrared_send",
             "infrared_signal_transmit",
             "GpioModeOutputPushPull",
@@ -190,7 +267,8 @@ class TumoSpectrumTest(unittest.TestCase):
             "tumospectrum_append_json_string",
         ):
             self.assertIn(required, self.storage)
-        self.assertIn('TUMOSPECTRUM_BRIDGE_COMMAND "report"', self.source)
+        self.assertIn("TUMOSPECTRUM_BRIDGE_COMMAND", self.source)
+        self.assertIn('"report"', self.source)
         self.assertIn("bt_app_bridge_send_text_v2", self.source)
         self.assertIn("BT_APP_BRIDGE_V2_PAYLOAD_LEN_MAX", self.source)
 

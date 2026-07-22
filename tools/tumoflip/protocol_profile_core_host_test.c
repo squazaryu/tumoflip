@@ -1,4 +1,4 @@
-#include "../../applications_user/protocol_compiler/protocol_profile_core.h"
+#include "../../applications_user/signal_workbench/protocol_profile_core.h"
 
 #include <assert.h>
 #include <stdio.h>

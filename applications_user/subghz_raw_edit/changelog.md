@@ -1,3 +1,11 @@
+## v1.7
+
+- Extended the configurable merge gap to 1-1000 ms.
+- Preserved long RAW levels by splitting them into bounded same-level chunks.
+- Kept native synchronization gaps between repeats of the same signal.
+- Added checked sample-count arithmetic and peak-RAM validation for merges.
+- Kept Tumoflip's receive/analysis-only policy and API 88 package routing.
+
 ## v1.6
 
 - Fixed MPU fault stack overflow error on some flipper firmwares.

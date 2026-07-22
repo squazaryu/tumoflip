@@ -72,6 +72,7 @@ struct SubGhz {
     SubGhzFrequencyAnalyzer* subghz_frequency_analyzer;
     SubGhzReadRAW* subghz_read_raw;
     bool raw_send_only;
+    bool return_to_launcher;
 
     bool save_datetime_set;
     DateTime save_datetime;
@@ -126,6 +127,7 @@ void subghz_rx_key_state_set(SubGhz* subghz, SubGhzRxKeyState state);
 SubGhzRxKeyState subghz_rx_key_state_get(SubGhz* subghz);
 
 void subghz_ensure_frequency_analyzer_view(SubGhz* subghz);
+void subghz_ensure_receiver_view(SubGhz* subghz);
 
 extern const NotificationSequence subghz_sequence_rx;
 extern const NotificationSequence subghz_sequence_rx_locked;

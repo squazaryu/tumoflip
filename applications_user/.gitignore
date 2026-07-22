@@ -61,3 +61,5 @@
 !tumofabric_node/**
 !tumonet_gateway/
 !tumonet_gateway/**
+!subghz_wardriving/
+!subghz_wardriving/**

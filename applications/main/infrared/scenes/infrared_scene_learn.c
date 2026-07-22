@@ -31,6 +31,11 @@ bool infrared_scene_learn_on_event(void* context, SceneManagerEvent event) {
             dolphin_deed(DolphinDeedIrLearnSuccess);
             consumed = true;
         }
+    } else if(
+        event.type == SceneManagerEventTypeBack && infrared->app_state.return_to_launcher) {
+        scene_manager_stop(infrared->scene_manager);
+        view_dispatcher_stop(infrared->view_dispatcher);
+        consumed = true;
     }
 
     return consumed;

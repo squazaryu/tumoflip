@@ -223,7 +223,9 @@ static void subghz_protocol_hay21_remote_controller(SubGhzBlockGeneric* instance
 
     // Save original button for later use
     if(subghz_custom_btn_get_original() == 0) {
-
+        subghz_custom_btn_set_original(instance->btn);
+    }
+    subghz_custom_btn_set_max(2);
 
     // Hay21 Decoder
     // 09.2024 - @xMasterX (MMX)
