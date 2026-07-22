@@ -25,12 +25,12 @@ you find a tumoflip-specific issue, report it in this repository:
 ## Current Build
 
 - Base: Unleashed 089 with selected upstream dev updates
-- Firmware version: `t-dev-089-040-010`
+- Firmware version: `t-flppr-fw-089-040`
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `88.0`
 - Target: Flipper Zero F7
-- Release channel: `dev experimental line`
-- Release package: `flipper-z-f7-update-t-dev-089-040-010.tgz`
+- Release channel: `main stable line`
+- Release package: `flipper-z-f7-update-t-flppr-fw-089-040.tgz`
 - Flash profile: JS Runner / MJS runtime excluded to preserve internal flash headroom.
 
 API `88.0` is a deliberate breaking migration. External FAP/FAL binaries built
@@ -67,8 +67,8 @@ published update package name together.
 Companion and release tooling continue to recognize the legacy
 `tmwhflpprarf<unleashed>-<build>` format. Existing release tags and packages
 are never renamed; only new stable builds use `t-flppr-fw-*`.
-Stable Git tags remain SemVer: stable `089-039` uses `v0.3.9` and the stable
-firmware prefix. The current development line reports `t-dev-089-040-010`
+Stable Git tags remain SemVer: stable `089-040` uses `v0.4.0` and the stable
+firmware prefix. The current stable line reports `t-flppr-fw-089-040`
 through `device_info`.
 
 For `dev`, every separate issue-level or user-visible firmware change should
@@ -97,7 +97,7 @@ The four-page post-update splash screen is generated automatically from
 ## tumoflip Changes
 
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
-  `t-dev-089-040-010`.
+  `t-flppr-fw-089-040`.
 - Added custom Desktop main menu styles inspired by Momentum-style layouts.
 - Keeps a bounded compressed Desktop animation preview while external FAPs exit,
   reducing the visible SD reload pause without retaining the full wallpaper in RAM.
@@ -204,7 +204,7 @@ identity.
 
 | Area | Unleashed | tumoflip |
 | --- | --- | --- |
-| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: t-dev-089-040-010` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: t-flppr-fw-089-040` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
@@ -217,7 +217,7 @@ identity.
 | Sub-GHz hopping | Frequency hopping only. | Adds preset and combined hopping plus an adaptive scan dwell, signal hold, post-signal grace period, and bounded hold time to system Sub-GHz. |
 | NFC additions | Uses the Unleashed 089 NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK and adds the Bambu Lab filament spool parser. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `t-dev-089-040-010` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `t-flppr-fw-089-040` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -402,7 +402,7 @@ Stable `main` update packages and `dev` prereleases are published on
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases). The currently
 selected branch build uses this artifact name:
 
-- `flipper-z-f7-update-t-dev-089-040-010.tgz`
+- `flipper-z-f7-update-t-flppr-fw-089-040.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -424,7 +424,7 @@ python3 tools/tumoflip/validate_release.py --write-manifest
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-t-dev-089-040-010.tgz
+dist/f7-C/flipper-z-f7-update-t-flppr-fw-089-040.tgz
 ```
 
 ## Upstream
