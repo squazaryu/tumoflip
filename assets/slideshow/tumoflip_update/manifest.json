@@ -2,7 +2,7 @@
   "frames": {
     "frame_00.png": {
       "mode": "1",
-      "pixels_sha256": "4ff17206def6620e17e59a6fde7b866768afbe8eab3004e3fe609d216820cbf5",
+      "pixels_sha256": "b10597f53f7e25313e1fef7ce30c1a0acc975d2f322d2af89f01524205a7d424",
       "size": [
         128,
         64
@@ -35,5 +35,5 @@
   },
   "schema": 1,
   "title": "T-DEV",
-  "version": "089-040-009"
+  "version": "089-040-010"
 }
