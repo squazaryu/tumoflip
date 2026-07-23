@@ -46,6 +46,7 @@
 #define TUMOFLOW_SAMPLE_PATH TUMOFLOW_WORKFLOWS_DIR "/field_demo.tflow"
 #define TUMOFLOW_EDIT_TEMP_PATH TUMOFLOW_DATA_DIR "/workflow_edit.tmp"
 #define TUMOFLOW_EDIT_BACKUP_PATH TUMOFLOW_DATA_DIR "/workflow_edit.bak"
+#define TUMOFLOW_ONBOARDING_PATH TUMOFLOW_DATA_DIR "/onboarding-v1"
 #define TUMOFLOW_LEGACY_SCRIPT_DIR EXT_PATH("apps_data/tumoscript/scripts")
 #define TUMOFLOW_LEGACY_MACRO_DIR EXT_PATH("apps_data/tumo_macro_deck/macros")
 
@@ -75,11 +76,15 @@
 #define TUMOFLOW_SUBGHZ_TX_TIMEOUT_MS 2500U
 #define TUMOFLOW_SUBGHZ_ACQUIRE_TIMEOUT_MS 500U
 #define TUMOFLOW_SUBGHZ_OWNER "tumoflow"
+#define TUMOFLOW_HELP_PAGE_COUNT 5U
 
 typedef enum {
+    TumoFlowModeDashboard,
     TumoFlowModeBrowse,
     TumoFlowModePreview,
     TumoFlowModeEdit,
+    TumoFlowModeHelp,
+    TumoFlowModeAbout,
     TumoFlowModeRun,
 } TumoFlowMode;
 
@@ -212,6 +217,7 @@ typedef struct {
     uint8_t workflow_count;
     uint8_t selected;
     uint8_t preview_page;
+    uint8_t help_page;
     uint8_t current_step;
     uint8_t total_steps;
     TumoFlowTriggerType edit_trigger;
@@ -219,6 +225,7 @@ typedef struct {
     uint32_t request_id_next;
     TumoFlowMode mode;
     bool cancel_requested;
+    bool onboarding_pending;
     char status[TUMOFLOW_STATUS_SIZE];
     char detail[TUMOFLOW_STATUS_SIZE];
     char preview[3][TUMOFLOW_STATUS_SIZE];
@@ -378,7 +385,8 @@ static void tumoflow_draw_callback(Canvas* canvas, void* context) {
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 0, 10, "TumoFlow");
-    if(has_workflows) {
+    if(has_workflows && app->mode != TumoFlowModeDashboard &&
+       app->mode != TumoFlowModeHelp && app->mode != TumoFlowModeAbout) {
         canvas_set_font(canvas, FontSecondary);
         canvas_draw_str_aligned(
             canvas,
@@ -391,7 +399,20 @@ static void tumoflow_draw_callback(Canvas* canvas, void* context) {
     canvas_draw_line(canvas, 0, 12, 127, 12);
     canvas_set_font(canvas, FontSecondary);
 
-    if(app->mode == TumoFlowModeBrowse) {
+    if(app->mode == TumoFlowModeDashboard) {
+        char workflow_count[32];
+        snprintf(
+            workflow_count,
+            sizeof(workflow_count),
+            "%u workflows ready",
+            (unsigned)app->workflow_count);
+        canvas_draw_str(canvas, 0, 24, "Field automation");
+        canvas_draw_str(canvas, 0, 37, workflow_count);
+        canvas_draw_str(canvas, 0, 49, "Safe, bounded, local");
+        elements_button_left(canvas, "Guide");
+        elements_button_center(canvas, "Open");
+        elements_button_right(canvas, "About");
+    } else if(app->mode == TumoFlowModeBrowse) {
         char counter[32];
         snprintf(
             counter,
@@ -403,8 +424,8 @@ static void tumoflow_draw_callback(Canvas* canvas, void* context) {
         canvas_draw_str(canvas, 0, 23, workflow_name);
         canvas_draw_str(canvas, 0, 35, counter);
         canvas_draw_str(canvas, 0, 47, detail);
-        elements_button_left(canvas, "Valid");
-        elements_button_center(canvas, "Arm");
+        elements_button_left(canvas, "Check");
+        elements_button_center(canvas, "Run");
         elements_button_right(canvas, "View");
     } else if(app->mode == TumoFlowModePreview) {
         char page[32];
@@ -419,7 +440,7 @@ static void tumoflow_draw_callback(Canvas* canvas, void* context) {
         canvas_draw_str(canvas, 0, 40, app->preview[1]);
         canvas_draw_str(canvas, 0, 49, app->preview[2]);
         elements_button_left(canvas, "Back");
-        elements_button_center(canvas, "Arm");
+        elements_button_center(canvas, "Run");
         elements_button_right(canvas, "Next");
     } else if(app->mode == TumoFlowModeEdit) {
         canvas_draw_str(canvas, 0, 23, "Trigger editor");
@@ -440,7 +461,46 @@ static void tumoflow_draw_callback(Canvas* canvas, void* context) {
         if(app->edit_trigger == TumoFlowTriggerCountdown) {
             elements_button_right(canvas, "+1s");
         }
-    } else {
+    } else if(app->mode == TumoFlowModeHelp) {
+        char page[20];
+        snprintf(
+            page,
+            sizeof(page),
+            "Guide %u/%u",
+            (unsigned)(app->help_page + 1U),
+            (unsigned)TUMOFLOW_HELP_PAGE_COUNT);
+        canvas_draw_str_aligned(canvas, 127, 10, AlignRight, AlignBottom, page);
+        if(app->help_page == 0U) {
+            canvas_draw_str(canvas, 0, 24, "1. Pick a workflow");
+            canvas_draw_str(canvas, 0, 36, "Open, then Up/Down");
+            canvas_draw_str(canvas, 0, 48, "View lists actions");
+        } else if(app->help_page == 1U) {
+            canvas_draw_str(canvas, 0, 24, "2. Check before run");
+            canvas_draw_str(canvas, 0, 36, "Check validates file");
+            canvas_draw_str(canvas, 0, 48, "Hold Right: Dry Run");
+        } else if(app->help_page == 2U) {
+            canvas_draw_str(canvas, 0, 24, "3. Arm outputs");
+            canvas_draw_str(canvas, 0, 36, "Run shows outputs");
+            canvas_draw_str(canvas, 0, 48, "OK confirms; Back stops");
+        } else if(app->help_page == 3U) {
+            canvas_draw_str(canvas, 0, 24, "4. Import old files");
+            canvas_draw_str(canvas, 0, 36, "Select Legacy source");
+            canvas_draw_str(canvas, 0, 48, "Hold OK; original stays");
+        } else {
+            canvas_draw_str(canvas, 0, 24, "5. Edit & recover");
+            canvas_draw_str(canvas, 0, 36, "Hold Left: trigger");
+            canvas_draw_str(canvas, 0, 48, "Back releases hardware");
+        }
+        elements_button_left(canvas, "Back");
+        elements_button_right(
+            canvas,
+            app->help_page + 1U < TUMOFLOW_HELP_PAGE_COUNT ? "Next" : "Done");
+    } else if(app->mode == TumoFlowModeAbout) {
+        canvas_draw_str(canvas, 0, 24, "TumoFlow v0.2");
+        canvas_draw_str(canvas, 0, 36, "Foreground workflows");
+        canvas_draw_str(canvas, 0, 48, "squazaryu/tumoflip");
+        elements_button_left(canvas, "Back");
+    } else if(app->mode == TumoFlowModeRun) {
         char progress[30];
         snprintf(
             progress,
@@ -473,6 +533,34 @@ static void tumoflow_ensure_dirs(TumoFlowApp* app) {
     tumoflow_mkdir(app->storage, TUMOFLOW_DATA_DIR);
     tumoflow_mkdir(app->storage, TUMOFLOW_WORKFLOWS_DIR);
     tumoflow_mkdir(app->storage, TUMOFLOW_RUNS_DIR);
+}
+
+static void tumoflow_show_dashboard(TumoFlowApp* app) {
+    tumoflow_set_model(app, TumoFlowModeDashboard, "Ready", "", 0U, 0U);
+}
+
+static void tumoflow_open_help(TumoFlowApp* app, uint8_t page) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    app->mode = TumoFlowModeHelp;
+    app->help_page = page < TUMOFLOW_HELP_PAGE_COUNT ? page : 0U;
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+    view_port_update(app->view_port);
+}
+
+static void tumoflow_show_about(TumoFlowApp* app) {
+    tumoflow_set_model(app, TumoFlowModeAbout, "", "", 0U, 0U);
+}
+
+static void tumoflow_mark_onboarding_seen(TumoFlowApp* app) {
+    if(!app->onboarding_pending) return;
+
+    File* file = storage_file_alloc(app->storage);
+    if(storage_file_open(file, TUMOFLOW_ONBOARDING_PATH, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+        tumoflow_write(file, "TumoFlow onboarding v1\n");
+        storage_file_close(file);
+        app->onboarding_pending = false;
+    }
+    storage_file_free(file);
 }
 
 static void tumoflow_ensure_sample(TumoFlowApp* app) {
@@ -2665,13 +2753,19 @@ static TumoFlowApp* tumoflow_alloc(void) {
     tumoflow_ensure_dirs(app);
     tumoflow_ensure_sample(app);
     tumoflow_scan_workflows(app);
+    app->onboarding_pending =
+        storage_common_stat(app->storage, TUMOFLOW_ONBOARDING_PATH, NULL) != FSE_OK;
 
     app->view_port = view_port_alloc();
     view_port_draw_callback_set(app->view_port, tumoflow_draw_callback, app);
     view_port_input_callback_set(app->view_port, tumoflow_input_callback, app);
     app->gui = furi_record_open(RECORD_GUI);
     gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
-    tumoflow_refresh_selected(app);
+    if(app->onboarding_pending) {
+        tumoflow_open_help(app, 0U);
+    } else {
+        tumoflow_show_dashboard(app);
+    }
     return app;
 }
 
@@ -2701,12 +2795,24 @@ int32_t tumoflow_app(void* context) {
         const bool long_press = input.type == InputTypeLong;
 
         if(input.key == InputKeyBack) {
-            if(app->mode == TumoFlowModePreview || app->mode == TumoFlowModeEdit) {
+            if(app->mode == TumoFlowModeHelp) {
+                tumoflow_mark_onboarding_seen(app);
+                tumoflow_show_dashboard(app);
+            } else if(app->mode == TumoFlowModePreview || app->mode == TumoFlowModeEdit) {
                 tumoflow_refresh_selected(app);
+            } else if(app->mode == TumoFlowModeBrowse ||
+                      app->mode == TumoFlowModeAbout) {
+                tumoflow_show_dashboard(app);
             } else {
                 running = false;
             }
         } else if(input.key == InputKeyUp) {
+            if(app->mode == TumoFlowModeHelp) {
+                if(!long_press && app->help_page > 0U) {
+                    tumoflow_open_help(app, app->help_page - 1U);
+                }
+                continue;
+            }
             if(app->mode == TumoFlowModeEdit) {
                 if(!long_press) tumoflow_cycle_edit_trigger(app, -1);
                 continue;
@@ -2720,6 +2826,12 @@ int32_t tumoflow_app(void* context) {
             furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
             tumoflow_refresh_selected(app);
         } else if(input.key == InputKeyDown) {
+            if(app->mode == TumoFlowModeHelp) {
+                if(!long_press && app->help_page + 1U < TUMOFLOW_HELP_PAGE_COUNT) {
+                    tumoflow_open_help(app, app->help_page + 1U);
+                }
+                continue;
+            }
             if(app->mode == TumoFlowModeEdit) {
                 if(!long_press) tumoflow_cycle_edit_trigger(app, 1);
                 continue;
@@ -2732,7 +2844,19 @@ int32_t tumoflow_app(void* context) {
             furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
             tumoflow_refresh_selected(app);
         } else if(input.key == InputKeyLeft) {
-            if(app->mode == TumoFlowModePreview) {
+            if(app->mode == TumoFlowModeDashboard) {
+                if(!long_press) tumoflow_open_help(app, 0U);
+            } else if(app->mode == TumoFlowModeHelp) {
+                if(long_press) continue;
+                if(app->help_page > 0U) {
+                    tumoflow_open_help(app, app->help_page - 1U);
+                } else {
+                    tumoflow_mark_onboarding_seen(app);
+                    tumoflow_show_dashboard(app);
+                }
+            } else if(app->mode == TumoFlowModeAbout) {
+                if(!long_press) tumoflow_show_dashboard(app);
+            } else if(app->mode == TumoFlowModePreview) {
                 tumoflow_refresh_selected(app);
             } else if(app->mode == TumoFlowModeEdit) {
                 if(long_press && app->edit_trigger == TumoFlowTriggerCountdown) {
@@ -2752,7 +2876,19 @@ int32_t tumoflow_app(void* context) {
                 tumoflow_run_selected(app, TumoFlowRunModeValidate);
             }
         } else if(input.key == InputKeyRight) {
-            if(app->mode == TumoFlowModePreview) {
+            if(app->mode == TumoFlowModeDashboard) {
+                if(!long_press) tumoflow_show_about(app);
+            } else if(app->mode == TumoFlowModeHelp) {
+                if(long_press) continue;
+                if(app->help_page + 1U < TUMOFLOW_HELP_PAGE_COUNT) {
+                    tumoflow_open_help(app, app->help_page + 1U);
+                } else {
+                    tumoflow_mark_onboarding_seen(app);
+                    tumoflow_show_dashboard(app);
+                }
+            } else if(app->mode == TumoFlowModeAbout) {
+                if(!long_press) tumoflow_show_dashboard(app);
+            } else if(app->mode == TumoFlowModePreview) {
                 tumoflow_fill_preview(app, app->preview_page + 1U);
             } else if(app->mode == TumoFlowModeEdit) {
                 if(app->edit_trigger == TumoFlowTriggerCountdown) {
@@ -2772,7 +2908,19 @@ int32_t tumoflow_app(void* context) {
                 tumoflow_fill_preview(app, 0U);
             }
         } else if(input.key == InputKeyOk) {
-            if(app->mode == TumoFlowModeEdit) {
+            if(app->mode == TumoFlowModeDashboard) {
+                if(!long_press) tumoflow_refresh_selected(app);
+            } else if(app->mode == TumoFlowModeHelp) {
+                if(long_press) continue;
+                if(app->help_page + 1U < TUMOFLOW_HELP_PAGE_COUNT) {
+                    tumoflow_open_help(app, app->help_page + 1U);
+                } else {
+                    tumoflow_mark_onboarding_seen(app);
+                    tumoflow_show_dashboard(app);
+                }
+            } else if(app->mode == TumoFlowModeAbout) {
+                if(!long_press) tumoflow_show_dashboard(app);
+            } else if(app->mode == TumoFlowModeEdit) {
                 if(!long_press) tumoflow_save_trigger_editor(app);
             } else if(long_press && app->mode == TumoFlowModeBrowse) {
                 tumoflow_import_selected(app);

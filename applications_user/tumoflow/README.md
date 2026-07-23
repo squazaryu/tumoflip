@@ -6,11 +6,15 @@ readable during migration.
 
 ## Controls
 
+- On first launch, TumoFlow opens a five-page Quick Start. The same guide and
+  the About screen remain available from the dashboard.
+- `Guide` / `Open` / `About`: open the built-in guide, workflow browser, or
+  application information.
 - `Up` / `Down`: select a workflow.
-- `Left`: validate.
+- `Left` (`Check`): validate.
 - `Right`: action preview.
 - Hold `Right`: dry-run without hardware output.
-- `OK`: arm and run.
+- `OK` (`Run`): preview output actions, arm, and run.
 - Hold `OK`: import a legacy `.tmacro` or `.tscr` into TumoFlow without deleting
   the original.
 - Hold `Left`: edit a native workflow trigger. Reference-based IR and Sub-GHz
