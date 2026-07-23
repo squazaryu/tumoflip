@@ -63,3 +63,5 @@
 !tumonet_gateway/**
 !subghz_wardriving/
 !subghz_wardriving/**
+!tumokey/
+!tumokey/**

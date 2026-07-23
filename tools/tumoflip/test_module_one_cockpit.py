@@ -24,7 +24,7 @@ COCKPIT_FAP_ROUTES = {
     "tumonet_gateway": "apps/Module One/Network/tumonet_gateway.fap",
     "tumovgm_bridge": "apps/Module One/VGM/tumovgm_bridge.fap",
     "tumomodule_runtime": "apps/Module One/Modules/tumomodule_runtime.fap",
-    "tumokey_phase_a": "apps/Module One/Labs/tumokey_phase_a.fap",
+    "tumokey": "apps/Module One/Security/tumokey.fap",
     "module_one_sensor_logger": (
         "apps/Module One/Sensors BME280/module_one_sensor_logger.fap"
     ),
@@ -64,7 +64,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("Network: TumoNet", self.source)
         self.assertIn("VGM: Bridge", self.source)
         self.assertIn("Modules: Runtime", self.source)
-        self.assertIn("Security: TumoKey A", self.source)
+        self.assertIn("Security: TumoKey", self.source)
         self.assertIn("NFC: TumoCard OS", self.source)
         self.assertIn("NFC: Tag Verify", self.source)
         self.assertIn("Macros: TumoScript", self.source)
@@ -117,7 +117,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
             self.source,
         )
         self.assertIn(
-            'EXT_PATH("apps/Module One/Labs/tumokey_phase_a.fap")',
+            'EXT_PATH("apps/Module One/Security/tumokey.fap")',
             self.source,
         )
         self.assertIn(

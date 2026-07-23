@@ -13,19 +13,20 @@ class TumoKeyThreatModelTest(unittest.TestCase):
         model = THREAT_MODEL.read_text(encoding="utf-8")
 
         for required in (
-            "Conditional GO for Phase A only",
-            "USB is the only approved transport",
+            "Conditional GO for dev-only Phase B-D hardware testing",
+            "USB HID and NFC ISO-DEP are enabled for dev testing",
             "separate dev-only FAP",
             "AES-GCM",
             "mbedtls_platform_zeroize",
             "bounded checked RNG API",
-            "PIN retry/lockout state in internal storage",
+            "sealed integrity structure",
             "Never use `furi_check`",
             "`furi_crash` on host-controlled values",
-            "Attestation is `none` or self-attestation",
-            "Real credentials must not be used before Phase C",
+            "device-local packed certificate",
+            "must not be primary or sole account credentials",
             "Stable-channel inclusion is explicitly denied",
             "Repository: squazaryu/tumoflip",
+            "MinorGlitch/zerofido@56b433f9d1390ad224246c85a06083b40de4903e",
         ):
             self.assertIn(required, model)
 
