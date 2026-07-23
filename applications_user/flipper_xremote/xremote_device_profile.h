@@ -56,6 +56,14 @@ bool xremote_device_profile_add_rf(
     const char* path,
     const char* protocol,
     XRemoteDeviceAdapter adapter);
+bool xremote_device_profile_rename(XRemoteDeviceProfile* profile, const char* name);
+bool xremote_device_profile_set_ir(XRemoteDeviceProfile* profile, const char* path);
+bool xremote_device_profile_rename_rf(
+    XRemoteDeviceProfile* profile,
+    uint8_t index,
+    const char* name);
+bool xremote_device_profile_move_rf(XRemoteDeviceProfile* profile, uint8_t from, uint8_t to);
+bool xremote_device_profile_remove_rf(XRemoteDeviceProfile* profile, uint8_t index);
 bool xremote_device_profile_delete(Storage* storage, const XRemoteDeviceProfile* profile);
 
 const char* xremote_device_radio_name(XRemoteDeviceRadio radio);

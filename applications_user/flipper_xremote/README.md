@@ -39,9 +39,19 @@ commands in one on-device remote:
 3. Open the profile, select a command with Up/Down, and press OK to send.
 4. For Sub-GHz commands, Right switches between the internal and external CC1101.
 
+`Manage Profile` edits the profile directly on the Flipper:
+
+- Up/Down selects the profile name, linked IR remote, or an RF command.
+- OK renames the selected label or chooses a replacement IR remote.
+- Left/Right moves the selected RF command up or down.
+- Long OK detaches the IR link or removes the selected RF command after confirmation.
+
 Profiles are stored under `/ext/apps_data/flipper_xremote/devices` and reference
 the original `.ir` and `.sub` files without modifying them. Missing source files
-are reported in the runtime UI.
+are reported in the editor and runtime UI. Profile updates use a temporary file
+and backup rename so a failed write leaves the previously saved profile intact.
+Removing a command or detaching IR removes only the profile link; the source
+signal remains on the SD card.
 
 Sub-GHz transmission keeps the firmware region gate and radio-broker ownership.
 Changing-code protocols are rejected. Other protocols replay the saved command
