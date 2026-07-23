@@ -235,6 +235,20 @@ class TumoSpectrumTest(unittest.TestCase):
         ):
             self.assertIn(required, self.source)
 
+    def test_internal_radio_does_not_require_external_device_begin(self) -> None:
+        runtime = (APP_DIR / "tumospectrum_protocol_runtime.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("bool device_ready = map->device != NULL;", self.band_map)
+        self.assertIn(
+            "map->snapshot.radio == TumoSpectrumBandMapRadioExternal",
+            self.band_map,
+        )
+        self.assertNotIn(
+            "map->device && subghz_devices_begin(map->device)", self.band_map
+        )
+        self.assertNotIn("!subghz_devices_begin(runtime->device)", runtime)
+
     def test_smart_capture_session_is_atomic_and_limited_to_four_paths(self) -> None:
         for required in (
             "TUMOSPECTRUM_BAND_SESSION_MAX_SAMPLES 4U",

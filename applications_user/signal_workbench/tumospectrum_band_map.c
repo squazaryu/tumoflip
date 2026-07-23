@@ -153,17 +153,20 @@ static bool tumospectrum_band_map_begin_device(TumoSpectrumBandMap* map, bool pr
         map->snapshot.radio = TumoSpectrumBandMapRadioInternal;
     }
 
-    bool device_begun = map->device && subghz_devices_begin(map->device);
-    if(!device_begun && map->snapshot.radio == TumoSpectrumBandMapRadioExternal) {
+    bool device_ready = map->device != NULL;
+    if(device_ready && map->snapshot.radio == TumoSpectrumBandMapRadioExternal) {
+        device_ready = subghz_devices_begin(map->device);
+    }
+    if(!device_ready && map->snapshot.radio == TumoSpectrumBandMapRadioExternal) {
         // The external driver allocates its context before reporting init failure.
         subghz_devices_end(map->device);
         subghz_radio_broker_external_power_off(map->broker, &map->lease);
         map->device = subghz_devices_get_by_name(TUMOSPECTRUM_BAND_MAP_INTERNAL_NAME);
         map->snapshot.radio = TumoSpectrumBandMapRadioInternal;
-        device_begun = map->device && subghz_devices_begin(map->device);
+        device_ready = map->device != NULL;
     }
 
-    if(!device_begun) {
+    if(!device_ready) {
         map->snapshot.status = TumoSpectrumBandMapStatusNoRadio;
         return false;
     }
