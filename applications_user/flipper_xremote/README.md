@@ -36,8 +36,15 @@ commands in one on-device remote:
 
 1. Use `Import IR Remote` or `New RF Profile` to create a profile.
 2. Use `Add Sub-GHz` to add up to eight saved `.sub` commands.
-3. Open the profile, select a command with Up/Down, and press OK to send.
-4. For Sub-GHz commands, Right switches between the internal and external CC1101.
+3. Open the profile, select a command in the paged control deck with the D-pad,
+   and press OK to send.
+4. For Sub-GHz commands, hold OK to switch between the internal and external
+   CC1101. Hold Right to cycle B1-B4 only for reviewed 24-bit Princeton commands.
+
+Horizontal mode shows four command buttons per page in a 2x2 grid. Left/Right
+moves through commands and Up/Down moves between rows. Vertical mode keeps four
+full-width buttons per page; Up/Down selects a command and Left/Right changes
+pages. The header always shows the current page and selected IR/RF output.
 
 `Manage Profile` edits the profile directly on the Flipper:
 
