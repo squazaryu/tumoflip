@@ -113,6 +113,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Labs/tumokey_phase_a.fap",
     "apps/Module One/NFC/nfc_ccid_bridge.fap",
     "apps/Module One/NFC/tumocard_os.fap",
+    "apps/Module One/NFC/tumotag_verify.fap",
 )
 MODULE_ONE_PACKAGE_DATA_FILES = (
     "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
