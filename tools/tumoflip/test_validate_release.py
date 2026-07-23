@@ -234,6 +234,10 @@ class ValidateReleaseTest(unittest.TestCase):
             MODULE_ONE_PACKAGE_FILES,
         )
         self.assertIn(
+            "apps/Module One/Automation/tumoflow.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
             "apps/Module One/Macros/tumo_macro_deck.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
@@ -272,6 +276,14 @@ class ValidateReleaseTest(unittest.TestCase):
             MODULE_ONE_PACKAGE_DATA_FILES,
         )
         self.assertIn(
+            "apps_data/tumoflow/workflows/field_demo.tflow",
+            MODULE_ONE_PACKAGE_DATA_FILES,
+        )
+        self.assertIn(
+            "apps_data/tumoflow/workflows/bounded_outputs.tflow",
+            MODULE_ONE_PACKAGE_DATA_FILES,
+        )
+        self.assertIn(
             "apps_data/tumoscript/scripts/safe_demo.tscr",
             MODULE_ONE_PACKAGE_DATA_FILES,
         )
@@ -307,6 +319,14 @@ class ValidateReleaseTest(unittest.TestCase):
             / "apps_data/tumoscript/scripts/safe_demo.tscr"
         )
         self.assertTrue(tumoscript_sample.is_file(), str(tumoscript_sample))
+        for workflow_name in ("field_demo.tflow", "bounded_outputs.tflow"):
+            workflow = (
+                REPO_ROOT
+                / STATIC_SD_RESOURCES
+                / "apps_data/tumoflow/workflows"
+                / workflow_name
+            )
+            self.assertTrue(workflow.is_file(), str(workflow))
         for module_manifest in ("bme280.tmod", "tumovgm.tmod"):
             sample = (
                 REPO_ROOT

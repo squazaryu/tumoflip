@@ -101,6 +101,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
     "apps/Module One/BLE/ble_gatt_lab.fap",
     "apps/Module One/BLE/app_bridge_terminal.fap",
+    "apps/Module One/Automation/tumoflow.fap",
     "apps/Module One/Macros/tumo_macro_deck.fap",
     "apps/Module One/Scripts/tumoscript.fap",
     "apps/Module One/IR Blaster/tumo_ir_lab.fap",
@@ -116,6 +117,8 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/NFC/tumotag_verify.fap",
 )
 MODULE_ONE_PACKAGE_DATA_FILES = (
+    "apps_data/tumoflow/workflows/field_demo.tflow",
+    "apps_data/tumoflow/workflows/bounded_outputs.tflow",
     "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
     "apps_data/tumoscript/scripts/safe_demo.tscr",
     "apps_data/tumomodule_runtime/modules/bme280.tmod",

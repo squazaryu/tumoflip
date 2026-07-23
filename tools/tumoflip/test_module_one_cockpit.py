@@ -15,6 +15,7 @@ COCKPIT_FAP_ROUTES = {
     "wifi_mapper": "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
     "ble_gatt_lab": "apps/Module One/BLE/ble_gatt_lab.fap",
     "app_bridge_terminal": "apps/Module One/BLE/app_bridge_terminal.fap",
+    "tumoflow": "apps/Module One/Automation/tumoflow.fap",
     "tumo_macro_deck": "apps/Module One/Macros/tumo_macro_deck.fap",
     "tumoscript": "apps/Module One/Scripts/tumoscript.fap",
     "field_logger": "apps/Module One/Field/field_logger.fap",
@@ -55,6 +56,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertTrue((APP_DIR / "icon.png").is_file())
         self.assertIn("BLE: GATT Lab", self.source)
         self.assertIn("BLE: Terminal", self.source)
+        self.assertIn("Automation: TumoFlow", self.source)
         self.assertIn("Field: Logger", self.source)
         self.assertIn("Signals: TumoSpectrum", self.source)
         self.assertIn("Signals: Profiles", self.source)
@@ -74,6 +76,10 @@ class ModuleOneCockpitTest(unittest.TestCase):
         )
         self.assertIn(
             'EXT_PATH("apps/Module One/BLE/app_bridge_terminal.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/Automation/tumoflow.fap")',
             self.source,
         )
         self.assertIn(
