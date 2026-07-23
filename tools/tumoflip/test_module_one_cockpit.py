@@ -10,6 +10,9 @@ APP_SOURCE = APP_DIR / "module_one_cockpit.c"
 APP_MANIFEST = APP_DIR / "application.fam"
 
 COCKPIT_FAP_ROUTES = {
+    "tumo_uart_console": (
+        "apps_data/module_one_cockpit/modules/tumo_uart_console.fap"
+    ),
     "tumo_ir_lab": "apps/Module One/IR Blaster/tumo_ir_lab.fap",
     "tumoflip_xremote": "apps/Module One/IR Blaster/tumoflip_xremote.fap",
     "wifi_mapper": "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
@@ -55,6 +58,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn('fap_icon="icon.png"', self.manifest)
         self.assertTrue((APP_DIR / "icon.png").is_file())
         self.assertIn("BLE: GATT Lab", self.source)
+        self.assertIn("UART: Field Console", self.source)
         self.assertIn("BLE: Terminal", self.source)
         self.assertIn("Automation: TumoFlow", self.source)
         self.assertIn("Field: Logger", self.source)
@@ -70,6 +74,10 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("Macros: TumoScript", self.source)
         self.assertIn("System: Acceptance", self.source)
         self.assertIn("System: Runtime Trace", self.source)
+        self.assertIn(
+            'EXT_PATH("apps_data/module_one_cockpit/modules/tumo_uart_console.fap")',
+            self.source,
+        )
         self.assertIn(
             'EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap")',
             self.source,

@@ -1,0 +1,23 @@
+App(
+    appid="tumo_uart_console",
+    name="UART Field Console",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="hermes_app",
+    requires=["gui", "storage", "notification"],
+    sources=[
+        "hermes.c",
+        "helpers/*.c",
+        "views/*.c",
+        "scenes/*.c",
+    ],
+    stack_size=4 * 1024,
+    icon="A_GPIO_14",
+    fap_icon="icons/hermes_10px.png",
+    fap_category="Module One/Internal",
+    fap_dist_path="apps_data/module_one_cockpit/modules/tumo_uart_console.fap",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip; Hermes by at0m-b0mb",
+    fap_weburl="https://github.com/squazaryu/tumoflip/issues/174",
+    fap_description="Cockpit UART field console with listen-only auto-baud, framing detection, terminal, logging, watch, and loopback self-test.",
+)

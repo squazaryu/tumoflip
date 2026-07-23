@@ -174,6 +174,10 @@ class ValidateReleaseTest(unittest.TestCase):
             MODULE_ONE_PACKAGE_FILES,
         )
         self.assertIn(
+            "apps_data/module_one_cockpit/modules/tumo_uart_console.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
             "apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
