@@ -40,6 +40,7 @@ typedef enum {
     ModuleOneCockpitActionUartStatus,
     ModuleOneCockpitActionLaunchBleGattLab,
     ModuleOneCockpitActionLaunchAppBridgeTerminal,
+    ModuleOneCockpitActionLaunchTumoFlow,
     ModuleOneCockpitActionLaunchMacroDeck,
     ModuleOneCockpitActionLaunchTumoScript,
     ModuleOneCockpitActionLaunchFieldLogger,
@@ -132,6 +133,7 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"GPS/UART: Status", ModuleOneCockpitActionUartStatus},
     {"BLE: GATT Lab", ModuleOneCockpitActionLaunchBleGattLab},
     {"BLE: Terminal", ModuleOneCockpitActionLaunchAppBridgeTerminal},
+    {"Automation: TumoFlow", ModuleOneCockpitActionLaunchTumoFlow},
     {"Macros: Deck", ModuleOneCockpitActionLaunchMacroDeck},
     {"Macros: TumoScript", ModuleOneCockpitActionLaunchTumoScript},
     {"Field: Logger", ModuleOneCockpitActionLaunchFieldLogger},
@@ -196,6 +198,14 @@ static const ModuleOneCockpitLaunchTarget module_one_cockpit_targets[] = {
         ModuleOneCockpitBlockBle,
         "App Bridge Terminal",
         EXT_PATH("apps/Module One/BLE/app_bridge_terminal.fap"),
+        NULL,
+        true,
+    },
+    {
+        ModuleOneCockpitActionLaunchTumoFlow,
+        ModuleOneCockpitBlockMacro,
+        "TumoFlow",
+        EXT_PATH("apps/Module One/Automation/tumoflow.fap"),
         NULL,
         true,
     },
@@ -439,7 +449,7 @@ static const char* module_one_cockpit_block_label(ModuleOneCockpitBlock block) {
     case ModuleOneCockpitBlockBle:
         return "BLE";
     case ModuleOneCockpitBlockMacro:
-        return "Macros";
+        return "Automation";
     case ModuleOneCockpitBlockNfc:
         return "NFC";
     case ModuleOneCockpitBlockNrf24:
@@ -604,7 +614,7 @@ static void module_one_cockpit_append_runtime_report(FuriString* output) {
         output,
         "ESP32/GPS: UART free means probe-safe; use dedicated screens for active checks\n"
         "BLE: use GATT Lab or App Bridge Terminal for App Bridge diagnostics\n"
-        "Macros: use Macro Deck for local sequences or TumoScript for scripted dry-runs\n"
+        "Automation: use TumoFlow for validated field workflows\n"
         "NRF24: unknown, no safe passive probe yet\n"
         "CC1101: unknown, use ARF/Sub-GHz status before transmit\n\n");
 }
@@ -636,7 +646,7 @@ static void module_one_cockpit_build_report(ModuleOneCockpitApp* app, FuriString
         "IR: use IR Blink or Tumo IR Lab\n"
         "ESP32: use UART/AT or WiFi Mapper\n"
         "BLE: use GATT Lab or App Bridge Terminal for App Bridge diagnostics\n"
-        "Macros: use Macro Deck or TumoScript for local action sequences\n"
+        "Automation: use TumoFlow; legacy Macro Deck and TumoScript remain during migration\n"
         "Signals: use TumoSpectrum Profiles for live .tproto RX or TumoScope for GPIO capture\n"
         "Acceptance: export release smoke reports after each flash\n"
         "GPS/BME280: use Sensor Logger\n"

@@ -58,6 +58,7 @@ static const TumoAcceptancePathCheck tumo_acceptance_paths[] = {
      true},
     {"BLE GATT Lab", EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap"), true},
     {"App Bridge Terminal", EXT_PATH("apps/Module One/BLE/app_bridge_terminal.fap"), true},
+    {"TumoFlow", EXT_PATH("apps/Module One/Automation/tumoflow.fap"), true},
     {"Macro Deck", EXT_PATH("apps/Module One/Macros/tumo_macro_deck.fap"), true},
     {"TumoScript", EXT_PATH("apps/Module One/Scripts/tumoscript.fap"), true},
     {"Tumo IR Lab", EXT_PATH("apps/Module One/IR Blaster/tumo_ir_lab.fap"), true},
