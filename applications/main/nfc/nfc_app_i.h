@@ -94,6 +94,10 @@
 
 #define NFC_MFKEY32_APP_PATH (EXT_PATH("apps/NFC/mfkey.fap"))
 
+#define NFC_TUMOTAG_VERIFY_CAPTURE_ARG "tumotag_verify_capture"
+#define NFC_TUMOTAG_VERIFY_DIR         EXT_PATH("apps_data/tumotag_verify")
+#define NFC_TUMOTAG_VERIFY_OUTPUT      (NFC_TUMOTAG_VERIFY_DIR "/observed.nfc")
+
 typedef enum {
     NfcRpcStateIdle,
     NfcRpcStateEmulating,
@@ -221,6 +225,7 @@ struct NfcApp {
     FuriString* file_path;
     FuriString* file_name;
     FuriTimer* timer;
+    bool tumotag_verify_capture;
 };
 
 typedef enum {
