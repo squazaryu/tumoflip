@@ -112,6 +112,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Labs/tumovm_peripherals.fap",
     "apps/Module One/Labs/tumofabric_node.fap",
     "apps/Module One/Labs/tumokey_phase_a.fap",
+    "apps/Module One/Security/tumokey.fap",
     "apps/Module One/NFC/nfc_ccid_bridge.fap",
     "apps/Module One/NFC/tumocard_os.fap",
     "apps/Module One/NFC/tumotag_verify.fap",

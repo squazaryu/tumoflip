@@ -1,13 +1,16 @@
 # TumoKey Threat Model
 
-Status: design gate for issue #64; no production credential storage is approved.
+Status: implementation review gate for issue #173; dev-only credential testing is approved,
+but stable or sole-authenticator use is not.
 
 ## Overview
 
-TumoKey is a proposed experimental USB roaming authenticator for Tumoflip. It
-extends the device's existing U2F role with a bounded CTAP2 implementation and,
-only after the storage and user-verification gates in this document are met,
-discoverable credentials and credential management.
+TumoKey is an experimental USB/NFC roaming authenticator for Tumoflip. The
+current implementation ports and adapts ZeroFIDO commit
+`56b433f9d1390ad224246c85a06083b40de4903e`, preserving its GPL notices and
+auditable internal symbol names. It provides bounded CTAP HID/CBOR handling,
+U2F, FIDO2 MakeCredential/GetAssertion, discoverable credentials, ClientPIN,
+credential management, local approval, and interrupted-write recovery.
 
 TumoKey is not a certified authenticator and must not claim protection
 equivalent to a YubiKey or a Secure Element-backed product. The Flipper crypto
@@ -17,9 +20,9 @@ guarantee secret safety. The device-unique enclave key can improve at-rest
 protection against casual SD-card inspection, but it does not establish a
 tamper-resistant authenticator boundary.
 
-The first implementation must be a separate dev-only FAP. It must not modify
-or replace the stock U2F application until CTAP2 transport, parsing, storage,
-and lifecycle tests demonstrate that existing U2F behavior is unaffected.
+The implementation remains a separate dev-only FAP and storage namespace. It
+does not modify or replace the stock U2F application. The earlier Phase A FAP
+remains packaged only as a fallback until real USB/NFC acceptance is complete.
 
 Primary references:
 
@@ -108,8 +111,9 @@ model:
 
 ### Assumptions and explicit limitations
 
-- USB is the only approved transport for the first implementation. BLE and NFC
-  CTAP transports require separate threat models.
+- USB HID and NFC ISO-DEP are enabled for dev testing. BLE is outside this
+  issue. NFC acceptance requires repeated iPhone ceremonies and transport
+  cleanup checks before this FAP can replace the Phase A route.
 - The Flipper is a single-user authenticator. Anyone who can operate the
   unlocked device may satisfy a presence-only request.
 - The user can read the display and distinguish the requested operation and RP
@@ -122,8 +126,9 @@ model:
   their availability is not stable for public applications.
 - No private credential export, cloud sync, Companion backup, diagnostic dump,
   or migration format is permitted.
-- Attestation is `none` or self-attestation. TumoKey must not reuse the stock
-  U2F batch certificate to imply certification or a protected model identity.
+- Attestation is `none`, self-attestation, or a device-local packed certificate.
+  TumoKey must not reuse the stock U2F batch certificate or imply FIDO
+  certification or a protected model identity.
 - Signature counters may be reported as zero if rollback-resistant monotonic
   storage cannot be guaranteed. A rollbackable counter must not be presented
   as clone detection.
@@ -136,7 +141,7 @@ Attacker story: a hostile host sends fragmented, interleaved, oversized, or
 out-of-order HID frames to overwrite memory, exhaust the worker, or authorize a
 different request than the one on screen.
 
-Required controls:
+Target stable controls:
 
 - Reuse the FIDO HID descriptor, but implement CTAPHID commands in a separate
   bounded transport module.
@@ -196,8 +201,8 @@ Required controls:
 
 - Use a versioned binary envelope with magic, schema, generation, nonce,
   ciphertext length, and authentication tag. These header fields are AEAD AAD.
-- Derive a domain-separated vault wrapping key from enclave slot 11, then use
-  AES-GCM. Never reuse the existing unauthenticated U2F CBC file format.
+- Derive a domain-separated vault wrapping key from the device enclave, then
+  use AES-GCM or an independently reviewed authenticated construction.
 - Keep at most a small fixed credential capacity; reject storage-full without
   deleting or overwriting an existing credential.
 - Write a temporary file, sync it, verify by reopening and authenticating it,
@@ -209,6 +214,18 @@ Required controls:
   firmware and must be documented as such.
 - Zeroize wrapping keys, PIN material, private keys, ECDH secrets, and decrypted
   records with `mbedtls_platform_zeroize` on every exit path.
+
+Current dev implementation:
+
+- Each credential uses a versioned bounded record. Private credential material
+  and HMAC-secret values are wrapped with the device enclave; discovery
+  metadata such as RP and account labels remains visible on the SD card.
+- Record, counter, PIN, and policy writes use temporary files plus recovery
+  paths, and native tests cover interrupted-write recovery and corruption.
+- PIN retry state has a sealed integrity structure, but it is still software
+  state and does not provide a hardware monotonic counter.
+- The complete record is not an AES-GCM vault. This is an explicit stable gate,
+  not a property that the current dev build claims to satisfy.
 
 ### Client PIN and user verification
 
@@ -286,14 +303,16 @@ Required controls:
 | Phase | Allowed capability | Gate |
 | --- | --- | --- |
 | A | Dev-only FAP, CTAPHID INIT/PING/CBOR framing, `authenticatorGetInfo`, parser tests | No credential persistence; malformed USB corpus must not crash |
-| B | Test-account non-discoverable ES256 credentials with UP | AEAD key handles, RP binding, consent UI, zeroization, browser smoke |
-| C | Discoverable credentials and credential list/delete | Authenticated atomic vault, capacity handling, corruption and power-loss tests |
-| D | Client PIN and UV-required operations | CTAP PIN/UV protocol, internal retry journal, rollback analysis, negative tests |
+| B | Test-account non-discoverable ES256 credentials with UP | Wrapped key handles, RP binding, consent UI, zeroization, browser smoke |
+| C | Discoverable credentials and credential list/delete | Atomic records, capacity handling, corruption and power-loss tests |
+| D | Client PIN and UV-required operations | CTAP PIN/UV protocol, sealed retry state, rollback analysis, negative tests |
 | E | Candidate stable integration | Independent security review, conformance subset report, hardware acceptance; no unresolved Critical/High findings |
 
-Real credentials must not be used before Phase C and must not be primary or
-sole account credentials before Phase E. BLE, backup/export, multi-device sync,
-and Secure Element support are outside this issue.
+The port implements Phase B-D capabilities for disposable test accounts, but
+capability presence is not equivalent to passing those release gates. Real
+credentials must not be primary or sole account credentials before Phase E.
+BLE, backup/export, multi-device sync, and Secure Element support are outside
+this issue.
 
 ## Severity Calibration (Critical, High, Medium, Low)
 
@@ -335,16 +354,24 @@ and Secure Element support are outside this issue.
 
 ## Decision
 
-**Conditional GO for Phase A only.** A separate USB-only, dev-channel TumoKey
-FAP may implement bounded CTAPHID framing, CBOR parsing, and
-`authenticatorGetInfo` using synthetic test vectors. Persistent credentials,
-discoverable credentials, Client PIN, UV claims, and credential management are
-blocked until their phase gates above are implemented and tested.
+**Conditional GO for dev-only Phase B-D hardware testing.** The separate
+TumoKey FAP may create and use credentials only on disposable test accounts
+while USB HID, NFC, PIN, credential-management, interruption, and cleanup
+acceptance is performed. Automatic approval is compiled out, diagnostics are
+compiled out, and every ceremony still requires a local Flipper decision.
+
+The current public firmware API provides `furi_hal_random_fill_buf()` without a
+success/failure result. A bounded checked RNG API is therefore still absent.
+TumoKey must fail its stable security gate until this is resolved or an
+independently reviewed platform guarantee is accepted. The current per-secret
+enclave wrapping also does not satisfy the stronger complete AES-GCM vault
+target above.
 
 Stable-channel inclusion is explicitly denied until an independent security
-review and real-client conformance subset have passed. The UI and About screen
-must label TumoKey `Experimental` and state that physical/debug access can
-compromise credentials.
+review, real-client conformance subset, checked-RNG decision, and storage
+confidentiality/integrity decision have passed. The Guide/About screen labels
+TumoKey as a development build and states that it has no Secure Element and
+must not be the user's only authenticator.
 
 Repository: squazaryu/tumoflip
-Version: 7d2f3040c06c7c9991c713328429c809d4b29e79
+Upstream: MinorGlitch/zerofido@56b433f9d1390ad224246c85a06083b40de4903e
