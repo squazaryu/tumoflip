@@ -29,6 +29,25 @@ To customize your layout, open the saved remote file, select `Edit` in the menu,
     </tr>
 </table>
 
+## TumoFlip device profiles
+
+`Device Profiles` combines an existing `.ir` remote with saved static Sub-GHz
+commands in one on-device remote:
+
+1. Use `Import IR Remote` or `New RF Profile` to create a profile.
+2. Use `Add Sub-GHz` to add up to eight saved `.sub` commands.
+3. Open the profile, select a command with Up/Down, and press OK to send.
+4. For Sub-GHz commands, Right switches between the internal and external CC1101.
+
+Profiles are stored under `/ext/apps_data/flipper_xremote/devices` and reference
+the original `.ir` and `.sub` files without modifying them. Missing source files
+are reported in the runtime UI.
+
+Sub-GHz transmission keeps the firmware region gate and radio-broker ownership.
+Changing-code protocols are rejected. Other protocols replay the saved command
+unchanged. Reviewed 24-bit Princeton commands additionally support B1-B4
+selection with a long Right press; only the documented command nibble changes.
+
 ## Standard file support
 
 The application is compatible with standard `.ir` files. However, to ensure functionality, names within these files must align with the predefined naming scheme. If the button is not highlighted when pressed or the notification LED does not light up, the button with the appropriate name cannot be found in the file.

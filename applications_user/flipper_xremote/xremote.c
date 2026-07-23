@@ -13,6 +13,7 @@
 #include "xremote_analyzer.h"
 #include "xremote_designer.h"
 #include "xremote_ac.h"
+#include "xremote_device_profiles.h"
 
 #include "views/xremote_about_view.h"
 
@@ -67,6 +68,8 @@ void xremote_submenu_callback(void* context, uint32_t index) {
         child = xremote_designer_alloc(app->app_ctx);
     else if(index == XRemoteViewAcSmart)
         child = xremote_ac_alloc(app->app_ctx);
+    else if(index == XRemoteViewDeviceProfiles)
+        child = xremote_device_profiles_alloc(app->app_ctx);
     else if(index == XRemoteViewIRSubmenu)
         child = xremote_control_alloc(app->app_ctx);
     else if(index == XRemoteViewAnalyzer)
@@ -135,6 +138,8 @@ int32_t xremote_main(void* p) {
     xremote_app_submenu_add(app, "Learn", XRemoteViewLearn, xremote_submenu_callback);
     xremote_app_submenu_add(app, "Designer", XRemoteViewDesigner, xremote_submenu_callback);
     xremote_app_submenu_add(app, "AC Smart", XRemoteViewAcSmart, xremote_submenu_callback);
+    xremote_app_submenu_add(
+        app, "Device Profiles", XRemoteViewDeviceProfiles, xremote_submenu_callback);
     xremote_app_submenu_add(app, "Saved", XRemoteViewIRSubmenu, xremote_submenu_callback);
     xremote_app_submenu_add(app, "Analyzer", XRemoteViewAnalyzer, xremote_submenu_callback);
     xremote_app_submenu_add(app, "Settings", XRemoteViewSettings, xremote_submenu_callback);
@@ -149,8 +154,7 @@ int32_t xremote_main(void* p) {
     view_dispatcher_run(app->app_ctx->view_dispatcher);
 
     /* Restore infrared settings and OTG state */
-    if(infra_settings_loaded)
-        xremote_infra_settings_restore(is_otg_enabled);
+    if(infra_settings_loaded) xremote_infra_settings_restore(is_otg_enabled);
 
     /* Cleanup and exit */
     xremote_app_free(app);

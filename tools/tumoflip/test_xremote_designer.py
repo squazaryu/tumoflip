@@ -19,7 +19,7 @@ class XRemoteDesignerTest(unittest.TestCase):
         self.assertIn("xremote_designer_alloc(app->app_ctx)", source)
         self.assertIn("XRemoteViewDesigner", header)
         self.assertIn("XRemoteViewDesignerMap", header)
-        self.assertIn('fap_version="1.7.1"', manifest)
+        self.assertIn('fap_version="1.8.0"', manifest)
 
     def test_ac_smart_is_integrated_as_xremote_child_app(self) -> None:
         source = (APP_DIR / "xremote.c").read_text(encoding="utf-8")
@@ -212,6 +212,100 @@ class XRemoteACSmartTest(unittest.TestCase):
             "        ctx->app_ctx->view_dispatcher, xremote_ac_custom_event_callback)",
             app,
         )
+
+
+class XRemoteDeviceProfilesTest(unittest.TestCase):
+    def test_device_profiles_are_integrated_without_replacing_ir_or_ac(self) -> None:
+        source = (APP_DIR / "xremote.c").read_text(encoding="utf-8")
+        header = (APP_DIR / "views/xremote_common_view.h").read_text(encoding="utf-8")
+        manifest = (APP_DIR / "application.fam").read_text(encoding="utf-8")
+
+        self.assertIn('#include "xremote_device_profiles.h"', source)
+        self.assertIn('"Device Profiles", XRemoteViewDeviceProfiles', source)
+        self.assertIn("xremote_device_profiles_alloc(app->app_ctx)", source)
+        self.assertIn("XRemoteViewDeviceRuntime", header)
+        self.assertIn('"subghz_radio_broker"', manifest)
+        self.assertIn('"AC Smart", XRemoteViewAcSmart', source)
+        self.assertIn('"Saved", XRemoteViewIRSubmenu', source)
+
+    def test_profile_schema_is_versioned_and_references_source_files(self) -> None:
+        header = (APP_DIR / "xremote_device_profile.h").read_text(encoding="utf-8")
+        storage = (APP_DIR / "xremote_device_profile.c").read_text(encoding="utf-8")
+
+        self.assertIn('"Tumo XRemote Device Profile"', header)
+        self.assertIn("#define XREMOTE_DEVICE_PROFILE_VERSION   1U", header)
+        self.assertIn('APP_DATA_PATH("devices")', header)
+        for field in (
+            '"IR File"',
+            '"RF Count"',
+            '"RF%lu Name"',
+            '"RF%lu File"',
+            '"RF%lu Protocol"',
+            '"RF%lu Adapter"',
+        ):
+            self.assertIn(field, storage)
+        self.assertNotIn("storage_common_copy", storage)
+        self.assertIn('"%s.tmp"', storage)
+        self.assertIn("storage_common_rename(storage, temporary, profile->path)", storage)
+
+    def test_empty_ir_remote_cannot_create_a_device_profile(self) -> None:
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+
+        self.assertIn("infrared_remote_get_button_count(remote) == 0U", source)
+        self.assertIn('"IR remote has no\\nusable commands."', source)
+
+    def test_subghz_runtime_uses_broker_region_gate_and_existing_encoder(self) -> None:
+        source = (APP_DIR / "xremote_subghz.c").read_text(encoding="utf-8")
+
+        for required in (
+            "subghz_radio_broker_acquire(",
+            "furi_hal_subghz_is_tx_allowed(info.frequency_hz)",
+            "subghz_transmitter_alloc_init(",
+            "subghz_transmitter_deserialize(",
+            "subghz_devices_start_async_tx(",
+            "subghz_devices_stop_async_tx(device)",
+            "subghz_radio_broker_release(broker, &lease)",
+            "XRemoteSubGhzStatusExternalUnavailable",
+        ):
+            self.assertIn(required, source)
+
+    def test_only_reviewed_princeton_field_can_be_changed(self) -> None:
+        source = (APP_DIR / "xremote_subghz.c").read_text(encoding="utf-8")
+        profiles = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+
+        self.assertIn('strcmp(info->protocol, "Princeton") != 0', source)
+        self.assertIn("info->bit_count != 24U", source)
+        self.assertIn("{0x1U, 0x2U, 0x4U, 0x8U}", source)
+        self.assertIn("subghz_block_generic_global_button_override_set(button)", source)
+        self.assertNotIn("counter_override_set", source)
+        for protocol in (
+            "SUBGHZ_PROTOCOL_KEELOQ_NAME",
+            "SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME",
+            "SUBGHZ_PROTOCOL_SECPLUS_V2_NAME",
+            "SUBGHZ_PROTOCOL_SOMFY_TELIS_NAME",
+            "SUBGHZ_PROTOCOL_FAAC_SLH_NAME",
+        ):
+            self.assertIn(protocol, source)
+        self.assertIn("XRemoteSubGhzStatusChangingCodeBlocked", source)
+        self.assertIn("if(info.changing_code)", profiles)
+        self.assertIn('"Changing-code signal\\nis not supported."', profiles)
+
+    def test_runtime_has_explicit_controls_and_actionable_states(self) -> None:
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+
+        for required in (
+            'elements_button_left(canvas, "Back")',
+            'elements_button_center(canvas, "Send")',
+            "elements_button_right(canvas, radio)",
+            "InputKeyUp",
+            "InputKeyDown",
+            "InputKeyOk",
+            "InputKeyRight",
+            '"IR file missing"',
+            '"No usable commands"',
+            "xremote_subghz_status_name(status)",
+        ):
+            self.assertIn(required, source)
 
 
 if __name__ == "__main__":
