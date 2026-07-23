@@ -16,5 +16,5 @@ App(
     fap_dist_path="apps/Module One/Automation/tumoflow.fap",
     fap_description="Safe field automation for IR, Sub-GHz, NFC, RFID, iButton, GPIO, and App Bridge",
     fap_author="Tumowuh",
-    fap_version="0.1",
+    fap_version="0.2",
 )

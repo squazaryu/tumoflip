@@ -63,6 +63,17 @@ class TumoFlowTest(unittest.TestCase):
         self.assertIn("subghz_worker_stop(worker)", self.source)
         self.assertIn("furi_hal_gpio_init_simple(&gpio_ext_pc0, GpioModeAnalog)", self.source)
 
+    def test_onboarding_and_guide_are_discoverable(self) -> None:
+        self.assertIn("TUMOFLOW_ONBOARDING_PATH", self.source)
+        self.assertIn("TUMOFLOW_HELP_PAGE_COUNT 5U", self.source)
+        self.assertIn("TumoFlowModeDashboard", self.source)
+        self.assertIn("TumoFlowModeHelp", self.source)
+        self.assertIn('elements_button_left(canvas, "Guide")', self.source)
+        self.assertIn('elements_button_center(canvas, "Open")', self.source)
+        self.assertIn('"Hold Right: Dry Run"', self.source)
+        self.assertIn('"Hold OK; original stays"', self.source)
+        self.assertIn("tumoflow_mark_onboarding_seen", self.source)
+
     def test_cockpit_and_samples_are_packaged(self) -> None:
         self.assertIn("Automation: TumoFlow", self.cockpit)
         self.assertIn(
