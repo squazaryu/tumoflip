@@ -7,7 +7,7 @@
 
 #define TUMOSPECTRUM_CAPTURE_PENDING_PATH     EXT_PATH("apps_data/signal_workbench/pending_capture.ff")
 #define TUMOSPECTRUM_CAPTURE_PENDING_FILETYPE "TumoSpectrum Capture Snapshot"
-#define TUMOSPECTRUM_CAPTURE_PENDING_VERSION  1U
+#define TUMOSPECTRUM_CAPTURE_PENDING_VERSION  2U
 #define TUMOSPECTRUM_CAPTURE_MAX_HASHES       96U
 
 static const char* tumospectrum_capture_flow_directory(TumoSpectrumCaptureType type) {
@@ -81,8 +81,17 @@ static size_t tumospectrum_capture_flow_snapshot(
     return count;
 }
 
-bool tumospectrum_capture_flow_prepare(Storage* storage, TumoSpectrumCaptureType type) {
+bool tumospectrum_capture_flow_prepare_route(
+    Storage* storage,
+    TumoSpectrumCaptureType type,
+    TumoSpectrumCaptureResume resume,
+    uint32_t frequency_hz) {
     if(!storage || !tumospectrum_capture_flow_directory(type)) return false;
+    if(resume > TumoSpectrumCaptureResumeBandMap ||
+       (resume == TumoSpectrumCaptureResumeBandMap &&
+        (type != TumoSpectrumCaptureSubGhzRaw || frequency_hz == 0U))) {
+        return false;
+    }
     const FS_Error mkdir_result =
         storage_common_mkdir(storage, EXT_PATH("apps_data/signal_workbench"));
     if(mkdir_result != FSE_OK && mkdir_result != FSE_EXIST) return false;
@@ -93,6 +102,7 @@ bool tumospectrum_capture_flow_prepare(Storage* storage, TumoSpectrumCaptureType
     const uint32_t stored_type = (uint32_t)type;
     const uint32_t stored_count = (uint32_t)hash_count;
     const uint32_t stored_overflow = overflow ? 1U : 0U;
+    const uint32_t stored_resume = (uint32_t)resume;
 
     FlipperFormat* format = flipper_format_file_alloc(storage);
     bool success = false;
@@ -103,6 +113,8 @@ bool tumospectrum_capture_flow_prepare(Storage* storage, TumoSpectrumCaptureType
                TUMOSPECTRUM_CAPTURE_PENDING_FILETYPE,
                TUMOSPECTRUM_CAPTURE_PENDING_VERSION) ||
            !flipper_format_write_uint32(format, "Capture type", &stored_type, 1U) ||
+           !flipper_format_write_uint32(format, "Resume mode", &stored_resume, 1U) ||
+           !flipper_format_write_uint32(format, "Frequency", &frequency_hz, 1U) ||
            !flipper_format_write_uint32(format, "Snapshot count", &stored_count, 1U) ||
            !flipper_format_write_uint32(format, "Snapshot overflow", &stored_overflow, 1U)) {
             break;
@@ -118,18 +130,32 @@ bool tumospectrum_capture_flow_prepare(Storage* storage, TumoSpectrumCaptureType
     return success;
 }
 
-bool tumospectrum_capture_flow_resume(
+bool tumospectrum_capture_flow_prepare(Storage* storage, TumoSpectrumCaptureType type) {
+    return tumospectrum_capture_flow_prepare_route(
+        storage, type, TumoSpectrumCaptureResumeResult, 0U);
+}
+
+bool tumospectrum_capture_flow_resume_route(
     Storage* storage,
     TumoSpectrumCaptureType* type,
+    TumoSpectrumCaptureResume* resume,
+    uint32_t* frequency_hz,
     char* path,
     size_t path_size,
     bool* needs_selection) {
-    if(!storage || !type || !path || path_size == 0U || !needs_selection) return false;
+    if(!storage || !type || !resume || !frequency_hz || !path || path_size == 0U ||
+       !needs_selection) {
+        return false;
+    }
     path[0] = '\0';
     *needs_selection = false;
+    *resume = TumoSpectrumCaptureResumeResult;
+    *frequency_hz = 0U;
     if(!storage_file_exists(storage, TUMOSPECTRUM_CAPTURE_PENDING_PATH)) return false;
 
     uint32_t stored_type = 0U;
+    uint32_t stored_resume = 0U;
+    uint32_t stored_frequency = 0U;
     uint32_t stored_count = 0U;
     uint32_t stored_overflow = 0U;
     uint32_t hashes[TUMOSPECTRUM_CAPTURE_MAX_HASHES];
@@ -140,12 +166,22 @@ bool tumospectrum_capture_flow_resume(
     do {
         if(!flipper_format_file_open_existing(format, TUMOSPECTRUM_CAPTURE_PENDING_PATH) ||
            !flipper_format_read_header(format, header, &version) ||
-           version != TUMOSPECTRUM_CAPTURE_PENDING_VERSION ||
+           (version < 1U || version > TUMOSPECTRUM_CAPTURE_PENDING_VERSION) ||
            furi_string_cmp_str(header, TUMOSPECTRUM_CAPTURE_PENDING_FILETYPE) != 0 ||
-           !flipper_format_read_uint32(format, "Capture type", &stored_type, 1U) ||
-           !flipper_format_read_uint32(format, "Snapshot count", &stored_count, 1U) ||
+           !flipper_format_read_uint32(format, "Capture type", &stored_type, 1U)) {
+            break;
+        }
+        if(version >= 2U &&
+           (!flipper_format_read_uint32(format, "Resume mode", &stored_resume, 1U) ||
+            !flipper_format_read_uint32(format, "Frequency", &stored_frequency, 1U))) {
+            break;
+        }
+        if(!flipper_format_read_uint32(format, "Snapshot count", &stored_count, 1U) ||
            !flipper_format_read_uint32(format, "Snapshot overflow", &stored_overflow, 1U) ||
-           stored_count > TUMOSPECTRUM_CAPTURE_MAX_HASHES) {
+           stored_count > TUMOSPECTRUM_CAPTURE_MAX_HASHES ||
+           stored_resume > TumoSpectrumCaptureResumeBandMap ||
+           (stored_resume == TumoSpectrumCaptureResumeBandMap &&
+            (stored_type != TumoSpectrumCaptureSubGhzRaw || stored_frequency == 0U))) {
             break;
         }
         if(stored_count > 0U) {
@@ -160,6 +196,8 @@ bool tumospectrum_capture_flow_resume(
     if(!valid) return false;
 
     *type = (TumoSpectrumCaptureType)stored_type;
+    *resume = (TumoSpectrumCaptureResume)stored_resume;
+    *frequency_hz = stored_frequency;
     const char* directory_path = tumospectrum_capture_flow_directory(*type);
     const char* extension = tumospectrum_capture_flow_extension(*type);
     if(!directory_path || !extension) return false;
@@ -195,4 +233,16 @@ bool tumospectrum_capture_flow_resume(
         *needs_selection = true;
     }
     return true;
+}
+
+bool tumospectrum_capture_flow_resume(
+    Storage* storage,
+    TumoSpectrumCaptureType* type,
+    char* path,
+    size_t path_size,
+    bool* needs_selection) {
+    TumoSpectrumCaptureResume resume = TumoSpectrumCaptureResumeResult;
+    uint32_t frequency_hz = 0U;
+    return tumospectrum_capture_flow_resume_route(
+        storage, type, &resume, &frequency_hz, path, path_size, needs_selection);
 }

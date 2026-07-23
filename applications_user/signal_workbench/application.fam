@@ -20,8 +20,8 @@ App(
     fap_icon_assets="icons",
     fap_category="Module One/Signals",
     fap_dist_path="apps/Module One/Signals/signal_workbench.fap",
-    fap_version="2.4.0",
+    fap_version="3.0.0",
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip",
-    fap_description="Autonomous field signal workspace with on-device receive-only profile building, live .tproto decoding, bounded multi-capture inference, comparison and notebook reports.",
+    fap_description="Autonomous receive-only Band Map, Smart RAW capture, on-device .tproto building, live decoding, comparison and notebook reports.",
 )

@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define TUMOSPECTRUM_APP_VERSION       "2.4.0"
+#define TUMOSPECTRUM_APP_VERSION       "3.0.0"
 #define TUMOSPECTRUM_PATH_SIZE         192U
 #define TUMOSPECTRUM_LABEL_SIZE        48U
 #define TUMOSPECTRUM_NOTE_SIZE         96U
