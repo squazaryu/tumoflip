@@ -40,6 +40,7 @@ static void nfc_app_rpc_command_callback(const RpcAppSystemEvent* event, void* c
 
 NfcApp* nfc_app_alloc(void) {
     NfcApp* instance = malloc(sizeof(NfcApp));
+    instance->tumotag_verify_capture = false;
 
     instance->view_dispatcher = view_dispatcher_alloc();
     instance->scene_manager = scene_manager_alloc(&nfc_scene_handlers, instance);
@@ -524,6 +525,11 @@ int32_t nfc_app(void* p) {
             view_dispatcher_attach_to_gui(
                 nfc->view_dispatcher, nfc->gui, ViewDispatcherTypeDesktop);
             scene_manager_next_scene(nfc->scene_manager, NfcSceneRpc);
+        } else if(strcmp(args, NFC_TUMOTAG_VERIFY_CAPTURE_ARG) == 0) {
+            nfc->tumotag_verify_capture = true;
+            view_dispatcher_attach_to_gui(
+                nfc->view_dispatcher, nfc->gui, ViewDispatcherTypeFullscreen);
+            scene_manager_next_scene(nfc->scene_manager, NfcSceneDetect);
         } else {
             view_dispatcher_attach_to_gui(
                 nfc->view_dispatcher, nfc->gui, ViewDispatcherTypeFullscreen);
