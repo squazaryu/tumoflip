@@ -11,6 +11,14 @@ static void xremote_device_copy(char* output, size_t output_size, const char* va
     snprintf(output, output_size, "%s", value ? value : "");
 }
 
+static bool xremote_device_name_valid(const char* name) {
+    if(!name) return false;
+    for(size_t index = 0U; name[index] != '\0'; index++) {
+        if(!isspace((unsigned char)name[index])) return true;
+    }
+    return false;
+}
+
 static bool xremote_device_read_string(
     FlipperFormat* format,
     const char* key,
@@ -287,6 +295,61 @@ bool xremote_device_profile_add_rf(
     xremote_device_copy(command->protocol, sizeof(command->protocol), protocol);
     command->adapter = adapter;
     profile->rf_count++;
+    return true;
+}
+
+bool xremote_device_profile_rename(XRemoteDeviceProfile* profile, const char* name) {
+    if(!profile || !xremote_device_name_valid(name)) return false;
+    xremote_device_copy(profile->name, sizeof(profile->name), name);
+    return true;
+}
+
+bool xremote_device_profile_set_ir(XRemoteDeviceProfile* profile, const char* path) {
+    if(!profile || !path) return false;
+    if(path[0] == '\0' && profile->rf_count == 0U) return false;
+    xremote_device_copy(profile->ir_path, sizeof(profile->ir_path), path);
+    return true;
+}
+
+bool xremote_device_profile_rename_rf(
+    XRemoteDeviceProfile* profile,
+    uint8_t index,
+    const char* name) {
+    if(!profile || index >= profile->rf_count || !xremote_device_name_valid(name)) return false;
+    xremote_device_copy(profile->rf[index].name, sizeof(profile->rf[index].name), name);
+    return true;
+}
+
+bool xremote_device_profile_move_rf(XRemoteDeviceProfile* profile, uint8_t from, uint8_t to) {
+    if(!profile || from >= profile->rf_count || to >= profile->rf_count) return false;
+    if(from == to) return true;
+
+    XRemoteDeviceRfCommand moving = profile->rf[from];
+    if(from < to) {
+        memmove(
+            &profile->rf[from],
+            &profile->rf[from + 1U],
+            (size_t)(to - from) * sizeof(profile->rf[0]));
+    } else {
+        memmove(
+            &profile->rf[to + 1U], &profile->rf[to], (size_t)(from - to) * sizeof(profile->rf[0]));
+    }
+    profile->rf[to] = moving;
+    return true;
+}
+
+bool xremote_device_profile_remove_rf(XRemoteDeviceProfile* profile, uint8_t index) {
+    if(!profile || index >= profile->rf_count) return false;
+    if(profile->ir_path[0] == '\0' && profile->rf_count == 1U) return false;
+
+    if(index + 1U < profile->rf_count) {
+        memmove(
+            &profile->rf[index],
+            &profile->rf[index + 1U],
+            (size_t)(profile->rf_count - index - 1U) * sizeof(profile->rf[0]));
+    }
+    profile->rf_count--;
+    memset(&profile->rf[profile->rf_count], 0, sizeof(profile->rf[0]));
     return true;
 }
 

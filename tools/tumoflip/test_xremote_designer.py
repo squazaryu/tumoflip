@@ -19,7 +19,7 @@ class XRemoteDesignerTest(unittest.TestCase):
         self.assertIn("xremote_designer_alloc(app->app_ctx)", source)
         self.assertIn("XRemoteViewDesigner", header)
         self.assertIn("XRemoteViewDesignerMap", header)
-        self.assertIn('fap_version="1.8.0"', manifest)
+        self.assertIn('fap_version="1.9.0"', manifest)
 
     def test_ac_smart_is_integrated_as_xremote_child_app(self) -> None:
         source = (APP_DIR / "xremote.c").read_text(encoding="utf-8")
@@ -306,6 +306,69 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
             "xremote_subghz_status_name(status)",
         ):
             self.assertIn(required, source)
+
+    def test_profile_editor_supports_on_device_management(self) -> None:
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+        header = (APP_DIR / "views/xremote_common_view.h").read_text(encoding="utf-8")
+
+        for required in (
+            '"Manage Profile"',
+            "XRemoteViewDeviceEditor",
+            "xremote_device_editor_start_text",
+            "xremote_device_editor_replace_ir",
+            "xremote_device_editor_detach_ir",
+            "xremote_device_editor_remove_rf",
+            "xremote_device_profile_move_rf",
+            '"Profile Editor"',
+            '"Source missing"',
+            '"Save failed; reopen profile"',
+        ):
+            self.assertIn(required, source if required != "XRemoteViewDeviceEditor" else header)
+
+    def test_profile_editor_mutations_preserve_source_files(self) -> None:
+        storage = (APP_DIR / "xremote_device_profile.c").read_text(encoding="utf-8")
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+
+        for required in (
+            "xremote_device_profile_rename",
+            "xremote_device_profile_set_ir",
+            "xremote_device_profile_rename_rf",
+            "xremote_device_profile_move_rf",
+            "xremote_device_profile_remove_rf",
+            "memmove(",
+        ):
+            self.assertIn(required, storage)
+        self.assertIn('"Source .ir stays on SD."', source)
+        self.assertIn(".sub stays on SD.", source)
+        self.assertNotIn("storage_common_remove(context->storage, context->profile->ir_path)", source)
+        self.assertNotIn(
+            "storage_common_remove(context->storage, context->profile->rf", source
+        )
+
+    def test_profile_editor_keeps_atomic_rollback_and_nonempty_profile(self) -> None:
+        storage = (APP_DIR / "xremote_device_profile.c").read_text(encoding="utf-8")
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+
+        self.assertIn('"%s.tmp"', storage)
+        self.assertIn('"%s.bak"', storage)
+        self.assertIn("storage_common_rename(storage, backup, profile->path)", storage)
+        self.assertIn("xremote_device_profile_reload(context)", source)
+        self.assertIn('"Save failed; restored"', source)
+        self.assertIn('"Profile needs command"', source)
+        self.assertIn("profile->ir_path[0] == '\\0' && profile->rf_count == 1U", storage)
+
+    def test_profile_editor_uses_framed_controls_without_footer_overlap(self) -> None:
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+        editor = source.split("static void xremote_device_editor_draw", 1)[1].split(
+            "static void xremote_device_editor_refresh", 1
+        )[0]
+
+        self.assertIn("elements_slightly_rounded_box", editor)
+        self.assertIn("elements_button_left", editor)
+        self.assertIn("elements_button_center", editor)
+        self.assertIn("elements_button_right", editor)
+        self.assertIn("canvas, 3, 50, 122, AlignLeft", editor)
+        self.assertNotIn("canvas, 3, 59", editor)
 
 
 if __name__ == "__main__":
