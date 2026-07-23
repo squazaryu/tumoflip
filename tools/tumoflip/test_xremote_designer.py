@@ -12,6 +12,7 @@ class XRemoteDesignerTest(unittest.TestCase):
     def test_designer_is_visible_from_xremote_menu(self) -> None:
         source = (APP_DIR / "xremote.c").read_text(encoding="utf-8")
         header = (APP_DIR / "views/xremote_common_view.h").read_text(encoding="utf-8")
+        version_header = (APP_DIR / "xremote.h").read_text(encoding="utf-8")
         manifest = (APP_DIR / "application.fam").read_text(encoding="utf-8")
 
         self.assertIn('#include "xremote_designer.h"', source)
@@ -19,7 +20,8 @@ class XRemoteDesignerTest(unittest.TestCase):
         self.assertIn("xremote_designer_alloc(app->app_ctx)", source)
         self.assertIn("XRemoteViewDesigner", header)
         self.assertIn("XRemoteViewDesignerMap", header)
-        self.assertIn('fap_version="1.9.0"', manifest)
+        self.assertIn('fap_version="1.10.0"', manifest)
+        self.assertIn("#define XREMOTE_VERSION_MIN  10", version_header)
 
     def test_ac_smart_is_integrated_as_xremote_child_app(self) -> None:
         source = (APP_DIR / "xremote.c").read_text(encoding="utf-8")
@@ -290,22 +292,41 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn("if(info.changing_code)", profiles)
         self.assertIn('"Changing-code signal\\nis not supported."', profiles)
 
-    def test_runtime_has_explicit_controls_and_actionable_states(self) -> None:
+    def test_runtime_has_adaptive_paged_controls_and_actionable_states(self) -> None:
         source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+        version = (APP_DIR / "xremote.h").read_text(encoding="utf-8")
 
         for required in (
             'elements_button_left(canvas, "Back")',
             'elements_button_center(canvas, "Send")',
-            "elements_button_right(canvas, radio)",
+            "#define XREMOTE_DEVICE_PAGE_SIZE    4U",
+            "#define XREMOTE_DEVICE_GRID_COLUMNS 2U",
+            "xremote_device_page_count",
+            "xremote_device_page_start",
+            "xremote_device_runtime_draw_cell",
+            "xremote_device_runtime_command_label",
+            "canvas_draw_rbox",
+            "canvas_draw_rframe",
+            "xremote_device_grid_move",
+            "xremote_device_list_move",
             "InputKeyUp",
             "InputKeyDown",
-            "InputKeyOk",
+            "InputKeyLeft",
             "InputKeyRight",
+            "InputKeyOk",
+            "InputTypeLong && event->key == InputKeyOk",
+            "xremote_device_runtime_toggle_radio",
+            "xremote_device_runtime_update_selection_status",
+            "context->rf_status[rf_index] = status",
             '"IR file missing"',
             '"No usable commands"',
             "xremote_subghz_status_name(status)",
         ):
             self.assertIn(required, source)
+        self.assertIn("row == 0U ? 15U : 32U", source)
+        self.assertIn("(uint8_t)(17U + slot * 18U)", source)
+        self.assertIn('"OK sends, hold OK INT/EXT.', source)
+        self.assertIn("#define XREMOTE_VERSION_MIN  10", version)
 
     def test_profile_editor_supports_on_device_management(self) -> None:
         source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")

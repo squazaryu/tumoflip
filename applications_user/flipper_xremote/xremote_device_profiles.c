@@ -12,6 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define XREMOTE_DEVICE_PAGE_SIZE    4U
+#define XREMOTE_DEVICE_GRID_COLUMNS 2U
+
 typedef enum {
     XRemoteDeviceMenuOpen,
     XRemoteDeviceMenuImportIr,
@@ -40,6 +43,7 @@ typedef struct {
     uint8_t edit_rf_index;
     XRemoteDeviceEditTarget edit_target;
     uint8_t variants[XREMOTE_DEVICE_RF_COMMAND_MAX];
+    XRemoteSubGhzStatus rf_status[XREMOTE_DEVICE_RF_COMMAND_MAX];
     char edit_buffer[XREMOTE_DEVICE_NAME_MAX + 1U];
     char status[40];
 } XRemoteDeviceContext;
@@ -155,13 +159,20 @@ static uint16_t xremote_device_command_count(const XRemoteDeviceContext* context
     return xremote_device_ir_count(context) + context->profile->rf_count;
 }
 
-static bool xremote_device_selected_is_rf(const XRemoteDeviceContext* context, uint8_t* rf_index) {
+static bool xremote_device_command_is_rf(
+    const XRemoteDeviceContext* context,
+    uint16_t command_index,
+    uint8_t* rf_index) {
     const uint16_t ir_count = xremote_device_ir_count(context);
-    if(context->selected < ir_count) return false;
-    const uint16_t index = context->selected - ir_count;
+    if(command_index < ir_count) return false;
+    const uint16_t index = command_index - ir_count;
     if(index >= context->profile->rf_count) return false;
     if(rf_index) *rf_index = (uint8_t)index;
     return true;
+}
+
+static bool xremote_device_selected_is_rf(const XRemoteDeviceContext* context, uint8_t* rf_index) {
+    return xremote_device_command_is_rf(context, context->selected, rf_index);
 }
 
 static const char*
@@ -194,6 +205,107 @@ static void xremote_device_draw_fitted(
     canvas_draw_str_aligned(canvas, x, y, align, AlignBottom, fitted);
 }
 
+static uint16_t xremote_device_page_start(uint16_t selected) {
+    return (selected / XREMOTE_DEVICE_PAGE_SIZE) * XREMOTE_DEVICE_PAGE_SIZE;
+}
+
+static uint16_t xremote_device_page_count(uint16_t command_count) {
+    return command_count == 0U ?
+               0U :
+               (command_count + XREMOTE_DEVICE_PAGE_SIZE - 1U) / XREMOTE_DEVICE_PAGE_SIZE;
+}
+
+static uint16_t xremote_device_page_last(uint16_t command_count, uint16_t page_start) {
+    const uint16_t last = page_start + XREMOTE_DEVICE_PAGE_SIZE - 1U;
+    return last < command_count ? last : command_count - 1U;
+}
+
+static bool
+    xremote_device_grid_move(XRemoteDeviceContext* context, InputKey key, uint16_t command_count) {
+    const uint16_t previous = context->selected;
+    const uint16_t page_start = xremote_device_page_start(context->selected);
+    const uint16_t local = context->selected - page_start;
+    const uint16_t column = local % XREMOTE_DEVICE_GRID_COLUMNS;
+
+    if(key == InputKeyLeft) {
+        if(column > 0U) {
+            context->selected--;
+        } else if(page_start > 0U) {
+            context->selected = page_start - 1U;
+        }
+    } else if(key == InputKeyRight) {
+        if(column + 1U < XREMOTE_DEVICE_GRID_COLUMNS && context->selected + 1U < command_count &&
+           context->selected + 1U < page_start + XREMOTE_DEVICE_PAGE_SIZE) {
+            context->selected++;
+        } else if(page_start + XREMOTE_DEVICE_PAGE_SIZE < command_count) {
+            context->selected = page_start + XREMOTE_DEVICE_PAGE_SIZE;
+        }
+    } else if(key == InputKeyUp) {
+        if(local >= XREMOTE_DEVICE_GRID_COLUMNS) {
+            context->selected -= XREMOTE_DEVICE_GRID_COLUMNS;
+        } else if(page_start > 0U) {
+            const uint16_t previous_page = page_start - XREMOTE_DEVICE_PAGE_SIZE;
+            const uint16_t candidate = previous_page + XREMOTE_DEVICE_GRID_COLUMNS + column;
+            context->selected = candidate < command_count ?
+                                    candidate :
+                                    xremote_device_page_last(command_count, previous_page);
+        }
+    } else if(key == InputKeyDown) {
+        const uint16_t candidate = context->selected + XREMOTE_DEVICE_GRID_COLUMNS;
+        if(local < XREMOTE_DEVICE_GRID_COLUMNS && candidate < command_count &&
+           candidate < page_start + XREMOTE_DEVICE_PAGE_SIZE) {
+            context->selected = candidate;
+        } else if(page_start + XREMOTE_DEVICE_PAGE_SIZE < command_count) {
+            const uint16_t next_page = page_start + XREMOTE_DEVICE_PAGE_SIZE;
+            const uint16_t next_candidate = next_page + column;
+            context->selected = next_candidate < command_count ? next_candidate :
+                                                                 command_count - 1U;
+        }
+    }
+    return context->selected != previous;
+}
+
+static bool
+    xremote_device_list_move(XRemoteDeviceContext* context, InputKey key, uint16_t command_count) {
+    const uint16_t previous = context->selected;
+    const uint16_t page_start = xremote_device_page_start(context->selected);
+    const uint16_t local = context->selected - page_start;
+
+    if(key == InputKeyUp) {
+        if(context->selected > 0U) context->selected--;
+    } else if(key == InputKeyDown) {
+        if(context->selected + 1U < command_count) context->selected++;
+    } else if(key == InputKeyLeft) {
+        if(page_start > 0U) {
+            const uint16_t previous_page = page_start - XREMOTE_DEVICE_PAGE_SIZE;
+            const uint16_t candidate = previous_page + local;
+            context->selected = candidate < command_count ?
+                                    candidate :
+                                    xremote_device_page_last(command_count, previous_page);
+        }
+    } else if(key == InputKeyRight) {
+        const uint16_t next_page = page_start + XREMOTE_DEVICE_PAGE_SIZE;
+        if(next_page < command_count) {
+            const uint16_t candidate = next_page + local;
+            context->selected = candidate < command_count ? candidate : command_count - 1U;
+        }
+    }
+    return context->selected != previous;
+}
+
+static void xremote_device_runtime_update_selection_status(XRemoteDeviceContext* context) {
+    uint8_t rf_index = 0U;
+    context->status[0] = '\0';
+    if(xremote_device_selected_is_rf(context, &rf_index) &&
+       context->rf_status[rf_index] != XRemoteSubGhzStatusOk) {
+        snprintf(
+            context->status,
+            sizeof(context->status),
+            "%s",
+            xremote_subghz_status_name(context->rf_status[rf_index]));
+    }
+}
+
 static void xremote_device_context_unload(XRemoteDeviceContext* context) {
     if(context->ir_remote) {
         infrared_remote_free(context->ir_remote);
@@ -201,6 +313,9 @@ static void xremote_device_context_unload(XRemoteDeviceContext* context) {
     }
     xremote_device_profile_reset(context->profile);
     memset(context->variants, 0, sizeof(context->variants));
+    for(uint8_t index = 0U; index < XREMOTE_DEVICE_RF_COMMAND_MAX; index++) {
+        context->rf_status[index] = XRemoteSubGhzStatusInvalidFile;
+    }
     context->selected = 0U;
     context->status[0] = '\0';
 }
@@ -224,16 +339,59 @@ static bool xremote_device_context_load(
 
     for(uint8_t index = 0U; index < profile->rf_count; index++) {
         XRemoteSubGhzInfo info;
-        if(xremote_subghz_inspect(context->storage, profile->rf[index].path, &info) ==
-           XRemoteSubGhzStatusOk) {
+        context->rf_status[index] =
+            xremote_subghz_inspect(context->storage, profile->rf[index].path, &info);
+        if(context->rf_status[index] == XRemoteSubGhzStatusOk) {
             context->variants[index] = info.original_variant;
+            if(info.changing_code) {
+                context->rf_status[index] = XRemoteSubGhzStatusChangingCodeBlocked;
+            }
         }
     }
     if(xremote_device_command_count(context) == 0U) {
         snprintf(context->status, sizeof(context->status), "No usable commands");
         return false;
     }
+    xremote_device_runtime_update_selection_status(context);
     return true;
+}
+
+static void xremote_device_runtime_draw_cell(
+    Canvas* canvas,
+    uint8_t x,
+    uint8_t y,
+    uint8_t width,
+    uint8_t height,
+    const char* label,
+    bool selected) {
+    if(selected) {
+        canvas_draw_rbox(canvas, x, y, width, height, 2);
+        canvas_set_color(canvas, ColorWhite);
+    } else {
+        canvas_draw_rframe(canvas, x, y, width, height, 2);
+    }
+
+    canvas_set_font(canvas, FontSecondary);
+    xremote_device_draw_fitted(
+        canvas,
+        (int32_t)x + (int32_t)width / 2,
+        (int32_t)y + (int32_t)height - 4,
+        width - 6U,
+        AlignCenter,
+        label);
+    canvas_set_color(canvas, ColorBlack);
+}
+
+static void xremote_device_runtime_command_label(
+    const XRemoteDeviceContext* context,
+    uint16_t command_index,
+    char* output,
+    size_t output_size) {
+    const char* name = xremote_device_command_name(context, command_index);
+    uint8_t rf_index = 0U;
+    const bool unavailable = xremote_device_command_is_rf(context, command_index, &rf_index) &&
+                             context->rf_status[rf_index] != XRemoteSubGhzStatusOk;
+    snprintf(output, output_size, unavailable ? "! %s" : "%s", name);
 }
 
 static void xremote_device_runtime_draw(Canvas* canvas, void* model_context) {
@@ -241,85 +399,72 @@ static void xremote_device_runtime_draw(Canvas* canvas, void* model_context) {
     XRemoteDeviceContext* context = model->context;
     const ViewOrientation orientation = context->app_ctx->app_settings->orientation;
     const uint16_t count = xremote_device_command_count(context);
-    const char* command = xremote_device_command_name(context, context->selected);
-    uint8_t rf_index = 0U;
-    const bool is_rf = xremote_device_selected_is_rf(context, &rf_index);
-    const char* source = is_rf ? "RF" : "IR";
+    const uint16_t page_start = xremote_device_page_start(context->selected);
+    const uint16_t page = context->selected / XREMOTE_DEVICE_PAGE_SIZE;
+    const uint16_t page_count = xremote_device_page_count(count);
+    const bool is_rf = xremote_device_selected_is_rf(context, NULL);
     const char* radio = context->profile->radio == XRemoteDeviceRadioExternal ? "EXT" : "INT";
+    char page_source[20];
+    snprintf(
+        page_source,
+        sizeof(page_source),
+        "%u/%u %s%s",
+        (unsigned int)(page + 1U),
+        (unsigned int)page_count,
+        is_rf ? "RF " : "",
+        is_rf ? radio : "IR");
+    const char* title = context->status[0] != '\0' ? context->status : context->profile->name;
 
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
     if(orientation == ViewOrientationHorizontal) {
-        xremote_device_draw_fitted(canvas, 2, 9, 91, AlignLeft, context->profile->name);
+        xremote_device_draw_fitted(canvas, 2, 9, 82, AlignLeft, title);
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 126, 9, AlignRight, AlignBottom, is_rf ? radio : "IR");
+        canvas_draw_str_aligned(canvas, 126, 9, AlignRight, AlignBottom, page_source);
         canvas_draw_line(canvas, 2, 12, 126, 12);
 
-        elements_slightly_rounded_box(canvas, 3, 16, 122, 17);
-        canvas_set_color(canvas, ColorWhite);
-        canvas_set_font(canvas, FontPrimary);
-        xremote_device_draw_fitted(canvas, 64, 29, 112, AlignCenter, command);
-        canvas_set_color(canvas, ColorBlack);
-        canvas_set_font(canvas, FontSecondary);
-
-        char details[42];
-        if(is_rf) {
-            const XRemoteDeviceRfCommand* rf = &context->profile->rf[rf_index];
-            snprintf(
-                details,
-                sizeof(details),
-                "%s  %.18s  %s",
-                source,
-                rf->protocol,
-                rf->adapter == XRemoteDeviceAdapterPrinceton4 ?
-                    xremote_subghz_variant_name(context->variants[rf_index]) :
-                    "Replay");
-        } else {
-            snprintf(
-                details,
-                sizeof(details),
-                "%s command %u/%u",
-                source,
-                (unsigned int)(context->selected + 1U),
-                (unsigned int)count);
-        }
-        xremote_device_draw_fitted(canvas, 3, 43, 122, AlignLeft, details);
-        if(context->status[0] != '\0') {
-            xremote_device_draw_fitted(canvas, 3, 52, 122, AlignLeft, context->status);
+        for(uint8_t slot = 0U; slot < XREMOTE_DEVICE_PAGE_SIZE; slot++) {
+            const uint16_t command_index = page_start + slot;
+            if(command_index >= count) break;
+            char label[40];
+            xremote_device_runtime_command_label(context, command_index, label, sizeof(label));
+            const uint8_t column = slot % XREMOTE_DEVICE_GRID_COLUMNS;
+            const uint8_t row = slot / XREMOTE_DEVICE_GRID_COLUMNS;
+            xremote_device_runtime_draw_cell(
+                canvas,
+                column == 0U ? 2U : 65U,
+                row == 0U ? 15U : 32U,
+                61U,
+                15U,
+                label,
+                command_index == context->selected);
         }
 
         elements_button_left(canvas, "Back");
         elements_button_center(canvas, "Send");
-        if(is_rf) elements_button_right(canvas, radio);
     } else {
-        canvas_draw_str(canvas, 2, 10, "Device");
+        xremote_device_draw_fitted(canvas, 2, 10, 39, AlignLeft, title);
         canvas_set_font(canvas, FontSecondary);
-        xremote_device_draw_fitted(canvas, 2, 20, 60, AlignLeft, context->profile->name);
-        canvas_draw_line(canvas, 2, 24, 62, 24);
-        elements_slightly_rounded_box(canvas, 2, 29, 60, 30);
-        canvas_set_color(canvas, ColorWhite);
-        xremote_device_draw_fitted(canvas, 32, 47, 54, AlignCenter, command);
-        canvas_set_color(canvas, ColorBlack);
-        char details[24];
-        snprintf(
-            details,
-            sizeof(details),
-            "%s %u/%u %s",
-            source,
-            (unsigned int)(context->selected + 1U),
-            (unsigned int)count,
-            is_rf ? radio : "");
-        canvas_draw_str(canvas, 2, 72, details);
-        if(is_rf && context->profile->rf[rf_index].adapter == XRemoteDeviceAdapterPrinceton4) {
-            canvas_draw_str(
-                canvas, 2, 84, xremote_subghz_variant_name(context->variants[rf_index]));
+        canvas_draw_str_aligned(canvas, 62, 10, AlignRight, AlignBottom, page_source);
+        canvas_draw_line(canvas, 2, 13, 62, 13);
+
+        for(uint8_t slot = 0U; slot < XREMOTE_DEVICE_PAGE_SIZE; slot++) {
+            const uint16_t command_index = page_start + slot;
+            if(command_index >= count) break;
+            char label[40];
+            xremote_device_runtime_command_label(context, command_index, label, sizeof(label));
+            xremote_device_runtime_draw_cell(
+                canvas,
+                2U,
+                (uint8_t)(17U + slot * 18U),
+                60U,
+                15U,
+                label,
+                command_index == context->selected);
         }
-        if(context->status[0] != '\0') {
-            elements_multiline_text_aligned(canvas, 2, 92, AlignLeft, AlignTop, context->status);
-        }
+
         elements_button_left(canvas, "Back");
         elements_button_center(canvas, "Send");
-        if(is_rf) elements_button_right(canvas, radio);
     }
 }
 
@@ -347,6 +492,11 @@ static void xremote_device_runtime_send(XRemoteDeviceContext* context) {
         context->profile->radio,
         command->adapter,
         context->variants[rf_index]);
+    if(status == XRemoteSubGhzStatusMissingFile || status == XRemoteSubGhzStatusInvalidFile ||
+       status == XRemoteSubGhzStatusUnsupportedPreset ||
+       status == XRemoteSubGhzStatusChangingCodeBlocked) {
+        context->rf_status[rf_index] = status;
+    }
     snprintf(context->status, sizeof(context->status), "%s", xremote_subghz_status_name(status));
     if(status == XRemoteSubGhzStatusOk) {
         dolphin_deed(DolphinDeedSubGhzSend);
@@ -354,41 +504,48 @@ static void xremote_device_runtime_send(XRemoteDeviceContext* context) {
     }
 }
 
+static void xremote_device_runtime_toggle_radio(XRemoteDeviceContext* context) {
+    if(!xremote_device_selected_is_rf(context, NULL)) {
+        snprintf(context->status, sizeof(context->status), "IR uses IR output");
+        return;
+    }
+
+    const XRemoteDeviceRadio previous = context->profile->radio;
+    context->profile->radio = context->profile->radio == XRemoteDeviceRadioInternal ?
+                                  XRemoteDeviceRadioExternal :
+                                  XRemoteDeviceRadioInternal;
+    if(xremote_device_profile_store(context->storage, context->profile)) {
+        snprintf(
+            context->status,
+            sizeof(context->status),
+            "%s selected",
+            xremote_device_radio_name(context->profile->radio));
+    } else {
+        context->profile->radio = previous;
+        snprintf(context->status, sizeof(context->status), "Cannot save radio");
+    }
+}
+
 static bool xremote_device_runtime_input(InputEvent* event, void* view_context) {
     XRemoteView* view = view_context;
     XRemoteDeviceContext* context = xremote_view_get_context(view);
     if(event->type == InputTypeShort && event->key == InputKeyBack) return false;
-    if(event->type == InputTypeShort && event->key == InputKeyLeft) return false;
 
     const uint16_t count = xremote_device_command_count(context);
     if(count == 0U) return true;
 
-    if(event->type == InputTypeShort && event->key == InputKeyUp) {
-        context->selected = context->selected == 0U ? count - 1U : context->selected - 1U;
-        context->status[0] = '\0';
-    } else if(event->type == InputTypeShort && event->key == InputKeyDown) {
-        context->selected = (context->selected + 1U) % count;
-        context->status[0] = '\0';
+    if(event->type == InputTypeShort &&
+       (event->key == InputKeyUp || event->key == InputKeyDown || event->key == InputKeyLeft ||
+        event->key == InputKeyRight)) {
+        const bool moved = context->app_ctx->app_settings->orientation ==
+                                   ViewOrientationHorizontal ?
+                               xremote_device_grid_move(context, event->key, count) :
+                               xremote_device_list_move(context, event->key, count);
+        if(moved) xremote_device_runtime_update_selection_status(context);
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         xremote_device_runtime_send(context);
-    } else if(event->type == InputTypeShort && event->key == InputKeyRight) {
-        uint8_t rf_index = 0U;
-        if(xremote_device_selected_is_rf(context, &rf_index)) {
-            const XRemoteDeviceRadio previous = context->profile->radio;
-            context->profile->radio = context->profile->radio == XRemoteDeviceRadioInternal ?
-                                          XRemoteDeviceRadioExternal :
-                                          XRemoteDeviceRadioInternal;
-            if(xremote_device_profile_store(context->storage, context->profile)) {
-                snprintf(
-                    context->status,
-                    sizeof(context->status),
-                    "%s selected",
-                    xremote_device_radio_name(context->profile->radio));
-            } else {
-                context->profile->radio = previous;
-                snprintf(context->status, sizeof(context->status), "Cannot save radio");
-            }
-        }
+    } else if(event->type == InputTypeLong && event->key == InputKeyOk) {
+        xremote_device_runtime_toggle_radio(context);
     } else if(event->type == InputTypeLong && event->key == InputKeyRight) {
         uint8_t rf_index = 0U;
         if(xremote_device_selected_is_rf(context, &rf_index) &&
@@ -949,8 +1106,9 @@ static void xremote_device_guide(XRemoteApp* app) {
         context,
         "Device Profiles",
         "Import IR or RF, then mix.\n"
-        "Runtime: Up/Down select,\n"
-        "OK sends, Right INT/EXT.\n"
+        "Runtime: arrows select,\n"
+        "OK sends, hold OK INT/EXT.\n"
+        "Hold Right: Princeton B1-B4.\n"
         "Manage: OK edits, Left/Right\n"
         "moves RF, hold OK unlinks.");
 }
