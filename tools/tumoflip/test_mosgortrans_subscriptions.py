@@ -148,6 +148,39 @@ class MosgortransSubscriptionsTest(unittest.TestCase):
         self.assertIn("block_num == 28", self.social_source)
         self.assertIn('render_section_header(parsed_data, "Ediny"', self.social_source)
 
+    def test_social_card_renders_ticket_before_identity(self) -> None:
+        parse_function = self.social_source[
+            self.social_source.index("static bool social_moscow_parse") :
+            self.social_source.index("/* Actual implementation")
+        ]
+        title = parse_function.index(r'furi_string_cat(parsed_data, "\e#Moscow Social Card\n")')
+        transport = parse_function.index("social_moscow_render_transport_data")
+        identity = parse_function.index(
+            'render_section_header(parsed_data, "Card", 24, 24)'
+        )
+
+        self.assertLess(title, transport)
+        self.assertLess(transport, identity)
+
+    def test_social_card_luhn_uses_complete_bcd_fields(self) -> None:
+        self.assertIn(
+            "social_moscow_bcd_to_uint64(card_code, 6)",
+            self.social_source,
+        )
+        self.assertIn(
+            "social_moscow_bcd_to_uint64(card_region, 2)",
+            self.social_source,
+        )
+        self.assertIn(
+            "social_moscow_bcd_to_uint64(card_number, 10)",
+            self.social_source,
+        )
+        self.assertIn(
+            "social_moscow_bcd_to_uint64(card_control, 1)",
+            self.social_source,
+        )
+        self.assertNotIn("pow(", self.social_source)
+
     def test_social_card_parser_remains_read_only(self) -> None:
         parse_helpers = self.social_source[
             self.social_source.index("static bool social_moscow_transport_block_is_duplicate") :
