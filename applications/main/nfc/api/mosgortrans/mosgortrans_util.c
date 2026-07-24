@@ -520,7 +520,7 @@ bool mosgortrans_parse_transport_block(const MfClassicBlock* block, FuriString* 
 
         if(data_block.valid_from_date == 0 || data_block.valid_to_date == 0) {
             furi_string_cat(result, "\e#No ticket");
-            return false;
+            return true;
         }
         //remaining_trips
         furi_string_cat_printf(result, "Trips: %d\n", data_block.total_trips);
@@ -1291,6 +1291,7 @@ bool mosgortrans_parse_transport_block(const MfClassicBlock* block, FuriString* 
         break;
     }
     case 0x3C0B: {
+        parse_layout_F0B(&data_block, block);
         //number
         furi_string_cat_printf(result, "Number: %010lu\n", data_block.number);
         //valid_from_date
@@ -1314,8 +1315,11 @@ bool mosgortrans_parse_transport_block(const MfClassicBlock* block, FuriString* 
         break;
     }
     default:
-        result = NULL;
-        return false;
+        furi_string_cat_printf(
+            result,
+            "Ticket data detected\nLayout: %04X\nValidity: not decoded",
+            layout_type);
+        return true;
     }
 
     return true;
