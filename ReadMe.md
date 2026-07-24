@@ -168,10 +168,10 @@ The four-page post-update splash screen is generated automatically from
 - Rebuilt ARF Sub-GHz Full as a lightweight launcher for the stable core
   Sub-GHz app and separate ARF FAPs. Each ARF child receives the full
   application heap instead of being linked into one large process.
-- Exposes ARF Sub-GHz Full, ARF Frequency Analyzer, Sub-GHz RAW Edit, KeeLoq
-  Keystore Decryptor, and Garage Door Remote in `/ext/apps/ARF Tools`; the
-  remaining isolated child FAPs, including RollJam, are packaged under
-  `/ext/apps_data/arf_subghz_full/modules`.
+- Exposes ARF Sub-GHz Full, Sub-GHz RAW Edit, KeeLoq Keystore Decryptor, and
+  Garage Door Remote in `/ext/apps/ARF Tools`; Frequency Analyzer remains
+  available inside Standard Sub-GHz, while isolated child FAPs, including
+  RollJam, are packaged under `/ext/apps_data/arf_subghz_full/modules`.
 - Keeps the Desktop `Sub-GHz` shortcut on the stable core app; ARF Tools stays
   as a separate Desktop folder/launcher.
 - Added MIFARE Ultralight/NTAG PWD and PACK to the NFC read-success screen.

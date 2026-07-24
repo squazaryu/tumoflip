@@ -59,12 +59,9 @@ class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
         subghz_app = SUBGHZ_APP.read_text(encoding="utf-8")
         self.assertIn('strcmp(p, "receiver") == 0', subghz_app)
         self.assertIn('strcmp(p, "tumospectrum_raw") == 0', subghz_app)
-        self.assertIn('strcmp(p, "frequency_analyzer") == 0', subghz_app)
-        self.assertIn("!open_frequency_analyzer", subghz_app)
-        self.assertIn(
-            "if(open_receiver || open_capture_raw || open_frequency_analyzer)",
-            subghz_app,
-        )
+        self.assertNotIn('strcmp(p, "frequency_analyzer") == 0', subghz_app)
+        self.assertNotIn("open_frequency_analyzer", subghz_app)
+        self.assertIn("if(open_receiver || open_capture_raw)", subghz_app)
         self.assertIn(
             "open_capture_raw ? SubGhzSceneReadRAW : SubGhzSceneReceiver",
             subghz_app,

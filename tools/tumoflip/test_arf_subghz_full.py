@@ -120,7 +120,8 @@ class ArfSubGhzFullTest(unittest.TestCase):
             REPO_ROOT / "applications_user/arf_subghz_full/arf_subghz_hub.c"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("Frequency Analyzer", start_scene)
+        self.assertIn("Standard Sub-GHz", start_scene)
+        self.assertNotIn("Frequency Analyzer", start_scene)
         self.assertNotIn("ARF Analyzer", start_scene)
         self.assertEqual(start_scene.count("loader_enqueue_launch("), 2)
         self.assertIn("loader_get_application_launch_path", start_scene)
@@ -193,9 +194,12 @@ class ArfSubGhzFullTest(unittest.TestCase):
         self.assertIn("loading_get_view(loader->loading)", enqueue_body)
         self.assertIn("view_holder_send_to_front(loader->view_holder)", enqueue_body)
 
-    def test_frequency_analyzer_uses_core_launch_contract(self) -> None:
+    def test_frequency_analyzer_is_only_exposed_inside_standard_subghz(self) -> None:
         manifest = (
             REPO_ROOT / "applications_user/arf_subghz_full/application.fam"
+        ).read_text(encoding="utf-8")
+        start_scene = (
+            REPO_ROOT / "applications/main/subghz/scenes/subghz_scene_start.c"
         ).read_text(encoding="utf-8")
         app = (
             REPO_ROOT / "applications/main/subghz/subghz.c"
@@ -205,17 +209,12 @@ class ArfSubGhzFullTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertNotIn('appid="arf_frequency_analyzer"', manifest)
-        self.assertIn('strcmp(p, "frequency_analyzer") == 0', app)
-        self.assertIn("open_frequency_analyzer", app)
-        self.assertRegex(
-            app,
-            r"scene_manager_next_scene\(\s*subghz->scene_manager,\s*"
-            r"SubGhzSceneFrequencyAnalyzer\s*\);",
-        )
-        self.assertIn(
-            '{.label = "Frequency Analyzer", .target = "Sub-GHz", .args = "frequency_analyzer"}',
-            hub,
-        )
+        self.assertIn('"Frequency Analyzer"', start_scene)
+        self.assertIn("SubGhzSceneFrequencyAnalyzer", start_scene)
+        self.assertNotIn('strcmp(p, "frequency_analyzer") == 0', app)
+        self.assertNotIn("open_frequency_analyzer", app)
+        self.assertNotIn('"Frequency Analyzer"', hub)
+        self.assertNotIn('"frequency_analyzer"', hub)
         self.assertNotIn("arf_frequency_analyzer.fap", hub)
 
     def test_frequency_analyzer_notebook_has_short_tags(self) -> None:
