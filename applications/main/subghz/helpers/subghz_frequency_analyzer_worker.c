@@ -271,6 +271,9 @@ static int32_t subghz_frequency_analyzer_worker_frequency_thread(void* context) 
 
     //Stop CC1101
     furi_hal_subghz_idle();
+    // Clear analyzer-specific AGC/BW settings and restore the boot RF-switch state.
+    furi_hal_subghz_reset();
+    furi_hal_subghz_set_path(FuriHalSubGhzPathIsolate);
     furi_hal_subghz_sleep();
 
     return 0;

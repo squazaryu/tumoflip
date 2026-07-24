@@ -83,6 +83,29 @@ class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
         )
         self.assertNotIn("const uint8_t icon_x = 119", view)
 
+    def test_frequency_scan_restores_radio_boot_state_on_exit(self) -> None:
+        worker = (CORE_ROOT / "helpers/subghz_frequency_analyzer_worker.c").read_text(
+            encoding="utf-8"
+        )
+        frequency_thread = re.search(
+            r"static int32_t subghz_frequency_analyzer_worker_frequency_thread"
+            r"\(.*?\n\}",
+            worker,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(frequency_thread)
+
+        teardown = frequency_thread.group(0)
+        idle = teardown.rindex("furi_hal_subghz_idle();")
+        reset = teardown.rindex("furi_hal_subghz_reset();")
+        isolate = teardown.rindex(
+            "furi_hal_subghz_set_path(FuriHalSubGhzPathIsolate);"
+        )
+        sleep = teardown.rindex("furi_hal_subghz_sleep();")
+        self.assertLess(idle, reset)
+        self.assertLess(reset, isolate)
+        self.assertLess(isolate, sleep)
+
 
 if __name__ == "__main__":
     unittest.main()
