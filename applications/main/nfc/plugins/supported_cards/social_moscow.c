@@ -209,6 +209,76 @@ static uint64_t hex_num(uint64_t hex) {
     return result;
 }
 
+static bool social_moscow_transport_block_is_duplicate(
+    const MfClassicData* data,
+    uint8_t block_num,
+    const uint8_t* parsed_blocks,
+    size_t parsed_blocks_count) {
+    for(size_t i = 0; i < parsed_blocks_count; i++) {
+        const uint8_t parsed_block = parsed_blocks[i];
+        if(memcmp(
+               &data->block[block_num], &data->block[parsed_block], sizeof(MfClassicBlock) * 2) ==
+           0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void social_moscow_render_transport_header(
+    FuriString* parsed_data,
+    uint8_t block_num,
+    uint8_t transport_index) {
+    if(block_num == 4 || block_num == 32) {
+        render_section_header(parsed_data, "Metro", 22, 21);
+    } else if(block_num == 16) {
+        render_section_header(parsed_data, "Ground", 21, 20);
+    } else if(block_num == 28) {
+        render_section_header(parsed_data, "Ediny", 22, 22);
+    } else {
+        furi_string_cat_printf(
+            parsed_data, ":::::::::::::::::[ Transport %u ]:::::::::::::::::", transport_index);
+    }
+}
+
+static size_t social_moscow_render_transport_data(
+    const MfClassicData* data,
+    uint8_t data_sector,
+    FuriString* parsed_data) {
+    uint8_t parsed_blocks[MF_CLASSIC_TOTAL_SECTORS_MAX] = {};
+    size_t parsed_blocks_count = 0;
+    FuriString* transport_result = furi_string_alloc();
+
+    // A Mosgortrans record occupies the first two data blocks of a sector.
+    // Sector 0 is manufacturer data; data_sector contains the social-card identity.
+    for(uint8_t sector = 1; sector < data_sector; sector++) {
+        const uint8_t block_num = mf_classic_get_first_block_num_of_sector(sector);
+        if(!mf_classic_is_block_read(data, block_num) ||
+           !mf_classic_is_block_read(data, block_num + 1)) {
+            continue;
+        }
+
+        furi_string_reset(transport_result);
+        if(!mosgortrans_parse_transport_block(&data->block[block_num], transport_result) ||
+           furi_string_empty(transport_result)) {
+            continue;
+        }
+        if(social_moscow_transport_block_is_duplicate(
+               data, block_num, parsed_blocks, parsed_blocks_count)) {
+            continue;
+        }
+
+        social_moscow_render_transport_header(
+            parsed_data, block_num, (uint8_t)parsed_blocks_count + 1);
+        furi_string_cat_printf(parsed_data, "\n%s\n", furi_string_get_cstr(transport_result));
+        parsed_blocks[parsed_blocks_count++] = block_num;
+    }
+
+    furi_string_free(transport_result);
+    return parsed_blocks_count;
+}
+
 static bool social_moscow_parse(const NfcDevice* device, FuriString* parsed_data) {
     furi_assert(device);
 
@@ -246,15 +316,9 @@ static bool social_moscow_parse(const NfcDevice* device, FuriString* parsed_data
         uint8_t luhn = calculate_luhn(number);
         if(luhn != card_control) break;
 
-        FuriString* metro_result = furi_string_alloc();
-        FuriString* ground_result = furi_string_alloc();
-        bool is_metro_data_present =
-            mosgortrans_parse_transport_block(&data->block[4], metro_result);
-        bool is_ground_data_present =
-            mosgortrans_parse_transport_block(&data->block[16], ground_result);
         furi_string_cat_printf(
             parsed_data,
-            "\e#Social \ecard\nNumber: %lx %x %llx %x\nOMC: %llx\nValid for: %02x/%02x %02x%02x\n",
+            "\e#Moscow Social Card\nNumber: %lx %x %llx %x\nOMC: %llx\nCard valid: %02x/%02x %02x%02x\n",
             card_code,
             card_region,
             card_number,
@@ -264,16 +328,11 @@ static bool social_moscow_parse(const NfcDevice* device, FuriString* parsed_data
             year,
             data->block[60].data[13],
             data->block[60].data[14]);
-        if(is_metro_data_present && !furi_string_empty(metro_result)) {
-            render_section_header(parsed_data, "Metro", 22, 21);
-            furi_string_cat_printf(parsed_data, "%s\n", furi_string_get_cstr(metro_result));
+
+        if(social_moscow_render_transport_data(data, cfg.data_sector, parsed_data) == 0) {
+            render_section_header(parsed_data, "Transport", 19, 19);
+            furi_string_cat(parsed_data, "\nNo readable ticket found\n");
         }
-        if(is_ground_data_present && !furi_string_empty(ground_result)) {
-            render_section_header(parsed_data, "Ground", 21, 20);
-            furi_string_cat_printf(parsed_data, "%s\n", furi_string_get_cstr(ground_result));
-        }
-        furi_string_free(ground_result);
-        furi_string_free(metro_result);
         parsed = true;
     } while(false);
 

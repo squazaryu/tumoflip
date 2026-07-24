@@ -14,6 +14,10 @@ PARSER_SOURCE = (
     REPO_ROOT
     / "applications/main/nfc/api/mosgortrans/mosgortrans_util.c"
 )
+SOCIAL_PARSER_SOURCE = (
+    REPO_ROOT
+    / "applications/main/nfc/plugins/supported_cards/social_moscow.c"
+)
 
 
 def set_bits(data: bytearray, position: int, length: int, value: int) -> None:
@@ -51,6 +55,7 @@ def extract_case(source: str, layout: str) -> str:
 class MosgortransSubscriptionsTest(unittest.TestCase):
     def setUp(self) -> None:
         self.source = PARSER_SOURCE.read_text(encoding="utf-8")
+        self.social_source = SOCIAL_PARSER_SOURCE.read_text(encoding="utf-8")
 
     def test_f0b_fixture_contains_subscription_dates(self) -> None:
         block = bytearray(32)
@@ -106,6 +111,50 @@ class MosgortransSubscriptionsTest(unittest.TestCase):
         self.assertIn('"Ticket data detected\\nLayout: %04X\\nValidity: not decoded"', default_case)
         self.assertIn("return true;", default_case)
         self.assertNotIn("result = NULL;", default_case)
+
+    def test_social_card_scans_complete_sector_records(self) -> None:
+        self.assertIn(
+            "for(uint8_t sector = 1; sector < data_sector; sector++)",
+            self.social_source,
+        )
+        self.assertIn(
+            "mf_classic_get_first_block_num_of_sector(sector)",
+            self.social_source,
+        )
+        self.assertIn(
+            "!mf_classic_is_block_read(data, block_num + 1)",
+            self.social_source,
+        )
+        self.assertIn(
+            "mosgortrans_parse_transport_block(&data->block[block_num]",
+            self.social_source,
+        )
+
+    def test_social_card_deduplicates_transport_records(self) -> None:
+        duplicate_check = re.search(
+            r"social_moscow_transport_block_is_duplicate\(.*?"
+            r"memcmp\(.*?sizeof\(MfClassicBlock\) \* 2\).*?"
+            r"return true;",
+            self.social_source,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(duplicate_check)
+
+    def test_social_card_keeps_known_transport_labels(self) -> None:
+        self.assertIn("block_num == 4 || block_num == 32", self.social_source)
+        self.assertIn('render_section_header(parsed_data, "Metro"', self.social_source)
+        self.assertIn("block_num == 16", self.social_source)
+        self.assertIn('render_section_header(parsed_data, "Ground"', self.social_source)
+        self.assertIn("block_num == 28", self.social_source)
+        self.assertIn('render_section_header(parsed_data, "Ediny"', self.social_source)
+
+    def test_social_card_parser_remains_read_only(self) -> None:
+        parse_helpers = self.social_source[
+            self.social_source.index("static bool social_moscow_transport_block_is_duplicate") :
+            self.social_source.index("static bool social_moscow_parse")
+        ]
+        self.assertNotIn("write", parse_helpers.lower())
+        self.assertNotIn("emulat", parse_helpers.lower())
 
 
 if __name__ == "__main__":
