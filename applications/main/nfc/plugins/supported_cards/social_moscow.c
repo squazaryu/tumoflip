@@ -194,18 +194,16 @@ static uint8_t calculate_luhn(uint64_t number) {
     return (10 - (sum % 10)) % 10;
 }
 
-static uint64_t hex_num(uint64_t hex) {
+static uint64_t social_moscow_bcd_to_uint64(uint64_t bcd, uint8_t digits) {
     uint64_t result = 0;
-    for(uint8_t i = 0; i < 8; ++i) {
-        uint8_t half_byte = hex & 0x0F;
-        uint64_t num = 0;
-        for(uint8_t j = 0; j < 4; ++j) {
-            num += (half_byte & 0x1) * (1 << j);
-            half_byte = half_byte >> 1;
-        }
-        result += num * pow(10, i);
-        hex = hex >> 4;
+    uint64_t decimal_place = 1;
+
+    for(uint8_t i = 0; i < digits; ++i) {
+        result += (bcd & 0x0F) * decimal_place;
+        bcd >>= 4;
+        decimal_place *= 10;
     }
+
     return result;
 }
 
@@ -309,16 +307,24 @@ static bool social_moscow_parse(const NfcDevice* device, FuriString* parsed_data
         uint8_t year = data->block[60].data[11];
         uint8_t month = data->block[60].data[12];
 
-        uint64_t number = hex_num(card_control) + hex_num(card_number) * 10 +
-                          hex_num(card_region) * 10 * 10000000000 +
-                          hex_num(card_code) * 10 * 10000000000 * 100;
+        uint64_t number = social_moscow_bcd_to_uint64(card_code, 6);
+        number = number * 100 + social_moscow_bcd_to_uint64(card_region, 2);
+        number = number * 10000000000ULL + social_moscow_bcd_to_uint64(card_number, 10);
+        number = number * 10 + social_moscow_bcd_to_uint64(card_control, 1);
 
         uint8_t luhn = calculate_luhn(number);
         if(luhn != card_control) break;
 
+        furi_string_cat(parsed_data, "\e#Moscow Social Card\n");
+        if(social_moscow_render_transport_data(data, cfg.data_sector, parsed_data) == 0) {
+            render_section_header(parsed_data, "Transport", 19, 19);
+            furi_string_cat(parsed_data, "\nNo readable ticket found\n");
+        }
+
+        render_section_header(parsed_data, "Card", 24, 24);
         furi_string_cat_printf(
             parsed_data,
-            "\e#Moscow Social Card\nNumber: %lx %x %llx %x\nOMC: %llx\nCard valid: %02x/%02x %02x%02x\n",
+            "\nNumber: %lx %x %llx %x\nOMC: %llx\nCard valid: %02x/%02x %02x%02x\n",
             card_code,
             card_region,
             card_number,
@@ -328,11 +334,6 @@ static bool social_moscow_parse(const NfcDevice* device, FuriString* parsed_data
             year,
             data->block[60].data[13],
             data->block[60].data[14]);
-
-        if(social_moscow_render_transport_data(data, cfg.data_sector, parsed_data) == 0) {
-            render_section_header(parsed_data, "Transport", 19, 19);
-            furi_string_cat(parsed_data, "\nNo readable ticket found\n");
-        }
         parsed = true;
     } while(false);
 
