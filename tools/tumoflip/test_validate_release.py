@@ -230,6 +230,10 @@ class ValidateReleaseTest(unittest.TestCase):
             MODULE_ONE_PACKAGE_FILES,
         )
         self.assertIn(
+            "apps_data/tumoflip_xremote/components/tumoflip_xremote_ac.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
             "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
             MODULE_ONE_PACKAGE_FILES,
         )

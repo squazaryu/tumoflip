@@ -12,7 +12,7 @@
 // XRemote generic functions and definitions
 //////////////////////////////////////////////////////////////////////////////
 
-#define XREMOTE_APP_SETTINGS APP_DATA_PATH("xremote.cfg")
+#define XREMOTE_APP_SETTINGS EXT_PATH("apps_data/tumoflip_xremote/xremote.cfg")
 
 #define XREMOTE_ORIENTATION_TEXT_HORIZONTAL  "Horizontal"
 #define XREMOTE_ORIENTATION_TEXT_VERTICAL    "Vertical"

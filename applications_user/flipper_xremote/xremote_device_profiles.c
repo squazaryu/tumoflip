@@ -1353,14 +1353,15 @@ static void xremote_device_library_draw(Canvas* canvas, void* model_context) {
             vertical ? 39 : 28,
             AlignCenter,
             AlignCenter,
-            context->library_notice[0] != '\0' ? context->library_notice : "No saved remotes");
+            context->library_notice[0] != '\0' ? context->library_notice :
+                                                (vertical ? "No remotes" : "No saved remotes"));
         canvas_draw_str_aligned(
             canvas,
             vertical ? 32 : 64,
             vertical ? 56 : 41,
             AlignCenter,
             AlignCenter,
-            vertical ? "Create from IR / RF" : "Create from IR or Sub-GHz");
+            vertical ? "Use Import IR/RF" : "Create from IR or Sub-GHz");
         elements_button_left(canvas, "Back");
         return;
     }
@@ -1975,16 +1976,29 @@ XRemoteApp* xremote_device_profiles_alloc(XRemoteAppContext* app_ctx) {
     context->owner_app = app;
     xremote_app_set_user_context(app, context, xremote_device_context_free);
     xremote_app_submenu_alloc(app, XRemoteViewDeviceProfiles, xremote_device_previous_main);
+    const bool vertical = app_ctx->app_settings->orientation == ViewOrientationVertical;
     xremote_app_submenu_add(
         app, "My Remotes", XRemoteDeviceMenuLibrary, xremote_device_menu_callback);
     xremote_app_submenu_add(
-        app, "Create from IR", XRemoteDeviceMenuImportIr, xremote_device_menu_callback);
+        app,
+        vertical ? "Import IR" : "Create from IR",
+        XRemoteDeviceMenuImportIr,
+        xremote_device_menu_callback);
     xremote_app_submenu_add(
-        app, "Create from Sub-GHz", XRemoteDeviceMenuImportRf, xremote_device_menu_callback);
+        app,
+        vertical ? "Import RF" : "Create from Sub-GHz",
+        XRemoteDeviceMenuImportRf,
+        xremote_device_menu_callback);
     xremote_app_submenu_add(
-        app, "Add Sub-GHz to Remote", XRemoteDeviceMenuAddRf, xremote_device_menu_callback);
+        app,
+        vertical ? "Add RF" : "Add Sub-GHz to Remote",
+        XRemoteDeviceMenuAddRf,
+        xremote_device_menu_callback);
     xremote_app_submenu_add(
-        app, "Restore Backup", XRemoteDeviceMenuImportBundle, xremote_device_menu_callback);
+        app,
+        vertical ? "Restore" : "Restore Backup",
+        XRemoteDeviceMenuImportBundle,
+        xremote_device_menu_callback);
     xremote_app_submenu_add(app, "Help", XRemoteDeviceMenuGuide, xremote_device_menu_callback);
 
     context->library_view =

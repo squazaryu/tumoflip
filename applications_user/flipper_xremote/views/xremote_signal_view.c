@@ -17,11 +17,12 @@ static void xremote_signal_view_draw_callback(Canvas* canvas, void* context) {
     XRemoteAppContext* app_ctx = xremote_signal_analyzer_get_app_context(analyzer);
 
     ViewOrientation orientation = app_ctx->app_settings->orientation;
-    uint8_t y = orientation == ViewOrientationHorizontal ? 17 : 49;
+    const uint8_t x = 2;
+    const uint8_t y = orientation == ViewOrientationHorizontal ? 18 : 40;
     const char* text = "Press any\nbutton on\nthe remote.";
 
     xremote_canvas_draw_header(canvas, orientation, "Analyzer");
-    elements_multiline_text_aligned(canvas, 0, y, AlignLeft, AlignTop, text);
+    elements_multiline_text_aligned(canvas, x, y, AlignLeft, AlignTop, text);
 
     const char* exit_str = xremote_app_context_get_exit_str(app_ctx);
     xremote_canvas_draw_exit_footer(canvas, orientation, exit_str);
@@ -65,17 +66,17 @@ static void xremote_signal_success_view_draw_callback(Canvas* canvas, void* cont
     }
 
     if(app_ctx->app_settings->orientation == ViewOrientationHorizontal) {
-        elements_multiline_text_aligned(canvas, 0, 17, AlignLeft, AlignTop, signal_info);
+        elements_multiline_text_aligned(canvas, 2, 18, AlignLeft, AlignTop, signal_info);
         xremote_canvas_draw_button_wide(
-            canvas, model->ok_pressed, 68, 26, "Send", XRemoteIconEnter);
+            canvas, model->ok_pressed, 64, 25, "Send", XRemoteIconEnter);
         xremote_canvas_draw_button_wide(
-            canvas, model->back_pressed, 68, 44, "Retry", XRemoteIconBack);
+            canvas, model->back_pressed, 64, 43, "Retry", XRemoteIconBack);
     } else {
-        elements_multiline_text_aligned(canvas, 0, 39, AlignLeft, AlignTop, signal_info);
+        elements_multiline_text_aligned(canvas, 2, 36, AlignLeft, AlignTop, signal_info);
         xremote_canvas_draw_button_wide(
-            canvas, model->ok_pressed, 0, 88, "Send", XRemoteIconEnter);
+            canvas, model->ok_pressed, 0, 86, "Send", XRemoteIconEnter);
         xremote_canvas_draw_button_wide(
-            canvas, model->back_pressed, 0, 106, "Retry", XRemoteIconBack);
+            canvas, model->back_pressed, 0, 104, "Retry", XRemoteIconBack);
     }
 }
 

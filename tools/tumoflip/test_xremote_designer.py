@@ -9,6 +9,25 @@ APP_DIR = REPO_ROOT / "applications_user/flipper_xremote"
 
 
 class XRemoteDesignerTest(unittest.TestCase):
+    def test_custom_views_keep_horizontal_content_clear_of_edges_and_footer(self) -> None:
+        learn = (APP_DIR / "views/xremote_learn_view.c").read_text(encoding="utf-8")
+        about = (APP_DIR / "views/xremote_about_view.c").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "elements_multiline_text_aligned(canvas, 2, 12, AlignLeft, AlignTop, info_text)",
+            learn,
+        )
+        self.assertIn(
+            'canvas, model->ok_pressed, 64, 22, "Finish", XRemoteIconEnter',
+            learn,
+        )
+        self.assertIn(
+            'canvas_draw_str_aligned(canvas, 2, 48, AlignLeft, AlignTop, '
+            '"squazaryu/tumoflip")',
+            about,
+        )
+        self.assertNotIn('canvas, 2, 56, AlignLeft, AlignTop, "/tumoflip"', about)
+
     def test_designer_is_visible_from_xremote_menu(self) -> None:
         source = (APP_DIR / "xremote.c").read_text(encoding="utf-8")
         header = (APP_DIR / "views/xremote_common_view.h").read_text(encoding="utf-8")
@@ -23,17 +42,64 @@ class XRemoteDesignerTest(unittest.TestCase):
         self.assertIn('fap_version="1.14.0"', manifest)
         self.assertIn("#define XREMOTE_VERSION_MIN  14", version_header)
 
-    def test_ac_smart_is_integrated_as_xremote_child_app(self) -> None:
+    def test_ac_smart_is_integrated_as_hidden_component(self) -> None:
         source = (APP_DIR / "xremote.c").read_text(encoding="utf-8")
         header = (APP_DIR / "views/xremote_common_view.h").read_text(encoding="utf-8")
         manifest = (APP_DIR / "application.fam").read_text(encoding="utf-8")
+        component = (APP_DIR / "xremote_ac_main.c").read_text(encoding="utf-8")
 
-        self.assertIn('#include "xremote_ac.h"', source)
         self.assertIn('"AC Smart", XRemoteViewAcSmart', source)
-        self.assertIn("xremote_ac_alloc(app->app_ctx)", source)
+        self.assertIn("xremote_launch_component(app, XREMOTE_AC_COMPONENT_PATH)", source)
+        self.assertIn(
+            'EXT_PATH("apps_data/tumoflip_xremote/components/tumoflip_xremote_ac.fap")',
+            source,
+        )
+        self.assertIn("loader_enqueue_launch(loader, path", source)
+        self.assertIn("loader_get_application_launch_path(loader, self_path)", source)
+        self.assertIn("app->app_ctx->app_argument", source)
+        self.assertIn("xremote_cockpit_return_arg(app)", source)
+        self.assertIn(
+            'EXT_PATH("apps/Module One/Diagnostics/cockpit.fap")',
+            source,
+        )
         self.assertIn("XRemoteViewAcSmart", header)
         self.assertIn("XRemoteViewAcSmartRemote", header)
+        self.assertIn('appid="tumoflip_xremote_ac"', manifest)
+        self.assertIn(
+            'fap_dist_path="apps_data/tumoflip_xremote/components/tumoflip_xremote_ac.fap"',
+            manifest,
+        )
+        validator = (
+            REPO_ROOT / "tools/tumoflip/validate_release.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            '"apps_data/tumoflip_xremote/components/tumoflip_xremote_ac.fap"',
+            validator,
+        )
+        self.assertIn('"!xremote_ac.c"', manifest)
+        self.assertIn('entry_point="xremote_ac_main"', manifest)
+        self.assertIn("xremote_ac_alloc(context)", component)
+        self.assertIn("return VIEW_NONE;", component)
         self.assertIn('"storage"', manifest)
+        ac_source = (APP_DIR / "xremote_ac.c").read_text(encoding="utf-8")
+        self.assertIn(
+            "submenu_set_orientation(ctx->app->submenu, ctx->app_ctx->app_settings->orientation)",
+            ac_source,
+        )
+        app_header = (APP_DIR / "xremote_app.h").read_text(encoding="utf-8")
+        self.assertIn(
+            'EXT_PATH("apps_data/tumoflip_xremote/xremote.cfg")',
+            app_header,
+        )
+
+        cockpit = (
+            REPO_ROOT / "applications_user/module_one_cockpit/module_one_cockpit.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "target->action == ModuleOneCockpitActionLaunchXRemote",
+            cockpit,
+        )
+        self.assertIn('"cockpit:%lu"', cockpit)
 
     def test_designer_exports_standard_ir_with_xremote_layout_metadata(self) -> None:
         designer = (APP_DIR / "xremote_designer.c").read_text(encoding="utf-8")
@@ -223,7 +289,7 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         manifest = (APP_DIR / "application.fam").read_text(encoding="utf-8")
 
         self.assertIn('#include "xremote_device_profiles.h"', source)
-        self.assertIn('"IR + RF Remotes", XRemoteViewDeviceProfiles', source)
+        self.assertIn('"Profiles", XRemoteViewDeviceProfiles', source)
         self.assertIn("xremote_device_profiles_alloc(app->app_ctx)", source)
         self.assertIn("XRemoteViewDeviceLibrary", header)
         self.assertIn("XRemoteViewDeviceRuntime", header)
