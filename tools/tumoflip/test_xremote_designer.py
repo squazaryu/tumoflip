@@ -223,10 +223,11 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         manifest = (APP_DIR / "application.fam").read_text(encoding="utf-8")
 
         self.assertIn('#include "xremote_device_profiles.h"', source)
-        self.assertIn('"Device Profiles", XRemoteViewDeviceProfiles', source)
+        self.assertIn('"IR + RF Remotes", XRemoteViewDeviceProfiles', source)
         self.assertIn("xremote_device_profiles_alloc(app->app_ctx)", source)
         self.assertIn("XRemoteViewDeviceLibrary", header)
         self.assertIn("XRemoteViewDeviceRuntime", header)
+        self.assertIn("XRemoteViewDeviceHelp", header)
         self.assertIn('"subghz_radio_broker"', manifest)
         self.assertIn('"AC Smart", XRemoteViewAcSmart', source)
         self.assertIn('"Saved", XRemoteViewIRSubmenu', source)
@@ -332,24 +333,25 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
             self.assertIn(required, source)
         self.assertIn("row == 0U ? 15U : 32U", source)
         self.assertIn("(uint8_t)(17U + slot * 18U)", source)
-        self.assertIn('"OK sends, hold OK INT/EXT.', source)
+        self.assertIn('"Arrows select a button. OK sends it. On a Sub-GHz button, hold OK to "', source)
         self.assertIn("#define XREMOTE_VERSION_MIN  13", version)
+        self.assertIn("#define XREMOTE_BUILD_NUMBER 1", version)
 
     def test_profile_editor_supports_on_device_management(self) -> None:
         source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
         header = (APP_DIR / "views/xremote_common_view.h").read_text(encoding="utf-8")
 
         for required in (
-            '"Profile Library"',
+            '"My Remotes"',
             "XRemoteViewDeviceEditor",
             "xremote_device_editor_start_text",
             "xremote_device_editor_replace_ir",
             "xremote_device_editor_detach_ir",
             "xremote_device_editor_remove_rf",
             "xremote_device_profile_move_rf",
-            '"Profile Editor"',
-            '"Source missing"',
-            '"Save failed; reopen profile"',
+            '"Edit Remote"',
+            '"RF source missing"',
+            '"Save failed; reopen remote"',
         ):
             self.assertIn(required, source if required != "XRemoteViewDeviceEditor" else header)
 
@@ -384,14 +386,14 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
             "XRemoteDeviceLibraryInvalid",
             "xremote_device_library_ir_count",
             "xremote_device_library_refresh",
-            '"Profile Library"',
-            '"MISS"',
-            '"BAD"',
+            '"My Remotes"',
+            '"Missing"',
+            '"Invalid"',
             '"Open"',
             '"Edit"',
             '"Repair"',
             '"Copy"',
-            '"Export"',
+            '"Backup"',
             '"Delete"',
             "xremote_device_library_keep_visible",
         ):
@@ -421,7 +423,10 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
 
         self.assertIn("ViewOrientationVertical", source)
         self.assertIn("vertical ? 60U : 124U", source)
-        self.assertIn("vertical ? 22U : 11U", source)
+        self.assertIn("vertical ? 24U : 17U", source)
+        self.assertIn("XREMOTE_DEVICE_LIBRARY_ROWS_HORIZONTAL 2U", source)
+        self.assertIn("XREMOTE_DEVICE_LIBRARY_ROWS_VERTICAL   4U", source)
+        self.assertIn("15U + row * (vertical ? 24U : 18U)", source)
         self.assertIn("(uint8_t)(16U + action * 16U)", source)
         self.assertIn("vertical && event->key == InputKeyUp", source)
         self.assertIn("vertical && event->key == InputKeyDown", source)
@@ -479,8 +484,8 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         ):
             self.assertIn(required, bundle)
         self.assertIn("XRemoteDeviceLibraryActionExport", source)
-        self.assertIn('"Import Bundle"', source)
-        self.assertIn('"Export requires a Ready profile."', source)
+        self.assertIn('"Restore Backup"', source)
+        self.assertIn('"Backup requires a Ready remote."', source)
         self.assertNotIn("storage_common_remove(storage, profile->ir_path)", bundle)
         self.assertNotIn("storage_common_remove(storage, profile->rf", bundle)
 
@@ -494,7 +499,7 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn("storage_common_remove(storage, profile->path)", storage)
         self.assertIn("xremote_device_profile_reload(context)", source)
         self.assertIn('"Save failed; restored"', source)
-        self.assertIn('"Profile needs command"', source)
+        self.assertIn('"Remote needs a button"', source)
         self.assertIn("profile->ir_path[0] == '\\0' && profile->rf_count == 1U", storage)
 
     def test_profile_editor_uses_framed_controls_without_footer_overlap(self) -> None:
@@ -527,6 +532,28 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
             "event->type == InputTypeShort && event->key == InputKeyBack) return false",
             editor_input,
         )
+
+    def test_profile_help_is_scrollable_and_returns_to_remote_menu(self) -> None:
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+        header = (APP_DIR / "views/xremote_common_view.h").read_text(encoding="utf-8")
+
+        for required in (
+            "TextBox* help_box",
+            "text_box_alloc()",
+            "text_box_set_text(",
+            "text_box_set_focus(context->help_box, TextBoxFocusStart)",
+            "view_set_orientation(help_view, app_ctx->app_settings->orientation)",
+            "view_set_previous_callback(help_view, xremote_device_help_previous)",
+            "XRemoteViewDeviceHelp",
+        ):
+            self.assertIn(required, source if required != "XRemoteViewDeviceHelp" else header)
+
+    def test_profile_library_rows_stay_above_footer_controls(self) -> None:
+        horizontal_last_bottom = 15 + (2 - 1) * 18 + 17
+        vertical_last_bottom = 15 + (4 - 1) * 24 + 24
+
+        self.assertLessEqual(horizontal_last_bottom, 52)
+        self.assertLessEqual(vertical_last_bottom, 116)
 
 
 if __name__ == "__main__":

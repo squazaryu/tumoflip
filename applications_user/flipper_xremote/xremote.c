@@ -139,7 +139,7 @@ int32_t xremote_main(void* p) {
     xremote_app_submenu_add(app, "Designer", XRemoteViewDesigner, xremote_submenu_callback);
     xremote_app_submenu_add(app, "AC Smart", XRemoteViewAcSmart, xremote_submenu_callback);
     xremote_app_submenu_add(
-        app, "Device Profiles", XRemoteViewDeviceProfiles, xremote_submenu_callback);
+        app, "IR + RF Remotes", XRemoteViewDeviceProfiles, xremote_submenu_callback);
     xremote_app_submenu_add(app, "Saved", XRemoteViewIRSubmenu, xremote_submenu_callback);
     xremote_app_submenu_add(app, "Analyzer", XRemoteViewAnalyzer, xremote_submenu_callback);
     xremote_app_submenu_add(app, "Settings", XRemoteViewSettings, xremote_submenu_callback);

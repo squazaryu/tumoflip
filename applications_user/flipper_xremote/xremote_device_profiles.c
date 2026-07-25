@@ -9,15 +9,17 @@
 #include <dialogs/dialogs.h>
 #include <dolphin/dolphin.h>
 #include <gui/elements.h>
+#include <gui/modules/text_box.h>
 
 #include <stdlib.h>
 #include <string.h>
 
-#define XREMOTE_DEVICE_PAGE_SIZE            4U
-#define XREMOTE_DEVICE_GRID_COLUMNS         2U
-#define XREMOTE_DEVICE_LIBRARY_MAX          16U
-#define XREMOTE_DEVICE_LIBRARY_FILENAME_MAX 96U
-#define XREMOTE_DEVICE_LIBRARY_ROWS         3U
+#define XREMOTE_DEVICE_PAGE_SIZE               4U
+#define XREMOTE_DEVICE_GRID_COLUMNS            2U
+#define XREMOTE_DEVICE_LIBRARY_MAX             16U
+#define XREMOTE_DEVICE_LIBRARY_FILENAME_MAX    96U
+#define XREMOTE_DEVICE_LIBRARY_ROWS_HORIZONTAL 2U
+#define XREMOTE_DEVICE_LIBRARY_ROWS_VERTICAL   4U
 
 typedef enum {
     XRemoteDeviceMenuLibrary,
@@ -66,6 +68,7 @@ typedef struct {
     XRemoteDeviceProfile* profile;
     InfraredRemote* ir_remote;
     TextInput* text_input;
+    TextBox* help_box;
     XRemoteView* library_view;
     XRemoteDeviceLibraryEntry library[XREMOTE_DEVICE_LIBRARY_MAX];
     uint8_t library_count;
@@ -104,6 +107,11 @@ static uint32_t xremote_device_previous_library(void* raw_view) {
 }
 
 static uint32_t xremote_device_library_previous(void* context) {
+    UNUSED(context);
+    return XRemoteViewDeviceProfiles;
+}
+
+static uint32_t xremote_device_help_previous(void* context) {
     UNUSED(context);
     return XRemoteViewDeviceProfiles;
 }
@@ -169,7 +177,7 @@ static bool
                                         context->storage, furi_string_get_cstr(path), profile);
     furi_string_free(path);
     if(selected && !loaded) {
-        xremote_device_message(context, "Device Profile", "Profile is invalid\nor unsupported.");
+        xremote_device_message(context, "IR + RF Remotes", "Remote is invalid\nor unsupported.");
     }
     return loaded;
 }
@@ -197,7 +205,7 @@ static bool xremote_device_profile_commit(
         context->status,
         sizeof(context->status),
         "%s",
-        restored ? failure_text : "Save failed; reopen profile");
+        restored ? failure_text : "Save failed; reopen remote");
     return false;
 }
 
@@ -635,9 +643,9 @@ static bool
 }
 
 static const char* xremote_device_editor_label(const XRemoteDeviceContext* context) {
-    if(context->editor_selected == 0U) return "Profile";
-    if(context->editor_selected == 1U) return "IR link";
-    return "Sub-GHz command";
+    if(context->editor_selected == 0U) return "Remote name";
+    if(context->editor_selected == 1U) return "IR buttons";
+    return "Sub-GHz button";
 }
 
 static void xremote_device_editor_value(
@@ -679,24 +687,24 @@ static void xremote_device_editor_detail(
                                storage_file_exists(context->storage, context->profile->ir_path) ?
                                                                       "IR linked" :
                                                                       "IR missing";
-        snprintf(primary, primary_size, "%s", ir_state);
+        snprintf(primary, primary_size, "IR: %s", ir_state);
         snprintf(
-            secondary, secondary_size, "RF commands: %u", (unsigned int)context->profile->rf_count);
+            secondary, secondary_size, "RF buttons: %u", (unsigned int)context->profile->rf_count);
         return;
     }
 
     if(context->editor_selected == 1U) {
         if(context->profile->ir_path[0] == '\0') {
-            snprintf(primary, primary_size, "No IR source");
-            snprintf(secondary, secondary_size, "Choose a remote");
+            snprintf(primary, primary_size, "No IR buttons");
+            snprintf(secondary, secondary_size, "Choose saved remote");
         } else {
             snprintf(
                 primary,
                 primary_size,
                 "%s",
                 storage_file_exists(context->storage, context->profile->ir_path) ?
-                    "Source ready" :
-                    "Source missing");
+                    "IR source ready" :
+                    "IR source missing");
             snprintf(secondary, secondary_size, "Hold OK: detach");
         }
         return;
@@ -712,8 +720,9 @@ static void xremote_device_editor_detail(
         primary,
         primary_size,
         "%s",
-        storage_file_exists(context->storage, command->path) ? "Source ready" : "Source missing");
-    snprintf(secondary, secondary_size, "%s", command->protocol);
+        storage_file_exists(context->storage, command->path) ? "RF source ready" :
+                                                               "RF source missing");
+    snprintf(secondary, secondary_size, "Protocol: %s", command->protocol);
 }
 
 static void xremote_device_editor_draw_move_button(
@@ -727,7 +736,7 @@ static void xremote_device_editor_draw_move_button(
     } else {
         canvas_draw_rframe(canvas, x, 85, 20, 17, 3);
     }
-    xremote_canvas_draw_icon(canvas, (uint8_t)(x + 12U), 93, icon);
+    xremote_canvas_draw_icon(canvas, (uint8_t)(x + 10U), 93, icon);
     canvas_set_color(canvas, ColorBlack);
 }
 
@@ -752,7 +761,7 @@ static void xremote_device_editor_draw(Canvas* canvas, void* model_context) {
     canvas_set_font(canvas, FontPrimary);
     if(orientation == ViewOrientationHorizontal) {
         xremote_canvas_draw_icon(canvas, 8, 7, XRemoteIconBack);
-        canvas_draw_str(canvas, 16, 9, "Profile Editor");
+        canvas_draw_str(canvas, 16, 9, "Edit Remote");
         canvas_set_font(canvas, FontSecondary);
         char position[12];
         snprintf(
@@ -798,7 +807,7 @@ static void xremote_device_editor_draw(Canvas* canvas, void* model_context) {
         }
     } else {
         xremote_canvas_draw_icon(canvas, 8, 8, XRemoteIconBack);
-        canvas_draw_str(canvas, 16, 10, "Editor");
+        canvas_draw_str(canvas, 16, 10, "Edit");
         canvas_set_font(canvas, FontSecondary);
         char position[12];
         snprintf(
@@ -937,7 +946,7 @@ static void xremote_device_editor_detach_ir(XRemoteDeviceContext* context) {
         return;
     }
     if(context->profile->rf_count == 0U) {
-        snprintf(context->status, sizeof(context->status), "Profile needs command");
+        snprintf(context->status, sizeof(context->status), "Remote needs a button");
         return;
     }
     if(!xremote_device_confirm(context, "Detach IR?", "Source .ir stays on SD.", "Detach")) {
@@ -951,7 +960,7 @@ static void xremote_device_editor_detach_ir(XRemoteDeviceContext* context) {
 static void xremote_device_editor_remove_rf(XRemoteDeviceContext* context, uint8_t rf_index) {
     if(rf_index >= context->profile->rf_count) return;
     if(context->profile->ir_path[0] == '\0' && context->profile->rf_count == 1U) {
-        snprintf(context->status, sizeof(context->status), "Profile needs command");
+        snprintf(context->status, sizeof(context->status), "Remote needs a button");
         return;
     }
 
@@ -995,7 +1004,7 @@ static bool xremote_device_editor_input(InputEvent* event, void* view_context) {
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         if(context->editor_selected == 0U) {
             xremote_device_editor_start_text(
-                context, XRemoteDeviceEditProfileName, 0U, context->profile->name, "Profile name");
+                context, XRemoteDeviceEditProfileName, 0U, context->profile->name, "Remote name");
             return true;
         }
         if(context->editor_selected == 1U) {
@@ -1058,6 +1067,12 @@ static bool xremote_device_library_has_extension(const char* filename) {
                                                      XREMOTE_DEVICE_PROFILE_EXTENSION) == 0;
 }
 
+static uint8_t xremote_device_library_visible_rows(const XRemoteDeviceContext* context) {
+    return context->app_ctx->app_settings->orientation == ViewOrientationVertical ?
+               XREMOTE_DEVICE_LIBRARY_ROWS_VERTICAL :
+               XREMOTE_DEVICE_LIBRARY_ROWS_HORIZONTAL;
+}
+
 static bool xremote_device_library_entry_path(
     const XRemoteDeviceLibraryEntry* entry,
     char* output,
@@ -1110,6 +1125,7 @@ static void xremote_device_library_sort(XRemoteDeviceContext* context) {
 }
 
 static void xremote_device_library_keep_visible(XRemoteDeviceContext* context) {
+    const uint8_t visible_rows = xremote_device_library_visible_rows(context);
     if(context->library_count == 0U) {
         context->library_selected = 0U;
         context->library_top = 0U;
@@ -1120,8 +1136,8 @@ static void xremote_device_library_keep_visible(XRemoteDeviceContext* context) {
     }
     if(context->library_selected < context->library_top) {
         context->library_top = context->library_selected;
-    } else if(context->library_selected >= context->library_top + XREMOTE_DEVICE_LIBRARY_ROWS) {
-        context->library_top = context->library_selected - XREMOTE_DEVICE_LIBRARY_ROWS + 1U;
+    } else if(context->library_selected >= context->library_top + visible_rows) {
+        context->library_top = context->library_selected - visible_rows + 1U;
     }
 }
 
@@ -1184,7 +1200,7 @@ static void xremote_device_library_refresh(XRemoteDeviceContext* context) {
         snprintf(
             context->library_notice,
             sizeof(context->library_notice),
-            "Showing first %u profiles",
+            "Showing first %u remotes",
             XREMOTE_DEVICE_LIBRARY_MAX);
     } else {
         context->library_notice[0] = '\0';
@@ -1192,9 +1208,9 @@ static void xremote_device_library_refresh(XRemoteDeviceContext* context) {
 }
 
 static const char* xremote_device_library_health_name(XRemoteDeviceLibraryHealth health) {
-    if(health == XRemoteDeviceLibraryMissing) return "MISS";
-    if(health == XRemoteDeviceLibraryInvalid) return "BAD";
-    return "OK";
+    if(health == XRemoteDeviceLibraryMissing) return "Missing";
+    if(health == XRemoteDeviceLibraryInvalid) return "Invalid";
+    return "Ready";
 }
 
 static const char* xremote_device_library_action_name(uint8_t action) {
@@ -1203,7 +1219,7 @@ static const char* xremote_device_library_action_name(uint8_t action) {
         "Edit",
         "Repair",
         "Copy",
-        "Export",
+        "Backup",
         "Delete",
     };
     return action < XRemoteDeviceLibraryActionCount ? names[action] : "?";
@@ -1215,26 +1231,35 @@ static void xremote_device_library_draw_entry(
     uint8_t y,
     bool selected,
     bool vertical) {
+    const uint8_t height = vertical ? 24U : 17U;
     if(selected) {
-        canvas_draw_rbox(canvas, 2, y, vertical ? 60U : 124U, vertical ? 22U : 11U, 2);
+        canvas_draw_rbox(canvas, 2, y, vertical ? 60U : 124U, height, 2);
         canvas_set_color(canvas, ColorWhite);
     }
 
     canvas_set_font(canvas, FontSecondary);
-    char summary[24];
+    char summary[20];
     snprintf(
         summary,
         sizeof(summary),
-        "I%u/R%u %s",
+        "IR %u  RF %u",
         (unsigned int)entry->ir_count,
-        (unsigned int)entry->rf_count,
-        xremote_device_library_health_name(entry->health));
+        (unsigned int)entry->rf_count);
     if(vertical) {
         xremote_device_draw_fitted(canvas, 5, y + 8U, 54U, AlignLeft, entry->name);
-        canvas_draw_str_aligned(canvas, 59, y + 19U, AlignRight, AlignBottom, summary);
+        xremote_device_draw_fitted(canvas, 5, y + 16U, 54U, AlignLeft, summary);
+        xremote_device_draw_fitted(
+            canvas, 5, y + 23U, 54U, AlignLeft, xremote_device_library_health_name(entry->health));
     } else {
-        xremote_device_draw_fitted(canvas, 5, y + 8U, 58U, AlignLeft, entry->name);
-        canvas_draw_str_aligned(canvas, 124, y + 8U, AlignRight, AlignBottom, summary);
+        xremote_device_draw_fitted(canvas, 5, y + 8U, 78U, AlignLeft, entry->name);
+        canvas_draw_str_aligned(
+            canvas,
+            124,
+            y + 8U,
+            AlignRight,
+            AlignBottom,
+            xremote_device_library_health_name(entry->health));
+        xremote_device_draw_fitted(canvas, 5, y + 16U, 116U, AlignLeft, summary);
     }
     canvas_set_color(canvas, ColorBlack);
 }
@@ -1294,7 +1319,7 @@ static void xremote_device_library_draw(Canvas* canvas, void* model_context) {
     }
 
     xremote_device_draw_fitted(
-        canvas, 2, vertical ? 10 : 9, vertical ? 44U : 100U, AlignLeft, "Profile Library");
+        canvas, 2, vertical ? 10 : 9, vertical ? 44U : 100U, AlignLeft, "My Remotes");
     canvas_set_font(canvas, FontSecondary);
     char count[12];
     snprintf(
@@ -1314,37 +1339,38 @@ static void xremote_device_library_draw(Canvas* canvas, void* model_context) {
             vertical ? 39 : 28,
             AlignCenter,
             AlignCenter,
-            context->library_notice[0] != '\0' ? context->library_notice : "No device profiles");
+            context->library_notice[0] != '\0' ? context->library_notice : "No saved remotes");
         canvas_draw_str_aligned(
             canvas,
             vertical ? 32 : 64,
             vertical ? 56 : 41,
             AlignCenter,
             AlignCenter,
-            vertical ? "Import IR / RF" : "Import IR or create RF");
+            vertical ? "Create from IR / RF" : "Create from IR or Sub-GHz");
         elements_button_left(canvas, "Back");
         return;
     }
 
-    for(uint8_t row = 0U; row < XREMOTE_DEVICE_LIBRARY_ROWS; row++) {
+    const uint8_t visible_rows = xremote_device_library_visible_rows(context);
+    for(uint8_t row = 0U; row < visible_rows; row++) {
         const uint8_t index = context->library_top + row;
         if(index >= context->library_count) break;
         xremote_device_library_draw_entry(
             canvas,
             &context->library[index],
-            (uint8_t)((vertical ? 17U : 15U) + row * (vertical ? 25U : 12U)),
+            (uint8_t)(15U + row * (vertical ? 24U : 18U)),
             index == context->library_selected,
             vertical);
     }
     elements_button_left(canvas, "Back");
     elements_button_center(canvas, "Open");
-    elements_button_right(canvas, "More");
+    elements_button_right(canvas, "Actions");
 }
 
 static bool xremote_device_library_start_runtime(XRemoteDeviceContext* context) {
     XRemoteDeviceProfile* selected = xremote_device_profile_alloc();
     if(!selected) {
-        xremote_device_message(context, "Profile Library", "Out of memory.");
+        xremote_device_message(context, "My Remotes", "Out of memory.");
         return false;
     }
     const bool loaded =
@@ -1359,7 +1385,7 @@ static bool xremote_device_library_start_runtime(XRemoteDeviceContext* context) 
         xremote_app_switch_to_view(context->owner_app, XRemoteViewDeviceRuntime);
     } else {
         xremote_device_message(
-            context, "Profile Library", loaded ? "No usable commands." : "Profile is invalid.");
+            context, "My Remotes", loaded ? "No usable commands." : "Remote is invalid.");
     }
     xremote_device_profile_free(selected);
     return ready;
@@ -1368,7 +1394,7 @@ static bool xremote_device_library_start_runtime(XRemoteDeviceContext* context) 
 static bool xremote_device_library_start_editor(XRemoteDeviceContext* context) {
     XRemoteDeviceProfile* selected = xremote_device_profile_alloc();
     if(!selected) {
-        xremote_device_message(context, "Profile Library", "Out of memory.");
+        xremote_device_message(context, "My Remotes", "Out of memory.");
         return false;
     }
     const bool loaded =
@@ -1385,7 +1411,7 @@ static bool xremote_device_library_start_editor(XRemoteDeviceContext* context) {
             context->owner_app, xremote_device_previous_library);
         xremote_app_switch_to_view(context->owner_app, XRemoteViewDeviceEditor);
     } else {
-        xremote_device_message(context, "Profile Library", "Profile is invalid.");
+        xremote_device_message(context, "My Remotes", "Remote is invalid.");
     }
     xremote_device_profile_free(selected);
     return loaded;
@@ -1404,9 +1430,8 @@ static void xremote_device_library_duplicate(XRemoteDeviceContext* context) {
     xremote_device_library_refresh(context);
     xremote_device_message(
         context,
-        "Duplicate profile",
-        copied ? "Independent profile copy created.\nSources stay unchanged." :
-                 "Cannot duplicate profile.");
+        "Copy remote",
+        copied ? "Independent remote created.\nSources stay unchanged." : "Cannot copy remote.");
 }
 
 static void xremote_device_library_export(XRemoteDeviceContext* context) {
@@ -1414,7 +1439,7 @@ static void xremote_device_library_export(XRemoteDeviceContext* context) {
     if(!profile ||
        !xremote_device_library_load_entry(context, context->library_selected, profile)) {
         xremote_device_profile_free(profile);
-        xremote_device_message(context, "Export bundle", "Profile is invalid.");
+        xremote_device_message(context, "Backup remote", "Remote is invalid.");
         return;
     }
 
@@ -1424,7 +1449,7 @@ static void xremote_device_library_export(XRemoteDeviceContext* context) {
     xremote_device_profile_free(profile);
     if(status != XRemoteDeviceBundleStatusOk) {
         xremote_device_message(
-            context, "Export bundle", xremote_device_bundle_status_name(status));
+            context, "Backup remote", xremote_device_bundle_status_name(status));
         return;
     }
 
@@ -1436,7 +1461,7 @@ static void xremote_device_library_export(XRemoteDeviceContext* context) {
     xremote_device_basename(folder_path, folder_name, sizeof(folder_name));
     char message[64];
     snprintf(message, sizeof(message), "Saved in bundles/%s", folder_name);
-    xremote_device_message(context, "Export bundle", message);
+    xremote_device_message(context, "Backup remote", message);
 }
 
 static bool
@@ -1448,7 +1473,7 @@ static bool
         xremote_device_profile_store(context->storage, profile);
     furi_string_free(selected_path);
     if(selected && !updated) {
-        xremote_device_message(context, "Repair IR", "Save failed;\nprofile unchanged.");
+        xremote_device_message(context, "Repair IR", "Save failed;\nremote unchanged.");
     }
     return updated;
 }
@@ -1485,7 +1510,7 @@ static bool xremote_device_library_repair_rf(
         xremote_device_profile_store(context->storage, profile);
     furi_string_free(selected_path);
     if(!updated) {
-        xremote_device_message(context, "Repair Sub-GHz", "Save failed;\nprofile unchanged.");
+        xremote_device_message(context, "Repair Sub-GHz", "Save failed;\nremote unchanged.");
     }
     return updated;
 }
@@ -1495,7 +1520,7 @@ static void xremote_device_library_repair(XRemoteDeviceContext* context) {
     if(!profile ||
        !xremote_device_library_load_entry(context, context->library_selected, profile)) {
         xremote_device_profile_free(profile);
-        xremote_device_message(context, "Repair profile", "Profile is invalid.");
+        xremote_device_message(context, "Repair remote", "Remote is invalid.");
         return;
     }
 
@@ -1521,7 +1546,7 @@ static void xremote_device_library_repair(XRemoteDeviceContext* context) {
 
     xremote_device_profile_free(profile);
     if(!attempted) {
-        xremote_device_message(context, "Repair profile", "No missing source found.");
+        xremote_device_message(context, "Repair remote", "No missing source found.");
         return;
     }
     if(!repaired) return;
@@ -1532,8 +1557,8 @@ static void xremote_device_library_repair(XRemoteDeviceContext* context) {
                            XRemoteDeviceLibraryReady;
     xremote_device_message(
         context,
-        "Repair profile",
-        ready ? "Source repaired.\nProfile is ready." : "Source repaired.\nMore sources missing.");
+        "Repair remote",
+        ready ? "Source repaired.\nRemote is ready." : "Source repaired.\nMore sources missing.");
 }
 
 static void xremote_device_library_delete(XRemoteDeviceContext* context) {
@@ -1541,7 +1566,7 @@ static void xremote_device_library_delete(XRemoteDeviceContext* context) {
     const XRemoteDeviceLibraryEntry* entry = &context->library[context->library_selected];
     char prompt[64];
     snprintf(prompt, sizeof(prompt), "Delete %.28s?\nSources stay on SD.", entry->name);
-    if(!xremote_device_confirm(context, "Delete profile?", prompt, "Delete")) return;
+    if(!xremote_device_confirm(context, "Delete remote?", prompt, "Delete")) return;
 
     char path[XREMOTE_DEVICE_PATH_MAX];
     const bool path_ready = xremote_device_library_entry_path(entry, path, sizeof(path));
@@ -1549,8 +1574,8 @@ static void xremote_device_library_delete(XRemoteDeviceContext* context) {
     xremote_device_library_refresh(context);
     xremote_device_message(
         context,
-        "Delete profile",
-        deleted ? "Profile deleted.\nSources stay unchanged." : "Delete failed.");
+        "Delete remote",
+        deleted ? "Remote deleted.\nSources stay unchanged." : "Delete failed.");
 }
 
 static void xremote_device_library_execute(XRemoteDeviceContext* context, uint8_t action) {
@@ -1559,17 +1584,17 @@ static void xremote_device_library_execute(XRemoteDeviceContext* context, uint8_
     if(entry->health == XRemoteDeviceLibraryInvalid &&
        action != XRemoteDeviceLibraryActionDelete) {
         xremote_device_message(
-            context, "Invalid profile", "Only Delete is available\nfor this file.");
+            context, "Invalid remote", "Only Delete is available\nfor this file.");
         return;
     }
     if(action == XRemoteDeviceLibraryActionRepair &&
        entry->health != XRemoteDeviceLibraryMissing) {
         xremote_device_message(
-            context, "Repair profile", "Repair is available only\nfor missing sources.");
+            context, "Repair remote", "Repair is available only\nfor missing sources.");
         return;
     }
     if(action == XRemoteDeviceLibraryActionExport && entry->health != XRemoteDeviceLibraryReady) {
-        xremote_device_message(context, "Export bundle", "Export requires a Ready profile.");
+        xremote_device_message(context, "Backup remote", "Backup requires a Ready remote.");
         return;
     }
 
@@ -1694,16 +1719,17 @@ static void xremote_device_import_ir(XRemoteApp* app) {
     xremote_device_message(
         context,
         "Import IR",
-        stored ? "Device profile created.\nUse Add Sub-GHz to mix." : "Cannot create profile.");
+        stored ? "Remote created.\nAdd Sub-GHz if needed." : "Cannot create remote.");
     xremote_device_profile_free(profile);
     infrared_remote_free(remote);
     furi_string_free(path);
+    if(stored) xremote_device_library_show(context);
 }
 
 static bool
     xremote_device_add_selected_rf(XRemoteDeviceContext* context, XRemoteDeviceProfile* profile) {
     if(profile->rf_count >= XREMOTE_DEVICE_RF_COMMAND_MAX) {
-        xremote_device_message(context, "Add Sub-GHz", "Profile already has\n8 RF commands.");
+        xremote_device_message(context, "Add Sub-GHz", "Remote already has\n8 RF buttons.");
         return false;
     }
 
@@ -1748,10 +1774,9 @@ static void xremote_device_import_rf(XRemoteApp* app) {
         context->storage, profile->name, profile->path, sizeof(profile->path));
     const bool stored = path_ready && xremote_device_profile_store(context->storage, profile);
     xremote_device_message(
-        context,
-        "Import Sub-GHz",
-        stored ? "RF device profile created." : "Cannot create profile.");
+        context, "Import Sub-GHz", stored ? "Sub-GHz remote created." : "Cannot create remote.");
     xremote_device_profile_free(profile);
+    if(stored) xremote_device_library_show(context);
 }
 
 static void xremote_device_add_rf(XRemoteApp* app) {
@@ -1762,9 +1787,8 @@ static void xremote_device_add_rf(XRemoteApp* app) {
        xremote_device_add_selected_rf(context, profile)) {
         const bool stored = xremote_device_profile_store(context->storage, profile);
         xremote_device_message(
-            context,
-            "Add Sub-GHz",
-            stored ? "Command added to profile." : "Cannot update profile.");
+            context, "Add Sub-GHz", stored ? "Sub-GHz button added." : "Cannot update remote.");
+        if(stored) xremote_device_library_show(context);
     }
     xremote_device_profile_free(profile);
 }
@@ -1785,7 +1809,7 @@ static void xremote_device_import_bundle(XRemoteApp* app) {
     XRemoteDeviceProfile* imported = xremote_device_profile_alloc();
     if(!imported) {
         furi_string_free(path);
-        xremote_device_message(context, "Import bundle", "Out of memory.");
+        xremote_device_message(context, "Restore backup", "Out of memory.");
         return;
     }
     const XRemoteDeviceBundleStatus status =
@@ -1793,27 +1817,45 @@ static void xremote_device_import_bundle(XRemoteApp* app) {
     if(status == XRemoteDeviceBundleStatusOk) {
         char message[64];
         snprintf(message, sizeof(message), "Imported as %.32s", imported->name);
-        xremote_device_message(context, "Import bundle", message);
+        xremote_device_message(context, "Restore backup", message);
     } else {
         xremote_device_message(
-            context, "Import bundle", xremote_device_bundle_status_name(status));
+            context, "Restore backup", xremote_device_bundle_status_name(status));
     }
     xremote_device_profile_free(imported);
     furi_string_free(path);
+    if(status == XRemoteDeviceBundleStatusOk) xremote_device_library_show(context);
 }
 
 static void xremote_device_guide(XRemoteApp* app) {
     XRemoteDeviceContext* context = app->context;
-    xremote_device_message(
-        context,
-        "Device Profiles",
-        "Library: OK opens, Right\n"
-        "has Edit/Repair/Export.\n"
-        "Repair fixes one source.\n"
-        "Bundles include all files.\n"
-        "Import IR or RF, then mix.\n"
-        "Runtime: arrows select,\n"
-        "OK sends, hold OK INT/EXT.");
+    text_box_reset(context->help_box);
+    text_box_set_text(
+        context->help_box,
+        "IR + RF REMOTES\n"
+        "\n"
+        "CREATE\n"
+        "Create from a saved IR remote or a static Sub-GHz file. Add Sub-GHz "
+        "buttons to combine both in one remote.\n"
+        "\n"
+        "MY REMOTES\n"
+        "OK opens the selected remote. Right opens Actions: Edit, Repair, Copy, "
+        "Backup, and Delete.\n"
+        "\n"
+        "EDIT\n"
+        "Up/Down selects a row. OK renames or replaces it. Left/Right reorders "
+        "Sub-GHz buttons. Hold OK detaches or removes a source. Back always "
+        "returns to My Remotes.\n"
+        "\n"
+        "USE\n"
+        "Arrows select a button. OK sends it. On a Sub-GHz button, hold OK to "
+        "switch INT/EXT. Reviewed Princeton buttons support hold Right for B1-B4.\n"
+        "\n"
+        "BACKUP\n"
+        "Backup includes the remote and all linked source files. Restore Backup "
+        "creates a separate copy and never overwrites the original.");
+    text_box_set_focus(context->help_box, TextBoxFocusStart);
+    view_dispatcher_switch_to_view(context->app_ctx->view_dispatcher, XRemoteViewDeviceHelp);
 }
 
 static void xremote_device_menu_callback(void* callback_context, uint32_t index) {
@@ -1850,6 +1892,8 @@ static void xremote_device_context_free(void* raw_context) {
         view_dispatcher_remove_view(context->app_ctx->view_dispatcher, XRemoteViewDeviceLibrary);
         xremote_view_free(context->library_view);
     }
+    view_dispatcher_remove_view(context->app_ctx->view_dispatcher, XRemoteViewDeviceHelp);
+    text_box_free(context->help_box);
     view_dispatcher_remove_view(context->app_ctx->view_dispatcher, XRemoteViewTextInput);
     text_input_free(context->text_input);
     xremote_device_profile_free(context->profile);
@@ -1866,7 +1910,9 @@ XRemoteApp* xremote_device_profiles_alloc(XRemoteAppContext* app_ctx) {
     context->dialogs = furi_record_open(RECORD_DIALOGS);
     context->profile = xremote_device_profile_alloc();
     context->text_input = text_input_alloc();
-    if(!context->profile || !context->text_input) {
+    context->help_box = text_box_alloc();
+    if(!context->profile || !context->text_input || !context->help_box) {
+        if(context->help_box) text_box_free(context->help_box);
         if(context->text_input) text_input_free(context->text_input);
         xremote_device_profile_free(context->profile);
         furi_record_close(RECORD_DIALOGS);
@@ -1878,6 +1924,12 @@ XRemoteApp* xremote_device_profiles_alloc(XRemoteAppContext* app_ctx) {
     View* text_view = text_input_get_view(context->text_input);
     view_set_previous_callback(text_view, xremote_device_text_input_previous);
     view_dispatcher_add_view(app_ctx->view_dispatcher, XRemoteViewTextInput, text_view);
+    text_box_set_font(context->help_box, TextBoxFontText);
+    text_box_set_focus(context->help_box, TextBoxFocusStart);
+    View* help_view = text_box_get_view(context->help_box);
+    view_set_orientation(help_view, app_ctx->app_settings->orientation);
+    view_set_previous_callback(help_view, xremote_device_help_previous);
+    view_dispatcher_add_view(app_ctx->view_dispatcher, XRemoteViewDeviceHelp, help_view);
     if(!xremote_device_profile_storage_ready(context->storage)) {
         snprintf(context->status, sizeof(context->status), "Storage unavailable");
     }
@@ -1887,16 +1939,16 @@ XRemoteApp* xremote_device_profiles_alloc(XRemoteAppContext* app_ctx) {
     xremote_app_set_user_context(app, context, xremote_device_context_free);
     xremote_app_submenu_alloc(app, XRemoteViewDeviceProfiles, xremote_device_previous_main);
     xremote_app_submenu_add(
-        app, "Profile Library", XRemoteDeviceMenuLibrary, xremote_device_menu_callback);
+        app, "My Remotes", XRemoteDeviceMenuLibrary, xremote_device_menu_callback);
     xremote_app_submenu_add(
-        app, "Import IR Remote", XRemoteDeviceMenuImportIr, xremote_device_menu_callback);
+        app, "Create from IR", XRemoteDeviceMenuImportIr, xremote_device_menu_callback);
     xremote_app_submenu_add(
-        app, "New RF Profile", XRemoteDeviceMenuImportRf, xremote_device_menu_callback);
+        app, "Create from Sub-GHz", XRemoteDeviceMenuImportRf, xremote_device_menu_callback);
     xremote_app_submenu_add(
-        app, "Add Sub-GHz", XRemoteDeviceMenuAddRf, xremote_device_menu_callback);
+        app, "Add Sub-GHz to Remote", XRemoteDeviceMenuAddRf, xremote_device_menu_callback);
     xremote_app_submenu_add(
-        app, "Import Bundle", XRemoteDeviceMenuImportBundle, xremote_device_menu_callback);
-    xremote_app_submenu_add(app, "Guide", XRemoteDeviceMenuGuide, xremote_device_menu_callback);
+        app, "Restore Backup", XRemoteDeviceMenuImportBundle, xremote_device_menu_callback);
+    xremote_app_submenu_add(app, "Help", XRemoteDeviceMenuGuide, xremote_device_menu_callback);
 
     context->library_view =
         xremote_view_alloc(app_ctx, xremote_device_library_input, xremote_device_library_draw);
