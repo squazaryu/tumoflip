@@ -185,7 +185,7 @@ static const char* const g_ac_buttons[] = {
 };
 
 static const XRemoteRemoteTypeInfo g_remote_types[XRemoteRemoteTypeCount] = {
-    {XRemoteRemoteTypeGeneric, "Generic", "Generic / Full", g_generic_buttons, COUNT_OF(g_generic_buttons)},
+    {XRemoteRemoteTypeGeneric, "Generic", "Generic", g_generic_buttons, COUNT_OF(g_generic_buttons)},
     {XRemoteRemoteTypeTV, "TV", "TV", g_tv_buttons, COUNT_OF(g_tv_buttons)},
     {XRemoteRemoteTypeAudio, "Audio", "Audio", g_audio_buttons, COUNT_OF(g_audio_buttons)},
     {XRemoteRemoteTypeProjector, "Projector", "Projector", g_projector_buttons, COUNT_OF(g_projector_buttons)},
@@ -520,11 +520,11 @@ void xremote_canvas_draw_icon(Canvas* canvas, uint8_t x, uint8_t y, XRemoteIcon 
 
 void xremote_canvas_draw_header(Canvas* canvas, ViewOrientation orient, const char* section) {
     Align align = AlignLeft;
-    uint8_t x = 0;
+    uint8_t x = 2;
 
     if(orient == ViewOrientationHorizontal) {
         align = AlignRight;
-        x = 128;
+        x = 126;
     }
 
     canvas_set_font(canvas, FontPrimary);
@@ -539,11 +539,12 @@ void xremote_canvas_draw_exit_footer(Canvas* canvas, ViewOrientation orient, con
 
     if(orient == ViewOrientationVertical) {
         xremote_canvas_draw_icon(canvas, 6, 124, XRemoteIconBack);
-        elements_multiline_text_aligned(canvas, 12, 128, AlignLeft, AlignBottom, text);
+        const char* compact = strncmp(text, "Hold", 4) == 0 ? "Hold" : "Back";
+        elements_multiline_text_aligned(canvas, 12, 126, AlignLeft, AlignBottom, compact);
     } else {
         uint8_t x = strncmp(text, "Hold", 4) ? 71 : 76;
         xremote_canvas_draw_icon(canvas, x, 60, XRemoteIconBack);
-        elements_multiline_text_aligned(canvas, 128, 64, AlignRight, AlignBottom, text);
+        elements_multiline_text_aligned(canvas, 126, 62, AlignRight, AlignBottom, text);
     }
 }
 

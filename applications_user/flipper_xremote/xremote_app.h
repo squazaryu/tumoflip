@@ -37,8 +37,8 @@
 #define XREMOTE_APP_TAG "XRemoteApp"
 
 #define XREMOTE_APP_FOLDER ANY_PATH("infrared")
-#define XREMOTE_APP_SETTINGS APP_DATA_PATH("xremote.cfg")
-#define XREMOTE_ALT_NAMES APP_DATA_PATH("alt_names.txt")
+#define XREMOTE_APP_SETTINGS EXT_PATH("apps_data/tumoflip_xremote/xremote.cfg")
+#define XREMOTE_ALT_NAMES EXT_PATH("apps_data/tumoflip_xremote/alt_names.txt")
 
 #define xremote_app_assert_void(cond) \
     if(!cond) return

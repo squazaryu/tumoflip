@@ -107,6 +107,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Scripts/tumoscript.fap",
     "apps/Module One/IR Blaster/tumo_ir_lab.fap",
     "apps/Module One/IR Blaster/tumoflip_xremote.fap",
+    "apps_data/tumoflip_xremote/components/tumoflip_xremote_ac.fap",
     "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
     "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
     "apps/Module One/Labs/tumovm_poc.fap",

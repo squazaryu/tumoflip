@@ -16,17 +16,13 @@ static void xremote_about_view_draw_vertical(Canvas* canvas, XRemoteViewModel* m
     canvas_set_font(canvas, FontSecondary);
     xremote_get_version(version, sizeof(version));
 
-    canvas_draw_str_aligned(canvas, 0, 30, AlignLeft, AlignTop, "Version:");
-    canvas_draw_str_aligned(canvas, 35, 30, AlignLeft, AlignTop, version);
+    canvas_draw_str_aligned(canvas, 2, 30, AlignLeft, AlignTop, version);
+    canvas_draw_str_aligned(canvas, 2, 42, AlignLeft, AlignTop, "GPLv3");
+    canvas_draw_str_aligned(canvas, 2, 54, AlignLeft, AlignTop, "squazaryu");
 
-    canvas_draw_str_aligned(canvas, 0, 40, AlignLeft, AlignTop, "License: GPLv3");
-    canvas_draw_str_aligned(canvas, 0, 50, AlignLeft, AlignTop, "Author:");
-    canvas_draw_str_aligned(canvas, 0, 60, AlignLeft, AlignTop, "squazaryu");
-
-    canvas_draw_str_aligned(canvas, 0, 78, AlignLeft, AlignTop, "Repo:");
-    canvas_draw_str_aligned(canvas, 0, 88, AlignLeft, AlignTop, "github.com/");
-    canvas_draw_str_aligned(canvas, 0, 98, AlignLeft, AlignTop, "squazaryu/");
-    canvas_draw_str_aligned(canvas, 0, 108, AlignLeft, AlignTop, "tumoflip");
+    canvas_draw_str_aligned(canvas, 2, 72, AlignLeft, AlignTop, "github.com/");
+    canvas_draw_str_aligned(canvas, 2, 82, AlignLeft, AlignTop, "squazaryu/");
+    canvas_draw_str_aligned(canvas, 2, 92, AlignLeft, AlignTop, "tumoflip");
 }
 
 static void xremote_about_view_draw_horizontal(Canvas* canvas, XRemoteViewModel* model) {
@@ -36,15 +32,14 @@ static void xremote_about_view_draw_horizontal(Canvas* canvas, XRemoteViewModel*
     canvas_set_font(canvas, FontSecondary);
     xremote_get_version(version, sizeof(version));
 
-    canvas_draw_str_aligned(canvas, 0, 0, AlignLeft, AlignTop, "Version:");
-    canvas_draw_str_aligned(canvas, 35, 0, AlignLeft, AlignTop, version);
+    canvas_draw_str_aligned(canvas, 2, 2, AlignLeft, AlignTop, "Version:");
+    canvas_draw_str_aligned(canvas, 37, 2, AlignLeft, AlignTop, version);
 
-    canvas_draw_str_aligned(canvas, 0, 10, AlignLeft, AlignTop, "License: GPLv3");
-    canvas_draw_str_aligned(canvas, 0, 20, AlignLeft, AlignTop, "Author: squazaryu");
+    canvas_draw_str_aligned(canvas, 2, 14, AlignLeft, AlignTop, "License: GPLv3");
+    canvas_draw_str_aligned(canvas, 2, 26, AlignLeft, AlignTop, "Author: squazaryu");
 
-    canvas_draw_str_aligned(canvas, 0, 32, AlignLeft, AlignTop, "Repo:");
-    canvas_draw_str_aligned(canvas, 0, 42, AlignLeft, AlignTop, "github.com/squazaryu");
-    canvas_draw_str_aligned(canvas, 0, 52, AlignLeft, AlignTop, "/tumoflip");
+    canvas_draw_str_aligned(canvas, 2, 38, AlignLeft, AlignTop, "Repo:");
+    canvas_draw_str_aligned(canvas, 2, 48, AlignLeft, AlignTop, "squazaryu/tumoflip");
 }
 
 static void xremote_about_view_draw_callback(Canvas* canvas, void* context) {

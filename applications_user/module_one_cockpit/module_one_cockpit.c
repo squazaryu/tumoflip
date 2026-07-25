@@ -873,8 +873,19 @@ static void module_one_cockpit_launch_or_report(
         return;
     }
 
+    char launch_args[24];
+    const char* target_args = target->args;
+    if(target->action == ModuleOneCockpitActionLaunchXRemote) {
+        snprintf(
+            launch_args,
+            sizeof(launch_args),
+            "cockpit:%lu",
+            (unsigned long)app->selected_item);
+        target_args = launch_args;
+    }
+
     loader_clear_launch_queue(app->loader);
-    loader_enqueue_launch(app->loader, target->target, target->args, LoaderDeferredLaunchFlagGui);
+    loader_enqueue_launch(app->loader, target->target, target_args, LoaderDeferredLaunchFlagGui);
 
     FuriString* self_path = furi_string_alloc();
     if(loader_get_application_launch_path(app->loader, self_path)) {

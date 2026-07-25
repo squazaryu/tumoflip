@@ -163,6 +163,7 @@ typedef enum {
     XRemoteViewDeviceLibrary,
     XRemoteViewDeviceRuntime,
     XRemoteViewDeviceEditor,
+    XRemoteViewDeviceHelp,
     XRemoteViewSaved,
     XRemoteViewAnalyzer,
     XRemoteViewSettings,
