@@ -1,7 +1,7 @@
 <p align="center">Advanced IR Remote App for Flipper Device</p>
 
 <p align="center">
-  Tumo XRemote 1.13.0
+  Tumo XRemote 1.13.1
 </p>
 
 <p align="center">

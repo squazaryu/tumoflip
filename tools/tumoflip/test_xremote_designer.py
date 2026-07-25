@@ -20,7 +20,7 @@ class XRemoteDesignerTest(unittest.TestCase):
         self.assertIn("xremote_designer_alloc(app->app_ctx)", source)
         self.assertIn("XRemoteViewDesigner", header)
         self.assertIn("XRemoteViewDesignerMap", header)
-        self.assertIn('fap_version="1.13.0"', manifest)
+        self.assertIn('fap_version="1.13.1"', manifest)
         self.assertIn("#define XREMOTE_VERSION_MIN  13", version_header)
 
     def test_ac_smart_is_integrated_as_xremote_child_app(self) -> None:
@@ -507,8 +507,26 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn("elements_button_left", editor)
         self.assertIn("elements_button_center", editor)
         self.assertIn("elements_button_right", editor)
-        self.assertIn("canvas, 3, 50, 122, AlignLeft", editor)
+        self.assertIn("canvas, 3, 49, 122, AlignLeft", editor)
         self.assertNotIn("canvas, 3, 59", editor)
+        self.assertIn("xremote_device_editor_draw_move_button", editor)
+        self.assertIn("66,\n            60,\n            AlignLeft", editor)
+
+    def test_profile_editor_back_is_explicit_and_matches_the_visible_control(self) -> None:
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+        editor_input = source.split("static bool xremote_device_editor_input", 1)[1].split(
+            "static XRemoteView* xremote_device_editor_alloc", 1
+        )[0]
+
+        self.assertIn("xremote_device_editor_close(context);", editor_input)
+        self.assertIn(
+            "event->type == InputTypeShort && event->key == InputKeyBack", editor_input
+        )
+        self.assertIn("if(!is_rf)", editor_input)
+        self.assertNotIn(
+            "event->type == InputTypeShort && event->key == InputKeyBack) return false",
+            editor_input,
+        )
 
 
 if __name__ == "__main__":

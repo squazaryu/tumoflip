@@ -667,45 +667,68 @@ static void xremote_device_editor_value(
 
 static void xremote_device_editor_detail(
     const XRemoteDeviceContext* context,
-    char* output,
-    size_t output_size) {
+    char* primary,
+    size_t primary_size,
+    char* secondary,
+    size_t secondary_size) {
+    primary[0] = '\0';
+    secondary[0] = '\0';
+
     if(context->editor_selected == 0U) {
         const char* ir_state = context->profile->ir_path[0] == '\0' ? "IR off" :
                                storage_file_exists(context->storage, context->profile->ir_path) ?
                                                                       "IR linked" :
                                                                       "IR missing";
+        snprintf(primary, primary_size, "%s", ir_state);
         snprintf(
-            output, output_size, "%s  RF %u", ir_state, (unsigned int)context->profile->rf_count);
+            secondary, secondary_size, "RF commands: %u", (unsigned int)context->profile->rf_count);
         return;
     }
 
     if(context->editor_selected == 1U) {
         if(context->profile->ir_path[0] == '\0') {
-            snprintf(output, output_size, "OK: choose IR remote");
+            snprintf(primary, primary_size, "No IR source");
+            snprintf(secondary, secondary_size, "Choose a remote");
         } else {
             snprintf(
-                output,
-                output_size,
-                "%s  Hold OK: detach",
+                primary,
+                primary_size,
+                "%s",
                 storage_file_exists(context->storage, context->profile->ir_path) ?
                     "Source ready" :
                     "Source missing");
+            snprintf(secondary, secondary_size, "Hold OK: detach");
         }
         return;
     }
 
     uint8_t rf_index = 0U;
     if(!xremote_device_editor_rf_index(context, &rf_index)) {
-        snprintf(output, output_size, "No command");
+        snprintf(primary, primary_size, "No command");
         return;
     }
     const XRemoteDeviceRfCommand* command = &context->profile->rf[rf_index];
     snprintf(
-        output,
-        output_size,
-        "%s  %s",
-        storage_file_exists(context->storage, command->path) ? "Source ready" : "Source missing",
-        command->protocol);
+        primary,
+        primary_size,
+        "%s",
+        storage_file_exists(context->storage, command->path) ? "Source ready" : "Source missing");
+    snprintf(secondary, secondary_size, "%s", command->protocol);
+}
+
+static void xremote_device_editor_draw_move_button(
+    Canvas* canvas,
+    uint8_t x,
+    XRemoteIcon icon,
+    bool enabled) {
+    if(enabled) {
+        canvas_draw_rbox(canvas, x, 85, 20, 17, 3);
+        canvas_set_color(canvas, ColorWhite);
+    } else {
+        canvas_draw_rframe(canvas, x, 85, 20, 17, 3);
+    }
+    xremote_canvas_draw_icon(canvas, (uint8_t)(x + 12U), 93, icon);
+    canvas_set_color(canvas, ColorBlack);
 }
 
 static void xremote_device_editor_draw(Canvas* canvas, void* model_context) {
@@ -715,14 +738,21 @@ static void xremote_device_editor_draw(Canvas* canvas, void* model_context) {
     uint8_t rf_index = 0U;
     const bool is_rf = xremote_device_editor_rf_index(context, &rf_index);
     char value[40];
-    char detail[48];
+    char detail_primary[24];
+    char detail_secondary[24];
     xremote_device_editor_value(context, value, sizeof(value));
-    xremote_device_editor_detail(context, detail, sizeof(detail));
+    xremote_device_editor_detail(
+        context,
+        detail_primary,
+        sizeof(detail_primary),
+        detail_secondary,
+        sizeof(detail_secondary));
 
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
     if(orientation == ViewOrientationHorizontal) {
-        canvas_draw_str(canvas, 2, 9, "Profile Editor");
+        xremote_canvas_draw_icon(canvas, 8, 7, XRemoteIconBack);
+        canvas_draw_str(canvas, 16, 9, "Profile Editor");
         canvas_set_font(canvas, FontSecondary);
         char position[12];
         snprintf(
@@ -734,16 +764,24 @@ static void xremote_device_editor_draw(Canvas* canvas, void* model_context) {
         canvas_draw_str_aligned(canvas, 126, 9, AlignRight, AlignBottom, position);
         canvas_draw_line(canvas, 2, 12, 126, 12);
 
-        canvas_draw_str(canvas, 3, 22, xremote_device_editor_label(context));
-        elements_slightly_rounded_box(canvas, 3, 25, 122, 16);
+        canvas_draw_str(canvas, 3, 21, xremote_device_editor_label(context));
+        elements_slightly_rounded_box(canvas, 3, 23, 122, 17);
         canvas_set_color(canvas, ColorWhite);
         canvas_set_font(canvas, FontPrimary);
-        xremote_device_draw_fitted(canvas, 64, 38, 112, AlignCenter, value);
+        xremote_device_draw_fitted(canvas, 64, 37, 112, AlignCenter, value);
         canvas_set_color(canvas, ColorBlack);
         canvas_set_font(canvas, FontSecondary);
 
+        char detail[52];
+        snprintf(
+            detail,
+            sizeof(detail),
+            "%s%s%s",
+            detail_primary,
+            detail_secondary[0] != '\0' ? " | " : "",
+            detail_secondary);
         xremote_device_draw_fitted(
-            canvas, 3, 50, 122, AlignLeft, context->status[0] != '\0' ? context->status : detail);
+            canvas, 3, 49, 122, AlignLeft, context->status[0] != '\0' ? context->status : detail);
 
         if(is_rf) {
             elements_button_left(canvas, rf_index > 0U ? "Up" : "-");
@@ -759,35 +797,52 @@ static void xremote_device_editor_draw(Canvas* canvas, void* model_context) {
                                                        "Choose");
         }
     } else {
-        canvas_draw_str(canvas, 2, 10, "Editor");
+        xremote_canvas_draw_icon(canvas, 8, 8, XRemoteIconBack);
+        canvas_draw_str(canvas, 16, 10, "Editor");
         canvas_set_font(canvas, FontSecondary);
-        xremote_device_draw_fitted(canvas, 2, 21, 60, AlignLeft, context->profile->name);
-        canvas_draw_line(canvas, 2, 24, 62, 24);
-        canvas_draw_str(canvas, 2, 36, xremote_device_editor_label(context));
-        elements_slightly_rounded_box(canvas, 2, 40, 60, 28);
+        char position[12];
+        snprintf(
+            position,
+            sizeof(position),
+            "%u/%u",
+            (unsigned int)(context->editor_selected + 1U),
+            (unsigned int)xremote_device_editor_count(context));
+        canvas_draw_str_aligned(canvas, 62, 10, AlignRight, AlignBottom, position);
+        canvas_draw_line(canvas, 2, 13, 62, 13);
+        canvas_draw_str(canvas, 2, 25, xremote_device_editor_label(context));
+        elements_slightly_rounded_box(canvas, 2, 29, 60, 24);
         canvas_set_color(canvas, ColorWhite);
         canvas_set_font(canvas, FontPrimary);
-        xremote_device_draw_fitted(canvas, 32, 58, 54, AlignCenter, value);
+        xremote_device_draw_fitted(canvas, 32, 46, 52, AlignCenter, value);
         canvas_set_color(canvas, ColorBlack);
         canvas_set_font(canvas, FontSecondary);
 
         xremote_device_draw_fitted(
-            canvas, 2, 81, 60, AlignLeft, context->status[0] != '\0' ? context->status : detail);
-        if(strcmp(context->status, "Save failed; restored") == 0) {
-            canvas_draw_str(canvas, 2, 93, "Saved profile is unchanged");
-        } else if(strcmp(context->status, "Save failed; reopen profile") == 0) {
-            canvas_draw_str(canvas, 2, 93, "Exit and reopen profile");
-        } else if(is_rf) {
-            canvas_draw_str(canvas, 2, 93, "Hold OK: remove link");
-        }
+            canvas,
+            2,
+            66,
+            60,
+            AlignLeft,
+            context->status[0] != '\0' ? context->status : detail_primary);
+        xremote_device_draw_fitted(
+            canvas,
+            2,
+            78,
+            60,
+            AlignLeft,
+            context->status[0] != '\0' ? detail_primary : detail_secondary);
+
         if(is_rf) {
-            elements_button_left(canvas, rf_index > 0U ? "Up" : "-");
-            elements_button_center(canvas, "Edit");
-            elements_button_right(canvas, rf_index + 1U < context->profile->rf_count ? "Dn" : "-");
-        } else {
-            elements_button_left(canvas, "Back");
-            elements_button_center(canvas, "Edit");
+            xremote_device_editor_draw_move_button(canvas, 2, XRemoteIconArrowLeft, rf_index > 0U);
+            xremote_device_editor_draw_move_button(
+                canvas, 42, XRemoteIconArrowRight, rf_index + 1U < context->profile->rf_count);
         }
+        elements_button_center(
+            canvas,
+            context->editor_selected == 0U ? "Rename" :
+            context->editor_selected == 1U ? context->profile->ir_path[0] != '\0' ? "Replace" :
+                                                                                    "Choose" :
+                                             "Rename");
     }
 }
 
@@ -912,10 +967,19 @@ static void xremote_device_editor_remove_rf(XRemoteDeviceContext* context, uint8
     }
 }
 
+static void xremote_device_editor_close(XRemoteDeviceContext* context) {
+    xremote_device_context_unload(context);
+    xremote_device_library_refresh(context);
+    view_dispatcher_switch_to_view(context->app_ctx->view_dispatcher, XRemoteViewDeviceLibrary);
+}
+
 static bool xremote_device_editor_input(InputEvent* event, void* view_context) {
     XRemoteView* view = view_context;
     XRemoteDeviceContext* context = xremote_view_get_context(view);
-    if(event->type == InputTypeShort && event->key == InputKeyBack) return false;
+    if(event->type == InputTypeShort && event->key == InputKeyBack) {
+        xremote_device_editor_close(context);
+        return true;
+    }
 
     const uint8_t count = xremote_device_editor_count(context);
     uint8_t rf_index = 0U;
@@ -952,7 +1016,10 @@ static bool xremote_device_editor_input(InputEvent* event, void* view_context) {
             xremote_device_editor_remove_rf(context, rf_index);
         }
     } else if(event->type == InputTypeShort && event->key == InputKeyLeft) {
-        if(!is_rf) return false;
+        if(!is_rf) {
+            xremote_device_editor_close(context);
+            return true;
+        }
         if(rf_index > 0U &&
            xremote_device_profile_move_rf(context->profile, rf_index, rf_index - 1U)) {
             if(xremote_device_profile_commit(context, "Command moved", "Save failed; restored")) {
