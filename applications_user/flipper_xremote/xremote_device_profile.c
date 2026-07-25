@@ -451,6 +451,24 @@ bool xremote_device_profile_rename_rf(
     return true;
 }
 
+bool xremote_device_profile_replace_rf_source(
+    XRemoteDeviceProfile* profile,
+    uint8_t index,
+    const char* path,
+    const char* protocol,
+    XRemoteDeviceAdapter adapter) {
+    if(!profile || index >= profile->rf_count || !path || path[0] == '\0' || !protocol ||
+       protocol[0] == '\0') {
+        return false;
+    }
+
+    XRemoteDeviceRfCommand* command = &profile->rf[index];
+    xremote_device_copy(command->path, sizeof(command->path), path);
+    xremote_device_copy(command->protocol, sizeof(command->protocol), protocol);
+    command->adapter = adapter;
+    return true;
+}
+
 bool xremote_device_profile_move_rf(XRemoteDeviceProfile* profile, uint8_t from, uint8_t to) {
     if(!profile || from >= profile->rf_count || to >= profile->rf_count) return false;
     if(from == to) return true;

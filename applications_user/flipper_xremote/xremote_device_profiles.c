@@ -41,6 +41,7 @@ typedef enum {
 typedef enum {
     XRemoteDeviceLibraryActionOpen,
     XRemoteDeviceLibraryActionEdit,
+    XRemoteDeviceLibraryActionRepair,
     XRemoteDeviceLibraryActionDuplicate,
     XRemoteDeviceLibraryActionDelete,
     XRemoteDeviceLibraryActionCount,
@@ -1130,6 +1131,7 @@ static const char* xremote_device_library_action_name(uint8_t action) {
     static const char* const names[XRemoteDeviceLibraryActionCount] = {
         "Open",
         "Edit",
+        "Repair",
         "Copy",
         "Delete",
     };
@@ -1186,9 +1188,9 @@ static void xremote_device_library_draw_actions(Canvas* canvas, XRemoteDeviceCon
             xremote_device_runtime_draw_cell(
                 canvas,
                 2U,
-                (uint8_t)(17U + action * 20U),
+                (uint8_t)(17U + action * 18U),
                 60U,
-                17U,
+                15U,
                 xremote_device_library_action_name(action),
                 context->library_action == action);
         } else {
@@ -1197,9 +1199,9 @@ static void xremote_device_library_draw_actions(Canvas* canvas, XRemoteDeviceCon
             xremote_device_runtime_draw_cell(
                 canvas,
                 column == 0U ? 2U : 65U,
-                row == 0U ? 15U : 33U,
+                (uint8_t)(15U + row * 13U),
                 61U,
-                16U,
+                11U,
                 xremote_device_library_action_name(action),
                 context->library_action == action);
         }
@@ -1336,6 +1338,103 @@ static void xremote_device_library_duplicate(XRemoteDeviceContext* context) {
                  "Cannot duplicate profile.");
 }
 
+static bool
+    xremote_device_library_repair_ir(XRemoteDeviceContext* context, XRemoteDeviceProfile* profile) {
+    FuriString* selected_path = furi_string_alloc();
+    const bool selected = xremote_device_editor_select_ir(context, selected_path);
+    const bool updated =
+        selected && xremote_device_profile_set_ir(profile, furi_string_get_cstr(selected_path)) &&
+        xremote_device_profile_store(context->storage, profile);
+    furi_string_free(selected_path);
+    if(selected && !updated) {
+        xremote_device_message(context, "Repair IR", "Save failed;\nprofile unchanged.");
+    }
+    return updated;
+}
+
+static bool xremote_device_library_repair_rf(
+    XRemoteDeviceContext* context,
+    XRemoteDeviceProfile* profile,
+    uint8_t index) {
+    FuriString* selected_path = furi_string_alloc();
+    if(!xremote_device_select_file(
+           context, selected_path, EXT_PATH("subghz"), ".sub", &I_sub1_10px)) {
+        furi_string_free(selected_path);
+        return false;
+    }
+
+    XRemoteSubGhzInfo info;
+    const XRemoteSubGhzStatus status =
+        xremote_subghz_inspect(context->storage, furi_string_get_cstr(selected_path), &info);
+    if(status != XRemoteSubGhzStatusOk) {
+        xremote_device_message(context, "Repair Sub-GHz", xremote_subghz_status_name(status));
+        furi_string_free(selected_path);
+        return false;
+    }
+    if(info.changing_code) {
+        xremote_device_message(
+            context, "Repair Sub-GHz", "Changing-code signal\nis not supported.");
+        furi_string_free(selected_path);
+        return false;
+    }
+
+    const bool updated =
+        xremote_device_profile_replace_rf_source(
+            profile, index, furi_string_get_cstr(selected_path), info.protocol, info.adapter) &&
+        xremote_device_profile_store(context->storage, profile);
+    furi_string_free(selected_path);
+    if(!updated) {
+        xremote_device_message(context, "Repair Sub-GHz", "Save failed;\nprofile unchanged.");
+    }
+    return updated;
+}
+
+static void xremote_device_library_repair(XRemoteDeviceContext* context) {
+    XRemoteDeviceProfile* profile = xremote_device_profile_alloc();
+    if(!profile ||
+       !xremote_device_library_load_entry(context, context->library_selected, profile)) {
+        xremote_device_profile_free(profile);
+        xremote_device_message(context, "Repair profile", "Profile is invalid.");
+        return;
+    }
+
+    bool attempted = false;
+    bool repaired = false;
+    if(profile->ir_path[0] != '\0') {
+        bool ir_missing = false;
+        xremote_device_library_ir_count(context->storage, profile->ir_path, &ir_missing);
+        if(ir_missing) {
+            attempted = true;
+            repaired = xremote_device_library_repair_ir(context, profile);
+        }
+    }
+    if(!attempted) {
+        for(uint8_t index = 0U; index < profile->rf_count; index++) {
+            if(!storage_file_exists(context->storage, profile->rf[index].path)) {
+                attempted = true;
+                repaired = xremote_device_library_repair_rf(context, profile, index);
+                break;
+            }
+        }
+    }
+
+    xremote_device_profile_free(profile);
+    if(!attempted) {
+        xremote_device_message(context, "Repair profile", "No missing source found.");
+        return;
+    }
+    if(!repaired) return;
+
+    xremote_device_library_refresh(context);
+    const bool ready = context->library_selected < context->library_count &&
+                       context->library[context->library_selected].health ==
+                           XRemoteDeviceLibraryReady;
+    xremote_device_message(
+        context,
+        "Repair profile",
+        ready ? "Source repaired.\nProfile is ready." : "Source repaired.\nMore sources missing.");
+}
+
 static void xremote_device_library_delete(XRemoteDeviceContext* context) {
     if(context->library_selected >= context->library_count) return;
     const XRemoteDeviceLibraryEntry* entry = &context->library[context->library_selected];
@@ -1362,12 +1461,20 @@ static void xremote_device_library_execute(XRemoteDeviceContext* context, uint8_
             context, "Invalid profile", "Only Delete is available\nfor this file.");
         return;
     }
+    if(action == XRemoteDeviceLibraryActionRepair &&
+       entry->health != XRemoteDeviceLibraryMissing) {
+        xremote_device_message(
+            context, "Repair profile", "Repair is available only\nfor missing sources.");
+        return;
+    }
 
     context->library_actions = false;
     if(action == XRemoteDeviceLibraryActionOpen) {
         xremote_device_library_start_runtime(context);
     } else if(action == XRemoteDeviceLibraryActionEdit) {
         xremote_device_library_start_editor(context);
+    } else if(action == XRemoteDeviceLibraryActionRepair) {
+        xremote_device_library_repair(context);
     } else if(action == XRemoteDeviceLibraryActionDuplicate) {
         xremote_device_library_duplicate(context);
     } else if(action == XRemoteDeviceLibraryActionDelete) {
@@ -1399,7 +1506,9 @@ static bool xremote_device_library_input(InputEvent* event, void* view_context) 
             context->library_action++;
         } else if(!vertical && event->key == InputKeyLeft && (context->library_action % 2U) != 0U) {
             context->library_action--;
-        } else if(!vertical && event->key == InputKeyRight && (context->library_action % 2U) == 0U) {
+        } else if(
+            !vertical && event->key == InputKeyRight && (context->library_action % 2U) == 0U &&
+            context->library_action + 1U < XRemoteDeviceLibraryActionCount) {
             context->library_action++;
         } else if(!vertical && event->key == InputKeyUp && context->library_action >= 2U) {
             context->library_action -= 2U;
@@ -1559,7 +1668,8 @@ static void xremote_device_guide(XRemoteApp* app) {
         context,
         "Device Profiles",
         "Library: OK opens, Right\n"
-        "offers Edit/Copy/Delete.\n"
+        "offers Edit/Repair/Copy.\n"
+        "Repair fixes one source.\n"
         "Import IR or RF, then mix.\n"
         "Runtime: arrows select,\n"
         "OK sends, hold OK INT/EXT.");
