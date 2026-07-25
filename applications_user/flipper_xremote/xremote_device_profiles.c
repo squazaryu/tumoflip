@@ -1174,7 +1174,9 @@ XRemoteApp* xremote_device_profiles_alloc(XRemoteAppContext* app_ctx) {
     View* text_view = text_input_get_view(context->text_input);
     view_set_previous_callback(text_view, xremote_device_text_input_previous);
     view_dispatcher_add_view(app_ctx->view_dispatcher, XRemoteViewTextInput, text_view);
-    storage_simply_mkdir(context->storage, XREMOTE_DEVICE_PROFILE_FOLDER);
+    if(!xremote_device_profile_storage_ready(context->storage)) {
+        snprintf(context->status, sizeof(context->status), "Storage unavailable");
+    }
 
     XRemoteApp* app = xremote_app_alloc(app_ctx);
     xremote_app_set_user_context(app, context, xremote_device_context_free);

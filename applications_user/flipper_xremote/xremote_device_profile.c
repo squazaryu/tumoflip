@@ -31,6 +31,102 @@ static bool xremote_device_read_string(
     return success;
 }
 
+bool xremote_device_profile_storage_ready(Storage* storage) {
+    return storage && storage_simply_mkdir(storage, XREMOTE_DEVICE_PROFILE_ROOT) &&
+           storage_simply_mkdir(storage, XREMOTE_DEVICE_PROFILE_FOLDER);
+}
+
+static bool xremote_device_profile_verify_string(
+    FlipperFormat* format,
+    const char* key,
+    const char* expected,
+    char* buffer,
+    size_t buffer_size) {
+    flipper_format_rewind(format);
+    return xremote_device_read_string(format, key, buffer, buffer_size) &&
+           strcmp(buffer, expected) == 0;
+}
+
+static bool xremote_device_profile_verify(
+    Storage* storage,
+    const XRemoteDeviceProfile* profile) {
+    FlipperFormat* format = flipper_format_buffered_file_alloc(storage);
+    FuriString* header = furi_string_alloc();
+    char key[24];
+    char value[XREMOTE_DEVICE_PATH_MAX];
+    uint32_t version = 0U;
+    uint32_t rf_count = 0U;
+    bool success = false;
+
+    do {
+        if(!flipper_format_buffered_file_open_existing(format, profile->path)) break;
+        if(!flipper_format_read_header(format, header, &version)) break;
+        if(strcmp(furi_string_get_cstr(header), XREMOTE_DEVICE_PROFILE_HEADER) != 0 ||
+           version != XREMOTE_DEVICE_PROFILE_VERSION) {
+            break;
+        }
+        if(!xremote_device_profile_verify_string(
+               format, "Name", profile->name, value, sizeof(value))) {
+            break;
+        }
+        if(!xremote_device_profile_verify_string(
+               format, "IR File", profile->ir_path, value, sizeof(value))) {
+            break;
+        }
+        if(!xremote_device_profile_verify_string(
+               format,
+               "Radio",
+               xremote_device_radio_name(profile->radio),
+               value,
+               sizeof(value))) {
+            break;
+        }
+        if(!flipper_format_read_uint32(format, "RF Count", &rf_count, 1U) ||
+           rf_count != profile->rf_count) {
+            break;
+        }
+
+        bool commands_valid = true;
+        for(uint32_t index = 0U; index < profile->rf_count; index++) {
+            const XRemoteDeviceRfCommand* command = &profile->rf[index];
+            snprintf(key, sizeof(key), "RF%lu Name", (unsigned long)index);
+            if(!xremote_device_profile_verify_string(
+                   format, key, command->name, value, sizeof(value))) {
+                commands_valid = false;
+                break;
+            }
+            snprintf(key, sizeof(key), "RF%lu File", (unsigned long)index);
+            if(!xremote_device_profile_verify_string(
+                   format, key, command->path, value, sizeof(value))) {
+                commands_valid = false;
+                break;
+            }
+            snprintf(key, sizeof(key), "RF%lu Protocol", (unsigned long)index);
+            if(!xremote_device_profile_verify_string(
+                   format, key, command->protocol, value, sizeof(value))) {
+                commands_valid = false;
+                break;
+            }
+            snprintf(key, sizeof(key), "RF%lu Adapter", (unsigned long)index);
+            if(!xremote_device_profile_verify_string(
+                   format,
+                   key,
+                   xremote_device_adapter_name(command->adapter),
+                   value,
+                   sizeof(value))) {
+                commands_valid = false;
+                break;
+            }
+        }
+        if(!commands_valid) break;
+        success = true;
+    } while(false);
+
+    furi_string_free(header);
+    flipper_format_free(format);
+    return success;
+}
+
 static void xremote_device_safe_name(const char* source, char* output, size_t output_size) {
     size_t written = 0U;
     if(output_size == 0U) return;
@@ -164,7 +260,7 @@ bool xremote_device_profile_store(Storage* storage, const XRemoteDeviceProfile* 
         return false;
     }
 
-    storage_simply_mkdir(storage, XREMOTE_DEVICE_PROFILE_FOLDER);
+    if(!xremote_device_profile_storage_ready(storage)) return false;
     char temporary[XREMOTE_DEVICE_PATH_MAX + 5U];
     char backup[XREMOTE_DEVICE_PATH_MAX + 5U];
     const int temporary_length = snprintf(temporary, sizeof(temporary), "%s.tmp", profile->path);
@@ -239,6 +335,11 @@ bool xremote_device_profile_store(Storage* storage, const XRemoteDeviceProfile* 
         if(had_profile) storage_common_rename(storage, backup, profile->path);
         return false;
     }
+    if(!xremote_device_profile_verify(storage, profile)) {
+        storage_common_remove(storage, profile->path);
+        if(had_profile) storage_common_rename(storage, backup, profile->path);
+        return false;
+    }
     storage_common_remove(storage, backup);
     return true;
 }
@@ -252,10 +353,14 @@ bool xremote_device_profile_create_path(
 
     char safe_name[XREMOTE_DEVICE_NAME_MAX + 1U];
     xremote_device_safe_name(preferred_name, safe_name, sizeof(safe_name));
-    storage_simply_mkdir(storage, XREMOTE_DEVICE_PROFILE_FOLDER);
+    if(!xremote_device_profile_storage_ready(storage)) {
+        output[0] = '\0';
+        return false;
+    }
     for(uint32_t suffix = 0U; suffix < 100U; suffix++) {
+        int written = 0;
         if(suffix == 0U) {
-            snprintf(
+            written = snprintf(
                 output,
                 output_size,
                 "%s/%s%s",
@@ -263,7 +368,7 @@ bool xremote_device_profile_create_path(
                 safe_name,
                 XREMOTE_DEVICE_PROFILE_EXTENSION);
         } else {
-            snprintf(
+            written = snprintf(
                 output,
                 output_size,
                 "%s/%s_%lu%s",
@@ -271,6 +376,10 @@ bool xremote_device_profile_create_path(
                 safe_name,
                 (unsigned long)(suffix + 1U),
                 XREMOTE_DEVICE_PROFILE_EXTENSION);
+        }
+        if(written <= 0 || (size_t)written >= output_size) {
+            output[0] = '\0';
+            return false;
         }
         if(!storage_file_exists(storage, output)) return true;
     }

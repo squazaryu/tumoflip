@@ -20,7 +20,7 @@ class XRemoteDesignerTest(unittest.TestCase):
         self.assertIn("xremote_designer_alloc(app->app_ctx)", source)
         self.assertIn("XRemoteViewDesigner", header)
         self.assertIn("XRemoteViewDesignerMap", header)
-        self.assertIn('fap_version="1.10.0"', manifest)
+        self.assertIn('fap_version="1.10.1"', manifest)
         self.assertIn("#define XREMOTE_VERSION_MIN  10", version_header)
 
     def test_ac_smart_is_integrated_as_xremote_child_app(self) -> None:
@@ -236,7 +236,11 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
 
         self.assertIn('"Tumo XRemote Device Profile"', header)
         self.assertIn("#define XREMOTE_DEVICE_PROFILE_VERSION   1U", header)
-        self.assertIn('APP_DATA_PATH("devices")', header)
+        self.assertIn('EXT_PATH("apps_data/tumoflip_xremote")', header)
+        self.assertIn(
+            '#define XREMOTE_DEVICE_PROFILE_FOLDER    XREMOTE_DEVICE_PROFILE_ROOT "/devices"',
+            header,
+        )
         for field in (
             '"IR File"',
             '"RF Count"',
@@ -247,6 +251,8 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         ):
             self.assertIn(field, storage)
         self.assertNotIn("storage_common_copy", storage)
+        self.assertIn("xremote_device_profile_storage_ready(storage)", storage)
+        self.assertIn("xremote_device_profile_verify(storage, profile)", storage)
         self.assertIn('"%s.tmp"', storage)
         self.assertIn("storage_common_rename(storage, temporary, profile->path)", storage)
 
@@ -373,6 +379,7 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn('"%s.tmp"', storage)
         self.assertIn('"%s.bak"', storage)
         self.assertIn("storage_common_rename(storage, backup, profile->path)", storage)
+        self.assertIn("storage_common_remove(storage, profile->path)", storage)
         self.assertIn("xremote_device_profile_reload(context)", source)
         self.assertIn('"Save failed; restored"', source)
         self.assertIn('"Profile needs command"', source)

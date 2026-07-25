@@ -6,7 +6,8 @@
 #define XREMOTE_DEVICE_PROFILE_HEADER    "Tumo XRemote Device Profile"
 #define XREMOTE_DEVICE_PROFILE_VERSION   1U
 #define XREMOTE_DEVICE_PROFILE_EXTENSION ".tdevice"
-#define XREMOTE_DEVICE_PROFILE_FOLDER    APP_DATA_PATH("devices")
+#define XREMOTE_DEVICE_PROFILE_ROOT      EXT_PATH("apps_data/tumoflip_xremote")
+#define XREMOTE_DEVICE_PROFILE_FOLDER    XREMOTE_DEVICE_PROFILE_ROOT "/devices"
 
 #define XREMOTE_DEVICE_NAME_MAX       32U
 #define XREMOTE_DEVICE_PATH_MAX       256U
@@ -42,6 +43,7 @@ typedef struct {
 XRemoteDeviceProfile* xremote_device_profile_alloc(void);
 void xremote_device_profile_free(XRemoteDeviceProfile* profile);
 void xremote_device_profile_reset(XRemoteDeviceProfile* profile);
+bool xremote_device_profile_storage_ready(Storage* storage);
 
 bool xremote_device_profile_load(Storage* storage, const char* path, XRemoteDeviceProfile* profile);
 bool xremote_device_profile_store(Storage* storage, const XRemoteDeviceProfile* profile);
