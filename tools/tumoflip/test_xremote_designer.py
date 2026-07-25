@@ -20,8 +20,8 @@ class XRemoteDesignerTest(unittest.TestCase):
         self.assertIn("xremote_designer_alloc(app->app_ctx)", source)
         self.assertIn("XRemoteViewDesigner", header)
         self.assertIn("XRemoteViewDesignerMap", header)
-        self.assertIn('fap_version="1.10.1"', manifest)
-        self.assertIn("#define XREMOTE_VERSION_MIN  10", version_header)
+        self.assertIn('fap_version="1.11.0"', manifest)
+        self.assertIn("#define XREMOTE_VERSION_MIN  11", version_header)
 
     def test_ac_smart_is_integrated_as_xremote_child_app(self) -> None:
         source = (APP_DIR / "xremote.c").read_text(encoding="utf-8")
@@ -225,6 +225,7 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn('#include "xremote_device_profiles.h"', source)
         self.assertIn('"Device Profiles", XRemoteViewDeviceProfiles', source)
         self.assertIn("xremote_device_profiles_alloc(app->app_ctx)", source)
+        self.assertIn("XRemoteViewDeviceLibrary", header)
         self.assertIn("XRemoteViewDeviceRuntime", header)
         self.assertIn('"subghz_radio_broker"', manifest)
         self.assertIn('"AC Smart", XRemoteViewAcSmart', source)
@@ -305,8 +306,8 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         for required in (
             'elements_button_left(canvas, "Back")',
             'elements_button_center(canvas, "Send")',
-            "#define XREMOTE_DEVICE_PAGE_SIZE    4U",
-            "#define XREMOTE_DEVICE_GRID_COLUMNS 2U",
+            "#define XREMOTE_DEVICE_PAGE_SIZE",
+            "#define XREMOTE_DEVICE_GRID_COLUMNS",
             "xremote_device_page_count",
             "xremote_device_page_start",
             "xremote_device_runtime_draw_cell",
@@ -332,14 +333,14 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn("row == 0U ? 15U : 32U", source)
         self.assertIn("(uint8_t)(17U + slot * 18U)", source)
         self.assertIn('"OK sends, hold OK INT/EXT.', source)
-        self.assertIn("#define XREMOTE_VERSION_MIN  10", version)
+        self.assertIn("#define XREMOTE_VERSION_MIN  11", version)
 
     def test_profile_editor_supports_on_device_management(self) -> None:
         source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
         header = (APP_DIR / "views/xremote_common_view.h").read_text(encoding="utf-8")
 
         for required in (
-            '"Manage Profile"',
+            '"Profile Library"',
             "XRemoteViewDeviceEditor",
             "xremote_device_editor_start_text",
             "xremote_device_editor_replace_ir",
@@ -371,6 +372,59 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertNotIn(
             "storage_common_remove(context->storage, context->profile->rf", source
         )
+
+    def test_profile_library_lists_health_and_bounded_actions(self) -> None:
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+
+        for required in (
+            "#define XREMOTE_DEVICE_LIBRARY_MAX",
+            "storage_dir_open(directory, XREMOTE_DEVICE_PROFILE_FOLDER)",
+            "XRemoteDeviceLibraryReady",
+            "XRemoteDeviceLibraryMissing",
+            "XRemoteDeviceLibraryInvalid",
+            "xremote_device_library_ir_count",
+            "xremote_device_library_refresh",
+            '"Profile Library"',
+            '"MISS"',
+            '"BAD"',
+            '"Open"',
+            '"Edit"',
+            '"Copy"',
+            '"Delete"',
+            "xremote_device_library_keep_visible",
+        ):
+            self.assertIn(required, source)
+        self.assertNotIn('"Open Profile"', source)
+        self.assertNotIn('"Manage Profile"', source)
+        self.assertNotIn('"Delete Profile"', source)
+
+    def test_profile_duplicate_is_transactional_and_sources_are_references(self) -> None:
+        storage = (APP_DIR / "xremote_device_profile.c").read_text(encoding="utf-8")
+        header = (APP_DIR / "xremote_device_profile.h").read_text(encoding="utf-8")
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+
+        self.assertIn("xremote_device_profile_duplicate(", header)
+        self.assertIn("*duplicate = *source", storage)
+        self.assertIn("xremote_device_profile_create_path(", storage)
+        self.assertIn("xremote_device_profile_store(storage, duplicate)", storage)
+        self.assertIn("xremote_device_profile_delete_path(", header)
+        self.assertIn("XREMOTE_DEVICE_PROFILE_FOLDER", storage)
+        self.assertIn("XREMOTE_DEVICE_PROFILE_EXTENSION", storage)
+        self.assertIn("strchr(filename, '/') != NULL", storage)
+        self.assertIn("Sources stay unchanged.", source)
+        self.assertNotIn("storage_common_copy", storage)
+
+    def test_profile_library_supports_both_screen_orientations(self) -> None:
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+
+        self.assertIn("ViewOrientationVertical", source)
+        self.assertIn("vertical ? 60U : 124U", source)
+        self.assertIn("vertical ? 22U : 11U", source)
+        self.assertIn("(uint8_t)(17U + action * 20U)", source)
+        self.assertIn("vertical && event->key == InputKeyUp", source)
+        self.assertIn("vertical && event->key == InputKeyDown", source)
+        self.assertIn("!vertical && event->key == InputKeyLeft", source)
+        self.assertIn("!vertical && event->key == InputKeyRight", source)
 
     def test_profile_editor_keeps_atomic_rollback_and_nonempty_profile(self) -> None:
         storage = (APP_DIR / "xremote_device_profile.c").read_text(encoding="utf-8")

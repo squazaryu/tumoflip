@@ -12,16 +12,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define XREMOTE_DEVICE_PAGE_SIZE    4U
-#define XREMOTE_DEVICE_GRID_COLUMNS 2U
+#define XREMOTE_DEVICE_PAGE_SIZE            4U
+#define XREMOTE_DEVICE_GRID_COLUMNS         2U
+#define XREMOTE_DEVICE_LIBRARY_MAX          16U
+#define XREMOTE_DEVICE_LIBRARY_FILENAME_MAX 96U
+#define XREMOTE_DEVICE_LIBRARY_ROWS         3U
 
 typedef enum {
-    XRemoteDeviceMenuOpen,
+    XRemoteDeviceMenuLibrary,
     XRemoteDeviceMenuImportIr,
     XRemoteDeviceMenuImportRf,
     XRemoteDeviceMenuAddRf,
-    XRemoteDeviceMenuManage,
-    XRemoteDeviceMenuDelete,
     XRemoteDeviceMenuGuide,
 } XRemoteDeviceMenu;
 
@@ -31,13 +32,44 @@ typedef enum {
     XRemoteDeviceEditRfName,
 } XRemoteDeviceEditTarget;
 
+typedef enum {
+    XRemoteDeviceLibraryReady,
+    XRemoteDeviceLibraryMissing,
+    XRemoteDeviceLibraryInvalid,
+} XRemoteDeviceLibraryHealth;
+
+typedef enum {
+    XRemoteDeviceLibraryActionOpen,
+    XRemoteDeviceLibraryActionEdit,
+    XRemoteDeviceLibraryActionDuplicate,
+    XRemoteDeviceLibraryActionDelete,
+    XRemoteDeviceLibraryActionCount,
+} XRemoteDeviceLibraryAction;
+
+typedef struct {
+    char name[XREMOTE_DEVICE_NAME_MAX + 1U];
+    char filename[XREMOTE_DEVICE_LIBRARY_FILENAME_MAX];
+    uint16_t ir_count;
+    uint8_t rf_count;
+    XRemoteDeviceLibraryHealth health;
+} XRemoteDeviceLibraryEntry;
+
 typedef struct {
     XRemoteAppContext* app_ctx;
+    XRemoteApp* owner_app;
     Storage* storage;
     DialogsApp* dialogs;
     XRemoteDeviceProfile* profile;
     InfraredRemote* ir_remote;
     TextInput* text_input;
+    XRemoteView* library_view;
+    XRemoteDeviceLibraryEntry library[XREMOTE_DEVICE_LIBRARY_MAX];
+    uint8_t library_count;
+    uint8_t library_selected;
+    uint8_t library_top;
+    uint8_t library_action;
+    bool library_actions;
+    bool library_truncated;
     uint16_t selected;
     uint8_t editor_selected;
     uint8_t edit_rf_index;
@@ -46,14 +78,28 @@ typedef struct {
     XRemoteSubGhzStatus rf_status[XREMOTE_DEVICE_RF_COMMAND_MAX];
     char edit_buffer[XREMOTE_DEVICE_NAME_MAX + 1U];
     char status[40];
+    char library_notice[40];
 } XRemoteDeviceContext;
+
+static void xremote_device_library_refresh(XRemoteDeviceContext* context);
+static void xremote_device_context_unload(XRemoteDeviceContext* context);
 
 static uint32_t xremote_device_previous_main(void* context) {
     UNUSED(context);
     return XRemoteViewSubmenu;
 }
 
-static uint32_t xremote_device_previous_menu(void* context) {
+static uint32_t xremote_device_previous_library(void* raw_view) {
+    XRemoteView* view = raw_view;
+    XRemoteDeviceContext* context = view ? xremote_view_get_context(view) : NULL;
+    if(context) {
+        xremote_device_context_unload(context);
+        xremote_device_library_refresh(context);
+    }
+    return XRemoteViewDeviceLibrary;
+}
+
+static uint32_t xremote_device_library_previous(void* context) {
     UNUSED(context);
     return XRemoteViewDeviceProfiles;
 }
@@ -932,44 +978,469 @@ static XRemoteView* xremote_device_editor_alloc(void* app_ctx, void* model_ctx) 
     return view;
 }
 
-static void xremote_device_manage(XRemoteApp* app) {
-    XRemoteDeviceContext* context = app->context;
-    XRemoteDeviceProfile* selected = xremote_device_profile_alloc();
-    if(!selected) {
-        xremote_device_message(context, "Profile Editor", "Out of memory.");
+static bool xremote_device_library_has_extension(const char* filename) {
+    if(!filename) return false;
+    const size_t filename_length = strlen(filename);
+    const size_t extension_length = strlen(XREMOTE_DEVICE_PROFILE_EXTENSION);
+    return filename_length > extension_length && strcmp(
+                                                     filename + filename_length - extension_length,
+                                                     XREMOTE_DEVICE_PROFILE_EXTENSION) == 0;
+}
+
+static bool xremote_device_library_entry_path(
+    const XRemoteDeviceLibraryEntry* entry,
+    char* output,
+    size_t output_size) {
+    if(!entry || !output || output_size == 0U || entry->filename[0] == '\0') return false;
+    const int written =
+        snprintf(output, output_size, "%s/%s", XREMOTE_DEVICE_PROFILE_FOLDER, entry->filename);
+    return written > 0 && (size_t)written < output_size;
+}
+
+static bool xremote_device_library_load_entry(
+    XRemoteDeviceContext* context,
+    uint8_t index,
+    XRemoteDeviceProfile* profile) {
+    if(!context || !profile || index >= context->library_count) return false;
+    char path[XREMOTE_DEVICE_PATH_MAX];
+    return xremote_device_library_entry_path(&context->library[index], path, sizeof(path)) &&
+           xremote_device_profile_load(context->storage, path, profile);
+}
+
+static uint16_t
+    xremote_device_library_ir_count(Storage* storage, const char* path, bool* missing) {
+    if(!path || path[0] == '\0') return 0U;
+    if(!storage_file_exists(storage, path)) {
+        *missing = true;
+        return 0U;
+    }
+
+    FuriString* source_path = furi_string_alloc_set_str(path);
+    InfraredRemote* remote = infrared_remote_alloc();
+    const bool loaded = remote && infrared_remote_load(remote, source_path);
+    const uint16_t count = loaded ? infrared_remote_get_button_count(remote) : 0U;
+    if(!loaded || count == 0U) *missing = true;
+    if(remote) infrared_remote_free(remote);
+    furi_string_free(source_path);
+    return count;
+}
+
+static void xremote_device_library_sort(XRemoteDeviceContext* context) {
+    for(uint8_t index = 1U; index < context->library_count; index++) {
+        XRemoteDeviceLibraryEntry moving = context->library[index];
+        uint8_t destination = index;
+        while(destination > 0U &&
+              strcmp(context->library[destination - 1U].name, moving.name) > 0) {
+            context->library[destination] = context->library[destination - 1U];
+            destination--;
+        }
+        context->library[destination] = moving;
+    }
+}
+
+static void xremote_device_library_keep_visible(XRemoteDeviceContext* context) {
+    if(context->library_count == 0U) {
+        context->library_selected = 0U;
+        context->library_top = 0U;
         return;
     }
-    if(xremote_device_profile_select(context, selected)) {
+    if(context->library_selected >= context->library_count) {
+        context->library_selected = context->library_count - 1U;
+    }
+    if(context->library_selected < context->library_top) {
+        context->library_top = context->library_selected;
+    } else if(context->library_selected >= context->library_top + XREMOTE_DEVICE_LIBRARY_ROWS) {
+        context->library_top = context->library_selected - XREMOTE_DEVICE_LIBRARY_ROWS + 1U;
+    }
+}
+
+static void xremote_device_library_refresh(XRemoteDeviceContext* context) {
+    context->library_count = 0U;
+    context->library_truncated = false;
+    if(!xremote_device_profile_storage_ready(context->storage)) {
+        snprintf(context->library_notice, sizeof(context->library_notice), "Storage unavailable");
+        return;
+    }
+
+    File* directory = storage_file_alloc(context->storage);
+    FileInfo info;
+    char filename[XREMOTE_DEVICE_LIBRARY_FILENAME_MAX];
+    if(storage_dir_open(directory, XREMOTE_DEVICE_PROFILE_FOLDER)) {
+        while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
+            if(file_info_is_dir(&info) || !xremote_device_library_has_extension(filename)) {
+                continue;
+            }
+            if(context->library_count >= XREMOTE_DEVICE_LIBRARY_MAX) {
+                context->library_truncated = true;
+                continue;
+            }
+
+            XRemoteDeviceLibraryEntry* entry = &context->library[context->library_count];
+            memset(entry, 0, sizeof(*entry));
+            snprintf(entry->filename, sizeof(entry->filename), "%s", filename);
+
+            char path[XREMOTE_DEVICE_PATH_MAX];
+            XRemoteDeviceProfile* profile = xremote_device_profile_alloc();
+            const bool path_ready = xremote_device_library_entry_path(entry, path, sizeof(path));
+            const bool loaded = profile && path_ready &&
+                                xremote_device_profile_load(context->storage, path, profile);
+            if(!loaded) {
+                xremote_device_basename(filename, entry->name, sizeof(entry->name));
+                entry->health = XRemoteDeviceLibraryInvalid;
+            } else {
+                snprintf(entry->name, sizeof(entry->name), "%s", profile->name);
+                entry->rf_count = profile->rf_count;
+                bool missing = false;
+                entry->ir_count =
+                    xremote_device_library_ir_count(context->storage, profile->ir_path, &missing);
+                for(uint8_t index = 0U; index < profile->rf_count; index++) {
+                    if(!storage_file_exists(context->storage, profile->rf[index].path)) {
+                        missing = true;
+                    }
+                }
+                entry->health = missing ? XRemoteDeviceLibraryMissing : XRemoteDeviceLibraryReady;
+            }
+            xremote_device_profile_free(profile);
+            context->library_count++;
+        }
+        storage_dir_close(directory);
+    }
+    storage_file_free(directory);
+
+    xremote_device_library_sort(context);
+    xremote_device_library_keep_visible(context);
+    if(context->library_truncated) {
+        snprintf(
+            context->library_notice,
+            sizeof(context->library_notice),
+            "Showing first %u profiles",
+            XREMOTE_DEVICE_LIBRARY_MAX);
+    } else {
+        context->library_notice[0] = '\0';
+    }
+}
+
+static const char* xremote_device_library_health_name(XRemoteDeviceLibraryHealth health) {
+    if(health == XRemoteDeviceLibraryMissing) return "MISS";
+    if(health == XRemoteDeviceLibraryInvalid) return "BAD";
+    return "OK";
+}
+
+static const char* xremote_device_library_action_name(uint8_t action) {
+    static const char* const names[XRemoteDeviceLibraryActionCount] = {
+        "Open",
+        "Edit",
+        "Copy",
+        "Delete",
+    };
+    return action < XRemoteDeviceLibraryActionCount ? names[action] : "?";
+}
+
+static void xremote_device_library_draw_entry(
+    Canvas* canvas,
+    const XRemoteDeviceLibraryEntry* entry,
+    uint8_t y,
+    bool selected,
+    bool vertical) {
+    if(selected) {
+        canvas_draw_rbox(canvas, 2, y, vertical ? 60U : 124U, vertical ? 22U : 11U, 2);
+        canvas_set_color(canvas, ColorWhite);
+    }
+
+    canvas_set_font(canvas, FontSecondary);
+    char summary[24];
+    snprintf(
+        summary,
+        sizeof(summary),
+        "I%u/R%u %s",
+        (unsigned int)entry->ir_count,
+        (unsigned int)entry->rf_count,
+        xremote_device_library_health_name(entry->health));
+    if(vertical) {
+        xremote_device_draw_fitted(canvas, 5, y + 8U, 54U, AlignLeft, entry->name);
+        canvas_draw_str_aligned(canvas, 59, y + 19U, AlignRight, AlignBottom, summary);
+    } else {
+        xremote_device_draw_fitted(canvas, 5, y + 8U, 58U, AlignLeft, entry->name);
+        canvas_draw_str_aligned(canvas, 124, y + 8U, AlignRight, AlignBottom, summary);
+    }
+    canvas_set_color(canvas, ColorBlack);
+}
+
+static void xremote_device_library_draw_actions(Canvas* canvas, XRemoteDeviceContext* context) {
+    const XRemoteDeviceLibraryEntry* entry = &context->library[context->library_selected];
+    const bool vertical = context->app_ctx->app_settings->orientation == ViewOrientationVertical;
+    xremote_device_draw_fitted(
+        canvas, 2, vertical ? 10 : 9, vertical ? 40U : 94U, AlignLeft, entry->name);
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(
+        canvas,
+        vertical ? 62 : 126,
+        vertical ? 10 : 9,
+        AlignRight,
+        AlignBottom,
+        xremote_device_library_health_name(entry->health));
+    canvas_draw_line(canvas, 2, vertical ? 13 : 12, vertical ? 62 : 126, vertical ? 13 : 12);
+
+    for(uint8_t action = 0U; action < XRemoteDeviceLibraryActionCount; action++) {
+        if(vertical) {
+            xremote_device_runtime_draw_cell(
+                canvas,
+                2U,
+                (uint8_t)(17U + action * 20U),
+                60U,
+                17U,
+                xremote_device_library_action_name(action),
+                context->library_action == action);
+        } else {
+            const uint8_t column = action % 2U;
+            const uint8_t row = action / 2U;
+            xremote_device_runtime_draw_cell(
+                canvas,
+                column == 0U ? 2U : 65U,
+                row == 0U ? 15U : 33U,
+                61U,
+                16U,
+                xremote_device_library_action_name(action),
+                context->library_action == action);
+        }
+    }
+    elements_button_left(canvas, "Back");
+    elements_button_center(canvas, "Select");
+}
+
+static void xremote_device_library_draw(Canvas* canvas, void* model_context) {
+    XRemoteViewModel* model = model_context;
+    XRemoteDeviceContext* context = model->context;
+    const bool vertical = context->app_ctx->app_settings->orientation == ViewOrientationVertical;
+    canvas_clear(canvas);
+    canvas_set_font(canvas, FontPrimary);
+
+    if(context->library_actions && context->library_count > 0U) {
+        xremote_device_library_draw_actions(canvas, context);
+        return;
+    }
+
+    xremote_device_draw_fitted(
+        canvas, 2, vertical ? 10 : 9, vertical ? 44U : 100U, AlignLeft, "Profile Library");
+    canvas_set_font(canvas, FontSecondary);
+    char count[12];
+    snprintf(
+        count,
+        sizeof(count),
+        "%u%s",
+        (unsigned int)context->library_count,
+        context->library_truncated ? "+" : "");
+    canvas_draw_str_aligned(
+        canvas, vertical ? 62 : 126, vertical ? 10 : 9, AlignRight, AlignBottom, count);
+    canvas_draw_line(canvas, 2, vertical ? 13 : 12, vertical ? 62 : 126, vertical ? 13 : 12);
+
+    if(context->library_count == 0U) {
+        canvas_draw_str_aligned(
+            canvas,
+            vertical ? 32 : 64,
+            vertical ? 39 : 28,
+            AlignCenter,
+            AlignCenter,
+            context->library_notice[0] != '\0' ? context->library_notice : "No device profiles");
+        canvas_draw_str_aligned(
+            canvas,
+            vertical ? 32 : 64,
+            vertical ? 56 : 41,
+            AlignCenter,
+            AlignCenter,
+            vertical ? "Import IR / RF" : "Import IR or create RF");
+        elements_button_left(canvas, "Back");
+        return;
+    }
+
+    for(uint8_t row = 0U; row < XREMOTE_DEVICE_LIBRARY_ROWS; row++) {
+        const uint8_t index = context->library_top + row;
+        if(index >= context->library_count) break;
+        xremote_device_library_draw_entry(
+            canvas,
+            &context->library[index],
+            (uint8_t)((vertical ? 17U : 15U) + row * (vertical ? 25U : 12U)),
+            index == context->library_selected,
+            vertical);
+    }
+    elements_button_left(canvas, "Back");
+    elements_button_center(canvas, "Open");
+    elements_button_right(canvas, "More");
+}
+
+static bool xremote_device_library_start_runtime(XRemoteDeviceContext* context) {
+    XRemoteDeviceProfile* selected = xremote_device_profile_alloc();
+    if(!selected) {
+        xremote_device_message(context, "Profile Library", "Out of memory.");
+        return false;
+    }
+    const bool loaded =
+        xremote_device_library_load_entry(context, context->library_selected, selected);
+    const bool ready = loaded && xremote_device_context_load(context, selected);
+    if(ready) {
+        xremote_app_view_free(context->owner_app);
+        xremote_app_view_alloc2(
+            context->owner_app, XRemoteViewDeviceRuntime, xremote_device_runtime_alloc, context);
+        xremote_app_view_set_previous_callback(
+            context->owner_app, xremote_device_previous_library);
+        xremote_app_switch_to_view(context->owner_app, XRemoteViewDeviceRuntime);
+    } else {
+        xremote_device_message(
+            context, "Profile Library", loaded ? "No usable commands." : "Profile is invalid.");
+    }
+    xremote_device_profile_free(selected);
+    return ready;
+}
+
+static bool xremote_device_library_start_editor(XRemoteDeviceContext* context) {
+    XRemoteDeviceProfile* selected = xremote_device_profile_alloc();
+    if(!selected) {
+        xremote_device_message(context, "Profile Library", "Out of memory.");
+        return false;
+    }
+    const bool loaded =
+        xremote_device_library_load_entry(context, context->library_selected, selected);
+    if(loaded) {
         xremote_device_context_unload(context);
         *context->profile = *selected;
         context->editor_selected = 0U;
         context->status[0] = '\0';
+        xremote_app_view_free(context->owner_app);
         xremote_app_view_alloc2(
-            app, XRemoteViewDeviceEditor, xremote_device_editor_alloc, context);
-        xremote_app_view_set_previous_callback(app, xremote_device_previous_menu);
-        xremote_app_switch_to_view(app, XRemoteViewDeviceEditor);
+            context->owner_app, XRemoteViewDeviceEditor, xremote_device_editor_alloc, context);
+        xremote_app_view_set_previous_callback(
+            context->owner_app, xremote_device_previous_library);
+        xremote_app_switch_to_view(context->owner_app, XRemoteViewDeviceEditor);
+    } else {
+        xremote_device_message(context, "Profile Library", "Profile is invalid.");
     }
     xremote_device_profile_free(selected);
+    return loaded;
 }
 
-static void xremote_device_open(XRemoteApp* app) {
-    XRemoteDeviceContext* context = app->context;
-    XRemoteDeviceProfile* selected = xremote_device_profile_alloc();
-    if(!selected) {
-        xremote_device_message(context, "Device Profile", "Out of memory.");
+static void xremote_device_library_duplicate(XRemoteDeviceContext* context) {
+    XRemoteDeviceProfile* source = xremote_device_profile_alloc();
+    XRemoteDeviceProfile* duplicate = xremote_device_profile_alloc();
+    const bool loaded =
+        source && duplicate &&
+        xremote_device_library_load_entry(context, context->library_selected, source);
+    const bool copied = loaded &&
+                        xremote_device_profile_duplicate(context->storage, source, duplicate);
+    xremote_device_profile_free(duplicate);
+    xremote_device_profile_free(source);
+    xremote_device_library_refresh(context);
+    xremote_device_message(
+        context,
+        "Duplicate profile",
+        copied ? "Independent profile copy created.\nSources stay unchanged." :
+                 "Cannot duplicate profile.");
+}
+
+static void xremote_device_library_delete(XRemoteDeviceContext* context) {
+    if(context->library_selected >= context->library_count) return;
+    const XRemoteDeviceLibraryEntry* entry = &context->library[context->library_selected];
+    char prompt[64];
+    snprintf(prompt, sizeof(prompt), "Delete %.28s?\nSources stay on SD.", entry->name);
+    if(!xremote_device_confirm(context, "Delete profile?", prompt, "Delete")) return;
+
+    char path[XREMOTE_DEVICE_PATH_MAX];
+    const bool path_ready = xremote_device_library_entry_path(entry, path, sizeof(path));
+    const bool deleted = path_ready && xremote_device_profile_delete_path(context->storage, path);
+    xremote_device_library_refresh(context);
+    xremote_device_message(
+        context,
+        "Delete profile",
+        deleted ? "Profile deleted.\nSources stay unchanged." : "Delete failed.");
+}
+
+static void xremote_device_library_execute(XRemoteDeviceContext* context, uint8_t action) {
+    if(context->library_selected >= context->library_count) return;
+    const XRemoteDeviceLibraryEntry* entry = &context->library[context->library_selected];
+    if(entry->health == XRemoteDeviceLibraryInvalid &&
+       action != XRemoteDeviceLibraryActionDelete) {
+        xremote_device_message(
+            context, "Invalid profile", "Only Delete is available\nfor this file.");
         return;
     }
-    if(xremote_device_profile_select(context, selected) &&
-       xremote_device_context_load(context, selected)) {
-        xremote_app_view_free(app);
-        xremote_app_view_alloc2(
-            app, XRemoteViewDeviceRuntime, xremote_device_runtime_alloc, context);
-        xremote_app_view_set_previous_callback(app, xremote_device_previous_menu);
-        xremote_app_switch_to_view(app, XRemoteViewDeviceRuntime);
-    } else if(selected->path[0] != '\0') {
-        xremote_device_message(context, "Device Profile", "No usable commands.");
+
+    context->library_actions = false;
+    if(action == XRemoteDeviceLibraryActionOpen) {
+        xremote_device_library_start_runtime(context);
+    } else if(action == XRemoteDeviceLibraryActionEdit) {
+        xremote_device_library_start_editor(context);
+    } else if(action == XRemoteDeviceLibraryActionDuplicate) {
+        xremote_device_library_duplicate(context);
+    } else if(action == XRemoteDeviceLibraryActionDelete) {
+        xremote_device_library_delete(context);
     }
-    xremote_device_profile_free(selected);
+}
+
+static bool xremote_device_library_input(InputEvent* event, void* view_context) {
+    XRemoteView* view = view_context;
+    XRemoteDeviceContext* context = xremote_view_get_context(view);
+    if(event->type != InputTypeShort) return true;
+
+    if(event->key == InputKeyBack) {
+        if(context->library_actions) {
+            context->library_actions = false;
+        } else {
+            return false;
+        }
+    } else if(context->library_count == 0U) {
+        return true;
+    } else if(context->library_actions) {
+        const bool vertical = context->app_ctx->app_settings->orientation ==
+                              ViewOrientationVertical;
+        if(vertical && event->key == InputKeyUp && context->library_action > 0U) {
+            context->library_action--;
+        } else if(
+            vertical && event->key == InputKeyDown &&
+            context->library_action + 1U < XRemoteDeviceLibraryActionCount) {
+            context->library_action++;
+        } else if(!vertical && event->key == InputKeyLeft && (context->library_action % 2U) != 0U) {
+            context->library_action--;
+        } else if(!vertical && event->key == InputKeyRight && (context->library_action % 2U) == 0U) {
+            context->library_action++;
+        } else if(!vertical && event->key == InputKeyUp && context->library_action >= 2U) {
+            context->library_action -= 2U;
+        } else if(
+            !vertical && event->key == InputKeyDown &&
+            context->library_action + 2U < XRemoteDeviceLibraryActionCount) {
+            context->library_action += 2U;
+        } else if(event->key == InputKeyOk) {
+            xremote_device_library_execute(context, context->library_action);
+            return true;
+        }
+    } else if(event->key == InputKeyUp) {
+        if(context->library_selected > 0U) context->library_selected--;
+        xremote_device_library_keep_visible(context);
+    } else if(event->key == InputKeyDown) {
+        if(context->library_selected + 1U < context->library_count) {
+            context->library_selected++;
+        }
+        xremote_device_library_keep_visible(context);
+    } else if(event->key == InputKeyOk) {
+        xremote_device_library_execute(context, XRemoteDeviceLibraryActionOpen);
+        return true;
+    } else if(event->key == InputKeyRight) {
+        context->library_actions = true;
+        context->library_action = XRemoteDeviceLibraryActionOpen;
+    }
+
+    with_view_model(
+        xremote_view_get_view(view), XRemoteViewModel * model, { model->context = context; }, true);
+    return true;
+}
+
+static void xremote_device_library_show(XRemoteDeviceContext* context) {
+    context->library_actions = false;
+    xremote_device_library_refresh(context);
+    with_view_model(
+        xremote_view_get_view(context->library_view),
+        XRemoteViewModel * model,
+        { model->context = context; },
+        true);
+    view_dispatcher_switch_to_view(context->app_ctx->view_dispatcher, XRemoteViewDeviceLibrary);
 }
 
 static void xremote_device_import_ir(XRemoteApp* app) {
@@ -1082,42 +1553,23 @@ static void xremote_device_add_rf(XRemoteApp* app) {
     xremote_device_profile_free(profile);
 }
 
-static void xremote_device_delete(XRemoteApp* app) {
-    XRemoteDeviceContext* context = app->context;
-    XRemoteDeviceProfile* profile = xremote_device_profile_alloc();
-    if(!profile) return;
-    if(xremote_device_profile_select(context, profile)) {
-        char prompt[64];
-        snprintf(prompt, sizeof(prompt), "Delete %.28s?", profile->name);
-        if(xremote_device_confirm(context, "Delete profile?", prompt, "Delete")) {
-            xremote_device_message(
-                context,
-                "Delete profile",
-                xremote_device_profile_delete(context->storage, profile) ? "Profile deleted." :
-                                                                           "Delete failed.");
-        }
-    }
-    xremote_device_profile_free(profile);
-}
-
 static void xremote_device_guide(XRemoteApp* app) {
     XRemoteDeviceContext* context = app->context;
     xremote_device_message(
         context,
         "Device Profiles",
+        "Library: OK opens, Right\n"
+        "offers Edit/Copy/Delete.\n"
         "Import IR or RF, then mix.\n"
         "Runtime: arrows select,\n"
-        "OK sends, hold OK INT/EXT.\n"
-        "Hold Right: Princeton B1-B4.\n"
-        "Manage: OK edits, Left/Right\n"
-        "moves RF, hold OK unlinks.");
+        "OK sends, hold OK INT/EXT.");
 }
 
 static void xremote_device_menu_callback(void* callback_context, uint32_t index) {
     XRemoteApp* app = callback_context;
     switch(index) {
-    case XRemoteDeviceMenuOpen:
-        xremote_device_open(app);
+    case XRemoteDeviceMenuLibrary:
+        xremote_device_library_show(app->context);
         break;
     case XRemoteDeviceMenuImportIr:
         xremote_device_import_ir(app);
@@ -1127,12 +1579,6 @@ static void xremote_device_menu_callback(void* callback_context, uint32_t index)
         break;
     case XRemoteDeviceMenuAddRf:
         xremote_device_add_rf(app);
-        break;
-    case XRemoteDeviceMenuManage:
-        xremote_device_manage(app);
-        break;
-    case XRemoteDeviceMenuDelete:
-        xremote_device_delete(app);
         break;
     case XRemoteDeviceMenuGuide:
         xremote_device_guide(app);
@@ -1146,6 +1592,10 @@ static void xremote_device_context_free(void* raw_context) {
     XRemoteDeviceContext* context = raw_context;
     if(!context) return;
     xremote_device_context_unload(context);
+    if(context->library_view) {
+        view_dispatcher_remove_view(context->app_ctx->view_dispatcher, XRemoteViewDeviceLibrary);
+        xremote_view_free(context->library_view);
+    }
     view_dispatcher_remove_view(context->app_ctx->view_dispatcher, XRemoteViewTextInput);
     text_input_free(context->text_input);
     xremote_device_profile_free(context->profile);
@@ -1179,20 +1629,25 @@ XRemoteApp* xremote_device_profiles_alloc(XRemoteAppContext* app_ctx) {
     }
 
     XRemoteApp* app = xremote_app_alloc(app_ctx);
+    context->owner_app = app;
     xremote_app_set_user_context(app, context, xremote_device_context_free);
     xremote_app_submenu_alloc(app, XRemoteViewDeviceProfiles, xremote_device_previous_main);
     xremote_app_submenu_add(
-        app, "Open Profile", XRemoteDeviceMenuOpen, xremote_device_menu_callback);
+        app, "Profile Library", XRemoteDeviceMenuLibrary, xremote_device_menu_callback);
     xremote_app_submenu_add(
         app, "Import IR Remote", XRemoteDeviceMenuImportIr, xremote_device_menu_callback);
     xremote_app_submenu_add(
         app, "New RF Profile", XRemoteDeviceMenuImportRf, xremote_device_menu_callback);
     xremote_app_submenu_add(
         app, "Add Sub-GHz", XRemoteDeviceMenuAddRf, xremote_device_menu_callback);
-    xremote_app_submenu_add(
-        app, "Manage Profile", XRemoteDeviceMenuManage, xremote_device_menu_callback);
-    xremote_app_submenu_add(
-        app, "Delete Profile", XRemoteDeviceMenuDelete, xremote_device_menu_callback);
     xremote_app_submenu_add(app, "Guide", XRemoteDeviceMenuGuide, xremote_device_menu_callback);
+
+    context->library_view =
+        xremote_view_alloc(app_ctx, xremote_device_library_input, xremote_device_library_draw);
+    xremote_view_set_context(context->library_view, context, NULL);
+    xremote_view_model_context_set(context->library_view, context);
+    View* library_view = xremote_view_get_view(context->library_view);
+    view_set_previous_callback(library_view, xremote_device_library_previous);
+    view_dispatcher_add_view(app_ctx->view_dispatcher, XRemoteViewDeviceLibrary, library_view);
     return app;
 }
