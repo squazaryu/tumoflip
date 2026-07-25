@@ -1,7 +1,7 @@
 <p align="center">Advanced IR Remote App for Flipper Device</p>
 
 <p align="center">
-  Tumo XRemote 1.12.0
+  Tumo XRemote 1.13.0
 </p>
 
 <p align="center">
@@ -48,8 +48,8 @@ pages. The header always shows the current page and selected IR/RF output.
 
 `Profile Library` shows each profile's IR/RF command counts and reports missing
 sources or invalid profile files before launch. Press Right for Open, Edit,
-Repair, Copy, and Delete. Copy creates a separate profile record while keeping
-the same source references.
+Repair, Copy, Export, and Delete. Copy creates a separate profile record while
+keeping the same source references.
 
 `Repair` is available only for a profile marked `MISS`. It finds the first
 missing or unusable IR source, or the first missing Sub-GHz source, then opens
@@ -58,6 +58,15 @@ command. A replacement Sub-GHz file must parse successfully and must not use a
 changing-code protocol. One source is repaired per explicit operation so every
 replacement remains visible and deliberate. Cancelled or rejected replacements
 leave the profile unchanged.
+
+`Export` is available for a Ready profile and creates a portable folder under
+`/ext/apps_data/tumoflip_xremote/bundles`. The folder contains a versioned
+`manifest.tdeck`, the `.tdevice` record, and validated copies of every linked
+`.ir` and static `.sub` source. `Import Bundle` validates the complete package
+before copying its sources into a managed import folder and adding a separate
+profile to the library. Repeated imports use new names and never overwrite the
+previous profile. Invalid, incomplete, or cancelled imports do not create a
+partial library record.
 
 `Edit` changes the selected profile directly on the Flipper:
 

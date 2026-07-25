@@ -1,6 +1,7 @@
 #include "xremote_device_profiles.h"
 
 #include "infrared/infrared_remote.h"
+#include "xremote_device_bundle.h"
 #include "xremote_device_profile.h"
 #include "xremote_subghz.h"
 
@@ -23,6 +24,7 @@ typedef enum {
     XRemoteDeviceMenuImportIr,
     XRemoteDeviceMenuImportRf,
     XRemoteDeviceMenuAddRf,
+    XRemoteDeviceMenuImportBundle,
     XRemoteDeviceMenuGuide,
 } XRemoteDeviceMenu;
 
@@ -43,6 +45,7 @@ typedef enum {
     XRemoteDeviceLibraryActionEdit,
     XRemoteDeviceLibraryActionRepair,
     XRemoteDeviceLibraryActionDuplicate,
+    XRemoteDeviceLibraryActionExport,
     XRemoteDeviceLibraryActionDelete,
     XRemoteDeviceLibraryActionCount,
 } XRemoteDeviceLibraryAction;
@@ -1133,6 +1136,7 @@ static const char* xremote_device_library_action_name(uint8_t action) {
         "Edit",
         "Repair",
         "Copy",
+        "Export",
         "Delete",
     };
     return action < XRemoteDeviceLibraryActionCount ? names[action] : "?";
@@ -1188,9 +1192,9 @@ static void xremote_device_library_draw_actions(Canvas* canvas, XRemoteDeviceCon
             xremote_device_runtime_draw_cell(
                 canvas,
                 2U,
-                (uint8_t)(17U + action * 18U),
+                (uint8_t)(16U + action * 16U),
                 60U,
-                15U,
+                14U,
                 xremote_device_library_action_name(action),
                 context->library_action == action);
         } else {
@@ -1338,6 +1342,36 @@ static void xremote_device_library_duplicate(XRemoteDeviceContext* context) {
                  "Cannot duplicate profile.");
 }
 
+static void xremote_device_library_export(XRemoteDeviceContext* context) {
+    XRemoteDeviceProfile* profile = xremote_device_profile_alloc();
+    if(!profile ||
+       !xremote_device_library_load_entry(context, context->library_selected, profile)) {
+        xremote_device_profile_free(profile);
+        xremote_device_message(context, "Export bundle", "Profile is invalid.");
+        return;
+    }
+
+    char manifest_path[XREMOTE_DEVICE_PATH_MAX];
+    const XRemoteDeviceBundleStatus status = xremote_device_bundle_export(
+        context->storage, profile, manifest_path, sizeof(manifest_path));
+    xremote_device_profile_free(profile);
+    if(status != XRemoteDeviceBundleStatusOk) {
+        xremote_device_message(
+            context, "Export bundle", xremote_device_bundle_status_name(status));
+        return;
+    }
+
+    char folder_name[XREMOTE_DEVICE_NAME_MAX + 1U];
+    char folder_path[XREMOTE_DEVICE_PATH_MAX];
+    snprintf(folder_path, sizeof(folder_path), "%s", manifest_path);
+    char* manifest_leaf = strrchr(folder_path, '/');
+    if(manifest_leaf) *manifest_leaf = '\0';
+    xremote_device_basename(folder_path, folder_name, sizeof(folder_name));
+    char message[64];
+    snprintf(message, sizeof(message), "Saved in bundles/%s", folder_name);
+    xremote_device_message(context, "Export bundle", message);
+}
+
 static bool
     xremote_device_library_repair_ir(XRemoteDeviceContext* context, XRemoteDeviceProfile* profile) {
     FuriString* selected_path = furi_string_alloc();
@@ -1467,6 +1501,10 @@ static void xremote_device_library_execute(XRemoteDeviceContext* context, uint8_
             context, "Repair profile", "Repair is available only\nfor missing sources.");
         return;
     }
+    if(action == XRemoteDeviceLibraryActionExport && entry->health != XRemoteDeviceLibraryReady) {
+        xremote_device_message(context, "Export bundle", "Export requires a Ready profile.");
+        return;
+    }
 
     context->library_actions = false;
     if(action == XRemoteDeviceLibraryActionOpen) {
@@ -1477,6 +1515,8 @@ static void xremote_device_library_execute(XRemoteDeviceContext* context, uint8_
         xremote_device_library_repair(context);
     } else if(action == XRemoteDeviceLibraryActionDuplicate) {
         xremote_device_library_duplicate(context);
+    } else if(action == XRemoteDeviceLibraryActionExport) {
+        xremote_device_library_export(context);
     } else if(action == XRemoteDeviceLibraryActionDelete) {
         xremote_device_library_delete(context);
     }
@@ -1662,14 +1702,48 @@ static void xremote_device_add_rf(XRemoteApp* app) {
     xremote_device_profile_free(profile);
 }
 
+static void xremote_device_import_bundle(XRemoteApp* app) {
+    XRemoteDeviceContext* context = app->context;
+    FuriString* path = furi_string_alloc();
+    if(!xremote_device_select_file(
+           context,
+           path,
+           XREMOTE_DEVICE_BUNDLE_FOLDER,
+           XREMOTE_DEVICE_BUNDLE_EXTENSION,
+           &I_unknown_10px)) {
+        furi_string_free(path);
+        return;
+    }
+
+    XRemoteDeviceProfile* imported = xremote_device_profile_alloc();
+    if(!imported) {
+        furi_string_free(path);
+        xremote_device_message(context, "Import bundle", "Out of memory.");
+        return;
+    }
+    const XRemoteDeviceBundleStatus status =
+        xremote_device_bundle_import(context->storage, furi_string_get_cstr(path), imported);
+    if(status == XRemoteDeviceBundleStatusOk) {
+        char message[64];
+        snprintf(message, sizeof(message), "Imported as %.32s", imported->name);
+        xremote_device_message(context, "Import bundle", message);
+    } else {
+        xremote_device_message(
+            context, "Import bundle", xremote_device_bundle_status_name(status));
+    }
+    xremote_device_profile_free(imported);
+    furi_string_free(path);
+}
+
 static void xremote_device_guide(XRemoteApp* app) {
     XRemoteDeviceContext* context = app->context;
     xremote_device_message(
         context,
         "Device Profiles",
         "Library: OK opens, Right\n"
-        "offers Edit/Repair/Copy.\n"
+        "has Edit/Repair/Export.\n"
         "Repair fixes one source.\n"
+        "Bundles include all files.\n"
         "Import IR or RF, then mix.\n"
         "Runtime: arrows select,\n"
         "OK sends, hold OK INT/EXT.");
@@ -1689,6 +1763,9 @@ static void xremote_device_menu_callback(void* callback_context, uint32_t index)
         break;
     case XRemoteDeviceMenuAddRf:
         xremote_device_add_rf(app);
+        break;
+    case XRemoteDeviceMenuImportBundle:
+        xremote_device_import_bundle(app);
         break;
     case XRemoteDeviceMenuGuide:
         xremote_device_guide(app);
@@ -1750,6 +1827,8 @@ XRemoteApp* xremote_device_profiles_alloc(XRemoteAppContext* app_ctx) {
         app, "New RF Profile", XRemoteDeviceMenuImportRf, xremote_device_menu_callback);
     xremote_app_submenu_add(
         app, "Add Sub-GHz", XRemoteDeviceMenuAddRf, xremote_device_menu_callback);
+    xremote_app_submenu_add(
+        app, "Import Bundle", XRemoteDeviceMenuImportBundle, xremote_device_menu_callback);
     xremote_app_submenu_add(app, "Guide", XRemoteDeviceMenuGuide, xremote_device_menu_callback);
 
     context->library_view =
