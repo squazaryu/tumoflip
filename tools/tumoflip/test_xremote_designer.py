@@ -20,8 +20,8 @@ class XRemoteDesignerTest(unittest.TestCase):
         self.assertIn("xremote_designer_alloc(app->app_ctx)", source)
         self.assertIn("XRemoteViewDesigner", header)
         self.assertIn("XRemoteViewDesignerMap", header)
-        self.assertIn('fap_version="1.12.0"', manifest)
-        self.assertIn("#define XREMOTE_VERSION_MIN  12", version_header)
+        self.assertIn('fap_version="1.13.0"', manifest)
+        self.assertIn("#define XREMOTE_VERSION_MIN  13", version_header)
 
     def test_ac_smart_is_integrated_as_xremote_child_app(self) -> None:
         source = (APP_DIR / "xremote.c").read_text(encoding="utf-8")
@@ -333,7 +333,7 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn("row == 0U ? 15U : 32U", source)
         self.assertIn("(uint8_t)(17U + slot * 18U)", source)
         self.assertIn('"OK sends, hold OK INT/EXT.', source)
-        self.assertIn("#define XREMOTE_VERSION_MIN  12", version)
+        self.assertIn("#define XREMOTE_VERSION_MIN  13", version)
 
     def test_profile_editor_supports_on_device_management(self) -> None:
         source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
@@ -391,6 +391,7 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
             '"Edit"',
             '"Repair"',
             '"Copy"',
+            '"Export"',
             '"Delete"',
             "xremote_device_library_keep_visible",
         ):
@@ -421,7 +422,7 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn("ViewOrientationVertical", source)
         self.assertIn("vertical ? 60U : 124U", source)
         self.assertIn("vertical ? 22U : 11U", source)
-        self.assertIn("(uint8_t)(17U + action * 18U)", source)
+        self.assertIn("(uint8_t)(16U + action * 16U)", source)
         self.assertIn("vertical && event->key == InputKeyUp", source)
         self.assertIn("vertical && event->key == InputKeyDown", source)
         self.assertIn("!vertical && event->key == InputKeyLeft", source)
@@ -448,6 +449,40 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn("xremote_device_profile_replace_rf_source(", header)
         self.assertIn("XRemoteDeviceRfCommand* command = &profile->rf[index]", storage)
         self.assertNotIn("storage_common_remove(context->storage", source)
+
+    def test_profile_bundle_is_portable_validated_and_transactional(self) -> None:
+        bundle = (APP_DIR / "xremote_device_bundle.c").read_text(encoding="utf-8")
+        header = (APP_DIR / "xremote_device_bundle.h").read_text(encoding="utf-8")
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+
+        for required in (
+            '"Tumo XRemote Device Bundle"',
+            "#define XREMOTE_DEVICE_BUNDLE_VERSION   1U",
+            '"/bundles"',
+            '"/imports"',
+            "xremote_device_bundle_export(",
+            "xremote_device_bundle_import(",
+        ):
+            self.assertIn(required, header)
+        for required in (
+            "storage_common_copy(storage",
+            "workspace->staging_folder, workspace->final_folder",
+            "storage_simply_remove_recursive(storage, workspace->staging_folder)",
+            "xremote_device_bundle_leaf_valid",
+            'strstr(manifest_path, "/../")',
+            "xremote_device_bundle_ir_valid",
+            "xremote_device_bundle_rf_valid",
+            "xremote_device_profile_store(storage, imported_profile)",
+            "workspace->installed_profile_path, imported_profile",
+            "XRemoteDeviceBundleImportWorkspace* workspace = calloc",
+            '"%.*s Import %u"',
+        ):
+            self.assertIn(required, bundle)
+        self.assertIn("XRemoteDeviceLibraryActionExport", source)
+        self.assertIn('"Import Bundle"', source)
+        self.assertIn('"Export requires a Ready profile."', source)
+        self.assertNotIn("storage_common_remove(storage, profile->ir_path)", bundle)
+        self.assertNotIn("storage_common_remove(storage, profile->rf", bundle)
 
     def test_profile_editor_keeps_atomic_rollback_and_nonempty_profile(self) -> None:
         storage = (APP_DIR / "xremote_device_profile.c").read_text(encoding="utf-8")
