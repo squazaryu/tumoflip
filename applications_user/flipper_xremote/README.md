@@ -1,7 +1,7 @@
 <p align="center">Advanced IR Remote App for Flipper Device</p>
 
 <p align="center">
-  Version 1.4 - <a href="https://github.com/kala13x/flipper-xremote/blob/main/docs/changelog.md">Changelog</a>
+  Tumo XRemote 1.12.0
 </p>
 
 <p align="center">
@@ -47,9 +47,17 @@ full-width buttons per page; Up/Down selects a command and Left/Right changes
 pages. The header always shows the current page and selected IR/RF output.
 
 `Profile Library` shows each profile's IR/RF command counts and reports missing
-sources or invalid profile files before launch. Press Right for Open, Edit, Copy,
-and Delete. Copy creates a separate profile record while keeping the same source
-references.
+sources or invalid profile files before launch. Press Right for Open, Edit,
+Repair, Copy, and Delete. Copy creates a separate profile record while keeping
+the same source references.
+
+`Repair` is available only for a profile marked `MISS`. It finds the first
+missing or unusable IR source, or the first missing Sub-GHz source, then opens
+the matching file picker. A replacement IR file must contain at least one valid
+command. A replacement Sub-GHz file must parse successfully and must not use a
+changing-code protocol. One source is repaired per explicit operation so every
+replacement remains visible and deliberate. Cancelled or rejected replacements
+leave the profile unchanged.
 
 `Edit` changes the selected profile directly on the Flipper:
 

@@ -20,8 +20,8 @@ class XRemoteDesignerTest(unittest.TestCase):
         self.assertIn("xremote_designer_alloc(app->app_ctx)", source)
         self.assertIn("XRemoteViewDesigner", header)
         self.assertIn("XRemoteViewDesignerMap", header)
-        self.assertIn('fap_version="1.11.0"', manifest)
-        self.assertIn("#define XREMOTE_VERSION_MIN  11", version_header)
+        self.assertIn('fap_version="1.12.0"', manifest)
+        self.assertIn("#define XREMOTE_VERSION_MIN  12", version_header)
 
     def test_ac_smart_is_integrated_as_xremote_child_app(self) -> None:
         source = (APP_DIR / "xremote.c").read_text(encoding="utf-8")
@@ -333,7 +333,7 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn("row == 0U ? 15U : 32U", source)
         self.assertIn("(uint8_t)(17U + slot * 18U)", source)
         self.assertIn('"OK sends, hold OK INT/EXT.', source)
-        self.assertIn("#define XREMOTE_VERSION_MIN  11", version)
+        self.assertIn("#define XREMOTE_VERSION_MIN  12", version)
 
     def test_profile_editor_supports_on_device_management(self) -> None:
         source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
@@ -389,6 +389,7 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
             '"BAD"',
             '"Open"',
             '"Edit"',
+            '"Repair"',
             '"Copy"',
             '"Delete"',
             "xremote_device_library_keep_visible",
@@ -420,11 +421,33 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn("ViewOrientationVertical", source)
         self.assertIn("vertical ? 60U : 124U", source)
         self.assertIn("vertical ? 22U : 11U", source)
-        self.assertIn("(uint8_t)(17U + action * 20U)", source)
+        self.assertIn("(uint8_t)(17U + action * 18U)", source)
         self.assertIn("vertical && event->key == InputKeyUp", source)
         self.assertIn("vertical && event->key == InputKeyDown", source)
         self.assertIn("!vertical && event->key == InputKeyLeft", source)
         self.assertIn("!vertical && event->key == InputKeyRight", source)
+
+    def test_profile_library_repair_is_explicit_atomic_and_source_safe(self) -> None:
+        storage = (APP_DIR / "xremote_device_profile.c").read_text(encoding="utf-8")
+        header = (APP_DIR / "xremote_device_profile.h").read_text(encoding="utf-8")
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+
+        for required in (
+            "XRemoteDeviceLibraryActionRepair",
+            "xremote_device_library_repair_ir",
+            "xremote_device_library_repair_rf",
+            "xremote_device_library_repair",
+            "entry->health != XRemoteDeviceLibraryMissing",
+            '"Repair is available only\\nfor missing sources."',
+            '"Source repaired.\\nMore sources missing."',
+            "xremote_subghz_inspect",
+            "info.changing_code",
+            "xremote_device_profile_store(context->storage, profile)",
+        ):
+            self.assertIn(required, source)
+        self.assertIn("xremote_device_profile_replace_rf_source(", header)
+        self.assertIn("XRemoteDeviceRfCommand* command = &profile->rf[index]", storage)
+        self.assertNotIn("storage_common_remove(context->storage", source)
 
     def test_profile_editor_keeps_atomic_rollback_and_nonempty_profile(self) -> None:
         storage = (APP_DIR / "xremote_device_profile.c").read_text(encoding="utf-8")
