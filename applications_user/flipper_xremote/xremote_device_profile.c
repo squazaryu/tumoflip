@@ -47,9 +47,7 @@ static bool xremote_device_profile_verify_string(
            strcmp(buffer, expected) == 0;
 }
 
-static bool xremote_device_profile_verify(
-    Storage* storage,
-    const XRemoteDeviceProfile* profile) {
+static bool xremote_device_profile_verify(Storage* storage, const XRemoteDeviceProfile* profile) {
     FlipperFormat* format = flipper_format_buffered_file_alloc(storage);
     FuriString* header = furi_string_alloc();
     char key[24];
@@ -74,11 +72,7 @@ static bool xremote_device_profile_verify(
             break;
         }
         if(!xremote_device_profile_verify_string(
-               format,
-               "Radio",
-               xremote_device_radio_name(profile->radio),
-               value,
-               sizeof(value))) {
+               format, "Radio", xremote_device_radio_name(profile->radio), value, sizeof(value))) {
             break;
         }
         if(!flipper_format_read_uint32(format, "RF Count", &rf_count, 1U) ||
@@ -387,6 +381,34 @@ bool xremote_device_profile_create_path(
     return false;
 }
 
+bool xremote_device_profile_duplicate(
+    Storage* storage,
+    const XRemoteDeviceProfile* source,
+    XRemoteDeviceProfile* duplicate) {
+    if(!storage || !source || !duplicate || source->path[0] == '\0' || source->name[0] == '\0') {
+        return false;
+    }
+
+    *duplicate = *source;
+    snprintf(
+        duplicate->name,
+        sizeof(duplicate->name),
+        "%.*s Copy",
+        (int)(XREMOTE_DEVICE_NAME_MAX - 5U),
+        source->name);
+    duplicate->path[0] = '\0';
+    if(!xremote_device_profile_create_path(
+           storage, duplicate->name, duplicate->path, sizeof(duplicate->path))) {
+        xremote_device_profile_reset(duplicate);
+        return false;
+    }
+    if(!xremote_device_profile_store(storage, duplicate)) {
+        xremote_device_profile_reset(duplicate);
+        return false;
+    }
+    return true;
+}
+
 bool xremote_device_profile_add_rf(
     XRemoteDeviceProfile* profile,
     const char* name,
@@ -463,6 +485,24 @@ bool xremote_device_profile_remove_rf(XRemoteDeviceProfile* profile, uint8_t ind
 }
 
 bool xremote_device_profile_delete(Storage* storage, const XRemoteDeviceProfile* profile) {
-    return storage && profile && profile->path[0] != '\0' &&
-           storage_simply_remove(storage, profile->path);
+    return profile && xremote_device_profile_delete_path(storage, profile->path);
+}
+
+bool xremote_device_profile_delete_path(Storage* storage, const char* path) {
+    if(!storage || !path || path[0] == '\0') return false;
+
+    const size_t folder_length = strlen(XREMOTE_DEVICE_PROFILE_FOLDER);
+    const size_t path_length = strlen(path);
+    const size_t extension_length = strlen(XREMOTE_DEVICE_PROFILE_EXTENSION);
+    if(path_length <= folder_length + 1U + extension_length ||
+       strncmp(path, XREMOTE_DEVICE_PROFILE_FOLDER "/", folder_length + 1U) != 0) {
+        return false;
+    }
+
+    const char* filename = path + folder_length + 1U;
+    if(filename[0] == '\0' || strchr(filename, '/') != NULL ||
+       strcmp(path + path_length - extension_length, XREMOTE_DEVICE_PROFILE_EXTENSION) != 0) {
+        return false;
+    }
+    return storage_simply_remove(storage, path);
 }

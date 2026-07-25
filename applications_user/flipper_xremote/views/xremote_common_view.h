@@ -160,6 +160,7 @@ typedef enum {
     XRemoteViewAcSmartSweep,
     XRemoteViewAcSmartDelete,
     XRemoteViewDeviceProfiles,
+    XRemoteViewDeviceLibrary,
     XRemoteViewDeviceRuntime,
     XRemoteViewDeviceEditor,
     XRemoteViewSaved,

@@ -36,8 +36,8 @@ commands in one on-device remote:
 
 1. Use `Import IR Remote` or `New RF Profile` to create a profile.
 2. Use `Add Sub-GHz` to add up to eight saved `.sub` commands.
-3. Open the profile, select a command in the paged control deck with the D-pad,
-   and press OK to send.
+3. Open `Profile Library`, select a profile, and press OK to launch its paged
+   control deck.
 4. For Sub-GHz commands, hold OK to switch between the internal and external
    CC1101. Hold Right to cycle B1-B4 only for reviewed 24-bit Princeton commands.
 
@@ -46,14 +46,19 @@ moves through commands and Up/Down moves between rows. Vertical mode keeps four
 full-width buttons per page; Up/Down selects a command and Left/Right changes
 pages. The header always shows the current page and selected IR/RF output.
 
-`Manage Profile` edits the profile directly on the Flipper:
+`Profile Library` shows each profile's IR/RF command counts and reports missing
+sources or invalid profile files before launch. Press Right for Open, Edit, Copy,
+and Delete. Copy creates a separate profile record while keeping the same source
+references.
+
+`Edit` changes the selected profile directly on the Flipper:
 
 - Up/Down selects the profile name, linked IR remote, or an RF command.
 - OK renames the selected label or chooses a replacement IR remote.
 - Left/Right moves the selected RF command up or down.
 - Long OK detaches the IR link or removes the selected RF command after confirmation.
 
-Profiles are stored under `/ext/apps_data/flipper_xremote/devices` and reference
+Profiles are stored under `/ext/apps_data/tumoflip_xremote/devices` and reference
 the original `.ir` and `.sub` files without modifying them. Missing source files
 are reported in the editor and runtime UI. Profile updates use a temporary file
 and backup rename so a failed write leaves the previously saved profile intact.
