@@ -20,8 +20,8 @@ class XRemoteDesignerTest(unittest.TestCase):
         self.assertIn("xremote_designer_alloc(app->app_ctx)", source)
         self.assertIn("XRemoteViewDesigner", header)
         self.assertIn("XRemoteViewDesignerMap", header)
-        self.assertIn('fap_version="1.13.1"', manifest)
-        self.assertIn("#define XREMOTE_VERSION_MIN  13", version_header)
+        self.assertIn('fap_version="1.14.0"', manifest)
+        self.assertIn("#define XREMOTE_VERSION_MIN  14", version_header)
 
     def test_ac_smart_is_integrated_as_xremote_child_app(self) -> None:
         source = (APP_DIR / "xremote.c").read_text(encoding="utf-8")
@@ -230,7 +230,9 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn("XRemoteViewDeviceHelp", header)
         self.assertIn('"subghz_radio_broker"', manifest)
         self.assertIn('"AC Smart", XRemoteViewAcSmart', source)
-        self.assertIn('"Saved", XRemoteViewIRSubmenu', source)
+        self.assertNotIn('"Saved", XRemoteViewIRSubmenu', source)
+        self.assertIn('"!xremote_control.c"', manifest)
+        self.assertIn('"!xremote_universal_view.c"', manifest)
 
     def test_profile_schema_is_versioned_and_references_source_files(self) -> None:
         header = (APP_DIR / "xremote_device_profile.h").read_text(encoding="utf-8")
@@ -332,10 +334,10 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         ):
             self.assertIn(required, source)
         self.assertIn("row == 0U ? 15U : 32U", source)
-        self.assertIn("(uint8_t)(17U + slot * 18U)", source)
+        self.assertIn("(uint8_t)(26U + slot * 18U)", source)
         self.assertIn('"Arrows select a button. OK sends it. On a Sub-GHz button, hold OK to "', source)
-        self.assertIn("#define XREMOTE_VERSION_MIN  13", version)
-        self.assertIn("#define XREMOTE_BUILD_NUMBER 1", version)
+        self.assertIn("#define XREMOTE_VERSION_MIN  14", version)
+        self.assertIn("#define XREMOTE_BUILD_NUMBER 0", version)
 
     def test_profile_editor_supports_on_device_management(self) -> None:
         source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
@@ -350,7 +352,7 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
             "xremote_device_editor_remove_rf",
             "xremote_device_profile_move_rf",
             '"Edit Remote"',
-            '"RF source missing"',
+            '"Source: missing"',
             '"Save failed; reopen remote"',
         ):
             self.assertIn(required, source if required != "XRemoteViewDeviceEditor" else header)
@@ -423,11 +425,11 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
 
         self.assertIn("ViewOrientationVertical", source)
         self.assertIn("vertical ? 60U : 124U", source)
-        self.assertIn("vertical ? 24U : 17U", source)
+        self.assertIn("vertical ? 25U : 17U", source)
         self.assertIn("XREMOTE_DEVICE_LIBRARY_ROWS_HORIZONTAL 2U", source)
-        self.assertIn("XREMOTE_DEVICE_LIBRARY_ROWS_VERTICAL   4U", source)
-        self.assertIn("15U + row * (vertical ? 24U : 18U)", source)
-        self.assertIn("(uint8_t)(16U + action * 16U)", source)
+        self.assertIn("XREMOTE_DEVICE_LIBRARY_ROWS_VERTICAL   3U", source)
+        self.assertIn("15U + row * (vertical ? 27U : 18U)", source)
+        self.assertIn("(uint8_t)(16U + action * 15U)", source)
         self.assertIn("vertical && event->key == InputKeyUp", source)
         self.assertIn("vertical && event->key == InputKeyDown", source)
         self.assertIn("!vertical && event->key == InputKeyLeft", source)
@@ -515,7 +517,7 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn("canvas, 3, 49, 122, AlignLeft", editor)
         self.assertNotIn("canvas, 3, 59", editor)
         self.assertIn("xremote_device_editor_draw_move_button", editor)
-        self.assertIn("66,\n            60,\n            AlignLeft", editor)
+        self.assertIn("60,\n            60,\n            AlignLeft", editor)
 
     def test_profile_editor_back_is_explicit_and_matches_the_visible_control(self) -> None:
         source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
@@ -523,15 +525,21 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
             "static XRemoteView* xremote_device_editor_alloc", 1
         )[0]
 
-        self.assertIn("xremote_device_editor_close(context);", editor_input)
         self.assertIn(
-            "event->type == InputTypeShort && event->key == InputKeyBack", editor_input
-        )
-        self.assertIn("if(!is_rf)", editor_input)
-        self.assertNotIn(
             "event->type == InputTypeShort && event->key == InputKeyBack) return false",
             editor_input,
         )
+        self.assertIn(
+            "if(event->type != InputTypeShort && event->type != InputTypeLong) return true",
+            editor_input,
+        )
+        self.assertNotIn("xremote_device_editor_close(context);", editor_input)
+        self.assertIn("if(is_rf && rf_index > 0U", editor_input)
+        self.assertIn("view_set_enter_callback(library_view, xremote_device_library_enter)", source)
+        previous_library = source.split(
+            "static uint32_t xremote_device_previous_library", 1
+        )[1].split("static uint32_t xremote_device_library_previous", 1)[0]
+        self.assertNotIn("xremote_device_context_unload", previous_library)
 
     def test_profile_help_is_scrollable_and_returns_to_remote_menu(self) -> None:
         source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
@@ -542,15 +550,17 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
             "text_box_alloc()",
             "text_box_set_text(",
             "text_box_set_focus(context->help_box, TextBoxFocusStart)",
-            "view_set_orientation(help_view, app_ctx->app_settings->orientation)",
+            "view_set_orientation(help_view, context->app_ctx->app_settings->orientation)",
             "view_set_previous_callback(help_view, xremote_device_help_previous)",
             "XRemoteViewDeviceHelp",
         ):
             self.assertIn(required, source if required != "XRemoteViewDeviceHelp" else header)
+        allocator = source.split("XRemoteApp* xremote_device_profiles_alloc", 1)[1]
+        self.assertNotIn("context->help_box = text_box_alloc();", allocator)
 
     def test_profile_library_rows_stay_above_footer_controls(self) -> None:
         horizontal_last_bottom = 15 + (2 - 1) * 18 + 17
-        vertical_last_bottom = 15 + (4 - 1) * 24 + 24
+        vertical_last_bottom = 15 + (3 - 1) * 27 + 25
 
         self.assertLessEqual(horizontal_last_bottom, 52)
         self.assertLessEqual(vertical_last_bottom, 116)

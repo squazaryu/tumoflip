@@ -19,7 +19,7 @@
 #define XREMOTE_DEVICE_LIBRARY_MAX             16U
 #define XREMOTE_DEVICE_LIBRARY_FILENAME_MAX    96U
 #define XREMOTE_DEVICE_LIBRARY_ROWS_HORIZONTAL 2U
-#define XREMOTE_DEVICE_LIBRARY_ROWS_VERTICAL   4U
+#define XREMOTE_DEVICE_LIBRARY_ROWS_VERTICAL   3U
 
 typedef enum {
     XRemoteDeviceMenuLibrary,
@@ -97,12 +97,7 @@ static uint32_t xremote_device_previous_main(void* context) {
 }
 
 static uint32_t xremote_device_previous_library(void* raw_view) {
-    XRemoteView* view = raw_view;
-    XRemoteDeviceContext* context = view ? xremote_view_get_context(view) : NULL;
-    if(context) {
-        xremote_device_context_unload(context);
-        xremote_device_library_refresh(context);
-    }
+    UNUSED(raw_view);
     return XRemoteViewDeviceLibrary;
 }
 
@@ -440,6 +435,19 @@ static void xremote_device_runtime_draw_cell(
     canvas_set_color(canvas, ColorBlack);
 }
 
+static void xremote_device_draw_vertical_footer(
+    Canvas* canvas,
+    bool show_center,
+    bool show_right) {
+    xremote_device_runtime_draw_cell(canvas, 2U, 109U, 18U, 15U, "<", false);
+    if(show_center) {
+        xremote_device_runtime_draw_cell(canvas, 23U, 109U, 18U, 15U, "OK", false);
+    }
+    if(show_right) {
+        xremote_device_runtime_draw_cell(canvas, 44U, 109U, 18U, 15U, "...", false);
+    }
+}
+
 static void xremote_device_runtime_command_label(
     const XRemoteDeviceContext* context,
     uint16_t command_index,
@@ -501,10 +509,10 @@ static void xremote_device_runtime_draw(Canvas* canvas, void* model_context) {
         elements_button_left(canvas, "Back");
         elements_button_center(canvas, "Send");
     } else {
-        xremote_device_draw_fitted(canvas, 2, 10, 39, AlignLeft, title);
+        xremote_device_draw_fitted(canvas, 2, 9, 60, AlignLeft, title);
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 62, 10, AlignRight, AlignBottom, page_source);
-        canvas_draw_line(canvas, 2, 13, 62, 13);
+        canvas_draw_str_aligned(canvas, 62, 19, AlignRight, AlignBottom, page_source);
+        canvas_draw_line(canvas, 2, 22, 62, 22);
 
         for(uint8_t slot = 0U; slot < XREMOTE_DEVICE_PAGE_SIZE; slot++) {
             const uint16_t command_index = page_start + slot;
@@ -514,7 +522,7 @@ static void xremote_device_runtime_draw(Canvas* canvas, void* model_context) {
             xremote_device_runtime_draw_cell(
                 canvas,
                 2U,
-                (uint8_t)(17U + slot * 18U),
+                (uint8_t)(26U + slot * 18U),
                 60U,
                 15U,
                 label,
@@ -683,29 +691,29 @@ static void xremote_device_editor_detail(
     secondary[0] = '\0';
 
     if(context->editor_selected == 0U) {
-        const char* ir_state = context->profile->ir_path[0] == '\0' ? "IR off" :
+        const char* ir_state = context->profile->ir_path[0] == '\0' ? "off" :
                                storage_file_exists(context->storage, context->profile->ir_path) ?
-                                                                      "IR linked" :
-                                                                      "IR missing";
+                                                                      "linked" :
+                                                                      "missing";
         snprintf(primary, primary_size, "IR: %s", ir_state);
         snprintf(
-            secondary, secondary_size, "RF buttons: %u", (unsigned int)context->profile->rf_count);
+            secondary, secondary_size, "RF: %u buttons", (unsigned int)context->profile->rf_count);
         return;
     }
 
     if(context->editor_selected == 1U) {
         if(context->profile->ir_path[0] == '\0') {
-            snprintf(primary, primary_size, "No IR buttons");
-            snprintf(secondary, secondary_size, "Choose saved remote");
+            snprintf(primary, primary_size, "IR not linked");
+            snprintf(secondary, secondary_size, "OK: choose");
         } else {
             snprintf(
                 primary,
                 primary_size,
                 "%s",
                 storage_file_exists(context->storage, context->profile->ir_path) ?
-                    "IR source ready" :
-                    "IR source missing");
-            snprintf(secondary, secondary_size, "Hold OK: detach");
+                    "Source: ready" :
+                    "Source: missing");
+            snprintf(secondary, secondary_size, "Hold: unlink");
         }
         return;
     }
@@ -720,9 +728,9 @@ static void xremote_device_editor_detail(
         primary,
         primary_size,
         "%s",
-        storage_file_exists(context->storage, command->path) ? "RF source ready" :
-                                                               "RF source missing");
-    snprintf(secondary, secondary_size, "Protocol: %s", command->protocol);
+        storage_file_exists(context->storage, command->path) ? "Source: ready" :
+                                                               "Source: missing");
+    snprintf(secondary, secondary_size, "Proto: %s", command->protocol);
 }
 
 static void xremote_device_editor_draw_move_button(
@@ -731,12 +739,12 @@ static void xremote_device_editor_draw_move_button(
     XRemoteIcon icon,
     bool enabled) {
     if(enabled) {
-        canvas_draw_rbox(canvas, x, 85, 20, 17, 3);
+        canvas_draw_rbox(canvas, x, 82, 20, 16, 3);
         canvas_set_color(canvas, ColorWhite);
     } else {
-        canvas_draw_rframe(canvas, x, 85, 20, 17, 3);
+        canvas_draw_rframe(canvas, x, 82, 20, 16, 3);
     }
-    xremote_canvas_draw_icon(canvas, (uint8_t)(x + 10U), 93, icon);
+    xremote_canvas_draw_icon(canvas, (uint8_t)(x + 10U), 90, icon);
     canvas_set_color(canvas, ColorBlack);
 }
 
@@ -806,8 +814,8 @@ static void xremote_device_editor_draw(Canvas* canvas, void* model_context) {
                                                        "Choose");
         }
     } else {
-        xremote_canvas_draw_icon(canvas, 8, 8, XRemoteIconBack);
-        canvas_draw_str(canvas, 16, 10, "Edit");
+        xremote_canvas_draw_icon(canvas, 8, 7, XRemoteIconBack);
+        canvas_draw_str(canvas, 16, 9, "Edit");
         canvas_set_font(canvas, FontSecondary);
         char position[12];
         snprintf(
@@ -816,27 +824,27 @@ static void xremote_device_editor_draw(Canvas* canvas, void* model_context) {
             "%u/%u",
             (unsigned int)(context->editor_selected + 1U),
             (unsigned int)xremote_device_editor_count(context));
-        canvas_draw_str_aligned(canvas, 62, 10, AlignRight, AlignBottom, position);
-        canvas_draw_line(canvas, 2, 13, 62, 13);
-        canvas_draw_str(canvas, 2, 25, xremote_device_editor_label(context));
-        elements_slightly_rounded_box(canvas, 2, 29, 60, 24);
+        canvas_draw_str_aligned(canvas, 62, 9, AlignRight, AlignBottom, position);
+        canvas_draw_line(canvas, 2, 12, 62, 12);
+        canvas_draw_str(canvas, 2, 23, xremote_device_editor_label(context));
+        elements_slightly_rounded_box(canvas, 2, 26, 60, 22);
         canvas_set_color(canvas, ColorWhite);
         canvas_set_font(canvas, FontPrimary);
-        xremote_device_draw_fitted(canvas, 32, 46, 52, AlignCenter, value);
+        xremote_device_draw_fitted(canvas, 32, 42, 52, AlignCenter, value);
         canvas_set_color(canvas, ColorBlack);
         canvas_set_font(canvas, FontSecondary);
 
         xremote_device_draw_fitted(
             canvas,
             2,
-            66,
+            60,
             60,
             AlignLeft,
             context->status[0] != '\0' ? context->status : detail_primary);
         xremote_device_draw_fitted(
             canvas,
             2,
-            78,
+            72,
             60,
             AlignLeft,
             context->status[0] != '\0' ? detail_primary : detail_secondary);
@@ -976,19 +984,11 @@ static void xremote_device_editor_remove_rf(XRemoteDeviceContext* context, uint8
     }
 }
 
-static void xremote_device_editor_close(XRemoteDeviceContext* context) {
-    xremote_device_context_unload(context);
-    xremote_device_library_refresh(context);
-    view_dispatcher_switch_to_view(context->app_ctx->view_dispatcher, XRemoteViewDeviceLibrary);
-}
-
 static bool xremote_device_editor_input(InputEvent* event, void* view_context) {
     XRemoteView* view = view_context;
     XRemoteDeviceContext* context = xremote_view_get_context(view);
-    if(event->type == InputTypeShort && event->key == InputKeyBack) {
-        xremote_device_editor_close(context);
-        return true;
-    }
+    if(event->type != InputTypeShort && event->type != InputTypeLong) return true;
+    if(event->type == InputTypeShort && event->key == InputKeyBack) return false;
 
     const uint8_t count = xremote_device_editor_count(context);
     uint8_t rf_index = 0U;
@@ -1025,11 +1025,7 @@ static bool xremote_device_editor_input(InputEvent* event, void* view_context) {
             xremote_device_editor_remove_rf(context, rf_index);
         }
     } else if(event->type == InputTypeShort && event->key == InputKeyLeft) {
-        if(!is_rf) {
-            xremote_device_editor_close(context);
-            return true;
-        }
-        if(rf_index > 0U &&
+        if(is_rf && rf_index > 0U &&
            xremote_device_profile_move_rf(context->profile, rf_index, rf_index - 1U)) {
             if(xremote_device_profile_commit(context, "Command moved", "Save failed; restored")) {
                 context->editor_selected--;
@@ -1213,6 +1209,12 @@ static const char* xremote_device_library_health_name(XRemoteDeviceLibraryHealth
     return "Ready";
 }
 
+static const char* xremote_device_library_health_short(XRemoteDeviceLibraryHealth health) {
+    if(health == XRemoteDeviceLibraryMissing) return "MISS";
+    if(health == XRemoteDeviceLibraryInvalid) return "BAD";
+    return "OK";
+}
+
 static const char* xremote_device_library_action_name(uint8_t action) {
     static const char* const names[XRemoteDeviceLibraryActionCount] = {
         "Open",
@@ -1231,26 +1233,31 @@ static void xremote_device_library_draw_entry(
     uint8_t y,
     bool selected,
     bool vertical) {
-    const uint8_t height = vertical ? 24U : 17U;
+    const uint8_t height = vertical ? 25U : 17U;
     if(selected) {
         canvas_draw_rbox(canvas, 2, y, vertical ? 60U : 124U, height, 2);
         canvas_set_color(canvas, ColorWhite);
     }
 
     canvas_set_font(canvas, FontSecondary);
-    char summary[20];
-    snprintf(
-        summary,
-        sizeof(summary),
-        "IR %u  RF %u",
-        (unsigned int)entry->ir_count,
-        (unsigned int)entry->rf_count);
+    char summary[28];
     if(vertical) {
-        xremote_device_draw_fitted(canvas, 5, y + 8U, 54U, AlignLeft, entry->name);
-        xremote_device_draw_fitted(canvas, 5, y + 16U, 54U, AlignLeft, summary);
-        xremote_device_draw_fitted(
-            canvas, 5, y + 23U, 54U, AlignLeft, xremote_device_library_health_name(entry->health));
+        snprintf(
+            summary,
+            sizeof(summary),
+            "IR%u RF%u %s",
+            (unsigned int)entry->ir_count,
+            (unsigned int)entry->rf_count,
+            xremote_device_library_health_short(entry->health));
+        xremote_device_draw_fitted(canvas, 5, y + 10U, 54U, AlignLeft, entry->name);
+        xremote_device_draw_fitted(canvas, 5, y + 21U, 54U, AlignLeft, summary);
     } else {
+        snprintf(
+            summary,
+            sizeof(summary),
+            "IR %u  RF %u",
+            (unsigned int)entry->ir_count,
+            (unsigned int)entry->rf_count);
         xremote_device_draw_fitted(canvas, 5, y + 8U, 78U, AlignLeft, entry->name);
         canvas_draw_str_aligned(
             canvas,
@@ -1268,15 +1275,17 @@ static void xremote_device_library_draw_actions(Canvas* canvas, XRemoteDeviceCon
     const XRemoteDeviceLibraryEntry* entry = &context->library[context->library_selected];
     const bool vertical = context->app_ctx->app_settings->orientation == ViewOrientationVertical;
     xremote_device_draw_fitted(
-        canvas, 2, vertical ? 10 : 9, vertical ? 40U : 94U, AlignLeft, entry->name);
+        canvas, 2, vertical ? 10 : 9, vertical ? 60U : 94U, AlignLeft, entry->name);
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str_aligned(
-        canvas,
-        vertical ? 62 : 126,
-        vertical ? 10 : 9,
-        AlignRight,
-        AlignBottom,
-        xremote_device_library_health_name(entry->health));
+    if(!vertical) {
+        canvas_draw_str_aligned(
+            canvas,
+            126,
+            9,
+            AlignRight,
+            AlignBottom,
+            xremote_device_library_health_name(entry->health));
+    }
     canvas_draw_line(canvas, 2, vertical ? 13 : 12, vertical ? 62 : 126, vertical ? 13 : 12);
 
     for(uint8_t action = 0U; action < XRemoteDeviceLibraryActionCount; action++) {
@@ -1284,9 +1293,9 @@ static void xremote_device_library_draw_actions(Canvas* canvas, XRemoteDeviceCon
             xremote_device_runtime_draw_cell(
                 canvas,
                 2U,
-                (uint8_t)(16U + action * 16U),
+                (uint8_t)(16U + action * 15U),
                 60U,
-                14U,
+                13U,
                 xremote_device_library_action_name(action),
                 context->library_action == action);
         } else {
@@ -1302,8 +1311,12 @@ static void xremote_device_library_draw_actions(Canvas* canvas, XRemoteDeviceCon
                 context->library_action == action);
         }
     }
-    elements_button_left(canvas, "Back");
-    elements_button_center(canvas, "Select");
+    if(vertical) {
+        xremote_device_draw_vertical_footer(canvas, true, false);
+    } else {
+        elements_button_left(canvas, "Back");
+        elements_button_center(canvas, "Select");
+    }
 }
 
 static void xremote_device_library_draw(Canvas* canvas, void* model_context) {
@@ -1319,7 +1332,8 @@ static void xremote_device_library_draw(Canvas* canvas, void* model_context) {
     }
 
     xremote_device_draw_fitted(
-        canvas, 2, vertical ? 10 : 9, vertical ? 44U : 100U, AlignLeft, "My Remotes");
+        canvas, 2, vertical ? 10 : 9, vertical ? 44U : 100U, AlignLeft, vertical ? "Remotes" :
+                                                                                  "My Remotes");
     canvas_set_font(canvas, FontSecondary);
     char count[12];
     snprintf(
@@ -1358,13 +1372,17 @@ static void xremote_device_library_draw(Canvas* canvas, void* model_context) {
         xremote_device_library_draw_entry(
             canvas,
             &context->library[index],
-            (uint8_t)(15U + row * (vertical ? 24U : 18U)),
+            (uint8_t)(15U + row * (vertical ? 27U : 18U)),
             index == context->library_selected,
             vertical);
     }
-    elements_button_left(canvas, "Back");
-    elements_button_center(canvas, "Open");
-    elements_button_right(canvas, "Actions");
+    if(vertical) {
+        xremote_device_draw_vertical_footer(canvas, true, true);
+    } else {
+        elements_button_left(canvas, "Back");
+        elements_button_center(canvas, "Open");
+        elements_button_right(canvas, "Actions");
+    }
 }
 
 static bool xremote_device_library_start_runtime(XRemoteDeviceContext* context) {
@@ -1673,6 +1691,17 @@ static bool xremote_device_library_input(InputEvent* event, void* view_context) 
     return true;
 }
 
+static void xremote_device_library_enter(void* raw_view) {
+    XRemoteView* view = raw_view;
+    XRemoteDeviceContext* context = view ? xremote_view_get_context(view) : NULL;
+    if(!context) return;
+
+    xremote_device_context_unload(context);
+    xremote_device_library_refresh(context);
+    with_view_model(
+        xremote_view_get_view(view), XRemoteViewModel * model, { model->context = context; }, true);
+}
+
 static void xremote_device_library_show(XRemoteDeviceContext* context) {
     context->library_actions = false;
     xremote_device_library_refresh(context);
@@ -1829,10 +1858,24 @@ static void xremote_device_import_bundle(XRemoteApp* app) {
 
 static void xremote_device_guide(XRemoteApp* app) {
     XRemoteDeviceContext* context = app->context;
+    if(!context->help_box) {
+        context->help_box = text_box_alloc();
+        if(!context->help_box) {
+            xremote_device_message(context, "Help", "Out of memory.");
+            return;
+        }
+        text_box_set_font(context->help_box, TextBoxFontText);
+        text_box_set_focus(context->help_box, TextBoxFocusStart);
+        View* help_view = text_box_get_view(context->help_box);
+        view_set_orientation(help_view, context->app_ctx->app_settings->orientation);
+        view_set_previous_callback(help_view, xremote_device_help_previous);
+        view_dispatcher_add_view(
+            context->app_ctx->view_dispatcher, XRemoteViewDeviceHelp, help_view);
+    }
     text_box_reset(context->help_box);
     text_box_set_text(
         context->help_box,
-        "IR + RF REMOTES\n"
+        "IR+RF HELP\n"
         "\n"
         "CREATE\n"
         "Create from a saved IR remote or a static Sub-GHz file. Add Sub-GHz "
@@ -1892,8 +1935,10 @@ static void xremote_device_context_free(void* raw_context) {
         view_dispatcher_remove_view(context->app_ctx->view_dispatcher, XRemoteViewDeviceLibrary);
         xremote_view_free(context->library_view);
     }
-    view_dispatcher_remove_view(context->app_ctx->view_dispatcher, XRemoteViewDeviceHelp);
-    text_box_free(context->help_box);
+    if(context->help_box) {
+        view_dispatcher_remove_view(context->app_ctx->view_dispatcher, XRemoteViewDeviceHelp);
+        text_box_free(context->help_box);
+    }
     view_dispatcher_remove_view(context->app_ctx->view_dispatcher, XRemoteViewTextInput);
     text_input_free(context->text_input);
     xremote_device_profile_free(context->profile);
@@ -1910,9 +1955,7 @@ XRemoteApp* xremote_device_profiles_alloc(XRemoteAppContext* app_ctx) {
     context->dialogs = furi_record_open(RECORD_DIALOGS);
     context->profile = xremote_device_profile_alloc();
     context->text_input = text_input_alloc();
-    context->help_box = text_box_alloc();
-    if(!context->profile || !context->text_input || !context->help_box) {
-        if(context->help_box) text_box_free(context->help_box);
+    if(!context->profile || !context->text_input) {
         if(context->text_input) text_input_free(context->text_input);
         xremote_device_profile_free(context->profile);
         furi_record_close(RECORD_DIALOGS);
@@ -1924,12 +1967,6 @@ XRemoteApp* xremote_device_profiles_alloc(XRemoteAppContext* app_ctx) {
     View* text_view = text_input_get_view(context->text_input);
     view_set_previous_callback(text_view, xremote_device_text_input_previous);
     view_dispatcher_add_view(app_ctx->view_dispatcher, XRemoteViewTextInput, text_view);
-    text_box_set_font(context->help_box, TextBoxFontText);
-    text_box_set_focus(context->help_box, TextBoxFocusStart);
-    View* help_view = text_box_get_view(context->help_box);
-    view_set_orientation(help_view, app_ctx->app_settings->orientation);
-    view_set_previous_callback(help_view, xremote_device_help_previous);
-    view_dispatcher_add_view(app_ctx->view_dispatcher, XRemoteViewDeviceHelp, help_view);
     if(!xremote_device_profile_storage_ready(context->storage)) {
         snprintf(context->status, sizeof(context->status), "Storage unavailable");
     }
@@ -1956,6 +1993,7 @@ XRemoteApp* xremote_device_profiles_alloc(XRemoteAppContext* app_ctx) {
     xremote_view_model_context_set(context->library_view, context);
     View* library_view = xremote_view_get_view(context->library_view);
     view_set_previous_callback(library_view, xremote_device_library_previous);
+    view_set_enter_callback(library_view, xremote_device_library_enter);
     view_dispatcher_add_view(app_ctx->view_dispatcher, XRemoteViewDeviceLibrary, library_view);
     return app;
 }
