@@ -607,6 +607,22 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         )[1].split("static uint32_t xremote_device_library_previous", 1)[0]
         self.assertNotIn("xremote_device_context_unload", previous_library)
 
+    def test_profile_editor_cancel_restores_context_after_text_input_reset(self) -> None:
+        source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
+        previous = source.split(
+            "static uint32_t xremote_device_text_input_previous", 1
+        )[1].split("static void xremote_device_text_input_done", 1)[0]
+        start_text = source.split(
+            "static void xremote_device_editor_start_text", 1
+        )[1].split("static bool\n    xremote_device_editor_select_ir", 1)[0]
+
+        self.assertIn("if(context)", previous)
+        self.assertIn("context->edit_target = XRemoteDeviceEditNone", previous)
+        self.assertLess(
+            start_text.index("text_input_reset(context->text_input)"),
+            start_text.index("text_input_set_validator(context->text_input, NULL, context)"),
+        )
+
     def test_profile_help_is_scrollable_and_returns_to_remote_menu(self) -> None:
         source = (APP_DIR / "xremote_device_profiles.c").read_text(encoding="utf-8")
         header = (APP_DIR / "views/xremote_common_view.h").read_text(encoding="utf-8")
