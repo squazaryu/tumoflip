@@ -10,6 +10,20 @@ SOURCE_ROOT = APP_ROOT / "src"
 
 
 class TumoKeyTest(unittest.TestCase):
+    def test_stable_release_excludes_unaccepted_security_app(self) -> None:
+        options = (REPO_ROOT / "fbt_options.py").read_text(encoding="utf-8")
+        cockpit = (
+            REPO_ROOT
+            / "applications_user/module_one_cockpit/module_one_cockpit.c"
+        ).read_text(encoding="utf-8")
+        validator = (
+            REPO_ROOT / "tools/tumoflip/validate_release.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('"tumokey"', options)
+        self.assertNotIn('"Security: TumoKey"', cockpit)
+        self.assertNotIn('"apps/Module One/Security/tumokey.fap"', validator)
+
     def test_manifest_is_dev_only_api_88_package(self) -> None:
         manifest = (APP_ROOT / "application.fam").read_text(encoding="utf-8")
 

@@ -10,9 +10,6 @@ APP_SOURCE = APP_DIR / "module_one_cockpit.c"
 APP_MANIFEST = APP_DIR / "application.fam"
 
 COCKPIT_FAP_ROUTES = {
-    "tumo_uart_console": (
-        "apps_data/module_one_cockpit/modules/tumo_uart_console.fap"
-    ),
     "tumo_ir_lab": "apps/Module One/IR Blaster/tumo_ir_lab.fap",
     "tumoflip_xremote": "apps/Module One/IR Blaster/tumoflip_xremote.fap",
     "wifi_mapper": "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
@@ -27,7 +24,6 @@ COCKPIT_FAP_ROUTES = {
     "tumonet_gateway": "apps/Module One/Network/tumonet_gateway.fap",
     "tumovgm_bridge": "apps/Module One/VGM/tumovgm_bridge.fap",
     "tumomodule_runtime": "apps/Module One/Modules/tumomodule_runtime.fap",
-    "tumokey": "apps/Module One/Security/tumokey.fap",
     "module_one_sensor_logger": (
         "apps/Module One/Sensors BME280/module_one_sensor_logger.fap"
     ),
@@ -58,7 +54,7 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn('fap_icon="icon.png"', self.manifest)
         self.assertTrue((APP_DIR / "icon.png").is_file())
         self.assertIn("BLE: GATT Lab", self.source)
-        self.assertIn("UART: Field Console", self.source)
+        self.assertNotIn("UART: Field Console", self.source)
         self.assertIn("BLE: Terminal", self.source)
         self.assertIn("Automation: TumoFlow", self.source)
         self.assertIn("Field: Logger", self.source)
@@ -68,16 +64,12 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("Network: TumoNet", self.source)
         self.assertIn("VGM: Bridge", self.source)
         self.assertIn("Modules: Runtime", self.source)
-        self.assertIn("Security: TumoKey", self.source)
+        self.assertNotIn("Security: TumoKey", self.source)
         self.assertIn("NFC: TumoCard OS", self.source)
         self.assertIn("NFC: Tag Verify", self.source)
         self.assertIn("Macros: TumoScript", self.source)
         self.assertIn("System: Acceptance", self.source)
         self.assertIn("System: Runtime Trace", self.source)
-        self.assertIn(
-            'EXT_PATH("apps_data/module_one_cockpit/modules/tumo_uart_console.fap")',
-            self.source,
-        )
         self.assertIn(
             'EXT_PATH("apps/Module One/BLE/ble_gatt_lab.fap")',
             self.source,
@@ -122,10 +114,6 @@ class ModuleOneCockpitTest(unittest.TestCase):
         )
         self.assertIn(
             'EXT_PATH("apps/Module One/Modules/tumomodule_runtime.fap")',
-            self.source,
-        )
-        self.assertIn(
-            'EXT_PATH("apps/Module One/Security/tumokey.fap")',
             self.source,
         )
         self.assertIn(

@@ -33,7 +33,7 @@ VERSION_COMPONENT_RE = re.compile(r"^\d{3}$")
 
 @dataclass(frozen=True)
 class DevVersion:
-    base: str
+    base: str | None
     build: str
     iteration: str
 
@@ -45,6 +45,8 @@ class DevVersion:
         return cls(base=base, build=build, iteration=iteration)
 
     def format(self) -> str:
+        if self.base is None:
+            return f"t-dev-{self.build}-{self.iteration}"
         return f"t-dev-{self.base}-{self.build}-{self.iteration}"
 
 

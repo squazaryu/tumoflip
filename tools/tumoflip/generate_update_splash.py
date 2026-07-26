@@ -353,10 +353,9 @@ def generate_slideshow(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     generate(title, version, frames[0])
-    base_version = version.split("-", 1)[0]
     if title == "T-DEV":
         frame_01_lines = (
-            (f"UNLEASHED {base_version}", gravity_bold(8), 22),
+            ("TUMOFLIP FIRMWARE", gravity_bold(8), 22),
             ("TUMOFLIP DEV", gravity_bold(8), 36),
         )
         frame_02_lines = (
@@ -365,12 +364,12 @@ def generate_slideshow(
         )
     else:
         frame_01_lines = (
-            (f"UNLEASHED {base_version}", gravity_bold(8), 22),
-            ("TUMOWUH FIRMWARE", gravity_bold(8), 36),
+            ("TUMOFLIP FIRMWARE", gravity_bold(8), 22),
+            ("STABLE RELEASE", gravity_bold(8), 36),
         )
         frame_02_lines = (
-            ("CUSTOM BUILD", gravity_bold(8), 22),
-            ("USE WITH CARE", gravity_bold(8), 36),
+            ("WELCOME TO", gravity_bold(8), 22),
+            ("TUMOFLIP", gravity_bold(8), 36),
         )
     generate_message_frame(
         frame_01_lines,

@@ -15,9 +15,13 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 STABLE_PREFIX = "t-flppr-fw"
 LEGACY_STABLE_PREFIX = "tmwhflpprarf"
 README_VERSION_RE = re.compile(
-    r"(?:t-flppr-fw-\d{3}-\d{3}|tmwhflpprarf\d{3}-\d{3}|(?:t-)?dev-\d{3}-\d{3}-\d{3})"
+    r"(?:t-flppr-fw-(?:\d{3}-\d{3}|\d{3})|tmwhflpprarf\d{3}-\d{3}|"
+    r"(?:t-)?dev-(?:\d{3}-\d{3}-\d{3}|\d{3}-\d{3}))"
 )
 DIST_SUFFIX_RE = re.compile(r'DIST_SUFFIX\s*=\s*"([^"]+)"')
+STANDALONE_STABLE_VERSION_RE = re.compile(
+    rf"^(?P<prefix>{re.escape(STABLE_PREFIX)})-(?P<release>\d{{3}})$"
+)
 STABLE_VERSION_RE = re.compile(
     rf"^(?P<prefix>{re.escape(STABLE_PREFIX)})-(?P<base>\d{{3}})-(?P<build>\d{{3}})$"
 )
@@ -26,6 +30,9 @@ LEGACY_STABLE_VERSION_RE = re.compile(
 )
 DEV_VERSION_RE = re.compile(
     r"^(?P<prefix>t-dev)-(?P<base>\d{3})-(?P<build>\d{3})-(?P<iteration>\d{3})$"
+)
+STANDALONE_DEV_VERSION_RE = re.compile(
+    r"^(?P<prefix>t-dev)-(?P<release>\d{3})-(?P<iteration>\d{3})$"
 )
 
 
@@ -41,7 +48,18 @@ def read_dist_suffix(repo_root: Path = REPO_ROOT) -> str:
     return match.group(1)
 
 
-def parse_dist_suffix(dist_suffix: str) -> tuple[str, str, str, str | None]:
+def parse_dist_suffix(
+    dist_suffix: str,
+) -> tuple[str, str | None, str, str | None]:
+    standalone_stable_match = STANDALONE_STABLE_VERSION_RE.match(dist_suffix)
+    if standalone_stable_match:
+        return (
+            standalone_stable_match.group("prefix"),
+            None,
+            standalone_stable_match.group("release"),
+            None,
+        )
+
     stable_match = STABLE_VERSION_RE.match(dist_suffix)
     if not stable_match:
         stable_match = LEGACY_STABLE_VERSION_RE.match(dist_suffix)
@@ -62,6 +80,15 @@ def parse_dist_suffix(dist_suffix: str) -> tuple[str, str, str, str | None]:
             dev_match.group("iteration"),
         )
 
+    standalone_dev_match = STANDALONE_DEV_VERSION_RE.match(dist_suffix)
+    if standalone_dev_match:
+        return (
+            standalone_dev_match.group("prefix"),
+            None,
+            standalone_dev_match.group("release"),
+            standalone_dev_match.group("iteration"),
+        )
+
     raise ValueError(f"unsupported tumoflip DIST_SUFFIX: {dist_suffix}")
 
 
@@ -75,9 +102,15 @@ def sync_readme_text(
     prefix, base, build, iteration = parse_dist_suffix(dist_suffix)
     updated = README_VERSION_RE.sub(dist_suffix, text)
 
+    build_label = (
+        "tumoflip internal build version"
+        if base is not None
+        else "standalone Tumoflip release number"
+    )
     updated = re.sub(
-        r"- `\d{3}`: tumoflip internal build version\.",
-        f"- `{build}`: tumoflip internal build version.",
+        r"- `\d{3}`: (?:tumoflip internal build version|"
+        r"standalone Tumoflip release number)\.",
+        f"- `{build}`: {build_label}.",
         updated,
         count=1,
     )
@@ -126,11 +159,11 @@ def sync_readme_text(
         raise ValueError(
             "ReadMe.md version scheme prefix line was not updated as expected"
         )
-    if f"- `{base}`: upstream Unleashed base version." not in updated:
+    if base is not None and f"- `{base}`: upstream Unleashed base version." not in updated:
         raise ValueError("ReadMe.md base version line was not updated as expected")
-    if f"- `{build}`: tumoflip internal build version." not in updated:
+    if f"- `{build}`: {build_label}." not in updated:
         raise ValueError(
-            "ReadMe.md internal build version line was not updated as expected"
+            "ReadMe.md release/build version line was not updated as expected"
         )
     if iteration and (
         f"- `{iteration}`: development iteration inside the tumoflip internal build version."

@@ -89,7 +89,6 @@ ARF_EXTAPP_TARGETS = {
 STATIC_SD_RESOURCES = Path("tools/tumoflip/sd_resources")
 MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Diagnostics/cockpit.fap",
-    "apps_data/module_one_cockpit/modules/tumo_uart_console.fap",
     "apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
     "apps/Module One/Diagnostics/runtime_trace_viewer.fap",
     "apps/Module One/Field/field_logger.fap",
@@ -114,7 +113,6 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Labs/tumovm_peripherals.fap",
     "apps/Module One/Labs/tumofabric_node.fap",
     "apps/Module One/Labs/tumokey_phase_a.fap",
-    "apps/Module One/Security/tumokey.fap",
     "apps/Module One/NFC/nfc_ccid_bridge.fap",
     "apps/Module One/NFC/tumocard_os.fap",
     "apps/Module One/NFC/tumotag_verify.fap",

@@ -30,7 +30,9 @@ DEFAULT_TITLE = "T-FLPPR-FW"
 DEV_TITLE = "T-DEV"
 DEFAULT_PREFIX = "t-flppr-fw-"
 LEGACY_STABLE_PREFIX = "tmwhflpprarf"
-DEV_SUFFIX_RE = re.compile(r"^t-dev-(?P<version>\d{3}-\d{3}-\d{3})$")
+DEV_SUFFIX_RE = re.compile(
+    r"^t-dev-(?P<version>(?:\d{3}-\d{3}-\d{3}|\d{3}-\d{3}))$"
+)
 DEFAULT_OUTPUT_DIR = Path("assets/slideshow/tumoflip_update")
 MANIFEST_NAME = "manifest.json"
 MANIFEST_SCHEMA = 1
@@ -125,7 +127,7 @@ def version_from_dist_suffix(
     for stable_prefix in stable_prefixes:
         if dist_suffix.startswith(stable_prefix):
             version = dist_suffix.removeprefix(stable_prefix)
-            if re.fullmatch(r"\d{3}-\d{3}", version):
+            if re.fullmatch(r"(?:\d{3}-\d{3}|\d{3})", version):
                 return version
 
     dev_match = DEV_SUFFIX_RE.match(dist_suffix)

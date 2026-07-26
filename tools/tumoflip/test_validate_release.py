@@ -173,7 +173,7 @@ class ValidateReleaseTest(unittest.TestCase):
             "apps/Module One/Diagnostics/cockpit.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
-        self.assertIn(
+        self.assertNotIn(
             "apps_data/module_one_cockpit/modules/tumo_uart_console.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
@@ -217,7 +217,7 @@ class ValidateReleaseTest(unittest.TestCase):
             "apps/Module One/Labs/tumokey_phase_a.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
-        self.assertIn(
+        self.assertNotIn(
             "apps/Module One/Security/tumokey.fap",
             MODULE_ONE_PACKAGE_FILES,
         )

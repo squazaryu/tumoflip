@@ -41,10 +41,14 @@ def compute_stable_version(
             raise ValueError(
                 f"expected {STABLE_PREFIX} stable version, got: {set_suffix}"
             )
+        if selected_base is None:
+            return f"{STABLE_PREFIX}-{selected_build}"
         return f"{STABLE_PREFIX}-{selected_base}-{selected_build}"
 
     selected_base = validate_component("base", base) if base else current_base
     selected_build = validate_component("build", build) if build else current_build
+    if selected_base is None:
+        return f"{STABLE_PREFIX}-{selected_build}"
     return f"{STABLE_PREFIX}-{selected_base}-{selected_build}"
 
 

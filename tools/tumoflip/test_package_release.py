@@ -131,8 +131,6 @@ class PackageReleaseTest(unittest.TestCase):
             extapp_macro_deck = build / ".extapps/tumo_macro_deck.fap"
             old_tumoscript = resources / "apps/Module One/Scripts/tumoscript.fap"
             extapp_tumoscript = build / ".extapps/tumoscript.fap"
-            old_tumokey = resources / "apps/Module One/Security/tumokey.fap"
-            extapp_tumokey = build / ".extapps/tumokey.fap"
             old_wifi.write_bytes(b"old wifi mapper")
             write_file(extapp_wifi, b"wifi mapper fix")
             old_ir_lab.write_bytes(b"old ir lab")
@@ -157,8 +155,6 @@ class PackageReleaseTest(unittest.TestCase):
             write_file(extapp_macro_deck, b"macro deck")
             old_tumoscript.write_bytes(b"old tumoscript")
             write_file(extapp_tumoscript, b"tumoscript")
-            old_tumokey.write_bytes(b"old tumokey")
-            write_file(extapp_tumokey, b"tumokey")
 
             manifest = build_package_release(
                 repo,
@@ -205,7 +201,6 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(old_app_bridge_terminal.read_bytes(), b"app bridge terminal")
             self.assertEqual(old_macro_deck.read_bytes(), b"macro deck")
             self.assertEqual(old_tumoscript.read_bytes(), b"tumoscript")
-            self.assertEqual(old_tumokey.read_bytes(), b"tumokey")
 
             module_entries = {
                 entry["source"]: entry
@@ -260,9 +255,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(macro_deck_entry["sha256"], sha256(extapp_macro_deck))
             tumoscript_entry = module_entries["apps/Module One/Scripts/tumoscript.fap"]
             self.assertEqual(tumoscript_entry["sha256"], sha256(extapp_tumoscript))
-            tumokey_entry = module_entries["apps/Module One/Security/tumokey.fap"]
-            self.assertEqual(tumokey_entry["sha256"], sha256(extapp_tumokey))
-            self.assertEqual(tumokey_entry["md5"], md5(extapp_tumokey))
+            self.assertNotIn("apps/Module One/Security/tumokey.fap", module_entries)
             self.assertIn(
                 "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
                 module_entries,
