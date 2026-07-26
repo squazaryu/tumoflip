@@ -84,7 +84,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v7
         with:
-          name: unleashed-fw-${{ steps.vars.outputs.dist }}
+          name: tumoflip-fw-${{ steps.vars.outputs.dist }}
           path: dist/f7-C/*
           retention-days: 14
           if-no-files-found: error
@@ -133,11 +133,11 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           {
-            echo "<!-- unleashed-pr-report -->"
+            echo "<!-- tumoflip-pr-report -->"
             echo "## 🤖 Build & analyze — \`${{ steps.vars.outputs.ref }}\` @ \`${{ steps.vars.outputs.sha8 }}\`"
             echo ""
             if [ "${{ steps.build.outcome }}" = "success" ]; then
-              echo "✅ **Firmware built** — artifact \`unleashed-fw-${{ steps.vars.outputs.dist }}\` ([run]($RUN_URL))"
+              echo "✅ **Firmware built** — artifact \`tumoflip-fw-${{ steps.vars.outputs.dist }}\` ([run]($RUN_URL))"
             else
               echo "❌ **Firmware build failed** — see the [run log]($RUN_URL)"
             fi
@@ -154,7 +154,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const marker = '<!-- unleashed-pr-report -->';
+            const marker = '<!-- tumoflip-pr-report -->';
             const body = fs.readFileSync('pr_report.md', 'utf8');
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
