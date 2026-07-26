@@ -874,7 +874,10 @@ static void xremote_device_editor_refresh(XRemoteDeviceContext* context) {
 static uint32_t xremote_device_text_input_previous(void* raw_text_input) {
     TextInput* text_input = raw_text_input;
     XRemoteDeviceContext* context = text_input_get_validator_callback_context(text_input);
-    context->edit_target = XRemoteDeviceEditNone;
+    if(context) {
+        context->edit_target = XRemoteDeviceEditNone;
+        context->edit_rf_index = 0U;
+    }
     return XRemoteViewDeviceEditor;
 }
 
@@ -910,6 +913,7 @@ static void xremote_device_editor_start_text(
     context->edit_rf_index = rf_index;
     snprintf(context->edit_buffer, sizeof(context->edit_buffer), "%s", value);
     text_input_reset(context->text_input);
+    text_input_set_validator(context->text_input, NULL, context);
     text_input_set_header_text(context->text_input, title);
     text_input_set_result_callback(
         context->text_input,
@@ -1964,7 +1968,6 @@ XRemoteApp* xremote_device_profiles_alloc(XRemoteAppContext* app_ctx) {
         free(context);
         return NULL;
     }
-    text_input_set_validator(context->text_input, NULL, context);
     View* text_view = text_input_get_view(context->text_input);
     view_set_previous_callback(text_view, xremote_device_text_input_previous);
     view_dispatcher_add_view(app_ctx->view_dispatcher, XRemoteViewTextInput, text_view);
