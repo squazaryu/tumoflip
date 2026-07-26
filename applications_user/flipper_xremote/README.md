@@ -1,7 +1,7 @@
 <p align="center">Advanced IR Remote App for Flipper Device</p>
 
 <p align="center">
-  Version 1.4 - <a href="https://github.com/kala13x/flipper-xremote/blob/main/docs/changelog.md">Changelog</a>
+  Tumo XRemote 1.13.1
 </p>
 
 <p align="center">
@@ -28,6 +28,62 @@ To customize your layout, open the saved remote file, select `Edit` in the menu,
         <td><img src="https://github.com/kala13x/flipper-xremote/blob/main/screens/custom_layout.png" alt="XRemote edit layout"></td>
     </tr>
 </table>
+
+## IR + RF Remotes
+
+`IR + RF Remotes` combines an existing `.ir` remote with saved static Sub-GHz
+commands in one remote that works entirely on Flipper:
+
+1. Use `Create from IR` or `Create from Sub-GHz` to create a remote.
+2. Use `Add Sub-GHz to Remote` to add up to eight saved `.sub` commands.
+3. Open `My Remotes`, select a remote, and press OK to use it.
+4. For Sub-GHz commands, hold OK to switch between the internal and external
+   CC1101. Hold Right to cycle B1-B4 only for reviewed 24-bit Princeton commands.
+
+Horizontal mode shows four command buttons per page in a 2x2 grid. Left/Right
+moves through commands and Up/Down moves between rows. Vertical mode keeps four
+full-width buttons per page; Up/Down selects a command and Left/Right changes
+pages. The header always shows the current page and selected IR/RF output.
+
+`My Remotes` shows each remote's IR/RF button counts and reports missing sources
+or invalid files before launch. Press Right for Open, Edit, Repair, Copy, Backup,
+and Delete. Copy creates a separate remote while keeping the same source references.
+
+`Repair` is available only for a remote marked `Missing`. It finds the first
+missing or unusable IR source, or the first missing Sub-GHz source, then opens
+the matching file picker. A replacement IR file must contain at least one valid
+command. A replacement Sub-GHz file must parse successfully and must not use a
+changing-code protocol. One source is repaired per explicit operation so every
+replacement remains visible and deliberate. Cancelled or rejected replacements
+leave the profile unchanged.
+
+`Backup` is available for a Ready remote and creates a portable folder under
+`/ext/apps_data/tumoflip_xremote/bundles`. The folder contains a versioned
+`manifest.tdeck`, the `.tdevice` record, and validated copies of every linked
+`.ir` and static `.sub` source. `Restore Backup` validates the complete package
+before copying its sources into a managed import folder and adding a separate
+remote to the library. Repeated restores use new names and never overwrite the
+previous remote. Invalid, incomplete, or cancelled restores do not create a
+partial library record.
+
+`Edit` changes the selected remote directly on the Flipper:
+
+- Up/Down selects the remote name, linked IR remote, or an RF command.
+- OK renames the selected label or chooses a replacement IR remote.
+- Left/Right moves the selected RF command up or down.
+- Long OK detaches the IR link or removes the selected RF command after confirmation.
+
+Remotes are stored under `/ext/apps_data/tumoflip_xremote/devices` and reference
+the original `.ir` and `.sub` files without modifying them. Missing source files
+are reported in the editor and runtime UI. Updates use a temporary file and
+backup rename so a failed write leaves the previously saved remote intact.
+Removing a command or detaching IR removes only the remote link; the source
+signal remains on the SD card.
+
+Sub-GHz transmission keeps the firmware region gate and radio-broker ownership.
+Changing-code protocols are rejected. Other protocols replay the saved command
+unchanged. Reviewed 24-bit Princeton commands additionally support B1-B4
+selection with a long Right press; only the documented command nibble changes.
 
 ## Standard file support
 

@@ -14,6 +14,18 @@ from tools.tumoflip.sync_readme_version import parse_dist_suffix
 
 
 class BumpDevVersionTest(unittest.TestCase):
+    def test_starts_standalone_dev_iteration_from_standalone_stable(self) -> None:
+        self.assertEqual(
+            compute_dev_version("t-flppr-fw-001"),
+            "t-dev-001-001",
+        )
+
+    def test_increments_standalone_dev_iteration(self) -> None:
+        self.assertEqual(
+            compute_dev_version("t-dev-002-009"),
+            "t-dev-002-010",
+        )
+
     def test_compute_next_iteration_by_default(self) -> None:
         self.assertEqual(
             compute_dev_version("t-dev-089-036-001"),
@@ -89,7 +101,8 @@ class BumpDevVersionTest(unittest.TestCase):
         prefix, base, build, iteration = parse_dist_suffix(fbt_options.DIST_SUFFIX)
 
         self.assertIn(prefix, ("t-flppr-fw", "tmwhflpprarf", "t-dev"))
-        self.assertRegex(base, r"^\d{3}$")
+        if base is not None:
+            self.assertRegex(base, r"^\d{3}$")
         self.assertRegex(build, r"^\d{3}$")
         if prefix in ("t-flppr-fw", "tmwhflpprarf"):
             self.assertIsNone(iteration)

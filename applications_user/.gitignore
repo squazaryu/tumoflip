@@ -63,3 +63,7 @@
 !tumonet_gateway/**
 !subghz_wardriving/
 !subghz_wardriving/**
+!tumokey/
+!tumokey/**
+!tumo_uart_console/
+!tumo_uart_console/**

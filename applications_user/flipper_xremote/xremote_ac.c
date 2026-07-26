@@ -230,10 +230,19 @@ static void xremote_ac_refresh_list(XRemoteAcContext* ctx) {
 
 static void xremote_ac_rebuild_menu(XRemoteAcContext* ctx) {
     submenu_reset(ctx->app->submenu);
+    submenu_set_orientation(ctx->app->submenu, ctx->app_ctx->app_settings->orientation);
+    const bool vertical =
+        ctx->app_ctx->app_settings->orientation == ViewOrientationVertical;
     xremote_app_submenu_add(
-        ctx->app, "Add Smart AC", XRemoteAcMenuAddSmart, xremote_ac_submenu_callback);
+        ctx->app,
+        vertical ? "Smart AC" : "Add Smart AC",
+        XRemoteAcMenuAddSmart,
+        xremote_ac_submenu_callback);
     xremote_app_submenu_add(
-        ctx->app, "Add Button AC", XRemoteAcMenuAddSimple, xremote_ac_submenu_callback);
+        ctx->app,
+        vertical ? "Button AC" : "Add Button AC",
+        XRemoteAcMenuAddSimple,
+        xremote_ac_submenu_callback);
 
     xremote_ac_refresh_list(ctx);
     for(uint32_t i = 0; i < ctx->ac_count; i++) {

@@ -14,6 +14,10 @@ from tools.tumoflip.sync_readme_version import (
 class ReadmeVersionSyncTest(unittest.TestCase):
     def test_parse_dist_suffix(self) -> None:
         self.assertEqual(
+            parse_dist_suffix("t-flppr-fw-001"),
+            ("t-flppr-fw", None, "001", None),
+        )
+        self.assertEqual(
             parse_dist_suffix("t-flppr-fw-089-037"),
             ("t-flppr-fw", "089", "037", None),
         )
@@ -25,6 +29,25 @@ class ReadmeVersionSyncTest(unittest.TestCase):
             parse_dist_suffix("t-dev-089-035-001"),
             ("t-dev", "089", "035", "001"),
         )
+        self.assertEqual(
+            parse_dist_suffix("t-dev-002-001"),
+            ("t-dev", None, "002", "001"),
+        )
+
+    def test_sync_updates_standalone_stable_version(self) -> None:
+        original = """# tumoflip
+- Firmware version: `t-dev-089-041-024`
+- Release channel: `dev experimental line`
+- Release package: `flipper-z-f7-update-t-dev-089-041-024.tgz`
+- `t-flppr-fw`: Tumowuh Flipper Firmware stable build prefix.
+- `001`: standalone Tumoflip release number.
+"""
+        updated = sync_readme_text(original, "t-flppr-fw-001")
+
+        self.assertIn("Firmware version: `t-flppr-fw-001`", updated)
+        self.assertIn("Release channel: `main stable line`", updated)
+        self.assertIn("flipper-z-f7-update-t-flppr-fw-001.tgz", updated)
+        self.assertIn("- `001`: standalone Tumoflip release number.", updated)
 
     def test_sync_updates_new_stable_version(self) -> None:
         original = """# tumoflip

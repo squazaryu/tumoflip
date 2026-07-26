@@ -173,6 +173,10 @@ class ValidateReleaseTest(unittest.TestCase):
             "apps/Module One/Diagnostics/cockpit.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
+        self.assertNotIn(
+            "apps_data/module_one_cockpit/modules/tumo_uart_console.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
         self.assertIn(
             "apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
             MODULE_ONE_PACKAGE_FILES,
@@ -213,8 +217,20 @@ class ValidateReleaseTest(unittest.TestCase):
             "apps/Module One/Labs/tumokey_phase_a.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
+        self.assertNotIn(
+            "apps/Module One/Security/tumokey.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
         self.assertIn(
             "apps/Module One/Labs/tumofabric_node.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
+            "apps/Module One/NFC/tumotag_verify.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
+            "apps_data/tumoflip_xremote/components/tumoflip_xremote_ac.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
         self.assertIn(
@@ -227,6 +243,10 @@ class ValidateReleaseTest(unittest.TestCase):
         )
         self.assertIn(
             "apps/Module One/BLE/app_bridge_terminal.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertIn(
+            "apps/Module One/Automation/tumoflow.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
         self.assertIn(
@@ -268,6 +288,14 @@ class ValidateReleaseTest(unittest.TestCase):
             MODULE_ONE_PACKAGE_DATA_FILES,
         )
         self.assertIn(
+            "apps_data/tumoflow/workflows/field_demo.tflow",
+            MODULE_ONE_PACKAGE_DATA_FILES,
+        )
+        self.assertIn(
+            "apps_data/tumoflow/workflows/bounded_outputs.tflow",
+            MODULE_ONE_PACKAGE_DATA_FILES,
+        )
+        self.assertIn(
             "apps_data/tumoscript/scripts/safe_demo.tscr",
             MODULE_ONE_PACKAGE_DATA_FILES,
         )
@@ -303,6 +331,14 @@ class ValidateReleaseTest(unittest.TestCase):
             / "apps_data/tumoscript/scripts/safe_demo.tscr"
         )
         self.assertTrue(tumoscript_sample.is_file(), str(tumoscript_sample))
+        for workflow_name in ("field_demo.tflow", "bounded_outputs.tflow"):
+            workflow = (
+                REPO_ROOT
+                / STATIC_SD_RESOURCES
+                / "apps_data/tumoflow/workflows"
+                / workflow_name
+            )
+            self.assertTrue(workflow.is_file(), str(workflow))
         for module_manifest in ("bme280.tmod", "tumovgm.tmod"):
             sample = (
                 REPO_ROOT

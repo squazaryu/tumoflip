@@ -79,10 +79,10 @@ static DialogMessageButton tumoflip_info_screen(DialogsApp* dialogs, DialogMessa
         "%s\n",
         ver ? version_get_version(ver) : "t-flppr-fw");
 
-    const char* screen_text = "tumoflip custom build\n"
-                              "Base: Unleashed 089\n"
-                              "github.com/DarkFlippers\n"
-                              "/unleashed-firmware";
+    const char* screen_text = "Independent firmware\n"
+                              "Stable release\n"
+                              "github.com/squazaryu\n"
+                              "/tumoflip";
 
     dialog_message_set_header(
         message, furi_string_get_cstr(screen_header), 0, 0, AlignLeft, AlignTop);
@@ -95,7 +95,7 @@ static DialogMessageButton tumoflip_info_screen(DialogsApp* dialogs, DialogMessa
     return result;
 }
 
-static DialogMessageButton unleashed_info_screen2(DialogsApp* dialogs, DialogMessage* message) {
+static DialogMessageButton license_info_screen(DialogsApp* dialogs, DialogMessage* message) {
     DialogMessageButton result;
 
     const char* screen_text =
@@ -109,12 +109,13 @@ static DialogMessageButton unleashed_info_screen2(DialogsApp* dialogs, DialogMes
     return result;
 }
 
-static DialogMessageButton unleashed_info_screen3(DialogsApp* dialogs, DialogMessage* message) {
+static DialogMessageButton community_info_screen(DialogsApp* dialogs, DialogMessage* message) {
     DialogMessageButton result;
 
-    const char* screen_text = "Community apps included in\nall builds except `c` build\n"
-                              "For updates and more visit:\n"
-                              "github.com/DarkFlippers";
+    const char* screen_text = "FW Packages are published\n"
+                              "with every stable release.\n"
+                              "Updates and support:\n"
+                              "github.com/squazaryu";
 
     dialog_message_set_text(message, screen_text, 0, 0, AlignLeft, AlignTop);
     result = dialog_message_show(dialogs, message);
@@ -196,8 +197,8 @@ static DialogMessageButton fw_version_screen(DialogsApp* dialogs, DialogMessage*
 
 const AboutDialogScreen about_screens[] = {
     tumoflip_info_screen,
-    unleashed_info_screen2,
-    unleashed_info_screen3,
+    license_info_screen,
+    community_info_screen,
     product_screen,
     compliance_screen,
     address_screen,

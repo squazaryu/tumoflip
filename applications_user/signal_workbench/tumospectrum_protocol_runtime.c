@@ -176,8 +176,7 @@ TumoSpectrumProtocolRadioStatus tumospectrum_protocol_runtime_start(
     runtime->devices_initialized = true;
     runtime->device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
     if(runtime->device == NULL ||
-       !subghz_devices_is_frequency_valid(runtime->device, package->profile.frequency_hz) ||
-       !subghz_devices_begin(runtime->device)) {
+       !subghz_devices_is_frequency_valid(runtime->device, package->profile.frequency_hz)) {
         const TumoSpectrumProtocolRadioStatus failure =
             runtime->device != NULL ? TumoSpectrumProtocolRadioInvalidFrequency :
                                       TumoSpectrumProtocolRadioError;

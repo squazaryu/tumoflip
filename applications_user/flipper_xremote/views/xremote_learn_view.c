@@ -31,11 +31,11 @@ static void xremote_learn_view_draw_callback(Canvas* canvas, void* context) {
         button_name != NULL ? button_name : "");
 
     if(orientation == ViewOrientationHorizontal) {
-        elements_multiline_text_aligned(canvas, 0, 12, AlignLeft, AlignTop, info_text);
+        elements_multiline_text_aligned(canvas, 2, 12, AlignLeft, AlignTop, info_text);
         xremote_canvas_draw_button_wide(
-            canvas, model->ok_pressed, 68, 22, "Finish", XRemoteIconEnter);
+            canvas, model->ok_pressed, 64, 22, "Finish", XRemoteIconEnter);
         xremote_canvas_draw_button_wide(
-            canvas, model->right_pressed, 68, 40, "Skip", XRemoteIconArrowRight);
+            canvas, model->right_pressed, 64, 40, "Skip", XRemoteIconArrowRight);
     } else {
         elements_multiline_text_aligned(canvas, 0, 30, AlignLeft, AlignTop, info_text);
         xremote_canvas_draw_button_wide(
@@ -91,14 +91,14 @@ static void xremote_learn_success_view_draw_callback(Canvas* canvas, void* conte
     }
 
     if(app_ctx->app_settings->orientation == ViewOrientationHorizontal) {
-        canvas_draw_str_aligned(canvas, 0, 0, AlignLeft, AlignTop, "Received signal");
-        elements_multiline_text_aligned(canvas, 0, 16, AlignLeft, AlignTop, signal_info);
+        canvas_draw_str_aligned(canvas, 2, 0, AlignLeft, AlignTop, "Received signal");
+        elements_multiline_text_aligned(canvas, 2, 16, AlignLeft, AlignTop, signal_info);
         xremote_canvas_draw_button_wide(
-            canvas, model->ok_pressed, 68, 12, "Finish", XRemoteIconEnter);
+            canvas, model->ok_pressed, 64, 12, "Finish", XRemoteIconEnter);
         xremote_canvas_draw_button_wide(
-            canvas, model->right_pressed, 68, 30, "Next", XRemoteIconArrowRight);
+            canvas, model->right_pressed, 64, 30, "Next", XRemoteIconArrowRight);
         xremote_canvas_draw_button_wide(
-            canvas, model->back_pressed, 68, 48, "Retry", XRemoteIconBack);
+            canvas, model->back_pressed, 64, 48, "Retry", XRemoteIconBack);
     } else {
         canvas_draw_str_aligned(canvas, 0, 12, AlignLeft, AlignTop, "Received signal");
         elements_multiline_text_aligned(canvas, 0, 27, AlignLeft, AlignTop, signal_info);

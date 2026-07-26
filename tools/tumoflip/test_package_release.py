@@ -255,6 +255,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(macro_deck_entry["sha256"], sha256(extapp_macro_deck))
             tumoscript_entry = module_entries["apps/Module One/Scripts/tumoscript.fap"]
             self.assertEqual(tumoscript_entry["sha256"], sha256(extapp_tumoscript))
+            self.assertNotIn("apps/Module One/Security/tumokey.fap", module_entries)
             self.assertIn(
                 "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
                 module_entries,

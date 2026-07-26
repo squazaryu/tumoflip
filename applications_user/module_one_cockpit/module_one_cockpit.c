@@ -40,6 +40,7 @@ typedef enum {
     ModuleOneCockpitActionUartStatus,
     ModuleOneCockpitActionLaunchBleGattLab,
     ModuleOneCockpitActionLaunchAppBridgeTerminal,
+    ModuleOneCockpitActionLaunchTumoFlow,
     ModuleOneCockpitActionLaunchMacroDeck,
     ModuleOneCockpitActionLaunchTumoScript,
     ModuleOneCockpitActionLaunchFieldLogger,
@@ -51,9 +52,9 @@ typedef enum {
     ModuleOneCockpitActionLaunchTumoVmPeripherals,
     ModuleOneCockpitActionLaunchTumoFabric,
     ModuleOneCockpitActionLaunchTumoNet,
-    ModuleOneCockpitActionLaunchTumoKey,
     ModuleOneCockpitActionLaunchSensorLogger,
     ModuleOneCockpitActionLaunchTumoCardOs,
+    ModuleOneCockpitActionLaunchTumoTagVerify,
     ModuleOneCockpitActionEsp32Ping,
     ModuleOneCockpitActionLaunchIrLab,
     ModuleOneCockpitActionLaunchXRemote,
@@ -131,6 +132,7 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"GPS/UART: Status", ModuleOneCockpitActionUartStatus},
     {"BLE: GATT Lab", ModuleOneCockpitActionLaunchBleGattLab},
     {"BLE: Terminal", ModuleOneCockpitActionLaunchAppBridgeTerminal},
+    {"Automation: TumoFlow", ModuleOneCockpitActionLaunchTumoFlow},
     {"Macros: Deck", ModuleOneCockpitActionLaunchMacroDeck},
     {"Macros: TumoScript", ModuleOneCockpitActionLaunchTumoScript},
     {"Field: Logger", ModuleOneCockpitActionLaunchFieldLogger},
@@ -141,10 +143,10 @@ static const ModuleOneCockpitMenuItem module_one_cockpit_menu[] = {
     {"Modules: Runtime", ModuleOneCockpitActionLaunchTumoModule},
     {"VM: Peripherals", ModuleOneCockpitActionLaunchTumoVmPeripherals},
     {"VM: Fabric", ModuleOneCockpitActionLaunchTumoFabric},
-    {"Security: TumoKey A", ModuleOneCockpitActionLaunchTumoKey},
     {"BME280/I2C: Scan", ModuleOneCockpitActionI2cScan},
     {"Sensors: Logger", ModuleOneCockpitActionLaunchSensorLogger},
     {"NFC: TumoCard OS", ModuleOneCockpitActionLaunchTumoCardOs},
+    {"NFC: Tag Verify", ModuleOneCockpitActionLaunchTumoTagVerify},
     {"Network: TumoNet", ModuleOneCockpitActionLaunchTumoNet},
     {"CC1101: ARF Full", ModuleOneCockpitActionLaunchArfHub},
     {"CC1101: ARF Status", ModuleOneCockpitActionLaunchArfStatus},
@@ -194,6 +196,14 @@ static const ModuleOneCockpitLaunchTarget module_one_cockpit_targets[] = {
         ModuleOneCockpitBlockBle,
         "App Bridge Terminal",
         EXT_PATH("apps/Module One/BLE/app_bridge_terminal.fap"),
+        NULL,
+        true,
+    },
+    {
+        ModuleOneCockpitActionLaunchTumoFlow,
+        ModuleOneCockpitBlockMacro,
+        "TumoFlow",
+        EXT_PATH("apps/Module One/Automation/tumoflow.fap"),
         NULL,
         true,
     },
@@ -286,14 +296,6 @@ static const ModuleOneCockpitLaunchTarget module_one_cockpit_targets[] = {
         true,
     },
     {
-        ModuleOneCockpitActionLaunchTumoKey,
-        ModuleOneCockpitBlockSystem,
-        "TumoKey Phase A",
-        EXT_PATH("apps/Module One/Labs/tumokey_phase_a.fap"),
-        NULL,
-        true,
-    },
-    {
         ModuleOneCockpitActionLaunchSensorLogger,
         ModuleOneCockpitBlockSensor,
         "Sensor Logger",
@@ -306,6 +308,14 @@ static const ModuleOneCockpitLaunchTarget module_one_cockpit_targets[] = {
         ModuleOneCockpitBlockNfc,
         "TumoCard OS",
         EXT_PATH("apps/Module One/NFC/tumocard_os.fap"),
+        NULL,
+        true,
+    },
+    {
+        ModuleOneCockpitActionLaunchTumoTagVerify,
+        ModuleOneCockpitBlockNfc,
+        "TumoTag Verify",
+        EXT_PATH("apps/Module One/NFC/tumotag_verify.fap"),
         NULL,
         true,
     },
@@ -429,7 +439,7 @@ static const char* module_one_cockpit_block_label(ModuleOneCockpitBlock block) {
     case ModuleOneCockpitBlockBle:
         return "BLE";
     case ModuleOneCockpitBlockMacro:
-        return "Macros";
+        return "Automation";
     case ModuleOneCockpitBlockNfc:
         return "NFC";
     case ModuleOneCockpitBlockNrf24:
@@ -594,7 +604,7 @@ static void module_one_cockpit_append_runtime_report(FuriString* output) {
         output,
         "ESP32/GPS: UART free means probe-safe; use dedicated screens for active checks\n"
         "BLE: use GATT Lab or App Bridge Terminal for App Bridge diagnostics\n"
-        "Macros: use Macro Deck for local sequences or TumoScript for scripted dry-runs\n"
+        "Automation: use TumoFlow for validated field workflows\n"
         "NRF24: unknown, no safe passive probe yet\n"
         "CC1101: unknown, use ARF/Sub-GHz status before transmit\n\n");
 }
@@ -626,7 +636,7 @@ static void module_one_cockpit_build_report(ModuleOneCockpitApp* app, FuriString
         "IR: use IR Blink or Tumo IR Lab\n"
         "ESP32: use UART/AT or WiFi Mapper\n"
         "BLE: use GATT Lab or App Bridge Terminal for App Bridge diagnostics\n"
-        "Macros: use Macro Deck or TumoScript for local action sequences\n"
+        "Automation: use TumoFlow; legacy Macro Deck and TumoScript remain during migration\n"
         "Signals: use TumoSpectrum Profiles for live .tproto RX or TumoScope for GPIO capture\n"
         "Acceptance: export release smoke reports after each flash\n"
         "GPS/BME280: use Sensor Logger\n"
@@ -843,8 +853,19 @@ static void module_one_cockpit_launch_or_report(
         return;
     }
 
+    char launch_args[24];
+    const char* target_args = target->args;
+    if(target->action == ModuleOneCockpitActionLaunchXRemote) {
+        snprintf(
+            launch_args,
+            sizeof(launch_args),
+            "cockpit:%lu",
+            (unsigned long)app->selected_item);
+        target_args = launch_args;
+    }
+
     loader_clear_launch_queue(app->loader);
-    loader_enqueue_launch(app->loader, target->target, target->args, LoaderDeferredLaunchFlagGui);
+    loader_enqueue_launch(app->loader, target->target, target_args, LoaderDeferredLaunchFlagGui);
 
     FuriString* self_path = furi_string_alloc();
     if(loader_get_application_launch_path(app->loader, self_path)) {

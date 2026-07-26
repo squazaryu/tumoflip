@@ -1,0 +1,10 @@
+# TumoFlow v1
+name Field Demo
+trigger manual
+policy stop
+log Workflow started
+delay 250
+prompt Press OK to continue
+bridge event field_demo_started
+label done
+log Workflow done

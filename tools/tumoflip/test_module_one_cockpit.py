@@ -15,6 +15,7 @@ COCKPIT_FAP_ROUTES = {
     "wifi_mapper": "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
     "ble_gatt_lab": "apps/Module One/BLE/ble_gatt_lab.fap",
     "app_bridge_terminal": "apps/Module One/BLE/app_bridge_terminal.fap",
+    "tumoflow": "apps/Module One/Automation/tumoflow.fap",
     "tumo_macro_deck": "apps/Module One/Macros/tumo_macro_deck.fap",
     "tumoscript": "apps/Module One/Scripts/tumoscript.fap",
     "field_logger": "apps/Module One/Field/field_logger.fap",
@@ -23,11 +24,11 @@ COCKPIT_FAP_ROUTES = {
     "tumonet_gateway": "apps/Module One/Network/tumonet_gateway.fap",
     "tumovgm_bridge": "apps/Module One/VGM/tumovgm_bridge.fap",
     "tumomodule_runtime": "apps/Module One/Modules/tumomodule_runtime.fap",
-    "tumokey_phase_a": "apps/Module One/Labs/tumokey_phase_a.fap",
     "module_one_sensor_logger": (
         "apps/Module One/Sensors BME280/module_one_sensor_logger.fap"
     ),
     "tumocard_os": "apps/Module One/NFC/tumocard_os.fap",
+    "tumotag_verify": "apps/Module One/NFC/tumotag_verify.fap",
     "arf_subghz_full": "apps/ARF Tools/arf_subghz_full.fap",
     "arf_status": "apps_data/arf_subghz_full/modules/arf_status.fap",
     "tumo_acceptance_suite": (
@@ -53,7 +54,9 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn('fap_icon="icon.png"', self.manifest)
         self.assertTrue((APP_DIR / "icon.png").is_file())
         self.assertIn("BLE: GATT Lab", self.source)
+        self.assertNotIn("UART: Field Console", self.source)
         self.assertIn("BLE: Terminal", self.source)
+        self.assertIn("Automation: TumoFlow", self.source)
         self.assertIn("Field: Logger", self.source)
         self.assertIn("Signals: TumoSpectrum", self.source)
         self.assertIn("Signals: Profiles", self.source)
@@ -61,8 +64,9 @@ class ModuleOneCockpitTest(unittest.TestCase):
         self.assertIn("Network: TumoNet", self.source)
         self.assertIn("VGM: Bridge", self.source)
         self.assertIn("Modules: Runtime", self.source)
-        self.assertIn("Security: TumoKey A", self.source)
+        self.assertNotIn("Security: TumoKey", self.source)
         self.assertIn("NFC: TumoCard OS", self.source)
+        self.assertIn("NFC: Tag Verify", self.source)
         self.assertIn("Macros: TumoScript", self.source)
         self.assertIn("System: Acceptance", self.source)
         self.assertIn("System: Runtime Trace", self.source)
@@ -72,6 +76,10 @@ class ModuleOneCockpitTest(unittest.TestCase):
         )
         self.assertIn(
             'EXT_PATH("apps/Module One/BLE/app_bridge_terminal.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/Automation/tumoflow.fap")',
             self.source,
         )
         self.assertIn(
@@ -109,15 +117,15 @@ class ModuleOneCockpitTest(unittest.TestCase):
             self.source,
         )
         self.assertIn(
-            'EXT_PATH("apps/Module One/Labs/tumokey_phase_a.fap")',
-            self.source,
-        )
-        self.assertIn(
             'EXT_PATH("apps/Module One/Scripts/tumoscript.fap")',
             self.source,
         )
         self.assertIn(
             'EXT_PATH("apps/Module One/NFC/tumocard_os.fap")',
+            self.source,
+        )
+        self.assertIn(
+            'EXT_PATH("apps/Module One/NFC/tumotag_verify.fap")',
             self.source,
         )
 

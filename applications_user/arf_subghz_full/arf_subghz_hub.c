@@ -25,7 +25,6 @@ typedef struct {
 
 static const ArfSubGhzHubItem arf_subghz_hub_items[] = {
     {.label = "Standard Sub-GHz", .target = "Sub-GHz"},
-    {.label = "Frequency Analyzer", .target = "Sub-GHz", .args = "frequency_analyzer"},
     {.label = "Sub-GHz Wardriving", .target = SUBGHZ_WARDRIVING_PATH},
     {.label = "ARF KeeLoq", .target = ARF_MODULES_PATH "arf_keeloq.fap"},
     {.label = "ARF Counter BF", .target = ARF_MODULES_PATH "arf_counter_bf.fap"},

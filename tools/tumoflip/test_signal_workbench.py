@@ -15,6 +15,9 @@ ANALYSIS_SOURCE = APP_DIR / "tumospectrum_analysis.c"
 INFERENCE_SOURCE = APP_DIR / "tumospectrum_inference.c"
 CAPTURE_FLOW_SOURCE = APP_DIR / "tumospectrum_capture_flow.c"
 CAPTURE_FLOW_HEADER = APP_DIR / "tumospectrum_capture_flow.h"
+BAND_MAP_SOURCE = APP_DIR / "tumospectrum_band_map.c"
+BAND_MAP_HEADER = APP_DIR / "tumospectrum_band_map.h"
+BAND_SESSION_SOURCE = APP_DIR / "tumospectrum_band_session.c"
 STORAGE_SOURCE = APP_DIR / "tumospectrum_storage.c"
 APP_MANIFEST = APP_DIR / "application.fam"
 SUBGHZ_SOURCE = REPO_ROOT / "applications/main/subghz/subghz.c"
@@ -41,6 +44,9 @@ class TumoSpectrumTest(unittest.TestCase):
         cls.inference = INFERENCE_SOURCE.read_text(encoding="utf-8")
         cls.capture_flow = CAPTURE_FLOW_SOURCE.read_text(encoding="utf-8")
         cls.capture_flow_header = CAPTURE_FLOW_HEADER.read_text(encoding="utf-8")
+        cls.band_map = BAND_MAP_SOURCE.read_text(encoding="utf-8")
+        cls.band_map_header = BAND_MAP_HEADER.read_text(encoding="utf-8")
+        cls.band_session = BAND_SESSION_SOURCE.read_text(encoding="utf-8")
         cls.storage = STORAGE_SOURCE.read_text(encoding="utf-8")
         cls.manifest = APP_MANIFEST.read_text(encoding="utf-8")
         cls.subghz = SUBGHZ_SOURCE.read_text(encoding="utf-8")
@@ -60,8 +66,8 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_app_migrates_in_place_without_duplicate_fap(self) -> None:
         self.assertIn('appid="signal_workbench"', self.manifest)
         self.assertIn('name="TumoSpectrum"', self.manifest)
-        self.assertIn('fap_version="2.4.0"', self.manifest)
-        self.assertIn('"TumoSpectrum 2.4"', self.source)
+        self.assertIn('fap_version="3.0.0"', self.manifest)
+        self.assertIn('"TumoSpectrum 3.0"', self.source)
         self.assertIn('fap_category="Module One/Signals"', self.manifest)
         self.assertIn(
             'fap_dist_path="apps/Module One/Signals/signal_workbench.fap"', self.manifest
@@ -200,6 +206,78 @@ class TumoSpectrumTest(unittest.TestCase):
         self.assertIn("InfraredSceneLearn", self.infrared)
         self.assertIn("infrared_worker_rx_enable_signal_decoding", self.infrared)
 
+    def test_band_map_is_bounded_receive_only_and_broker_owned(self) -> None:
+        for required in (
+            "TUMOSPECTRUM_BAND_MAP_BINS         64U",
+            "TUMOSPECTRUM_BAND_MAP_HISTORY_ROWS 8U",
+            "TUMOSPECTRUM_BAND_MAP_BINS_PER_TICK   4U",
+            "subghz_radio_broker_acquire",
+            "subghz_radio_broker_release",
+            "subghz_devices_get_rssi",
+            '"cc1101_int"',
+            '"cc1101_ext"',
+            "tumospectrum_band_map_cycle_zoom",
+            "tumospectrum_band_map_toggle_hold",
+            "tumospectrum_band_map_snap_to_peak",
+        ):
+            self.assertIn(required, self.band_map_header + self.band_map)
+        for forbidden in (
+            "subghz_devices_set_tx",
+            "subghz_devices_start_async_tx",
+            "furi_hal_subghz_tx",
+        ):
+            self.assertNotIn(forbidden, self.band_map)
+        for required in (
+            '"Band Map"',
+            'elements_button_center(canvas, "Capture")',
+            "tumospectrum_start_smart_capture",
+            "TumoSpectrumCaptureResumeBandMap",
+        ):
+            self.assertIn(required, self.source)
+
+    def test_internal_radio_does_not_require_external_device_begin(self) -> None:
+        runtime = (APP_DIR / "tumospectrum_protocol_runtime.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("bool device_ready = map->device != NULL;", self.band_map)
+        self.assertIn(
+            "map->snapshot.radio == TumoSpectrumBandMapRadioExternal",
+            self.band_map,
+        )
+        self.assertNotIn(
+            "map->device && subghz_devices_begin(map->device)", self.band_map
+        )
+        self.assertNotIn("!subghz_devices_begin(runtime->device)", runtime)
+
+    def test_smart_capture_session_is_atomic_and_limited_to_four_paths(self) -> None:
+        for required in (
+            "TUMOSPECTRUM_BAND_SESSION_MAX_SAMPLES 4U",
+            'TUMOSPECTRUM_DATA_DIR "/band_map_session.ff"',
+            'TUMOSPECTRUM_DATA_DIR "/band_map_session.tmp"',
+            "tumospectrum_band_session_path_valid",
+            "storage_common_rename",
+            "TUMOSPECTRUM_BAND_SESSION_MAX_DELTA_HZ",
+        ):
+            session_sources = self.band_session + (
+                APP_DIR / "tumospectrum_band_session.h"
+            ).read_text(encoding="utf-8")
+            self.assertIn(required, session_sources)
+        self.assertIn("storage_file_exists", self.band_session)
+        for required in (
+            "TUMOSPECTRUM_CAPTURE_PENDING_VERSION  2U",
+            '"Resume mode"',
+            '"Frequency"',
+            "tumospectrum_capture_flow_prepare_route",
+            "tumospectrum_capture_flow_resume_route",
+        ):
+            self.assertIn(required, self.capture_flow + self.capture_flow_header)
+        for required in (
+            '"tumospectrum_raw:"',
+            "subghz_parse_tumospectrum_capture_frequency",
+            "SubGhzHoppingModeOff",
+        ):
+            self.assertIn(required, self.subghz)
+
     def test_stock_capture_apps_resume_tumospectrum_without_changing_normal_back(self) -> None:
         self.assertIn("bool return_to_launcher;", self.subghz_internal)
         self.assertIn("subghz->return_to_launcher = open_capture_raw;", self.subghz)
@@ -240,7 +318,15 @@ class TumoSpectrumTest(unittest.TestCase):
         runtime = (APP_DIR / "tumospectrum_protocol_runtime.c").read_text(
             encoding="utf-8"
         )
-        combined = self.source + self.parser + self.analysis + self.storage + runtime
+        combined = (
+            self.source
+            + self.parser
+            + self.analysis
+            + self.storage
+            + runtime
+            + self.band_map
+            + self.band_session
+        )
         for forbidden in (
             "furi_hal_subghz",
             "subghz_txrx_tx_start",

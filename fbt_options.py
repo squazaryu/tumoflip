@@ -16,7 +16,7 @@ DEBUG = 0
 
 # Suffix to add to files when building distribution
 # If OS environment has DIST_SUFFIX set, it will be used instead
-DIST_SUFFIX = "t-flppr-fw-089-040"
+DIST_SUFFIX = "t-flppr-fw-001"
 
 # Post-update slideshow shown by the updater package
 UPDATE_SPLASH = "tumoflip_update"
@@ -123,6 +123,11 @@ EXCLUDED_EXT_APPS = (
     "js_vgm",
     "rolljam_standalone",
     "test_js",
+    # Dev-only product candidates. Keep source available for continued review,
+    # but do not publish their FAPs in the stable release before hardware and
+    # security acceptance is complete.
+    "tumo_uart_console",
+    "tumokey",
 )
 
 custom_options_fn = "fbt_options_local.py"

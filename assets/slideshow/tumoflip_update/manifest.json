@@ -2,7 +2,7 @@
   "frames": {
     "frame_00.png": {
       "mode": "1",
-      "pixels_sha256": "e706470cb3addc06f81ca29da9c420156f6568aeb26f5b654f2119a1e8617d18",
+      "pixels_sha256": "82e5c591a28232ff61cedf0e55c2a0e853a13bb39d75aca06ae1718f210a3190",
       "size": [
         128,
         64
@@ -10,7 +10,7 @@
     },
     "frame_01.png": {
       "mode": "1",
-      "pixels_sha256": "2062386084e49767ed234a7cf89750e42378c60a4556c39e3280a29e1c58ebdc",
+      "pixels_sha256": "ca26d21a09e708685887d10f34b5d9524cf2ad51df6c037ca05271bebd0d3491",
       "size": [
         128,
         64
@@ -18,7 +18,7 @@
     },
     "frame_02.png": {
       "mode": "1",
-      "pixels_sha256": "a65b84a0a636638f068f9a057b334381adcebc1722c42b73168b6dbf92ae3ef8",
+      "pixels_sha256": "4480f278cbfda5526c471dee16effc4b76d0c12c0ece3647659f08b9ea1e8d35",
       "size": [
         128,
         64
@@ -35,5 +35,5 @@
   },
   "schema": 1,
   "title": "T-FLPPR-FW",
-  "version": "089-040"
+  "version": "001"
 }

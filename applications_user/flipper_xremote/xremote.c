@@ -8,17 +8,25 @@
 
 #include "xremote.h"
 #include "xremote_learn.h"
-#include "xremote_control.h"
 #include "xremote_settings.h"
 #include "xremote_analyzer.h"
 #include "xremote_designer.h"
-#include "xremote_ac.h"
+#include "xremote_device_profiles.h"
 
 #include "views/xremote_about_view.h"
 
+#include <dialogs/dialogs.h>
+#include <loader/loader.h>
+#include <storage/storage.h>
 #include <toolbox/saved_struct.h>
 
+#include <string.h>
+
 #define TAG "XRemote"
+#define XREMOTE_AC_COMPONENT_PATH \
+    EXT_PATH("apps_data/tumoflip_xremote/components/tumoflip_xremote_ac.fap")
+#define XREMOTE_COCKPIT_PATH EXT_PATH("apps/Module One/Diagnostics/cockpit.fap")
+#define XREMOTE_COCKPIT_ARG_PREFIX "cockpit:"
 
 void xremote_get_version(char* version, size_t length) {
     snprintf(
@@ -52,6 +60,58 @@ static XRemoteApp* xremote_about_alloc(XRemoteAppContext* app_ctx) {
     return app;
 }
 
+static const char* xremote_cockpit_return_arg(const XRemoteApp* app) {
+    const char* argument = app->app_ctx->app_argument;
+    if(!argument) return NULL;
+
+    const size_t prefix_length = strlen(XREMOTE_COCKPIT_ARG_PREFIX);
+    if(strncmp(argument, XREMOTE_COCKPIT_ARG_PREFIX, prefix_length) != 0) return NULL;
+
+    const char* selected_item = argument + prefix_length;
+    if(selected_item[0] == '\0') return NULL;
+    for(const char* cursor = selected_item; *cursor; cursor++) {
+        if(*cursor < '0' || *cursor > '9') return NULL;
+    }
+    return selected_item;
+}
+
+static void xremote_launch_component(XRemoteApp* app, const char* path) {
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    const bool installed = storage_file_exists(storage, path);
+    furi_record_close(RECORD_STORAGE);
+    if(!installed) {
+        DialogsApp* dialogs = furi_record_open(RECORD_DIALOGS);
+        dialog_message_show_storage_error(dialogs, "XRemote component\nis not installed");
+        furi_record_close(RECORD_DIALOGS);
+        return;
+    }
+
+    Loader* loader = furi_record_open(RECORD_LOADER);
+    loader_clear_launch_queue(loader);
+    loader_enqueue_launch(loader, path, NULL, LoaderDeferredLaunchFlagGui);
+
+    FuriString* self_path = furi_string_alloc();
+    if(loader_get_application_launch_path(loader, self_path)) {
+        loader_enqueue_launch(
+            loader,
+            furi_string_get_cstr(self_path),
+            app->app_ctx->app_argument,
+            LoaderDeferredLaunchFlagGui);
+    }
+    furi_string_free(self_path);
+
+    const char* cockpit_selected_item = xremote_cockpit_return_arg(app);
+    if(cockpit_selected_item) {
+        loader_enqueue_launch(
+            loader,
+            XREMOTE_COCKPIT_PATH,
+            cockpit_selected_item,
+            LoaderDeferredLaunchFlagGui);
+    }
+    furi_record_close(RECORD_LOADER);
+    view_dispatcher_stop(app->app_ctx->view_dispatcher);
+}
+
 void xremote_submenu_callback(void* context, uint32_t index) {
     furi_assert(context);
     XRemoteApp* app = (XRemoteApp*)context;
@@ -65,10 +125,12 @@ void xremote_submenu_callback(void* context, uint32_t index) {
         child = xremote_learn_alloc(app->app_ctx);
     else if(index == XRemoteViewDesigner)
         child = xremote_designer_alloc(app->app_ctx);
-    else if(index == XRemoteViewAcSmart)
-        child = xremote_ac_alloc(app->app_ctx);
-    else if(index == XRemoteViewIRSubmenu)
-        child = xremote_control_alloc(app->app_ctx);
+    else if(index == XRemoteViewAcSmart) {
+        xremote_launch_component(app, XREMOTE_AC_COMPONENT_PATH);
+        return;
+    }
+    else if(index == XRemoteViewDeviceProfiles)
+        child = xremote_device_profiles_alloc(app->app_ctx);
     else if(index == XRemoteViewAnalyzer)
         child = xremote_analyzer_alloc(app->app_ctx);
     else if(index == XRemoteViewSettings)
@@ -135,7 +197,7 @@ int32_t xremote_main(void* p) {
     xremote_app_submenu_add(app, "Learn", XRemoteViewLearn, xremote_submenu_callback);
     xremote_app_submenu_add(app, "Designer", XRemoteViewDesigner, xremote_submenu_callback);
     xremote_app_submenu_add(app, "AC Smart", XRemoteViewAcSmart, xremote_submenu_callback);
-    xremote_app_submenu_add(app, "Saved", XRemoteViewIRSubmenu, xremote_submenu_callback);
+    xremote_app_submenu_add(app, "Profiles", XRemoteViewDeviceProfiles, xremote_submenu_callback);
     xremote_app_submenu_add(app, "Analyzer", XRemoteViewAnalyzer, xremote_submenu_callback);
     xremote_app_submenu_add(app, "Settings", XRemoteViewSettings, xremote_submenu_callback);
     xremote_app_submenu_add(app, "About", XRemoteViewAbout, xremote_submenu_callback);
@@ -149,8 +211,7 @@ int32_t xremote_main(void* p) {
     view_dispatcher_run(app->app_ctx->view_dispatcher);
 
     /* Restore infrared settings and OTG state */
-    if(infra_settings_loaded)
-        xremote_infra_settings_restore(is_otg_enabled);
+    if(infra_settings_loaded) xremote_infra_settings_restore(is_otg_enabled);
 
     /* Cleanup and exit */
     xremote_app_free(app);

@@ -1,0 +1,9 @@
+# TumoFlow v1
+name Bounded Output Demo
+trigger countdown 3000
+policy stop
+log Output demo armed
+ir_burst 38000 50
+delay 100
+gpio_pulse pc0 4 500 500
+log Output demo complete
