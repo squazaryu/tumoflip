@@ -435,11 +435,21 @@ static void xremote_device_runtime_draw_cell(
     canvas_set_color(canvas, ColorBlack);
 }
 
+static void xremote_device_draw_back_hint(Canvas* canvas, bool vertical) {
+    if(vertical) {
+        xremote_canvas_draw_icon(canvas, 11, 117, XRemoteIconBack);
+    } else {
+        xremote_canvas_draw_icon(canvas, 8, 60, XRemoteIconBack);
+        canvas_set_font(canvas, FontSecondary);
+        canvas_draw_str(canvas, 15, 62, "Back");
+    }
+}
+
 static void xremote_device_draw_vertical_footer(
     Canvas* canvas,
     bool show_center,
     bool show_right) {
-    xremote_device_runtime_draw_cell(canvas, 2U, 109U, 18U, 15U, "<", false);
+    xremote_device_draw_back_hint(canvas, true);
     if(show_center) {
         xremote_device_runtime_draw_cell(canvas, 23U, 109U, 18U, 15U, "OK", false);
     }
@@ -506,7 +516,7 @@ static void xremote_device_runtime_draw(Canvas* canvas, void* model_context) {
                 command_index == context->selected);
         }
 
-        elements_button_left(canvas, "Back");
+        xremote_device_draw_back_hint(canvas, false);
         elements_button_center(canvas, "Send");
     } else {
         xremote_device_draw_fitted(canvas, 2, 9, 60, AlignLeft, title);
@@ -529,7 +539,7 @@ static void xremote_device_runtime_draw(Canvas* canvas, void* model_context) {
                 command_index == context->selected);
         }
 
-        elements_button_left(canvas, "Back");
+        xremote_device_draw_back_hint(canvas, true);
         elements_button_center(canvas, "Send");
     }
 }
@@ -801,12 +811,11 @@ static void xremote_device_editor_draw(Canvas* canvas, void* model_context) {
             canvas, 3, 49, 122, AlignLeft, context->status[0] != '\0' ? context->status : detail);
 
         if(is_rf) {
-            elements_button_left(canvas, rf_index > 0U ? "Up" : "-");
+            elements_button_left(canvas, rf_index > 0U ? "Move" : "-");
             elements_button_center(canvas, "Rename");
             elements_button_right(
-                canvas, rf_index + 1U < context->profile->rf_count ? "Down" : "-");
+                canvas, rf_index + 1U < context->profile->rf_count ? "Move" : "-");
         } else {
-            elements_button_left(canvas, "Back");
             elements_button_center(
                 canvas,
                 context->editor_selected == 0U       ? "Rename" :
@@ -1318,7 +1327,7 @@ static void xremote_device_library_draw_actions(Canvas* canvas, XRemoteDeviceCon
     if(vertical) {
         xremote_device_draw_vertical_footer(canvas, true, false);
     } else {
-        elements_button_left(canvas, "Back");
+        xremote_device_draw_back_hint(canvas, false);
         elements_button_center(canvas, "Select");
     }
 }
@@ -1366,7 +1375,7 @@ static void xremote_device_library_draw(Canvas* canvas, void* model_context) {
             AlignCenter,
             AlignCenter,
             vertical ? "Use Import IR/RF" : "Create from IR or Sub-GHz");
-        elements_button_left(canvas, "Back");
+        xremote_device_draw_back_hint(canvas, vertical);
         return;
     }
 
@@ -1384,7 +1393,7 @@ static void xremote_device_library_draw(Canvas* canvas, void* model_context) {
     if(vertical) {
         xremote_device_draw_vertical_footer(canvas, true, true);
     } else {
-        elements_button_left(canvas, "Back");
+        xremote_device_draw_back_hint(canvas, false);
         elements_button_center(canvas, "Open");
         elements_button_right(canvas, "Actions");
     }

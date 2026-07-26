@@ -373,7 +373,8 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         version = (APP_DIR / "xremote.h").read_text(encoding="utf-8")
 
         for required in (
-            'elements_button_left(canvas, "Back")',
+            "xremote_device_draw_back_hint",
+            "XRemoteIconBack",
             'elements_button_center(canvas, "Send")',
             "#define XREMOTE_DEVICE_PAGE_SIZE",
             "#define XREMOTE_DEVICE_GRID_COLUMNS",
@@ -580,6 +581,11 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn("elements_button_left", editor)
         self.assertIn("elements_button_center", editor)
         self.assertIn("elements_button_right", editor)
+        self.assertIn('rf_index > 0U ? "Move" : "-"', editor)
+        self.assertIn(
+            'rf_index + 1U < context->profile->rf_count ? "Move" : "-"',
+            editor,
+        )
         self.assertIn("canvas, 3, 49, 122, AlignLeft", editor)
         self.assertNotIn("canvas, 3, 59", editor)
         self.assertIn("xremote_device_editor_draw_move_button", editor)
@@ -598,6 +604,13 @@ class XRemoteDeviceProfilesTest(unittest.TestCase):
         self.assertIn(
             "if(event->type != InputTypeShort && event->type != InputTypeLong) return true",
             editor_input,
+        )
+        self.assertNotIn('elements_button_left(canvas, "Back")', source)
+        self.assertIn(
+            "xremote_canvas_draw_icon(canvas, 8, 7, XRemoteIconBack)",
+            source.split("static void xremote_device_editor_draw", 1)[1].split(
+                "static void xremote_device_editor_refresh", 1
+            )[0],
         )
         self.assertNotIn("xremote_device_editor_close(context);", editor_input)
         self.assertIn("if(is_rf && rf_index > 0U", editor_input)
