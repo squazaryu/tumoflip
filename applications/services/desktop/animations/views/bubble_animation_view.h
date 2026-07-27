@@ -82,7 +82,8 @@ View* bubble_animation_get_view(BubbleAnimationView* view);
 void bubble_animation_freeze(BubbleAnimationView* view);
 
 /**
- * Animate the small in-memory preview while the full animation is restored.
+ * Play the bounded in-memory preview once while the full animation is restored.
+ * The final preview frame is held if restoration takes longer than the cache.
  *
  * @view        bubble animation view instance
  */

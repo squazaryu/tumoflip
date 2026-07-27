@@ -28,7 +28,6 @@ typedef struct {
     Icon* freeze_frame;
     uint8_t freeze_frame_index;
     uint8_t freeze_frame_origin;
-    uint32_t freeze_started_at;
     bool freeze_active;
 } BubbleAnimationViewModel;
 
@@ -240,16 +239,6 @@ static void bubble_animation_next_frame(BubbleAnimationViewModel* model) {
     }
 }
 
-static uint32_t bubble_animation_freeze_elapsed_frames(BubbleAnimationViewModel* model) {
-    furi_assert(model);
-    furi_assert(model->freeze_frame);
-
-    const uint32_t elapsed_ticks = furi_get_tick() - model->freeze_started_at;
-    const uint8_t frame_rate = model->freeze_frame->frame_rate;
-    return ((elapsed_ticks / 1000U) * frame_rate) +
-           (((elapsed_ticks % 1000U) * frame_rate) / 1000U);
-}
-
 static void bubble_animation_timer_callback(void* context) {
     furi_assert(context);
     BubbleAnimationView* view = context;
@@ -259,9 +248,8 @@ static void bubble_animation_timer_callback(void* context) {
 
     if(model->freeze_frame) {
         const uint8_t frame_count = icon_get_frame_count(model->freeze_frame);
-        if(frame_count > 1U) {
-            model->freeze_frame_index =
-                bubble_animation_freeze_elapsed_frames(model) % frame_count;
+        if((frame_count > 1U) && ((model->freeze_frame_index + 1U) < frame_count)) {
+            ++model->freeze_frame_index;
         }
         view_commit_model(view->view, true);
         return;
@@ -463,7 +451,6 @@ void bubble_animation_freeze(BubbleAnimationView* view) {
     model->freeze_frame = bubble_animation_clone_preview(
         model->current, model->freeze_active, model->freeze_frame_origin);
     model->freeze_frame_index = 0U;
-    model->freeze_started_at = furi_get_tick();
     model->current = NULL;
     view_commit_model(view->view, false);
     furi_timer_stop(view->timer);
@@ -476,8 +463,7 @@ void bubble_animation_start_resume_preview(BubbleAnimationView* view) {
     furi_assert(model->freeze_frame);
     const uint8_t frame_count = icon_get_frame_count(model->freeze_frame);
     const uint8_t frame_rate = model->freeze_frame->frame_rate;
-    model->freeze_frame_index =
-        frame_count > 1U ? bubble_animation_freeze_elapsed_frames(model) % frame_count : 0U;
+    model->freeze_frame_index = 0U;
     view_commit_model(view->view, true);
 
     if((frame_count > 1U) && frame_rate) {
@@ -498,9 +484,8 @@ void bubble_animation_unfreeze(BubbleAnimationView* view) {
     const uint8_t playback_frames = restore_active ? model->current->active_frames :
                                                      model->current->passive_frames;
     if(playback_frames > 0U) {
-        const uint32_t elapsed_frames = bubble_animation_freeze_elapsed_frames(model);
         const uint8_t phase_frame =
-            (model->freeze_frame_origin + elapsed_frames) % playback_frames;
+            (model->freeze_frame_origin + model->freeze_frame_index) % playback_frames;
         model->current_frame =
             phase_frame + (restore_active ? model->current->passive_frames : 0U);
         model->active_cycle = 0U;

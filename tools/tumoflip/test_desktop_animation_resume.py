@@ -51,8 +51,12 @@ class DesktopAnimationResumeTest(unittest.TestCase):
         ].split("static size_t bubble_animation_frame_data_size", 1)[0]
         self.assertIn("frame_count > 1U", preview)
         self.assertIn("furi_timer_start", preview)
-        self.assertIn("bubble_animation_freeze_elapsed_frames(model)", timer)
-        self.assertIn("bubble_animation_freeze_elapsed_frames(model)", preview)
+        self.assertIn("model->freeze_frame_index = 0U", preview)
+        self.assertIn("model->freeze_frame_index + 1U", timer)
+        self.assertIn("++model->freeze_frame_index", timer)
+        self.assertNotIn("% frame_count", timer)
+        self.assertNotIn("freeze_elapsed", view_source)
+        self.assertNotIn("freeze_started_at", view_source)
 
         restore = manager_source.split(
             "void animation_manager_load_and_continue_animation", 1
@@ -71,14 +75,39 @@ class DesktopAnimationResumeTest(unittest.TestCase):
         )
 
         unfreeze = view_source.split("void bubble_animation_unfreeze", 1)[1]
-        self.assertIn("model->freeze_frame_origin + elapsed_frames", unfreeze)
-        self.assertIn("bubble_animation_freeze_elapsed_frames(model)", unfreeze)
+        self.assertIn(
+            "model->freeze_frame_origin + model->freeze_frame_index", unfreeze
+        )
         self.assertIn("restore_active", unfreeze)
         self.assertIn("bubble_animation_pick_bubble(model, restore_active)", unfreeze)
         self.assertLess(
             unfreeze.index("model->current_frame ="),
             unfreeze.index("bubble_animation_release_frame"),
         )
+
+    def test_preview_to_full_animation_handoff_is_continuous(self) -> None:
+        # The compact preview is stored in visible order starting at `origin`.
+        # Restoring the full animation from the same origin plus the last
+        # displayed preview index guarantees that the handoff frame is identical.
+        cases = [
+            (0, 0, 12, 0),
+            (4, 3, 12, 7),
+            (10, 1, 12, 11),
+            (10, 5, 12, 3),
+        ]
+        for origin, preview_index, phase_frames, expected_frame in cases:
+            preview_frame = (origin + preview_index) % phase_frames
+            restored_frame = (origin + preview_index) % phase_frames
+            self.assertEqual(preview_frame, expected_frame)
+            self.assertEqual(restored_frame, expected_frame)
+
+        preview_index = 0
+        visible_indices = [preview_index]
+        for _ in range(6):
+            if preview_index + 1 < 4:
+                preview_index += 1
+            visible_indices.append(preview_index)
+        self.assertEqual(visible_indices, [0, 1, 2, 3, 3, 3, 3])
 
 
 if __name__ == "__main__":
