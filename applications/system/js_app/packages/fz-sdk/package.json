@@ -1,13 +1,12 @@
 {
   "name": "@darkflippers/fz-sdk-ul",
-  "version": "1.0.1",
-  "description": "Type declarations and documentation for native JS modules available on Unleashed Custom Firmware for Flipper Zero",
+  "version": "1.0.2",
+  "description": "Type declarations and build tooling for native JavaScript modules available on Tumoflip firmware",
   "keywords": [
-    "unleashed",
-    "unleashed firmware",
-    "ul",
-    "darkflippers",
-    "flipper unleashed fw sdk",
+    "tumoflip",
+    "tumoflip firmware",
+    "flipper custom firmware",
+    "javascript sdk",
     "flipper",
     "flipper zero",
     "framework"
@@ -16,17 +15,35 @@
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DarkFlippers/unleashed-firmware.git",
+    "url": "git+https://github.com/squazaryu/tumoflip.git",
     "directory": "applications/system/js_app/packages/fz-sdk"
   },
+  "homepage": "https://github.com/squazaryu/tumoflip/tree/main/applications/system/js_app/packages/fz-sdk",
+  "bugs": {
+    "url": "https://github.com/squazaryu/tumoflip/issues"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=18.12"
+  },
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "docs": "typedoc --options typedoc.json",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@serialport/bindings-cpp",
+      "esbuild"
+    ]
+  },
   "dependencies": {
-    "esbuild": "^0.24.0",
+    "esbuild": "0.28.1",
     "esbuild-plugin-tsc": "^0.4.0",
     "json5": "^2.2.3",
-    "typedoc": "^0.26.10",
-    "typedoc-material-theme": "^1.1.0",
     "prompts": "^2.4.2",
-    "serialport": "^12.0.0"
+    "serialport": "^12.0.0",
+    "typedoc": "0.28.20",
+    "typedoc-material-theme": "1.4.1"
   }
 }

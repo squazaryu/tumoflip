@@ -1,15 +1,14 @@
 {
   "name": "@darkflippers/create-fz-app-ul",
-  "version": "0.1.2",
-  "description": "Template package for JS apps for Flipper Zero using Unleashed Firmware JS SDK",
+  "version": "0.1.3",
+  "description": "Project wizard for Flipper Zero JavaScript apps using the Tumoflip SDK",
   "bin": "index.js",
   "type": "module",
   "keywords": [
-    "unleashed",
-    "unleashed firmware",
-    "ul",
-    "darkflippers",
-    "flipper cfw js",
+    "tumoflip",
+    "tumoflip firmware",
+    "flipper custom firmware",
+    "javascript sdk",
     "flipper",
     "flipper zero"
   ],
@@ -17,11 +16,22 @@
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DarkFlippers/unleashed-firmware.git",
+    "url": "git+https://github.com/squazaryu/tumoflip.git",
     "directory": "applications/system/js_app/packages/create-fz-app"
+  },
+  "homepage": "https://github.com/squazaryu/tumoflip/tree/main/applications/system/js_app/packages/create-fz-app",
+  "bugs": {
+    "url": "https://github.com/squazaryu/tumoflip/issues"
+  },
+  "engines": {
+    "node": ">=18.12"
+  },
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "prompts": "^2.4.2",
-    "replace-in-file": "^8.2.0"
+    "replace-in-file": "8.4.0"
   }
 }

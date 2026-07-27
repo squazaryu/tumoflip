@@ -26,7 +26,8 @@ export declare function getBatteryCharge(): number;
  * @warning Do **NOT** use this to check the presence or absence of features. If
  *          you do, I'm gonna be sad :( Instead, refer to `checkSdkFeatures` and
  *          other similar mechanisms.
- * @note Unleashed firmware reports `"unleashed"`. / Official firmware reports `"flipperdevices"`.
+ * @note Tumoflip firmware reports `"tumoflip"`. Official firmware reports
+ * `"flipperdevices"`; other distributions may use their own identifier.
  * @version Added in JS SDK 0.1
  */
 export declare const firmwareVendor: string;
