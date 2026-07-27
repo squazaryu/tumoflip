@@ -8,6 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CLOCK_SOURCE = REPO_ROOT / "applications/main/clock_app/clock_app.c"
 CLOCK_HEADER = REPO_ROOT / "applications/main/clock_app/clock_app.h"
 CLOCK_MANIFEST = REPO_ROOT / "applications/main/clock_app/application.fam"
+RELEASE_VALIDATOR = REPO_ROOT / "tools/tumoflip/validate_release.py"
 
 
 class ClockNightstandTest(unittest.TestCase):
@@ -16,6 +17,7 @@ class ClockNightstandTest(unittest.TestCase):
         cls.source = CLOCK_SOURCE.read_text(encoding="utf-8")
         cls.header = CLOCK_HEADER.read_text(encoding="utf-8")
         cls.manifest = CLOCK_MANIFEST.read_text(encoding="utf-8")
+        cls.release_validator = RELEASE_VALIDATOR.read_text(encoding="utf-8")
 
     def test_alarm_uses_native_rtc_service(self) -> None:
         self.assertIn("furi_hal_rtc_get_alarm(&app->alarm_time)", self.source)
@@ -81,6 +83,9 @@ class ClockNightstandTest(unittest.TestCase):
         )
         self.assertIn('fap_version="1.3.1"', self.manifest)
         self.assertIn("native alarm", self.manifest)
+        self.assertIn(
+            'resources / "apps/Tools/clock.fap"', self.release_validator
+        )
 
 
 if __name__ == "__main__":

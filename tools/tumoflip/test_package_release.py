@@ -65,6 +65,7 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
         "apps/Bluetooth/flipper_companion.fap",
         "apps/Sub-GHz/subghz_wardriving.fap",
         "apps/Tools/ai_dashboard.fap",
+        "apps/Tools/clock.fap",
         "apps/Tools/flipper_relay.fap",
         "apps/Tools/quac.fap",
         "apps/Tools/tumoflip_packages.fap",
