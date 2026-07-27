@@ -70,6 +70,15 @@ class ClockNightstandTest(unittest.TestCase):
         self.assertIn('elements_button_right(canvas, "Alarm")', self.source)
         self.assertIn('"L/R field  U/D value"', self.source)
         self.assertIn('elements_button_center(canvas, "Save")', self.source)
+        self.assertIn(
+            "canvas_draw_line(canvas, ux - uw / 2, 42, ux + uw / 2, 42)",
+            self.source,
+        )
+        self.assertIn(
+            'canvas_draw_str_aligned(canvas, 64, 50, AlignCenter, AlignBottom, '
+            '"L/R field  U/D value")',
+            self.source,
+        )
         self.assertIn('fap_version="1.3.1"', self.manifest)
         self.assertIn("native alarm", self.manifest)
 
