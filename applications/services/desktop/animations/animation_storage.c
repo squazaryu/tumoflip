@@ -13,9 +13,25 @@
 #include <assets_dolphin_blocking.h>
 
 #define ANIMATION_META_FILE     "meta.txt"
+#define ANIMATION_FRAMES_FILE   "frames.bin"
 #define ANIMATION_DIR           EXT_PATH("dolphin")
 #define ANIMATION_MANIFEST_FILE ANIMATION_DIR "/manifest.txt"
 #define TAG                     "AnimationStorage"
+
+#define ANIMATION_FRAME_BUNDLE_VERSION 1U
+
+typedef struct {
+    uint8_t magic[4];
+    uint32_t payload_size;
+    uint8_t version;
+    uint8_t frame_count;
+    uint8_t width;
+    uint8_t height;
+} AnimationFrameBundleHeader;
+
+_Static_assert(sizeof(AnimationFrameBundleHeader) == 12U, "Unexpected frame bundle header size");
+
+static const uint8_t animation_frame_bundle_magic[4] = {'T', 'F', 'A', 'B'};
 
 static void animation_storage_free_bubbles(BubbleAnimation* animation);
 static void animation_storage_free_frames(BubbleAnimation* animation);
@@ -308,6 +324,129 @@ static void animation_storage_free_frames(BubbleAnimation* animation) {
     FURI_CONST_ASSIGN_PTR(icon->frames, NULL);
 }
 
+static void animation_storage_prepare_icon(
+    BubbleAnimation* animation,
+    uint8_t frame_count,
+    uint8_t width,
+    uint8_t height) {
+    Icon* icon = (Icon*)&animation->icon_animation;
+    FURI_CONST_ASSIGN(icon->frame_count, frame_count);
+    FURI_CONST_ASSIGN(icon->frame_rate, 0);
+    FURI_CONST_ASSIGN(icon->height, height);
+    FURI_CONST_ASSIGN(icon->width, width);
+    icon->frames = calloc(frame_count, sizeof(const uint8_t*));
+}
+
+static bool animation_storage_frame_data_is_valid(
+    const uint8_t* frame,
+    size_t frame_size,
+    size_t bitmap_size) {
+    if(!frame || (frame_size == 0U)) return false;
+
+    if(frame[0] == 0U) {
+        return frame_size == (bitmap_size + 1U);
+    }
+
+    if(frame_size < 4U) return false;
+
+    uint16_t compressed_size = 0U;
+    memcpy(&compressed_size, &frame[2], sizeof(compressed_size));
+    return frame_size == (4U + compressed_size);
+}
+
+static bool animation_storage_load_frame_bundle(
+    Storage* storage,
+    const char* name,
+    BubbleAnimation* animation,
+    uint8_t frame_count,
+    uint8_t width,
+    uint8_t height) {
+    furi_assert(storage);
+    furi_assert(name);
+    furi_assert(animation);
+    furi_assert(!animation->icon_animation.frames);
+    furi_assert(frame_count > 0U);
+
+    bool success = false;
+    bool bundle_present = false;
+    File* file = storage_file_alloc(storage);
+    FuriString* filename = furi_string_alloc();
+    uint16_t* frame_sizes = NULL;
+    furi_string_printf(filename, ANIMATION_DIR "/%s/" ANIMATION_FRAMES_FILE, name);
+
+    do {
+        if(!storage_file_open(
+               file, furi_string_get_cstr(filename), FSAM_READ, FSOM_OPEN_EXISTING)) {
+            break;
+        }
+        bundle_present = true;
+
+        AnimationFrameBundleHeader header;
+        if(storage_file_read(file, &header, sizeof(header)) != sizeof(header)) break;
+        if(memcmp(header.magic, animation_frame_bundle_magic, sizeof(header.magic)) != 0) break;
+        if((header.version != ANIMATION_FRAME_BUNDLE_VERSION) ||
+           (header.frame_count != frame_count) || (header.width != width) ||
+           (header.height != height)) {
+            break;
+        }
+
+        const size_t max_frame_size = ROUND_UP_TO(width, 8) * height + 1U;
+        const size_t frame_sizes_bytes = frame_count * sizeof(uint16_t);
+        const uint64_t expected_file_size =
+            sizeof(header) + frame_sizes_bytes + header.payload_size;
+        if((header.payload_size == 0U) || (header.payload_size > (frame_count * max_frame_size)) ||
+           (storage_file_size(file) != expected_file_size)) {
+            break;
+        }
+
+        frame_sizes = malloc(frame_sizes_bytes);
+        if(!frame_sizes ||
+           (storage_file_read(file, frame_sizes, frame_sizes_bytes) != frame_sizes_bytes)) {
+            break;
+        }
+
+        bool frame_sizes_valid = true;
+        size_t checked_payload_size = 0U;
+        for(uint8_t i = 0U; i < frame_count; ++i) {
+            if((frame_sizes[i] == 0U) || (frame_sizes[i] > max_frame_size)) {
+                frame_sizes_valid = false;
+                break;
+            }
+            checked_payload_size += frame_sizes[i];
+        }
+        if(!frame_sizes_valid || (checked_payload_size != header.payload_size)) break;
+
+        animation_storage_prepare_icon(animation, frame_count, width, height);
+        if(!animation->icon_animation.frames) break;
+
+        success = true;
+        Icon* icon = (Icon*)&animation->icon_animation;
+        const size_t bitmap_size = ROUND_UP_TO(width, 8) * height;
+        for(uint8_t i = 0U; i < frame_count; ++i) {
+            uint8_t* frame = malloc(frame_sizes[i]);
+            if(!frame || (storage_file_read(file, frame, frame_sizes[i]) != frame_sizes[i]) ||
+               !animation_storage_frame_data_is_valid(frame, frame_sizes[i], bitmap_size)) {
+                free(frame);
+                success = false;
+                break;
+            }
+            FURI_CONST_ASSIGN_PTR(icon->frames[i], frame);
+        }
+    } while(false);
+
+    if(!success && animation->icon_animation.frames) {
+        animation_storage_free_frames(animation);
+    }
+    if(bundle_present && !success) {
+        FURI_LOG_W(TAG, "Ignoring invalid frame bundle '%s'", furi_string_get_cstr(filename));
+    }
+
+    free(frame_sizes);
+    storage_file_free(file);
+    furi_string_free(filename);
+    return success;
+}
+
 static bool animation_storage_load_frames(
     Storage* storage,
     const char* name,
@@ -323,16 +462,18 @@ static bool animation_storage_load_frames(
         max_frame_count = MAX(max_frame_count, frame_order[i]);
     }
 
-    if((max_frame_count >= frame_order_count) || (max_frame_count >= 256 /* max uint8_t */)) {
+    if((max_frame_count >= frame_order_count) || (max_frame_count >= 255 /* max uint8_t */)) {
         return false;
     }
 
+    const uint8_t frame_count = max_frame_count + 1U;
+    if(animation_storage_load_frame_bundle(storage, name, animation, frame_count, width, height)) {
+        return true;
+    }
+
+    animation_storage_prepare_icon(animation, frame_count, width, height);
+    if(!animation->icon_animation.frames) return false;
     Icon* icon = (Icon*)&animation->icon_animation;
-    FURI_CONST_ASSIGN(icon->frame_count, max_frame_count + 1);
-    FURI_CONST_ASSIGN(icon->frame_rate, 0);
-    FURI_CONST_ASSIGN(icon->height, height);
-    FURI_CONST_ASSIGN(icon->width, width);
-    icon->frames = calloc(icon->frame_count, sizeof(const uint8_t*));
 
     bool frames_ok = false;
     File* file = storage_file_alloc(storage);
@@ -365,6 +506,10 @@ static bool animation_storage_load_frames(
         }
 
         FURI_CONST_ASSIGN_PTR(icon->frames[i], malloc(frame_size));
+        if(!icon->frames[i]) {
+            storage_file_close(file);
+            break;
+        }
         if(storage_file_read(file, (void*)icon->frames[i], frame_size) != frame_size) {
             FURI_LOG_E(TAG, "Read failed: \'%s\'", furi_string_get_cstr(filename));
             storage_file_close(file);

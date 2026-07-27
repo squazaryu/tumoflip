@@ -1,11 +1,18 @@
 import multiprocessing
 import logging
 import os
+import struct
 from collections import Counter
 
 from flipper.utils.fff import FlipperFormatFile
 from flipper.utils.templite import Templite
 from .icon import ImageTools, file2image
+
+
+FRAME_BUNDLE_FILENAME = "frames.bin"
+FRAME_BUNDLE_MAGIC = b"TFAB"
+FRAME_BUNDLE_VERSION = 1
+FRAME_BUNDLE_HEADER_FORMAT = "<4sIBBBB"
 
 
 def _convert_image_to_bm(pair: set):
@@ -17,6 +24,48 @@ def _convert_image_to_bm(pair: set):
 def _convert_image(source_filename: str):
     image = file2image(source_filename)
     return image.data
+
+
+def _write_frame_bundle(
+    animation_directory: str,
+    frame_filenames: list[str],
+    width: int,
+    height: int,
+):
+    frame_count = len(frame_filenames)
+    if not 0 < frame_count <= 0xFF:
+        raise ValueError(f"frame bundle count out of range: {frame_count}")
+    if not 0 < width <= 0xFF or not 0 < height <= 0xFF:
+        raise ValueError(f"frame bundle dimensions out of range: {width}x{height}")
+
+    frames = []
+    for frame_filename in frame_filenames:
+        with open(frame_filename, "rb") as frame_file:
+            frame = frame_file.read()
+        if not 0 < len(frame) <= 0xFFFF:
+            raise ValueError(
+                f"frame bundle payload out of range: {frame_filename} ({len(frame)} bytes)"
+            )
+        frames.append(frame)
+
+    payload_size = sum(len(frame) for frame in frames)
+    header = struct.pack(
+        FRAME_BUNDLE_HEADER_FORMAT,
+        FRAME_BUNDLE_MAGIC,
+        payload_size,
+        FRAME_BUNDLE_VERSION,
+        frame_count,
+        width,
+        height,
+    )
+    frame_sizes = struct.pack(f"<{frame_count}H", *(len(frame) for frame in frames))
+
+    bundle_filename = os.path.join(animation_directory, FRAME_BUNDLE_FILENAME)
+    with open(bundle_filename, "wb") as bundle:
+        bundle.write(header)
+        bundle.write(frame_sizes)
+        for frame in frames:
+            bundle.write(frame)
 
 
 class DolphinBubbleAnimation:
@@ -230,6 +279,13 @@ class DolphinBubbleAnimation:
         else:
             for image in to_pack:
                 _convert_image_to_bm(image)
+
+        _write_frame_bundle(
+            animation_directory,
+            [destination for _, destination in to_pack],
+            self.meta["Width"],
+            self.meta["Height"],
+        )
 
     def process(self):
         if ImageTools.is_processing_slow():
