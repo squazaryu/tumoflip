@@ -31,10 +31,8 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: "10.34.5"
+      - name: Install pnpm
+        run: npm install --global pnpm@10.34.5
 
       - name: Verify SDK package
         working-directory: applications/system/js_app/packages/fz-sdk
