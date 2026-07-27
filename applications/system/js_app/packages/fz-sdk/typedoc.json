@@ -1,16 +1,21 @@
 {
     "$schema": "https://typedoc.org/schema.json",
-    "name": "Flipper Zero JS API",
+    "name": "Tumoflip JavaScript API",
     "excludePrivate": true,
     "entryPointStrategy": "expand",
     "entryPoints": [
-        ".",
+        "./global.d.ts",
+        "./*/index.d.ts",
+        "./gui/*.d.ts"
     ],
     "exclude": [
         "node_modules"
     ],
     "cleanOutputDir": true,
     "out": "./docs",
+    "validation": {
+        "notExported": false
+    },
     "plugin": [
         "typedoc-material-theme",
     ],

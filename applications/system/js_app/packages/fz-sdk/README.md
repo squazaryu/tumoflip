@@ -1,17 +1,19 @@
-# Flipper Unleashed FW JavaScript SDK
-This package contains tooling and typings for developing Flipper Zero
-applications in JavaScript for Unleashed Custom Firmware (based on official SDK).
+# Tumoflip JavaScript SDK
 
-This is a fork of the [Official Flipper Zero JS SDK](https://www.npmjs.com/package/@flipperdevices/fz-sdk),
-with added types for the extra features provided by the Unleashed firmware JavaScript API.
+This package contains tooling and type declarations for developing Flipper Zero
+JavaScript applications for Tumoflip firmware. It is derived from the
+[official Flipper Zero JavaScript SDK](https://www.npmjs.com/package/@flipperdevices/fz-sdk)
+and adds declarations for Tumoflip-specific JavaScript APIs.
 
-Scripts made for Official Flipper Zero JS SDK will work on Unleashed Firmware too.
-If you use extra features provided by Unleashed FW JS SDK, you are encouraged to use syntax like
-`if (doesSdkSupport(["feature-name"])) { ... }` so that your JS app can work on Official
-Firmware too, aswell as all other compliant Custom Firmwares. If some of those extra
-features are essential to the functionality of your app, you can use `checkSdkFeatures(["feature1", "feature2"])`
-near the beginning of your script, which will show a warning to the user that these features
-are not available in their firmware distribution.
+The published npm package keeps its historical `@darkflippers/fz-sdk-ul` name
+for compatibility with existing projects. New repository metadata, support
+links, and documentation point to Tumoflip.
+
+Applications made for the official Flipper Zero JavaScript SDK also work on
+Tumoflip. When using distribution-specific features, check them with
+`doesSdkSupport(["feature-name"])`. If a feature is essential, call
+`checkSdkFeatures(["feature1", "feature2"])` near the beginning of the script
+to show an explicit compatibility warning on unsupported firmware.
 
 ## Getting started
 Create your application using the interactive wizard:
@@ -39,4 +41,4 @@ recommended to check SDK compatibility using a combination of
 on your use case.
 
 ## Documentation
-Check out the [JavaScript section in the Developer Documentation](https://developer.flipper.net/flipperzero/doxygen/js.html)
+Check out the [JavaScript section in the Flipper Developer Documentation](https://developer.flipper.net/flipperzero/doxygen/js.html).
