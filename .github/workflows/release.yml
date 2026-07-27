@@ -84,6 +84,7 @@ jobs:
           python3 -m unittest \
             tools/tumoflip/test_arf_subghz_full.py \
             tools/tumoflip/test_clock_nightstand.py \
+            tools/tumoflip/test_desktop_animation_resume.py \
             tools/tumoflip/test_release_workflow.py \
             tools/tumoflip/test_readme_version_sync.py \
             tools/tumoflip/test_subghz_drift.py \
