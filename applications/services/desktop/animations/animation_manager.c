@@ -43,6 +43,7 @@ struct AnimationManager {
     FuriTimer* idle_animation_timer;
     FuriTimer* profile_reload_timer;
     StorageAnimation* current_animation;
+    StorageAnimation* freezed_animation;
     AnimationManagerInteractCallback interact_callback;
     AnimationManagerSetNewIdleAnimationCallback new_idle_callback;
     AnimationManagerSetNewIdleAnimationCallback check_blocking_callback;
@@ -342,6 +343,7 @@ AnimationManager* animation_manager_alloc(void) {
     animation_manager->profile_read_in_progress = false;
     animation_manager->profile_reload_pending = false;
     animation_manager->profile_reload_forced = false;
+    animation_manager->freezed_animation = NULL;
     animation_manager->animation_view = bubble_animation_view_alloc();
     animation_manager->view_stack = view_stack_alloc();
     View* animation_view = bubble_animation_get_view(animation_manager->animation_view);
@@ -386,6 +388,9 @@ void animation_manager_free(AnimationManager* animation_manager) {
         storage_get_pubsub(storage), animation_manager->pubsub_subscription_storage);
     furi_record_close(RECORD_STORAGE);
 
+    if(animation_manager->freezed_animation) {
+        animation_storage_free_storage_animation(&animation_manager->freezed_animation);
+    }
     furi_string_free(animation_manager->freezed_animation_name);
     desktop_profile_free(animation_manager->desktop_profile);
     View* animation_view = bubble_animation_get_view(animation_manager->animation_view);
@@ -672,6 +677,7 @@ bool animation_manager_is_animation_loaded(AnimationManager* animation_manager) 
 void animation_manager_unload_and_stall_animation(AnimationManager* animation_manager) {
     furi_assert(animation_manager);
     furi_assert(animation_manager->current_animation);
+    furi_assert(!animation_manager->freezed_animation);
     furi_assert(!furi_string_size(animation_manager->freezed_animation_name));
     furi_assert(
         (animation_manager->state == AnimationManagerStateIdle) ||
@@ -703,44 +709,50 @@ void animation_manager_unload_and_stall_animation(AnimationManager* animation_ma
     furi_string_set(animation_manager->freezed_animation_name, meta->name);
 
     bubble_animation_freeze(animation_manager->animation_view);
-    animation_storage_free_storage_animation(&animation_manager->current_animation);
+    animation_manager->freezed_animation = animation_manager->current_animation;
+    animation_manager->current_animation = NULL;
+    animation_storage_release_animation_frames(animation_manager->freezed_animation);
 }
 
 void animation_manager_load_and_continue_animation(AnimationManager* animation_manager) {
     furi_assert(animation_manager);
     furi_assert(!animation_manager->current_animation);
+    furi_assert(animation_manager->freezed_animation);
     furi_assert(furi_string_size(animation_manager->freezed_animation_name));
     furi_assert(
         (animation_manager->state == AnimationManagerStateFreezedIdle) ||
         (animation_manager->state == AnimationManagerStateFreezedBlocked));
 
     bubble_animation_start_resume_preview(animation_manager->animation_view);
+    const bool storage_changed = animation_manager->profile_reload_forced;
     const bool profile_changed = animation_manager_reload_profile(animation_manager);
 
     if(animation_manager->state == AnimationManagerStateFreezedBlocked) {
-        StorageAnimation* restore_animation = animation_storage_find_animation(
-            furi_string_get_cstr(animation_manager->freezed_animation_name));
+        StorageAnimation* restore_animation = animation_manager->freezed_animation;
+        animation_manager->freezed_animation = NULL;
         /* all blocked animations must be in flipper -> we can
          * always find blocking animation */
-        furi_assert(restore_animation);
+        furi_assert(animation_storage_get_bubble_animation(restore_animation));
         animation_manager_replace_current_animation(animation_manager, restore_animation);
         animation_manager->state = AnimationManagerStateBlocked;
     } else if(animation_manager->state == AnimationManagerStateFreezedIdle) { //-V547
         /* check if we missed some system notifications, and set current_animation */
         bool blocked = animation_manager_check_blocking(animation_manager);
-        if(!blocked && !profile_changed) {
+        if(!blocked && !profile_changed && !storage_changed) {
             /* if no blocking - try restore last one idle */
-            StorageAnimation* restore_animation = animation_storage_find_animation(
-                furi_string_get_cstr(animation_manager->freezed_animation_name));
-            if(restore_animation) {
-                Dolphin* dolphin = furi_record_open(RECORD_DOLPHIN);
-                DolphinStats stats = dolphin_stats(dolphin);
-                furi_record_close(RECORD_DOLPHIN);
-                const StorageAnimationManifestInfo* manifest_info =
-                    animation_storage_get_meta(restore_animation);
-                bool valid =
-                    animation_manager_is_idle_candidate(animation_manager, manifest_info, &stats);
-                if(valid) {
+            StorageAnimation* restore_animation = animation_manager->freezed_animation;
+            Dolphin* dolphin = furi_record_open(RECORD_DOLPHIN);
+            DolphinStats stats = dolphin_stats(dolphin);
+            furi_record_close(RECORD_DOLPHIN);
+            const StorageAnimationManifestInfo* manifest_info =
+                animation_storage_get_meta(restore_animation);
+            const bool valid =
+                animation_manager_is_idle_candidate(animation_manager, manifest_info, &stats);
+            if(valid) {
+                const BubbleAnimation* animation =
+                    animation_storage_get_bubble_animation(restore_animation);
+                if(animation) {
+                    animation_manager->freezed_animation = NULL;
                     animation_manager_replace_current_animation(
                         animation_manager, restore_animation);
                     animation_manager->state = AnimationManagerStateIdle;
@@ -750,24 +762,26 @@ void animation_manager_load_and_continue_animation(AnimationManager* animation_m
                             animation_manager->idle_animation_timer,
                             animation_manager->freezed_animation_time_left);
                     } else {
-                        const BubbleAnimation* animation = animation_storage_get_bubble_animation(
-                            animation_manager->current_animation);
                         furi_timer_start(
                             animation_manager->idle_animation_timer,
                             animation_manager_get_idle_duration(animation_manager, animation) *
                                 1000);
                     }
+                } else {
+                    FURI_LOG_E(
+                        TAG,
+                        "Failed to reload \'%s\' frames",
+                        furi_string_get_cstr(animation_manager->freezed_animation_name));
                 }
-            } else {
-                FURI_LOG_E(
-                    TAG,
-                    "Failed to restore \'%s\'",
-                    furi_string_get_cstr(animation_manager->freezed_animation_name));
             }
         }
     } else {
         /* Unknown state is an error. But not in release version.*/
         furi_crash();
+    }
+
+    if(animation_manager->freezed_animation) {
+        animation_storage_free_storage_animation(&animation_manager->freezed_animation);
     }
 
     /* if can't restore previous animation - select new */

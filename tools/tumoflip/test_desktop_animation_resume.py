@@ -67,11 +67,12 @@ class DesktopAnimationResumeTest(unittest.TestCase):
         )
         self.assertLess(
             restore.index("bubble_animation_start_resume_preview"),
-            restore.index("animation_storage_find_animation"),
+            restore.index("animation_storage_get_bubble_animation"),
         )
-        self.assertLess(
-            restore.index("animation_storage_find_animation"),
-            restore.index("bubble_animation_unfreeze"),
+        self.assertNotIn("animation_storage_find_animation", restore)
+        self.assertIn(
+            "StorageAnimation* restore_animation = animation_manager->freezed_animation",
+            restore,
         )
 
         unfreeze = view_source.split("void bubble_animation_unfreeze", 1)[1]
@@ -108,6 +109,67 @@ class DesktopAnimationResumeTest(unittest.TestCase):
                 preview_index += 1
             visible_indices.append(preview_index)
         self.assertEqual(visible_indices, [0, 1, 2, 3, 3, 3, 3])
+
+    def test_resume_reuses_parsed_animation_and_reads_frames_directly(self) -> None:
+        storage_source = (
+            REPO_ROOT
+            / "applications/services/desktop/animations/animation_storage.c"
+        ).read_text(encoding="utf-8")
+        manager_source = (
+            REPO_ROOT
+            / "applications/services/desktop/animations/animation_manager.c"
+        ).read_text(encoding="utf-8")
+
+        release = storage_source.split(
+            "void animation_storage_release_animation_frames", 1
+        )[1].split("static void animation_storage_free_animation", 1)[0]
+        self.assertIn("animation_storage_free_frames", release)
+        self.assertNotIn("animation_storage_free_animation", release)
+
+        cache = storage_source.split("void animation_storage_cache_animation", 1)[
+            1
+        ].split("void animation_storage_release_animation_frames", 1)[0]
+        self.assertIn("animation_storage_reload_frames", cache)
+
+        reload_frames = storage_source.split(
+            "static bool animation_storage_reload_frames", 2
+        )[2].split("static void animation_storage_free_bubbles", 1)[0]
+        self.assertIn(
+            "const uint8_t frame_rate = animation->icon_animation.frame_rate",
+            reload_frames,
+        )
+        self.assertIn(
+            "FURI_CONST_ASSIGN(animation->icon_animation.frame_rate, frame_rate)",
+            reload_frames,
+        )
+
+        load_frames = storage_source.split(
+            "static bool animation_storage_load_frames", 1
+        )[1].split("static bool animation_storage_load_bubbles", 1)[0]
+        self.assertIn("storage_file_size(file)", load_frames)
+        self.assertNotIn("storage_common_stat", load_frames)
+
+        unload = manager_source.split(
+            "void animation_manager_unload_and_stall_animation", 1
+        )[1].split("void animation_manager_load_and_continue_animation", 1)[0]
+        self.assertIn(
+            "animation_manager->freezed_animation = animation_manager->current_animation",
+            unload,
+        )
+        self.assertIn("animation_storage_release_animation_frames", unload)
+        self.assertNotIn("animation_storage_free_storage_animation", unload)
+
+        restore = manager_source.split(
+            "void animation_manager_load_and_continue_animation", 1
+        )[1].split("static void animation_manager_switch_to_one_shot_view", 1)[0]
+        self.assertIn(
+            "const bool storage_changed = animation_manager->profile_reload_forced",
+            restore,
+        )
+        self.assertIn(
+            "!blocked && !profile_changed && !storage_changed",
+            restore,
+        )
 
 
 if __name__ == "__main__":

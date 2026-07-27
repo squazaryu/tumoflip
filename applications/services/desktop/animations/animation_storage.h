@@ -55,6 +55,16 @@ const BubbleAnimation* animation_storage_get_bubble_animation(StorageAnimation* 
 void animation_storage_cache_animation(StorageAnimation* storage_animation);
 
 /**
+ * Release external animation frame payloads while keeping the parsed
+ * animation descriptor available for a direct reload.
+ *
+ * Internal animations are stored in firmware and are left unchanged.
+ *
+ * @storage_animation       animation whose external frame payloads to release
+ */
+void animation_storage_release_animation_frames(StorageAnimation* storage_animation);
+
+/**
  * Find animation by name.
  * Search through the inner flash, and SD-card if has.
  *
