@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
 
 import unittest
+import struct
+import sys
+import tempfile
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from flipper.assets.dolphin import (  # noqa: E402
+    FRAME_BUNDLE_FILENAME,
+    FRAME_BUNDLE_HEADER_FORMAT,
+    FRAME_BUNDLE_MAGIC,
+    FRAME_BUNDLE_VERSION,
+    _write_frame_bundle,
+)
 
 
 class DesktopAnimationResumeTest(unittest.TestCase):
@@ -170,6 +182,69 @@ class DesktopAnimationResumeTest(unittest.TestCase):
             "!blocked && !profile_changed && !storage_changed",
             restore,
         )
+
+    def test_generated_frame_bundle_is_versioned_and_sequential(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            frame_paths = [root / "frame_0.bm", root / "frame_1.bm"]
+            frames = [b"\x00\xaa", b"\x01\x00\x02\x00\xbb\xcc"]
+            for path, frame in zip(frame_paths, frames):
+                path.write_bytes(frame)
+
+            _write_frame_bundle(
+                str(root),
+                [str(path) for path in frame_paths],
+                width=8,
+                height=1,
+            )
+
+            bundle = (root / FRAME_BUNDLE_FILENAME).read_bytes()
+            header_size = struct.calcsize(FRAME_BUNDLE_HEADER_FORMAT)
+            magic, payload_size, version, frame_count, width, height = struct.unpack(
+                FRAME_BUNDLE_HEADER_FORMAT, bundle[:header_size]
+            )
+            frame_sizes = struct.unpack(
+                f"<{frame_count}H",
+                bundle[header_size : header_size + (2 * frame_count)],
+            )
+            payload = bundle[header_size + (2 * frame_count) :]
+
+            self.assertEqual(magic, FRAME_BUNDLE_MAGIC)
+            self.assertEqual(version, FRAME_BUNDLE_VERSION)
+            self.assertEqual((frame_count, width, height), (2, 8, 1))
+            self.assertEqual(frame_sizes, tuple(len(frame) for frame in frames))
+            self.assertEqual(payload_size, len(payload))
+            self.assertEqual(payload, b"".join(frames))
+
+    def test_resume_prefers_validated_bundle_and_keeps_legacy_fallback(self) -> None:
+        storage_source = (
+            REPO_ROOT
+            / "applications/services/desktop/animations/animation_storage.c"
+        ).read_text(encoding="utf-8")
+
+        bundle = storage_source.split(
+            "static bool animation_storage_load_frame_bundle", 1
+        )[1].split("static bool animation_storage_load_frames", 1)[0]
+        self.assertIn("animation_frame_bundle_magic", bundle)
+        self.assertIn("ANIMATION_FRAME_BUNDLE_VERSION", bundle)
+        self.assertIn("header.frame_count != frame_count", bundle)
+        self.assertIn("header.width != width", bundle)
+        self.assertIn("header.height != height", bundle)
+        self.assertIn("storage_file_size(file) != expected_file_size", bundle)
+        self.assertIn("checked_payload_size != header.payload_size", bundle)
+        self.assertIn("animation_storage_frame_data_is_valid", bundle)
+        self.assertEqual(bundle.count("storage_file_open("), 1)
+
+        load_frames = storage_source.split(
+            "static bool animation_storage_load_frames", 1
+        )[1].split("static bool animation_storage_load_bubbles", 1)[0]
+        self.assertLess(
+            load_frames.index("animation_storage_load_frame_bundle"),
+            load_frames.index('ANIMATION_DIR "/%s/frame_%d.bm"'),
+        )
+        self.assertIn('ANIMATION_DIR "/%s/frame_%d.bm"', load_frames)
+        self.assertIn("storage_file_open(", load_frames)
+        self.assertIn("storage_file_read(", load_frames)
 
 
 if __name__ == "__main__":
