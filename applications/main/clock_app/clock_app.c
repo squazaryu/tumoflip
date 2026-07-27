@@ -433,6 +433,9 @@ static void alarm_time_draw(Canvas* canvas, void* ctx) {
     ClockModel* model = ctx;
     AppState* app = model->app;
     bool h12mode = (app->time_format == LocaleTimeFormat12h);
+    const uint8_t value_y = 27;
+    const uint8_t underline_y = 38;
+    const uint8_t underline_height = 2;
     canvas_clear(canvas);
 
     canvas_set_font(canvas, FontPrimary);
@@ -455,12 +458,12 @@ static void alarm_time_draw(Canvas* canvas, void* ctx) {
     uint8_t mx = h12mode ? 72 : 83;
 
     canvas_set_font(canvas, FontBigNumbers);
-    canvas_draw_str_aligned(canvas, hx, 30, AlignCenter, AlignCenter, hh);
-    canvas_draw_str_aligned(canvas, cx, 30, AlignCenter, AlignCenter, ":");
-    canvas_draw_str_aligned(canvas, mx, 30, AlignCenter, AlignCenter, mm);
+    canvas_draw_str_aligned(canvas, hx, value_y, AlignCenter, AlignCenter, hh);
+    canvas_draw_str_aligned(canvas, cx, value_y, AlignCenter, AlignCenter, ":");
+    canvas_draw_str_aligned(canvas, mx, value_y, AlignCenter, AlignCenter, mm);
     if(h12mode) {
         canvas_set_font(canvas, FontPrimary);
-        canvas_draw_str_aligned(canvas, 104, 30, AlignCenter, AlignCenter, pm ? "PM" : "AM");
+        canvas_draw_str_aligned(canvas, 104, value_y, AlignCenter, AlignCenter, pm ? "PM" : "AM");
     }
 
     // Underline whichever field Up/Down currently changes.
@@ -475,7 +478,7 @@ static void alarm_time_draw(Canvas* canvas, void* ctx) {
         ux = 104;
         uw = 18;
     }
-    canvas_draw_line(canvas, ux - uw / 2, 42, ux + uw / 2, 42);
+    canvas_draw_box(canvas, ux - uw / 2, underline_y, uw + 1, underline_height);
 
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str_aligned(canvas, 64, 50, AlignCenter, AlignBottom, "L/R field  U/D value");

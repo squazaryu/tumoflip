@@ -72,16 +72,23 @@ class ClockNightstandTest(unittest.TestCase):
         self.assertIn('elements_button_right(canvas, "Alarm")', self.source)
         self.assertIn('"L/R field  U/D value"', self.source)
         self.assertIn('elements_button_center(canvas, "Save")', self.source)
+        alarm_picker = self.source.split("static void alarm_time_draw", 1)[1].split(
+            "static bool alarm_time_input", 1
+        )[0]
+        self.assertIn("const uint8_t value_y = 27", alarm_picker)
+        self.assertIn("const uint8_t underline_y = 38", alarm_picker)
+        self.assertIn("const uint8_t underline_height = 2", alarm_picker)
         self.assertIn(
-            "canvas_draw_line(canvas, ux - uw / 2, 42, ux + uw / 2, 42)",
-            self.source,
+            "canvas_draw_box(canvas, ux - uw / 2, underline_y, uw + 1, "
+            "underline_height)",
+            alarm_picker,
         )
         self.assertIn(
             'canvas_draw_str_aligned(canvas, 64, 50, AlignCenter, AlignBottom, '
             '"L/R field  U/D value")',
             self.source,
         )
-        self.assertIn('fap_version="1.3.1"', self.manifest)
+        self.assertIn('fap_version="1.3.2"', self.manifest)
         self.assertIn("native alarm", self.manifest)
         self.assertIn(
             'resources / "apps/Tools/clock.fap"', self.release_validator

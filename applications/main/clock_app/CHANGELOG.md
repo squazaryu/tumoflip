@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.2 (Tumoflip)
+
+- Raise the alarm time values and selection underline to keep the navigation
+  hint visually separate.
+- Make the selected field underline two pixels thick for clearer focus.
+
 ## 1.3.1 (Tumoflip)
 
 - Use the firmware's native daily RTC alarm instead of an app-only alarm. The alarm remains armed after Clock exits and uses the system alarm screen and Snooze behavior.
