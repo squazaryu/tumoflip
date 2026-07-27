@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <stddef.h>
 #include <flipper_format/flipper_format.h>
 #include <furi.h>
 #include <core/dangerous_defines.h>
@@ -28,6 +29,11 @@ typedef struct {
     uint8_t width;
     uint8_t height;
 } AnimationFrameBundleHeader;
+
+typedef struct {
+    const uint8_t* bundled_data;
+    const uint8_t* frames[];
+} AnimationFrameStorage;
 
 _Static_assert(sizeof(AnimationFrameBundleHeader) == 12U, "Unexpected frame bundle header size");
 
@@ -314,27 +320,46 @@ static void animation_storage_free_frames(BubbleAnimation* animation) {
     Icon* icon = (Icon*)&animation->icon_animation;
     if(!icon->frames) return;
 
-    for(int i = 0; i < icon->frame_count; ++i) {
-        if(icon->frames[i]) {
-            free((void*)icon->frames[i]);
+    AnimationFrameStorage* frame_storage =
+        (AnimationFrameStorage*)((uint8_t*)icon->frames -
+                                 offsetof(AnimationFrameStorage, frames));
+    if(!frame_storage->bundled_data) {
+        for(int i = 0; i < icon->frame_count; ++i) {
+            if(icon->frames[i]) {
+                free((void*)icon->frames[i]);
+            }
         }
     }
 
-    free((void*)icon->frames);
+    free(frame_storage);
     FURI_CONST_ASSIGN_PTR(icon->frames, NULL);
 }
 
-static void animation_storage_prepare_icon(
+static bool animation_storage_prepare_icon(
     BubbleAnimation* animation,
     uint8_t frame_count,
     uint8_t width,
-    uint8_t height) {
+    uint8_t height,
+    size_t bundled_bytes) {
+    const size_t frame_pointers_bytes = frame_count * sizeof(const uint8_t*);
+    if(bundled_bytes > (SIZE_MAX - sizeof(AnimationFrameStorage) - frame_pointers_bytes)) {
+        return false;
+    }
+    AnimationFrameStorage* frame_storage =
+        calloc(1, sizeof(AnimationFrameStorage) + frame_pointers_bytes + bundled_bytes);
+    if(!frame_storage) return false;
+    if(bundled_bytes) {
+        frame_storage->bundled_data =
+            (const uint8_t*)frame_storage->frames + frame_pointers_bytes;
+    }
+
     Icon* icon = (Icon*)&animation->icon_animation;
     FURI_CONST_ASSIGN(icon->frame_count, frame_count);
     FURI_CONST_ASSIGN(icon->frame_rate, 0);
     FURI_CONST_ASSIGN(icon->height, height);
     FURI_CONST_ASSIGN(icon->width, width);
-    icon->frames = calloc(frame_count, sizeof(const uint8_t*));
+    FURI_CONST_ASSIGN_PTR(icon->frames, frame_storage->frames);
+    return true;
 }
 
 static bool animation_storage_frame_data_is_valid(
@@ -371,7 +396,6 @@ static bool animation_storage_load_frame_bundle(
     bool bundle_present = false;
     File* file = storage_file_alloc(storage);
     FuriString* filename = furi_string_alloc();
-    uint16_t* frame_sizes = NULL;
     furi_string_printf(filename, ANIMATION_DIR "/%s/" ANIMATION_FRAMES_FILE, name);
 
     do {
@@ -381,8 +405,32 @@ static bool animation_storage_load_frame_bundle(
         }
         bundle_present = true;
 
+        const size_t max_frame_size = ROUND_UP_TO(width, 8) * height + 1U;
+        const size_t frame_sizes_bytes = frame_count * sizeof(uint16_t);
+        const uint64_t bundle_file_size = storage_file_size(file);
+        const uint64_t min_bundle_size =
+            sizeof(AnimationFrameBundleHeader) + frame_sizes_bytes + frame_count;
+        const uint64_t max_bundle_size =
+            sizeof(AnimationFrameBundleHeader) + frame_sizes_bytes +
+            (frame_count * max_frame_size);
+        if((bundle_file_size < min_bundle_size) || (bundle_file_size > max_bundle_size) ||
+           (bundle_file_size > SIZE_MAX)) {
+            break;
+        }
+
+        if(!animation_storage_prepare_icon(
+               animation, frame_count, width, height, (size_t)bundle_file_size)) {
+            break;
+        }
+        Icon* icon = (Icon*)&animation->icon_animation;
+        AnimationFrameStorage* frame_storage =
+            (AnimationFrameStorage*)((uint8_t*)icon->frames -
+                                     offsetof(AnimationFrameStorage, frames));
+        uint8_t* bundle = (uint8_t*)frame_storage->bundled_data;
+        if(storage_file_read(file, bundle, (size_t)bundle_file_size) != bundle_file_size) break;
+
         AnimationFrameBundleHeader header;
-        if(storage_file_read(file, &header, sizeof(header)) != sizeof(header)) break;
+        memcpy(&header, bundle, sizeof(header));
         if(memcmp(header.magic, animation_frame_bundle_magic, sizeof(header.magic)) != 0) break;
         if((header.version != ANIMATION_FRAME_BUNDLE_VERSION) ||
            (header.frame_count != frame_count) || (header.width != width) ||
@@ -390,48 +438,35 @@ static bool animation_storage_load_frame_bundle(
             break;
         }
 
-        const size_t max_frame_size = ROUND_UP_TO(width, 8) * height + 1U;
-        const size_t frame_sizes_bytes = frame_count * sizeof(uint16_t);
         const uint64_t expected_file_size =
             sizeof(header) + frame_sizes_bytes + header.payload_size;
         if((header.payload_size == 0U) || (header.payload_size > (frame_count * max_frame_size)) ||
-           (storage_file_size(file) != expected_file_size)) {
+           (bundle_file_size != expected_file_size)) {
             break;
         }
 
-        frame_sizes = malloc(frame_sizes_bytes);
-        if(!frame_sizes ||
-           (storage_file_read(file, frame_sizes, frame_sizes_bytes) != frame_sizes_bytes)) {
-            break;
-        }
-
-        bool frame_sizes_valid = true;
+        const uint8_t* frame_sizes = bundle + sizeof(header);
+        uint8_t* payload = bundle + sizeof(header) + frame_sizes_bytes;
+        const size_t bitmap_size = ROUND_UP_TO(width, 8) * height;
         size_t checked_payload_size = 0U;
+        success = true;
         for(uint8_t i = 0U; i < frame_count; ++i) {
-            if((frame_sizes[i] == 0U) || (frame_sizes[i] > max_frame_size)) {
-                frame_sizes_valid = false;
+            uint16_t frame_size = 0U;
+            memcpy(&frame_size, frame_sizes + (i * sizeof(frame_size)), sizeof(frame_size));
+            if((frame_size == 0U) || (frame_size > max_frame_size) ||
+               ((checked_payload_size + frame_size) > header.payload_size)) {
+                success = false;
                 break;
             }
-            checked_payload_size += frame_sizes[i];
-        }
-        if(!frame_sizes_valid || (checked_payload_size != header.payload_size)) break;
-
-        animation_storage_prepare_icon(animation, frame_count, width, height);
-        if(!animation->icon_animation.frames) break;
-
-        success = true;
-        Icon* icon = (Icon*)&animation->icon_animation;
-        const size_t bitmap_size = ROUND_UP_TO(width, 8) * height;
-        for(uint8_t i = 0U; i < frame_count; ++i) {
-            uint8_t* frame = malloc(frame_sizes[i]);
-            if(!frame || (storage_file_read(file, frame, frame_sizes[i]) != frame_sizes[i]) ||
-               !animation_storage_frame_data_is_valid(frame, frame_sizes[i], bitmap_size)) {
-                free(frame);
+            uint8_t* frame = payload + checked_payload_size;
+            if(!animation_storage_frame_data_is_valid(frame, frame_size, bitmap_size)) {
                 success = false;
                 break;
             }
             FURI_CONST_ASSIGN_PTR(icon->frames[i], frame);
+            checked_payload_size += frame_size;
         }
+        if(checked_payload_size != header.payload_size) success = false;
     } while(false);
 
     if(!success && animation->icon_animation.frames) {
@@ -441,7 +476,6 @@ static bool animation_storage_load_frame_bundle(
         FURI_LOG_W(TAG, "Ignoring invalid frame bundle '%s'", furi_string_get_cstr(filename));
     }
 
-    free(frame_sizes);
     storage_file_free(file);
     furi_string_free(filename);
     return success;
@@ -471,8 +505,7 @@ static bool animation_storage_load_frames(
         return true;
     }
 
-    animation_storage_prepare_icon(animation, frame_count, width, height);
-    if(!animation->icon_animation.frames) return false;
+    if(!animation_storage_prepare_icon(animation, frame_count, width, height, 0U)) return false;
     Icon* icon = (Icon*)&animation->icon_animation;
 
     bool frames_ok = false;

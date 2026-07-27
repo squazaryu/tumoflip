@@ -230,10 +230,23 @@ class DesktopAnimationResumeTest(unittest.TestCase):
         self.assertIn("header.frame_count != frame_count", bundle)
         self.assertIn("header.width != width", bundle)
         self.assertIn("header.height != height", bundle)
-        self.assertIn("storage_file_size(file) != expected_file_size", bundle)
+        self.assertIn("bundle_file_size != expected_file_size", bundle)
         self.assertIn("checked_payload_size != header.payload_size", bundle)
         self.assertIn("animation_storage_frame_data_is_valid", bundle)
         self.assertEqual(bundle.count("storage_file_open("), 1)
+        self.assertEqual(bundle.count("storage_file_read("), 1)
+        self.assertIn("(size_t)bundle_file_size", bundle)
+        self.assertNotIn("malloc(", bundle)
+        self.assertNotIn("free(frame)", bundle)
+        self.assertIn("payload + checked_payload_size", bundle)
+
+        frame_owner = storage_source.split(
+            "static void animation_storage_free_frames", 1
+        )[1].split("static bool animation_storage_frame_data_is_valid", 1)[0]
+        self.assertIn("AnimationFrameStorage", frame_owner)
+        self.assertIn("frame_storage->bundled_data", frame_owner)
+        self.assertIn("free(frame_storage)", frame_owner)
+        self.assertIn("bundled_bytes", frame_owner)
 
         load_frames = storage_source.split(
             "static bool animation_storage_load_frames", 1
