@@ -40,7 +40,7 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm audit --audit-level moderate
           pnpm test
-          pnpm docs
+          pnpm run docs
 
       - name: Verify project wizard
         working-directory: applications/system/js_app/packages/create-fz-app
