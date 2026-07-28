@@ -63,6 +63,7 @@ struct AnimationManager {
     bool profile_read_in_progress : 1;
     bool profile_reload_pending   : 1;
     bool profile_reload_forced    : 1;
+    bool retained_animation       : 1;
 };
 
 static StorageAnimation*
@@ -343,6 +344,7 @@ AnimationManager* animation_manager_alloc(void) {
     animation_manager->profile_read_in_progress = false;
     animation_manager->profile_reload_pending = false;
     animation_manager->profile_reload_forced = false;
+    animation_manager->retained_animation = false;
     animation_manager->freezed_animation = NULL;
     animation_manager->animation_view = bubble_animation_view_alloc();
     animation_manager->view_stack = view_stack_alloc();
@@ -674,11 +676,12 @@ bool animation_manager_is_animation_loaded(AnimationManager* animation_manager) 
     return animation_manager->current_animation;
 }
 
-void animation_manager_unload_and_stall_animation(AnimationManager* animation_manager) {
+static void animation_manager_prepare_stall(AnimationManager* animation_manager) {
     furi_assert(animation_manager);
     furi_assert(animation_manager->current_animation);
     furi_assert(!animation_manager->freezed_animation);
     furi_assert(!furi_string_size(animation_manager->freezed_animation_name));
+    furi_assert(!animation_manager->retained_animation);
     furi_assert(
         (animation_manager->state == AnimationManagerStateIdle) ||
         (animation_manager->state == AnimationManagerStateBlocked));
@@ -698,20 +701,59 @@ void animation_manager_unload_and_stall_animation(AnimationManager* animation_ma
         furi_crash();
     }
 
+    StorageAnimationManifestInfo* meta =
+        animation_storage_get_meta(animation_manager->current_animation);
+    /* copy str, not move, because it can be internal animation */
+    furi_string_set(animation_manager->freezed_animation_name, meta->name);
+}
+
+void animation_manager_unload_and_stall_animation(AnimationManager* animation_manager) {
+    animation_manager_prepare_stall(animation_manager);
+
     FURI_LOG_I(
         TAG,
         "Unload animation \'%s\'",
         animation_storage_get_meta(animation_manager->current_animation)->name);
 
-    StorageAnimationManifestInfo* meta =
-        animation_storage_get_meta(animation_manager->current_animation);
-    /* copy str, not move, because it can be internal animation */
-    furi_string_set(animation_manager->freezed_animation_name, meta->name);
-
     bubble_animation_freeze(animation_manager->animation_view);
     animation_manager->freezed_animation = animation_manager->current_animation;
     animation_manager->current_animation = NULL;
     animation_storage_release_animation_frames(animation_manager->freezed_animation);
+}
+
+void animation_manager_retain_and_stall_animation(AnimationManager* animation_manager) {
+    animation_manager_prepare_stall(animation_manager);
+
+    FURI_LOG_I(
+        TAG,
+        "Retain animation \'%s\'",
+        animation_storage_get_meta(animation_manager->current_animation)->name);
+
+    bubble_animation_suspend(animation_manager->animation_view);
+    animation_manager->freezed_animation = animation_manager->current_animation;
+    animation_manager->current_animation = NULL;
+    animation_manager->retained_animation = true;
+}
+
+bool animation_manager_has_retained_animation(AnimationManager* animation_manager) {
+    furi_assert(animation_manager);
+    return animation_manager->retained_animation;
+}
+
+void animation_manager_release_retained_animation(AnimationManager* animation_manager) {
+    furi_assert(animation_manager);
+    furi_assert(animation_manager->retained_animation);
+    furi_assert(!animation_manager->current_animation);
+    furi_assert(animation_manager->freezed_animation);
+
+    FURI_LOG_I(
+        TAG,
+        "Release retained animation \'%s\'",
+        animation_storage_get_meta(animation_manager->freezed_animation)->name);
+
+    bubble_animation_freeze(animation_manager->animation_view);
+    animation_storage_release_animation_frames(animation_manager->freezed_animation);
+    animation_manager->retained_animation = false;
 }
 
 void animation_manager_load_and_continue_animation(AnimationManager* animation_manager) {
@@ -723,17 +765,31 @@ void animation_manager_load_and_continue_animation(AnimationManager* animation_m
         (animation_manager->state == AnimationManagerStateFreezedIdle) ||
         (animation_manager->state == AnimationManagerStateFreezedBlocked));
 
-    bubble_animation_start_resume_preview(animation_manager->animation_view);
+    bool retained = animation_manager->retained_animation;
+    bool resumed_retained = false;
+    if(!retained) {
+        bubble_animation_start_resume_preview(animation_manager->animation_view);
+    }
     const bool storage_changed = animation_manager->profile_reload_forced;
     const bool profile_changed = animation_manager_reload_profile(animation_manager);
+    if(retained && (storage_changed || profile_changed)) {
+        animation_manager_release_retained_animation(animation_manager);
+        bubble_animation_start_resume_preview(animation_manager->animation_view);
+        retained = false;
+    }
 
     if(animation_manager->state == AnimationManagerStateFreezedBlocked) {
         StorageAnimation* restore_animation = animation_manager->freezed_animation;
         animation_manager->freezed_animation = NULL;
-        /* all blocked animations must be in flipper -> we can
-         * always find blocking animation */
-        furi_assert(animation_storage_get_bubble_animation(restore_animation));
-        animation_manager_replace_current_animation(animation_manager, restore_animation);
+        if(retained) {
+            animation_manager->current_animation = restore_animation;
+            resumed_retained = true;
+        } else {
+            /* all blocked animations must be in flipper -> we can
+             * always find blocking animation */
+            furi_assert(animation_storage_get_bubble_animation(restore_animation));
+            animation_manager_replace_current_animation(animation_manager, restore_animation);
+        }
         animation_manager->state = AnimationManagerStateBlocked;
     } else if(animation_manager->state == AnimationManagerStateFreezedIdle) { //-V547
         /* check if we missed some system notifications, and set current_animation */
@@ -753,8 +809,13 @@ void animation_manager_load_and_continue_animation(AnimationManager* animation_m
                     animation_storage_get_bubble_animation(restore_animation);
                 if(animation) {
                     animation_manager->freezed_animation = NULL;
-                    animation_manager_replace_current_animation(
-                        animation_manager, restore_animation);
+                    if(retained) {
+                        animation_manager->current_animation = restore_animation;
+                        resumed_retained = true;
+                    } else {
+                        animation_manager_replace_current_animation(
+                            animation_manager, restore_animation);
+                    }
                     animation_manager->state = AnimationManagerStateIdle;
 
                     if(animation_manager->freezed_animation_time_left) {
@@ -773,6 +834,10 @@ void animation_manager_load_and_continue_animation(AnimationManager* animation_m
                         "Failed to reload \'%s\' frames",
                         furi_string_get_cstr(animation_manager->freezed_animation_name));
                 }
+            } else if(retained) {
+                animation_manager_release_retained_animation(animation_manager);
+                bubble_animation_start_resume_preview(animation_manager->animation_view);
+                retained = false;
             }
         }
     } else {
@@ -780,20 +845,34 @@ void animation_manager_load_and_continue_animation(AnimationManager* animation_m
         furi_crash();
     }
 
+    StorageAnimation* discarded_retained_animation = NULL;
     if(animation_manager->freezed_animation) {
-        animation_storage_free_storage_animation(&animation_manager->freezed_animation);
+        if(retained) {
+            discarded_retained_animation = animation_manager->freezed_animation;
+            animation_manager->freezed_animation = NULL;
+        } else {
+            animation_storage_free_storage_animation(&animation_manager->freezed_animation);
+        }
     }
 
     /* if can't restore previous animation - select new */
     if(!animation_manager->current_animation) {
         animation_manager_start_new_idle(animation_manager);
     }
+    if(discarded_retained_animation) {
+        animation_storage_free_storage_animation(&discarded_retained_animation);
+    }
     FURI_LOG_I(
         TAG,
         "Load animation \'%s\'",
         animation_storage_get_meta(animation_manager->current_animation)->name);
 
-    bubble_animation_unfreeze(animation_manager->animation_view);
+    if(resumed_retained) {
+        bubble_animation_resume(animation_manager->animation_view);
+    } else if(!retained) {
+        bubble_animation_unfreeze(animation_manager->animation_view);
+    }
+    animation_manager->retained_animation = false;
     furi_string_reset(animation_manager->freezed_animation_name);
     furi_assert(animation_manager->current_animation);
 }

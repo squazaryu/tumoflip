@@ -183,6 +183,126 @@ class DesktopAnimationResumeTest(unittest.TestCase):
             restore,
         )
 
+    def test_shortcut_retention_is_preflighted_and_fail_closed(self) -> None:
+        scene_source = (
+            REPO_ROOT
+            / "applications/services/desktop/scenes/desktop_scene_main.c"
+        ).read_text(encoding="utf-8")
+
+        preflight = scene_source.split(
+            "desktop_scene_main_shortcut_can_retain_animation(", 1
+        )[1].split("desktop_scene_main_launch_target(", 1)[0]
+        for required in (
+            'desktop_scene_main_path_ends_with(target, ".fap")',
+            "DESKTOP_SHORTCUT_RETAIN_MIN_FREE_HEAP",
+            "DESKTOP_SHORTCUT_RETAIN_MIN_HEAP_BLOCK",
+            "DESKTOP_SHORTCUT_RETAIN_MAX_FAP_BYTES",
+            "DESKTOP_SHORTCUT_RETAIN_MAX_STACK_BYTES",
+            "DESKTOP_SHORTCUT_RETAIN_ARF_HUB_PATH",
+            "DESKTOP_SHORTCUT_RETAIN_ARF_HUB_NAME",
+            "memmgr_get_free_heap()",
+            "memmgr_heap_get_max_free_block()",
+            "storage_common_stat",
+            "flipper_application_preload_manifest",
+            "FlipperApplicationPreloadStatusSuccess",
+            "expected_app",
+        ):
+            self.assertIn(required, preflight)
+
+        launch = scene_source.split(
+            "desktop_scene_main_launch_target(Desktop* desktop", 1
+        )[1].split(
+            "static void desktop_scene_main_open_app_or_profile", 1
+        )[0]
+        self.assertIn(
+            "desktop->shortcut_animation_retain_pending =",
+            launch,
+        )
+        self.assertIn(
+            "from_shortcut && desktop_scene_main_shortcut_can_retain_animation",
+            launch,
+        )
+
+    def test_retention_covers_only_the_first_shortcut_app(self) -> None:
+        desktop_source = (
+            REPO_ROOT / "applications/services/desktop/desktop.c"
+        ).read_text(encoding="utf-8")
+        manager_source = (
+            REPO_ROOT
+            / "applications/services/desktop/animations/animation_manager.c"
+        ).read_text(encoding="utf-8")
+        view_source = (
+            REPO_ROOT
+            / "applications/services/desktop/animations/views/bubble_animation_view.c"
+        ).read_text(encoding="utf-8")
+
+        before_load = desktop_source.split(
+            "if(event == DesktopGlobalBeforeAppStarted)", 1
+        )[1].split(
+            "} else if(event == DesktopGlobalAfterAppFinished)", 1
+        )[0]
+        self.assertIn(
+            "animation_manager_retain_and_stall_animation",
+            before_load,
+        )
+        self.assertIn(
+            "animation_manager_has_retained_animation",
+            before_load,
+        )
+        self.assertIn(
+            "animation_manager_release_retained_animation",
+            before_load,
+        )
+        self.assertLess(
+            before_load.index("animation_manager_has_retained_animation"),
+            before_load.index("animation_manager_release_retained_animation"),
+        )
+        self.assertIn(
+            "desktop->shortcut_animation_retain_pending = false",
+            before_load,
+        )
+
+        retain = manager_source.split(
+            "void animation_manager_retain_and_stall_animation", 1
+        )[1].split(
+            "bool animation_manager_has_retained_animation", 1
+        )[0]
+        self.assertIn("bubble_animation_suspend", retain)
+        self.assertIn("animation_manager->retained_animation = true", retain)
+        self.assertNotIn("animation_storage_release_animation_frames", retain)
+
+        release = manager_source.split(
+            "void animation_manager_release_retained_animation", 1
+        )[1].split(
+            "void animation_manager_load_and_continue_animation", 1
+        )[0]
+        self.assertIn("bubble_animation_freeze", release)
+        self.assertIn("animation_storage_release_animation_frames", release)
+        self.assertIn("animation_manager->retained_animation = false", release)
+
+        suspend = view_source.split("void bubble_animation_suspend", 1)[1].split(
+            "void bubble_animation_start_resume_preview", 1
+        )[0]
+        self.assertIn("furi_timer_stop(view->timer)", suspend)
+        self.assertNotIn("model->current = NULL", suspend)
+        self.assertNotIn("bubble_animation_clone_preview", suspend)
+
+        resume = view_source.split("void bubble_animation_resume", 1)[1].split(
+            "View* bubble_animation_get_view", 1
+        )[0]
+        self.assertIn("model->current->icon_animation.frame_rate", resume)
+        self.assertIn("furi_timer_start", resume)
+        self.assertNotIn("model->current_frame =", resume)
+
+        restore = manager_source.split(
+            "void animation_manager_load_and_continue_animation", 1
+        )[1].split(
+            "static void animation_manager_switch_to_one_shot_view", 1
+        )[0]
+        self.assertIn("resumed_retained", restore)
+        self.assertIn("bubble_animation_resume", restore)
+        self.assertIn("storage_changed || profile_changed", restore)
+
     def test_generated_frame_bundle_is_versioned_and_sequential(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
