@@ -6,10 +6,16 @@ import tempfile
 import unittest
 
 import fbt_options
-from PIL import Image
+from PIL import Image, ImageDraw
 from PIL.PngImagePlugin import PngInfo
 
-from tools.tumoflip.generate_update_splash import fit_gravity_bold, generate_slideshow
+from tools.tumoflip.generate_update_splash import (
+    DISPLAY_SIZE,
+    SOURCE_ART_DIR,
+    draw_button,
+    fit_gravity_bold,
+    generate_slideshow,
+)
 from tools.tumoflip.sync_update_splash import (
     MANIFEST_NAME,
     current_splash_metadata,
@@ -53,67 +59,80 @@ class UpdateSplashTest(unittest.TestCase):
             ["frame_00.png", "frame_01.png", "frame_02.png", "frame_03.png"],
         )
 
-    def test_first_page_keeps_top_bar_clear(self) -> None:
-        with Image.open(SPLASH_DIR / "frame_00.png") as frame:
-            top_bar_area = frame.convert("1").crop((0, 0, 128, 18))
-            self.assertEqual(top_bar_area.getextrema(), (255, 255))
+    def test_pages_are_dense_one_bit_illustrations(self) -> None:
+        for frame_path in sorted(SPLASH_DIR.glob("frame_*.png")):
+            with Image.open(frame_path) as frame:
+                self.assertEqual(frame.mode, "1", frame_path.name)
+                self.assertEqual(frame.size, DISPLAY_SIZE, frame_path.name)
+                black_ratio = sum(pixel == 0 for pixel in frame.getdata()) / (
+                    DISPLAY_SIZE[0] * DISPLAY_SIZE[1]
+                )
+                self.assertGreater(black_ratio, 0.18, frame_path.name)
+                self.assertLess(black_ratio, 0.43, frame_path.name)
 
-    def test_first_page_keeps_gap_above_next_button(self) -> None:
-        with Image.open(SPLASH_DIR / "frame_00.png") as frame:
-            gap = frame.convert("1").crop((0, 46, 128, 50))
-            self.assertEqual(gap.getextrema(), (255, 255))
-
-    def test_dev_first_page_separates_title_and_version(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            frame = generate_slideshow(
+    def test_art_is_channel_and_version_neutral(self) -> None:
+        with tempfile.TemporaryDirectory() as stable, tempfile.TemporaryDirectory() as dev:
+            stable_frames = generate_slideshow(
+                "T-FLPPR-FW",
+                "001",
+                Path(stable),
+            )
+            dev_frames = generate_slideshow(
                 "T-DEV",
-                "089-038-003",
-                Path(directory),
-            )[0]
-            with Image.open(frame) as image:
-                title_version_gap = image.convert("1").crop((0, 34, 128, 38))
-                self.assertEqual(title_version_gap.getextrema(), (255, 255))
-                button_gap = image.convert("1").crop((0, 46, 128, 50))
-                self.assertEqual(button_gap.getextrema(), (255, 255))
+                "001-002",
+                Path(dev),
+            )
+            for stable_frame, dev_frame in zip(stable_frames, dev_frames):
+                self.assertPngPixelsEqual(stable_frame, dev_frame)
 
-    def test_generated_pages_use_friendly_post_install_copy(self) -> None:
+    def test_action_buttons_clear_their_reserved_area(self) -> None:
+        crop_box = (86, 48, 128, 64)
+        for index, label in enumerate(("NEXT", "NEXT", "NEXT", "OK")):
+            expected = Image.new("1", DISPLAY_SIZE, 1)
+            draw_button(ImageDraw.Draw(expected), label)
+            with Image.open(SPLASH_DIR / f"frame_{index:02d}.png") as frame:
+                self.assertEqual(
+                    frame.convert("1").crop(crop_box).tobytes(),
+                    expected.crop(crop_box).tobytes(),
+                )
+
+    def test_generated_pages_use_approved_illustrated_sources(self) -> None:
         generator = (REPO_ROOT / "tools/tumoflip/generate_update_splash.py").read_text(
             encoding="utf-8"
         )
 
         for phrase in (
-            "TUMOFLIP FIRMWARE",
-            "TUMOFLIP DEV",
-            "STABLE RELEASE",
-            "WELCOME TO",
-            "DEV BUILD",
-            "MAY BE UNSTABLE",
-            "ISSUES",
-            "GH: SQUAZARYU/TUMOFLIP",
+            "SOURCE_ART_DIR",
+            "render_source_art",
+            "TUMOFLIP UPDATED",
+            "SIGNAL TOOLKIT",
+            "EXPLORE THE AIR",
             "GravityBold8.ttf",
             "GravityRegular5.ttf",
         ):
             self.assertIn(phrase, generator)
 
+        for index in range(4):
+            source = SOURCE_ART_DIR / f"panel_{index:02d}.png"
+            self.assertTrue(source.is_file(), source.name)
+            with Image.open(source) as image:
+                self.assertEqual(image.mode, "1", source.name)
+                self.assertEqual(image.width, image.height * 2, source.name)
+
     def test_gravity_font_assets_are_vendored(self) -> None:
         for name in ("GravityBold8.ttf", "GravityRegular5.ttf", "README.md"):
             self.assertTrue((GRAVITY_FONT_DIR / name).exists(), name)
 
-    def test_stable_brand_fits_the_display(self) -> None:
-        font = fit_gravity_bold("T-FLPPR-FW", 116)
-        bbox = font.getbbox("T-FLPPR-FW")
-        self.assertLessEqual(bbox[2] - bbox[0], 116)
-        self.assertGreaterEqual(font.size, 12)
-
-        with tempfile.TemporaryDirectory() as directory:
-            frames = generate_slideshow(
-                "T-FLPPR-FW",
-                "089-037",
-                Path(directory),
-            )
-            with Image.open(frames[0]) as frame:
-                top_bar_area = frame.convert("1").crop((0, 0, 128, 18))
-                self.assertEqual(top_bar_area.getextrema(), (255, 255))
+    def test_welcome_wordmarks_fit_the_display(self) -> None:
+        for text, max_width, preferred_size in (
+            ("TUMOFLIP UPDATED", 100, 8),
+            ("SIGNAL TOOLKIT", 87, 8),
+            ("EXPLORE THE AIR", 88, 8),
+            ("TUMOFLIP", 119, 16),
+        ):
+            font = fit_gravity_bold(text, max_width, preferred_size)
+            bbox = font.getbbox(text)
+            self.assertLessEqual(bbox[2] - bbox[0], max_width)
 
     def test_sync_update_splash_removes_stale_frames(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
