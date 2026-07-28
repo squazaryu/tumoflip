@@ -138,6 +138,43 @@ tmwhflpprarf089-034
         )
         self.assertNotIn("<iteration>", updated)
 
+    def test_sync_starts_standalone_dev_iteration_without_placeholder(self) -> None:
+        original = """# tumoflip
+- Firmware version: `t-flppr-fw-001`
+- Release channel: `main stable line`
+- Release package: `flipper-z-f7-update-t-flppr-fw-001.tgz`
+- `t-dev`: Tumoflip development build prefix for unstable builds.
+- `001`: standalone Tumoflip release number.
+
+The first standalone stable line is
+`t-flppr-fw-001`, published as SemVer `v1.0.0`, and remains historical.
+
+- Rebranded firmware origin to `tumoflip` and distribution/version suffix to
+  `t-flppr-fw-001`.
+"""
+        updated = sync_readme_text(original, "t-dev-001-001")
+
+        self.assertIn("Firmware version: `t-dev-001-001`", updated)
+        self.assertIn("Release channel: `dev experimental line`", updated)
+        self.assertIn("flipper-z-f7-update-t-dev-001-001.tgz", updated)
+        self.assertIn("- `001`: standalone Tumoflip release number.", updated)
+        self.assertIn(
+            "- `001`: development iteration inside the standalone Tumoflip release number.",
+            updated,
+        )
+        self.assertIn(
+            "`t-flppr-fw-001`, published as SemVer `v1.0.0`",
+            updated,
+        )
+        self.assertIn(
+            "distribution/version suffix to\n  `t-flppr-fw-001`.",
+            updated,
+        )
+        self.assertNotIn(
+            "`t-dev-001-001`, published as SemVer `v1.0.0`",
+            updated,
+        )
+
     def test_readme_is_synced_with_dist_suffix(self) -> None:
         readme = (REPO_ROOT / "ReadMe.md").read_text(encoding="utf-8")
         self.assertEqual(sync_readme_text(readme, fbt_options.DIST_SUFFIX), readme)

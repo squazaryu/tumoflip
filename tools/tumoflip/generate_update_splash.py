@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DISPLAY_SIZE = (128, 64)
 FIRST_FRAME_SAFE_TOP = 18
 FIRST_FRAME_VERSION_Y = 32
-DEV_FIRST_FRAME_VERSION_Y = 37
+DEV_FIRST_FRAME_VERSION_Y = 38
 GRAVITY_FONT_DIR = REPO_ROOT / "assets/tumoflip/fonts/gravity"
 GRAVITY_BOLD = GRAVITY_FONT_DIR / "GravityBold8.ttf"
 GRAVITY_REGULAR = GRAVITY_FONT_DIR / "GravityRegular5.ttf"
@@ -403,10 +403,15 @@ def generate(title: str, version: str, output: Path) -> None:
 
     draw_centered_text(draw, title, FIRST_FRAME_SAFE_TOP, title_font)
 
-    version_bbox = draw.textbbox((0, 0), version, font=version_font)
-    if version_bbox[2] - version_bbox[0] > 116:
+    if title == "T-DEV":
+        # Keep the dev identifier clear of both the title and the updater button.
+        # Even short identifiers must use the compact line: the full-width
+        # 16/12 px variants visually collide with the button in a 64 px frame.
         version_font = gravity_bold(8)
-    version_y = DEV_FIRST_FRAME_VERSION_Y if title == "T-DEV" else FIRST_FRAME_VERSION_Y
+        version_y = DEV_FIRST_FRAME_VERSION_Y
+    else:
+        version_font = fit_gravity_bold(version, 116)
+        version_y = FIRST_FRAME_VERSION_Y
     draw_centered_text(draw, version, version_y, version_font)
 
     draw_next_button(draw)

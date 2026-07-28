@@ -26,6 +26,39 @@ class BumpDevVersionTest(unittest.TestCase):
             "t-dev-002-010",
         )
 
+    def test_updates_standalone_stable_readme_for_first_dev_iteration(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            (repo_root / "fbt_options.py").write_text(
+                'DIST_SUFFIX = "t-flppr-fw-001"\n',
+                encoding="utf-8",
+            )
+            (repo_root / "ReadMe.md").write_text(
+                """# tumoflip
+- Firmware version: `t-flppr-fw-001`
+- Release channel: `main stable line`
+- Release package: `flipper-z-f7-update-t-flppr-fw-001.tgz`
+- `t-dev`: Tumoflip development build prefix for unstable builds.
+- `001`: standalone Tumoflip release number.
+""",
+                encoding="utf-8",
+            )
+
+            old_suffix, new_suffix = apply_dev_version(
+                repo_root,
+                "t-dev-001-001",
+                update_splash=False,
+            )
+
+            self.assertEqual(old_suffix, "t-flppr-fw-001")
+            self.assertEqual(new_suffix, "t-dev-001-001")
+            readme = (repo_root / "ReadMe.md").read_text(encoding="utf-8")
+            self.assertIn("Firmware version: `t-dev-001-001`", readme)
+            self.assertIn(
+                "- `001`: development iteration inside the standalone Tumoflip release number.",
+                readme,
+            )
+
     def test_compute_next_iteration_by_default(self) -> None:
         self.assertEqual(
             compute_dev_version("t-dev-089-036-001"),

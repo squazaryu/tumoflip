@@ -60,7 +60,7 @@ class UpdateSplashTest(unittest.TestCase):
 
     def test_first_page_keeps_gap_above_next_button(self) -> None:
         with Image.open(SPLASH_DIR / "frame_00.png") as frame:
-            gap = frame.convert("1").crop((0, 48, 128, 50))
+            gap = frame.convert("1").crop((0, 46, 128, 50))
             self.assertEqual(gap.getextrema(), (255, 255))
 
     def test_dev_first_page_separates_title_and_version(self) -> None:
@@ -71,8 +71,10 @@ class UpdateSplashTest(unittest.TestCase):
                 Path(directory),
             )[0]
             with Image.open(frame) as image:
-                title_version_gap = image.convert("1").crop((0, 34, 128, 37))
+                title_version_gap = image.convert("1").crop((0, 34, 128, 38))
                 self.assertEqual(title_version_gap.getextrema(), (255, 255))
+                button_gap = image.convert("1").crop((0, 46, 128, 50))
+                self.assertEqual(button_gap.getextrema(), (255, 255))
 
     def test_generated_pages_use_friendly_post_install_copy(self) -> None:
         generator = (REPO_ROOT / "tools/tumoflip/generate_update_splash.py").read_text(
