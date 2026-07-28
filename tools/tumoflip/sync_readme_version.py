@@ -101,6 +101,22 @@ def sync_readme_text(
 ) -> str:
     prefix, base, build, iteration = parse_dist_suffix(dist_suffix)
     updated = README_VERSION_RE.sub(dist_suffix, text)
+    # These lines describe the immutable first standalone stable release, not
+    # the currently selected branch build. A dev bump must not rewrite history.
+    updated = re.sub(
+        r"(The first standalone stable line is\n)"
+        r"`[^`]+`, published as SemVer `v1\.0\.0`,",
+        r"\1`t-flppr-fw-001`, published as SemVer `v1.0.0`,",
+        updated,
+        count=1,
+    )
+    updated = re.sub(
+        r"(- Rebranded firmware origin to `tumoflip` and distribution/version suffix to\n)"
+        r"  `[^`]+`\.",
+        r"\1  `t-flppr-fw-001`.",
+        updated,
+        count=1,
+    )
 
     build_label = (
         "tumoflip internal build version"
@@ -115,13 +131,26 @@ def sync_readme_text(
         count=1,
     )
     if iteration:
-        updated = re.sub(
+        iteration_label = (
+            "development iteration inside the tumoflip internal build version"
+            if base is not None
+            else "development iteration inside the standalone Tumoflip release number"
+        )
+        updated, iteration_count = re.subn(
             r"- (?:`\d{3}`: development iteration inside the tumoflip internal build version|"
+            r"`\d{3}`: development iteration inside the standalone Tumoflip release number|"
             r"`<iteration>`: monotonically increasing revision used only by `t-dev` builds)\.",
-            f"- `{iteration}`: development iteration inside the tumoflip internal build version.",
+            f"- `{iteration}`: {iteration_label}.",
             updated,
             count=1,
         )
+        if iteration_count == 0:
+            build_line = f"- `{build}`: {build_label}."
+            updated = updated.replace(
+                build_line,
+                f"{build_line}\n- `{iteration}`: {iteration_label}.",
+                1,
+            )
 
     expected_channel = (
         "main stable line" if is_stable_prefix(prefix) else "dev experimental line"
@@ -165,10 +194,7 @@ def sync_readme_text(
         raise ValueError(
             "ReadMe.md release/build version line was not updated as expected"
         )
-    if iteration and (
-        f"- `{iteration}`: development iteration inside the tumoflip internal build version."
-        not in updated
-    ):
+    if iteration and f"- `{iteration}`: {iteration_label}." not in updated:
         raise ValueError(
             "ReadMe.md development iteration line was not updated as expected"
         )

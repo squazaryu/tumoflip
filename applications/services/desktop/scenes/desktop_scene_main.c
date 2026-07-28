@@ -2,7 +2,11 @@
 #include <furi_hal.h>
 #include <applications.h>
 #include <assets_icons.h>
+#include <core/memmgr.h>
+#include <core/memmgr_heap.h>
+#include <flipper_application/flipper_application.h>
 #include <loader/loader.h>
+#include <loader/firmware_api/firmware_api.h>
 #include <storage/storage.h>
 
 #include "../desktop_i.h"
@@ -11,6 +15,13 @@
 #include "desktop_scene.h"
 
 #define TAG "DesktopSrv"
+
+#define DESKTOP_SHORTCUT_RETAIN_MAX_FAP_BYTES   (8U * 1024U)
+#define DESKTOP_SHORTCUT_RETAIN_MAX_STACK_BYTES (4U * 1024U)
+#define DESKTOP_SHORTCUT_RETAIN_MIN_FREE_HEAP   (64U * 1024U)
+#define DESKTOP_SHORTCUT_RETAIN_MIN_HEAP_BLOCK  (48U * 1024U)
+#define DESKTOP_SHORTCUT_RETAIN_ARF_HUB_PATH    EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")
+#define DESKTOP_SHORTCUT_RETAIN_ARF_HUB_NAME    "ARF Sub-GHz Full"
 
 static void desktop_scene_main_new_idle_animation_callback(void* context) {
     furi_assert(context);
@@ -81,7 +92,53 @@ static bool desktop_scene_main_is_apps_folder_target(const char* path) {
            !desktop_scene_main_path_ends_with(path, ".js");
 }
 
-static void desktop_scene_main_launch_target(Desktop* desktop, const char* target) {
+static bool
+    desktop_scene_main_shortcut_can_retain_animation(Desktop* desktop, const char* target) {
+    /*
+     * FAP size and declared stack do not bound runtime heap use. Keep this
+     * optimization restricted to the measured lightweight first-hop hub.
+     */
+    if(strcmp(target, DESKTOP_SHORTCUT_RETAIN_ARF_HUB_PATH) != 0) return false;
+    if(!desktop_scene_main_path_ends_with(target, ".fap")) return false;
+    if((memmgr_get_free_heap() < DESKTOP_SHORTCUT_RETAIN_MIN_FREE_HEAP) ||
+       (memmgr_heap_get_max_free_block() < DESKTOP_SHORTCUT_RETAIN_MIN_HEAP_BLOCK)) {
+        return false;
+    }
+
+    FileInfo file_info;
+    if((storage_common_stat(desktop->storage, target, &file_info) != FSE_OK) ||
+       file_info_is_dir(&file_info) || (file_info.size > DESKTOP_SHORTCUT_RETAIN_MAX_FAP_BYTES)) {
+        return false;
+    }
+
+    FlipperApplication* app = flipper_application_alloc(desktop->storage, firmware_api_interface);
+    const FlipperApplicationPreloadStatus preload_status =
+        flipper_application_preload_manifest(app, target);
+    uint16_t stack_size = UINT16_MAX;
+    bool expected_app = false;
+    if(preload_status == FlipperApplicationPreloadStatusSuccess) {
+        const FlipperApplicationManifest* manifest = flipper_application_get_manifest(app);
+        stack_size = manifest->stack_size;
+        expected_app = strcmp(manifest->name, DESKTOP_SHORTCUT_RETAIN_ARF_HUB_NAME) == 0;
+    }
+    const bool retain = expected_app && (stack_size <= DESKTOP_SHORTCUT_RETAIN_MAX_STACK_BYTES);
+    flipper_application_free(app);
+
+    if(retain) {
+        FURI_LOG_I(
+            TAG,
+            "Retain shortcut animation for '%s' (%llu bytes, stack %u)",
+            target,
+            (unsigned long long)file_info.size,
+            stack_size);
+    }
+    return retain;
+}
+
+static void
+    desktop_scene_main_launch_target(Desktop* desktop, const char* target, bool from_shortcut) {
+    desktop->shortcut_animation_retain_pending =
+        from_shortcut && desktop_scene_main_shortcut_can_retain_animation(desktop, target);
     if(desktop_scene_main_is_apps_folder_target(target)) {
         loader_start_detached_with_gui_error(desktop->loader, LOADER_APPLICATIONS_NAME, target);
     } else {
@@ -90,10 +147,11 @@ static void desktop_scene_main_launch_target(Desktop* desktop, const char* targe
 }
 
 static void desktop_scene_main_open_app_or_profile(Desktop* desktop, FavoriteApp* application) {
+    desktop->shortcut_animation_retain_pending = false;
     bool load_ok = false;
     if(strlen(application->name_or_path) > 0) {
         if(!desktop_scene_main_check_none(application->name_or_path)) {
-            desktop_scene_main_launch_target(desktop, application->name_or_path);
+            desktop_scene_main_launch_target(desktop, application->name_or_path, true);
         }
         load_ok = true;
     }
@@ -104,9 +162,10 @@ static void desktop_scene_main_open_app_or_profile(Desktop* desktop, FavoriteApp
 }
 
 static void desktop_scene_main_start_favorite(Desktop* desktop, FavoriteApp* application) {
+    desktop->shortcut_animation_retain_pending = false;
     if(strlen(application->name_or_path) > 0) {
         if(!desktop_scene_main_check_none(application->name_or_path)) {
-            desktop_scene_main_launch_target(desktop, application->name_or_path);
+            desktop_scene_main_launch_target(desktop, application->name_or_path, true);
         }
     } else {
         loader_start_detached_with_gui_error(desktop->loader, LOADER_APPLICATIONS_NAME, NULL);
@@ -122,6 +181,7 @@ void desktop_scene_main_callback(DesktopEvent event, void* context) {
 void desktop_scene_main_on_enter(void* context) {
     Desktop* desktop = (Desktop*)context;
     DesktopMainView* main_view = desktop->main_view;
+    desktop->shortcut_animation_retain_pending = false;
 
     animation_manager_set_context(desktop->animation_manager, desktop);
     animation_manager_set_new_idle_callback(
@@ -143,6 +203,7 @@ bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
     if(event.type == SceneManagerEventTypeCustom) {
         switch(event.event) {
         case DesktopMainEventOpenMenu: {
+            desktop->shortcut_animation_retain_pending = false;
             Loader* loader = furi_record_open(RECORD_LOADER);
             loader_show_menu(loader);
             furi_record_close(RECORD_LOADER);
@@ -173,6 +234,7 @@ bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
             break;
 
         case DesktopMainEventOpenPowerOff: {
+            desktop->shortcut_animation_retain_pending = false;
             loader_start_detached_with_gui_error(desktop->loader, "Power", "off");
             consumed = true;
             break;

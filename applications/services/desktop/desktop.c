@@ -124,8 +124,16 @@ static bool desktop_custom_event_callback(void* context, uint32_t event) {
 
     if(event == DesktopGlobalBeforeAppStarted) {
         if(animation_manager_is_animation_loaded(desktop->animation_manager)) {
-            animation_manager_unload_and_stall_animation(desktop->animation_manager);
+            if(desktop->shortcut_animation_retain_pending) {
+                animation_manager_retain_and_stall_animation(desktop->animation_manager);
+            } else {
+                animation_manager_unload_and_stall_animation(desktop->animation_manager);
+            }
+        } else if(animation_manager_has_retained_animation(desktop->animation_manager)) {
+            /* A queued second app can be much heavier than the preflight-approved shortcut FAP. */
+            animation_manager_release_retained_animation(desktop->animation_manager);
         }
+        desktop->shortcut_animation_retain_pending = false;
 
         desktop_auto_lock_inhibit(desktop);
 
@@ -373,6 +381,7 @@ static Desktop* desktop_alloc(void) {
         furi_timer_alloc(desktop_clock_timer_callback, FuriTimerTypePeriodic, desktop);
 
     desktop->app_running = loader_is_locked(desktop->loader);
+    desktop->shortcut_animation_retain_pending = false;
 
     furi_record_create(RECORD_DESKTOP, desktop);
 

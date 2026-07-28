@@ -31,6 +31,7 @@ issue, report it in this repository:
 - Firmware API: `88.0`
 - Target: Flipper Zero F7
 - Release channel: `main stable line`
+- Target stable SemVer: `v1.0.1`
 - Release package: `flipper-z-f7-update-t-flppr-fw-001.tgz`
 - Flash profile: JS Runner / MJS runtime excluded to preserve internal flash headroom.
 
@@ -56,6 +57,7 @@ t-dev-<release>-<iteration>
 - `tmwhflpprarf`: legacy stable prefix kept for existing releases.
 - `t-dev`: Tumoflip development build prefix for unstable builds.
 - `001`: standalone Tumoflip release number.
+- `002`: development iteration inside the standalone Tumoflip release number.
 
 `main` should only receive builds that are stable enough to publish as tagged
 releases. Active firmware work lands on `dev` first. When the standalone release
