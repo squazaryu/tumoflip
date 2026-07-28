@@ -83,6 +83,8 @@ jobs:
           set -euo pipefail
           python3 -m unittest \
             tools/tumoflip/test_arf_subghz_full.py \
+            tools/tumoflip/test_clock_nightstand.py \
+            tools/tumoflip/test_desktop_animation_resume.py \
             tools/tumoflip/test_release_workflow.py \
             tools/tumoflip/test_readme_version_sync.py \
             tools/tumoflip/test_subghz_drift.py \
@@ -153,7 +155,7 @@ jobs:
 
           notes = f"""## {version}
 
-          Stable Tumoflip release based on Unleashed 089. Report regressions in Issues.
+          Stable standalone Tumoflip firmware release. Report regressions in Issues.
 
           ### Automated release assets
 
@@ -181,7 +183,7 @@ jobs:
 
           CI must not mark hardware-only checks as passed. Update these release notes after executing the hardware checklist on a physical Flipper Zero for this exact commit.
 
-          Before flashing, back up `/int` and important SD files. `tumoflip-packages.zip` is for Unleashed Companion SD package installation; firmware is installed separately through the standard updater package.
+          Before flashing, back up `/int` and important SD files. `tumoflip-packages.zip` is for TumoCompanion FW Packages installation; firmware is installed separately through the standard updater package.
           """
           Path("release-notes.md").write_text(
               "\n".join(line.strip() for line in notes.splitlines()) + "\n",

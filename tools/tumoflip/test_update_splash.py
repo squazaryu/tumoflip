@@ -60,7 +60,7 @@ class UpdateSplashTest(unittest.TestCase):
 
     def test_first_page_keeps_gap_above_next_button(self) -> None:
         with Image.open(SPLASH_DIR / "frame_00.png") as frame:
-            gap = frame.convert("1").crop((0, 48, 128, 50))
+            gap = frame.convert("1").crop((0, 46, 128, 50))
             self.assertEqual(gap.getextrema(), (255, 255))
 
     def test_dev_first_page_separates_title_and_version(self) -> None:
@@ -71,8 +71,10 @@ class UpdateSplashTest(unittest.TestCase):
                 Path(directory),
             )[0]
             with Image.open(frame) as image:
-                title_version_gap = image.convert("1").crop((0, 34, 128, 37))
+                title_version_gap = image.convert("1").crop((0, 34, 128, 38))
                 self.assertEqual(title_version_gap.getextrema(), (255, 255))
+                button_gap = image.convert("1").crop((0, 46, 128, 50))
+                self.assertEqual(button_gap.getextrema(), (255, 255))
 
     def test_generated_pages_use_friendly_post_install_copy(self) -> None:
         generator = (REPO_ROOT / "tools/tumoflip/generate_update_splash.py").read_text(
@@ -80,11 +82,10 @@ class UpdateSplashTest(unittest.TestCase):
         )
 
         for phrase in (
-            "UNLEASHED {base_version}",
-            "TUMOWUH FIRMWARE",
+            "TUMOFLIP FIRMWARE",
             "TUMOFLIP DEV",
-            "CUSTOM BUILD",
-            "USE WITH CARE",
+            "STABLE RELEASE",
+            "WELCOME TO",
             "DEV BUILD",
             "MAY BE UNSTABLE",
             "ISSUES",
@@ -173,15 +174,21 @@ class UpdateSplashTest(unittest.TestCase):
             )
 
     def test_dist_suffix_version_parser(self) -> None:
+        self.assertEqual(version_from_dist_suffix("t-flppr-fw-001"), "001")
         self.assertEqual(version_from_dist_suffix("t-flppr-fw-089-037"), "089-037")
         self.assertEqual(version_from_dist_suffix("tmwhflpprarf089-031"), "089-031")
         self.assertEqual(version_from_dist_suffix("t-dev-089-035-001"), "089-035-001")
+        self.assertEqual(version_from_dist_suffix("t-dev-002-001"), "002-001")
         self.assertIsNone(version_from_dist_suffix("abcdef12"))
 
     def test_dev_splash_uses_dev_title(self) -> None:
         self.assertEqual(
             current_splash_metadata("t-dev-089-035-001"),
             ("T-DEV", "089-035-001"),
+        )
+        self.assertEqual(
+            current_splash_metadata("t-flppr-fw-001"),
+            ("T-FLPPR-FW", "001"),
         )
         self.assertEqual(
             current_splash_metadata("t-flppr-fw-089-037"),

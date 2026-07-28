@@ -2,7 +2,7 @@
   "frames": {
     "frame_00.png": {
       "mode": "1",
-      "pixels_sha256": "19ab1e092790a863d072e3e46d351f57df7d7e95cb156f25e88cf2cf8449eee6",
+      "pixels_sha256": "3af75bdc38cab244334daa7e4d70b723c6ff50e3fa99e4d0c1c443ca6159b114",
       "size": [
         128,
         64
@@ -10,7 +10,7 @@
     },
     "frame_01.png": {
       "mode": "1",
-      "pixels_sha256": "f858958eabb73c75415c5fbb2bbc5bb58483bef7d676d54f5b9ed3f5b9544d49",
+      "pixels_sha256": "ba18b105e04e432e6aa3faecc270d5d5295c522ba00c7afa86647b776ef62fc1",
       "size": [
         128,
         64
@@ -35,5 +35,5 @@
   },
   "schema": 1,
   "title": "T-DEV",
-  "version": "089-041-024"
+  "version": "001-001"
 }

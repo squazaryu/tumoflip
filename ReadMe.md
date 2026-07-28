@@ -2,9 +2,9 @@
 
 # tumoflip
 
-**Custom Flipper Zero firmware** based on [DarkFlippers/unleashed-firmware](https://github.com/DarkFlippers/unleashed-firmware).
+**Independent Flipper Zero firmware distribution** maintained as Tumoflip.
 
-![base](https://img.shields.io/badge/base-Unleashed-black)
+![firmware](https://img.shields.io/badge/firmware-Tumoflip-black)
 ![target](https://img.shields.io/badge/target-Flipper%20Zero%20(f7)-orange)
 ![license](https://img.shields.io/badge/license-GPLv3-blue)
 [![release](https://img.shields.io/github/v/release/squazaryu/tumoflip?label=release&color=brightgreen)](https://github.com/squazaryu/tumoflip/releases/latest)
@@ -13,24 +13,26 @@
 
 </div>
 
-This repository keeps the Unleashed firmware history and adds a small set of
-personal firmware changes on top of it. It is not an official Unleashed release
-and is not affiliated with Flipper Devices or the Unleashed team.
+Tumoflip is released and versioned as its own firmware distribution. The
+repository retains its complete Git history, licenses, and third-party
+attribution, while all published firmware identity and support channels belong
+to Tumoflip.
 
-This firmware contains experimental features and local changes. Some of them
-may be unstable, incomplete, or incompatible with future Unleashed updates. If
-you find a tumoflip-specific issue, report it in this repository:
+Some dev-channel features remain experimental and may be unstable or
+incompatible with future upstream changes. If you find a Tumoflip-specific
+issue, report it in this repository:
 [squazaryu/tumoflip issues](https://github.com/squazaryu/tumoflip/issues).
 
 ## Current Build
 
-- Base: Unleashed 089 with selected upstream dev updates
-- Firmware version: `t-dev-089-041-024`
+- Distribution: Tumoflip standalone release line
+- Firmware version: `t-dev-001-001`
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `88.0`
 - Target: Flipper Zero F7
 - Release channel: `dev experimental line`
-- Release package: `flipper-z-f7-update-t-dev-089-041-024.tgz`
+- Target stable SemVer: `v1.0.1`
+- Release package: `flipper-z-f7-update-t-dev-001-001.tgz`
 - Flash profile: JS Runner / MJS runtime excluded to preserve internal flash headroom.
 
 API `88.0` is a deliberate breaking migration. External FAP/FAL binaries built
@@ -42,53 +44,52 @@ matching Tumoflip FW Packages release.
 Stable `main` firmware versions use this format:
 
 ```text
-t-flppr-fw-<unleashed>-<build>
+t-flppr-fw-<release>
 ```
 
 Development `dev` firmware versions use this format:
 
 ```text
-t-dev-<unleashed>-<build>-<iteration>
+t-dev-<release>-<iteration>
 ```
 
 - `t-flppr-fw`: Tumowuh Flipper Firmware stable build prefix.
 - `tmwhflpprarf`: legacy stable prefix kept for existing releases.
 - `t-dev`: Tumoflip development build prefix for unstable builds.
-- `089`: upstream Unleashed base version.
-- `041`: tumoflip internal build version.
-- `024`: development iteration inside the tumoflip internal build version.
+- `001`: standalone Tumoflip release number.
+- `001`: development iteration inside the standalone Tumoflip release number.
 
 `main` should only receive builds that are stable enough to publish as tagged
-releases. Active firmware work lands on `dev` first. When the Unleashed base
-version, tumoflip internal version, or dev iteration changes, update the
-firmware version suffix in `fbt_options.py`, release notes, README, and the
-published update package name together.
+releases. Active firmware work lands on `dev` first. When the standalone release
+number or dev iteration changes, update the firmware version suffix in
+`fbt_options.py`, release notes, README, splash, and the published update
+package name together.
 
 Companion and release tooling continue to recognize the legacy
-`tmwhflpprarf<unleashed>-<build>` format. Existing release tags and packages
-are never renamed; only new stable builds use `t-flppr-fw-*`.
-Stable Git tags remain SemVer: stable `089-039` uses `v0.3.9` and the stable
-firmware prefix. The current development line reports `t-dev-089-041-024`
-through `device_info`.
+`tmwhflpprarf<legacy-base>-<build>`, `t-flppr-fw-<legacy-base>-<build>`, and
+`t-dev-<legacy-base>-<build>-<iteration>` formats. Existing release tags and
+packages are never renamed. The first standalone stable line is
+`t-flppr-fw-001`, published as SemVer `v1.0.0`, and reports that exact firmware
+identity through `device_info`.
 
 For `dev`, every separate issue-level or user-visible firmware change should
-advance the last three-digit iteration. A new Tumoflip internal build starts at
-`001`; the next change in the same internal build advances that suffix to
-`002`, then `003`, and so on. Use the helper to keep `DIST_SUFFIX`, README, and
-the update splash synchronized:
+advance the final three-digit iteration. A new standalone release line starts
+at iteration `001`; the next change advances it to `002`, then `003`, and so
+on. Use the helper to keep `DIST_SUFFIX`, README, and the update splash
+synchronized:
 
 ```sh
-python3 tools/tumoflip/bump_dev_version.py --build 036 --iteration 001
+python3 tools/tumoflip/bump_dev_version.py --build 002 --iteration 001
 python3 tools/tumoflip/bump_dev_version.py
 ```
 
-Prepare a new stable identity only on an approved release branch. This keeps
-the current Unleashed/build numbers, removes the dev iteration, updates README
-and splash assets together, and never rewrites an existing legacy release:
+Prepare a new stable identity only on an approved release branch. This removes
+the dev iteration, updates README and splash assets together, and never
+rewrites an existing legacy release:
 
 ```sh
-python3 tools/tumoflip/prepare_stable_version.py --dry-run
-python3 tools/tumoflip/prepare_stable_version.py
+python3 tools/tumoflip/prepare_stable_version.py --set t-flppr-fw-XXX --dry-run
+python3 tools/tumoflip/prepare_stable_version.py --set t-flppr-fw-XXX
 ```
 
 The four-page post-update splash screen is generated automatically from
@@ -97,7 +98,7 @@ The four-page post-update splash screen is generated automatically from
 ## tumoflip Changes
 
 - Rebranded firmware origin to `tumoflip` and distribution/version suffix to
-  `t-dev-089-041-024`.
+  `t-flppr-fw-001`.
 - Restores the CC1101 boot configuration and isolated RF path when Frequency
   Analyzer exits, preventing its custom AGC and bandwidth state from affecting
   the next Sub-GHz tool.
@@ -227,35 +228,33 @@ The four-page post-update splash screen is generated automatically from
 - Vendored local user applications into `applications_user` so the repository
   can be built without absolute local symlinks.
 
-## Differences from Unleashed
+## Tumoflip feature overview
 
-tumoflip is based on Unleashed, but it intentionally changes the parts of the
-firmware that affect the Desktop, quick access flow, bundled apps, and build
-identity.
+Tumoflip owns the firmware identity, Desktop, quick access flow, bundled apps,
+package contract, and release process.
 
-| Area | Unleashed | tumoflip |
+| Area | Baseline behavior | Tumoflip |
 | --- | --- | --- |
-| Firmware identity | Reports itself as Unleashed. | Reports `firmware_version: t-dev-089-041-024` and `firmware_origin_fork: tumoflip`. |
-| Desktop layouts | Uses the default Unleashed Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
+| Firmware identity | Uses another distribution identity. | Reports `firmware_version: t-dev-001-001` and `firmware_origin_fork: tumoflip`. |
+| Desktop layouts | Uses the baseline Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
 | Desktop OK menu | Uses the standard app/menu layout. | Keeps the `8/1` Module One folder after Apps, keeps `Sub-GHz` on the core app, and replaces `Sub-GHz Remote` with the `ARF Tools` folder. |
 | Desktop favorites | Can launch built-in apps or selected `.fap` apps. | Also supports `.js` scripts and direct folder targets for `8/1` Module One and `ARF Tools`. |
 | ARF tools access | Apps are reached through the normal Apps tree. | Exposes one Full launcher; child ARF/ProtoPirate FAPs are internal modules under `apps_data`. |
-| Settings return flow | Standard Unleashed navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
-| BLE services | Standard Unleashed BLE behavior. | Adds BLE App Bridge support and Service Changed indications for stale iOS GATT cache recovery after firmware updates/profile rebuilds. |
+| Settings return flow | Standard navigation. | Keeps the Desktop Settings shortcut separate from the normal OK menu flow where possible. |
+| BLE services | Standard BLE behavior. | Adds BLE App Bridge support and Service Changed indications for stale iOS GATT cache recovery after firmware updates/profile rebuilds. |
 | ARF protocols | Not included. | Keeps the core set size-limited and loads selected automotive decoders from SD as Protocol Packs. |
 | Sub-GHz hopping | Frequency hopping only. | Adds preset and combined hopping plus an adaptive scan dwell, signal hold, post-signal grace period, and bounded hold time to system Sub-GHz. |
-| NFC additions | Uses the Unleashed 089 NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK, adds Bambu Lab and Moscow social-card subscription parsers, and supports large ISO15693 multi-block emulation with bounded parser writes. |
+| NFC additions | Uses the baseline NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK, adds Bambu Lab and Moscow social-card subscription parsers, and supports large ISO15693 multi-block emulation with bounded parser writes. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `t-dev-089-041-024` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `t-dev-001-001` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
-The custom Desktop styles are focused on changing the main Desktop launcher
-experience, not replacing every nested app list in the firmware. Apps and
-system screens still mostly follow the underlying Unleashed UI behavior unless
-they were changed explicitly.
+The custom Desktop styles focus on the main Desktop launcher experience rather
+than replacing every nested app list. Apps and system screens retain baseline
+UI behavior unless Tumoflip changes them explicitly.
 
 Custom `8/1` and `ARF Tools` OK-menu icons can be overridden from SD without a
 firmware rebuild. See [Tumoflip Asset Packs](docs/tumoflip-asset-packs.md) for
@@ -274,8 +273,8 @@ tumoflip includes an initial merge of selected automotive Sub-GHz protocol code
 from [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF).
 Additional Shuka Auto protocol packs are credited to
 [shuka0158/ARF-Shuka-Edition](https://github.com/shuka0158/ARF-Shuka-Edition).
-This is a feature merge, not a replacement of the existing Unleashed/tumoflip
-Sub-GHz stack. The supported boundary is documented in
+This is a feature merge into the existing Tumoflip Sub-GHz stack. The supported
+boundary is documented in
 [Sub-GHz Architecture](docs/subghz-architecture.md): core Sub-GHz stays in
 firmware, optional decoders are loaded as `.fal` Protocol Packs, and heavy ARF
 utilities stay as separate `.fap` tools on SD.
@@ -433,7 +432,7 @@ Stable `main` update packages and `dev` prereleases are published on
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases). The currently
 selected branch build uses this artifact name:
 
-- `flipper-z-f7-update-t-dev-089-041-024.tgz`
+- `flipper-z-f7-update-t-dev-001-001.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -455,18 +454,17 @@ python3 tools/tumoflip/validate_release.py --write-manifest
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-t-dev-089-041-024.tgz
+dist/f7-C/flipper-z-f7-update-t-dev-001-001.tgz
 ```
 
-## Upstream
+## Provenance and third-party sources
 
-This firmware is based on Unleashed:
+Tumoflip is an independent distribution. Historical Git lineage, copyright
+notices, and licenses remain intact in the repository. Project documentation:
 
-- Upstream repository:
-  [DarkFlippers/unleashed-firmware](https://github.com/DarkFlippers/unleashed-firmware)
-- Original documentation:
+- Firmware documentation:
   [documentation/](documentation/)
-- Original license:
+- License:
   [LICENSE](LICENSE)
 
 Additional Sub-GHz research sources used by tumoflip:
@@ -476,8 +474,9 @@ Additional Sub-GHz research sources used by tumoflip:
 - Shuka Auto protocol additions:
   [shuka0158/ARF-Shuka-Edition](https://github.com/shuka0158/ARF-Shuka-Edition)
 
-When updating tumoflip, pull/rebase from Unleashed carefully and review conflicts
-around Desktop, Loader, BLE, API symbols, and bundled user applications.
+When importing selected upstream changes, review them individually and inspect
+conflicts around Desktop, Loader, BLE, API symbols, and bundled user
+applications.
 
 ## Disclaimer
 

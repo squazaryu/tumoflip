@@ -10,7 +10,8 @@ import json5 from "json5";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const cfwSdkName = "@darkflippers/fz-sdk-ul/";
+// Keep the historical npm scope as an input alias for existing projects.
+const legacySdkName = "@darkflippers/fz-sdk-ul/";
 const ofwSdkName = "@flipperdevices/fz-sdk/";
 
 async function build(config) {
@@ -78,7 +79,7 @@ async function build(config) {
     outContents = "let exports = {};\n" + outContents;
 
     // Transform CFW SDK name to OFW SDK name so all firmwares understand it
-    outContents = outContents.replaceAll(`require("${cfwSdkName}`, `require("${ofwSdkName}`);
+    outContents = outContents.replaceAll(`require("${legacySdkName}`, `require("${ofwSdkName}`);
 
     if (config.enforceSdkVersion) {
         const version = json5.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8")).version;

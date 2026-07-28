@@ -82,7 +82,7 @@ class TumoUartConsoleTest(unittest.TestCase):
         self.assertIn("#define SCRIPT_MAX_LINES (64u)", read("helpers/script.h"))
         self.assertFalse((APP_DIR / "scripts/example_login.txt").exists())
 
-    def test_cockpit_and_package_routes_match(self) -> None:
+    def test_stable_release_does_not_publish_unaccepted_uart_console(self) -> None:
         cockpit = (
             REPO_ROOT
             / "applications_user/module_one_cockpit/module_one_cockpit.c"
@@ -90,11 +90,13 @@ class TumoUartConsoleTest(unittest.TestCase):
         validator = (
             REPO_ROOT / "tools/tumoflip/validate_release.py"
         ).read_text(encoding="utf-8")
+        options = (REPO_ROOT / "fbt_options.py").read_text(encoding="utf-8")
         route = "apps_data/module_one_cockpit/modules/tumo_uart_console.fap"
 
-        self.assertIn('"UART: Field Console"', cockpit)
-        self.assertIn(f'EXT_PATH("{route}")', cockpit)
-        self.assertIn(f'"{route}"', validator)
+        self.assertNotIn('"UART: Field Console"', cockpit)
+        self.assertNotIn(f'EXT_PATH("{route}")', cockpit)
+        self.assertNotIn(f'"{route}"', validator)
+        self.assertIn('"tumo_uart_console"', options)
 
 
 if __name__ == "__main__":
