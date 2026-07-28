@@ -456,6 +456,16 @@ void bubble_animation_freeze(BubbleAnimationView* view) {
     furi_timer_stop(view->timer);
 }
 
+void bubble_animation_suspend(BubbleAnimationView* view) {
+    furi_assert(view);
+
+    BubbleAnimationViewModel* model = view_get_model(view->view);
+    furi_assert(model->current);
+    furi_assert(!model->freeze_frame);
+    view_commit_model(view->view, false);
+    furi_timer_stop(view->timer);
+}
+
 void bubble_animation_start_resume_preview(BubbleAnimationView* view) {
     furi_assert(view);
 
@@ -496,6 +506,21 @@ void bubble_animation_unfreeze(BubbleAnimationView* view) {
     view_commit_model(view->view, true);
 
     furi_timer_start(view->timer, 1000 / frame_rate);
+    bubble_animation_activate(view, false);
+}
+
+void bubble_animation_resume(BubbleAnimationView* view) {
+    furi_assert(view);
+
+    BubbleAnimationViewModel* model = view_get_model(view->view);
+    furi_assert(model->current);
+    furi_assert(!model->freeze_frame);
+    const uint8_t frame_rate = model->current->icon_animation.frame_rate;
+    view_commit_model(view->view, true);
+
+    if(frame_rate) {
+        furi_timer_start(view->timer, 1000U / frame_rate);
+    }
     bubble_animation_activate(view, false);
 }
 

@@ -82,6 +82,14 @@ View* bubble_animation_get_view(BubbleAnimationView* view);
 void bubble_animation_freeze(BubbleAnimationView* view);
 
 /**
+ * Suspend playback without cloning or releasing the current animation.
+ * The model, encoded frames, current phase, and current bubble stay intact.
+ *
+ * @view        bubble animation view instance
+ */
+void bubble_animation_suspend(BubbleAnimationView* view);
+
+/**
  * Play the bounded in-memory preview once while the full animation is restored.
  * The final preview frame is held if restoration takes longer than the cache.
  *
@@ -95,3 +103,10 @@ void bubble_animation_start_resume_preview(BubbleAnimationView* view);
  * @view        bubble animation view instance
  */
 void bubble_animation_unfreeze(BubbleAnimationView* view);
+
+/**
+ * Resume a previously suspended animation from the same phase and buffer.
+ *
+ * @view        bubble animation view instance
+ */
+void bubble_animation_resume(BubbleAnimationView* view);

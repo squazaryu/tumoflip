@@ -152,6 +152,33 @@ bool animation_manager_is_animation_loaded(AnimationManager* animation_manager);
 void animation_manager_unload_and_stall_animation(AnimationManager* animation_manager);
 
 /**
+ * Stall animation playback while retaining the complete encoded frame buffer
+ * and current playback phase.
+ *
+ * This mode is reserved for a preflight-approved first shortcut FAP. It must
+ * be converted to the normal unloaded handoff before a chained application.
+ *
+ * @animation_manager   instance
+ */
+void animation_manager_retain_and_stall_animation(AnimationManager* animation_manager);
+
+/**
+ * Check whether the stalled animation still owns its full frame buffer.
+ *
+ * @animation_manager   instance
+ * @return              true when frames are retained
+ */
+bool animation_manager_has_retained_animation(AnimationManager* animation_manager);
+
+/**
+ * Convert a retained stall to the normal bounded-preview handoff and release
+ * the complete frame buffer.
+ *
+ * @animation_manager   instance
+ */
+void animation_manager_release_retained_animation(AnimationManager* animation_manager);
+
+/**
  * Load and Continue execution of animation manager.
  *
  * @animation_manager   instance

@@ -84,6 +84,7 @@ struct Desktop {
     bool in_transition;
     bool app_running;
     bool locked;
+    bool shortcut_animation_retain_pending;
 };
 
 void desktop_lock(Desktop* desktop);
