@@ -53,6 +53,7 @@ struct Gui {
     bool lockdown;
     bool lockdown_inhibit;
     bool direct_draw;
+    bool status_bar_hidden;
     ViewPortArray_t layers[GuiLayerMAX];
     Canvas* canvas;
 
@@ -93,16 +94,12 @@ void gui_input_events_callback(const void* value, void* ctx);
  */
 size_t gui_active_view_port_count(Gui* gui, GuiLayer layer);
 
-/** Move an attached ViewPort to another layer without breaking input routing.
+/** Hide or restore the status bar while keeping the current GUI layer.
  *
- * Unlike remove/add, this keeps the ViewPort associated with the same Gui and
- * preserves an in-flight key sequence that must still receive its release.
- *
- * @param      gui        The Gui instance
- * @param      view_port  The attached ViewPort instance
- * @param[in]  layer      Destination layer
+ * @param      gui     The Gui instance
+ * @param[in]  hidden  True to suppress status bar drawing
  */
-void gui_view_port_set_layer(Gui* gui, ViewPort* view_port, GuiLayer layer);
+void gui_set_status_bar_hidden(Gui* gui, bool hidden);
 
 /** Lock GUI
  *

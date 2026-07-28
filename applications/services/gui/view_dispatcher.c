@@ -215,18 +215,6 @@ void view_dispatcher_send_to_back(ViewDispatcher* view_dispatcher) {
     gui_view_port_send_to_back(view_dispatcher->gui, view_dispatcher->view_port);
 }
 
-static GuiLayer view_dispatcher_type_to_layer(ViewDispatcherType type) {
-    if(type == ViewDispatcherTypeDesktop) {
-        return GuiLayerDesktop;
-    } else if(type == ViewDispatcherTypeWindow) {
-        return GuiLayerWindow;
-    } else if(type == ViewDispatcherTypeFullscreen) {
-        return GuiLayerFullscreen;
-    }
-
-    furi_crash();
-}
-
 void view_dispatcher_attach_to_gui(
     ViewDispatcher* view_dispatcher,
     Gui* gui,
@@ -235,20 +223,16 @@ void view_dispatcher_attach_to_gui(
     furi_check(view_dispatcher->gui == NULL);
     furi_check(gui);
 
-    gui_add_view_port(gui, view_dispatcher->view_port, view_dispatcher_type_to_layer(type));
+    if(type == ViewDispatcherTypeDesktop) {
+        gui_add_view_port(gui, view_dispatcher->view_port, GuiLayerDesktop);
+    } else if(type == ViewDispatcherTypeWindow) {
+        gui_add_view_port(gui, view_dispatcher->view_port, GuiLayerWindow);
+    } else if(type == ViewDispatcherTypeFullscreen) {
+        gui_add_view_port(gui, view_dispatcher->view_port, GuiLayerFullscreen);
+    } else {
+        furi_crash();
+    }
     view_dispatcher->gui = gui;
-}
-
-void view_dispatcher_set_gui_type(
-    ViewDispatcher* view_dispatcher,
-    ViewDispatcherType type) {
-    furi_check(view_dispatcher);
-    furi_check(view_dispatcher->gui);
-
-    gui_view_port_set_layer(
-        view_dispatcher->gui,
-        view_dispatcher->view_port,
-        view_dispatcher_type_to_layer(type));
 }
 
 void view_dispatcher_draw_callback(Canvas* canvas, void* context) {

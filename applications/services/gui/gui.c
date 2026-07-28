@@ -251,16 +251,20 @@ static void gui_redraw(Gui* gui) {
 
         if(gui_is_lockdown(gui)) {
             gui_redraw_desktop(gui);
-            bool need_attention =
-                (gui_view_port_find_enabled(gui->layers[GuiLayerWindow]) != 0 ||
-                 gui_view_port_find_enabled(gui->layers[GuiLayerFullscreen]) != 0);
-            gui_redraw_status_bar(gui, need_attention);
+            if(!gui->status_bar_hidden) {
+                bool need_attention =
+                    (gui_view_port_find_enabled(gui->layers[GuiLayerWindow]) != 0 ||
+                     gui_view_port_find_enabled(gui->layers[GuiLayerFullscreen]) != 0);
+                gui_redraw_status_bar(gui, need_attention);
+            }
         } else {
             if(!gui_redraw_fs(gui)) {
                 if(!gui_redraw_window(gui)) {
                     gui_redraw_desktop(gui);
                 }
-                gui_redraw_status_bar(gui, false);
+                if(!gui->status_bar_hidden) {
+                    gui_redraw_status_bar(gui, false);
+                }
             }
         }
 
@@ -405,47 +409,6 @@ void gui_remove_view_port(Gui* gui, ViewPort* view_port) {
     gui_update(gui);
 }
 
-void gui_view_port_set_layer(Gui* gui, ViewPort* view_port, GuiLayer layer) {
-    furi_check(gui);
-    furi_check(view_port);
-    furi_check(layer < GuiLayerMAX);
-
-    const ViewPortOrientation orientation = view_port_get_orientation(view_port);
-    furi_check(
-        (layer == GuiLayerFullscreen) ||
-        ((orientation != ViewPortOrientationVertical) &&
-         (orientation != ViewPortOrientationVerticalFlip)));
-
-    gui_lock(gui);
-
-    GuiLayer current_layer = GuiLayerMAX;
-    ViewPortArray_it_t it;
-    for(size_t i = 0; i < GuiLayerMAX; i++) {
-        ViewPortArray_it(it, gui->layers[i]);
-        while(!ViewPortArray_end_p(it)) {
-            if(*ViewPortArray_ref(it) == view_port) {
-                furi_check(current_layer == GuiLayerMAX);
-                current_layer = i;
-                if(current_layer != layer) {
-                    ViewPortArray_remove(gui->layers[i], it);
-                } else {
-                    ViewPortArray_next(it);
-                }
-            } else {
-                ViewPortArray_next(it);
-            }
-        }
-    }
-
-    furi_check(current_layer != GuiLayerMAX);
-    if(current_layer != layer) {
-        ViewPortArray_push_back(gui->layers[layer], view_port);
-    }
-
-    gui_unlock(gui);
-    gui_update(gui);
-}
-
 void gui_view_port_send_to_front(Gui* gui, ViewPort* view_port) {
     furi_check(gui);
     furi_check(view_port);
@@ -553,6 +516,16 @@ bool gui_is_lockdown(const Gui* gui) {
     return gui->lockdown && !gui->lockdown_inhibit;
 }
 
+void gui_set_status_bar_hidden(Gui* gui, bool hidden) {
+    furi_check(gui);
+
+    gui_lock(gui);
+    gui->status_bar_hidden = hidden;
+    gui_unlock(gui);
+
+    gui_update(gui);
+}
+
 Canvas* gui_direct_draw_acquire(Gui* gui) {
     furi_check(gui);
 
@@ -583,6 +556,7 @@ void gui_direct_draw_release(Gui* gui) {
 
 Gui* gui_alloc(void) {
     Gui* gui = malloc(sizeof(Gui));
+    gui->status_bar_hidden = false;
     // Thread ID
     gui->thread_id = furi_thread_get_current_id();
     // Allocate mutex
