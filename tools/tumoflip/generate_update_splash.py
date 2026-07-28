@@ -10,7 +10,9 @@ from PIL import Image, ImageDraw, ImageFont
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DISPLAY_SIZE = (128, 64)
 FIRST_FRAME_SAFE_TOP = 18
-FIRST_FRAME_VERSION_Y = 32
+# Keep the stable identifier clear of the updater button's reserved gap.
+# Gravity Bold 16 extends below its text origin, so y=32 reaches row 46.
+FIRST_FRAME_VERSION_Y = 30
 DEV_FIRST_FRAME_VERSION_Y = 38
 GRAVITY_FONT_DIR = REPO_ROOT / "assets/tumoflip/fonts/gravity"
 GRAVITY_BOLD = GRAVITY_FONT_DIR / "GravityBold8.ttf"
