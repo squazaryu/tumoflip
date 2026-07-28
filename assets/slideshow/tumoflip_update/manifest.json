@@ -2,7 +2,7 @@
   "frames": {
     "frame_00.png": {
       "mode": "1",
-      "pixels_sha256": "0bc9e4f86a88d1e443137f23272d42d3b9096780ace1e40a46cb1eaf66d2921f",
+      "pixels_sha256": "054433d43081c9a21ab069023fdda6fff54d12a901469255e6bd68ccec68726f",
       "size": [
         128,
         64
@@ -10,7 +10,7 @@
     },
     "frame_01.png": {
       "mode": "1",
-      "pixels_sha256": "ca26d21a09e708685887d10f34b5d9524cf2ad51df6c037ca05271bebd0d3491",
+      "pixels_sha256": "bb57ec526e7bf96a002ef7f5edd5c3907771a36d72193cd77c60f9e37271d3ed",
       "size": [
         128,
         64
@@ -18,7 +18,7 @@
     },
     "frame_02.png": {
       "mode": "1",
-      "pixels_sha256": "4480f278cbfda5526c471dee16effc4b76d0c12c0ece3647659f08b9ea1e8d35",
+      "pixels_sha256": "9bbae28556e346f31888ca8060e0d021e6da5db69798271fca48cd1b5294eb88",
       "size": [
         128,
         64
@@ -26,7 +26,7 @@
     },
     "frame_03.png": {
       "mode": "1",
-      "pixels_sha256": "8f8b9347a870dd586067621d6e87a388a0f7a1c6c2c8f16bd999a7545a7864b3",
+      "pixels_sha256": "7510154b37e8bf64921fa0799852c94fd7ecac609f4e1e7eb5dbffff10992021",
       "size": [
         128,
         64
