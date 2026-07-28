@@ -56,6 +56,11 @@ void view_dispatcher_set_current_view(ViewDispatcher* view_dispatcher, View* vie
 /** ViewDispatcher update event */
 void view_dispatcher_update(View* view, void* context);
 
+/** Move an attached ViewDispatcher between GUI layer types. */
+void view_dispatcher_set_gui_type(
+    ViewDispatcher* view_dispatcher,
+    ViewDispatcherType type);
+
 /** ViewDispatcher run event loop event callback */
 void view_dispatcher_run_event_callback(FuriEventLoopObject* object, void* context);
 

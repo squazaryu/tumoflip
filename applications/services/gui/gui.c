@@ -405,6 +405,47 @@ void gui_remove_view_port(Gui* gui, ViewPort* view_port) {
     gui_update(gui);
 }
 
+void gui_view_port_set_layer(Gui* gui, ViewPort* view_port, GuiLayer layer) {
+    furi_check(gui);
+    furi_check(view_port);
+    furi_check(layer < GuiLayerMAX);
+
+    const ViewPortOrientation orientation = view_port_get_orientation(view_port);
+    furi_check(
+        (layer == GuiLayerFullscreen) ||
+        ((orientation != ViewPortOrientationVertical) &&
+         (orientation != ViewPortOrientationVerticalFlip)));
+
+    gui_lock(gui);
+
+    GuiLayer current_layer = GuiLayerMAX;
+    ViewPortArray_it_t it;
+    for(size_t i = 0; i < GuiLayerMAX; i++) {
+        ViewPortArray_it(it, gui->layers[i]);
+        while(!ViewPortArray_end_p(it)) {
+            if(*ViewPortArray_ref(it) == view_port) {
+                furi_check(current_layer == GuiLayerMAX);
+                current_layer = i;
+                if(current_layer != layer) {
+                    ViewPortArray_remove(gui->layers[i], it);
+                } else {
+                    ViewPortArray_next(it);
+                }
+            } else {
+                ViewPortArray_next(it);
+            }
+        }
+    }
+
+    furi_check(current_layer != GuiLayerMAX);
+    if(current_layer != layer) {
+        ViewPortArray_push_back(gui->layers[layer], view_port);
+    }
+
+    gui_unlock(gui);
+    gui_update(gui);
+}
+
 void gui_view_port_send_to_front(Gui* gui, ViewPort* view_port) {
     furi_check(gui);
     furi_check(view_port);

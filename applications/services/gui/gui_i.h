@@ -93,6 +93,17 @@ void gui_input_events_callback(const void* value, void* ctx);
  */
 size_t gui_active_view_port_count(Gui* gui, GuiLayer layer);
 
+/** Move an attached ViewPort to another layer without breaking input routing.
+ *
+ * Unlike remove/add, this keeps the ViewPort associated with the same Gui and
+ * preserves an in-flight key sequence that must still receive its release.
+ *
+ * @param      gui        The Gui instance
+ * @param      view_port  The attached ViewPort instance
+ * @param[in]  layer      Destination layer
+ */
+void gui_view_port_set_layer(Gui* gui, ViewPort* view_port, GuiLayer layer);
+
 /** Lock GUI
  *
  * @param      gui   The Gui instance
