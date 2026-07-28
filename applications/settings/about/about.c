@@ -14,6 +14,18 @@
 
 typedef DialogMessageButton (*AboutDialogScreen)(DialogsApp* dialogs, DialogMessage* message);
 
+static const char* tumoflip_release_channel(const Version* ver) {
+    const char* firmware_version = ver ? version_get_version(ver) : NULL;
+    if(firmware_version &&
+       (strncmp(firmware_version, "t-flppr-fw-", sizeof("t-flppr-fw-") - 1U) == 0)) {
+        return "Stable release";
+    }
+    if(firmware_version && (strncmp(firmware_version, "t-dev-", sizeof("t-dev-") - 1U) == 0)) {
+        return "Development release";
+    }
+    return "Development build";
+}
+
 static DialogMessageButton product_screen(DialogsApp* dialogs, DialogMessage* message) {
     DialogMessageButton result;
 
@@ -75,22 +87,25 @@ static DialogMessageButton compliance_screen(DialogsApp* dialogs, DialogMessage*
 static DialogMessageButton tumoflip_info_screen(DialogsApp* dialogs, DialogMessage* message) {
     DialogMessageButton result;
     const Version* ver = furi_hal_version_get_firmware_version();
-    FuriString* screen_header = furi_string_alloc_printf(
-        "%s\n",
-        ver ? version_get_version(ver) : "t-flppr-fw");
+    FuriString* screen_header =
+        furi_string_alloc_printf("%s\n", ver ? version_get_version(ver) : "t-flppr-fw");
 
-    const char* screen_text = "Independent firmware\n"
-                              "Stable release\n"
-                              "github.com/squazaryu\n"
-                              "/tumoflip";
+    FuriString* screen_text = furi_string_alloc_printf(
+        "Independent firmware\n"
+        "%s\n"
+        "github.com/squazaryu\n"
+        "/tumoflip",
+        tumoflip_release_channel(ver));
 
     dialog_message_set_header(
         message, furi_string_get_cstr(screen_header), 0, 0, AlignLeft, AlignTop);
-    dialog_message_set_text(message, screen_text, 0, 11, AlignLeft, AlignTop);
+    dialog_message_set_text(
+        message, furi_string_get_cstr(screen_text), 0, 11, AlignLeft, AlignTop);
     result = dialog_message_show(dialogs, message);
     dialog_message_set_header(message, NULL, 0, 0, AlignLeft, AlignTop);
     dialog_message_set_text(message, NULL, 0, 0, AlignLeft, AlignTop);
     furi_string_free(screen_header);
+    furi_string_free(screen_text);
 
     return result;
 }

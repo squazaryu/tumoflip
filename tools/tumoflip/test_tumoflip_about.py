@@ -13,7 +13,12 @@ class TumoflipAboutTest(unittest.TestCase):
         source = ABOUT_SOURCE.read_text(encoding="utf-8")
 
         self.assertIn('"Independent firmware\\n"', source)
-        self.assertIn('"Stable release\\n"', source)
+        self.assertIn('return "Stable release"', source)
+        self.assertIn('return "Development release"', source)
+        self.assertIn('return "Development build"', source)
+        self.assertIn('"t-flppr-fw-"', source)
+        self.assertIn('"t-dev-"', source)
+        self.assertIn("tumoflip_release_channel(ver)", source)
         self.assertIn('"github.com/squazaryu\\n"', source)
         self.assertIn('"/tumoflip"', source)
         self.assertIn('"FW Packages are published\\n"', source)
