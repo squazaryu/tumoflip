@@ -26,13 +26,13 @@ issue, report it in this repository:
 ## Current Build
 
 - Distribution: Tumoflip standalone release line
-- Firmware version: `t-dev-001-002`
+- Firmware version: `t-flppr-fw-001`
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `88.0`
 - Target: Flipper Zero F7
-- Release channel: `dev experimental line`
+- Release channel: `main stable line`
 - Target stable SemVer: `v1.0.1`
-- Release package: `flipper-z-f7-update-t-dev-001-002.tgz`
+- Release package: `flipper-z-f7-update-t-flppr-fw-001.tgz`
 - Flash profile: JS Runner / MJS runtime excluded to preserve internal flash headroom.
 
 API `88.0` is a deliberate breaking migration. External FAP/FAL binaries built
@@ -235,7 +235,7 @@ package contract, and release process.
 
 | Area | Baseline behavior | Tumoflip |
 | --- | --- | --- |
-| Firmware identity | Uses another distribution identity. | Reports `firmware_version: t-dev-001-002` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Uses another distribution identity. | Reports `firmware_version: t-flppr-fw-001` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the baseline Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
@@ -248,7 +248,7 @@ package contract, and release process.
 | Sub-GHz hopping | Frequency hopping only. | Adds preset and combined hopping plus an adaptive scan dwell, signal hold, post-signal grace period, and bounded hold time to system Sub-GHz. |
 | NFC additions | Uses the baseline NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK, adds Bambu Lab and Moscow social-card subscription parsers, and supports large ISO15693 multi-block emulation with bounded parser writes. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `t-dev-001-002` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `t-flppr-fw-001` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -432,7 +432,7 @@ Stable `main` update packages and `dev` prereleases are published on
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases). The currently
 selected branch build uses this artifact name:
 
-- `flipper-z-f7-update-t-dev-001-002.tgz`
+- `flipper-z-f7-update-t-flppr-fw-001.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -454,7 +454,7 @@ python3 tools/tumoflip/validate_release.py --write-manifest
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-t-dev-001-002.tgz
+dist/f7-C/flipper-z-f7-update-t-flppr-fw-001.tgz
 ```
 
 ## Provenance and third-party sources
