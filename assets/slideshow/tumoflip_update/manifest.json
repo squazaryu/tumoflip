@@ -2,7 +2,7 @@
   "frames": {
     "frame_00.png": {
       "mode": "1",
-      "pixels_sha256": "054433d43081c9a21ab069023fdda6fff54d12a901469255e6bd68ccec68726f",
+      "pixels_sha256": "db4314716a1e8144bad639c6e6a118496988454d900b9dd8d6d276cf863d3957",
       "size": [
         128,
         64
@@ -10,7 +10,7 @@
     },
     "frame_01.png": {
       "mode": "1",
-      "pixels_sha256": "bb57ec526e7bf96a002ef7f5edd5c3907771a36d72193cd77c60f9e37271d3ed",
+      "pixels_sha256": "421d3ec031558bd7268207fbb277def673b669eb1ac0436a8ec83c28961de773",
       "size": [
         128,
         64
@@ -18,7 +18,7 @@
     },
     "frame_02.png": {
       "mode": "1",
-      "pixels_sha256": "e7f88ce290bb02d3409c2e43e5af5770df3f254d8aec01a36b3265b384aaeeb7",
+      "pixels_sha256": "75e321ceaa82c229ed703ea3e6fd554b140dc086b9d6a91cadf57518cbf44d93",
       "size": [
         128,
         64
@@ -26,7 +26,7 @@
     },
     "frame_03.png": {
       "mode": "1",
-      "pixels_sha256": "7510154b37e8bf64921fa0799852c94fd7ecac609f4e1e7eb5dbffff10992021",
+      "pixels_sha256": "c9408b322703db1f56142fc4ed6215e3cc0183609f676a5a12573112004b6c59",
       "size": [
         128,
         64
@@ -35,5 +35,5 @@
   },
   "schema": 1,
   "title": "T-DEV",
-  "version": "001-003"
+  "version": "001-004"
 }

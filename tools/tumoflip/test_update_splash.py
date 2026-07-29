@@ -11,10 +11,15 @@ from PIL.PngImagePlugin import PngInfo
 
 from tools.tumoflip.generate_update_splash import (
     DISPLAY_SIZE,
+    HEADER_GLYPHS,
+    NEXT_ARROW_PIXELS,
+    READY_DEVICE_SCREEN,
     SOURCE_ART_DIR,
+    SOURCE_ART_PATTERN,
     draw_button,
-    fit_gravity_bold,
+    draw_header_text,
     generate_slideshow,
+    header_text_width,
 )
 from tools.tumoflip.sync_update_splash import (
     MANIFEST_NAME,
@@ -68,7 +73,7 @@ class UpdateSplashTest(unittest.TestCase):
                     DISPLAY_SIZE[0] * DISPLAY_SIZE[1]
                 )
                 self.assertGreater(black_ratio, 0.18, frame_path.name)
-                self.assertLess(black_ratio, 0.43, frame_path.name)
+                self.assertLess(black_ratio, 0.34, frame_path.name)
 
     def test_art_is_channel_and_version_neutral(self) -> None:
         with tempfile.TemporaryDirectory() as stable, tempfile.TemporaryDirectory() as dev:
@@ -96,6 +101,41 @@ class UpdateSplashTest(unittest.TestCase):
                     expected.crop(crop_box).tobytes(),
                 )
 
+    def test_next_buttons_keep_white_gutters_inside_the_frame(self) -> None:
+        for index in range(3):
+            with Image.open(SPLASH_DIR / f"frame_{index:02d}.png") as frame:
+                pixels = frame.convert("1")
+                for y in range(51, 62):
+                    self.assertEqual(pixels.getpixel((89, y)), 255, (index, 89, y))
+                    self.assertEqual(pixels.getpixel((124, y)), 255, (index, 124, y))
+
+    def test_next_arrow_is_a_symmetric_pixel_arrow(self) -> None:
+        expected = {(118 + x, 56 + y) for x, y in NEXT_ARROW_PIXELS}
+        self.assertEqual(
+            expected,
+            {
+                (120, 54),
+                (121, 55),
+                (118, 56),
+                (119, 56),
+                (120, 56),
+                (121, 56),
+                (122, 56),
+                (121, 57),
+                (120, 58),
+            },
+        )
+        for index in range(3):
+            with Image.open(SPLASH_DIR / f"frame_{index:02d}.png") as frame:
+                pixels = frame.convert("1")
+                actual = {
+                    (x, y)
+                    for y in range(54, 59)
+                    for x in range(118, 123)
+                    if pixels.getpixel((x, y)) == 0
+                }
+                self.assertEqual(actual, expected, index)
+
     def test_generated_pages_use_approved_illustrated_sources(self) -> None:
         generator = (REPO_ROOT / "tools/tumoflip/generate_update_splash.py").read_text(
             encoding="utf-8"
@@ -107,32 +147,118 @@ class UpdateSplashTest(unittest.TestCase):
             "TUMOFLIP UPDATED",
             "SIGNAL TOOLKIT",
             "EXPLORE THE AIR",
+            "ALL SYSTEMS GO",
+            "draw_signal_overview",
+            "TOOLKIT_BLACK_THRESHOLD",
+            "HEADER_GLYPHS",
+            "draw_header_text",
             "GravityBold8.ttf",
             "GravityRegular5.ttf",
         ):
             self.assertIn(phrase, generator)
 
         for index in range(4):
-            source = SOURCE_ART_DIR / f"panel_{index:02d}.png"
+            source = SOURCE_ART_DIR / SOURCE_ART_PATTERN.format(index=index)
             self.assertTrue(source.is_file(), source.name)
             with Image.open(source) as image:
                 self.assertEqual(image.mode, "1", source.name)
                 self.assertEqual(image.width, image.height * 2, source.name)
+
+    def test_explore_scene_keeps_whale_and_radio_details_readable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            frame_path = generate_slideshow(
+                "T-FLPPR-FW",
+                "001",
+                Path(directory),
+            )[2]
+            with Image.open(frame_path) as frame:
+                pixels = frame.convert("1")
+                for box, minimum, maximum in (
+                    ((38, 16, 95, 51), 0.18, 0.30),
+                    ((67, 35, 86, 50), 0.20, 0.40),
+                    ((3, 50, 87, 62), 0.15, 0.30),
+                ):
+                    left, top, right, bottom = box
+                    region = [
+                        pixels.getpixel((x, y))
+                        for y in range(top, bottom)
+                        for x in range(left, right)
+                    ]
+                    black_ratio = sum(pixel == 0 for pixel in region) / len(region)
+                    self.assertGreater(black_ratio, minimum)
+                    self.assertLess(black_ratio, maximum)
+
+    def test_ready_device_screen_and_bars_stay_inside_the_bezel(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            frame_path = generate_slideshow(
+                "T-FLPPR-FW",
+                "001",
+                Path(directory),
+            )[3]
+            with Image.open(frame_path) as frame:
+                pixels = frame.convert("1")
+                left, top, right, bottom = READY_DEVICE_SCREEN
+
+                self.assertGreaterEqual(left, 66)
+                self.assertLessEqual(right, 85)
+                self.assertGreaterEqual(top, 25)
+                self.assertLessEqual(bottom, 39)
+                self.assertTrue(
+                    all(
+                        pixels.getpixel((x, y)) == 0
+                        for x in range(left, right + 1)
+                        for y in (top, bottom)
+                    )
+                )
+                self.assertTrue(
+                    all(
+                        pixels.getpixel((x, y)) == 0
+                        for x in (left, right)
+                        for y in range(top, bottom + 1)
+                    )
+                )
+                self.assertEqual(pixels.getpixel((left + 1, top + 1)), 255)
+                self.assertEqual(pixels.getpixel((right - 1, bottom - 1)), 255)
 
     def test_gravity_font_assets_are_vendored(self) -> None:
         for name in ("GravityBold8.ttf", "GravityRegular5.ttf", "README.md"):
             self.assertTrue((GRAVITY_FONT_DIR / name).exists(), name)
 
     def test_welcome_wordmarks_fit_the_display(self) -> None:
-        for text, max_width, preferred_size in (
-            ("TUMOFLIP UPDATED", 100, 8),
-            ("SIGNAL TOOLKIT", 87, 8),
-            ("EXPLORE THE AIR", 88, 8),
-            ("TUMOFLIP", 119, 16),
+        for text, left, right in (
+            ("TUMOFLIP UPDATED", 4, 122),
+            ("SIGNAL TOOLKIT", 5, 110),
+            ("EXPLORE THE AIR", 4, 116),
+            ("ALL SYSTEMS GO", 4, 107),
         ):
-            font = fit_gravity_bold(text, max_width, preferred_size)
-            bbox = font.getbbox(text)
-            self.assertLessEqual(bbox[2] - bbox[0], max_width)
+            self.assertLessEqual(header_text_width(text), right - left + 1 - 8)
+            self.assertTrue(set(text.replace(" ", "")).issubset(HEADER_GLYPHS))
+
+    def test_welcome_wordmarks_do_not_touch_their_header_frames(self) -> None:
+        for text, left, right in (
+            ("TUMOFLIP UPDATED", 4, 122),
+            ("SIGNAL TOOLKIT", 5, 110),
+            ("EXPLORE THE AIR", 4, 116),
+            ("ALL SYSTEMS GO", 4, 107),
+        ):
+            layer = Image.new("1", DISPLAY_SIZE, 1)
+            width = header_text_width(text)
+            draw_header_text(
+                ImageDraw.Draw(layer),
+                text,
+                x=left + (right - left + 1 - width) // 2,
+                y=6,
+            )
+            black_pixels = [
+                (x, y)
+                for y in range(DISPLAY_SIZE[1])
+                for x in range(DISPLAY_SIZE[0])
+                if layer.getpixel((x, y)) == 0
+            ]
+            self.assertGreater(min(x for x, _ in black_pixels), left)
+            self.assertLess(max(x for x, _ in black_pixels), right)
+            self.assertEqual(min(y for _, y in black_pixels), 6)
+            self.assertEqual(max(y for _, y in black_pixels), 12)
 
     def test_sync_update_splash_removes_stale_frames(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
