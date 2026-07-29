@@ -317,12 +317,25 @@ bool subghz_save_protocol_to_file(
 void subghz_save_to_file(void* context) {
     furi_assert(context);
     SubGhz* subghz = context;
-    if(subghz_path_is_file(subghz->file_path)) {
-        subghz_save_protocol_to_file(
-            subghz,
-            subghz_txrx_get_fff_data(subghz->txrx),
-            furi_string_get_cstr(subghz->file_path));
+
+    if(!subghz_path_is_file(subghz->file_path)) {
+        return;
     }
+
+    FlipperFormat* fff_data = subghz_txrx_get_fff_data(subghz->txrx);
+
+    // RAW samples are streamed from disk and are never persisted through this callback.
+    // Saving the in-memory RAW header would otherwise truncate the source file.
+    FuriString* protocol = furi_string_alloc();
+    bool protocol_read = flipper_format_rewind(fff_data) &&
+                         flipper_format_read_string(fff_data, "Protocol", protocol);
+    bool is_raw = protocol_read && furi_string_equal(protocol, "RAW");
+    furi_string_free(protocol);
+    if(!protocol_read || is_raw) {
+        return;
+    }
+
+    subghz_save_protocol_to_file(subghz, fff_data, furi_string_get_cstr(subghz->file_path));
 }
 
 bool subghz_load_protocol_from_file(SubGhz* subghz) {
