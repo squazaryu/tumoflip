@@ -16,6 +16,7 @@ GRAVITY_FONT_DIR = REPO_ROOT / "assets/tumoflip/fonts/gravity"
 GRAVITY_BOLD = GRAVITY_FONT_DIR / "GravityBold8.ttf"
 GRAVITY_REGULAR = GRAVITY_FONT_DIR / "GravityRegular5.ttf"
 NEXT_BUTTON = (88, 50, 125, 62)
+READY_DEVICE_SCREEN = (66, 25, 85, 39)
 NEXT_ARROW_PIXELS = (
     (2, -2),
     (3, -1),
@@ -33,6 +34,34 @@ SOURCE_ART_PATTERN = "panel_{index:02d}_v2.png"
 # 14x reduction. Keeping the normal cutoff preserves continuous strokes without
 # merging nearby details into solid black areas.
 BLACK_THRESHOLD = 176
+# The toolkit scene contains a complete mascot/device composition with thinner
+# contours than the other panels. A local cutoff keeps those contours intact
+# without darkening the remaining three screens.
+TOOLKIT_BLACK_THRESHOLD = 192
+HEADER_GLYPH_HEIGHT = 7
+HEADER_GLYPH_SPACING = 1
+HEADER_SPACE_WIDTH = 3
+HEADER_GLYPHS = {
+    "A": (0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001),
+    "D": (0b11110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11110),
+    "E": (0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111),
+    "F": (0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000),
+    "G": (0b01110, 0b10001, 0b10000, 0b10111, 0b10001, 0b10001, 0b01110),
+    "H": (0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001),
+    "I": (0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b11111),
+    "K": (0b10001, 0b10010, 0b10100, 0b11000, 0b10100, 0b10010, 0b10001),
+    "L": (0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111),
+    "M": (0b10001, 0b11011, 0b10101, 0b10101, 0b10001, 0b10001, 0b10001),
+    "N": (0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001, 0b10001),
+    "O": (0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110),
+    "P": (0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000),
+    "R": (0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001),
+    "S": (0b01111, 0b10000, 0b10000, 0b01110, 0b00001, 0b00001, 0b11110),
+    "T": (0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100),
+    "U": (0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110),
+    "X": (0b10001, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001, 0b10001),
+    "Y": (0b10001, 0b10001, 0b01010, 0b00100, 0b00100, 0b00100, 0b00100),
+}
 
 
 def load_gravity_font(path: Path, size: int) -> ImageFont.ImageFont:
@@ -50,19 +79,6 @@ def gravity_regular(size: int) -> ImageFont.ImageFont:
     return load_gravity_font(GRAVITY_REGULAR, size)
 
 
-def fit_gravity_bold(
-    text: str,
-    max_width: int,
-    preferred_size: int = 16,
-) -> ImageFont.ImageFont:
-    for size in range(preferred_size, 4, -1):
-        font = gravity_bold(size)
-        bbox = font.getbbox(text)
-        if bbox[2] - bbox[0] <= max_width:
-            return font
-    return gravity_bold(5)
-
-
 def text_size(
     draw: ImageDraw.ImageDraw,
     text: str,
@@ -72,16 +88,36 @@ def text_size(
     return bbox[2] - bbox[0], bbox[3] - bbox[1]
 
 
-def draw_text_centered(
+def header_text_width(text: str) -> int:
+    glyph_width = sum(
+        HEADER_SPACE_WIDTH if character == " " else 5 for character in text
+    )
+    return glyph_width + max(0, len(text) - 1) * HEADER_GLYPH_SPACING
+
+
+def draw_header_text(
     draw: ImageDraw.ImageDraw,
     text: str,
-    box: tuple[int, int, int, int],
-    font: ImageFont.ImageFont,
+    *,
+    x: int,
+    y: int,
 ) -> None:
-    width, height = text_size(draw, text, font)
-    x = box[0] + (box[2] - box[0] + 1 - width) // 2
-    y = box[1] + (box[3] - box[1] + 1 - height) // 2
-    draw.text((x, y), text, font=font, fill=0)
+    """Draw crisp uppercase text directly on the display pixel grid."""
+
+    cursor_x = x
+    for character in text:
+        if character == " ":
+            cursor_x += HEADER_SPACE_WIDTH + HEADER_GLYPH_SPACING
+            continue
+        try:
+            rows = HEADER_GLYPHS[character]
+        except KeyError as error:
+            raise ValueError(f"Unsupported header glyph: {character}") from error
+        for row_index, row_bits in enumerate(rows):
+            for column in range(5):
+                if row_bits & (1 << (4 - column)):
+                    draw.point((cursor_x + column, y + row_index), fill=0)
+        cursor_x += 5 + HEADER_GLYPH_SPACING
 
 
 def draw_header_tab(
@@ -93,19 +129,25 @@ def draw_header_tab(
 ) -> None:
     """Replace downscaled heading pixels with crisp display-native text."""
 
-    top = 0
-    bottom = 9
+    top = 4
+    bottom = 14
+    # Preserve one white pixel row between the outer frame and the title tab.
+    draw.rectangle((left - 1, 3, min(126, right + 1), bottom), fill=1)
     tab = (
         (left, top),
         (right, top),
-        (right, 6),
+        (right, 11),
         (right - 4, bottom),
         (left + 4, bottom),
-        (left, 6),
+        (left, 11),
     )
     draw.polygon(tab, fill=1, outline=0)
-    font = fit_gravity_bold(text, right - left - 7, preferred_size=8)
-    draw_text_centered(draw, text, (left + 3, 1, right - 3, 7), font)
+    text_width = header_text_width(text)
+    available_width = right - left + 1
+    if text_width > available_width - 8:
+        raise ValueError(f"Header text does not fit: {text}")
+    text_x = left + (available_width - text_width) // 2
+    draw_header_text(draw, text, x=text_x, y=6)
 
 
 def draw_button(
@@ -140,7 +182,10 @@ def draw_button(
             draw.point((arrow_x + offset_x, arrow_center_y + offset_y), fill=0)
 
 
-def render_source_art(source: Path) -> Image.Image:
+def render_source_art(
+    source: Path,
+    black_threshold: int = BLACK_THRESHOLD,
+) -> Image.Image:
     """Downsample the accepted line art and pack it as a strict 1-bit frame."""
 
     with Image.open(source) as original:
@@ -149,7 +194,7 @@ def render_source_art(source: Path) -> Image.Image:
         reduced = original.convert("L").resize(DISPLAY_SIZE, Image.Resampling.LANCZOS)
 
     return reduced.point(
-        lambda value: 255 if value >= BLACK_THRESHOLD else 0,
+        lambda value: 255 if value >= black_threshold else 0,
         mode="1",
     )
 
@@ -173,16 +218,6 @@ def draw_progress_strip(draw: ImageDraw.ImageDraw) -> None:
         draw.rectangle((x, 54, x + 2, 57), fill=0)
 
 
-def draw_ready_wordmark(draw: ImageDraw.ImageDraw) -> None:
-    """Render the last panel's title at display resolution."""
-
-    draw.rectangle((2, 1, 125, 21), fill=1)
-    draw.text((4, 2), "READY", font=gravity_regular(5), fill=0)
-    wordmark = "TUMOFLIP"
-    font = fit_gravity_bold(wordmark, max_width=110, preferred_size=15)
-    draw_text_centered(draw, wordmark, (14, 7, 124, 21), font)
-
-
 def draw_bar_display(
     draw: ImageDraw.ImageDraw,
     box: tuple[int, int, int, int],
@@ -201,24 +236,44 @@ def draw_bar_display(
         draw.line((x, baseline, x, max(y1 + 2, baseline - height)), fill=1)
 
 
+def draw_signal_overview(draw: ImageDraw.ImageDraw) -> None:
+    """Replace four lossy mini-icons with one legible signal display."""
+
+    draw.rectangle((3, 13, 61, 39), fill=1)
+    draw.rectangle((5, 14, 59, 37), outline=0)
+    draw.rectangle((8, 17, 56, 34), outline=0)
+    waveform = (
+        (10, 27),
+        (15, 22),
+        (20, 30),
+        (25, 19),
+        (30, 29),
+        (35, 23),
+        (40, 30),
+        (45, 20),
+        (51, 28),
+        (54, 25),
+    )
+    draw.line(waveform, fill=0, width=1)
+
+
 def polish_frame(image: Image.Image, index: int) -> Image.Image:
     """Apply only resolution-dependent typography and action controls."""
 
     draw = ImageDraw.Draw(image)
     if index == 0:
-        draw_header_tab(draw, "TUMOFLIP UPDATED", left=5, right=124)
+        draw_header_tab(draw, "TUMOFLIP UPDATED", left=4, right=122)
         draw_progress_strip(draw)
     elif index == 1:
-        draw_header_tab(draw, "SIGNAL TOOLKIT", left=5, right=108)
+        draw_header_tab(draw, "SIGNAL TOOLKIT", left=5, right=110)
+        draw_signal_overview(draw)
         draw_protocol_labels(draw)
         draw_bar_display(draw, (64, 35, 80, 46), (2, 5, 3, 7, 4, 6))
     elif index == 2:
-        draw.rectangle((3, 1, 110, 11), fill=1)
-        heading_font = gravity_bold(8)
-        draw.text((4, 2), "EXPLORE THE AIR", font=heading_font, fill=0)
+        draw_header_tab(draw, "EXPLORE THE AIR", left=4, right=116)
     elif index == 3:
-        draw_ready_wordmark(draw)
-        draw_bar_display(draw, (61, 31, 82, 49), (3, 7, 5, 10, 4, 8, 6))
+        draw_header_tab(draw, "ALL SYSTEMS GO", left=4, right=107)
+        draw_bar_display(draw, READY_DEVICE_SCREEN, (2, 5, 3, 7, 4, 6))
 
     draw_button(draw, "OK" if index == FRAME_COUNT - 1 else "NEXT")
     return image
@@ -242,7 +297,10 @@ def generate_slideshow(
         if not source.is_file():
             raise FileNotFoundError(f"Missing welcome art source: {source}")
         output = output_dir / f"frame_{index:02d}.png"
-        polish_frame(render_source_art(source), index).save(output)
+        threshold = {
+            1: TOOLKIT_BLACK_THRESHOLD,
+        }.get(index, BLACK_THRESHOLD)
+        polish_frame(render_source_art(source, threshold), index).save(output)
         frames.append(output)
 
     return frames
