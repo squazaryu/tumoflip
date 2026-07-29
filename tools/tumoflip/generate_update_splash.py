@@ -16,7 +16,22 @@ GRAVITY_FONT_DIR = REPO_ROOT / "assets/tumoflip/fonts/gravity"
 GRAVITY_BOLD = GRAVITY_FONT_DIR / "GravityBold8.ttf"
 GRAVITY_REGULAR = GRAVITY_FONT_DIR / "GravityRegular5.ttf"
 NEXT_BUTTON = (88, 50, 125, 62)
+NEXT_ARROW_PIXELS = (
+    (2, -2),
+    (3, -1),
+    (0, 0),
+    (1, 0),
+    (2, 0),
+    (3, 0),
+    (4, 0),
+    (3, 1),
+    (2, 2),
+)
 FRAME_COUNT = 4
+SOURCE_ART_PATTERN = "panel_{index:02d}_v2.png"
+# The v2 panels deliberately use fewer, wider contours that survive the nearly
+# 14x reduction. Keeping the normal cutoff preserves continuous strokes without
+# merging nearby details into solid black areas.
 BLACK_THRESHOLD = 176
 
 
@@ -109,7 +124,9 @@ def draw_button(
     )
     draw.rectangle(button, fill=1, outline=0)
 
-    font = gravity_bold(8)
+    # NEXT needs a narrower 7 px face so its left glyph and right arrow keep a
+    # real white gutter inside the 38 px button instead of touching its frame.
+    font = gravity_bold(7 if text == "NEXT" else 8)
     arrow_space = 7 if text == "NEXT" else 0
     text_width, text_height = text_size(draw, text, font)
     content_width = text_width + arrow_space
@@ -118,18 +135,9 @@ def draw_button(
     draw.text((text_x, text_y), text, font=font, fill=0)
     if text == "NEXT":
         arrow_x = text_x + text_width + 2
-        arrow_y = y1 + 4
-        draw.line(
-            (
-                arrow_x,
-                arrow_y,
-                arrow_x + 4,
-                arrow_y + 3,
-                arrow_x,
-                arrow_y + 6,
-            ),
-            fill=0,
-        )
+        arrow_center_y = y1 + (y2 - y1 + 1) // 2
+        for offset_x, offset_y in NEXT_ARROW_PIXELS:
+            draw.point((arrow_x + offset_x, arrow_center_y + offset_y), fill=0)
 
 
 def render_source_art(source: Path) -> Image.Image:
@@ -163,6 +171,16 @@ def draw_progress_strip(draw: ImageDraw.ImageDraw) -> None:
     draw.rectangle((4, 52, 67, 59), outline=0)
     for x in range(7, 64, 5):
         draw.rectangle((x, 54, x + 2, 57), fill=0)
+
+
+def draw_ready_wordmark(draw: ImageDraw.ImageDraw) -> None:
+    """Render the last panel's title at display resolution."""
+
+    draw.rectangle((2, 1, 125, 21), fill=1)
+    draw.text((4, 2), "READY", font=gravity_regular(5), fill=0)
+    wordmark = "TUMOFLIP"
+    font = fit_gravity_bold(wordmark, max_width=110, preferred_size=15)
+    draw_text_centered(draw, wordmark, (14, 7, 124, 21), font)
 
 
 def draw_bar_display(
@@ -199,6 +217,7 @@ def polish_frame(image: Image.Image, index: int) -> Image.Image:
         heading_font = gravity_bold(8)
         draw.text((4, 2), "EXPLORE THE AIR", font=heading_font, fill=0)
     elif index == 3:
+        draw_ready_wordmark(draw)
         draw_bar_display(draw, (61, 31, 82, 49), (3, 7, 5, 10, 4, 8, 6))
 
     draw_button(draw, "OK" if index == FRAME_COUNT - 1 else "NEXT")
@@ -219,7 +238,7 @@ def generate_slideshow(
 
     frames: list[Path] = []
     for index in range(FRAME_COUNT):
-        source = source_dir / f"panel_{index:02d}.png"
+        source = source_dir / SOURCE_ART_PATTERN.format(index=index)
         if not source.is_file():
             raise FileNotFoundError(f"Missing welcome art source: {source}")
         output = output_dir / f"frame_{index:02d}.png"
@@ -232,7 +251,8 @@ def generate_slideshow(
 def generate(title: str, version: str, output: Path) -> None:
     del title, version
     output.parent.mkdir(parents=True, exist_ok=True)
-    polish_frame(render_source_art(SOURCE_ART_DIR / "panel_00.png"), 0).save(output)
+    source = SOURCE_ART_DIR / SOURCE_ART_PATTERN.format(index=0)
+    polish_frame(render_source_art(source), 0).save(output)
 
 
 def main() -> None:

@@ -11,7 +11,9 @@ from PIL.PngImagePlugin import PngInfo
 
 from tools.tumoflip.generate_update_splash import (
     DISPLAY_SIZE,
+    NEXT_ARROW_PIXELS,
     SOURCE_ART_DIR,
+    SOURCE_ART_PATTERN,
     draw_button,
     fit_gravity_bold,
     generate_slideshow,
@@ -68,7 +70,7 @@ class UpdateSplashTest(unittest.TestCase):
                     DISPLAY_SIZE[0] * DISPLAY_SIZE[1]
                 )
                 self.assertGreater(black_ratio, 0.18, frame_path.name)
-                self.assertLess(black_ratio, 0.43, frame_path.name)
+                self.assertLess(black_ratio, 0.34, frame_path.name)
 
     def test_art_is_channel_and_version_neutral(self) -> None:
         with tempfile.TemporaryDirectory() as stable, tempfile.TemporaryDirectory() as dev:
@@ -96,6 +98,41 @@ class UpdateSplashTest(unittest.TestCase):
                     expected.crop(crop_box).tobytes(),
                 )
 
+    def test_next_buttons_keep_white_gutters_inside_the_frame(self) -> None:
+        for index in range(3):
+            with Image.open(SPLASH_DIR / f"frame_{index:02d}.png") as frame:
+                pixels = frame.convert("1")
+                for y in range(51, 62):
+                    self.assertEqual(pixels.getpixel((89, y)), 255, (index, 89, y))
+                    self.assertEqual(pixels.getpixel((124, y)), 255, (index, 124, y))
+
+    def test_next_arrow_is_a_symmetric_pixel_arrow(self) -> None:
+        expected = {(118 + x, 56 + y) for x, y in NEXT_ARROW_PIXELS}
+        self.assertEqual(
+            expected,
+            {
+                (120, 54),
+                (121, 55),
+                (118, 56),
+                (119, 56),
+                (120, 56),
+                (121, 56),
+                (122, 56),
+                (121, 57),
+                (120, 58),
+            },
+        )
+        for index in range(3):
+            with Image.open(SPLASH_DIR / f"frame_{index:02d}.png") as frame:
+                pixels = frame.convert("1")
+                actual = {
+                    (x, y)
+                    for y in range(54, 59)
+                    for x in range(118, 123)
+                    if pixels.getpixel((x, y)) == 0
+                }
+                self.assertEqual(actual, expected, index)
+
     def test_generated_pages_use_approved_illustrated_sources(self) -> None:
         generator = (REPO_ROOT / "tools/tumoflip/generate_update_splash.py").read_text(
             encoding="utf-8"
@@ -107,13 +144,16 @@ class UpdateSplashTest(unittest.TestCase):
             "TUMOFLIP UPDATED",
             "SIGNAL TOOLKIT",
             "EXPLORE THE AIR",
+            "draw_ready_wordmark",
+            '"READY"',
+            '"TUMOFLIP"',
             "GravityBold8.ttf",
             "GravityRegular5.ttf",
         ):
             self.assertIn(phrase, generator)
 
         for index in range(4):
-            source = SOURCE_ART_DIR / f"panel_{index:02d}.png"
+            source = SOURCE_ART_DIR / SOURCE_ART_PATTERN.format(index=index)
             self.assertTrue(source.is_file(), source.name)
             with Image.open(source) as image:
                 self.assertEqual(image.mode, "1", source.name)
