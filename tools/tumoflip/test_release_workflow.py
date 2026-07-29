@@ -23,6 +23,8 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("validate_release.py", workflow)
         self.assertIn("--write-manifest", workflow)
         self.assertIn("test_readme_version_sync.py", workflow)
+        self.assertIn("validate_stable_release.py", workflow)
+        self.assertIn("test_validate_stable_release.py", workflow)
         self.assertIn("test_subghz_drift.py", workflow)
         self.assertIn("test_subghz_protocol_packs.py", workflow)
         self.assertIn("test_update_splash.py", workflow)
@@ -30,8 +32,9 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("tumoflip-packages.zip", workflow)
         self.assertIn("sha256sum", workflow)
         self.assertIn("gh release create", workflow)
-        self.assertIn("gh release upload", workflow)
-        self.assertIn("--clobber", workflow)
+        self.assertNotIn("gh release upload", workflow)
+        self.assertNotIn("--clobber", workflow)
+        self.assertIn("already exists; publish a new tag instead", workflow)
         self.assertIn('--repo "$GITHUB_REPOSITORY"', workflow)
 
     def test_package_release_workflow_updates_only_sd_package_assets(self) -> None:

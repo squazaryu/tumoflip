@@ -166,6 +166,12 @@ def sync_readme_text(
         if not release_tag.startswith("v"):
             raise ValueError(f"release tag must start with v: {release_tag}")
         updated = re.sub(
+            r"- Target stable SemVer: `v[^`]+`",
+            f"- Target stable SemVer: `{release_tag}`",
+            updated,
+            count=1,
+        )
+        updated = re.sub(
             r"- Release: `v[^`]+` published release \(hardware validation in progress\)",
             f"- Release: `{release_tag}` published release (hardware validation in progress)",
             updated,

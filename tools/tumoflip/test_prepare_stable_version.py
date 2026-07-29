@@ -26,6 +26,16 @@ class PrepareStableVersionTest(unittest.TestCase):
             "t-flppr-fw-089-037",
         )
 
+    def test_promotes_standalone_dev_to_next_immutable_serial(self) -> None:
+        self.assertEqual(
+            compute_stable_version("t-dev-001-003"),
+            "t-flppr-fw-002",
+        )
+
+    def test_rejects_standalone_serial_overflow(self) -> None:
+        with self.assertRaises(ValueError):
+            compute_stable_version("t-dev-999-001")
+
     def test_converts_legacy_stable_identity_without_renaming_old_release(self) -> None:
         self.assertEqual(
             compute_stable_version("tmwhflpprarf089-036", build="037"),

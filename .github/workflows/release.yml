@@ -42,10 +42,13 @@ jobs:
       - name: Resolve release tag
         id: ref
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.release_tag }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.release_tag }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="$INPUT_TAG"
           else
             TAG="${GITHUB_REF_NAME}"
           fi
@@ -55,6 +58,44 @@ jobs:
           fi
           git rev-parse --verify "refs/tags/$TAG" >/dev/null
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Validate immutable stable identity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Stable release $TAG already exists; publish a new tag instead." >&2
+            exit 1
+          fi
+
+          WORK="$(mktemp -d)"
+          trap 'rm -rf "$WORK"' EXIT
+          PREVIOUS_TAG="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)"
+          gh release download "$PREVIOUS_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir "$WORK" \
+            --pattern "tumoflip-packages.json"
+          PREVIOUS_VERSION="$(python3 - "$WORK/tumoflip-packages.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          print(json.loads(Path(sys.argv[1]).read_text())["firmware"]["version"])
+          PY
+          )"
+          CURRENT_VERSION="$(python3 - <<'PY'
+          from tools.tumoflip.sync_readme_version import read_dist_suffix
+          print(read_dist_suffix())
+          PY
+          )"
+
+          python3 tools/tumoflip/validate_stable_release.py \
+            --release-tag "$TAG" \
+            --firmware-version "$CURRENT_VERSION" \
+            --previous-release-tag "$PREVIOUS_TAG" \
+            --previous-firmware-version "$PREVIOUS_VERSION"
 
       - name: Install Python release dependencies
         shell: bash
@@ -87,6 +128,7 @@ jobs:
             tools/tumoflip/test_desktop_animation_resume.py \
             tools/tumoflip/test_release_workflow.py \
             tools/tumoflip/test_readme_version_sync.py \
+            tools/tumoflip/test_validate_stable_release.py \
             tools/tumoflip/test_subghz_drift.py \
             tools/tumoflip/test_subghz_protocol_packs.py \
             tools/tumoflip/test_update_splash.py \
@@ -212,18 +254,9 @@ jobs:
             "dist/f7-C/f7-update-${VERSION}/tumoflip-packages.zip"
           )
 
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
-            gh release edit "$TAG" \
-              --title "$VERSION" \
-              --notes-file release-notes.md \
-              --latest \
-              --repo "$GITHUB_REPOSITORY"
-          else
-            gh release create "$TAG" "${assets[@]}" \
-              --verify-tag \
-              --title "$VERSION" \
-              --notes-file release-notes.md \
-              --latest \
-              --repo "$GITHUB_REPOSITORY"
-          fi
+          gh release create "$TAG" "${assets[@]}" \
+            --verify-tag \
+            --title "$VERSION" \
+            --notes-file release-notes.md \
+            --latest \
+            --repo "$GITHUB_REPOSITORY"

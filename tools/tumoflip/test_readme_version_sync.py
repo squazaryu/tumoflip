@@ -95,6 +95,24 @@ tmwhflpprarf089-030
         self.assertIn("- `031`: tumoflip internal build version.", updated)
         self.assertNotIn("tmwhflpprarf089-030", updated)
 
+    def test_sync_updates_target_stable_semver(self) -> None:
+        original = """# tumoflip
+- Firmware version: `t-dev-001-003`
+- Target stable SemVer: `v1.0.1`
+- Release channel: `dev experimental line`
+- Release package: `flipper-z-f7-update-t-dev-001-003.tgz`
+- `t-dev`: Tumoflip development build prefix for unstable builds.
+- `001`: standalone Tumoflip release number.
+- `003`: development iteration inside the standalone Tumoflip release number.
+"""
+        updated = sync_readme_text(
+            original,
+            "t-dev-001-003",
+            release_tag="v1.0.2",
+        )
+
+        self.assertIn("Target stable SemVer: `v1.0.2`", updated)
+
     def test_sync_updates_dev_versions(self) -> None:
         original = """# tumoflip
 - Firmware version: `tmwhflpprarf089-034`
