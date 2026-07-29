@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+from pathlib import Path
+import subprocess
+import sys
 import unittest
 
 from tools.tumoflip.validate_stable_release import (
@@ -7,6 +10,8 @@ from tools.tumoflip.validate_stable_release import (
     parse_stable_tag,
     validate_new_stable_release,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class ValidateStableReleaseTest(unittest.TestCase):
@@ -63,6 +68,31 @@ class ValidateStableReleaseTest(unittest.TestCase):
         for tag in ("v1.0", "v1.0.2-rc.1", "1.0.2"):
             with self.subTest(tag=tag), self.assertRaises(ValueError):
                 parse_stable_tag(tag)
+
+    def test_cli_runs_from_repository_root(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "tools/tumoflip/validate_stable_release.py",
+                "--release-tag",
+                "v1.0.2",
+                "--firmware-version",
+                "t-flppr-fw-002",
+                "--previous-release-tag",
+                "v1.0.1",
+                "--previous-firmware-version",
+                "t-flppr-fw-001",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "v1.0.1/t-flppr-fw-001 -> v1.0.2/t-flppr-fw-002",
+            result.stdout,
+        )
 
 
 if __name__ == "__main__":
