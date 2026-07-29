@@ -53,6 +53,7 @@ struct Gui {
     bool lockdown;
     bool lockdown_inhibit;
     bool direct_draw;
+    bool status_bar_hidden;
     ViewPortArray_t layers[GuiLayerMAX];
     Canvas* canvas;
 
@@ -92,6 +93,13 @@ void gui_input_events_callback(const void* value, void* ctx);
  * @param[in]  layer      GuiLayer that we want to get count of view ports
  */
 size_t gui_active_view_port_count(Gui* gui, GuiLayer layer);
+
+/** Hide or restore the status bar while keeping the current GUI layer.
+ *
+ * @param      gui     The Gui instance
+ * @param[in]  hidden  True to suppress status bar drawing
+ */
+void gui_set_status_bar_hidden(Gui* gui, bool hidden);
 
 /** Lock GUI
  *

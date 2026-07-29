@@ -3,6 +3,7 @@
 #include "../desktop_i.h"
 #include "../views/desktop_view_slideshow.h"
 #include "../views/desktop_events.h"
+#include <gui/gui_i.h>
 #include <power/power_service/power.h>
 
 void desktop_scene_slideshow_callback(DesktopEvent event, void* context) {
@@ -14,6 +15,7 @@ void desktop_scene_slideshow_on_enter(void* context) {
     Desktop* desktop = (Desktop*)context;
     DesktopSlideshowView* slideshow_view = desktop->slideshow_view;
 
+    gui_set_status_bar_hidden(desktop->gui, true);
     desktop_view_slideshow_set_callback(slideshow_view, desktop_scene_slideshow_callback, desktop);
 
     view_dispatcher_switch_to_view(desktop->view_dispatcher, DesktopViewIdSlideshow);
@@ -46,5 +48,6 @@ bool desktop_scene_slideshow_on_event(void* context, SceneManagerEvent event) {
 
 void desktop_scene_slideshow_on_exit(void* context) {
     Desktop* desktop = context;
+    gui_set_status_bar_hidden(desktop->gui, false);
     storage_common_remove(desktop->storage, SLIDESHOW_FS_PATH);
 }
