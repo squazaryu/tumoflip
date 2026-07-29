@@ -121,6 +121,7 @@ def apply_dev_version(
     *,
     dry_run: bool = False,
     update_splash: bool = True,
+    target_stable_tag: str | None = None,
 ) -> tuple[str, str]:
     repo_root = repo_root.resolve()
     old_suffix = read_dist_suffix(repo_root)
@@ -134,7 +135,11 @@ def apply_dev_version(
     readme_before = readme_path.read_text(encoding="utf-8")
 
     options_after = replace_dist_suffix(options_before, new_suffix)
-    readme_after = sync_readme_text(readme_before, new_suffix)
+    readme_after = sync_readme_text(
+        readme_before,
+        new_suffix,
+        release_tag=target_stable_tag,
+    )
 
     if dry_run:
         for path, before, after in (
@@ -164,6 +169,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--base", help="three-digit Unleashed base version")
     parser.add_argument("--build", help="three-digit Tumoflip internal build version")
     parser.add_argument("--iteration", help="three-digit development iteration")
+    parser.add_argument(
+        "--target-stable",
+        help="target stable SemVer tag, for example v1.0.2",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-splash", action="store_true")
     return parser.parse_args(argv)
@@ -185,6 +194,7 @@ def main(argv: list[str] | None = None) -> int:
             new_suffix,
             dry_run=args.dry_run,
             update_splash=not args.no_splash,
+            target_stable_tag=args.target_stable,
         )
     except ValueError as error:
         print(f"error: {error}", file=sys.stderr)

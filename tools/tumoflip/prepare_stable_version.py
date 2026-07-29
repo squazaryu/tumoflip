@@ -27,6 +27,13 @@ def validate_component(name: str, value: str) -> str:
     return value
 
 
+def next_component(name: str, value: str) -> str:
+    current = int(validate_component(name, value))
+    if current >= 999:
+        raise ValueError(f"{name} overflow: 999")
+    return f"{current + 1:03d}"
+
+
 def compute_stable_version(
     current_suffix: str,
     *,
@@ -46,7 +53,14 @@ def compute_stable_version(
         return f"{STABLE_PREFIX}-{selected_base}-{selected_build}"
 
     selected_base = validate_component("base", base) if base else current_base
-    selected_build = validate_component("build", build) if build else current_build
+    if build:
+        selected_build = validate_component("build", build)
+    elif current_base is None:
+        # Standalone dev builds are named after the stable serial they started
+        # from. Promotion always creates the next immutable stable serial.
+        selected_build = next_component("standalone release", current_build)
+    else:
+        selected_build = current_build
     if selected_base is None:
         return f"{STABLE_PREFIX}-{selected_build}"
     return f"{STABLE_PREFIX}-{selected_base}-{selected_build}"
@@ -58,6 +72,7 @@ def apply_stable_version(
     *,
     dry_run: bool = False,
     update_splash: bool = True,
+    release_tag: str | None = None,
 ) -> tuple[str, str]:
     repo_root = repo_root.resolve()
     old_suffix = read_dist_suffix(repo_root)
@@ -68,7 +83,11 @@ def apply_stable_version(
     options_before = options_path.read_text(encoding="utf-8")
     readme_before = readme_path.read_text(encoding="utf-8")
     options_after = replace_dist_suffix(options_before, expected_suffix)
-    readme_after = sync_readme_text(readme_before, expected_suffix)
+    readme_after = sync_readme_text(
+        readme_before,
+        expected_suffix,
+        release_tag=release_tag,
+    )
 
     if dry_run:
         for path, before, after in (
@@ -95,6 +114,7 @@ def main() -> int:
     parser.add_argument("--set", dest="set_suffix")
     parser.add_argument("--base")
     parser.add_argument("--build")
+    parser.add_argument("--release-tag")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-splash", action="store_true")
     args = parser.parse_args()
@@ -112,6 +132,7 @@ def main() -> int:
             new_suffix,
             dry_run=args.dry_run,
             update_splash=not args.no_splash,
+            release_tag=args.release_tag,
         )
     except (OSError, ValueError) as error:
         print(f"error: {error}")
