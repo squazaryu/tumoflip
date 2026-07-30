@@ -26,13 +26,13 @@ issue, report it in this repository:
 ## Current Build
 
 - Distribution: Tumoflip standalone release line
-- Firmware version: `t-dev-001-004`
+- Firmware version: `t-flppr-fw-002`
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `88.0`
 - Target: Flipper Zero F7
-- Release channel: `dev experimental line`
-- Target stable SemVer: `v1.0.2`
-- Release package: `flipper-z-f7-update-t-dev-001-004.tgz`
+- Release channel: `main stable line`
+- Target stable SemVer: `v1.0.3`
+- Release package: `flipper-z-f7-update-t-flppr-fw-002.tgz`
 - Flash profile: JS Runner / MJS runtime excluded to preserve internal flash headroom.
 
 API `88.0` is a deliberate breaking migration. External FAP/FAL binaries built
@@ -56,29 +56,36 @@ t-dev-<release>-<iteration>
 - `t-flppr-fw`: Tumowuh Flipper Firmware stable build prefix.
 - `tmwhflpprarf`: legacy stable prefix kept for existing releases.
 - `t-dev`: Tumoflip development build prefix for unstable builds.
-- `001`: standalone Tumoflip release number.
-- `004`: development iteration inside the standalone Tumoflip release number.
+- `002`: standalone Tumoflip release number.
+- `<iteration>`: monotonically increasing revision used only by `t-dev` builds.
 
 `main` should only receive builds that are stable enough to publish as tagged
 releases. Active firmware work lands on `dev` first. A dev identity refers to
-the stable serial it started from: `t-dev-<stable-serial>-<iteration>` advances
-only its final component during development. Promotion creates the next stable
-serial rather than reusing the base serial.
+the stable release it targets: `t-dev-<target-release>-<iteration>` advances
+only its final component during development. Promotion removes the development
+iteration and keeps the same target release number.
 
-Every future stable firmware publication is immutable. Even when the SemVer
-major/minor line stays at `1.0`, a new accepted firmware gets both the next
-patch tag and the next standalone serial. In other words, `v1.0.P` advances to
-`v1.0.(P+1)` while `t-flppr-fw-NNN` advances to the next three-digit serial.
-Firmware DFU, SDK, updater, tag, and release notes are never replaced in place.
-Package-only FW Packages updates remain a separate workflow and cannot replace
-those firmware binaries.
+Starting with the next release after historical `v1.0.3`, whose firmware
+serial is `002`, the SemVer patch is the single source of truth for the
+standalone release number. `v1.0.4` therefore uses stable serial `004`; its
+development builds use release component `004` with iterations `001`, `002`,
+and so on. The skipped firmware serial `003` is intentional: existing tags and
+binaries remain immutable. A release on another SemVer major/minor line is
+rejected until an explicit mapping is defined.
+
+Every future stable firmware publication is immutable. Firmware DFU, SDK,
+updater, tag, and release notes are never replaced in place. Package-only FW
+Packages updates remain a separate workflow and cannot replace those firmware
+binaries.
 
 Companion and release tooling continue to recognize the legacy
 `tmwhflpprarf<legacy-base>-<build>`, `t-flppr-fw-<legacy-base>-<build>`, and
 `t-dev-<legacy-base>-<build>-<iteration>` formats. Existing release tags and
 packages are never renamed. The first standalone stable line is
-`t-flppr-fw-001`, published as SemVer `v1.0.0`, and reports that exact firmware
-identity through `device_info`.
+`t-flppr-fw-001`, published as SemVer `v1.0.0`, and reports that historical
+firmware identity through `device_info`. Releases through `v1.0.3` and firmware
+serials through `002` remain supported historical identities and are not
+renamed.
 
 For `dev`, every separate issue-level or user-visible firmware change should
 advance the final three-digit iteration. A new standalone release line starts
@@ -88,8 +95,8 @@ synchronized:
 
 ```sh
 python3 tools/tumoflip/bump_dev_version.py \
-  --iteration 003 \
-  --target-stable v1.0.2
+  --iteration 001 \
+  --target-stable v1.0.4
 python3 tools/tumoflip/bump_dev_version.py
 ```
 
@@ -99,9 +106,9 @@ rewrites an existing legacy release:
 
 ```sh
 python3 tools/tumoflip/prepare_stable_version.py \
-  --release-tag v1.0.2 \
+  --release-tag v1.0.4 \
   --dry-run
-python3 tools/tumoflip/prepare_stable_version.py --release-tag v1.0.2
+python3 tools/tumoflip/prepare_stable_version.py --release-tag v1.0.4
 ```
 
 The four-page post-update splash screen is generated automatically from
@@ -247,7 +254,7 @@ package contract, and release process.
 
 | Area | Baseline behavior | Tumoflip |
 | --- | --- | --- |
-| Firmware identity | Uses another distribution identity. | Reports `firmware_version: t-dev-001-004` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Uses another distribution identity. | Reports `firmware_version: t-flppr-fw-002` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the baseline Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
@@ -260,7 +267,7 @@ package contract, and release process.
 | Sub-GHz hopping | Frequency hopping only. | Adds preset and combined hopping plus an adaptive scan dwell, signal hold, post-signal grace period, and bounded hold time to system Sub-GHz. |
 | NFC additions | Uses the baseline NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK, adds Bambu Lab and Moscow social-card subscription parsers, and supports large ISO15693 multi-block emulation with bounded parser writes. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `t-dev-001-004` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `t-flppr-fw-002` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -444,7 +451,7 @@ Stable `main` update packages and `dev` prereleases are published on
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases). The currently
 selected branch build uses this artifact name:
 
-- `flipper-z-f7-update-t-dev-001-004.tgz`
+- `flipper-z-f7-update-t-flppr-fw-002.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -466,7 +473,7 @@ python3 tools/tumoflip/validate_release.py --write-manifest
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-t-dev-001-004.tgz
+dist/f7-C/flipper-z-f7-update-t-flppr-fw-002.tgz
 ```
 
 ## Provenance and third-party sources

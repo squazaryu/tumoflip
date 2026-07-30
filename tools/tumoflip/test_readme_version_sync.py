@@ -41,6 +41,7 @@ class ReadmeVersionSyncTest(unittest.TestCase):
 - Release package: `flipper-z-f7-update-t-dev-089-041-024.tgz`
 - `t-flppr-fw`: Tumowuh Flipper Firmware stable build prefix.
 - `001`: standalone Tumoflip release number.
+- `024`: development iteration inside the standalone Tumoflip release number.
 """
         updated = sync_readme_text(original, "t-flppr-fw-001")
 
@@ -48,6 +49,15 @@ class ReadmeVersionSyncTest(unittest.TestCase):
         self.assertIn("Release channel: `main stable line`", updated)
         self.assertIn("flipper-z-f7-update-t-flppr-fw-001.tgz", updated)
         self.assertIn("- `001`: standalone Tumoflip release number.", updated)
+        self.assertIn(
+            "- `<iteration>`: monotonically increasing revision used only by "
+            "`t-dev` builds.",
+            updated,
+        )
+        self.assertNotIn(
+            "development iteration inside the standalone Tumoflip release number",
+            updated,
+        )
 
     def test_sync_updates_new_stable_version(self) -> None:
         original = """# tumoflip

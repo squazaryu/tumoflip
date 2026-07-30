@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
+from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,6 +23,8 @@ SEMVER_TAG_RE = re.compile(
     r"(?P<minor>0|[1-9]\d*)\."
     r"(?P<patch>0|[1-9]\d*)$"
 )
+ALIGNED_SEMVER_MAJOR = 1
+ALIGNED_SEMVER_MINOR = 0
 
 
 @dataclass(frozen=True, order=True)
@@ -50,12 +54,29 @@ def parse_stable_serial(version: str) -> int:
     return int(build)
 
 
+def aligned_stable_serial(tag: str) -> int:
+    """Return the firmware serial assigned to an aligned standalone release."""
+    parsed = parse_stable_tag(tag)
+    if (parsed.major, parsed.minor) != (
+        ALIGNED_SEMVER_MAJOR,
+        ALIGNED_SEMVER_MINOR,
+    ):
+        raise ValueError(
+            "standalone firmware alignment is defined only for v1.0.N; "
+            f"define a new mapping before releasing {tag}"
+        )
+    if parsed.patch > 999:
+        raise ValueError("standalone stable serial overflow: 999")
+    return parsed.patch
+
+
 def validate_new_stable_release(
     *,
     release_tag: str,
     firmware_version: str,
     previous_release_tag: str,
     previous_firmware_version: str,
+    existing_release_tags: Collection[str] = (),
 ) -> None:
     current_tag = parse_stable_tag(release_tag)
     previous_tag = parse_stable_tag(previous_release_tag)
@@ -66,25 +87,44 @@ def validate_new_stable_release(
 
     current_serial = parse_stable_serial(firmware_version)
     previous_serial = parse_stable_serial(previous_firmware_version)
-    expected_serial = previous_serial + 1
-    if expected_serial > 999:
-        raise ValueError("standalone stable serial overflow: 999")
+    expected_serial = aligned_stable_serial(release_tag)
     if current_serial != expected_serial:
         raise ValueError(
-            "stable firmware serial must advance exactly once: "
+            "stable firmware serial must match the SemVer patch: "
             f"expected {STABLE_PREFIX}-{expected_serial:03d}, got {firmware_version}"
+        )
+    if current_serial <= previous_serial:
+        raise ValueError(
+            "stable firmware serial must advance beyond "
+            f"{previous_firmware_version}: {firmware_version}"
         )
 
     same_line = (
         current_tag.major == previous_tag.major
         and current_tag.minor == previous_tag.minor
     )
-    if same_line and current_tag.patch != previous_tag.patch + 1:
-        raise ValueError(
-            "stable patch must advance exactly once inside the same major.minor line: "
-            f"expected v{previous_tag.major}.{previous_tag.minor}."
-            f"{previous_tag.patch + 1}, got {release_tag}"
-        )
+    if same_line:
+        consumed_tags = {
+            f"v{previous_tag.major}.{previous_tag.minor}.{patch}"
+            for patch in range(previous_tag.patch + 1, current_tag.patch)
+        }
+        missing_tags = sorted(consumed_tags.difference(existing_release_tags))
+        if missing_tags:
+            raise ValueError(
+                "stable patch may skip only tags that already exist: "
+                + ", ".join(missing_tags)
+            )
+
+
+def repository_release_tags(repo_root: Path) -> set[str]:
+    result = subprocess.run(
+        ["git", "tag", "--list", "v*"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return {line for line in result.stdout.splitlines() if line}
 
 
 def main() -> int:
@@ -93,6 +133,7 @@ def main() -> int:
     parser.add_argument("--firmware-version", required=True)
     parser.add_argument("--previous-release-tag", required=True)
     parser.add_argument("--previous-firmware-version", required=True)
+    parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     args = parser.parse_args()
 
     try:
@@ -101,8 +142,9 @@ def main() -> int:
             firmware_version=args.firmware_version,
             previous_release_tag=args.previous_release_tag,
             previous_firmware_version=args.previous_firmware_version,
+            existing_release_tags=repository_release_tags(args.repo_root),
         )
-    except ValueError as error:
+    except (OSError, subprocess.CalledProcessError, ValueError) as error:
         print(f"error: {error}")
         return 2
 

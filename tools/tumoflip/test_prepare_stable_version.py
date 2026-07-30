@@ -26,15 +26,86 @@ class PrepareStableVersionTest(unittest.TestCase):
             "t-flppr-fw-089-037",
         )
 
-    def test_promotes_standalone_dev_to_next_immutable_serial(self) -> None:
+    def test_promotes_aligned_dev_without_changing_release_number(self) -> None:
         self.assertEqual(
-            compute_stable_version("t-dev-001-003"),
-            "t-flppr-fw-002",
+            compute_stable_version("t-dev-004-003"),
+            "t-flppr-fw-004",
         )
 
-    def test_rejects_standalone_serial_overflow(self) -> None:
-        with self.assertRaises(ValueError):
-            compute_stable_version("t-dev-999-001")
+    def test_apply_requires_release_tag_for_standalone_promotion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            (repo_root / "fbt_options.py").write_text(
+                'DIST_SUFFIX = "t-dev-004-003"\n',
+                encoding="utf-8",
+            )
+            (repo_root / "ReadMe.md").write_text("# tumoflip\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "release_tag is required"):
+                apply_stable_version(
+                    repo_root,
+                    "t-flppr-fw-004",
+                    update_splash=False,
+                )
+
+    def test_release_tag_must_match_promoted_serial(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            (repo_root / "fbt_options.py").write_text(
+                'DIST_SUFFIX = "t-dev-004-003"\n',
+                encoding="utf-8",
+            )
+            (repo_root / "ReadMe.md").write_text(
+                """# tumoflip
+- Firmware version: `t-dev-004-003`
+- Release channel: `dev experimental line`
+- Target stable SemVer: `v1.0.4`
+- Release package: `flipper-z-f7-update-t-dev-004-003.tgz`
+""",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "must match"):
+                apply_stable_version(
+                    repo_root,
+                    "t-flppr-fw-004",
+                    update_splash=False,
+                    release_tag="v1.0.5",
+                )
+
+    def test_release_tag_accepts_promoted_serial(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            (repo_root / "fbt_options.py").write_text(
+                'DIST_SUFFIX = "t-dev-004-003"\n',
+                encoding="utf-8",
+            )
+            (repo_root / "ReadMe.md").write_text(
+                """# tumoflip
+- Firmware version: `t-dev-004-003`
+- Release channel: `dev experimental line`
+- Target stable SemVer: `v1.0.4`
+- Release package: `flipper-z-f7-update-t-dev-004-003.tgz`
+- `t-flppr-fw`: Tumowuh Flipper Firmware stable build prefix.
+- `004`: standalone Tumoflip release number.
+- `003`: development iteration inside the standalone Tumoflip release number.
+""",
+                encoding="utf-8",
+            )
+
+            old_suffix, new_suffix = apply_stable_version(
+                repo_root,
+                "t-flppr-fw-004",
+                update_splash=False,
+                release_tag="v1.0.4",
+            )
+
+            self.assertEqual(old_suffix, "t-dev-004-003")
+            self.assertEqual(new_suffix, "t-flppr-fw-004")
+            self.assertIn(
+                'DIST_SUFFIX = "t-flppr-fw-004"',
+                (repo_root / "fbt_options.py").read_text(encoding="utf-8"),
+            )
 
     def test_converts_legacy_stable_identity_without_renaming_old_release(self) -> None:
         self.assertEqual(

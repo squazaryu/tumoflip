@@ -151,6 +151,19 @@ def sync_readme_text(
                 f"{build_line}\n- `{iteration}`: {iteration_label}.",
                 1,
             )
+    else:
+        # A stable identity has no development iteration. Keep the version
+        # scheme documented without carrying the promoted dev build's final
+        # iteration into stable release metadata.
+        updated = re.sub(
+            r"- `\d{3}`: development iteration inside the "
+            r"(?:tumoflip internal build version|"
+            r"standalone Tumoflip release number)\.",
+            "- `<iteration>`: monotonically increasing revision used only by "
+            "`t-dev` builds.",
+            updated,
+            count=1,
+        )
 
     expected_channel = (
         "main stable line" if is_stable_prefix(prefix) else "dev experimental line"
