@@ -12,11 +12,11 @@ from PIL.PngImagePlugin import PngInfo
 from tools.tumoflip.generate_update_splash import (
     DISPLAY_SIZE,
     HEADER_GLYPHS,
+    NEXT_BUTTON,
     NEXT_ARROW_PIXELS,
     READY_DEVICE_SCREEN,
     SOURCE_ART_DIR,
     SOURCE_ART_PATTERN,
-    draw_button,
     draw_header_text,
     generate_slideshow,
     header_text_width,
@@ -92,14 +92,35 @@ class UpdateSplashTest(unittest.TestCase):
 
     def test_action_buttons_clear_their_reserved_area(self) -> None:
         crop_box = (86, 48, 128, 64)
-        for index, label in enumerate(("NEXT", "NEXT", "NEXT", "OK")):
-            expected = Image.new("1", DISPLAY_SIZE, 1)
-            draw_button(ImageDraw.Draw(expected), label)
+        x1, y1, x2, y2 = NEXT_BUTTON
+        expected = Image.new("1", DISPLAY_SIZE, 255)
+        expected_draw = ImageDraw.Draw(expected)
+        expected_draw.rectangle(
+            (x1 + 2, y1 + 2, min(127, x2 + 1), min(63, y2 + 1)),
+            outline=0,
+        )
+        expected_draw.rectangle(NEXT_BUTTON, fill=255, outline=0)
+
+        # The committed frames are canonical: FreeType rasterizes the same TTF
+        # a few pixels differently across macOS and Linux. Verify the
+        # deterministic cleared gutter, frame, and shadow here while the
+        # manifest test above locks the complete reviewed frame pixel hashes.
+        content_box = (x1 + 1, y1 + 1, x2 - 1, y2 - 1)
+        for index in range(4):
             with Image.open(SPLASH_DIR / f"frame_{index:02d}.png") as frame:
-                self.assertEqual(
-                    frame.convert("1").crop(crop_box).tobytes(),
-                    expected.crop(crop_box).tobytes(),
-                )
+                pixels = frame.convert("1")
+                for y in range(crop_box[1], crop_box[3]):
+                    for x in range(crop_box[0], crop_box[2]):
+                        if (
+                            content_box[0] <= x <= content_box[2]
+                            and content_box[1] <= y <= content_box[3]
+                        ):
+                            continue
+                        self.assertEqual(
+                            pixels.getpixel((x, y)),
+                            expected.getpixel((x, y)),
+                            (index, x, y),
+                        )
 
     def test_next_buttons_keep_white_gutters_inside_the_frame(self) -> None:
         for index in range(3):
