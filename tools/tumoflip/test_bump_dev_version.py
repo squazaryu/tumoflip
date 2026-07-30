@@ -37,6 +37,7 @@ class BumpDevVersionTest(unittest.TestCase):
                 """# tumoflip
 - Firmware version: `t-flppr-fw-001`
 - Release channel: `main stable line`
+- Target stable SemVer: `v1.0.1`
 - Release package: `flipper-z-f7-update-t-flppr-fw-001.tgz`
 - `t-dev`: Tumoflip development build prefix for unstable builds.
 - `001`: standalone Tumoflip release number.
@@ -48,12 +49,14 @@ class BumpDevVersionTest(unittest.TestCase):
                 repo_root,
                 "t-dev-001-001",
                 update_splash=False,
+                target_stable_tag="v1.0.2",
             )
 
             self.assertEqual(old_suffix, "t-flppr-fw-001")
             self.assertEqual(new_suffix, "t-dev-001-001")
             readme = (repo_root / "ReadMe.md").read_text(encoding="utf-8")
             self.assertIn("Firmware version: `t-dev-001-001`", readme)
+            self.assertIn("Target stable SemVer: `v1.0.2`", readme)
             self.assertIn(
                 "- `001`: development iteration inside the standalone Tumoflip release number.",
                 readme,

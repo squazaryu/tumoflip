@@ -124,6 +124,7 @@ SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group) {
     instance->worker = subghz_worker_alloc();
     instance->rx_callback_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     instance->fff_data = flipper_format_string_alloc();
+    instance->tx_from_internal_fff = false;
     instance->rx_callback = NULL;
     instance->rx_context = NULL;
     instance->receiver_filter = SubGhzProtocolFlag_Decodable;
@@ -497,6 +498,10 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
 
     subghz_txrx_stop(instance);
 
+    // Only the internal format is bound to the currently opened file.
+    // History and RX signals use a separate format and must never trigger save-back.
+    instance->tx_from_internal_fff = (flipper_format == instance->fff_data);
+
     SubGhzTxRxStartTxState ret = SubGhzTxRxStartTxStateErrorParserOthers;
     FuriString* temp_str = furi_string_alloc();
     do {
@@ -632,8 +637,9 @@ static void subghz_txrx_tx_stop(SubGhzTxRx* instance) {
     subghz_transmitter_stop(instance->transmitter);
     subghz_transmitter_free(instance->transmitter);
 
-    //if protocol dynamic then we save the last upload
-    if(instance->decoder_result->protocol->type == SubGhzProtocolTypeDynamic) {
+    // Persist a dynamic counter only when TX used the format bound to file_path.
+    if(instance->tx_from_internal_fff &&
+       instance->decoder_result->protocol->type == SubGhzProtocolTypeDynamic) {
         if(instance->need_save_callback) {
             instance->need_save_callback(instance->need_save_context);
         }

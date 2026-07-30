@@ -151,6 +151,19 @@ def sync_readme_text(
                 f"{build_line}\n- `{iteration}`: {iteration_label}.",
                 1,
             )
+    else:
+        # A stable identity has no development iteration. Keep the version
+        # scheme documented without carrying the promoted dev build's final
+        # iteration into stable release metadata.
+        updated = re.sub(
+            r"- `\d{3}`: development iteration inside the "
+            r"(?:tumoflip internal build version|"
+            r"standalone Tumoflip release number)\.",
+            "- `<iteration>`: monotonically increasing revision used only by "
+            "`t-dev` builds.",
+            updated,
+            count=1,
+        )
 
     expected_channel = (
         "main stable line" if is_stable_prefix(prefix) else "dev experimental line"
@@ -165,6 +178,12 @@ def sync_readme_text(
     if release_tag:
         if not release_tag.startswith("v"):
             raise ValueError(f"release tag must start with v: {release_tag}")
+        updated = re.sub(
+            r"- Target stable SemVer: `v[^`]+`",
+            f"- Target stable SemVer: `{release_tag}`",
+            updated,
+            count=1,
+        )
         updated = re.sub(
             r"- Release: `v[^`]+` published release \(hardware validation in progress\)",
             f"- Release: `{release_tag}` published release (hardware validation in progress)",

@@ -41,6 +41,7 @@ class ReadmeVersionSyncTest(unittest.TestCase):
 - Release package: `flipper-z-f7-update-t-dev-089-041-024.tgz`
 - `t-flppr-fw`: Tumowuh Flipper Firmware stable build prefix.
 - `001`: standalone Tumoflip release number.
+- `024`: development iteration inside the standalone Tumoflip release number.
 """
         updated = sync_readme_text(original, "t-flppr-fw-001")
 
@@ -48,6 +49,15 @@ class ReadmeVersionSyncTest(unittest.TestCase):
         self.assertIn("Release channel: `main stable line`", updated)
         self.assertIn("flipper-z-f7-update-t-flppr-fw-001.tgz", updated)
         self.assertIn("- `001`: standalone Tumoflip release number.", updated)
+        self.assertIn(
+            "- `<iteration>`: monotonically increasing revision used only by "
+            "`t-dev` builds.",
+            updated,
+        )
+        self.assertNotIn(
+            "development iteration inside the standalone Tumoflip release number",
+            updated,
+        )
 
     def test_sync_updates_new_stable_version(self) -> None:
         original = """# tumoflip
@@ -94,6 +104,24 @@ tmwhflpprarf089-030
         self.assertIn("flipper-z-f7-update-tmwhflpprarf089-031.tgz", updated)
         self.assertIn("- `031`: tumoflip internal build version.", updated)
         self.assertNotIn("tmwhflpprarf089-030", updated)
+
+    def test_sync_updates_target_stable_semver(self) -> None:
+        original = """# tumoflip
+- Firmware version: `t-dev-001-003`
+- Target stable SemVer: `v1.0.1`
+- Release channel: `dev experimental line`
+- Release package: `flipper-z-f7-update-t-dev-001-003.tgz`
+- `t-dev`: Tumoflip development build prefix for unstable builds.
+- `001`: standalone Tumoflip release number.
+- `003`: development iteration inside the standalone Tumoflip release number.
+"""
+        updated = sync_readme_text(
+            original,
+            "t-dev-001-003",
+            release_tag="v1.0.2",
+        )
+
+        self.assertIn("Target stable SemVer: `v1.0.2`", updated)
 
     def test_sync_updates_dev_versions(self) -> None:
         original = """# tumoflip
