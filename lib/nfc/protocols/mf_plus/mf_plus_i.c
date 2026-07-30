@@ -50,28 +50,6 @@ static MfPlusSize mf_plus_size_from_atqa(const uint8_t atqa[2]) {
     return MfPlusSizeUnknown;
 }
 
-// Map the ATS historical bytes to a MIFARE Plus product, or MfPlusTypeUnknown if they match no
-// known S/X/SE entry. A non-table-length count never matches (and is NULL-safe).
-static MfPlusType mf_plus_type_from_ats(const uint8_t* historical_bytes, size_t len) {
-    if(len != MF_PLUS_T1_TK_VALUE_LEN) return MfPlusTypeUnknown;
-    if(memcmp(historical_bytes, mf_plus_ats_t1_tk_values[0], len) == 0) return MfPlusTypeS;
-    if(memcmp(historical_bytes, mf_plus_ats_t1_tk_values[1], len) == 0) return MfPlusTypeX;
-    if(memcmp(historical_bytes, mf_plus_ats_t1_tk_values[2], len) == 0 ||
-       memcmp(historical_bytes, mf_plus_ats_t1_tk_values[3], len) == 0)
-        return MfPlusTypeSE;
-    return MfPlusTypeUnknown;
-}
-
-// SL0/SL3 expose no product-independent size byte, so once the card is confirmed Plus fall back to
-// the ATQA size coding: bit 2 (0x0004) = 2K, bit 1 (0x0002) = 4K. Size refinement only, never type
-// identification (same as PM3 hf mfp info).
-static MfPlusSize mf_plus_size_from_atqa(const uint8_t atqa[2]) {
-    const uint16_t atqa_value = atqa[0] | ((uint16_t)atqa[1] << 8);
-    if(atqa_value & 0x0004) return MfPlusSize2K;
-    if(atqa_value & 0x0002) return MfPlusSize4K;
-    return MfPlusSizeUnknown;
-}
-
 MfPlusError mf_plus_get_type_from_version(
     const Iso14443_4aData* iso14443_4a_data,
     MfPlusSecurityLevel probed_security_level,

@@ -43,6 +43,27 @@ class NfcUnleashed090FollowupTest(unittest.TestCase):
         self.assertIn("data->hw_vendor == 0x04", poller)
         self.assertIn("(data->hw_type & 0x0F) == 0x02", poller)
 
+    def test_mifare_plus_helpers_are_defined_once(self) -> None:
+        mf_plus = source("lib/nfc/protocols/mf_plus/mf_plus_i.c")
+        mf_plus_poller_header = source(
+            "lib/nfc/protocols/mf_plus/mf_plus_poller_i.h"
+        )
+        self.assertEqual(
+            mf_plus.count(
+                "static MfPlusType mf_plus_type_from_ats("
+                "const uint8_t* historical_bytes, size_t len)"
+            ),
+            1,
+        )
+        self.assertEqual(
+            mf_plus.count(
+                "static MfPlusSize mf_plus_size_from_atqa(const uint8_t atqa[2])"
+            ),
+            1,
+        )
+        self.assertNotIn("mf_plus_ats_t1_tk_values", mf_plus)
+        self.assertEqual(mf_plus_poller_header.count("} MfPlusProbeResult;"), 1)
+
     def test_ultralight_aes_uses_identity_only_presentation(self) -> None:
         support = source(
             "applications/main/nfc/helpers/protocol_support/mf_ultralight/"
