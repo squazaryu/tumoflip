@@ -16,15 +16,57 @@ from tools.tumoflip.sync_readme_version import parse_dist_suffix
 class BumpDevVersionTest(unittest.TestCase):
     def test_starts_standalone_dev_iteration_from_standalone_stable(self) -> None:
         self.assertEqual(
-            compute_dev_version("t-flppr-fw-001"),
-            "t-dev-001-001",
+            compute_dev_version(
+                "t-flppr-fw-002",
+                target_stable_tag="v1.0.4",
+            ),
+            "t-dev-004-001",
         )
+
+    def test_requires_target_when_starting_standalone_dev_release(self) -> None:
+        with self.assertRaisesRegex(ValueError, "--target-stable is required"):
+            compute_dev_version("t-flppr-fw-002")
+
+    def test_apply_requires_target_when_starting_standalone_dev_release(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            (repo_root / "fbt_options.py").write_text(
+                'DIST_SUFFIX = "t-flppr-fw-002"\n',
+                encoding="utf-8",
+            )
+            (repo_root / "ReadMe.md").write_text("# tumoflip\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "target_stable_tag is required"):
+                apply_dev_version(
+                    repo_root,
+                    "t-dev-004-001",
+                    update_splash=False,
+                )
 
     def test_increments_standalone_dev_iteration(self) -> None:
         self.assertEqual(
             compute_dev_version("t-dev-002-009"),
             "t-dev-002-010",
         )
+
+    def test_target_change_starts_new_aligned_dev_release(self) -> None:
+        self.assertEqual(
+            compute_dev_version(
+                "t-dev-002-009",
+                target_stable_tag="v1.0.4",
+            ),
+            "t-dev-004-001",
+        )
+
+    def test_rejects_dev_release_that_disagrees_with_target(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must match"):
+            compute_dev_version(
+                "t-flppr-fw-002",
+                set_suffix="t-dev-003-001",
+                target_stable_tag="v1.0.4",
+            )
 
     def test_updates_standalone_stable_readme_for_first_dev_iteration(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -47,16 +89,16 @@ class BumpDevVersionTest(unittest.TestCase):
 
             old_suffix, new_suffix = apply_dev_version(
                 repo_root,
-                "t-dev-001-001",
+                "t-dev-004-001",
                 update_splash=False,
-                target_stable_tag="v1.0.2",
+                target_stable_tag="v1.0.4",
             )
 
             self.assertEqual(old_suffix, "t-flppr-fw-001")
-            self.assertEqual(new_suffix, "t-dev-001-001")
+            self.assertEqual(new_suffix, "t-dev-004-001")
             readme = (repo_root / "ReadMe.md").read_text(encoding="utf-8")
-            self.assertIn("Firmware version: `t-dev-001-001`", readme)
-            self.assertIn("Target stable SemVer: `v1.0.2`", readme)
+            self.assertIn("Firmware version: `t-dev-004-001`", readme)
+            self.assertIn("Target stable SemVer: `v1.0.4`", readme)
             self.assertIn(
                 "- `001`: development iteration inside the standalone Tumoflip release number.",
                 readme,

@@ -23,6 +23,8 @@ SEMVER_TAG_RE = re.compile(
     r"(?P<minor>0|[1-9]\d*)\."
     r"(?P<patch>0|[1-9]\d*)$"
 )
+ALIGNED_SEMVER_MAJOR = 1
+ALIGNED_SEMVER_MINOR = 0
 
 
 @dataclass(frozen=True, order=True)
@@ -52,6 +54,22 @@ def parse_stable_serial(version: str) -> int:
     return int(build)
 
 
+def aligned_stable_serial(tag: str) -> int:
+    """Return the firmware serial assigned to an aligned standalone release."""
+    parsed = parse_stable_tag(tag)
+    if (parsed.major, parsed.minor) != (
+        ALIGNED_SEMVER_MAJOR,
+        ALIGNED_SEMVER_MINOR,
+    ):
+        raise ValueError(
+            "standalone firmware alignment is defined only for v1.0.N; "
+            f"define a new mapping before releasing {tag}"
+        )
+    if parsed.patch > 999:
+        raise ValueError("standalone stable serial overflow: 999")
+    return parsed.patch
+
+
 def validate_new_stable_release(
     *,
     release_tag: str,
@@ -69,13 +87,16 @@ def validate_new_stable_release(
 
     current_serial = parse_stable_serial(firmware_version)
     previous_serial = parse_stable_serial(previous_firmware_version)
-    expected_serial = previous_serial + 1
-    if expected_serial > 999:
-        raise ValueError("standalone stable serial overflow: 999")
+    expected_serial = aligned_stable_serial(release_tag)
     if current_serial != expected_serial:
         raise ValueError(
-            "stable firmware serial must advance exactly once: "
+            "stable firmware serial must match the SemVer patch: "
             f"expected {STABLE_PREFIX}-{expected_serial:03d}, got {firmware_version}"
+        )
+    if current_serial <= previous_serial:
+        raise ValueError(
+            "stable firmware serial must advance beyond "
+            f"{previous_firmware_version}: {firmware_version}"
         )
 
     same_line = (

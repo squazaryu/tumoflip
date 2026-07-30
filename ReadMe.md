@@ -61,24 +61,31 @@ t-dev-<release>-<iteration>
 
 `main` should only receive builds that are stable enough to publish as tagged
 releases. Active firmware work lands on `dev` first. A dev identity refers to
-the stable serial it started from: `t-dev-<stable-serial>-<iteration>` advances
-only its final component during development. Promotion creates the next stable
-serial rather than reusing the base serial.
+the stable release it targets: `t-dev-<target-release>-<iteration>` advances
+only its final component during development. Promotion removes the development
+iteration and keeps the same target release number.
 
-Every future stable firmware publication is immutable. Even when the SemVer
-major/minor line stays at `1.0`, a new accepted firmware gets both the next
-patch tag and the next standalone serial. In other words, `v1.0.P` advances to
-`v1.0.(P+1)` while `t-flppr-fw-NNN` advances to the next three-digit serial.
-Firmware DFU, SDK, updater, tag, and release notes are never replaced in place.
-Package-only FW Packages updates remain a separate workflow and cannot replace
-those firmware binaries.
+Starting with the next release after historical `v1.0.3`, whose firmware
+serial is `002`, the SemVer patch is the single source of truth for the
+standalone release number. `v1.0.4` therefore uses stable serial `004`; its
+development builds use release component `004` with iterations `001`, `002`,
+and so on. The skipped firmware serial `003` is intentional: existing tags and
+binaries remain immutable. A release on another SemVer major/minor line is
+rejected until an explicit mapping is defined.
+
+Every future stable firmware publication is immutable. Firmware DFU, SDK,
+updater, tag, and release notes are never replaced in place. Package-only FW
+Packages updates remain a separate workflow and cannot replace those firmware
+binaries.
 
 Companion and release tooling continue to recognize the legacy
 `tmwhflpprarf<legacy-base>-<build>`, `t-flppr-fw-<legacy-base>-<build>`, and
 `t-dev-<legacy-base>-<build>-<iteration>` formats. Existing release tags and
 packages are never renamed. The first standalone stable line is
-`t-flppr-fw-001`, published as SemVer `v1.0.0`, and reports that exact firmware
-identity through `device_info`.
+`t-flppr-fw-001`, published as SemVer `v1.0.0`, and reports that historical
+firmware identity through `device_info`. Releases through `v1.0.3` and firmware
+serials through `002` remain supported historical identities and are not
+renamed.
 
 For `dev`, every separate issue-level or user-visible firmware change should
 advance the final three-digit iteration. A new standalone release line starts
@@ -88,8 +95,8 @@ synchronized:
 
 ```sh
 python3 tools/tumoflip/bump_dev_version.py \
-  --iteration 003 \
-  --target-stable v1.0.2
+  --iteration 001 \
+  --target-stable v1.0.4
 python3 tools/tumoflip/bump_dev_version.py
 ```
 
@@ -99,9 +106,9 @@ rewrites an existing legacy release:
 
 ```sh
 python3 tools/tumoflip/prepare_stable_version.py \
-  --release-tag v1.0.2 \
+  --release-tag v1.0.4 \
   --dry-run
-python3 tools/tumoflip/prepare_stable_version.py --release-tag v1.0.2
+python3 tools/tumoflip/prepare_stable_version.py --release-tag v1.0.4
 ```
 
 The four-page post-update splash screen is generated automatically from
