@@ -103,6 +103,12 @@ struct FelicaListener {
     uint8_t requested_blocks[FELICA_LISTENER_READ_BLOCK_COUNT_MAX];
     uint8_t mac_calc_start;
     bool rc_written;
+    uint8_t mode;
+    // Index of the currently selected System (via Polling with a specific System
+    // Code). Real multi-system cards derive a distinct IDm per System by encoding
+    // this index into the upper nibble of the base IDm's first byte - mirrors the
+    // convention used on the poller side when switching Systems.
+    uint8_t current_system_idx;
 
     BitBuffer* tx_buffer;
     BitBuffer* rx_buffer;
@@ -134,24 +140,32 @@ void felica_wcnt_increment(FelicaData* data);
  */
 bool felica_listener_check_idm(const FelicaListener* instance, const FelicaIDm* request_idm);
 
-/** This is the first request validation function.
+/** Computes the IDm for the currently selected System (instance->current_system_idx),
+ * derived from the card's base IDm by encoding the System index into the upper
+ * nibble of the first byte.
  *
- * Its main aim is to check whether the input request is valid in general by
- * counting the amount of data in request. Function iterates through block list
- * elements and data, counts real amount of elements and real amount of
- * coresponding elements data (in case of write operation). If block list
- * element amount is invalid or request data is missing, such request will be
- * ignored.
+ * @param      instance  pointer to the listener instance to be used.
+ *
+ * @return     IDm to use for responses/comparisons in the current System context.
+ */
+FelicaIDm felica_listener_get_current_idm(const FelicaListener* instance);
+
+/** Validate a received request before dispatching it.
+ *
+ * Checks the fixed command header, command-specific fields, block-list elements,
+ * and write payload. Malformed or truncated requests are rejected before any
+ * command handler reads their fields.
  *
  * @param      instance  pointer to the listener instance to be used.
  * @param      request   pointer to received request.
+ * @param      request_size  request size in bytes, excluding CRC.
  *
- * @return     True if block element list contains valid amount of data,
- *             otherwise false.
+ * @return     True if the complete request has a valid shape, otherwise false.
  */
-bool felica_listener_check_block_list_size(
+bool felica_listener_validate_request(
     FelicaListener* instance,
-    FelicaListenerGenericRequest* request);
+    FelicaListenerGenericRequest* request,
+    size_t request_size);
 
 /** Used to take first element from block element list.
  *
