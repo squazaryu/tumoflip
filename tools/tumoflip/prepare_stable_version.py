@@ -19,19 +19,13 @@ from tools.tumoflip.sync_readme_version import (
     sync_readme_text,
 )
 from tools.tumoflip.sync_update_splash import DEFAULT_OUTPUT_DIR, sync_update_splash
+from tools.tumoflip.validate_stable_release import aligned_stable_serial
 
 
 def validate_component(name: str, value: str) -> str:
     if len(value) != 3 or not value.isdigit():
         raise ValueError(f"{name} must be three digits, got: {value}")
     return value
-
-
-def next_component(name: str, value: str) -> str:
-    current = int(validate_component(name, value))
-    if current >= 999:
-        raise ValueError(f"{name} overflow: 999")
-    return f"{current + 1:03d}"
 
 
 def compute_stable_version(
@@ -56,9 +50,9 @@ def compute_stable_version(
     if build:
         selected_build = validate_component("build", build)
     elif current_base is None:
-        # Standalone dev builds are named after the stable serial they started
-        # from. Promotion always creates the next immutable stable serial.
-        selected_build = next_component("standalone release", current_build)
+        # Standalone dev builds already carry their target stable release
+        # number. Promotion removes only the dev iteration.
+        selected_build = current_build
     else:
         selected_build = current_build
     if selected_base is None:
@@ -76,7 +70,30 @@ def apply_stable_version(
 ) -> tuple[str, str]:
     repo_root = repo_root.resolve()
     old_suffix = read_dist_suffix(repo_root)
+    old_prefix, old_base, _, old_iteration = parse_dist_suffix(old_suffix)
+    if (
+        old_prefix == "t-dev"
+        and old_base is None
+        and old_iteration is not None
+        and not release_tag
+    ):
+        raise ValueError(
+            "release_tag is required when promoting a standalone dev release"
+        )
     expected_suffix = compute_stable_version(old_suffix, set_suffix=new_suffix)
+    if release_tag:
+        _, base, build, iteration = parse_dist_suffix(expected_suffix)
+        if base is not None or iteration is not None:
+            raise ValueError(
+                "aligned release tags require a standalone stable identity"
+            )
+        expected_serial = aligned_stable_serial(release_tag)
+        if int(build) != expected_serial:
+            raise ValueError(
+                "stable firmware serial must match the SemVer patch: "
+                f"expected {STABLE_PREFIX}-{expected_serial:03d}, "
+                f"got {expected_suffix}"
+            )
 
     options_path = repo_root / "fbt_options.py"
     readme_path = repo_root / "ReadMe.md"

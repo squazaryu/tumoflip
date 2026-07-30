@@ -26,6 +26,9 @@ from tools.tumoflip.sync_update_splash import (  # noqa: E402
     DEFAULT_OUTPUT_DIR,
     sync_update_splash,
 )
+from tools.tumoflip.validate_stable_release import (  # noqa: E402
+    aligned_stable_serial,
+)
 
 
 VERSION_COMPONENT_RE = re.compile(r"^\d{3}$")
@@ -70,15 +73,42 @@ def compute_dev_version(
     base: str | None = None,
     build: str | None = None,
     iteration: str | None = None,
+    target_stable_tag: str | None = None,
 ) -> str:
     if set_suffix:
-        return DevVersion.parse(set_suffix).format()
+        selected = DevVersion.parse(set_suffix)
+        if target_stable_tag and selected.base is None:
+            expected = aligned_stable_serial(target_stable_tag)
+            if int(selected.build) != expected:
+                raise ValueError(
+                    "dev release number must match the target stable SemVer patch: "
+                    f"expected {expected:03d}, got {selected.build}"
+                )
+        return selected.format()
 
     prefix, current_base, current_build, current_iteration = parse_dist_suffix(
         current_suffix
     )
     new_base = validate_component("base", base) if base else current_base
-    new_build = validate_component("build", build) if build else current_build
+    if target_stable_tag:
+        if new_base is not None:
+            raise ValueError(
+                "--target-stable alignment is supported only for standalone versions"
+            )
+        target_build = f"{aligned_stable_serial(target_stable_tag):03d}"
+        if build and validate_component("build", build) != target_build:
+            raise ValueError(
+                "build must match the target stable SemVer patch: "
+                f"expected {target_build}, got {build}"
+            )
+        new_build = target_build
+    else:
+        new_build = validate_component("build", build) if build else current_build
+
+    if is_stable_prefix(prefix) and current_base is None and not target_stable_tag:
+        raise ValueError(
+            "--target-stable is required when starting a standalone dev release"
+        )
 
     if iteration:
         new_iteration = validate_component("iteration", iteration)
@@ -125,8 +155,23 @@ def apply_dev_version(
 ) -> tuple[str, str]:
     repo_root = repo_root.resolve()
     old_suffix = read_dist_suffix(repo_root)
-    parse_dist_suffix(old_suffix)
-    DevVersion.parse(new_suffix)
+    old_prefix, old_base, _, _ = parse_dist_suffix(old_suffix)
+    if (
+        is_stable_prefix(old_prefix)
+        and old_base is None
+        and not target_stable_tag
+    ):
+        raise ValueError(
+            "target_stable_tag is required when starting a standalone dev release"
+        )
+    selected = DevVersion.parse(new_suffix)
+    if target_stable_tag and selected.base is None:
+        expected = aligned_stable_serial(target_stable_tag)
+        if int(selected.build) != expected:
+            raise ValueError(
+                "dev release number must match the target stable SemVer patch: "
+                f"expected {expected:03d}, got {selected.build}"
+            )
 
     options_path = repo_root / "fbt_options.py"
     readme_path = repo_root / "ReadMe.md"
@@ -188,6 +233,7 @@ def main(argv: list[str] | None = None) -> int:
             base=args.base,
             build=args.build,
             iteration=args.iteration,
+            target_stable_tag=args.target_stable,
         )
         old_suffix, applied_suffix = apply_dev_version(
             args.repo_root,
