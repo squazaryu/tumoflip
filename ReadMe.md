@@ -31,7 +31,7 @@ issue, report it in this repository:
 - Firmware API: `88.0`
 - Target: Flipper Zero F7
 - Release channel: `main stable line`
-- Target stable SemVer: `v1.0.2`
+- Target stable SemVer: `v1.0.3`
 - Release package: `flipper-z-f7-update-t-flppr-fw-002.tgz`
 - Flash profile: JS Runner / MJS runtime excluded to preserve internal flash headroom.
 

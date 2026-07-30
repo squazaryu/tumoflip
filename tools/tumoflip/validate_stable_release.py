@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
+from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -56,6 +58,7 @@ def validate_new_stable_release(
     firmware_version: str,
     previous_release_tag: str,
     previous_firmware_version: str,
+    existing_release_tags: Collection[str] = (),
 ) -> None:
     current_tag = parse_stable_tag(release_tag)
     previous_tag = parse_stable_tag(previous_release_tag)
@@ -79,12 +82,28 @@ def validate_new_stable_release(
         current_tag.major == previous_tag.major
         and current_tag.minor == previous_tag.minor
     )
-    if same_line and current_tag.patch != previous_tag.patch + 1:
-        raise ValueError(
-            "stable patch must advance exactly once inside the same major.minor line: "
-            f"expected v{previous_tag.major}.{previous_tag.minor}."
-            f"{previous_tag.patch + 1}, got {release_tag}"
-        )
+    if same_line:
+        consumed_tags = {
+            f"v{previous_tag.major}.{previous_tag.minor}.{patch}"
+            for patch in range(previous_tag.patch + 1, current_tag.patch)
+        }
+        missing_tags = sorted(consumed_tags.difference(existing_release_tags))
+        if missing_tags:
+            raise ValueError(
+                "stable patch may skip only tags that already exist: "
+                + ", ".join(missing_tags)
+            )
+
+
+def repository_release_tags(repo_root: Path) -> set[str]:
+    result = subprocess.run(
+        ["git", "tag", "--list", "v*"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return {line for line in result.stdout.splitlines() if line}
 
 
 def main() -> int:
@@ -93,6 +112,7 @@ def main() -> int:
     parser.add_argument("--firmware-version", required=True)
     parser.add_argument("--previous-release-tag", required=True)
     parser.add_argument("--previous-firmware-version", required=True)
+    parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     args = parser.parse_args()
 
     try:
@@ -101,8 +121,9 @@ def main() -> int:
             firmware_version=args.firmware_version,
             previous_release_tag=args.previous_release_tag,
             previous_firmware_version=args.previous_firmware_version,
+            existing_release_tags=repository_release_tags(args.repo_root),
         )
-    except ValueError as error:
+    except (OSError, subprocess.CalledProcessError, ValueError) as error:
         print(f"error: {error}")
         return 2
 

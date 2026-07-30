@@ -49,6 +49,25 @@ class ValidateStableReleaseTest(unittest.TestCase):
                 previous_firmware_version="t-flppr-fw-001",
             )
 
+    def test_accepts_patch_after_an_existing_consumed_tag(self) -> None:
+        validate_new_stable_release(
+            release_tag="v1.0.3",
+            firmware_version="t-flppr-fw-002",
+            previous_release_tag="v1.0.1",
+            previous_firmware_version="t-flppr-fw-001",
+            existing_release_tags={"v1.0.2"},
+        )
+
+    def test_requires_every_skipped_patch_tag_to_exist(self) -> None:
+        with self.assertRaises(ValueError):
+            validate_new_stable_release(
+                release_tag="v1.0.4",
+                firmware_version="t-flppr-fw-002",
+                previous_release_tag="v1.0.1",
+                previous_firmware_version="t-flppr-fw-001",
+                existing_release_tags={"v1.0.2"},
+            )
+
     def test_rejects_reused_or_skipped_serial(self) -> None:
         for version in ("t-flppr-fw-001", "t-flppr-fw-003"):
             with self.subTest(version=version), self.assertRaises(ValueError):
