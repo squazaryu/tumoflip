@@ -117,11 +117,18 @@ MfPlusError mf_plus_poller_read_version(MfPlusPoller* instance, MfPlusVersion* d
 
     MfPlusError error =
         mf_plus_poller_send_chunks(instance, instance->input_buffer, instance->result_buffer);
-    if(error == MfPlusErrorNone) {
-        error = mf_plus_version_parse(data, instance->result_buffer);
+
+    // A genuine Plus EV1/EV2 returns the full 28-byte GetVersion block but ends the native frame with
+    // a non-zero status (unlike DESFire), so send_chunks flags MfPlusErrorProtocol on a complete,
+    // correct reply. Trust it when it parses as an NXP Plus (vendor 0x04, family nibble 0x02);
+    // otherwise fail so the caller falls back to ATS (EV1/EV2 share the Plus-X ATS, so GetVersion is
+    // their only tell).
+    if(mf_plus_version_parse(data, instance->result_buffer) == MfPlusErrorNone &&
+       data->hw_vendor == 0x04 && (data->hw_type & 0x0F) == 0x02) {
+        return MfPlusErrorNone;
     }
 
-    return error;
+    return (error != MfPlusErrorNone) ? error : MfPlusErrorProtocol;
 }
 
 /* ---- SL3 secure messaging ---- */
