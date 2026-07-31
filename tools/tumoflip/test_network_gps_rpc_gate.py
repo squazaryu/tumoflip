@@ -67,6 +67,77 @@ class NetworkGpsRpcGateTest(unittest.TestCase):
         ):
             self.assertIn(required, docs)
 
+    def test_narrow_device_services_contract_is_advertised(self) -> None:
+        runtime = (
+            REPO_ROOT
+            / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
+        ).read_text(encoding="utf-8")
+        companion = (
+            REPO_ROOT
+            / "applications_user/flipper_companion/flipper_companion.c"
+        ).read_text(encoding="utf-8")
+
+        for capability in ("gps=1", "net=1", "fabric,gps,net"):
+            self.assertIn(capability, runtime)
+
+        for contract_token in (
+            '"device_services"',
+            '"gps_once"',
+            '"https_get"',
+            '"weather_now"',
+            '"place_once"',
+            '"release_latest"',
+            '"journal_append"',
+            "BtAppBridgeFlagAckRequested",
+            "DEVICE_SERVICES_RESPONSE_MAX   512U",
+            "BtAppBridgeFlagResponse",
+            "furi_ms_to_ticks(DEVICE_SERVICES_TIMEOUT_MS)",
+        ):
+            self.assertIn(contract_token, companion)
+
+    def test_capture_sidecar_is_separate_and_transactional(self) -> None:
+        companion = (
+            REPO_ROOT
+            / "applications_user/flipper_companion/flipper_companion.c"
+        ).read_text(encoding="utf-8")
+
+        for required in (
+            '".sub|.nfc|.rfid"',
+            '"%s.tumoflip.json"',
+            '"%s.part"',
+            '"%s.bak"',
+            "companion_verify_file",
+            "moved_destination",
+            "installed_new",
+            '"Write rolled back"',
+        ):
+            self.assertIn(required, companion)
+
+    def test_first_https_consumer_is_exact_and_public(self) -> None:
+        companion = (
+            REPO_ROOT
+            / "applications_user/flipper_companion/flipper_companion.c"
+        ).read_text(encoding="utf-8")
+        docs = (REPO_ROOT / "docs/app-bridge-v2.md").read_text(encoding="utf-8")
+
+        self.assertIn("https://api.github.com/zen", companion)
+        self.assertIn("disabled by default", docs)
+        self.assertIn("does not expose raw sockets", docs)
+
+    def test_companion_menu_has_no_horizontal_action_shortcuts(self) -> None:
+        companion = (
+            REPO_ROOT
+            / "applications_user/flipper_companion/flipper_companion.c"
+        ).read_text(encoding="utf-8")
+        manifest = (
+            REPO_ROOT
+            / "applications_user/flipper_companion/application.fam"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("InputKeyLeft", companion)
+        self.assertNotIn("InputKeyRight", companion)
+        self.assertIn('fap_version="0.3.1"', manifest)
+
 
 if __name__ == "__main__":
     unittest.main()

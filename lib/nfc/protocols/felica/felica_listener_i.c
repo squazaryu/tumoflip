@@ -174,11 +174,92 @@ static uint8_t felica_listener_get_block_list_item_count_size(
     return item_cnt;
 }
 
-bool felica_listener_check_block_list_size(
+static bool felica_listener_validate_standard_request(
+    const FelicaListenerGenericRequest* req,
+    size_t request_size,
+    bool write) {
+    const uint8_t* raw = (const uint8_t*)req;
+
+    if(request_size < 11U) return false;
+
+    const uint8_t service_count = raw[10];
+    if(service_count == 0U || service_count > 16U) return false;
+
+    size_t offset = 11U + (size_t)service_count * sizeof(uint16_t);
+    if(offset >= request_size) return false;
+
+    const uint8_t block_count = raw[offset++];
+    const uint8_t block_count_max = write ? 16U : 7U;
+    if(block_count == 0U || block_count > block_count_max) return false;
+
+    for(uint8_t i = 0; i < block_count; i++) {
+        if(offset >= request_size) return false;
+
+        const bool short_block_number = (raw[offset] & 0x80U) != 0U;
+        const size_t item_size = short_block_number ? 2U : 3U;
+        if(item_size > request_size - offset) return false;
+
+        // The Standard backend currently stores block indices as uint8_t.
+        if(!short_block_number && raw[offset + 2U] != 0U) return false;
+        offset += item_size;
+    }
+
+    const size_t data_size = write ? (size_t)block_count * FELICA_DATA_BLOCK_SIZE : 0U;
+    return data_size <= request_size - offset && offset + data_size == request_size;
+}
+
+bool felica_listener_validate_request(
     FelicaListener* instance,
-    FelicaListenerGenericRequest* req) {
+    FelicaListenerGenericRequest* req,
+    size_t request_size) {
     furi_assert(instance);
     furi_assert(req);
+
+    if(request_size < 2U || req->length != request_size) return false;
+
+    const uint8_t* raw = (const uint8_t*)req;
+    const uint8_t command = raw[1];
+
+    if(command == 0x00U) {
+        return request_size == sizeof(uint8_t) + sizeof(FelicaListenerPollingHeader);
+    }
+
+    // All non-Polling commands contain command code and IDm.
+    if(request_size < sizeof(FelicaCommandHeaderRaw)) return false;
+
+    if(command == FELICA_CMD_REQUEST_SYSTEM_CODE ||
+       command == FELICA_CMD_REQUEST_RESPONSE) {
+        return request_size == sizeof(FelicaCommandHeaderRaw);
+    }
+
+    if(command == FELICA_CMD_LIST_SERVICE_CODE) {
+        return request_size == sizeof(FelicaCommandHeaderRaw) + sizeof(uint16_t);
+    }
+
+    if(command == FELICA_CMD_REQUEST_SERVICE) {
+        if(request_size < sizeof(FelicaCommandHeaderRaw) + sizeof(uint8_t)) return false;
+
+        const uint8_t node_count = raw[sizeof(FelicaCommandHeaderRaw)];
+        if(node_count == 0U || node_count > 32U) return false;
+
+        return request_size ==
+               sizeof(FelicaCommandHeaderRaw) + sizeof(uint8_t) +
+                   (size_t)node_count * sizeof(uint16_t);
+    }
+
+    if(instance->data->workflow_type == FelicaStandard &&
+       (command == FELICA_CMD_READ_WITHOUT_ENCRYPTION ||
+        command == FELICA_CMD_WRITE_WITHOUT_ENCRYPTION)) {
+        return felica_listener_validate_standard_request(
+            req, request_size, command == FELICA_CMD_WRITE_WITHOUT_ENCRYPTION);
+    }
+
+    if(command != FELICA_CMD_READ_WITHOUT_ENCRYPTION &&
+       command != FELICA_CMD_WRITE_WITHOUT_ENCRYPTION) {
+        return true;
+    }
+
+    if(request_size < sizeof(FelicaListenerGenericRequest)) return false;
 
     FelicaListenerRequest* request = (FelicaListenerRequest*)req;
     bool valid = true;
@@ -198,12 +279,27 @@ bool felica_listener_check_block_list_size(
     return valid;
 }
 
+FelicaIDm felica_listener_get_current_idm(const FelicaListener* instance) {
+    furi_assert(instance);
+
+    FelicaIDm idm = instance->data->idm;
+    // System 0 uses the card's base IDm untouched - only non-zero System indices get
+    // their index encoded into the upper nibble. Unconditionally masking byte 0 here
+    // would corrupt the base IDm's real upper nibble for cards where it isn't already
+    // zero, making the emulated card report an IDm inconsistent with what the reader
+    // saw during the initial (hardware-handled) wildcard Polling.
+    if(instance->current_system_idx != 0) {
+        idm.data[0] = (uint8_t)((idm.data[0] & 0x0F) | (instance->current_system_idx << 4));
+    }
+    return idm;
+}
+
 bool felica_listener_check_idm(const FelicaListener* instance, const FelicaIDm* request_idm) {
     furi_assert(instance);
     furi_assert(request_idm);
 
-    const FelicaIDm* idm = &instance->data->idm;
-    return memcmp(idm->data, request_idm->data, 8) == 0;
+    const FelicaIDm idm = felica_listener_get_current_idm(instance);
+    return memcmp(idm.data, request_idm->data, 8) == 0;
 }
 
 void felica_listener_reset(FelicaListener* instance) {
@@ -213,6 +309,8 @@ void felica_listener_reset(FelicaListener* instance) {
     instance->auth.context.auth_status.external = false;
     instance->data->data.fs.state.data[0] = 0;
     instance->rc_written = false;
+    instance->mode = 0;
+    instance->current_system_idx = 0;
     memset(instance->auth.session_key.data, 0, FELICA_DATA_BLOCK_SIZE);
 
     memcpy(instance->data->data.fs.mc.data, instance->mc_shadow.data, FELICA_DATA_BLOCK_SIZE);

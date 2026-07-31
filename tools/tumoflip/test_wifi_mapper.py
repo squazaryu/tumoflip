@@ -99,8 +99,8 @@ class WiFiMapperTest(unittest.TestCase):
             manifest,
         )
         self.assertIn('fap_category="Module One/ESP32 Wi-Fi"', manifest)
-        self.assertIn('fap_version="1.2.2"', manifest)
-        self.assertIn('"TumoSurvey v1.2.2"', source)
+        self.assertIn('fap_version="1.3.0"', manifest)
+        self.assertIn('"TumoSurvey v1.3.0"', source)
         self.assertIn('fap_icon="wifi_mapper_10px.png"', manifest)
         self.assertIn('fap_icon_assets="icons"', manifest)
         self.assertTrue((APP_DIR / "wifi_mapper_10px.png").is_file())
@@ -247,7 +247,7 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertIn('if(model->logging) strlcat(chips, "LIVE ", sizeof(chips));', source)
         self.assertIn("static void wifi_mapper_draw_insights(", source)
         self.assertIn("static void wifi_mapper_draw_about(", source)
-        self.assertIn('"TumoSurvey v1.2.2"', source)
+        self.assertIn('"TumoSurvey v1.3.0"', source)
         self.assertIn('"Survey + AP Inspector"', source)
         self.assertIn('"squazaryu/tumoflip"', source)
         self.assertIn('elements_button_left(canvas, "Pin")', source)
@@ -268,6 +268,28 @@ class WiFiMapperTest(unittest.TestCase):
         self.assertNotIn("wifi_mapper_draw_top_action", source)
         self.assertNotIn("canvas_draw_rbox(canvas, 94, 1, 34, 12, 2)", source)
         self.assertNotIn("static int wifi_mapper_hint(", source)
+
+    def test_iphone_gps_is_correlated_nonblocking_fallback(self) -> None:
+        source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
+
+        for required in (
+            '"schema=1;purpose=survey"',
+            "BtAppBridgeFlagAckRequested",
+            "event->request_id != app->gps_pending_request_id",
+            'strcmp(event->command, "gps_once")',
+            "!record.has_location",
+            "WiFiMapperGpsReady",
+            "wifi_mapper_write_phone_location_record",
+            '"%lu,location,,,,,,"',
+            "WIFI_MAPPER_GPS_TIMEOUT_MS",
+            "WiFiMapperGpsUnavailable",
+        ):
+            self.assertIn(required, source)
+
+        self.assertLess(
+            source.index("wifi_mapper_request_phone_location(app);"),
+            source.index("wifi_mapper_send_active_scan_command(app);"),
+        )
 
     def test_live_relay_contract_is_stable_and_opt_in(self) -> None:
         source = (APP_DIR / "wifi_mapper.c").read_text(encoding="utf-8")
