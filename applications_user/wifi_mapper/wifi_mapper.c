@@ -59,6 +59,9 @@
 #define WIFI_MAPPER_RELAY_STOP_COMMAND  "survey_stop"
 #define WIFI_MAPPER_RELAY_PAYLOAD_MAX   150U
 #define WIFI_MAPPER_RELAY_FLUSH_MS      120U
+#define WIFI_MAPPER_DEVICE_SERVICES_APP "device_services"
+#define WIFI_MAPPER_GPS_TIMEOUT_MS      12000U
+#define WIFI_MAPPER_GPS_RESPONSE_MAX    256U
 
 typedef enum {
     WiFiMapperEventReserved = (1 << 0),
@@ -66,10 +69,19 @@ typedef enum {
     WiFiMapperEventRxData = (1 << 2),
     WiFiMapperEventRxIdle = (1 << 3),
     WiFiMapperEventRxError = (1 << 4),
+    WiFiMapperEventBridge = (1 << 5),
 } WiFiMapperEvent;
 
-#define WIFI_MAPPER_WORKER_EVENTS \
-    (WiFiMapperEventStop | WiFiMapperEventRxData | WiFiMapperEventRxIdle | WiFiMapperEventRxError)
+#define WIFI_MAPPER_WORKER_EVENTS                                          \
+    (WiFiMapperEventStop | WiFiMapperEventRxData | WiFiMapperEventRxIdle | \
+     WiFiMapperEventRxError | WiFiMapperEventBridge)
+
+typedef enum {
+    WiFiMapperGpsIdle,
+    WiFiMapperGpsWaiting,
+    WiFiMapperGpsReady,
+    WiFiMapperGpsUnavailable,
+} WiFiMapperGpsState;
 
 typedef enum {
     WiFiMapperScanModeAll,
@@ -219,6 +231,7 @@ typedef struct {
     bool logging;
     bool uart_ready;
     bool ble_relay;
+    WiFiMapperGpsState gps_state;
     WiFiMapperScanMode scan_mode;
     WiFiMapperExportMode export_mode;
     WiFiMapperSessionStats session;
@@ -256,11 +269,14 @@ typedef struct {
     Storage* storage;
     NotificationApp* notification;
     Bt* bt;
+    FuriPubSub* bridge_pubsub;
+    FuriPubSubSubscription* bridge_sub;
     Expansion* expansion;
     ViewDispatcher* view_dispatcher;
     View* view;
     FuriThread* worker_thread;
     FuriStreamBuffer* rx_stream;
+    FuriMessageQueue* bridge_queue;
     FuriMutex* mutex;
     FuriHalSerialHandle* serial_handle;
     File* log_file;
@@ -277,6 +293,18 @@ typedef struct {
     char relay_buffer[WIFI_MAPPER_RELAY_PAYLOAD_MAX + 1U];
     size_t relay_buffer_len;
     uint32_t relay_last_send_ms;
+    WiFiMapperGpsState gps_state;
+    uint32_t gps_request_id_next;
+    uint32_t gps_pending_request_id;
+    uint32_t gps_request_started_at;
+    uint8_t gps_response_chunk_count;
+    uint8_t gps_response_next_chunk;
+    size_t gps_response_size;
+    uint8_t gps_response[WIFI_MAPPER_GPS_RESPONSE_MAX + 1U];
+    char gps_latitude[WIFI_MAPPER_GEO_SIZE];
+    char gps_longitude[WIFI_MAPPER_GEO_SIZE];
+    char gps_altitude[WIFI_MAPPER_GEO_SIZE];
+    char gps_accuracy[WIFI_MAPPER_GEO_SIZE];
     WiFiMapperScanMode scan_mode;
     WiFiMapperExportMode export_mode;
     WiFiMapperSessionStats session;
@@ -352,6 +380,7 @@ static void wifi_mapper_update_model(WiFiMapperApp* app) {
             model->logging = app->logging;
             model->uart_ready = app->uart_ready;
             model->ble_relay = app->ble_relay;
+            model->gps_state = app->gps_state;
             model->scan_mode = app->scan_mode;
             model->export_mode = app->export_mode;
             model->session = app->session;
@@ -661,6 +690,31 @@ static bool wifi_mapper_geo_coordinates_valid(const char* latitude, const char* 
     }
 
     return true;
+}
+
+static bool wifi_mapper_copy_bridge_field(
+    const char* payload,
+    const char* key,
+    char* output,
+    size_t output_size) {
+    if(!payload || !key || !output || (output_size == 0U)) return false;
+
+    const size_t key_size = strlen(key);
+    const char* cursor = payload;
+    while(cursor && *cursor) {
+        if((strncmp(cursor, key, key_size) == 0) && (cursor[key_size] == '=')) {
+            const char* value = cursor + key_size + 1U;
+            const char* end = strchr(value, ';');
+            size_t value_size = end ? (size_t)(end - value) : strlen(value);
+            if(value_size >= output_size) value_size = output_size - 1U;
+            memcpy(output, value, value_size);
+            output[value_size] = '\0';
+            return value_size > 0U;
+        }
+        cursor = strchr(cursor, ';');
+        if(cursor) cursor++;
+    }
+    return false;
 }
 
 static bool wifi_mapper_is_mac(const char* cursor) {
@@ -2014,6 +2068,26 @@ static void wifi_mapper_write_log_record(
     storage_file_write(file, "\n", 1);
 }
 
+static void wifi_mapper_write_phone_location_record(
+    File* file,
+    uint32_t tick_ms,
+    const char* latitude,
+    const char* longitude,
+    const char* altitude,
+    const char* accuracy) {
+    char prefix[48];
+    snprintf(prefix, sizeof(prefix), "%lu,location,,,,,,", (unsigned long)tick_ms);
+    storage_file_write(file, prefix, strlen(prefix));
+    wifi_mapper_write_escaped_csv(file, latitude);
+    storage_file_write(file, ",", 1);
+    wifi_mapper_write_escaped_csv(file, longitude);
+    storage_file_write(file, ",", 1);
+    wifi_mapper_write_escaped_csv(file, altitude);
+    storage_file_write(file, ",", 1);
+    wifi_mapper_write_escaped_csv(file, accuracy);
+    storage_file_write(file, ",iphone_gps\n", 12);
+}
+
 // Must be called with app->mutex held. Sends whatever is buffered (if any) as one
 // App Bridge event and resets the buffer. Best-effort: a failed/absent BLE link just
 // drops this flush, matching how the rest of the app treats a missing connection.
@@ -2109,9 +2183,16 @@ static void wifi_mapper_toggle_ble_relay(WiFiMapperApp* app) {
 }
 
 static void wifi_mapper_log_line(WiFiMapperApp* app, const char* line) {
-    const WiFiMapperRecord record = wifi_mapper_parse_record(line);
+    WiFiMapperRecord record = wifi_mapper_parse_record(line);
 
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    if(record.is_wifi && !record.has_location && (app->gps_state == WiFiMapperGpsReady)) {
+        strlcpy(record.latitude, app->gps_latitude, sizeof(record.latitude));
+        strlcpy(record.longitude, app->gps_longitude, sizeof(record.longitude));
+        strlcpy(record.altitude, app->gps_altitude, sizeof(record.altitude));
+        strlcpy(record.accuracy, app->gps_accuracy, sizeof(record.accuracy));
+        record.has_location = true;
+    }
     if(app->logging && app->log_file) {
         const uint32_t tick_ms = (furi_get_tick() * 1000U) / furi_kernel_get_tick_frequency();
         wifi_mapper_write_log_record(app->log_file, tick_ms, &record, line);
@@ -2142,6 +2223,160 @@ static void wifi_mapper_log_line(WiFiMapperApp* app, const char* line) {
     }
     strlcpy(app->last_line, line, sizeof(app->last_line));
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+}
+
+// Runs on the BT service thread. Only copy the bounded event and wake the worker.
+static void wifi_mapper_bridge_callback(const void* message, void* context) {
+    WiFiMapperApp* app = context;
+    const BtAppBridgeEvent* event = message;
+    if((event->protocol_version != 2U) || ((event->flags & BtAppBridgeFlagResponse) == 0U) ||
+       (strcmp(event->app_id, WIFI_MAPPER_DEVICE_SERVICES_APP) != 0) ||
+       (strcmp(event->command, "gps_once") != 0)) {
+        return;
+    }
+
+    if(furi_message_queue_put(app->bridge_queue, event, 0U) == FuriStatusOk) {
+        furi_thread_flags_set(furi_thread_get_id(app->worker_thread), WiFiMapperEventBridge);
+    }
+}
+
+static void wifi_mapper_finish_gps_unavailable(WiFiMapperApp* app) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    app->gps_pending_request_id = 0U;
+    app->gps_response_chunk_count = 0U;
+    app->gps_response_next_chunk = 0U;
+    app->gps_response_size = 0U;
+    app->gps_state = WiFiMapperGpsUnavailable;
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+    wifi_mapper_update_model(app);
+}
+
+static void wifi_mapper_handle_gps_response(WiFiMapperApp* app, const BtAppBridgeEvent* event) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    if((app->gps_pending_request_id == 0U) || (event->request_id != app->gps_pending_request_id)) {
+        furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+        return;
+    }
+
+    const bool invalid =
+        ((event->flags & BtAppBridgeFlagError) != 0U) || (event->chunk_count == 0U) ||
+        ((app->gps_response_chunk_count != 0U) &&
+         (app->gps_response_chunk_count != event->chunk_count)) ||
+        (event->chunk_index != app->gps_response_next_chunk) ||
+        ((app->gps_response_size + event->payload_len) > WIFI_MAPPER_GPS_RESPONSE_MAX);
+    if(invalid) {
+        app->gps_pending_request_id = 0U;
+        app->gps_state = WiFiMapperGpsUnavailable;
+        furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+        wifi_mapper_update_model(app);
+        return;
+    }
+
+    if(app->gps_response_chunk_count == 0U) {
+        app->gps_response_chunk_count = event->chunk_count;
+    }
+    memcpy(&app->gps_response[app->gps_response_size], event->payload, event->payload_len);
+    app->gps_response_size += event->payload_len;
+    app->gps_response_next_chunk++;
+    const bool complete = app->gps_response_next_chunk == app->gps_response_chunk_count;
+    if(!complete) {
+        furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+        return;
+    }
+
+    app->gps_response[app->gps_response_size] = '\0';
+    char schema[4];
+    char latitude[WIFI_MAPPER_GEO_SIZE];
+    char longitude[WIFI_MAPPER_GEO_SIZE];
+    char altitude[WIFI_MAPPER_GEO_SIZE];
+    char accuracy[WIFI_MAPPER_GEO_SIZE];
+    float parsed_altitude = 0.0f;
+    float parsed_accuracy = 0.0f;
+    const char* response = (const char*)app->gps_response;
+    const bool valid =
+        wifi_mapper_copy_bridge_field(response, "schema", schema, sizeof(schema)) &&
+        (strcmp(schema, "1") == 0) &&
+        wifi_mapper_copy_bridge_field(response, "lat", latitude, sizeof(latitude)) &&
+        wifi_mapper_copy_bridge_field(response, "lon", longitude, sizeof(longitude)) &&
+        wifi_mapper_copy_bridge_field(response, "alt", altitude, sizeof(altitude)) &&
+        wifi_mapper_copy_bridge_field(response, "acc", accuracy, sizeof(accuracy)) &&
+        wifi_mapper_geo_coordinates_valid(latitude, longitude) &&
+        wifi_mapper_geo_parse(altitude, &parsed_altitude) &&
+        wifi_mapper_geo_parse(accuracy, &parsed_accuracy) && (parsed_altitude >= -2000.0f) &&
+        (parsed_altitude <= 100000.0f) && (parsed_accuracy >= 0.0f) &&
+        (parsed_accuracy <= 100000.0f);
+
+    app->gps_pending_request_id = 0U;
+    if(valid) {
+        strlcpy(app->gps_latitude, latitude, sizeof(app->gps_latitude));
+        strlcpy(app->gps_longitude, longitude, sizeof(app->gps_longitude));
+        strlcpy(app->gps_altitude, altitude, sizeof(app->gps_altitude));
+        strlcpy(app->gps_accuracy, accuracy, sizeof(app->gps_accuracy));
+        app->gps_state = WiFiMapperGpsReady;
+        if(app->logging && app->log_file) {
+            const uint32_t tick_ms = (furi_get_tick() * 1000U) / furi_kernel_get_tick_frequency();
+            wifi_mapper_write_phone_location_record(
+                app->log_file,
+                tick_ms,
+                app->gps_latitude,
+                app->gps_longitude,
+                app->gps_altitude,
+                app->gps_accuracy);
+        }
+    } else {
+        app->gps_state = WiFiMapperGpsUnavailable;
+    }
+    app->gps_response_chunk_count = 0U;
+    app->gps_response_next_chunk = 0U;
+    app->gps_response_size = 0U;
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    notification_message(
+        app->notification, valid ? &sequence_blink_green_100 : &sequence_wifi_mapper_error);
+    wifi_mapper_update_model(app);
+}
+
+static void wifi_mapper_request_phone_location(WiFiMapperApp* app) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    app->gps_request_id_next++;
+    if(app->gps_request_id_next == 0U) app->gps_request_id_next++;
+    app->gps_pending_request_id = app->gps_request_id_next;
+    app->gps_request_started_at = furi_get_tick();
+    app->gps_response_chunk_count = 0U;
+    app->gps_response_next_chunk = 0U;
+    app->gps_response_size = 0U;
+    app->gps_latitude[0] = '\0';
+    app->gps_longitude[0] = '\0';
+    app->gps_altitude[0] = '\0';
+    app->gps_accuracy[0] = '\0';
+    app->gps_state = WiFiMapperGpsWaiting;
+    const uint32_t request_id = app->gps_pending_request_id;
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+
+    static const char payload[] = "schema=1;purpose=survey";
+    if(!bt_app_bridge_send_v2(
+           app->bt,
+           WIFI_MAPPER_DEVICE_SERVICES_APP,
+           "gps_once",
+           request_id,
+           BtAppBridgeFlagAckRequested,
+           0U,
+           1U,
+           (const uint8_t*)payload,
+           strlen(payload))) {
+        wifi_mapper_finish_gps_unavailable(app);
+    } else {
+        wifi_mapper_update_model(app);
+    }
+}
+
+static void wifi_mapper_check_gps_timeout(WiFiMapperApp* app) {
+    furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
+    const bool timed_out = (app->gps_pending_request_id != 0U) &&
+                           ((furi_get_tick() - app->gps_request_started_at) >=
+                            furi_ms_to_ticks(WIFI_MAPPER_GPS_TIMEOUT_MS));
+    furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
+    if(timed_out) wifi_mapper_finish_gps_unavailable(app);
 }
 
 static void wifi_mapper_start_logging(WiFiMapperApp* app) {
@@ -2178,6 +2413,7 @@ static void wifi_mapper_start_logging(WiFiMapperApp* app) {
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
 
     if(opened) {
+        wifi_mapper_request_phone_location(app);
         wifi_mapper_send_active_scan_command(app);
         notification_message(app->notification, &sequence_wifi_mapper_rx);
     } else {
@@ -2203,6 +2439,8 @@ static void wifi_mapper_stop_logging(WiFiMapperApp* app) {
     wifi_mapper_close_log(app);
     wifi_mapper_relay_flush_locked(app);
     wifi_mapper_relay_state_locked(app, WIFI_MAPPER_RELAY_STOP_COMMAND);
+    app->gps_pending_request_id = 0U;
+    if(app->gps_state == WiFiMapperGpsWaiting) app->gps_state = WiFiMapperGpsUnavailable;
     app->ble_relay = false;
     app->logging = false;
     strlcpy(
@@ -2230,6 +2468,13 @@ static void wifi_mapper_draw_live(Canvas* canvas, WiFiMapperModel* model) {
     chips[0] = '\0';
     if(model->logging) strlcat(chips, "LIVE ", sizeof(chips));
     if(model->ble_relay) strlcat(chips, "BLE", sizeof(chips));
+    if(model->gps_state == WiFiMapperGpsReady) {
+        strlcat(chips, " GPS", sizeof(chips));
+    } else if(model->gps_state == WiFiMapperGpsWaiting) {
+        strlcat(chips, " GPS?", sizeof(chips));
+    } else if(model->gps_state == WiFiMapperGpsUnavailable) {
+        strlcat(chips, " GPS--", sizeof(chips));
+    }
     size_t clen = strlen(chips);
     if(clen > 0U && chips[clen - 1U] == ' ') chips[clen - 1U] = '\0';
     if(chips[0]) canvas_draw_str(canvas, 128 - canvas_string_width(canvas, chips), 24, chips);
@@ -2316,7 +2561,7 @@ static void wifi_mapper_draw_insights(Canvas* canvas, WiFiMapperModel* model) {
 
 static void wifi_mapper_draw_about(Canvas* canvas) {
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 0, 10, "TumoSurvey v1.2.2");
+    canvas_draw_str(canvas, 0, 10, "TumoSurvey v1.3.0");
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, 0, 22, "Survey + AP Inspector");
     canvas_draw_str(canvas, 0, 34, "Module One / API 88");
@@ -2850,8 +3095,12 @@ static int32_t wifi_mapper_worker(void* context) {
     WiFiMapperApp* app = context;
 
     while(true) {
-        const uint32_t events =
-            furi_thread_flags_wait(WIFI_MAPPER_WORKER_EVENTS, FuriFlagWaitAny, FuriWaitForever);
+        const uint32_t events = furi_thread_flags_wait(
+            WIFI_MAPPER_WORKER_EVENTS, FuriFlagWaitAny, furi_ms_to_ticks(250U));
+        if(events == FuriFlagErrorTimeout) {
+            wifi_mapper_check_gps_timeout(app);
+            continue;
+        }
         furi_check((events & FuriFlagError) == 0);
 
         if(events & WiFiMapperEventStop) {
@@ -2877,6 +3126,15 @@ static int32_t wifi_mapper_worker(void* context) {
             notification_message(app->notification, &sequence_wifi_mapper_error);
             wifi_mapper_update_model(app);
         }
+
+        if(events & WiFiMapperEventBridge) {
+            BtAppBridgeEvent bridge_event;
+            while(furi_message_queue_get(app->bridge_queue, &bridge_event, 0U) == FuriStatusOk) {
+                wifi_mapper_handle_gps_response(app, &bridge_event);
+            }
+        }
+
+        wifi_mapper_check_gps_timeout(app);
     }
 
     return 0;
@@ -2892,9 +3150,12 @@ static WiFiMapperApp* wifi_mapper_alloc(void) {
     app->locator_peak_rssi = -100;
     app->locator_previous_rssi = -100;
     app->locator_trend = WiFiMapperLocatorTrendWaiting;
+    app->gps_state = WiFiMapperGpsIdle;
+    app->gps_request_id_next = furi_get_tick();
 
     app->mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     app->rx_stream = furi_stream_buffer_alloc(WIFI_MAPPER_RX_BUFFER_SIZE, 1);
+    app->bridge_queue = furi_message_queue_alloc(8U, sizeof(BtAppBridgeEvent));
     app->storage = furi_record_open(RECORD_STORAGE);
     app->notification = furi_record_open(RECORD_NOTIFICATION);
     app->gui = furi_record_open(RECORD_GUI);
@@ -2915,6 +3176,8 @@ static WiFiMapperApp* wifi_mapper_alloc(void) {
 
     app->worker_thread = furi_thread_alloc_ex("WiFiMapperRx", 3 * 1024, wifi_mapper_worker, app);
     furi_thread_start(app->worker_thread);
+    app->bridge_pubsub = bt_app_bridge_get_pubsub(app->bt);
+    app->bridge_sub = furi_pubsub_subscribe(app->bridge_pubsub, wifi_mapper_bridge_callback, app);
 
     expansion_disable(app->expansion);
     app->expansion_disabled = true;
@@ -2946,6 +3209,11 @@ static void wifi_mapper_free(WiFiMapperApp* app) {
     wifi_mapper_locator_stop(app);
     wifi_mapper_stop_logging(app);
 
+    if(app->bridge_sub) {
+        furi_pubsub_unsubscribe(app->bridge_pubsub, app->bridge_sub);
+        app->bridge_sub = NULL;
+    }
+
     furi_check(furi_mutex_acquire(app->mutex, FuriWaitForever) == FuriStatusOk);
     wifi_mapper_relay_flush_locked(app);
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);
@@ -2971,6 +3239,7 @@ static void wifi_mapper_free(WiFiMapperApp* app) {
     view_dispatcher_free(app->view_dispatcher);
 
     furi_stream_buffer_free(app->rx_stream);
+    furi_message_queue_free(app->bridge_queue);
     furi_mutex_free(app->mutex);
 
     free(app->inspector);

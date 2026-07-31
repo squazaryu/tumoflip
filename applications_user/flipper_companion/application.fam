@@ -6,8 +6,8 @@ App(
     requires=["subghz_radio_broker"],
     stack_size=4 * 1024,
     fap_category="Bluetooth",
-    fap_version="0.2.0",
+    fap_version="0.3.0",
     fap_icon="images/companion_10px.png",
-    fap_description="TumoCompanion bridge with opt-in iPhone GPS and bounded HTTPS checks",
+    fap_description="Opt-in iPhone GPS, named network services, transactional capture sidecars, and field journal",
     fap_author="tumoflip",
 )

@@ -173,26 +173,53 @@ acknowledgements and it does not replay missed events. If the phone is
 disconnected or App Bridge is disabled, the firmware may drop the event while
 continuing to write the local TumoSurvey CSV log.
 
+At survey start, TumoSurvey also sends one correlated
+`device_services/gps_once` request with `schema=1;purpose=survey`. A valid
+iPhone fix is written as a `location` CSV row and used only as a fallback for
+subsequent Wi-Fi rows that do not already carry Module One coordinates. A
+missing, denied, or timed-out fix changes the on-device GPS chip to `GPS--` but
+does not stop UART capture or local logging.
+
 ### iPhone device services
 
-`Flipper Companion` can request an iPhone location fix or a bounded HTTPS
-response while its on-device screen is open. Requests use app ID
+`Flipper Companion` and TumoSurvey can request opt-in iPhone field services.
+Requests use app ID
 `device_services`, FAB2 request IDs, and the acknowledgement-requested flag.
 TumoCompanion replies with the same request ID and the response flag.
 
 | Command | Request payload | Successful response |
 |---|---|---|
-| `gps_once` | `schema=1` | `schema=1;lat=...;lon=...;alt=...;acc=...;ts=...` |
+| `gps_once` | `schema=1;purpose=<manual|survey|sidecar>` | `schema=1;lat=...;lon=...;alt=...;acc=...;ts=...` |
+| `weather_now` | `schema=1` | `schema=1;temp=...;feels=...;wind=...;code=...;at=...` |
+| `place_once` | `schema=1` | `schema=1;place=...;region=...;country=...` |
+| `release_latest` | `schema=1` | `schema=1;tag=...;name=...;at=...` |
+| `journal_append` | `schema=1;kind=...;note=...` | `schema=1;stored=1;sent=<0|1>;delivery=...;id=...` |
 | `https_get` | Allowlisted HTTPS URL, one FAB2 frame | `status=<code>;truncated=<0|1>\n<body>` |
 
 Errors set both response and error flags and carry a stable token such as
 `disabled`, `permission`, `busy`, `invalid_url`, `forbidden_host`, `timeout`, or
 `network`.
 
-Location and network sharing are disabled by default in TumoCompanion. The
-first implementation accepts a single request at a time, bounds the reassembled
-response to 512 bytes on Flipper, and does not expose raw sockets, WebSocket,
-arbitrary headers, background location, or write-through to SD.
+Location, network sharing, last-known storage, journal storage, and webhook
+delivery are separate switches and are disabled by default in TumoCompanion.
+One request runs at a time and receives a bounded background execution window;
+background GPS requires Always Location and stops after the one-shot reply.
+
+Weather, reverse geocoding, and stable-release lookup are named services with
+fixed hosts, paths, fields, timeouts, redirect policy, and response limits in
+TumoCompanion. Flipper cannot provide their URL or credentials. The legacy
+`https_get` diagnostic remains restricted to the exact public GitHub test
+endpoint. An optional journal webhook is configured only on iPhone, is HTTPS
+only, rejects local/private literal hosts and redirects, and keeps its bearer
+token in Keychain.
+The contract does not expose raw sockets, WebSocket, arbitrary request headers,
+or Flipper-controlled service credentials.
+
+`Tag saved file` asks the user to choose an existing `.sub`, `.nfc`, or `.rfid`
+file, obtains one GPS fix, and atomically writes
+`<source>.tumoflip.json`. The capture itself is never modified; a previous
+sidecar is backed up, the new file is read back byte-for-byte, and any failure
+rolls the operation back.
 
 ### BLE GATT Lab diagnostics
 

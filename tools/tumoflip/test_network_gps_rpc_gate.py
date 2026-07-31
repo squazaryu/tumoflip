@@ -84,12 +84,34 @@ class NetworkGpsRpcGateTest(unittest.TestCase):
             '"device_services"',
             '"gps_once"',
             '"https_get"',
+            '"weather_now"',
+            '"place_once"',
+            '"release_latest"',
+            '"journal_append"',
             "BtAppBridgeFlagAckRequested",
             "DEVICE_SERVICES_RESPONSE_MAX   512U",
             "BtAppBridgeFlagResponse",
             "furi_ms_to_ticks(DEVICE_SERVICES_TIMEOUT_MS)",
         ):
             self.assertIn(contract_token, companion)
+
+    def test_capture_sidecar_is_separate_and_transactional(self) -> None:
+        companion = (
+            REPO_ROOT
+            / "applications_user/flipper_companion/flipper_companion.c"
+        ).read_text(encoding="utf-8")
+
+        for required in (
+            '".sub|.nfc|.rfid"',
+            '"%s.tumoflip.json"',
+            '"%s.part"',
+            '"%s.bak"',
+            "companion_verify_file",
+            "moved_destination",
+            "installed_new",
+            '"Write rolled back"',
+        ):
+            self.assertIn(required, companion)
 
     def test_first_https_consumer_is_exact_and_public(self) -> None:
         companion = (
