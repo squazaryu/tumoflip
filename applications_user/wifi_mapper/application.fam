@@ -6,10 +6,10 @@ App(
     requires=["gui", "storage", "notification", "bt", "expansion_start"],
     stack_size=4 * 1024,
     fap_category="Module One/ESP32 Wi-Fi",
-    fap_version="1.2.2",
+    fap_version="1.3.0",
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip",
-    fap_description="Module One network survey with pinned baselines, exact bounded AP changes, RSSI Locator, atomic sessions, GeoJSON export, and Companion live relay.",
+    fap_description="Module One survey with iPhone GPS fallback, pinned baselines, bounded AP changes, atomic sessions, GeoJSON export, and Companion live relay.",
     fap_icon="wifi_mapper_10px.png",
     fap_icon_assets="icons",
 )
