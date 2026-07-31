@@ -24,7 +24,7 @@
 #define TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
 #define TUMOFLIP_RUNTIME_CAPABILITIES                                       \
     "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;pkg=1;radio=2;sd=1;" \
-    "fabric=1;feat=pkg,radio,trace,twin,transfer,fabric"
+    "fabric=1;gps=1;net=1;feat=pkg,radio,trace,twin,transfer,fabric,gps,net"
 
 typedef struct {
     BtAppBridgeEvent event;

@@ -84,6 +84,8 @@ The system app ID is `runtime`.
   plus the live `active` and `owner` discovery fields.
   `fabric_open`, `fabric_state`, `fabric_step`, and `fabric_cancel` implement
   the fixed `counter` package described below.
+- `gps=1` and `net=1`, plus the matching `gps` and `net` feature tokens,
+  advertise the opt-in `device_services` Companion contract described below.
 - An unknown command returns `runtime/error`, sets response and error flags,
   and carries `badcmd`.
 - Chunked Runtime requests return `runtime/error` with `chunk`.
@@ -170,6 +172,27 @@ The relay is active-session-only and best-effort. It does not request
 acknowledgements and it does not replay missed events. If the phone is
 disconnected or App Bridge is disabled, the firmware may drop the event while
 continuing to write the local TumoSurvey CSV log.
+
+### iPhone device services
+
+`Flipper Companion` can request an iPhone location fix or a bounded HTTPS
+response while its on-device screen is open. Requests use app ID
+`device_services`, FAB2 request IDs, and the acknowledgement-requested flag.
+TumoCompanion replies with the same request ID and the response flag.
+
+| Command | Request payload | Successful response |
+|---|---|---|
+| `gps_once` | `schema=1` | `schema=1;lat=...;lon=...;alt=...;acc=...;ts=...` |
+| `https_get` | Allowlisted HTTPS URL, one FAB2 frame | `status=<code>;truncated=<0|1>\n<body>` |
+
+Errors set both response and error flags and carry a stable token such as
+`disabled`, `permission`, `busy`, `invalid_url`, `forbidden_host`, `timeout`, or
+`network`.
+
+Location and network sharing are disabled by default in TumoCompanion. The
+first implementation accepts a single request at a time, bounds the reassembled
+response to 512 bytes on Flipper, and does not expose raw sockets, WebSocket,
+arbitrary headers, background location, or write-through to SD.
 
 ### BLE GATT Lab diagnostics
 
