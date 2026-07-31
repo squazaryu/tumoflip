@@ -833,16 +833,6 @@ int32_t flipper_companion_app(void* p) {
                 (event.input.type == InputTypeShort) && !app->busy &&
                 (event.input.key == InputKeyOk)) {
                 companion_run_selected(app);
-            } else if(
-                (event.input.type == InputTypeShort) && !app->busy &&
-                (event.input.key == InputKeyLeft)) {
-                app->selected_menu = CompanionMenuGps;
-                companion_run_selected(app);
-            } else if(
-                (event.input.type == InputTypeShort) && !app->busy &&
-                (event.input.key == InputKeyRight)) {
-                app->selected_menu = CompanionMenuHttpsTest;
-                companion_run_selected(app);
             }
         } else if(event.type == CompanionEvtBridge) {
             companion_handle_bridge(app, &event.bridge);

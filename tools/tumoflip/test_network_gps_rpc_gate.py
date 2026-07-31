@@ -124,6 +124,20 @@ class NetworkGpsRpcGateTest(unittest.TestCase):
         self.assertIn("disabled by default", docs)
         self.assertIn("does not expose raw sockets", docs)
 
+    def test_companion_menu_has_no_horizontal_action_shortcuts(self) -> None:
+        companion = (
+            REPO_ROOT
+            / "applications_user/flipper_companion/flipper_companion.c"
+        ).read_text(encoding="utf-8")
+        manifest = (
+            REPO_ROOT
+            / "applications_user/flipper_companion/application.fam"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("InputKeyLeft", companion)
+        self.assertNotIn("InputKeyRight", companion)
+        self.assertIn('fap_version="0.3.1"', manifest)
+
 
 if __name__ == "__main__":
     unittest.main()
