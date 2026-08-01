@@ -5,6 +5,7 @@
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
 #include <dolphin/dolphin.h>
+#include <furi_hal_rtc.h>
 #include "config/app/config.h"
 #include "services/config/config.h"
 #include "types/plugin_state.h"
@@ -24,6 +25,38 @@ struct TotpRenderCallbackContext {
     FuriMutex* mutex;
     PluginState* plugin_state;
 };
+
+static uint32_t totp_datetime_timestamp(const DateTime* datetime) {
+    DateTime copy = *datetime;
+    return datetime_datetime_to_timestamp(&copy);
+}
+
+static void totp_phone_time_callback(const TumoflipDeviceServicesResult* result, void* context) {
+    PluginState* plugin_state = context;
+    if(result->request != TumoflipDeviceServicesRequestTime ||
+       result->code == TumoflipDeviceServicesResultCancelled) {
+        return;
+    }
+
+    TotpTimeValidation validation = TotpTimeValidationUnknown;
+    if(result->code == TumoflipDeviceServicesResultOk) {
+        DateTime rtc;
+        furi_hal_rtc_get_datetime(&rtc);
+        const uint32_t rtc_local = totp_datetime_timestamp(&rtc);
+        const uint32_t phone_local = totp_datetime_timestamp(&result->value.time.local_datetime);
+        const uint32_t clock_delta = rtc_local > phone_local ? rtc_local - phone_local :
+                                                               phone_local - rtc_local;
+        const int32_t configured_offset = (int32_t)(plugin_state->timezone_offset * 3600.0f);
+        const int32_t offset_delta =
+            configured_offset > result->value.time.utc_offset_seconds ?
+                configured_offset - result->value.time.utc_offset_seconds :
+                result->value.time.utc_offset_seconds - configured_offset;
+        validation = clock_delta <= 10U && offset_delta <= 60 ? TotpTimeValidationValid :
+                                                                TotpTimeValidationMismatch;
+    }
+    plugin_state->time_validation = validation;
+    totp_scene_director_force_redraw(plugin_state);
+}
 
 static void render_callback(Canvas* const canvas, void* const ctx) {
     furi_assert(ctx);
@@ -163,6 +196,9 @@ static bool totp_plugin_state_init(PluginState* const plugin_state) {
     }
 
     plugin_state->event_queue = furi_message_queue_alloc(8, sizeof(PluginEvent));
+    plugin_state->time_validation = TotpTimeValidationUnknown;
+    plugin_state->device_services =
+        tumoflip_device_services_client_alloc(totp_phone_time_callback, plugin_state);
 
 #ifdef TOTP_BADBT_AUTOMATION_ENABLED
     if(plugin_state->automation_method & AutomationMethodBadBt) {
@@ -186,6 +222,8 @@ static bool totp_plugin_state_init(PluginState* const plugin_state) {
 }
 
 static void totp_plugin_state_free(PluginState* plugin_state) {
+    tumoflip_device_services_client_free(plugin_state->device_services);
+    plugin_state->device_services = NULL;
     if(plugin_state->idle_timeout_context != NULL) {
         idle_timeout_stop(plugin_state->idle_timeout_context);
         idle_timeout_free(plugin_state->idle_timeout_context);
@@ -225,6 +263,7 @@ int32_t totp_app() {
 
     PluginState* plugin_state = malloc(sizeof(PluginState));
     furi_check(plugin_state != NULL);
+    memset(plugin_state, 0, sizeof(PluginState));
 
     if(!totp_plugin_state_init(plugin_state)) {
         FURI_LOG_E(LOGGING_TAG, "App state initialization failed\r\n");
@@ -237,6 +276,8 @@ int32_t totp_app() {
         totp_plugin_state_free(plugin_state);
         return 253;
     }
+
+    tumoflip_device_services_client_request_time(plugin_state->device_services, "totp");
 
     TotpCliContext* cli_context = totp_cli_register_command_handler(plugin_state);
 

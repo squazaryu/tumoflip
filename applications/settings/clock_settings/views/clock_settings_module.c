@@ -3,19 +3,31 @@
 #include <gui/elements.h>
 #include <assets_icons.h>
 #include <locale/locale.h>
+#include <tumoflip_device_services/tumoflip_device_services.h>
 
 #define TAG "ClockSettingsModule"
 
 struct ClockSettingsModule {
     FuriEventLoopTimer* timer;
     View* view;
+    Storage* storage;
+    TumoflipDeviceServicesClient* device_services;
+    uint32_t sync_finished_at;
 };
+
+typedef enum {
+    ClockSyncIdle,
+    ClockSyncWaiting,
+    ClockSyncOk,
+    ClockSyncError,
+} ClockSyncStatus;
 
 typedef struct {
     DateTime current;
     DateTime alarm;
     bool alarm_enabled;
     bool editing;
+    ClockSyncStatus sync_status;
 
     uint8_t row;
     uint8_t column;
@@ -86,6 +98,13 @@ static void
 
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 0, ROW_0_Y + 15, "Time");
+    if(model->sync_status != ClockSyncIdle) {
+        const char* status = model->sync_status == ClockSyncWaiting ? "sync" :
+                             model->sync_status == ClockSyncOk      ? "ok" :
+                                                                      "fail";
+        canvas_set_font(canvas, FontSecondary);
+        canvas_draw_str(canvas, 0, ROW_0_Y + 7, status);
+    }
 
     snprintf(buffer, sizeof(buffer), "%02u", model->current.hour);
     clock_settings_module_draw_block(
@@ -320,12 +339,18 @@ static bool clock_settings_module_input_callback(InputEvent* event, void* contex
 
     ClockSettingsModule* instance = context;
     bool consumed = false;
+    bool start_phone_sync = false;
 
     with_view_model(
         instance->view,
         ClockSettingsModuleViewModel * model,
         {
-            if(event->type == InputTypeShort || event->type == InputTypeRepeat) {
+            if(event->type == InputTypeLong && event->key == InputKeyOk && model->row == 0U &&
+               !model->editing && model->sync_status != ClockSyncWaiting) {
+                model->sync_status = ClockSyncWaiting;
+                start_phone_sync = true;
+                consumed = true;
+            } else if(event->type == InputTypeShort || event->type == InputTypeRepeat) {
                 bool previous_editing = model->editing;
                 if(model->editing) {
                     if(model->row == 0) {
@@ -367,7 +392,44 @@ static bool clock_settings_module_input_callback(InputEvent* event, void* contex
         },
         true);
 
+    if(start_phone_sync) {
+        if(!tumoflip_device_services_client_request_time(instance->device_services, "clock")) {
+            instance->sync_finished_at = furi_get_tick();
+            with_view_model(
+                instance->view,
+                ClockSettingsModuleViewModel * model,
+                { model->sync_status = ClockSyncError; },
+                true);
+        }
+    }
+
     return consumed;
+}
+
+static void clock_settings_module_phone_time_callback(
+    const TumoflipDeviceServicesResult* result,
+    void* context) {
+    ClockSettingsModule* instance = context;
+    if(result->code == TumoflipDeviceServicesResultCancelled) return;
+    ClockSyncStatus status = ClockSyncError;
+    DateTime current;
+    if(result->request == TumoflipDeviceServicesRequestTime &&
+       result->code == TumoflipDeviceServicesResultOk &&
+       tumoflip_device_services_apply_time(instance->storage, &result->value.time)) {
+        current = result->value.time.local_datetime;
+        status = ClockSyncOk;
+    } else {
+        furi_hal_rtc_get_datetime(&current);
+    }
+    instance->sync_finished_at = furi_get_tick();
+    with_view_model(
+        instance->view,
+        ClockSettingsModuleViewModel * model,
+        {
+            model->current = current;
+            model->sync_status = status;
+        },
+        true);
 }
 
 static void clock_settings_module_timer_callback(void* context) {
@@ -377,7 +439,16 @@ static void clock_settings_module_timer_callback(void* context) {
     DateTime dt;
     furi_hal_rtc_get_datetime(&dt);
     with_view_model(
-        instance->view, ClockSettingsModuleViewModel * model, { model->current = dt; }, true);
+        instance->view,
+        ClockSettingsModuleViewModel * model,
+        {
+            model->current = dt;
+            if((model->sync_status == ClockSyncOk || model->sync_status == ClockSyncError) &&
+               (furi_get_tick() - instance->sync_finished_at >= furi_ms_to_ticks(3000U))) {
+                model->sync_status = ClockSyncIdle;
+            }
+        },
+        true);
 }
 
 static void clock_settings_module_view_enter_callback(void* context) {
@@ -405,11 +476,16 @@ static void clock_settings_module_view_exit_callback(void* context) {
     furi_assert(context);
     ClockSettingsModule* instance = context;
     furi_event_loop_timer_stop(instance->timer);
+    tumoflip_device_services_client_cancel(instance->device_services);
 }
 
 ClockSettingsModule* clock_settings_module_alloc(FuriEventLoop* event_loop) {
     ClockSettingsModule* instance = malloc(sizeof(ClockSettingsModule));
+    memset(instance, 0, sizeof(ClockSettingsModule));
 
+    instance->storage = furi_record_open(RECORD_STORAGE);
+    instance->device_services =
+        tumoflip_device_services_client_alloc(clock_settings_module_phone_time_callback, instance);
     instance->timer = furi_event_loop_timer_alloc(
         event_loop, clock_settings_module_timer_callback, FuriEventLoopTimerTypePeriodic, instance);
     instance->view = view_alloc();
@@ -428,6 +504,9 @@ ClockSettingsModule* clock_settings_module_alloc(FuriEventLoop* event_loop) {
 
 void clock_settings_module_free(ClockSettingsModule* instance) {
     furi_assert(instance);
+    tumoflip_device_services_client_free(instance->device_services);
+    furi_record_close(RECORD_STORAGE);
+    furi_event_loop_timer_free(instance->timer);
     view_free(instance->view);
     free(instance);
 }
