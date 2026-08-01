@@ -79,6 +79,7 @@ static NfcSupportedCardsLoadContext* nfc_supported_cards_load_context_alloc(void
 
     instance->storage = furi_record_open(RECORD_STORAGE);
     instance->directory = storage_file_alloc(instance->storage);
+    instance->app = NULL;
 
     if(!storage_dir_open(instance->directory, NFC_SUPPORTED_CARDS_PLUGINS_PATH)) {
         FURI_LOG_D(TAG, "Failed to open directory: %s", NFC_SUPPORTED_CARDS_PLUGINS_PATH);
@@ -87,10 +88,15 @@ static NfcSupportedCardsLoadContext* nfc_supported_cards_load_context_alloc(void
     return instance;
 }
 
-static void nfc_supported_cards_load_context_free(NfcSupportedCardsLoadContext* instance) {
+static void nfc_supported_cards_unload_plugin(NfcSupportedCardsLoadContext* instance) {
     if(instance->app) {
         flipper_application_free(instance->app);
+        instance->app = NULL;
     }
+}
+
+static void nfc_supported_cards_load_context_free(NfcSupportedCardsLoadContext* instance) {
+    nfc_supported_cards_unload_plugin(instance);
 
     storage_dir_close(instance->directory);
     storage_file_free(instance->directory);
@@ -110,7 +116,7 @@ static const NfcSupportedCardsPlugin* nfc_supported_cards_get_plugin(
     FuriString* plugin_path = furi_string_alloc_printf(
         "%s/%s%s", NFC_SUPPORTED_CARDS_PLUGINS_PATH, name, NFC_SUPPORTED_CARDS_PLUGIN_SUFFIX);
     do {
-        if(instance->app) flipper_application_free(instance->app);
+        nfc_supported_cards_unload_plugin(instance);
         instance->app = flipper_application_alloc(instance->storage, api_interface);
 
         if(flipper_application_preload(instance->app, furi_string_get_cstr(plugin_path)) !=
@@ -182,9 +188,9 @@ void nfc_supported_cards_load_cache(NfcSupportedCards* instance) {
                 nfc_supported_cards_get_next_plugin(instance->load_context, api_interface);
             if(plugin == NULL) break; //-V547
 
-            NfcSupportedCardsPluginCache plugin_cache = {}; //-V779
-            plugin_cache.name = furi_string_alloc_set(instance->load_context->file_name);
-            plugin_cache.protocol = plugin->protocol;
+            NfcSupportedCardsPluginCache plugin_cache = {
+                .protocol = plugin->protocol,
+            }; //-V779
             if(plugin->verify) {
                 plugin_cache.feature |= NfcSupportedCardsPluginFeatureHasVerify;
             }
@@ -194,6 +200,12 @@ void nfc_supported_cards_load_cache(NfcSupportedCards* instance) {
             if(plugin->parse) {
                 plugin_cache.feature |= NfcSupportedCardsPluginFeatureHasParse;
             }
+
+            // Keep persistent cache allocations out of the temporary ELF section ranges.
+            // Otherwise each small plugin name can split a just-freed large block and leave
+            // too little contiguous heap for a later parser or the NFC scanner thread.
+            nfc_supported_cards_unload_plugin(instance->load_context);
+            plugin_cache.name = furi_string_alloc_set(instance->load_context->file_name);
             NfcSupportedCardsPluginCache_push_back(instance->plugins_cache_arr, plugin_cache);
         }
 
