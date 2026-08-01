@@ -2,6 +2,7 @@
 
 void lfrfid_scene_save_success_on_enter(void* context) {
     LfRfid* app = context;
+    lfrfid_request_location_sidecar(app);
     Popup* popup = app->popup;
 
     // Clear state of data enter scene

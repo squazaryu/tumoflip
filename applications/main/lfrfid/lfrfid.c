@@ -1,6 +1,30 @@
 #include "lfrfid_i.h"
 #include <dolphin/dolphin.h>
 
+#define TAG "LfRfidApp"
+
+static void
+    lfrfid_device_services_callback(const TumoflipDeviceServicesResult* result, void* context) {
+    LfRfid* app = context;
+    if(result->request == TumoflipDeviceServicesRequestLocation &&
+       result->code == TumoflipDeviceServicesResultOk && !furi_string_empty(app->sidecar_path)) {
+        if(!tumoflip_device_services_write_sidecar(
+               app->storage,
+               furi_string_get_cstr(app->sidecar_path),
+               "rfid",
+               &result->value.location)) {
+            FURI_LOG_W(TAG, "Could not write optional location sidecar");
+        }
+    }
+}
+
+void lfrfid_request_location_sidecar(LfRfid* app) {
+    furi_assert(app);
+    tumoflip_device_services_client_cancel(app->device_services);
+    furi_string_set(app->sidecar_path, app->file_path);
+    tumoflip_device_services_client_request_location(app->device_services, "sidecar");
+}
+
 //TODO: use .txt file in resources for passwords.
 const uint32_t default_passwords[] = {
     0x00000000, 0x00000001, 0x00000002, 0x0000000A, 0x0000000B, 0x00012323, 0x000D8787, 0x00434343,
@@ -66,6 +90,9 @@ static LfRfid* lfrfid_alloc(void) {
     lfrfid->file_name = furi_string_alloc();
     lfrfid->raw_file_name = furi_string_alloc();
     lfrfid->file_path = furi_string_alloc_set(LFRFID_APP_FOLDER);
+    lfrfid->sidecar_path = furi_string_alloc();
+    lfrfid->device_services =
+        tumoflip_device_services_client_alloc(lfrfid_device_services_callback, lfrfid);
 
     lfrfid->dict = protocol_dict_alloc(lfrfid_protocols, LFRFIDProtocolMax);
 
@@ -129,10 +156,12 @@ static LfRfid* lfrfid_alloc(void) {
 
 static void lfrfid_free(LfRfid* lfrfid) {
     furi_assert(lfrfid);
+    tumoflip_device_services_client_free(lfrfid->device_services);
 
     furi_string_free(lfrfid->raw_file_name);
     furi_string_free(lfrfid->file_name);
     furi_string_free(lfrfid->file_path);
+    furi_string_free(lfrfid->sidecar_path);
     protocol_dict_free(lfrfid->dict);
 
     lfrfid_worker_free(lfrfid->lfworker);

@@ -24,6 +24,7 @@
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
 #include <storage/storage.h>
+#include <tumoflip_device_services/tumoflip_device_services.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -156,6 +157,10 @@ struct TumoSpectrumApp {
     uint32_t smart_capture_frequency_hz;
     uint8_t smart_capture_sample_count;
     uint8_t result_page;
+    TumoflipDeviceServicesClient* device_services;
+    FuriMutex* device_services_mutex;
+    TumoflipDeviceLocation phone_location;
+    bool phone_location_valid;
 };
 
 static const NotificationSequence tumospectrum_sequence_ok = {
@@ -171,6 +176,34 @@ static const NotificationSequence tumospectrum_sequence_error = {
     &message_delay_10,
     NULL,
 };
+
+static void tumospectrum_device_services_callback(
+    const TumoflipDeviceServicesResult* result,
+    void* context) {
+    TumoSpectrumApp* app = context;
+    if(result->request != TumoflipDeviceServicesRequestLocation ||
+       result->code == TumoflipDeviceServicesResultCancelled) {
+        return;
+    }
+    furi_check(furi_mutex_acquire(app->device_services_mutex, FuriWaitForever) == FuriStatusOk);
+    app->phone_location_valid = result->code == TumoflipDeviceServicesResultOk;
+    if(app->phone_location_valid) app->phone_location = result->value.location;
+    furi_check(furi_mutex_release(app->device_services_mutex) == FuriStatusOk);
+}
+
+static void tumospectrum_write_report_sidecar(
+    TumoSpectrumApp* app,
+    const char* report_path,
+    const char* kind) {
+    TumoflipDeviceLocation location;
+    furi_check(furi_mutex_acquire(app->device_services_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool valid = app->phone_location_valid;
+    location = app->phone_location;
+    furi_check(furi_mutex_release(app->device_services_mutex) == FuriStatusOk);
+    if(valid && report_path && report_path[0]) {
+        tumoflip_device_services_write_sidecar(app->storage, report_path, kind, &location);
+    }
+}
 
 static void tumospectrum_refresh_result(TumoSpectrumApp* app) {
     with_view_model(
@@ -1248,6 +1281,7 @@ static void tumospectrum_capture_set_infer(TumoSpectrumApp* app) {
             TumoSpectrumViewCaptureSet);
         return;
     }
+    tumospectrum_write_report_sidecar(app, app->set_report_path, "signal_set");
 
     tumospectrum_refresh_set(app);
     notification_message(app->notification, &tumospectrum_sequence_ok);
@@ -1758,6 +1792,7 @@ static bool tumospectrum_save_report(TumoSpectrumApp* app) {
         app->comparison.compatible ? &app->comparison : NULL,
         app->report_path,
         sizeof(app->report_path));
+    if(success) tumospectrum_write_report_sidecar(app, app->report_path, "signal_report");
     notification_message(
         app->notification, success ? &tumospectrum_sequence_ok : &tumospectrum_sequence_error);
     return success;
@@ -1978,6 +2013,9 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     app->loader = furi_record_open(RECORD_LOADER);
     app->bt = furi_record_open(RECORD_BT);
     app->notification = furi_record_open(RECORD_NOTIFICATION);
+    app->device_services_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
+    app->device_services =
+        tumoflip_device_services_client_alloc(tumospectrum_device_services_callback, app);
     app->view_dispatcher = view_dispatcher_alloc();
     app->menu = submenu_alloc();
     app->actions = submenu_alloc();
@@ -2130,10 +2168,13 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     UNUSED(api_minor);
     app->current_api = api_major;
     app->protocol_result_status = ProtocolProfileStatusNoMatch;
+    tumoflip_device_services_client_request_location(app->device_services, "service");
     return app;
 }
 
 static void tumospectrum_free(TumoSpectrumApp* app) {
+    tumoflip_device_services_client_free(app->device_services);
+    furi_mutex_free(app->device_services_mutex);
     tumospectrum_band_map_stop(app->band_map);
     tumospectrum_protocol_runtime_stop(app->protocol_runtime);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewProtocol);

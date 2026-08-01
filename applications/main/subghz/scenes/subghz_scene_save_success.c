@@ -8,6 +8,7 @@ void subghz_scene_save_success_popup_callback(void* context) {
 
 void subghz_scene_save_success_on_enter(void* context) {
     SubGhz* subghz = context;
+    subghz_request_location_sidecar(subghz);
 
     // Setup view
     Popup* popup = subghz->popup;

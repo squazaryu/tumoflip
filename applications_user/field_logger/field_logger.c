@@ -9,22 +9,24 @@
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
 #include <storage/storage.h>
+#include <tumoflip_device_services/tumoflip_device_services.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define FIELD_LOGGER_DATA_DIR EXT_PATH("apps_data/field_logger")
+#define FIELD_LOGGER_DATA_DIR     EXT_PATH("apps_data/field_logger")
 #define FIELD_LOGGER_SESSIONS_DIR EXT_PATH("apps_data/field_logger/sessions")
 #define FIELD_LOGGER_RF_NOTEBOOK_CSV \
     EXT_PATH("apps_data/arf_subghz_full/notebook/observations.csv")
 #define FIELD_LOGGER_SENSOR_SESSIONS_DIR EXT_PATH("apps_data/module_one_sensor_logger/sessions")
 
-#define FIELD_LOGGER_PATH_SIZE 128U
-#define FIELD_LOGGER_STATUS_SIZE 48U
+#define FIELD_LOGGER_PATH_SIZE         128U
+#define FIELD_LOGGER_STATUS_SIZE       48U
 #define FIELD_LOGGER_SESSION_NAME_SIZE 48U
-#define FIELD_LOGGER_TICK_MS 250U
-#define FIELD_LOGGER_RF_LINE_SIZE 192U
+#define FIELD_LOGGER_TICK_MS           250U
+#define FIELD_LOGGER_RF_LINE_SIZE      192U
+#define FIELD_LOGGER_EVENT_PHONE_GPS   1U
 
 typedef enum {
     FieldLoggerViewMenu,
@@ -80,6 +82,10 @@ typedef struct {
     File* csv_file;
     File* jsonl_file;
     File* gpx_file;
+    TumoflipDeviceServicesClient* device_services;
+    FuriMutex* device_services_mutex;
+    TumoflipDeviceLocation phone_location;
+    bool phone_location_valid;
     uint32_t interval_index;
 } FieldLoggerApp;
 
@@ -192,11 +198,7 @@ static void field_logger_make_paths(FieldLoggerApp* app) {
         app->run_view,
         FieldLoggerModel * model,
         {
-            snprintf(
-                model->session_name,
-                sizeof(model->session_name),
-                "field_%s",
-                timestamp);
+            snprintf(model->session_name, sizeof(model->session_name), "field_%s", timestamp);
             snprintf(
                 model->csv_path,
                 sizeof(model->csv_path),
@@ -218,7 +220,8 @@ static void field_logger_make_paths(FieldLoggerApp* app) {
 
 static void field_logger_sync_files(FieldLoggerApp* app) {
     if(app->csv_file && storage_file_is_open(app->csv_file)) storage_file_sync(app->csv_file);
-    if(app->jsonl_file && storage_file_is_open(app->jsonl_file)) storage_file_sync(app->jsonl_file);
+    if(app->jsonl_file && storage_file_is_open(app->jsonl_file))
+        storage_file_sync(app->jsonl_file);
     if(app->gpx_file && storage_file_is_open(app->gpx_file)) storage_file_sync(app->gpx_file);
 }
 
@@ -335,10 +338,24 @@ static void field_logger_write_record(
     const char* rf_trigger = (rf && rf->valid) ? rf->trigger_dbm : "";
     const char* rf_radio = (rf && rf->valid) ? rf->radio : "";
     const char* rf_rx_count = (rf && rf->valid) ? rf->rx_count : "";
+    TumoflipDeviceLocation phone_location;
+    furi_check(furi_mutex_acquire(app->device_services_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool phone_location_valid = app->phone_location_valid;
+    phone_location = app->phone_location;
+    furi_check(furi_mutex_release(app->device_services_mutex) == FuriStatusOk);
+    const char* latitude = phone_location_valid ? phone_location.latitude : "";
+    const char* longitude = phone_location_valid ? phone_location.longitude : "";
+    const char* altitude = phone_location_valid ? phone_location.altitude : "";
+    const char* accuracy = phone_location_valid ? phone_location.accuracy : "";
+    char gps_timestamp[16] = "";
+    if(phone_location_valid) {
+        snprintf(
+            gps_timestamp, sizeof(gps_timestamp), "%lu", (unsigned long)phone_location.unix_time);
+    }
 
     furi_string_printf(
         line,
-        "1,%s,%lu,%lu,%s,%s,%u,%.2f,%u,%.2f,false,,,,,,,,",
+        "1,%s,%lu,%lu,%s,%s,%u,%.2f,%u,%.2f,%s,",
         furi_string_get_cstr(timestamp),
         (unsigned long)uptime_ms,
         (unsigned long)record,
@@ -347,15 +364,12 @@ static void field_logger_write_record(
         battery_pct,
         (double)battery_v,
         charging ? 1U : 0U,
-        (double)usb_v);
+        (double)usb_v,
+        phone_location_valid ? "true" : "false");
     furi_string_cat_printf(
-        line,
-        "%s,%s,%s,%s,%s,",
-        rf_frequency,
-        rf_rssi,
-        rf_trigger,
-        rf_radio,
-        rf_rx_count);
+        line, "%s,%s,%s,%s,%s,,,,", latitude, longitude, altitude, accuracy, gps_timestamp);
+    furi_string_cat_printf(
+        line, "%s,%s,%s,%s,%s,", rf_frequency, rf_rssi, rf_trigger, rf_radio, rf_rx_count);
     field_logger_csv_escape(line, note ? note : "");
     furi_string_push_back(line, '\n');
     bool ok = field_logger_write_all(app->csv_file, furi_string_get_cstr(line));
@@ -364,9 +378,7 @@ static void field_logger_write_record(
         line,
         "{\"schema\":1,\"timestamp\":\"%s\",\"uptime_ms\":%lu,\"record\":%lu,"
         "\"kind\":\"%s\",\"source\":\"%s\",\"battery_pct\":%u,\"battery_voltage_v\":%.2f,"
-        "\"charging\":%s,\"usb_voltage_v\":%.2f,\"gps_fix\":false,"
-        "\"latitude\":null,\"longitude\":null,\"altitude_m\":null,"
-        "\"temperature_c\":null,\"pressure_hpa\":null,\"humidity_percent\":null,",
+        "\"charging\":%s,\"usb_voltage_v\":%.2f,\"gps_fix\":%s,",
         furi_string_get_cstr(timestamp),
         (unsigned long)uptime_ms,
         (unsigned long)record,
@@ -375,7 +387,26 @@ static void field_logger_write_record(
         battery_pct,
         (double)battery_v,
         charging ? "true" : "false",
-        (double)usb_v);
+        (double)usb_v,
+        phone_location_valid ? "true" : "false");
+    if(phone_location_valid) {
+        furi_string_cat_printf(
+            line,
+            "\"latitude\":%s,\"longitude\":%s,\"altitude_m\":%s,"
+            "\"gps_accuracy_m\":%s,\"gps_timestamp\":%lu,",
+            latitude,
+            longitude,
+            altitude,
+            phone_location.accuracy,
+            (unsigned long)phone_location.unix_time);
+    } else {
+        furi_string_cat(
+            line,
+            "\"latitude\":null,\"longitude\":null,\"altitude_m\":null,"
+            "\"gps_accuracy_m\":null,\"gps_timestamp\":null,");
+    }
+    furi_string_cat(
+        line, "\"temperature_c\":null,\"pressure_hpa\":null,\"humidity_percent\":null,");
     if(rf && rf->valid) {
         furi_string_cat_printf(
             line,
@@ -393,6 +424,17 @@ static void field_logger_write_record(
     field_logger_json_escape(line, note ? note : "");
     furi_string_cat(line, "\"}\n");
     ok = ok && field_logger_write_all(app->jsonl_file, furi_string_get_cstr(line));
+    if(phone_location_valid && app->gpx_file && storage_file_is_open(app->gpx_file)) {
+        furi_string_printf(
+            line,
+            "<trkpt lat=\"%s\" lon=\"%s\"><ele>%s</ele><name>%s %lu</name></trkpt>\n",
+            latitude,
+            longitude,
+            altitude,
+            kind,
+            (unsigned long)record);
+        ok = ok && field_logger_write_all(app->gpx_file, furi_string_get_cstr(line));
+    }
     field_logger_sync_files(app);
 
     with_view_model(
@@ -438,9 +480,9 @@ static bool field_logger_open_files(FieldLoggerApp* app) {
 
     const char* csv_header =
         "schema,timestamp,uptime_ms,record,kind,source,battery_pct,battery_voltage_v,"
-        "charging,usb_voltage_v,gps_fix,latitude,longitude,altitude_m,temperature_c,"
-        "pressure_hpa,humidity_percent,rf_frequency_hz,rf_rssi_dbm,rf_trigger_dbm,"
-        "rf_radio,rf_rx_count,note\n";
+        "charging,usb_voltage_v,gps_fix,latitude,longitude,altitude_m,gps_accuracy_m,"
+        "gps_timestamp,temperature_c,pressure_hpa,humidity_percent,rf_frequency_hz,"
+        "rf_rssi_dbm,rf_trigger_dbm,rf_radio,rf_rx_count,note\n";
     field_logger_write_all(app->csv_file, csv_header);
 
     furi_string_reset(app->line);
@@ -508,7 +550,8 @@ static void field_logger_import_rf(FieldLoggerApp* app) {
 
     FieldLoggerRfObservation observation;
     if(field_logger_read_latest_rf_observation(app, &observation)) {
-        field_logger_write_record(app, "rf_observation", "arf_frequency_analyzer", &observation, observation.note);
+        field_logger_write_record(
+            app, "rf_observation", "arf_frequency_analyzer", &observation, observation.note);
         notification_message(app->notification, &field_logger_sequence_ok);
     } else {
         field_logger_write_record(
@@ -522,6 +565,12 @@ static void field_logger_import_rf(FieldLoggerApp* app) {
 }
 
 static bool field_logger_start_session(FieldLoggerApp* app) {
+    tumoflip_device_services_client_cancel(app->device_services);
+    furi_check(furi_mutex_acquire(app->device_services_mutex, FuriWaitForever) == FuriStatusOk);
+    app->phone_location_valid = false;
+    memset(&app->phone_location, 0, sizeof(app->phone_location));
+    furi_check(furi_mutex_release(app->device_services_mutex) == FuriStatusOk);
+
     with_view_model(
         app->run_view,
         FieldLoggerModel * model,
@@ -554,11 +603,24 @@ static bool field_logger_start_session(FieldLoggerApp* app) {
         },
         true);
     field_logger_write_record(app, "session_start", "field_logger", NULL, "Session started");
+    with_view_model(
+        app->run_view,
+        FieldLoggerModel * model,
+        { strlcpy(model->status, "Getting phone GPS", sizeof(model->status)); },
+        true);
+    if(!tumoflip_device_services_client_request_location(app->device_services, "journal")) {
+        with_view_model(
+            app->run_view,
+            FieldLoggerModel * model,
+            { strlcpy(model->status, "Phone GPS unavailable", sizeof(model->status)); },
+            true);
+    }
     notification_message(app->notification, &field_logger_sequence_ok);
     return true;
 }
 
 static void field_logger_stop_session(FieldLoggerApp* app) {
+    tumoflip_device_services_client_cancel(app->device_services);
     bool was_logging = false;
     with_view_model(
         app->run_view,
@@ -588,6 +650,49 @@ static void field_logger_stop_session(FieldLoggerApp* app) {
             true);
         notification_message(app->notification, &field_logger_sequence_ok);
     }
+}
+
+static void field_logger_device_services_callback(
+    const TumoflipDeviceServicesResult* result,
+    void* context) {
+    FieldLoggerApp* app = context;
+    if(result->request != TumoflipDeviceServicesRequestLocation ||
+       result->code == TumoflipDeviceServicesResultCancelled) {
+        return;
+    }
+
+    furi_check(furi_mutex_acquire(app->device_services_mutex, FuriWaitForever) == FuriStatusOk);
+    app->phone_location_valid = result->code == TumoflipDeviceServicesResultOk;
+    if(app->phone_location_valid) app->phone_location = result->value.location;
+    furi_check(furi_mutex_release(app->device_services_mutex) == FuriStatusOk);
+    view_dispatcher_send_custom_event(app->view_dispatcher, FIELD_LOGGER_EVENT_PHONE_GPS);
+}
+
+static bool field_logger_custom_event_callback(void* context, uint32_t event) {
+    FieldLoggerApp* app = context;
+    if(event != FIELD_LOGGER_EVENT_PHONE_GPS) return false;
+
+    furi_check(furi_mutex_acquire(app->device_services_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool location_valid = app->phone_location_valid;
+    furi_check(furi_mutex_release(app->device_services_mutex) == FuriStatusOk);
+    bool logging = false;
+    with_view_model(
+        app->run_view,
+        FieldLoggerModel * model,
+        {
+            logging = model->logging;
+            if(logging) {
+                strlcpy(
+                    model->status,
+                    location_valid ? "Phone GPS ready" : "Phone GPS unavailable",
+                    sizeof(model->status));
+            }
+        },
+        true);
+    if(logging && location_valid) {
+        field_logger_write_record(app, "gps_fix", "iphone", NULL, "Session phone GPS fix");
+    }
+    return true;
 }
 
 static void field_logger_draw_callback(Canvas* canvas, void* context) {
@@ -737,7 +842,7 @@ static void field_logger_build_about(FieldLoggerApp* app) {
         "Field Logger\n\n"
         "Writes a unified field timeline to CSV, JSONL, and GPX.\n\n"
         "This first increment is receive-only and does not take CC1101 ownership. RF rows import the latest ARF Frequency Analyzer notebook observation when one exists.\n\n"
-        "GPS and BME280 data are delegated to Sensor Logger; missing sources are recorded as unavailable instead of blocking a session.");
+        "A one-shot iPhone GPS fix is added when available. BME280 data remains delegated to Sensor Logger; missing sources never block a session.");
 }
 
 static void field_logger_menu_callback(void* context, uint32_t index) {
@@ -799,9 +904,15 @@ static FieldLoggerApp* field_logger_alloc(void) {
     app->storage = furi_record_open(RECORD_STORAGE);
     app->notification = furi_record_open(RECORD_NOTIFICATION);
     app->view_dispatcher = view_dispatcher_alloc();
+    app->device_services_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
+    app->device_services =
+        tumoflip_device_services_client_alloc(field_logger_device_services_callback, app);
 
     view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
-    view_dispatcher_set_navigation_event_callback(app->view_dispatcher, field_logger_back_callback);
+    view_dispatcher_set_navigation_event_callback(
+        app->view_dispatcher, field_logger_back_callback);
+    view_dispatcher_set_custom_event_callback(
+        app->view_dispatcher, field_logger_custom_event_callback);
     view_dispatcher_set_tick_event_callback(
         app->view_dispatcher, field_logger_tick_callback, FIELD_LOGGER_TICK_MS);
 
@@ -821,7 +932,8 @@ static FieldLoggerApp* field_logger_alloc(void) {
     app->text_box = text_box_alloc();
     text_box_set_font(app->text_box, TextBoxFontText);
     text_box_set_focus(app->text_box, TextBoxFocusStart);
-    view_set_previous_callback(text_box_get_view(app->text_box), field_logger_text_previous_callback);
+    view_set_previous_callback(
+        text_box_get_view(app->text_box), field_logger_text_previous_callback);
 
     app->run_view = view_alloc();
     view_allocate_model(app->run_view, ViewModelTypeLocking, sizeof(FieldLoggerModel));
@@ -840,7 +952,8 @@ static FieldLoggerApp* field_logger_alloc(void) {
         },
         true);
 
-    view_dispatcher_add_view(app->view_dispatcher, FieldLoggerViewMenu, submenu_get_view(app->submenu));
+    view_dispatcher_add_view(
+        app->view_dispatcher, FieldLoggerViewMenu, submenu_get_view(app->submenu));
     view_dispatcher_add_view(app->view_dispatcher, FieldLoggerViewRun, app->run_view);
     view_dispatcher_add_view(
         app->view_dispatcher, FieldLoggerViewText, text_box_get_view(app->text_box));
@@ -852,6 +965,8 @@ static FieldLoggerApp* field_logger_alloc(void) {
 static void field_logger_free(FieldLoggerApp* app) {
     furi_assert(app);
     field_logger_stop_session(app);
+    tumoflip_device_services_client_free(app->device_services);
+    furi_mutex_free(app->device_services_mutex);
     view_dispatcher_remove_view(app->view_dispatcher, FieldLoggerViewText);
     view_dispatcher_remove_view(app->view_dispatcher, FieldLoggerViewRun);
     view_dispatcher_remove_view(app->view_dispatcher, FieldLoggerViewMenu);
