@@ -7,7 +7,7 @@ App(
     provides=["clock_settings_start"],
     stack_size=2 * 1024,
     order=30,
-    fap_libs=["assets"],
+    fap_libs=["assets", "tumoflip_device_services"],
     fap_category="assets",
 )
 
