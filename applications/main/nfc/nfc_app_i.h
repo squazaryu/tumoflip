@@ -263,6 +263,8 @@ void nfc_text_store_set(NfcApp* nfc, const char* text, ...);
 void nfc_text_store_clear(NfcApp* nfc);
 void nfc_request_location_sidecar(NfcApp* nfc);
 
+void nfc_release_location_sidecar_client(NfcApp* nfc);
+
 void nfc_blink_read_start(NfcApp* nfc);
 
 void nfc_blink_emulate_start(NfcApp* nfc);

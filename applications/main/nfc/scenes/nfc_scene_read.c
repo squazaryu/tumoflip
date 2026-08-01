@@ -3,6 +3,7 @@
 
 void nfc_scene_read_on_enter(void* context) {
     NfcApp* instance = context;
+    nfc_release_location_sidecar_client(instance);
     nfc_show_loading_popup(instance, true);
     nfc_supported_cards_load_cache(instance->nfc_supported_cards);
     nfc_show_loading_popup(instance, false);
