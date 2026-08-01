@@ -1,0 +1,23 @@
+Filetype: Flipper NFC device
+Version: 4
+Device type: EMV
+UID: 04 01 02 03
+ATQA: 00 04
+SAK: 20
+Cardholder name: ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+Application name: ABCDEFGHIJKLMNOPQRSTUVWXYZ
+Application label: ABCDEFGHIJKLMNOPQRSTUVWXYZ
+PAN length: 8
+PAN: 12 34 56 78 90 12 34 56
+AID length: 7
+AID: A0 00 00 00 03 10 10
+Application interchange profile: 00 00
+Country code: 06 43
+Currency code: 06 43
+Expiration year: 29
+Expiration month: 12
+Expiration day: 31
+Effective year: 24
+Effective month: 01
+Effective day: 01
+PIN try counter: 3

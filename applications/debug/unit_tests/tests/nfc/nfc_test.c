@@ -14,6 +14,7 @@
 #include <nfc/protocols/mf_classic/mf_classic_poller_sync.h>
 #include <nfc/protocols/felica/felica.h>
 #include <nfc/protocols/felica/felica_poller_sync.h>
+#include <nfc/protocols/emv/emv.h>
 #include <nfc/protocols/mf_classic/mf_classic_poller.h>
 #include <nfc/protocols/iso15693_3/iso15693_3_poller.h>
 #include <nfc/protocols/slix/slix.h>
@@ -33,6 +34,11 @@
 
 #define NFC_TEST_NFC_DEV_PATH                  EXT_PATH("unit_tests/nfc/nfc_device_test.nfc")
 #define NFC_APP_MF_CLASSIC_DICT_UNIT_TEST_PATH EXT_PATH("unit_tests/mf_dict.nfc")
+#define NFC_TEST_EMV_VALID_PATH                EXT_PATH("unit_tests/nfc/Emv_valid.nfc")
+#define NFC_TEST_EMV_LONG_STRINGS_PATH         EXT_PATH("unit_tests/nfc/Emv_long_strings.nfc")
+#define NFC_TEST_EMV_OVERSIZED_PAN_PATH        EXT_PATH("unit_tests/nfc/Emv_oversized_pan.nfc")
+#define NFC_TEST_EMV_OVERSIZED_AID_PATH        EXT_PATH("unit_tests/nfc/Emv_oversized_aid.nfc")
+#define NFC_TEST_EMV_MISSING_AID_PATH          EXT_PATH("unit_tests/nfc/Emv_missing_aid.nfc")
 
 #define NFC_TEST_FLAG_WORKER_DONE (1)
 
@@ -134,6 +140,47 @@ MU_TEST(iso14443_3a_4b_file_test) {
 
 MU_TEST(iso14443_3a_7b_file_test) {
     iso14443_3a_file_test(7);
+}
+
+MU_TEST(emv_file_bounds_test) {
+    NfcDevice* device = nfc_device_alloc();
+
+    mu_assert(nfc_device_load(device, NFC_TEST_EMV_VALID_PATH), "Valid EMV file rejected");
+    const EmvData* data = nfc_device_get_data(device, NfcProtocolEmv);
+    mu_assert(data->emv_application.pan_len == 8, "Valid PAN length changed");
+    mu_assert(data->emv_application.aid_len == 7, "Valid AID length changed");
+    mu_assert(data->emv_application.pin_try_counter == 3, "PIN counter width changed");
+
+    nfc_test_save_and_load(device);
+
+    mu_assert(
+        !nfc_device_load(device, NFC_TEST_EMV_OVERSIZED_PAN_PATH),
+        "Oversized EMV PAN was accepted");
+    mu_assert(
+        !nfc_device_load(device, NFC_TEST_EMV_OVERSIZED_AID_PATH),
+        "Oversized EMV AID was accepted");
+    mu_assert(
+        !nfc_device_load(device, NFC_TEST_EMV_MISSING_AID_PATH),
+        "EMV file without required AID length was accepted");
+
+    mu_assert(
+        nfc_device_load(device, NFC_TEST_EMV_LONG_STRINGS_PATH),
+        "EMV file with cosmetic long strings was rejected");
+    data = nfc_device_get_data(device, NfcProtocolEmv);
+    mu_assert(
+        strlen(data->emv_application.cardholder_name) ==
+            sizeof(data->emv_application.cardholder_name) - 1,
+        "Cardholder name was not bounded");
+    mu_assert(
+        strlen(data->emv_application.application_name) ==
+            sizeof(data->emv_application.application_name) - 1,
+        "Application name was not bounded");
+    mu_assert(
+        strlen(data->emv_application.application_label) ==
+            sizeof(data->emv_application.application_label) - 1,
+        "Application label was not bounded");
+
+    nfc_device_free(device);
 }
 
 MU_TEST(mf_ultralight_file_test) {
@@ -1231,6 +1278,7 @@ MU_TEST_SUITE(nfc) {
 
     MU_RUN_TEST(iso14443_3a_4b_file_test);
     MU_RUN_TEST(iso14443_3a_7b_file_test);
+    MU_RUN_TEST(emv_file_bounds_test);
 
     MU_RUN_TEST(mf_ultralight_file_test);
     MU_RUN_TEST(mf_ultralight_ev1_11_file_test);
