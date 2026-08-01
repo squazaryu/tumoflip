@@ -77,7 +77,7 @@ class NetworkGpsRpcGateTest(unittest.TestCase):
             / "applications_user/flipper_companion/flipper_companion.c"
         ).read_text(encoding="utf-8")
 
-        for capability in ("gps=1", "net=1", "fabric,gps,net"):
+        for capability in ("time=1", "gps=1", "net=1", "fabric,time,gps,net"):
             self.assertIn(capability, runtime)
 
         for contract_token in (

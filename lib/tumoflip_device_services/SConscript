@@ -1,0 +1,14 @@
+Import("env")
+
+env.Append(
+    LINT_SOURCES=[Dir(".")],
+    CPPPATH=["#/lib"],
+)
+
+libenv = env.Clone(FW_LIB_NAME="tumoflip_device_services")
+libenv.ApplyLibFlags()
+
+sources = libenv.GlobRecursive("*.c")
+lib = libenv.StaticLibrary("${FW_LIB_NAME}", sources)
+libenv.Install("${LIB_DIST_DIR}", lib)
+Return("lib")
