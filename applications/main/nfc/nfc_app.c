@@ -5,28 +5,53 @@
 #include <dolphin/dolphin.h>
 #include <loader/firmware_api/firmware_api.h>
 
-#define TAG "NfcApp"
+#define TAG                              "NfcApp"
+#define NFC_LOCATION_SIDECAR_PLUGIN_PATH APP_ASSETS_PATH("plugins/nfc_location_sidecar.fal")
 
-static void
-    nfc_device_services_callback(const TumoflipDeviceServicesResult* result, void* context) {
-    NfcApp* nfc = context;
-    if(result->request == TumoflipDeviceServicesRequestLocation &&
-       result->code == TumoflipDeviceServicesResultOk && !furi_string_empty(nfc->sidecar_path)) {
-        if(!tumoflip_device_services_write_sidecar(
-               nfc->storage,
-               furi_string_get_cstr(nfc->sidecar_path),
-               "nfc",
-               &result->value.location)) {
-            FURI_LOG_W(TAG, "Could not write optional location sidecar");
-        }
+void nfc_release_location_sidecar(NfcApp* nfc) {
+    furi_assert(nfc);
+
+    if(nfc->location_sidecar_session && nfc->location_sidecar_plugin) {
+        nfc->location_sidecar_plugin->stop(nfc->location_sidecar_session);
+    }
+    nfc->location_sidecar_session = NULL;
+    nfc->location_sidecar_plugin = NULL;
+
+    if(nfc->location_sidecar_plugin_manager) {
+        plugin_manager_free(nfc->location_sidecar_plugin_manager);
+        nfc->location_sidecar_plugin_manager = NULL;
     }
 }
 
 void nfc_request_location_sidecar(NfcApp* nfc) {
     furi_assert(nfc);
-    tumoflip_device_services_client_cancel(nfc->device_services);
-    furi_string_set(nfc->sidecar_path, nfc->file_path);
-    tumoflip_device_services_client_request_location(nfc->device_services, "sidecar");
+    nfc_release_location_sidecar(nfc);
+
+    // A protocol FAL is no longer needed once the NFC dump has been saved. Release it before
+    // loading the optional sidecar plugin so both modules never compete for the same heap.
+    if(nfc->protocol_support) {
+        nfc_protocol_support_free(nfc);
+    }
+
+    nfc->location_sidecar_plugin_manager = plugin_manager_alloc(
+        NFC_LOCATION_SIDECAR_PLUGIN_APP_ID,
+        NFC_LOCATION_SIDECAR_PLUGIN_API_VERSION,
+        composite_api_resolver_get(nfc->api_resolver));
+    if(plugin_manager_load_single(
+           nfc->location_sidecar_plugin_manager, NFC_LOCATION_SIDECAR_PLUGIN_PATH) !=
+       PluginManagerErrorNone) {
+        FURI_LOG_W(TAG, "Could not load optional location sidecar plugin");
+        nfc_release_location_sidecar(nfc);
+        return;
+    }
+
+    nfc->location_sidecar_plugin = plugin_manager_get_ep(nfc->location_sidecar_plugin_manager, 0U);
+    nfc->location_sidecar_session =
+        nfc->location_sidecar_plugin->start(nfc->storage, furi_string_get_cstr(nfc->file_path));
+    if(!nfc->location_sidecar_session) {
+        FURI_LOG_W(TAG, "Could not start optional location sidecar plugin");
+        nfc_release_location_sidecar(nfc);
+    }
 }
 
 bool nfc_custom_event_callback(void* context, uint32_t event) {
@@ -64,7 +89,7 @@ static void nfc_app_rpc_command_callback(const RpcAppSystemEvent* event, void* c
 
 NfcApp* nfc_app_alloc(void) {
     NfcApp* instance = malloc(sizeof(NfcApp));
-    instance->tumotag_verify_capture = false;
+    memset(instance, 0, sizeof(NfcApp));
 
     instance->view_dispatcher = view_dispatcher_alloc();
     instance->scene_manager = scene_manager_alloc(&nfc_scene_handlers, instance);
@@ -166,16 +191,13 @@ NfcApp* nfc_app_alloc(void) {
     instance->iso14443_3a_edit_data = iso14443_3a_alloc();
     instance->file_path = furi_string_alloc_set(NFC_APP_FOLDER);
     instance->file_name = furi_string_alloc();
-    instance->sidecar_path = furi_string_alloc();
-    instance->device_services =
-        tumoflip_device_services_client_alloc(nfc_device_services_callback, instance);
 
     return instance;
 }
 
 void nfc_app_free(NfcApp* instance) {
     furi_assert(instance);
-    tumoflip_device_services_client_free(instance->device_services);
+    nfc_release_location_sidecar(instance);
 
     if(instance->rpc_ctx) {
         rpc_system_app_send_exited(instance->rpc_ctx);
@@ -261,7 +283,6 @@ void nfc_app_free(NfcApp* instance) {
     iso14443_3a_free(instance->iso14443_3a_edit_data);
     furi_string_free(instance->file_path);
     furi_string_free(instance->file_name);
-    furi_string_free(instance->sidecar_path);
 
     free(instance);
 }
@@ -396,6 +417,11 @@ bool nfc_load_file(NfcApp* instance, FuriString* path, bool show_dialog) {
     furi_assert(instance);
     furi_assert(path);
     bool result = false;
+
+    // Loading and parsing a saved NFC dump may map a supported-card FAL.
+    // The location client is optional and can retain several KiB of heap after a save, so
+    // release it before entering another memory-sensitive NFC path.
+    nfc_release_location_sidecar(instance);
 
     //nfc_supported_cards_load_cache(instance->nfc_supported_cards);
 
