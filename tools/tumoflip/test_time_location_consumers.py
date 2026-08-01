@@ -51,12 +51,11 @@ class TimeLocationConsumersTest(unittest.TestCase):
         )
         self.assertIn("event->type == InputTypeLong", clock)
         self.assertIn("event->key == InputKeyOk", clock)
-        self.assertIn("model->row == 0U", clock)
         self.assertIn('request_time(instance->device_services, "clock")', clock)
         self.assertIn("tumoflip_device_services_apply_time", clock)
-        self.assertIn('canvas_draw_str(canvas, 0, ROW_0_Y + 15, "Time")', clock)
-        for compact in ('"sync"', '"ok"', '"fail"'):
-            self.assertIn(compact, clock)
+        self.assertIn('canvas_draw_str(canvas, 0, ROW_0_Y + 14, "Time")', clock)
+        for status in ('"Syncing..."', '"Time synced"', '"Sync failed"'):
+            self.assertIn(status, clock)
 
         self.assertIn('request_time(plugin_state->device_services, "totp")', totp)
         self.assertIn("clock_delta <= 10U", totp)
@@ -64,6 +63,31 @@ class TimeLocationConsumersTest(unittest.TestCase):
         self.assertNotIn("tumoflip_device_services_apply_time", totp)
         self.assertIn('"TIME!"', totp_ui)
         self.assertNotIn('"SYNC TIME"', totp_ui)
+
+    def test_clock_long_ok_is_consumed_and_sync_status_uses_a_footer(self) -> None:
+        clock = source(
+            "applications/settings/clock_settings/views/clock_settings_module.c"
+        )
+
+        self.assertIn("bool suppress_ok_short;", clock)
+        self.assertIn("model->suppress_ok_short = true;", clock)
+        self.assertIn(
+            "event->key == InputKeyOk && model->suppress_ok_short", clock
+        )
+        self.assertIn(
+            "event->key == InputKeyOk && event->type == InputTypeShort", clock
+        )
+        self.assertIn(
+            "event->key == InputKeyOk && event->type == InputTypeRepeat", clock
+        )
+        self.assertIn('return "Hold to sync";', clock)
+        self.assertIn('return "Done";', clock)
+        self.assertIn("elements_button_center", clock)
+        self.assertIn("#define ROW_2_Y (39)", clock)
+        self.assertIn("#define ROW_2_H (12)", clock)
+        self.assertNotIn(
+            "canvas_draw_str(canvas, 0, ROW_0_Y + 7, status);", clock
+        )
 
     def test_sidecars_are_transactional_validated_and_do_not_replace_captures(self) -> None:
         common = source("lib/tumoflip_device_services/tumoflip_device_services.c")
