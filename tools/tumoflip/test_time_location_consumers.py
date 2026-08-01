@@ -33,6 +33,9 @@ class TimeLocationConsumersTest(unittest.TestCase):
         self.assertIn('"tumoflip_device_services"', target)
 
     def test_time_sync_is_explicit_and_totp_validation_is_non_mutating(self) -> None:
+        clock_manifest = source(
+            "applications/settings/clock_settings/application.fam"
+        )
         clock = source(
             "applications/settings/clock_settings/views/clock_settings_module.c"
         )
@@ -42,6 +45,10 @@ class TimeLocationConsumersTest(unittest.TestCase):
             "totp_scene_generate_token.c"
         )
 
+        self.assertIn(
+            'fap_libs=["assets", "tumoflip_device_services"]',
+            clock_manifest,
+        )
         self.assertIn("event->type == InputTypeLong", clock)
         self.assertIn("event->key == InputKeyOk", clock)
         self.assertIn("model->row == 0U", clock)
