@@ -107,7 +107,11 @@ class TimeLocationConsumersTest(unittest.TestCase):
 
         consumers = (
             ("applications/main/subghz/subghz.c", "subghz"),
-            ("applications/main/nfc/nfc_app.c", "nfc"),
+            (
+                "applications/main/nfc/plugins/location_sidecar/"
+                "nfc_location_sidecar_plugin.c",
+                "nfc",
+            ),
             ("applications/main/lfrfid/lfrfid.c", "rfid"),
         )
         for relative, kind in consumers:

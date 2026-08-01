@@ -126,20 +126,23 @@ void nfc_protocol_support_alloc(NfcProtocol protocol, void* context) {
     NfcApp* instance = context;
 
     NfcProtocolSupport* protocol_support = malloc(sizeof(NfcProtocolSupport));
+    memset(protocol_support, 0, sizeof(NfcProtocolSupport));
     protocol_support->protocol = protocol;
+    protocol_support->base = &nfc_protocol_support_empty;
 
     const char* protocol_name = nfc_protocol_support_plugin_names[protocol];
-    FuriString* plugin_path =
-        furi_string_alloc_printf(APP_ASSETS_PATH("plugins/nfc_%s.fal"), protocol_name);
-    FURI_LOG_D(TAG, "Loading %s", furi_string_get_cstr(plugin_path));
+    char plugin_path[96];
+    const int path_length = snprintf(
+        plugin_path, sizeof(plugin_path), APP_ASSETS_PATH("plugins/nfc_%s.fal"), protocol_name);
+    furi_check((path_length > 0) && ((size_t)path_length < sizeof(plugin_path)));
+    FURI_LOG_D(TAG, "Loading %s", plugin_path);
 
     protocol_support->plugin_manager = plugin_manager_alloc(
         NFC_PROTOCOL_SUPPORT_PLUGIN_APP_ID,
         NFC_PROTOCOL_SUPPORT_PLUGIN_API_VERSION,
         composite_api_resolver_get(instance->api_resolver));
     do {
-        if(plugin_manager_load_single(
-               protocol_support->plugin_manager, furi_string_get_cstr(plugin_path)) !=
+        if(plugin_manager_load_single(protocol_support->plugin_manager, plugin_path) !=
            PluginManagerErrorNone) {
             break;
         }
@@ -152,13 +155,10 @@ void nfc_protocol_support_alloc(NfcProtocol protocol, void* context) {
 
         protocol_support->base = plugin->base;
     } while(false);
-    if(!protocol_support->base) {
-        protocol_support->base = &nfc_protocol_support_empty;
+    if(protocol_support->base == &nfc_protocol_support_empty) {
         plugin_manager_free(protocol_support->plugin_manager);
         protocol_support->plugin_manager = NULL;
     }
-
-    furi_string_free(plugin_path);
 
     instance->protocol_support = protocol_support;
 }
@@ -305,13 +305,24 @@ static void nfc_protocol_support_scene_read_on_enter(NfcApp* instance) {
     view_dispatcher_switch_to_view(instance->view_dispatcher, NfcViewPopup);
 
     const NfcProtocol protocol = nfc_detected_protocols_get_selected(instance->detected_protocols);
+    const NfcProtocolSupportBase* protocol_base = nfc_protocol_support_get(protocol, instance);
+    if(protocol_base == &nfc_protocol_support_empty) {
+        FURI_LOG_E(TAG, "Could not load NFC protocol support");
+        dialog_message_show_storage_error(instance->dialogs, "Cannot load\nNFC module");
+        nfc_protocol_support_free(instance);
+
+        static const uint32_t previous_scenes[] = {NfcSceneSelectProtocol, NfcSceneStart};
+        scene_manager_search_and_switch_to_previous_scene_one_of(
+            instance->scene_manager, previous_scenes, COUNT_OF(previous_scenes));
+        return;
+    }
     instance->poller = nfc_poller_alloc(instance->nfc, protocol);
 
     view_dispatcher_switch_to_view(instance->view_dispatcher, NfcViewPopup);
     //nfc_supported_cards_load_cache(instance->nfc_supported_cards);
 
     // Start poller with the appropriate callback
-    nfc_protocol_support_get(protocol, instance)->scene_read.on_enter(instance);
+    protocol_base->scene_read.on_enter(instance);
 
     nfc_blink_read_start(instance);
 }

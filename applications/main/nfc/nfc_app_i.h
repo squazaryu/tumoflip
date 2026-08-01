@@ -11,7 +11,6 @@
 #include <gui/view_dispatcher.h>
 #include <gui/scene_manager.h>
 #include <notification/notification_messages.h>
-#include <tumoflip_device_services/tumoflip_device_services.h>
 
 #include <gui/modules/submenu.h>
 #include <gui/modules/dialog_ex.h>
@@ -39,8 +38,10 @@
 #include "helpers/nfc_supported_cards.h"
 #include "helpers/felica_auth.h"
 #include "helpers/slix_unlock.h"
+#include "plugins/location_sidecar/nfc_location_sidecar_plugin.h"
 
 #include <flipper_application/plugins/composite_resolver.h>
+#include <flipper_application/plugins/plugin_manager.h>
 #include <loader/loader.h>
 #include <dialogs/dialogs.h>
 #include <storage/storage.h>
@@ -227,8 +228,9 @@ struct NfcApp {
     Iso14443_3aData* iso14443_3a_edit_data;
     FuriString* file_path;
     FuriString* file_name;
-    FuriString* sidecar_path;
-    TumoflipDeviceServicesClient* device_services;
+    PluginManager* location_sidecar_plugin_manager;
+    const NfcLocationSidecarPlugin* location_sidecar_plugin;
+    NfcLocationSidecarSession* location_sidecar_session;
     FuriTimer* timer;
     bool tumotag_verify_capture;
 };
@@ -263,7 +265,7 @@ void nfc_text_store_set(NfcApp* nfc, const char* text, ...);
 void nfc_text_store_clear(NfcApp* nfc);
 void nfc_request_location_sidecar(NfcApp* nfc);
 
-void nfc_release_location_sidecar_client(NfcApp* nfc);
+void nfc_release_location_sidecar(NfcApp* nfc);
 
 void nfc_blink_read_start(NfcApp* nfc);
 
