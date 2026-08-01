@@ -14,6 +14,13 @@
 #include "../workers/bt_type_code/bt_type_code.h"
 #endif
 #include "crypto_settings.h"
+#include <tumoflip_device_services/tumoflip_device_services.h>
+
+typedef enum {
+    TotpTimeValidationUnknown,
+    TotpTimeValidationValid,
+    TotpTimeValidationMismatch,
+} TotpTimeValidation;
 
 /**
  * @brief Application state structure
@@ -43,6 +50,12 @@ typedef struct {
      * @brief Timezone UTC offset in hours 
      */
     float timezone_offset;
+
+    /**
+     * @brief Live comparison of Flipper RTC/timezone with the iPhone clock.
+     */
+    volatile TotpTimeValidation time_validation;
+    TumoflipDeviceServicesClient* device_services;
 
     /**
      * @brief Config file context

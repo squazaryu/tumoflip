@@ -12,6 +12,7 @@
 #include <storage/storage.h>
 #include <bt/bt_service/bt.h>
 #include <expansion/expansion.h>
+#include <tumoflip_device_services/tumoflip_device_services.h>
 
 #include "wifi_mapper_insights.h"
 #include "wifi_mapper_inspector.h"
@@ -305,6 +306,7 @@ typedef struct {
     char gps_longitude[WIFI_MAPPER_GEO_SIZE];
     char gps_altitude[WIFI_MAPPER_GEO_SIZE];
     char gps_accuracy[WIFI_MAPPER_GEO_SIZE];
+    uint32_t gps_unix_time;
     WiFiMapperScanMode scan_mode;
     WiFiMapperExportMode export_mode;
     WiFiMapperSessionStats session;
@@ -594,6 +596,16 @@ static void wifi_mapper_close_log(WiFiMapperApp* app) {
         if(storage_common_rename(app->storage, app->log_temp_path, app->log_path) != FSE_OK) {
             strlcpy(app->status, "Commit error", sizeof(app->status));
             app->errors++;
+        } else if(app->gps_state == WiFiMapperGpsReady) {
+            TumoflipDeviceLocation location = {
+                .unix_time = app->gps_unix_time,
+            };
+            strlcpy(location.latitude, app->gps_latitude, sizeof(location.latitude));
+            strlcpy(location.longitude, app->gps_longitude, sizeof(location.longitude));
+            strlcpy(location.altitude, app->gps_altitude, sizeof(location.altitude));
+            strlcpy(location.accuracy, app->gps_accuracy, sizeof(location.accuracy));
+            tumoflip_device_services_write_sidecar(
+                app->storage, app->log_path, "wifi_survey", &location);
         }
     }
 }
@@ -2290,8 +2302,11 @@ static void wifi_mapper_handle_gps_response(WiFiMapperApp* app, const BtAppBridg
     char longitude[WIFI_MAPPER_GEO_SIZE];
     char altitude[WIFI_MAPPER_GEO_SIZE];
     char accuracy[WIFI_MAPPER_GEO_SIZE];
+    char timestamp[16];
     float parsed_altitude = 0.0f;
     float parsed_accuracy = 0.0f;
+    unsigned long parsed_timestamp = 0UL;
+    char* timestamp_end = NULL;
     const char* response = (const char*)app->gps_response;
     const bool valid =
         wifi_mapper_copy_bridge_field(response, "schema", schema, sizeof(schema)) &&
@@ -2300,14 +2315,18 @@ static void wifi_mapper_handle_gps_response(WiFiMapperApp* app, const BtAppBridg
         wifi_mapper_copy_bridge_field(response, "lon", longitude, sizeof(longitude)) &&
         wifi_mapper_copy_bridge_field(response, "alt", altitude, sizeof(altitude)) &&
         wifi_mapper_copy_bridge_field(response, "acc", accuracy, sizeof(accuracy)) &&
+        wifi_mapper_copy_bridge_field(response, "ts", timestamp, sizeof(timestamp)) &&
         wifi_mapper_geo_coordinates_valid(latitude, longitude) &&
         wifi_mapper_geo_parse(altitude, &parsed_altitude) &&
         wifi_mapper_geo_parse(accuracy, &parsed_accuracy) && (parsed_altitude >= -2000.0f) &&
         (parsed_altitude <= 100000.0f) && (parsed_accuracy >= 0.0f) &&
-        (parsed_accuracy <= 100000.0f);
+        (parsed_accuracy <= 100000.0f) &&
+        ((parsed_timestamp = strtoul(timestamp, &timestamp_end, 10)) >= 946684800UL) &&
+        (parsed_timestamp <= 4102444799UL) && timestamp_end && (*timestamp_end == '\0');
 
     app->gps_pending_request_id = 0U;
     if(valid) {
+        app->gps_unix_time = (uint32_t)parsed_timestamp;
         strlcpy(app->gps_latitude, latitude, sizeof(app->gps_latitude));
         strlcpy(app->gps_longitude, longitude, sizeof(app->gps_longitude));
         strlcpy(app->gps_altitude, altitude, sizeof(app->gps_altitude));
@@ -2349,6 +2368,7 @@ static void wifi_mapper_request_phone_location(WiFiMapperApp* app) {
     app->gps_longitude[0] = '\0';
     app->gps_altitude[0] = '\0';
     app->gps_accuracy[0] = '\0';
+    app->gps_unix_time = 0U;
     app->gps_state = WiFiMapperGpsWaiting;
     const uint32_t request_id = app->gps_pending_request_id;
     furi_check(furi_mutex_release(app->mutex) == FuriStatusOk);

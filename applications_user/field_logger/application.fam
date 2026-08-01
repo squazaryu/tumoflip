@@ -4,7 +4,7 @@ App(
     apptype=FlipperAppType.EXTERNAL,
     targets=["f7"],
     entry_point="field_logger_app",
-    requires=["gui", "storage", "notification"],
+    requires=["gui", "storage", "notification", "bt"],
     stack_size=5 * 1024,
     icon="A_GPIO_14",
     fap_icon="icon.png",
@@ -14,4 +14,5 @@ App(
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip",
     fap_description="Unified field timeline logger for battery, session metadata, optional Sensor Logger context, and receive-only ARF Frequency Analyzer notebook observations.",
+    fap_libs=["tumoflip_device_services"],
 )

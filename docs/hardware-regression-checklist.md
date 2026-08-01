@@ -149,6 +149,11 @@ are legally allowed to test.
 ### BLE App Bridge And Runtime
 
 - Pair/connect with the iOS companion.
+- Open `Settings -> Clock`, select the Time row, hold `OK`, and confirm the
+  small `sync` indicator changes to `ok` and the Flipper time matches iPhone.
+- Change the Flipper clock by at least one minute, open Authenticator, and
+  confirm `TIME!` appears; resynchronize in Clock and confirm the warning is
+  absent after reopening Authenticator.
 - Confirm legacy FAB1-compatible traffic still works where applicable.
 - Query FAB2 Runtime capabilities.
 - Query FAB2 Runtime status and confirm firmware identity, API, transfer field,
@@ -166,7 +171,14 @@ are legally allowed to test.
   `OK` to add a manual sample, press `Right` to import the latest ARF
   Frequency Analyzer notebook observation or record the missing-source state,
   then press `Back` and confirm CSV/JSONL/GPX files exist under
-  `/ext/apps_data/field_logger/sessions`.
+  `/ext/apps_data/field_logger/sessions` and contain the iPhone fix when phone
+  location sharing is enabled.
+- Save one `.sub`, `.nfc`, and `.rfid` capture and confirm each primary file is
+  unchanged and has a valid adjacent `<source>.tumoflip.json` sidecar. Disable
+  location sharing and repeat one save; the capture must still succeed without
+  creating or corrupting a sidecar.
+- Complete one TumoSurvey session and save one TumoSpectrum report; confirm
+  their committed output has an adjacent location sidecar when GPS is enabled.
 - Query Runtime `twin` and confirm Device Twin fields reflect live firmware,
   SD/package, battery, Radio Broker, and App Bridge owner state.
 - Send a small Runtime command and verify a response or explicit error frame.

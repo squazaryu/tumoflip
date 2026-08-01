@@ -24,4 +24,5 @@ App(
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip",
     fap_description="Autonomous receive-only Band Map, Smart RAW capture, on-device .tproto building, live decoding, comparison and notebook reports.",
+    fap_libs=["tumoflip_device_services"],
 )

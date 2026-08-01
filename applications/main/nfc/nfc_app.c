@@ -5,6 +5,30 @@
 #include <dolphin/dolphin.h>
 #include <loader/firmware_api/firmware_api.h>
 
+#define TAG "NfcApp"
+
+static void
+    nfc_device_services_callback(const TumoflipDeviceServicesResult* result, void* context) {
+    NfcApp* nfc = context;
+    if(result->request == TumoflipDeviceServicesRequestLocation &&
+       result->code == TumoflipDeviceServicesResultOk && !furi_string_empty(nfc->sidecar_path)) {
+        if(!tumoflip_device_services_write_sidecar(
+               nfc->storage,
+               furi_string_get_cstr(nfc->sidecar_path),
+               "nfc",
+               &result->value.location)) {
+            FURI_LOG_W(TAG, "Could not write optional location sidecar");
+        }
+    }
+}
+
+void nfc_request_location_sidecar(NfcApp* nfc) {
+    furi_assert(nfc);
+    tumoflip_device_services_client_cancel(nfc->device_services);
+    furi_string_set(nfc->sidecar_path, nfc->file_path);
+    tumoflip_device_services_client_request_location(nfc->device_services, "sidecar");
+}
+
 bool nfc_custom_event_callback(void* context, uint32_t event) {
     furi_assert(context);
     NfcApp* nfc = context;
@@ -142,12 +166,16 @@ NfcApp* nfc_app_alloc(void) {
     instance->iso14443_3a_edit_data = iso14443_3a_alloc();
     instance->file_path = furi_string_alloc_set(NFC_APP_FOLDER);
     instance->file_name = furi_string_alloc();
+    instance->sidecar_path = furi_string_alloc();
+    instance->device_services =
+        tumoflip_device_services_client_alloc(nfc_device_services_callback, instance);
 
     return instance;
 }
 
 void nfc_app_free(NfcApp* instance) {
     furi_assert(instance);
+    tumoflip_device_services_client_free(instance->device_services);
 
     if(instance->rpc_ctx) {
         rpc_system_app_send_exited(instance->rpc_ctx);
@@ -233,6 +261,7 @@ void nfc_app_free(NfcApp* instance) {
     iso14443_3a_free(instance->iso14443_3a_edit_data);
     furi_string_free(instance->file_path);
     furi_string_free(instance->file_name);
+    furi_string_free(instance->sidecar_path);
 
     free(instance);
 }

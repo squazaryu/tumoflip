@@ -295,21 +295,26 @@ void totp_scene_generate_token_render(Canvas* const canvas, PluginState* plugin_
     const TokenInfo* token_info = totp_token_info_iterator_get_current_token(iterator_context);
     const char* token_name_cstr = furi_string_get_cstr(token_info->name);
     uint16_t token_name_width = canvas_string_width(canvas, token_name_cstr);
+    const int32_t token_name_y = plugin_state->time_validation == TotpTimeValidationMismatch ?
+                                     SCREEN_HEIGHT_CENTER - 15 :
+                                     SCREEN_HEIGHT_CENTER - 20;
     if(SCREEN_WIDTH - token_name_width > 18) {
         canvas_draw_str_aligned(
-            canvas,
-            SCREEN_WIDTH_CENTER,
-            SCREEN_HEIGHT_CENTER - 20,
-            AlignCenter,
-            AlignCenter,
-            token_name_cstr);
+            canvas, SCREEN_WIDTH_CENTER, token_name_y, AlignCenter, AlignCenter, token_name_cstr);
     } else {
-        canvas_draw_str_aligned(
-            canvas, 9, SCREEN_HEIGHT_CENTER - 20, AlignLeft, AlignCenter, token_name_cstr);
+        canvas_draw_str_aligned(canvas, 9, token_name_y, AlignLeft, AlignCenter, token_name_cstr);
         canvas_set_color(canvas, ColorWhite);
         canvas_draw_box(canvas, 0, SCREEN_HEIGHT_CENTER - 24, 9, 9);
         canvas_draw_box(canvas, SCREEN_WIDTH - 10, SCREEN_HEIGHT_CENTER - 24, 9, 9);
         canvas_set_color(canvas, ColorBlack);
+    }
+
+    if(plugin_state->time_validation == TotpTimeValidationMismatch) {
+        canvas_set_color(canvas, ColorWhite);
+        canvas_draw_box(canvas, 49, 0, 30, 9);
+        canvas_set_color(canvas, ColorBlack);
+        canvas_set_font(canvas, FontSecondary);
+        canvas_draw_str_aligned(canvas, 64, 8, AlignCenter, AlignBottom, "TIME!");
     }
 
     draw_totp_code(canvas, plugin_state);

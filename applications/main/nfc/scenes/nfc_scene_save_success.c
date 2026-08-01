@@ -7,6 +7,7 @@ void nfc_scene_save_success_popup_callback(void* context) {
 
 void nfc_scene_save_success_on_enter(void* context) {
     NfcApp* nfc = context;
+    nfc_request_location_sidecar(nfc);
 
     // Setup view
     Popup* popup = nfc->popup;
