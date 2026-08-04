@@ -95,6 +95,10 @@ bool desktop_scene_locked_on_event(void* context, SceneManagerEvent event) {
             desktop_view_locked_update(desktop->locked_view);
             consumed = true;
             break;
+        case DesktopLockedEventClockUpdate:
+            desktop_view_locked_update_clock(desktop->locked_view);
+            consumed = true;
+            break;
         case DesktopLockedEventShowPinInput:
             scene_manager_next_scene(desktop->scene_manager, DesktopScenePinInput);
             consumed = true;

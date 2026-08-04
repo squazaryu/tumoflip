@@ -1,17 +1,21 @@
 #include <furi.h>
+#include <furi_hal.h>
 
 #include <gui/elements.h>
 #include <gui/icon.h>
 #include <gui/view.h>
+#include <locale/locale.h>
 
 #include <assets_icons.h>
 
 #include "../desktop_i.h"
 #include "desktop_view_locked.h"
 
-#define DOOR_MOVING_INTERVAL_MS  (1000 / 16)
-#define LOCKED_HINT_TIMEOUT_MS   (1000)
-#define UNLOCKED_HINT_TIMEOUT_MS (2000)
+#define DOOR_MOVING_INTERVAL_MS           (1000 / 16)
+#define LOCKED_HINT_TIMEOUT_MS            (1000)
+#define UNLOCKED_HINT_TIMEOUT_MS          (2000)
+#define LOCKSCREEN_CLOCK_UPDATE_MS        (1000)
+#define LOCKSCREEN_BATTERY_UPDATE_SECONDS (30)
 
 #define DOOR_OFFSET_START (-55)
 #define DOOR_OFFSET_END   (0)
@@ -28,9 +32,12 @@ struct DesktopViewLocked {
     void* context;
 
     FuriTimer* timer;
+    FuriTimer* clock_timer;
     uint8_t lock_count;
     uint32_t lock_lastpress;
+    uint8_t battery_refresh_tick;
     bool skip_animation;
+    bool clock_enabled;
 };
 
 typedef enum {
@@ -43,6 +50,9 @@ typedef enum {
 
 typedef struct {
     bool pin_locked;
+    bool clock_enabled;
+    DateTime clock_datetime;
+    uint8_t battery_pct;
     int8_t door_offset;
     DesktopViewLockedState view_state;
 } DesktopViewLockedModel;
@@ -62,6 +72,38 @@ static void locked_view_timer_callback(void* context) {
     locked_view->callback(DesktopLockedEventUpdate, locked_view->context);
 }
 
+static void locked_view_clock_timer_callback(void* context) {
+    DesktopViewLocked* locked_view = context;
+    if(locked_view->callback) {
+        locked_view->callback(DesktopLockedEventClockUpdate, locked_view->context);
+    }
+}
+
+static void desktop_view_locked_refresh_clock(DesktopViewLocked* locked_view) {
+    if(!locked_view->clock_enabled) return;
+
+    DesktopViewLockedModel* model = view_get_model(locked_view->view);
+    furi_hal_rtc_get_datetime(&model->clock_datetime);
+    if(locked_view->battery_refresh_tick == 0) {
+        model->battery_pct = MIN(furi_hal_power_get_pct(), 100);
+    }
+    locked_view->battery_refresh_tick =
+        (locked_view->battery_refresh_tick + 1) % LOCKSCREEN_BATTERY_UPDATE_SECONDS;
+    view_commit_model(locked_view->view, true);
+}
+
+static void desktop_view_locked_clock_start(DesktopViewLocked* locked_view) {
+    if(!locked_view->clock_enabled) return;
+
+    locked_view->battery_refresh_tick = 0;
+    desktop_view_locked_refresh_clock(locked_view);
+    furi_timer_start(locked_view->clock_timer, furi_ms_to_ticks(LOCKSCREEN_CLOCK_UPDATE_MS));
+}
+
+static void desktop_view_locked_clock_stop(DesktopViewLocked* locked_view) {
+    furi_timer_stop(locked_view->clock_timer);
+}
+
 static void desktop_view_locked_doors_draw(Canvas* canvas, DesktopViewLockedModel* model) {
     int32_t offset = model->door_offset;
     int32_t door_left_x = DOOR_L_FINAL_POS + offset;
@@ -79,6 +121,68 @@ static bool desktop_view_locked_doors_move(DesktopViewLockedModel* model) {
     }
 
     return stop;
+}
+
+static void desktop_view_locked_clock_draw(Canvas* canvas, DesktopViewLockedModel* model) {
+    const DateTime* datetime = &model->clock_datetime;
+    const bool format_12h = locale_get_time_format() == LocaleTimeFormat12h;
+    uint8_t hour = datetime->hour;
+    const char* meridian = NULL;
+
+    if(format_12h) {
+        meridian = hour >= 12 ? "PM" : "AM";
+        hour %= 12;
+        if(hour == 0) hour = 12;
+    }
+
+    char time[12];
+    snprintf(time, sizeof(time), "%02u:%02u:%02u", hour, datetime->minute, datetime->second);
+
+    char date[16];
+    const LocaleDateFormat date_format = locale_get_date_format();
+    if(date_format == LocaleDateFormatMDY) {
+        snprintf(
+            date, sizeof(date), "%02u.%02u.%04u", datetime->month, datetime->day, datetime->year);
+    } else if(date_format == LocaleDateFormatYMD) {
+        snprintf(
+            date, sizeof(date), "%04u.%02u.%02u", datetime->year, datetime->month, datetime->day);
+    } else {
+        snprintf(
+            date, sizeof(date), "%02u.%02u.%04u", datetime->day, datetime->month, datetime->year);
+    }
+
+    char details[28];
+    if(format_12h) {
+        snprintf(details, sizeof(details), "%s  %u%%  %s", date, model->battery_pct, meridian);
+    } else {
+        snprintf(details, sizeof(details), "%s  %u%%", date, model->battery_pct);
+    }
+
+    canvas_set_color(canvas, ColorWhite);
+    canvas_draw_box(
+        canvas,
+        0,
+        STATUS_BAR_Y_SHIFT,
+        canvas_width(canvas),
+        canvas_height(canvas) - STATUS_BAR_Y_SHIFT);
+    canvas_set_color(canvas, ColorBlack);
+
+    canvas_set_font(canvas, FontBigNumbers);
+    canvas_draw_str_aligned(canvas, 64, 34, AlignCenter, AlignCenter, time);
+
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(canvas, 64, 53, AlignCenter, AlignCenter, details);
+}
+
+static void desktop_view_locked_clock_clear(Canvas* canvas) {
+    canvas_set_color(canvas, ColorWhite);
+    canvas_draw_box(
+        canvas,
+        0,
+        STATUS_BAR_Y_SHIFT,
+        canvas_width(canvas),
+        canvas_height(canvas) - STATUS_BAR_Y_SHIFT);
+    canvas_set_color(canvas, ColorBlack);
 }
 
 static void desktop_view_locked_update_hint_icon_timeout(DesktopViewLocked* locked_view) {
@@ -117,6 +221,12 @@ static void desktop_view_locked_draw(Canvas* canvas, void* model) {
     DesktopViewLockedModel* m = model;
     DesktopViewLockedState view_state = m->view_state;
     canvas_set_color(canvas, ColorBlack);
+
+    if(m->clock_enabled && view_state == DesktopViewLockedStateLocked) {
+        desktop_view_locked_clock_draw(canvas, m);
+    } else if(m->clock_enabled && view_state == DesktopViewLockedStateLockedHintShown) {
+        desktop_view_locked_clock_clear(canvas);
+    }
 
     if(view_state == DesktopViewLockedStateDoorsClosing) {
         desktop_view_locked_doors_draw(canvas, m);
@@ -194,9 +304,15 @@ static bool desktop_view_locked_input(InputEvent* event, void* context) {
 DesktopViewLocked* desktop_view_locked_alloc(void) {
     DesktopViewLocked* locked_view = malloc(sizeof(DesktopViewLocked));
     locked_view->view = view_alloc();
+    locked_view->callback = NULL;
+    locked_view->context = NULL;
+    locked_view->battery_refresh_tick = 0;
     locked_view->skip_animation = false;
+    locked_view->clock_enabled = false;
     locked_view->timer =
         furi_timer_alloc(locked_view_timer_callback, FuriTimerTypePeriodic, locked_view);
+    locked_view->clock_timer =
+        furi_timer_alloc(locked_view_clock_timer_callback, FuriTimerTypePeriodic, locked_view);
 
     view_allocate_model(locked_view->view, ViewModelTypeLocking, sizeof(DesktopViewLockedModel));
     view_set_context(locked_view->view, locked_view);
@@ -208,6 +324,7 @@ DesktopViewLocked* desktop_view_locked_alloc(void) {
 
 void desktop_view_locked_free(DesktopViewLocked* locked_view) {
     furi_assert(locked_view);
+    furi_timer_free(locked_view->clock_timer);
     furi_timer_free(locked_view->timer);
     view_free(locked_view->view);
     free(locked_view);
@@ -216,6 +333,30 @@ void desktop_view_locked_free(DesktopViewLocked* locked_view) {
 void desktop_view_locked_set_skip_animation(DesktopViewLocked* locked_view, bool skip_animation) {
     furi_assert(locked_view);
     locked_view->skip_animation = skip_animation;
+}
+
+void desktop_view_locked_set_clock_enabled(DesktopViewLocked* locked_view, bool clock_enabled) {
+    furi_assert(locked_view);
+    locked_view->clock_enabled = clock_enabled;
+
+    DesktopViewLockedModel* model = view_get_model(locked_view->view);
+    model->clock_enabled = clock_enabled;
+    const DesktopViewLockedState view_state = model->view_state;
+    view_commit_model(locked_view->view, true);
+
+    if(!clock_enabled) {
+        desktop_view_locked_clock_stop(locked_view);
+    } else if(
+        view_state == DesktopViewLockedStateLocked ||
+        view_state == DesktopViewLockedStateDoorsClosing ||
+        view_state == DesktopViewLockedStateLockedHintShown) {
+        desktop_view_locked_clock_start(locked_view);
+    }
+}
+
+void desktop_view_locked_update_clock(DesktopViewLocked* locked_view) {
+    furi_assert(locked_view);
+    desktop_view_locked_refresh_clock(locked_view);
 }
 
 void desktop_view_locked_close_doors(DesktopViewLocked* locked_view) {
@@ -241,9 +382,12 @@ void desktop_view_locked_lock(DesktopViewLocked* locked_view, bool pin_locked) {
     model->view_state = DesktopViewLockedStateLocked;
     model->pin_locked = pin_locked;
     view_commit_model(locked_view->view, true);
+
+    desktop_view_locked_clock_start(locked_view);
 }
 
 void desktop_view_locked_unlock(DesktopViewLocked* locked_view) {
+    desktop_view_locked_clock_stop(locked_view);
     locked_view->lock_count = 0;
     DesktopViewLockedModel* model = view_get_model(locked_view->view);
     model->view_state = DesktopViewLockedStateUnlockedHintShown;

@@ -243,6 +243,8 @@ static void desktop_apply_settings(Desktop* desktop) {
 
     desktop_view_locked_set_skip_animation(
         desktop->locked_view, desktop->settings.lockscreen_skip_animation);
+    desktop_view_locked_set_clock_enabled(
+        desktop->locked_view, desktop->settings.lockscreen_clock_enabled);
     desktop_clock_reconfigure(desktop);
 
     if(!desktop->app_running && !desktop->locked) {

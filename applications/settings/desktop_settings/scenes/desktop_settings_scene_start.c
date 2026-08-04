@@ -13,6 +13,7 @@ typedef enum {
     DesktopSettingsAutoLockDelay,
     DesktopSettingsAutoPowerOff,
     DesktopSettingsLockAnimation,
+    DesktopSettingsLockScreen,
     DesktopSettingsBatteryDisplay,
     DesktopSettingsClockDisplay,
     DesktopSettingsMainMenuStyle,
@@ -57,6 +58,14 @@ const char* const lock_animation_text[LOCK_ANIMATION_COUNT] = {
 };
 
 const uint32_t lockscreen_skip_animation_value[LOCK_ANIMATION_COUNT] = {0, 1};
+
+#define LOCK_SCREEN_COUNT 2
+const char* const lock_screen_text[LOCK_SCREEN_COUNT] = {
+    "Wallpaper",
+    "Clock",
+};
+
+const uint32_t lock_screen_value[LOCK_SCREEN_COUNT] = {0, 1};
 
 #define CLOCK_ENABLE_COUNT 2
 const char* const clock_enable_text[CLOCK_ENABLE_COUNT] = {
@@ -130,6 +139,14 @@ static void desktop_settings_scene_start_lock_animation_changed(VariableItem* it
     app->settings.lockscreen_skip_animation = lockscreen_skip_animation_value[index];
 }
 
+static void desktop_settings_scene_start_lock_screen_changed(VariableItem* item) {
+    DesktopSettingsApp* app = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+
+    variable_item_set_current_value_text(item, lock_screen_text[index]);
+    app->settings.lockscreen_clock_enabled = lock_screen_value[index];
+}
+
 void desktop_settings_scene_start_on_enter(void* context) {
     DesktopSettingsApp* app = context;
     VariableItemList* variable_item_list = app->variable_item_list;
@@ -179,6 +196,18 @@ void desktop_settings_scene_start_on_enter(void* context) {
         LOCK_ANIMATION_COUNT);
     variable_item_set_current_value_index(item, value_index);
     variable_item_set_current_value_text(item, lock_animation_text[value_index]);
+
+    item = variable_item_list_add(
+        variable_item_list,
+        "Lock Screen",
+        LOCK_SCREEN_COUNT,
+        desktop_settings_scene_start_lock_screen_changed,
+        app);
+
+    value_index = value_index_uint32(
+        app->settings.lockscreen_clock_enabled, lock_screen_value, LOCK_SCREEN_COUNT);
+    variable_item_set_current_value_index(item, value_index);
+    variable_item_set_current_value_text(item, lock_screen_text[value_index]);
 
     item = variable_item_list_add(
         variable_item_list,

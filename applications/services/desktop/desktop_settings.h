@@ -33,6 +33,7 @@ typedef struct {
     uint8_t displayBatteryPercentage;
     uint8_t display_clock;
     uint8_t lockscreen_skip_animation;
+    uint8_t lockscreen_clock_enabled;
     FavoriteApp favorite_apps[FavoriteAppNumber];
 } DesktopSettings;
 
