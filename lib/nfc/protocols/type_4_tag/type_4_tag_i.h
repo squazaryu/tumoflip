@@ -4,11 +4,14 @@
 
 // ISO SELECT FILE command and parameters
 #define TYPE_4_TAG_ISO_SELECT_CMD         0x00, 0xA4
-#define TYPE_4_TAG_ISO_SELECT_P1_BY_NAME  (0x04)
-#define TYPE_4_TAG_ISO_SELECT_P1_BY_EF_ID (0x02)
-#define TYPE_4_TAG_ISO_SELECT_P1_BY_ID    (0x00)
-#define TYPE_4_TAG_ISO_SELECT_P2_EMPTY    (0x0C)
-#define TYPE_4_TAG_ISO_SELECT_LE_EMPTY    (0x00)
+#define TYPE_4_TAG_ISO_SELECT_P1_BY_NAME        (0x04)
+// P1=0x00 is accepted by cards that reject the narrower DF-scoped 0x02 selector.
+#define TYPE_4_TAG_ISO_SELECT_P1_BY_EF_ID       (0x00)
+#define TYPE_4_TAG_ISO_SELECT_P1_BY_ID          (0x00)
+// Keep accepting the legacy selector while emulating a Type 4 Tag.
+#define TYPE_4_TAG_ISO_SELECT_P1_BY_EF_ID_IN_DF (0x02)
+#define TYPE_4_TAG_ISO_SELECT_P2_EMPTY          (0x0C)
+#define TYPE_4_TAG_ISO_SELECT_LE_EMPTY          (0x00)
 
 // ISO READ BINARY command and parameters
 #define TYPE_4_TAG_ISO_READ_CMD          0x00, 0xB0
