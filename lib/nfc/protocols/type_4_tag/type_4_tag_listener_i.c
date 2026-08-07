@@ -51,7 +51,8 @@ static Type4TagError type_4_tag_listener_iso_select(
         }
 
     } else if(
-        (p1 == TYPE_4_TAG_ISO_SELECT_P1_BY_ID || p1 == TYPE_4_TAG_ISO_SELECT_P1_BY_EF_ID) &&
+        (p1 == TYPE_4_TAG_ISO_SELECT_P1_BY_ID ||
+         p1 == TYPE_4_TAG_ISO_SELECT_P1_BY_EF_ID_IN_DF) &&
         lc == TYPE_4_TAG_ISO_ID_LEN) {
         uint16_t id = bit_lib_bytes_to_num_be(data, sizeof(uint16_t));
 
