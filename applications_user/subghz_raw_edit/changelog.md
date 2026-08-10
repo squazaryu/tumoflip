@@ -1,3 +1,8 @@
+## Post-v1.7 Tumoflip sync
+
+- Replaced free-text merge settings with bounded NumberInput controls.
+- Allowed a 0 ms manual merge gap without adding an artificial separator.
+
 ## v1.7
 
 - Extended the configurable merge gap to 1-1000 ms.
