@@ -16,6 +16,7 @@ try:
         ARF_VISIBLE_APP_IDS,
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
+        MODULE_ONE_LEGACY_PATHS,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
         ValidationError,
@@ -35,6 +36,7 @@ except ImportError:
         ARF_VISIBLE_APP_IDS,
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
+        MODULE_ONE_LEGACY_PATHS,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
         ValidationError,
@@ -265,6 +267,19 @@ class ValidateReleaseTest(unittest.TestCase):
             "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
             MODULE_ONE_PACKAGE_FILES,
         )
+        self.assertIn(
+            "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+            MODULE_ONE_PACKAGE_FILES,
+        )
+        self.assertEqual(
+            MODULE_ONE_LEGACY_PATHS["/ext/apps/GPIO/esp_flasher.fap"],
+            "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+        )
+        flasher_manifest = (
+            REPO_ROOT / "applications_user/esp_flasher/application.fam"
+        ).read_text(encoding="utf-8")
+        self.assertIn('appid="esp_flasher"', flasher_manifest)
+        self.assertIn('fap_category="Module One/ESP32 Wi-Fi"', flasher_manifest)
         self.assertIn(
             "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
             MODULE_ONE_PACKAGE_FILES,

@@ -86,6 +86,7 @@ jobs:
             tools/tumoflip/test_package_release.py \
             tools/tumoflip/test_readme_version_sync.py \
             tools/tumoflip/test_validate_release.py \
+            tools/tumoflip/test_esp_flash_package.py \
             tools/tumoflip/test_apply_packages.py \
             tools/tumoflip/test_make_packages_zip.py \
             tools/tumoflip/test_wifi_mapper.py
