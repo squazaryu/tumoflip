@@ -54,7 +54,7 @@ class SubGhzRawEditTest(unittest.TestCase):
 
         for definition in (
             "#define MERGE_GAP_DEFAULT_MS 100",
-            "#define MERGE_GAP_MIN_MS 1",
+            "#define MERGE_GAP_MIN_MS 0",
             "#define MERGE_GAP_MAX_MS 1000",
             "#define MERGE_REPEAT_DEFAULT 1",
             "#define MERGE_REPEAT_MIN 1",
@@ -66,6 +66,19 @@ class SubGhzRawEditTest(unittest.TestCase):
         self.assertIn('"Merge repeat"', source)
         self.assertIn("Merge gap", readme)
         self.assertIn("Merge repeat", readme)
+        self.assertIn("0-1000 ms", readme)
+
+    def test_merge_controls_use_bounded_number_input(self) -> None:
+        source = (
+            REPO_ROOT / "applications_user/subghz_raw_edit/subghz_raw_edit.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("#include <gui/modules/number_input.h>", source)
+        self.assertIn("NumberInput *num_input;", source)
+        self.assertIn("number_input_alloc()", source)
+        self.assertIn("number_input_set_result_callback(", source)
+        self.assertIn("current, min_value, max_value", source)
+        self.assertIn("number_input_free(menu->num_input)", source)
 
     def test_merge_preserves_long_and_native_gaps(self) -> None:
         source = (
@@ -77,6 +90,8 @@ class SubGhzRawEditTest(unittest.TestCase):
         self.assertIn("static bool merge_separator(SubData *dst)", source)
         self.assertIn("MergeJoinManual", source)
         self.assertIn("MergeJoinNative", source)
+        self.assertIn("if (g_merge_gap_ms == 0)\n        return true;", source)
+        self.assertIn("has_previous && g_merge_gap_ms > 0", source)
         self.assertIn("return push_duration(dst, -(g_merge_gap_ms * 1000));", source)
         self.assertNotIn("(int16_t)gap", source)
 
