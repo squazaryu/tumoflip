@@ -108,6 +108,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/IR Blaster/tumoflip_xremote.fap",
     "apps_data/tumoflip_xremote/components/tumoflip_xremote_ac.fap",
     "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
+    "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
     "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
     "apps/Module One/Labs/tumovm_poc.fap",
     "apps/Module One/Labs/tumovm_peripherals.fap",
@@ -168,6 +169,8 @@ ARF_LEGACY_PATHS = {
     "/ext/apps/ARF Tools/ble_killer.fap": ARF_VISIBLE_PATHS["arf_subghz_full"],
 }
 MODULE_ONE_LEGACY_PATHS = {
+    "/ext/apps/GPIO/esp_flasher.fap":
+        "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
     "/ext/apps/Module One/ESP32 Wi-Fi/wifi_map.fap":
         "/ext/apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
     "/ext/apps/Module One/Diagnostics/module_one_cockpit.fap":
