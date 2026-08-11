@@ -45,13 +45,37 @@ installed firmware version unchanged and emit a manifest with
 ```sh
 python3 tools/tumoflip/package_release.py \
   --build-dir build/f7-firmware-C \
-  --target-release-tag v0.3.1
+  --target-release-tag v0.3.1 \
+  --target-manifest downloaded-release/tumoflip-packages.json \
+  --target-package-zip downloaded-release/tumoflip-packages.zip
 ```
 
 Before writing the package manifest, the package-only builder syncs current
 `build/f7-firmware-C/.extapps/*.fap` exports into the release resources tree.
 This makes targeted FAP fixes, such as WiFi Mapper, publishable through FW
 Packages without rebuilding or reinstalling flash firmware.
+
+Large optional FAPs may set `fap_package_only=True` in `application.fam`.
+They are still compiled and APPCHK-validated, but are not copied into the
+updater's `resources.ths`. Release validation stages them from `.extapps` only
+while creating `tumoflip-packages.zip` and fails if one leaks into the updater.
+`ESP Flasher` uses this mode because its offline Quick Flash images make the FAP
+several megabytes larger than ordinary apps.
+
+Every workflow that produces package assets must therefore build both
+`updater_package` and the explicit package-only targets. At present the command
+ends with `updater_package fap_esp_flasher`; omitting the second target is a hard
+validation failure instead of a silent partial release.
+
+When package source comes from a newer branch than the installed firmware,
+`--target-manifest` and `--target-package-zip` preserve the existing release's
+exact firmware identity and every existing package payload. Only files declared
+with `fap_package_only=True` are overlaid from the newer build; all other
+manifest entries are retained byte-for-byte from the published ZIP.
+The builder accepts this only when the target is Tumoflip for Flipper Zero and
+its API exactly matches the package build API. This allows an API-compatible
+stable release to receive a protected FAP update without changing or relabeling
+its firmware artifacts.
 
 Use the `Package Release` GitHub Actions workflow to publish updated
 `tumoflip-packages.json`, `tumoflip-packages.zip`, and refreshed SHA-256 sums to

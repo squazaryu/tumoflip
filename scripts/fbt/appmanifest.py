@@ -82,6 +82,10 @@ class FlipperApplication:
     fap_extbuild: List[ExternallyBuiltFile] = field(default_factory=list)
     fap_private_libs: List[Library] = field(default_factory=list)
     fap_file_assets: Optional[str] = None
+    # Build the FAP and expose it to package tooling, but do not copy it into
+    # the updater's SD resource archive. Large optional/protected apps are
+    # delivered through FW Packages instead.
+    fap_package_only: bool = False
     fal_embedded: bool = False
     # Internally used by fbt
     _appmanager: Optional["AppManager"] = None
@@ -101,7 +105,11 @@ class FlipperApplication:
 
     @property
     def is_default_deployable(self):
-        return self.apptype != FlipperAppType.DEBUG and self.fap_category != "Examples"
+        return (
+            self.apptype != FlipperAppType.DEBUG
+            and self.fap_category != "Examples"
+            and not self.fap_package_only
+        )
 
     @property
     def do_strict_import_checks(self):

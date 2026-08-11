@@ -20,6 +20,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("sync_readme_version.py", workflow)
         self.assertIn("heatshrink2==0.13.0", workflow)
         self.assertIn("./fbt COMPACT=1 DEBUG=0", workflow)
+        self.assertIn("updater_package fap_esp_flasher", workflow)
         self.assertIn("validate_release.py", workflow)
         self.assertIn("--write-manifest", workflow)
         self.assertIn("test_readme_version_sync.py", workflow)
@@ -48,6 +49,13 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("sync_readme_version.py", workflow)
         self.assertIn("heatshrink2==0.13.0", workflow)
         self.assertIn("package_release.py", workflow)
+        self.assertIn("updater_package fap_esp_flasher", workflow)
+        self.assertIn("--target-manifest", workflow)
+        self.assertIn("--target-package-zip", workflow)
+        self.assertIn('steps.target.outputs.manifest', workflow)
+        self.assertIn('steps.target.outputs.package_zip', workflow)
+        self.assertIn('--pattern "tumoflip-packages.json"', workflow)
+        self.assertIn('--pattern "tumoflip-packages.zip"', workflow)
         self.assertIn("test_readme_version_sync.py", workflow)
         self.assertIn("--target-release-tag", workflow)
         self.assertIn("tumoflip-packages.json", workflow)
@@ -57,6 +65,19 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("--clobber", workflow)
         self.assertIn("flipper-z-f7-full-${VERSION}.dfu", workflow)
         self.assertNotIn("gh release create", workflow)
+        publish_step = workflow.split(
+            "- name: Publish package-only assets",
+            maxsplit=1,
+        )[1]
+        self.assertNotIn("flipper-z-f7", publish_step)
+        self.assertNotIn("updater_package", publish_step)
+
+    def test_pr_build_compiles_package_only_faps(self) -> None:
+        workflow = (REPO_ROOT / ".github/workflows/pr-build.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("updater_package fap_esp_flasher", workflow)
 
     def test_subghz_architecture_is_documented_as_core_first(self) -> None:
         doc = (REPO_ROOT / "docs/subghz-architecture.md").read_text(
