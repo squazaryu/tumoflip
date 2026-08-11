@@ -17,6 +17,8 @@ try:
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         MODULE_ONE_LEGACY_PATHS,
+        PACKAGE_ONLY_PACKAGE_FILES,
+        PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
         ValidationError,
@@ -29,6 +31,7 @@ try:
         resources_archive_hashes,
         runtime_capabilities,
         validate_runtime_contract,
+        validate_resources_archive,
         validate_static_sd_resources,
     )
 except ImportError:
@@ -37,6 +40,8 @@ except ImportError:
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         MODULE_ONE_LEGACY_PATHS,
+        PACKAGE_ONLY_PACKAGE_FILES,
+        PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
         ValidationError,
@@ -49,6 +54,7 @@ except ImportError:
         resources_archive_hashes,
         runtime_capabilities,
         validate_runtime_contract,
+        validate_resources_archive,
         validate_static_sd_resources,
     )
 
@@ -143,6 +149,61 @@ class ValidateReleaseTest(unittest.TestCase):
             hashes = resources_archive_hashes(REPO_ROOT, archive_path)
 
         self.assertEqual(hashes["apps/demo.fap"], hashlib.sha256(payload).hexdigest())
+
+    def test_package_only_fap_is_excluded_from_updater_archive(self) -> None:
+        package_only = "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
+        self.assertEqual(PACKAGE_ONLY_PACKAGE_FILES, {package_only})
+        self.assertEqual(
+            PACKAGE_ONLY_PACKAGE_GROUPS,
+            {package_only: "module_one"},
+        )
+        regular = "apps/Tools/clock.fap"
+        regular_payload = b"clock"
+        flasher_payload = b"large optional flasher"
+        packages = {
+            "base": [
+                {
+                    "target": f"/ext/{regular}",
+                    "sha256": hashlib.sha256(regular_payload).hexdigest(),
+                }
+            ],
+            "module_one": [
+                {
+                    "target": f"/ext/{package_only}",
+                    "sha256": hashlib.sha256(flasher_payload).hexdigest(),
+                }
+            ],
+        }
+
+        def write_archive(path: Path, files: dict[str, bytes]) -> None:
+            plain_tar = io.BytesIO()
+            with tarfile.open(fileobj=plain_tar, mode="w:") as archive:
+                for name, payload in files.items():
+                    info = tarfile.TarInfo(name)
+                    info.size = len(payload)
+                    archive.addfile(info, io.BytesIO(payload))
+            heatshrink2 = _load_heatshrink2(REPO_ROOT)
+            compressed = heatshrink2.compress(
+                plain_tar.getvalue(), window_sz2=13, lookahead_sz2=6
+            )
+            path.write_bytes(
+                struct.pack("<IBBB", 0x53445348, 1, 13, 6) + compressed
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            archive_path = Path(directory) / "resources.ths"
+            write_archive(archive_path, {regular: regular_payload})
+            validate_resources_archive(REPO_ROOT, archive_path, packages)
+
+            write_archive(
+                archive_path,
+                {regular: regular_payload, package_only: flasher_payload},
+            )
+            with self.assertRaisesRegex(
+                ValidationError,
+                "Package-only files must not be bundled",
+            ):
+                validate_resources_archive(REPO_ROOT, archive_path, packages)
 
     def test_find_objdump_falls_back_to_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -280,6 +341,12 @@ class ValidateReleaseTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('appid="esp_flasher"', flasher_manifest)
         self.assertIn('fap_category="Module One/ESP32 Wi-Fi"', flasher_manifest)
+        self.assertIn("fap_package_only=True", flasher_manifest)
+        appmanifest = (
+            REPO_ROOT / "scripts/fbt/appmanifest.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("fap_package_only: bool = False", appmanifest)
+        self.assertIn("and not self.fap_package_only", appmanifest)
         self.assertIn(
             "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
             MODULE_ONE_PACKAGE_FILES,

@@ -53,7 +53,16 @@ jobs:
             exit 1
           fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          TARGET_DIR="$RUNNER_TEMP/tumoflip-target-release"
+          mkdir -p "$TARGET_DIR"
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir "$TARGET_DIR" \
+            --pattern "tumoflip-packages.json" \
+            --pattern "tumoflip-packages.zip"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "manifest=$TARGET_DIR/tumoflip-packages.json" >> "$GITHUB_OUTPUT"
+          echo "package_zip=$TARGET_DIR/tumoflip-packages.zip" >> "$GITHUB_OUTPUT"
 
       - name: Install Python package dependencies
         shell: bash
@@ -76,7 +85,8 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf applications/main/clock_app/resources/apps/ || true
-          ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" updater_package
+          ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
+            updater_package fap_esp_flasher
 
       - name: Run package release tests
         shell: bash
@@ -96,15 +106,20 @@ jobs:
         shell: bash
         env:
           TAG: ${{ steps.target.outputs.tag }}
+          TARGET_MANIFEST: ${{ steps.target.outputs.manifest }}
+          TARGET_PACKAGE_ZIP: ${{ steps.target.outputs.package_zip }}
         run: |
           set -euo pipefail
           python3 tools/tumoflip/package_release.py \
             --build-dir build/f7-firmware-C \
-            --target-release-tag "$TAG"
-          VERSION="$(python3 - <<'PY'
+            --target-release-tag "$TAG" \
+            --target-manifest "$TARGET_MANIFEST" \
+            --target-package-zip "$TARGET_PACKAGE_ZIP"
+          VERSION="$(python3 - "$TARGET_MANIFEST" <<'PY'
           import json
+          import sys
           from pathlib import Path
-          print(json.loads(Path("build/f7-firmware-C/firmware.json").read_text())["firmware_version"])
+          print(json.loads(Path(sys.argv[1]).read_text())["firmware"]["version"])
           PY
           )"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"

@@ -14,6 +14,7 @@ import struct
 import subprocess
 import sys
 import tarfile
+import tempfile
 import zlib
 from pathlib import Path
 
@@ -118,6 +119,17 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/NFC/tumocard_os.fap",
     "apps/Module One/NFC/tumotag_verify.fap",
 )
+# These files are built from the same source/API as the firmware, but are
+# intentionally absent from resources.ths. They are delivered only through
+# tumoflip-packages.zip so an optional large FAP cannot inflate every updater.
+PACKAGE_ONLY_PACKAGE_FILES = frozenset(
+    {
+        "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+    }
+)
+PACKAGE_ONLY_PACKAGE_GROUPS = {
+    "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap": "module_one",
+}
 MODULE_ONE_PACKAGE_DATA_FILES = (
     "apps_data/tumoflow/workflows/field_demo.tflow",
     "apps_data/tumoflow/workflows/bounded_outputs.tflow",
@@ -475,7 +487,11 @@ def validate_static_sd_resources(repo_root: Path, resources: Path) -> None:
             raise ValidationError(f"Static SD resource differs from build output: {relative}")
 
 
-def sync_extapp_package_exports(build_dir: Path, resources: Path) -> list[dict[str, object]]:
+def sync_extapp_package_exports(
+    build_dir: Path,
+    resources: Path,
+    only_targets: frozenset[str] | None = None,
+) -> list[dict[str, object]]:
     extapps = build_dir / ".extapps"
     if not extapps.is_dir():
         prune_legacy_resource_exports(resources)
@@ -483,6 +499,8 @@ def sync_extapp_package_exports(build_dir: Path, resources: Path) -> list[dict[s
 
     synced: list[dict[str, object]] = []
     for filename, relative in sorted(package_extapp_exports().items()):
+        if only_targets is not None and relative not in only_targets:
+            continue
         source = extapps / filename
         if not source.is_file():
             continue
@@ -585,9 +603,17 @@ def validate_resources_archive(
     packages: dict[str, list[dict[str, object]]],
 ) -> None:
     archive_hashes = resources_archive_hashes(repo_root, archive_path)
+    accidentally_bundled = sorted(PACKAGE_ONLY_PACKAGE_FILES.intersection(archive_hashes))
+    if accidentally_bundled:
+        raise ValidationError(
+            "Package-only files must not be bundled in resources.ths: "
+            f"{accidentally_bundled}"
+        )
     for entries in packages.values():
         for entry in entries:
             relative = str(entry["target"]).removeprefix("/ext/")
+            if relative in PACKAGE_ONLY_PACKAGE_FILES:
+                continue
             archive_hash = archive_hashes.get(relative)
             if archive_hash is None:
                 raise ValidationError(f"Package entry is missing from resources.ths: {relative}")
@@ -751,48 +777,76 @@ def validate_release(
         build_dir / "resources/Manifest", "resource manifest"
     ).parent
     validate_static_sd_resources(repo_root, resources)
-    validate_extapp_package_exports(repo_root, build_dir, resources)
     validate_layout(resources)
-    packages = package_entries(resources)
-    validate_resources_archive(repo_root, referenced["Resources"], packages)
-    api = api_version(repo_root / "targets/f7/api_symbols.csv")
-    manifest: dict[str, object] = {
-        "schema": 2,
-        "firmware": {
-            "name": "tumoflip",
-            "version": firmware_json["firmware_version"],
-            "target": 7,
-            "api": api,
-            "radio_address": f"0x{radio_address:08X}",
-        },
-        "safety": {
-            "minimum_c2_gap_bytes": min_c2_gap,
-            "dfu_gap_bytes": coarse_gap,
-            "section_gap_bytes": section_gap,
-            "updater_bytes": loader.stat().st_size,
-            "updater_limit_bytes": UPDATER_LIMIT,
-        },
-        "artifacts": {
-            path.name: {"bytes": path.stat().st_size, "sha256": sha256(path)}
-            for path in sorted(referenced.values())
-        },
-        "packages": packages,
-        "cleanup": release_cleanup_entries(),
-    }
-    manifest["release_id"] = manifest_release_id(manifest)
-    if write_manifest:
-        output = update_dir / "tumoflip-packages.json"
-        output.write_text(
-            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    unexpectedly_bundled = sorted(
+        relative
+        for relative in PACKAGE_ONLY_PACKAGE_FILES
+        if (resources / relative).exists()
+    )
+    if unexpectedly_bundled:
+        raise ValidationError(
+            "Package-only files are present in the updater resource tree: "
+            f"{unexpectedly_bundled}"
         )
-        # Also publish the companion install archive (issue #8) from the SAME manifest
-        # and resources tree. Hardened + atomic; see make_packages_zip.py.
-        try:
-            from .make_packages_zip import build_packages_zip
-        except ImportError:
-            from make_packages_zip import build_packages_zip
-        build_packages_zip(manifest, resources, update_dir / "tumoflip-packages.zip")
-    return manifest
+
+    # Build the standalone FW Packages view from a disposable staging tree.
+    # The updater's resources and resources.ths remain immutable and exclude
+    # large optional package-only FAPs.
+    with tempfile.TemporaryDirectory(prefix="tumoflip-package-resources-") as directory:
+        package_resources = Path(directory) / "resources"
+        shutil.copytree(resources, package_resources)
+        sync_extapp_package_exports(
+            build_dir,
+            package_resources,
+            only_targets=PACKAGE_ONLY_PACKAGE_FILES,
+        )
+        validate_extapp_package_exports(repo_root, build_dir, package_resources)
+        validate_layout(package_resources)
+        packages = package_entries(package_resources)
+        validate_resources_archive(repo_root, referenced["Resources"], packages)
+        api = api_version(repo_root / "targets/f7/api_symbols.csv")
+        manifest: dict[str, object] = {
+            "schema": 2,
+            "firmware": {
+                "name": "tumoflip",
+                "version": firmware_json["firmware_version"],
+                "target": 7,
+                "api": api,
+                "radio_address": f"0x{radio_address:08X}",
+            },
+            "safety": {
+                "minimum_c2_gap_bytes": min_c2_gap,
+                "dfu_gap_bytes": coarse_gap,
+                "section_gap_bytes": section_gap,
+                "updater_bytes": loader.stat().st_size,
+                "updater_limit_bytes": UPDATER_LIMIT,
+            },
+            "artifacts": {
+                path.name: {"bytes": path.stat().st_size, "sha256": sha256(path)}
+                for path in sorted(referenced.values())
+            },
+            "packages": packages,
+            "cleanup": release_cleanup_entries(),
+        }
+        manifest["release_id"] = manifest_release_id(manifest)
+        if write_manifest:
+            output = update_dir / "tumoflip-packages.json"
+            output.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            # Publish the companion install archive from the staged package
+            # resources, not from resources.ths.
+            try:
+                from .make_packages_zip import build_packages_zip
+            except ImportError:
+                from make_packages_zip import build_packages_zip
+            build_packages_zip(
+                manifest,
+                package_resources,
+                update_dir / "tumoflip-packages.zip",
+            )
+        return manifest
 
 
 def main() -> int:
