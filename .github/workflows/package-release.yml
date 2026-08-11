@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_release_tag:
-        description: "Existing firmware release tag to update, for example v0.3.1"
+        description: "Existing firmware release tag, for example v1.0.4 or t-dev-004-013"
         required: true
         type: string
       package_ref:
@@ -48,8 +48,12 @@ jobs:
           TAG: ${{ github.event.inputs.target_release_tag }}
         run: |
           set -euo pipefail
-          if [[ ! "$TAG" =~ ^v[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.]+)?$ ]]; then
-            echo "Target release tag must look like v0.3.1; got: $TAG" >&2
+          if [[ "$TAG" =~ ^v[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.]+)?$ ]]; then
+            CHANNEL="stable"
+          elif [[ "$TAG" =~ ^t-dev-([0-9]{3}-){1,2}[0-9]{3}$ ]]; then
+            CHANNEL="dev"
+          else
+            echo "Target release tag must look like v1.0.4 or t-dev-004-013; got: $TAG" >&2
             exit 1
           fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
@@ -60,7 +64,21 @@ jobs:
             --dir "$TARGET_DIR" \
             --pattern "tumoflip-packages.json" \
             --pattern "tumoflip-packages.zip"
+          if [[ "$CHANNEL" == "dev" ]]; then
+            MANIFEST_VERSION="$(python3 - "$TARGET_DIR/tumoflip-packages.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          print(json.loads(Path(sys.argv[1]).read_text())["firmware"]["version"])
+          PY
+            )"
+            if [[ "$MANIFEST_VERSION" != "$TAG" ]]; then
+              echo "Dev release tag $TAG does not match manifest firmware $MANIFEST_VERSION" >&2
+              exit 1
+            fi
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "manifest=$TARGET_DIR/tumoflip-packages.json" >> "$GITHUB_OUTPUT"
           echo "package_zip=$TARGET_DIR/tumoflip-packages.zip" >> "$GITHUB_OUTPUT"
 
@@ -74,11 +92,16 @@ jobs:
         shell: bash
         env:
           TAG: ${{ steps.target.outputs.tag }}
+          CHANNEL: ${{ steps.target.outputs.channel }}
         run: |
           set -euo pipefail
-          python3 tools/tumoflip/sync_readme_version.py \
-            --release-tag "$TAG" \
-            --check
+          if [[ "$CHANNEL" == "stable" ]]; then
+            python3 tools/tumoflip/sync_readme_version.py \
+              --release-tag "$TAG" \
+              --check
+          else
+            python3 tools/tumoflip/sync_readme_version.py --check
+          fi
 
       - name: Build firmware resources
         shell: bash

@@ -144,6 +144,37 @@ def prepare_target_package(
 
 
 class PackageReleaseTest(unittest.TestCase):
+    def test_package_release_can_target_existing_dev_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo, build, resources = prepare_package_tree(Path(directory))
+            target_manifest, target_zip = prepare_target_package(repo, resources)
+            target_manifest["firmware"]["version"] = "t-dev-004-013"
+            target_manifest.pop("release_id")
+            target_manifest["release_id"] = manifest_release_id(target_manifest)
+            write_file(build / ".extapps/esp_flasher.fap", b"protected esp flasher")
+
+            manifest = build_package_release(
+                repo,
+                build,
+                repo / "dist/f7-C/f7-update-t-dev-004-013",
+                target_release_tag="t-dev-004-013",
+                target_manifest=target_manifest,
+                target_package_zip=target_zip,
+            )
+
+            self.assertEqual(manifest["firmware"], target_manifest["firmware"])
+            self.assertEqual(
+                manifest["package_release"]["target_release_tag"],
+                "t-dev-004-013",
+            )
+            self.assertEqual(
+                manifest["package_release"]["target_release_id"],
+                target_manifest["release_id"],
+            )
+            self.assertTrue(
+                manifest["package_release"]["firmware_flash_unchanged"]
+            )
+
     def test_package_release_can_target_existing_stable_identity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo, build, resources = prepare_package_tree(Path(directory))
