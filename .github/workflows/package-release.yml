@@ -86,7 +86,7 @@ jobs:
           set -euo pipefail
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
-            updater_package fap_esp_flasher
+            updater_package fap_esp_flasher -j2
 
       - name: Run package release tests
         shell: bash
