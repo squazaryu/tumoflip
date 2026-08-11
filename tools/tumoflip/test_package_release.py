@@ -203,6 +203,64 @@ class PackageReleaseTest(unittest.TestCase):
                 manifest["package_release"]["firmware_flash_unchanged"]
             )
 
+    def test_independent_catalog_has_its_own_channel_revision_and_tag(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo, build, resources = prepare_package_tree(Path(directory))
+            target_manifest, target_zip = prepare_target_package(repo, resources)
+            write_file(build / ".extapps/esp_flasher.fap", b"protected esp flasher")
+
+            manifest = build_package_release(
+                repo,
+                build,
+                repo / "dist/f7-C/f7-update-t-flppr-fw-004",
+                target_release_tag="v1.0.4",
+                target_manifest=target_manifest,
+                target_package_zip=target_zip,
+                catalog_release_tag="fw-packages-stable-001",
+            )
+
+            release = manifest["package_release"]
+            self.assertEqual(release["id"], "fw-packages-stable-001")
+            self.assertEqual(release["catalog_channel"], "stable")
+            self.assertEqual(release["catalog_revision"], 1)
+            self.assertEqual(
+                release["catalog_release_tag"],
+                "fw-packages-stable-001",
+            )
+            self.assertEqual(release["target_release_tag"], "v1.0.4")
+            unsigned = dict(manifest)
+            unsigned.pop("release_id")
+            self.assertEqual(manifest["release_id"], manifest_release_id(unsigned))
+
+    def test_independent_catalog_rejects_bad_tag_or_channel_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo, build, resources = prepare_package_tree(Path(directory))
+            target_manifest, target_zip = prepare_target_package(repo, resources)
+            write_file(build / ".extapps/esp_flasher.fap", b"protected esp flasher")
+
+            for tag in ("fw-packages-stable-000", "fw-packages-beta-001", "v1.0.4"):
+                with self.subTest(tag=tag), self.assertRaises(ValidationError):
+                    build_package_release(
+                        repo,
+                        build,
+                        repo / "dist/out",
+                        target_release_tag="v1.0.4",
+                        target_manifest=target_manifest,
+                        target_package_zip=target_zip,
+                        catalog_release_tag=tag,
+                    )
+
+            with self.assertRaisesRegex(ValidationError, "does not match target"):
+                build_package_release(
+                    repo,
+                    build,
+                    repo / "dist/out",
+                    target_release_tag="v1.0.4",
+                    target_manifest=target_manifest,
+                    target_package_zip=target_zip,
+                    catalog_release_tag="fw-packages-dev-001",
+                )
+
     def test_package_release_rejects_target_with_different_api(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo, build, resources = prepare_package_tree(Path(directory))
