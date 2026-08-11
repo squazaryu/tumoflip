@@ -80,8 +80,10 @@ its firmware artifacts.
 Use the `Package Release` GitHub Actions workflow to publish updated
 `tumoflip-packages.json`, `tumoflip-packages.zip`, and refreshed SHA-256 sums to
 an existing firmware release. The workflow downloads the already-published
-firmware assets for that tag, hashes those unchanged files together with the new
-package assets, and does not create or upload new firmware artifacts.
+firmware and package assets for that tag and verifies all five files against the
+release's existing SHA-256 ledger before producing the replacement package
+assets. It then hashes the verified, unchanged firmware files together with the
+new package assets and does not create or upload new firmware artifacts.
 
 Apply all package groups to a directly mounted SD card:
 
