@@ -57,6 +57,9 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn('--pattern "tumoflip-packages.json"', workflow)
         self.assertIn('--pattern "tumoflip-packages.zip"', workflow)
         self.assertIn("test_readme_version_sync.py", workflow)
+        self.assertIn("test_verify_release_assets.py", workflow)
+        self.assertIn("verify_release_assets.py", workflow)
+        self.assertIn('--pattern "${VERSION}-SHA256SUMS"', workflow)
         self.assertIn("--target-release-tag", workflow)
         self.assertIn("tumoflip-packages.json", workflow)
         self.assertIn("tumoflip-packages.zip", workflow)
@@ -69,6 +72,14 @@ class ReleaseWorkflowTest(unittest.TestCase):
             "- name: Publish package-only assets",
             maxsplit=1,
         )[1]
+        checksum_step = workflow.split(
+            "- name: Prepare mixed firmware/package SHA-256 sums",
+            maxsplit=1,
+        )[1].split("- name: Publish package-only assets", maxsplit=1)[0]
+        self.assertLess(
+            checksum_step.index("verify_release_assets.py"),
+            checksum_step.index('SHA_FILE="dist/f7-C/${VERSION}-SHA256SUMS"'),
+        )
         self.assertNotIn("flipper-z-f7", publish_step)
         self.assertNotIn("updater_package", publish_step)
 
