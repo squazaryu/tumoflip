@@ -39,12 +39,26 @@ class EspFlashPackageTests(unittest.TestCase):
 
     def test_package_mode_gates_target_and_uses_ascii_md5(self):
         worker = (APP_ROOT / "esp_flasher_worker.c").read_text(encoding="utf-8")
+        storage = (APP_ROOT / "esp_flash_package_storage.c").read_text(
+            encoding="utf-8"
+        )
         target_gate = worker.index("esp_loader_get_target()")
         first_package_flash = worker.index("_flash_package_files(app)")
         self.assertLess(target_gate, first_package_flash)
         self.assertIn("uint8_t expected_md5_hex[33]", worker)
         self.assertIn("esp_loader_flash_verify_known_md5", worker)
         self.assertIn("Package flash failed. Target was not reset.", worker)
+
+        # The worker revalidates the complete package before erase. Keep its large plan and
+        # digest scratch storage off the nested worker stack to avoid MPU stack-overflow faults.
+        self.assertIn(
+            "EspFlashPackagePlan* verified_plan = malloc(sizeof(*verified_plan))",
+            worker,
+        )
+        self.assertNotIn("EspFlashPackagePlan verified_plan;", worker)
+        self.assertIn("furi_thread_set_stack_size(app->flash_worker, 6 * 1024)", worker)
+        self.assertIn("uint8_t* buffer = malloc(hash_buffer_size)", storage)
+        self.assertNotIn("uint8_t buffer[1024]", storage)
 
     def test_package_picker_is_manifest_only_and_manual_mode_remains(self):
         storage = (APP_ROOT / "esp_flash_package_storage.c").read_text(encoding="utf-8")
