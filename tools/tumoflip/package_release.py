@@ -7,6 +7,7 @@ import argparse
 import copy
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -56,6 +57,7 @@ except ImportError:
 MAX_TARGET_PACKAGE_ENTRIES = 512
 MAX_TARGET_PACKAGE_FILE_BYTES = 16 * 1024 * 1024
 MAX_TARGET_PACKAGE_TOTAL_BYTES = 64 * 1024 * 1024
+CATALOG_RELEASE_TAG = re.compile(r"^fw-packages-(stable|dev)-([0-9]{3})$")
 
 
 def git_output(repo_root: Path, *args: str) -> str:
@@ -78,6 +80,19 @@ def git_identity(repo_root: Path) -> tuple[str, str, bool]:
 def package_release_id(version: str, short_commit: str, dirty: bool) -> str:
     suffix = "-dirty" if dirty else ""
     return f"{version}-packages-{short_commit}{suffix}"
+
+
+def catalog_release_identity(tag: str) -> tuple[str, int]:
+    match = CATALOG_RELEASE_TAG.fullmatch(tag)
+    if match is None:
+        raise ValidationError(
+            "Independent package release tag must look like "
+            "fw-packages-stable-001 or fw-packages-dev-001"
+        )
+    revision = int(match.group(2))
+    if revision < 1:
+        raise ValidationError("Independent package revision must be greater than zero")
+    return match.group(1), revision
 
 
 def resolve_target_firmware(
@@ -320,6 +335,7 @@ def build_package_release(
     target_release_tag: str | None = None,
     target_manifest: dict[str, object] | None = None,
     target_package_zip: Path | None = None,
+    catalog_release_tag: str | None = None,
 ) -> dict[str, object]:
     firmware_json = json.loads(
         require_file(build_dir / "firmware.json", "firmware metadata").read_text(
@@ -339,7 +355,34 @@ def build_package_release(
         target_manifest,
     )
     version = str(target_firmware["version"])
-    resolved_package_id = package_id or package_release_id(version, short, dirty)
+    catalog_identity = (
+        catalog_release_identity(catalog_release_tag)
+        if catalog_release_tag
+        else None
+    )
+    if catalog_identity is not None:
+        if target_release_tag is None:
+            raise ValidationError(
+                "Independent package catalog requires a target firmware release"
+            )
+        if target_release_tag.startswith("t-dev-"):
+            target_channel = "dev"
+        elif target_release_tag.startswith("v"):
+            target_channel = "stable"
+        else:
+            raise ValidationError(
+                "Independent package catalog target must be a stable or dev firmware release"
+            )
+        if catalog_identity[0] != target_channel:
+            raise ValidationError(
+                f"Catalog channel {catalog_identity[0]} does not match target "
+                f"firmware channel {target_channel}"
+            )
+    resolved_package_id = (
+        package_id
+        or catalog_release_tag
+        or package_release_id(version, short, dirty)
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if target_manifest is None:
@@ -417,6 +460,14 @@ def build_package_release(
         else [],
         "synced_extapps": synced,
     }
+    if catalog_identity is not None:
+        manifest["package_release"].update(
+            {
+                "catalog_channel": catalog_identity[0],
+                "catalog_revision": catalog_identity[1],
+                "catalog_release_tag": catalog_release_tag,
+            }
+        )
     manifest["release_id"] = manifest_release_id(manifest)
 
     try:
@@ -447,6 +498,7 @@ def main() -> int:
     parser.add_argument("--target-release-tag")
     parser.add_argument("--target-manifest", type=Path)
     parser.add_argument("--target-package-zip", type=Path)
+    parser.add_argument("--catalog-release-tag")
     args = parser.parse_args()
 
     repo_root = args.repo_root.resolve()
@@ -504,6 +556,7 @@ def main() -> int:
             target_release_tag=args.target_release_tag,
             target_manifest=target_manifest,
             target_package_zip=target_package_zip,
+            catalog_release_tag=args.catalog_release_tag,
         )
     except (
         OSError,

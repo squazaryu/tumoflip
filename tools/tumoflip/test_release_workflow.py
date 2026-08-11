@@ -38,7 +38,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("already exists; publish a new tag instead", workflow)
         self.assertIn('--repo "$GITHUB_REPOSITORY"', workflow)
 
-    def test_package_release_workflow_updates_only_sd_package_assets(self) -> None:
+    def test_package_release_workflow_supports_legacy_and_independent_catalogs(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/package-release.yml").read_text(
             encoding="utf-8"
         )
@@ -46,6 +46,9 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("target_release_tag:", workflow)
         self.assertIn("package_ref:", workflow)
+        self.assertIn("catalog_release_tag:", workflow)
+        self.assertIn("fw-packages-dev-001", workflow)
+        self.assertIn("already exists; publish a new revision instead", workflow)
         self.assertIn("t-dev-004-013", workflow)
         self.assertIn('CHANNEL="dev"', workflow)
         self.assertIn('if [[ "$MANIFEST_VERSION" != "$TAG" ]]', workflow)
@@ -66,13 +69,16 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("verify_release_assets.py", workflow)
         self.assertIn('--pattern "${VERSION}-SHA256SUMS"', workflow)
         self.assertIn("--target-release-tag", workflow)
+        self.assertIn("--catalog-release-tag", workflow)
         self.assertIn("tumoflip-packages.json", workflow)
         self.assertIn("tumoflip-packages.zip", workflow)
         self.assertIn("gh release download", workflow)
         self.assertIn("gh release upload", workflow)
         self.assertIn("--clobber", workflow)
+        self.assertIn("gh release create", workflow)
+        self.assertIn('--target "$SOURCE_COMMIT"', workflow)
+        self.assertIn("This release contains no firmware image", workflow)
         self.assertIn("flipper-z-f7-full-${VERSION}.dfu", workflow)
-        self.assertNotIn("gh release create", workflow)
         publish_step = workflow.split(
             "- name: Publish package-only assets",
             maxsplit=1,
@@ -87,6 +93,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         )
         self.assertNotIn("flipper-z-f7", publish_step)
         self.assertNotIn("updater_package", publish_step)
+        self.assertIn('if [[ -n "$CATALOG_TAG" ]]', publish_step)
 
     def test_pr_build_compiles_package_only_faps(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/pr-build.yml").read_text(

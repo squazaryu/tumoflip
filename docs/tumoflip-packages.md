@@ -78,12 +78,25 @@ stable release to receive a protected FAP update without changing or relabeling
 its firmware artifacts.
 
 Use the `Package Release` GitHub Actions workflow to publish updated
-`tumoflip-packages.json`, `tumoflip-packages.zip`, and refreshed SHA-256 sums to
-an existing firmware release. The workflow downloads the already-published
-firmware and package assets for that tag and verifies all five files against the
-release's existing SHA-256 ledger before producing the replacement package
-assets. It then hashes the verified, unchanged firmware files together with the
-new package assets and does not create or upload new firmware artifacts.
+`tumoflip-packages.json`, `tumoflip-packages.zip`, and SHA-256 sums. New updates
+must use an immutable catalog tag such as `fw-packages-stable-001` or
+`fw-packages-dev-001`. The catalog revision has its own lifecycle, analogous to
+Community Apps: updating a FAP never renames, replaces, or republishes firmware.
+
+The workflow still downloads a stable/dev firmware release as the verified
+baseline, checks its existing firmware and package assets against its SHA-256
+ledger, and overlays only declared package-only exports. The resulting manifest
+records `catalog_channel`, `catalog_revision`, and `catalog_release_tag`. The
+independent GitHub release contains only the package manifest, package ZIP, and
+their checksum ledger; it contains no DFU, updater, or SDK.
+
+TumoCompanion selects the newest catalog revision for the device's package
+channel. Firmware version is not package identity. Installation remains
+fail-closed on Tumoflip origin, channel, hardware target, firmware API, embedded
+FAP metadata, content hashes, and the existing rollback journal. The workflow's
+legacy mode can still replace package assets attached to an older firmware tag
+for clients predating independent catalogs, but it must not be used for new
+revisions.
 
 Apply all package groups to a directly mounted SD card:
 

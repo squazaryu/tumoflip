@@ -12,9 +12,13 @@ on:
         required: true
         default: "main"
         type: string
+      catalog_release_tag:
+        description: "Optional immutable catalog tag, for example fw-packages-dev-001"
+        required: false
+        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.inputs.target_release_tag }}
+  group: ${{ github.workflow }}-${{ github.event.inputs.catalog_release_tag || github.event.inputs.target_release_tag }}
   cancel-in-progress: false
 
 permissions:
@@ -46,6 +50,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.inputs.target_release_tag }}
+          CATALOG_TAG: ${{ github.event.inputs.catalog_release_tag }}
         run: |
           set -euo pipefail
           if [[ "$TAG" =~ ^v[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.]+)?$ ]]; then
@@ -55,6 +60,31 @@ jobs:
           else
             echo "Target release tag must look like v1.0.4 or t-dev-004-013; got: $TAG" >&2
             exit 1
+          fi
+          if [[ -n "$CATALOG_TAG" ]]; then
+            if [[ "$CATALOG_TAG" =~ ^fw-packages-(stable|dev)-([0-9]{3})$ ]]; then
+              CATALOG_CHANNEL="${BASH_REMATCH[1]}"
+              CATALOG_REVISION="${BASH_REMATCH[2]}"
+            else
+              echo "Catalog tag must look like fw-packages-stable-001 or fw-packages-dev-001" >&2
+              exit 1
+            fi
+            if [[ "$CATALOG_REVISION" == "000" ]]; then
+              echo "Catalog revision must be greater than zero" >&2
+              exit 1
+            fi
+            if [[ "$CATALOG_CHANNEL" != "$CHANNEL" ]]; then
+              echo "Catalog channel $CATALOG_CHANNEL does not match target channel $CHANNEL" >&2
+              exit 1
+            fi
+            if gh release view "$CATALOG_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "Catalog release $CATALOG_TAG already exists; publish a new revision instead" >&2
+              exit 1
+            fi
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$CATALOG_TAG" >/dev/null 2>&1; then
+              echo "Catalog tag $CATALOG_TAG already exists; publish a new revision instead" >&2
+              exit 1
+            fi
           fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
           TARGET_DIR="$RUNNER_TEMP/tumoflip-target-release"
@@ -81,6 +111,7 @@ jobs:
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "manifest=$TARGET_DIR/tumoflip-packages.json" >> "$GITHUB_OUTPUT"
           echo "package_zip=$TARGET_DIR/tumoflip-packages.zip" >> "$GITHUB_OUTPUT"
+          echo "catalog_tag=$CATALOG_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Install Python package dependencies
         shell: bash
@@ -132,13 +163,19 @@ jobs:
           TAG: ${{ steps.target.outputs.tag }}
           TARGET_MANIFEST: ${{ steps.target.outputs.manifest }}
           TARGET_PACKAGE_ZIP: ${{ steps.target.outputs.package_zip }}
+          CATALOG_TAG: ${{ steps.target.outputs.catalog_tag }}
         run: |
           set -euo pipefail
-          python3 tools/tumoflip/package_release.py \
-            --build-dir build/f7-firmware-C \
-            --target-release-tag "$TAG" \
-            --target-manifest "$TARGET_MANIFEST" \
+          PACKAGE_ARGS=(
+            --build-dir build/f7-firmware-C
+            --target-release-tag "$TAG"
+            --target-manifest "$TARGET_MANIFEST"
             --target-package-zip "$TARGET_PACKAGE_ZIP"
+          )
+          if [[ -n "$CATALOG_TAG" ]]; then
+            PACKAGE_ARGS+=(--catalog-release-tag "$CATALOG_TAG")
+          fi
+          python3 tools/tumoflip/package_release.py "${PACKAGE_ARGS[@]}"
           VERSION="$(python3 - "$TARGET_MANIFEST" <<'PY'
           import json
           import sys
@@ -157,6 +194,7 @@ jobs:
           TAG: ${{ steps.target.outputs.tag }}
           VERSION: ${{ steps.packages.outputs.version }}
           UPDATE_DIR: ${{ steps.packages.outputs.update_dir }}
+          CATALOG_TAG: ${{ steps.target.outputs.catalog_tag }}
         run: |
           set -euo pipefail
           WORK="dist/f7-C/package-release-existing-assets"
@@ -176,17 +214,25 @@ jobs:
             "${WORK}/flipper-z-f7-update-${VERSION}.tgz" \
             "${{ steps.target.outputs.manifest }}" \
             "${{ steps.target.outputs.package_zip }}"
-          SHA_FILE="dist/f7-C/${VERSION}-SHA256SUMS"
-          (
-            cd dist/f7-C
-            sha256sum \
-              "package-release-existing-assets/flipper-z-f7-full-${VERSION}.dfu" \
-              "package-release-existing-assets/flipper-z-f7-sdk-${VERSION}.zip" \
-              "package-release-existing-assets/flipper-z-f7-update-${VERSION}.tgz" \
-              "f7-update-${VERSION}/tumoflip-packages.json" \
-              "f7-update-${VERSION}/tumoflip-packages.zip" \
-              | sed "s#package-release-existing-assets/##; s#f7-update-${VERSION}/##"
-          ) > "$SHA_FILE"
+          if [[ -n "$CATALOG_TAG" ]]; then
+            SHA_FILE="dist/f7-C/${CATALOG_TAG}-SHA256SUMS"
+            (
+              cd "dist/f7-C/f7-update-${VERSION}"
+              sha256sum tumoflip-packages.json tumoflip-packages.zip
+            ) > "$GITHUB_WORKSPACE/$SHA_FILE"
+          else
+            SHA_FILE="dist/f7-C/${VERSION}-SHA256SUMS"
+            (
+              cd dist/f7-C
+              sha256sum \
+                "package-release-existing-assets/flipper-z-f7-full-${VERSION}.dfu" \
+                "package-release-existing-assets/flipper-z-f7-sdk-${VERSION}.zip" \
+                "package-release-existing-assets/flipper-z-f7-update-${VERSION}.tgz" \
+                "f7-update-${VERSION}/tumoflip-packages.json" \
+                "f7-update-${VERSION}/tumoflip-packages.zip" \
+                | sed "s#package-release-existing-assets/##; s#f7-update-${VERSION}/##"
+            ) > "$SHA_FILE"
+          fi
           echo "sha_file=${SHA_FILE}" >> "$GITHUB_OUTPUT"
 
       - name: Publish package-only assets
@@ -196,11 +242,32 @@ jobs:
           TAG: ${{ steps.target.outputs.tag }}
           UPDATE_DIR: ${{ steps.packages.outputs.update_dir }}
           SHA_FILE: ${{ steps.checksums.outputs.sha_file }}
+          CATALOG_TAG: ${{ steps.target.outputs.catalog_tag }}
+          CHANNEL: ${{ steps.target.outputs.channel }}
+          TARGET_TAG: ${{ steps.target.outputs.tag }}
         run: |
           set -euo pipefail
-          gh release upload "$TAG" \
-            "${UPDATE_DIR}/tumoflip-packages.json" \
-            "${UPDATE_DIR}/tumoflip-packages.zip" \
-            "${SHA_FILE}" \
-            --clobber \
-            --repo "$GITHUB_REPOSITORY"
+          if [[ -n "$CATALOG_TAG" ]]; then
+            SOURCE_COMMIT="$(git rev-parse HEAD)"
+            CREATE_ARGS=(
+              "$CATALOG_TAG"
+              "${UPDATE_DIR}/tumoflip-packages.json"
+              "${UPDATE_DIR}/tumoflip-packages.zip"
+              "${SHA_FILE}"
+              --repo "$GITHUB_REPOSITORY"
+              --target "$SOURCE_COMMIT"
+              --title "FW Packages ${CHANNEL^} ${CATALOG_TAG##*-}"
+              --notes "Independent ${CHANNEL} FW Packages revision. Compatible firmware is validated by Tumoflip lineage, hardware target, API and package channel. Baseline: ${TARGET_TAG}. Source: ${SOURCE_COMMIT}. This release contains no firmware image."
+            )
+            if [[ "$CHANNEL" == "dev" ]]; then
+              CREATE_ARGS+=(--prerelease)
+            fi
+            gh release create "${CREATE_ARGS[@]}"
+          else
+            gh release upload "$TAG" \
+              "${UPDATE_DIR}/tumoflip-packages.json" \
+              "${UPDATE_DIR}/tumoflip-packages.zip" \
+              "${SHA_FILE}" \
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
+          fi
