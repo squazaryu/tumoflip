@@ -1,7 +1,53 @@
 #include "lfrfid_i.h"
 #include <dolphin/dolphin.h>
 
-#define TAG "LfRfidApp"
+#define TAG                              "LfRfidApp"
+#define TUMOFLIP_LOCATION_SIDECAR_SUFFIX ".tumoflip.json"
+
+static FuriString* lfrfid_location_sidecar_path(const FuriString* source_path) {
+    furi_assert(source_path);
+    return furi_string_alloc_printf(
+        "%s%s", furi_string_get_cstr(source_path), TUMOFLIP_LOCATION_SIDECAR_SUFFIX);
+}
+
+static bool lfrfid_reconcile_location_sidecar(
+    LfRfid* app,
+    const FuriString* old_path,
+    const FuriString* new_path) {
+    furi_assert(app);
+    furi_assert(old_path);
+    furi_assert(new_path);
+
+    if(storage_common_equivalent_path(
+           app->storage, furi_string_get_cstr(old_path), furi_string_get_cstr(new_path))) {
+        return true;
+    }
+
+    FuriString* old_sidecar = lfrfid_location_sidecar_path(old_path);
+    FuriString* new_sidecar = lfrfid_location_sidecar_path(new_path);
+    bool result = false;
+
+    if(!storage_file_exists(app->storage, furi_string_get_cstr(old_sidecar))) {
+        // The destination file has just been replaced. Its previous metadata must not survive.
+        result = storage_simply_remove(app->storage, furi_string_get_cstr(new_sidecar));
+    } else if(storage_simply_remove(app->storage, furi_string_get_cstr(new_sidecar))) {
+        const bool copied = storage_common_copy(
+                                app->storage,
+                                furi_string_get_cstr(old_sidecar),
+                                furi_string_get_cstr(new_sidecar)) == FSE_OK;
+        if(copied) {
+            // Copy first, then remove. If copying fails, the source file and metadata stay intact.
+            result = storage_simply_remove(app->storage, furi_string_get_cstr(old_sidecar));
+        } else {
+            // Do not leave a partial sidecar attached to the successfully written destination.
+            storage_simply_remove(app->storage, furi_string_get_cstr(new_sidecar));
+        }
+    }
+
+    furi_string_free(new_sidecar);
+    furi_string_free(old_sidecar);
+    return result;
+}
 
 static void
     lfrfid_device_services_callback(const TumoflipDeviceServicesResult* result, void* context) {
@@ -323,10 +369,35 @@ bool lfrfid_load_raw_key_from_file_select(LfRfid* app) {
     return result;
 }
 
+bool lfrfid_delete_key_file(LfRfid* app, const FuriString* path) {
+    furi_assert(app);
+    furi_assert(path);
+
+    FuriString* sidecar_path = lfrfid_location_sidecar_path(path);
+    const bool removed_file = storage_simply_remove(app->storage, furi_string_get_cstr(path));
+    const bool removed_sidecar =
+        removed_file && storage_simply_remove(app->storage, furi_string_get_cstr(sidecar_path));
+    const bool result = removed_file && removed_sidecar;
+    furi_string_free(sidecar_path);
+    return result;
+}
+
+bool lfrfid_reconcile_replaced_key(LfRfid* app, const FuriString* old_path) {
+    furi_assert(app);
+    furi_assert(old_path);
+
+    if(storage_common_equivalent_path(
+           app->storage, furi_string_get_cstr(old_path), furi_string_get_cstr(app->file_path))) {
+        return true;
+    }
+
+    return lfrfid_reconcile_location_sidecar(app, old_path, app->file_path);
+}
+
 bool lfrfid_delete_key(LfRfid* app) {
     furi_assert(app);
 
-    return storage_simply_remove(app->storage, furi_string_get_cstr(app->file_path));
+    return lfrfid_delete_key_file(app, app->file_path);
 }
 
 bool lfrfid_load_key_data(LfRfid* app, FuriString* path, bool show_dialog) {
