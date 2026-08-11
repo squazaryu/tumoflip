@@ -437,8 +437,11 @@ host-side atomic installer with rollback. See
 For package-only changes, such as a fixed external FAP, use the `Package
 Release` workflow instead of creating a new firmware tag. It rebuilds package
 resources from the selected ref, keeps the firmware version unchanged, and
-replaces only `tumoflip-packages.json`, `tumoflip-packages.zip`, and the release
-SHA-256 sums in the existing GitHub Release.
+publishes a new immutable `fw-packages-stable-NNN` or `fw-packages-dev-NNN`
+catalog containing only `tumoflip-packages.json`, `tumoflip-packages.zip`, and
+their SHA-256 sums. The accepted per-channel baseline is pinned in
+`tools/tumoflip/package_catalog_baselines.json`; the workflow rejects a different
+firmware package set instead of surfacing unrelated rebuilt FAPs as updates.
 
 The standalone FlipperRelay repository lives at
 [squazaryu/flipper_relay](https://github.com/squazaryu/flipper_relay).

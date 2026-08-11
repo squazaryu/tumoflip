@@ -58,6 +58,7 @@ MAX_TARGET_PACKAGE_ENTRIES = 512
 MAX_TARGET_PACKAGE_FILE_BYTES = 16 * 1024 * 1024
 MAX_TARGET_PACKAGE_TOTAL_BYTES = 64 * 1024 * 1024
 CATALOG_RELEASE_TAG = re.compile(r"^fw-packages-(stable|dev)-([0-9]{3})$")
+CATALOG_BASELINES_PATH = Path("tools/tumoflip/package_catalog_baselines.json")
 
 
 def git_output(repo_root: Path, *args: str) -> str:
@@ -93,6 +94,42 @@ def catalog_release_identity(tag: str) -> tuple[str, int]:
     if revision < 1:
         raise ValidationError("Independent package revision must be greater than zero")
     return match.group(1), revision
+
+
+def catalog_baseline(
+    repo_root: Path,
+    channel: str,
+) -> dict[str, object]:
+    path = require_file(
+        repo_root / CATALOG_BASELINES_PATH,
+        "package catalog baselines",
+    )
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise ValidationError(f"Package catalog baselines are invalid: {error}") from error
+    if document.get("schema") != 1:
+        raise ValidationError("Package catalog baselines must use schema 1")
+    baseline = document.get(channel)
+    if not isinstance(baseline, dict):
+        raise ValidationError(f"Package catalog baseline is missing for {channel}")
+    expected_types = {
+        "release_tag": str,
+        "firmware_version": str,
+        "api": str,
+        "target": int,
+    }
+    for key, expected_type in expected_types.items():
+        value = baseline.get(key)
+        if (
+            not isinstance(value, expected_type)
+            or isinstance(value, bool)
+            or (isinstance(value, str) and not value.strip())
+        ):
+            raise ValidationError(
+                f"Package catalog baseline {channel}.{key} is invalid"
+            )
+    return baseline
 
 
 def resolve_target_firmware(
@@ -378,6 +415,23 @@ def build_package_release(
                 f"Catalog channel {catalog_identity[0]} does not match target "
                 f"firmware channel {target_channel}"
             )
+        baseline = catalog_baseline(repo_root, catalog_identity[0])
+        if target_release_tag != baseline["release_tag"]:
+            raise ValidationError(
+                f"Catalog {catalog_identity[0]} baseline must be "
+                f"{baseline['release_tag']}, got {target_release_tag}"
+            )
+        expected_firmware = {
+            "version": baseline["firmware_version"],
+            "api": baseline["api"],
+            "target": baseline["target"],
+        }
+        for key, expected in expected_firmware.items():
+            if target_firmware.get(key) != expected:
+                raise ValidationError(
+                    f"Catalog {catalog_identity[0]} baseline firmware {key} must be "
+                    f"{expected!r}, got {target_firmware.get(key)!r}"
+                )
     resolved_package_id = (
         package_id
         or catalog_release_tag
