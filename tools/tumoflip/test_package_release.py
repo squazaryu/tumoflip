@@ -52,6 +52,27 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
     build = repo / "build/f7-firmware-C"
     resources = build / "resources"
     (repo / "targets/f7").mkdir(parents=True)
+    (repo / "tools/tumoflip").mkdir(parents=True)
+    (repo / "tools/tumoflip/package_catalog_baselines.json").write_text(
+        json.dumps(
+            {
+                "schema": 1,
+                "stable": {
+                    "release_tag": "v1.0.4",
+                    "firmware_version": "t-flppr-fw-004",
+                    "api": "88.0",
+                    "target": 7,
+                },
+                "dev": {
+                    "release_tag": "t-dev-004-013",
+                    "firmware_version": "t-dev-004-013",
+                    "api": "88.0",
+                    "target": 7,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     (repo / "targets/f7/api_symbols.csv").write_text(
         "Version,+,88.0,\n", encoding="utf-8"
     )
@@ -259,6 +280,43 @@ class PackageReleaseTest(unittest.TestCase):
                     target_manifest=target_manifest,
                     target_package_zip=target_zip,
                     catalog_release_tag="fw-packages-dev-001",
+                )
+
+    def test_independent_dev_catalog_requires_accepted_dev_baseline(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo, build, resources = prepare_package_tree(Path(temp))
+            target_manifest, target_zip = prepare_target_package(repo, resources)
+            target_manifest["firmware"]["version"] = "t-dev-004-013"
+            target_manifest.pop("release_id")
+            target_manifest["release_id"] = manifest_release_id(target_manifest)
+            write_file(build / ".extapps/esp_flasher.fap", b"protected esp flasher")
+
+            accepted = build_package_release(
+                repo,
+                build,
+                repo / "accepted",
+                target_release_tag="t-dev-004-013",
+                target_manifest=target_manifest,
+                target_package_zip=target_zip,
+                catalog_release_tag="fw-packages-dev-002",
+            )
+            self.assertEqual(
+                accepted["package_release"]["target_release_tag"],
+                "t-dev-004-013",
+            )
+
+            with self.assertRaisesRegex(
+                ValidationError,
+                "Catalog dev baseline must be t-dev-004-013",
+            ):
+                build_package_release(
+                    repo,
+                    build,
+                    repo / "rejected",
+                    target_release_tag="t-dev-004-014",
+                    target_manifest=target_manifest,
+                    target_package_zip=target_zip,
+                    catalog_release_tag="fw-packages-dev-003",
                 )
 
     def test_package_release_rejects_target_with_different_api(self) -> None:

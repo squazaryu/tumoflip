@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "stable": {
+    "release_tag": "v1.0.4",
+    "firmware_version": "t-flppr-fw-004",
+    "api": "88.0",
+    "target": 7
+  },
+  "dev": {
+    "release_tag": "t-dev-004-013",
+    "firmware_version": "t-dev-004-013",
+    "api": "88.0",
+    "target": 7
+  }
+}

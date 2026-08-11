@@ -77,6 +77,22 @@ jobs:
               echo "Catalog channel $CATALOG_CHANNEL does not match target channel $CHANNEL" >&2
               exit 1
             fi
+            EXPECTED_BASELINE="$(python3 - "$CATALOG_CHANNEL" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          document = json.loads(
+              Path("tools/tumoflip/package_catalog_baselines.json").read_text()
+          )
+          if document.get("schema") != 1:
+              raise SystemExit("Package catalog baselines must use schema 1")
+          print(document[sys.argv[1]]["release_tag"])
+          PY
+            )"
+            if [[ "$TAG" != "$EXPECTED_BASELINE" ]]; then
+              echo "Catalog $CATALOG_CHANNEL baseline must be $EXPECTED_BASELINE; got: $TAG" >&2
+              exit 1
+            fi
             if gh release view "$CATALOG_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
               echo "Catalog release $CATALOG_TAG already exists; publish a new revision instead" >&2
               exit 1

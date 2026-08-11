@@ -90,6 +90,13 @@ records `catalog_channel`, `catalog_revision`, and `catalog_release_tag`. The
 independent GitHub release contains only the package manifest, package ZIP, and
 their checksum ledger; it contains no DFU, updater, or SDK.
 
+The accepted baseline for each channel is pinned in
+`tools/tumoflip/package_catalog_baselines.json`. Publishing a catalog from any
+other firmware tag fails before package generation. This prevents a rebuilt but
+unaccepted firmware package set from making unrelated FAPs appear as updates.
+Change a baseline only when that firmware/package set has completed its own
+acceptance; ordinary FAP updates do not change it.
+
 TumoCompanion selects the newest catalog revision for the device's package
 channel. Firmware version is not package identity. Installation remains
 fail-closed on Tumoflip origin, channel, hardware target, firmware API, embedded
