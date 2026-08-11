@@ -7,6 +7,52 @@
 
 #define TAG                              "NfcApp"
 #define NFC_LOCATION_SIDECAR_PLUGIN_PATH APP_ASSETS_PATH("plugins/nfc_location_sidecar.fal")
+#define TUMOFLIP_LOCATION_SIDECAR_SUFFIX ".tumoflip.json"
+
+static FuriString* nfc_location_sidecar_path(const FuriString* source_path) {
+    furi_assert(source_path);
+    return furi_string_alloc_printf(
+        "%s%s", furi_string_get_cstr(source_path), TUMOFLIP_LOCATION_SIDECAR_SUFFIX);
+}
+
+bool nfc_reconcile_replaced_file(
+    NfcApp* instance,
+    const FuriString* old_path,
+    const FuriString* new_path) {
+    furi_assert(instance);
+    furi_assert(old_path);
+    furi_assert(new_path);
+
+    if(storage_common_equivalent_path(
+           instance->storage, furi_string_get_cstr(old_path), furi_string_get_cstr(new_path))) {
+        return true;
+    }
+
+    FuriString* old_sidecar = nfc_location_sidecar_path(old_path);
+    FuriString* new_sidecar = nfc_location_sidecar_path(new_path);
+    bool result = false;
+
+    if(!storage_file_exists(instance->storage, furi_string_get_cstr(old_sidecar))) {
+        // The destination file has just been replaced. Its previous metadata must not survive.
+        result = storage_simply_remove(instance->storage, furi_string_get_cstr(new_sidecar));
+    } else if(storage_simply_remove(instance->storage, furi_string_get_cstr(new_sidecar))) {
+        const bool copied = storage_common_copy(
+                                instance->storage,
+                                furi_string_get_cstr(old_sidecar),
+                                furi_string_get_cstr(new_sidecar)) == FSE_OK;
+        if(copied) {
+            // Copy first, then remove. If copying fails, the source file and metadata stay intact.
+            result = storage_simply_remove(instance->storage, furi_string_get_cstr(old_sidecar));
+        } else {
+            // Do not leave a partial sidecar attached to the successfully written destination.
+            storage_simply_remove(instance->storage, furi_string_get_cstr(new_sidecar));
+        }
+    }
+
+    furi_string_free(new_sidecar);
+    furi_string_free(old_sidecar);
+    return result;
+}
 
 void nfc_release_location_sidecar(NfcApp* nfc) {
     furi_assert(nfc);
@@ -328,7 +374,7 @@ bool nfc_save_file(NfcApp* instance, FuriString* path) {
     furi_assert(instance);
     furi_assert(path);
 
-    bool result = nfc_device_save(instance->nfc_device, furi_string_get_cstr(instance->file_path));
+    bool result = nfc_device_save(instance->nfc_device, furi_string_get_cstr(path));
 
     if(!result) {
         dialog_message_show_storage_error(instance->dialogs, "Cannot save\nkey file");
@@ -451,19 +497,44 @@ bool nfc_load_file(NfcApp* instance, FuriString* path, bool show_dialog) {
     return result;
 }
 
+bool nfc_delete_file(NfcApp* instance, const FuriString* path) {
+    furi_assert(instance);
+    furi_assert(path);
+
+    // A .shd only ever overlays its .nfc, so either spelling means "remove the card": normalise to
+    // the .nfc and drop the shadow beside it.
+    FuriString* target = furi_string_alloc_set(path);
+    if(furi_string_end_with_str(target, NFC_APP_SHADOW_EXTENSION)) {
+        furi_string_replace_at(target, furi_string_size(target) - 4, 4, NFC_APP_EXTENSION);
+    }
+
+    FuriString* shadow_path = furi_string_alloc();
+    FuriString* sidecar_path = nfc_location_sidecar_path(target);
+    const bool removed_file =
+        storage_simply_remove(instance->storage, furi_string_get_cstr(target));
+    bool result = removed_file;
+    if(nfc_set_shadow_file_path(target, shadow_path)) {
+        // A surviving shadow would hijack the next card saved under this name, so it counts
+        // towards the result. storage_simply_remove() is happy when the file is already gone.
+        result = storage_simply_remove(instance->storage, furi_string_get_cstr(shadow_path)) &&
+                 result;
+    }
+    const bool removed_sidecar =
+        removed_file &&
+        storage_simply_remove(instance->storage, furi_string_get_cstr(sidecar_path));
+    result = removed_sidecar && result;
+
+    furi_string_free(sidecar_path);
+    furi_string_free(shadow_path);
+    furi_string_free(target);
+
+    return result;
+}
+
 bool nfc_delete(NfcApp* instance) {
     furi_assert(instance);
 
-    if(nfc_has_shadow_file(instance)) {
-        nfc_delete_shadow_file(instance);
-    }
-
-    if(furi_string_end_with_str(instance->file_path, NFC_APP_SHADOW_EXTENSION)) {
-        size_t path_len = furi_string_size(instance->file_path);
-        furi_string_replace_at(instance->file_path, path_len - 4, 4, NFC_APP_EXTENSION);
-    }
-
-    return storage_simply_remove(instance->storage, furi_string_get_cstr(instance->file_path));
+    return nfc_delete_file(instance, instance->file_path);
 }
 
 bool nfc_delete_shadow_file(NfcApp* instance) {
