@@ -1,5 +1,7 @@
 #include "esp_flasher_worker.h"
 
+#include <stdlib.h>
+
 FuriStreamBuffer* flash_rx_stream; // TODO make safe
 EspFlasherApp* global_app; // TODO make safe
 FuriTimer* timer; // TODO make
@@ -339,21 +341,27 @@ static int32_t esp_flasher_flash_bin(void* context) {
     }
 
     if(!err && app->package_mode) {
-        EspFlashPackagePlan verified_plan;
+        // The complete plan is close to 1 KiB. Allocating it in this worker frame on top of
+        // the verifier's hash buffers left too little stack headroom during physical C5 flashing.
+        // Revalidation is still fail-closed and happens before the first erase.
+        EspFlashPackagePlan* verified_plan = malloc(sizeof(*verified_plan));
         char verified_path[ESP_FLASH_PACKAGE_PATH_MAX];
         char validation_error[128] = {0};
         const char* directory_name = strrchr(app->package_path, '/');
-        if(!directory_name || !directory_name[1] ||
+        if(!verified_plan) {
+            loader_port_debug_print("Not enough memory to revalidate package\n");
+            err = ESP_LOADER_ERROR_FAIL;
+        } else if(!directory_name || !directory_name[1] ||
            !esp_flash_package_load_verified(
                app->storage,
                directory_name + 1,
-               &verified_plan,
+               verified_plan,
                verified_path,
                sizeof(verified_path),
                validation_error,
                sizeof(validation_error)) ||
            strcmp(verified_path, app->package_path) != 0 ||
-           memcmp(&verified_plan, &app->package_plan, sizeof(verified_plan)) != 0) {
+           memcmp(verified_plan, &app->package_plan, sizeof(*verified_plan)) != 0) {
             char message[192];
             snprintf(
                 message,
@@ -365,6 +373,7 @@ static int32_t esp_flasher_flash_bin(void* context) {
         } else {
             loader_port_debug_print("Package revalidated before erase\n");
         }
+        free(verified_plan);
     }
 
     // Change rate only after the package target gate and before the first erase.
@@ -507,7 +516,9 @@ void esp_flasher_worker_start_thread(EspFlasherApp* app) {
 
     app->flash_worker = furi_thread_alloc();
     furi_thread_set_name(app->flash_worker, "EspFlasherFlashWorker");
-    furi_thread_set_stack_size(app->flash_worker, 4096);
+    // Leave explicit headroom for the serial flasher and storage call chains. Large package
+    // verification buffers live on the heap, so this is a guard rather than the primary fix.
+    furi_thread_set_stack_size(app->flash_worker, 6 * 1024);
     furi_thread_set_context(app->flash_worker, app);
     if(app->reset || app->boot) {
         furi_thread_set_callback(app->flash_worker, esp_flasher_reset);

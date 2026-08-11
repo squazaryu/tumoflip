@@ -184,12 +184,18 @@ static bool storage_validate_segment(
     MD5Init(&md5);
     zf_sha256_init(&sha256);
 
+    // Package verification runs both from the UI and from the flash worker. Keeping this
+    // buffer on the stack left too little headroom in the worker's nested revalidation path.
+    // A failed allocation is safe here: no ESP flash operation has started yet.
+    const size_t hash_buffer_size = 1024U;
+    uint8_t* buffer = malloc(hash_buffer_size);
+    if(!buffer) return storage_error(error, error_size, "Not enough memory to verify segment");
+
     File* file = storage_file_alloc(storage);
     bool valid = storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING);
-    uint8_t buffer[1024];
     uint32_t remaining = segment->size;
     while(valid && remaining > 0U) {
-        const size_t requested = remaining < sizeof(buffer) ? remaining : sizeof(buffer);
+        const size_t requested = remaining < hash_buffer_size ? remaining : hash_buffer_size;
         const size_t read = storage_file_read(file, buffer, requested);
         if(read == 0U) {
             valid = false;
@@ -201,6 +207,7 @@ static bool storage_validate_segment(
     }
     storage_file_close(file);
     storage_file_free(file);
+    free(buffer);
 
     uint8_t actual_md5[16];
     uint8_t actual_sha256[32];
