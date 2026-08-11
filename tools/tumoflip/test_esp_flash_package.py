@@ -70,6 +70,25 @@ class EspFlashPackageTests(unittest.TestCase):
         self.assertIn('"Flash Package"', start)
         self.assertIn('"Manual Flash"', start)
 
+    def test_c5_package_uses_conservative_verified_transport(self):
+        confirm = (
+            APP_ROOT / "scenes/esp_flasher_scene_package_confirm.c"
+        ).read_text(encoding="utf-8")
+        worker = (APP_ROOT / "esp_flasher_worker.c").read_text(encoding="utf-8")
+        loader = (
+            APP_ROOT / "lib/esp-serial-flasher/src/esp_loader.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "app->package_plan.target != EspFlashPackageTargetEsp32C5",
+            confirm,
+        )
+        self.assertIn("C5 MD5 timed out; retrying verification once", worker)
+        self.assertIn("Segment %s failed with error %u", worker)
+        self.assertIn("ESP32C5_MD5_MIN_TIMEOUT 10000", loader)
+        self.assertIn("ESP32C5_DEFAULT_FLASH_SIZE 4 * 1024 * 1024", loader)
+        self.assertIn("loader_port_start_timer(md5_timeout(size))", loader)
+
     def test_offline_c5_fallback_is_versioned_and_back_routes_to_c5(self):
         quick = (APP_ROOT / "scenes/esp_flasher_scene_quick.c").read_text(
             encoding="utf-8"

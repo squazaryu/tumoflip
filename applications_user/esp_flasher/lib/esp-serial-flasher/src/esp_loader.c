@@ -28,6 +28,7 @@
 #define DEFAULT_FLASH_TIMEOUT 3000
 #define LOAD_RAM_TIMEOUT_PER_MB 2000000
 #define MD5_TIMEOUT_PER_MB 8000
+#define ESP32C5_MD5_MIN_TIMEOUT 10000
 #define ERASE_FLASH_TIMEOUT_PER_MB 10000
 
 #define FLASH_SECTOR_SIZE 4096
@@ -42,6 +43,7 @@ static target_chip_t s_target = ESP_UNKNOWN_CHIP;
 
 #ifndef SERIAL_FLASHER_INTERFACE_SPI
 #define DEFAULT_FLASH_SIZE 2 * 1024 * 1024
+#define ESP32C5_DEFAULT_FLASH_SIZE 4 * 1024 * 1024
 static uint32_t s_flash_write_size = 0;
 static uint32_t s_target_flash_size = 0;
 #endif
@@ -73,8 +75,18 @@ static inline void md5_final(uint8_t digets[16])
 
 static uint32_t timeout_per_mb(uint32_t size_bytes, uint32_t time_per_mb)
 {
-    uint32_t timeout = time_per_mb * (size_bytes / 1e6);
+    const uint64_t timeout =
+        ((uint64_t)time_per_mb * size_bytes + 1000000U - 1U) / 1000000U;
     return MAX(timeout, DEFAULT_FLASH_TIMEOUT);
+}
+
+static uint32_t md5_timeout(uint32_t size_bytes)
+{
+    uint32_t timeout = timeout_per_mb(size_bytes, MD5_TIMEOUT_PER_MB);
+    if (s_target == ESP32C5_CHIP) {
+        timeout = MAX(timeout, ESP32C5_MD5_MIN_TIMEOUT);
+    }
+    return timeout;
 }
 
 esp_loader_error_t esp_loader_connect(esp_loader_connect_args_t *connect_args)
@@ -332,8 +344,15 @@ static esp_loader_error_t init_flash_params(void)
     /* Flash size will be known in advance if we're in secure download mode or we already read it*/
     if (s_target_flash_size == 0) {
         if (esp_loader_flash_detect_size(&s_target_flash_size) != ESP_LOADER_SUCCESS) {
-            loader_port_debug_print("Flash size detection failed, falling back to default");
-            s_target_flash_size = DEFAULT_FLASH_SIZE;
+            if (s_target == ESP32C5_CHIP) {
+                loader_port_debug_print(
+                    "Flash size detection failed; using C5 4 MiB profile\n");
+                s_target_flash_size = ESP32C5_DEFAULT_FLASH_SIZE;
+            } else {
+                loader_port_debug_print(
+                    "Flash size detection failed; using 2 MiB default\n");
+                s_target_flash_size = DEFAULT_FLASH_SIZE;
+            }
         }
     }
 
@@ -763,7 +782,7 @@ esp_loader_error_t esp_loader_flash_verify_known_md5(uint32_t address,
     /* Zero termination require 1 byte */
     uint8_t received_md5[MAX(MD5_SIZE_ROM, MD5_SIZE_STUB) + 1] = {0};
 
-    loader_port_start_timer(timeout_per_mb(size, MD5_TIMEOUT_PER_MB));
+    loader_port_start_timer(md5_timeout(size));
 
     RETURN_ON_ERROR(loader_md5_cmd(address, size, received_md5));
 
