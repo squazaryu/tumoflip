@@ -49,7 +49,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("sync_readme_version.py", workflow)
         self.assertIn("heatshrink2==0.13.0", workflow)
         self.assertIn("package_release.py", workflow)
-        self.assertIn("updater_package fap_esp_flasher", workflow)
+        self.assertIn("updater_package fap_esp_flasher -j2", workflow)
         self.assertIn("--target-manifest", workflow)
         self.assertIn("--target-package-zip", workflow)
         self.assertIn('steps.target.outputs.manifest', workflow)
