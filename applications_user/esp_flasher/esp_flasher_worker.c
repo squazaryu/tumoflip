@@ -106,6 +106,14 @@ static esp_loader_error_t _flash_file(
         expected_md5_hex[32] = '\0';
         err = esp_loader_flash_verify_known_md5(
             addr, (uint32_t)total_size, expected_md5_hex);
+        if(err == ESP_LOADER_ERROR_TIMEOUT && app->package_mode &&
+           app->package_plan.target == EspFlashPackageTargetEsp32C5) {
+            // Retrying the read-only ROM digest command is safe: the segment is not
+            // erased or written again, and a second failure remains fail-closed.
+            loader_port_debug_print("C5 MD5 timed out; retrying verification once\n");
+            err = esp_loader_flash_verify_known_md5(
+                addr, (uint32_t)total_size, expected_md5_hex);
+        }
         if(err != ESP_LOADER_SUCCESS) {
             snprintf(user_msg, sizeof(user_msg), "Target verify failed with error %u\n", err);
             loader_port_debug_print(user_msg);
@@ -286,7 +294,16 @@ static esp_loader_error_t _flash_package_files(EspFlasherApp* app) {
         loader_port_debug_print(user_msg);
         const esp_loader_error_t err =
             _flash_file(app, path, segment->offset, segment->size, segment->md5);
-        if(err != ESP_LOADER_SUCCESS) return err;
+        if(err != ESP_LOADER_SUCCESS) {
+            snprintf(
+                user_msg,
+                sizeof(user_msg),
+                "Segment %s failed with error %u\n",
+                esp_flash_package_role_name(segment->role),
+                (unsigned)err);
+            loader_port_debug_print(user_msg);
+            return err;
+        }
     }
     return ESP_LOADER_SUCCESS;
 }
