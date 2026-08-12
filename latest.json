@@ -1,0 +1,1006 @@
+{
+  "schema": 2,
+  "sourceRepository": "xMasterX/all-the-plugins",
+  "generatedAt": "2026-08-12T09:29:17+00:00",
+  "audits": [
+    {
+      "sequence": 20260809193105,
+      "sourceTag": "9aug2026",
+      "sourceCommit": "0b71d9f34fec8ae3ba763b8de27ef15d1d604c5b",
+      "sourceURL": "https://github.com/xMasterX/all-the-plugins/releases/tag/9aug2026",
+      "publishedAt": "2026-08-09T19:31:05Z",
+      "api": "88.2",
+      "auditIssue": "https://github.com/squazaryu/tumoflip/issues/302",
+      "issue": {
+        "number": 302,
+        "url": "https://github.com/squazaryu/tumoflip/issues/302",
+        "state": "open"
+      },
+      "overallStatus": "pending",
+      "archives": [
+        {
+          "pack": "base",
+          "fileName": "all-the-apps-base.zip",
+          "sha256": "75002c05ac1dd49774acc52407bab7adb4857d5067efd098230e10ae93522a6a"
+        },
+        {
+          "pack": "extra",
+          "fileName": "all-the-apps-extra.zip",
+          "sha256": "a084a374d9e745b7d061b9e55f8585bc1a1e5829588c29d5e2b1682a55c3a917"
+        }
+      ],
+      "entries": [
+        {
+          "remotePath": "/ext/apps/Bluetooth/claude_remote_ble.fap",
+          "targetPath": "/ext/apps/Bluetooth/claude_remote_ble.fap",
+          "sourceMD5": "5e2047a5ffadd596d17171e17268777c",
+          "disposition": "intentionallyReplaced",
+          "note": "Claude Buddy replaces Agentic Remote by design; the upstream target remains absent.",
+          "targetMD5s": [],
+          "targetProvenance": []
+        },
+        {
+          "remotePath": "/ext/apps/GPIO/esp32_wifi_marauder.fap",
+          "targetPath": "/ext/apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
+          "sourceMD5": "0433a99999562c15e80db5a1d1d6eee0",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip keeps its Module One CLI-compatible protected build.",
+          "targetMD5s": [
+            "4280fa5e1696248b5f21cd0157df6c07",
+            "54b2ffcdb88cf3c25eacd99269c0db52"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "4280fa5e1696248b5f21cd0157df6c07",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "54b2ffcdb88cf3c25eacd99269c0db52",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps/GPIO/esp_flasher.fap",
+          "targetPath": "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+          "sourceMD5": "5a42646fe63dafd2f44d572cbcc0ae9c",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip ships a package-aware protected ESP Flasher through FW Packages.",
+          "targetMD5s": [
+            "0721d8da59efdfdf05c08e97b5e5b501",
+            "103a4aca9cce985b798bb705549c2ed0"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "103a4aca9cce985b798bb705549c2ed0",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "0721d8da59efdfdf05c08e97b5e5b501",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps/Infrared/flipper_xremote.fap",
+          "targetPath": "/ext/apps/Module One/IR Blaster/tumoflip_xremote.fap",
+          "sourceMD5": "f63a2449edae6ab7c0a1c5a96e426e14",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip keeps its accepted profile editor and Module One route.",
+          "targetMD5s": [
+            "9173da206a2de38d231d4c6da8ae60d4",
+            "9b69cb41de4362ecfc5a217065916e3b"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "9b69cb41de4362ecfc5a217065916e3b",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "9173da206a2de38d231d4c6da8ae60d4",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps/Sub-GHz/proto_pirate.fap",
+          "targetPath": "/ext/apps_data/arf_subghz_full/modules/proto_pirate.fap",
+          "sourceMD5": "4e40ccf1f47c732dfbf9e891e12e0be0",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip keeps the isolated ARF module build and radio broker integration.",
+          "targetMD5s": [
+            "56b13f6ee3b1513482ae6be63c83fc75",
+            "c2ee0aa6e97b3b24b64d32ebbf85e40f"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "56b13f6ee3b1513482ae6be63c83fc75",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "c2ee0aa6e97b3b24b64d32ebbf85e40f",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps/Sub-GHz/subghz_bruteforcer.fap",
+          "targetPath": "/ext/apps_data/arf_subghz_full/modules/subghz_bruteforcer.fap",
+          "sourceMD5": "3fb146392dca6613161ab3b8be08a6d9",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip keeps the isolated ARF module and radio broker integration.",
+          "targetMD5s": [
+            "183c69bf242e83f7775f8c35765a9965",
+            "8170a9c2ea8e70e0686b40e33ac338b9"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "183c69bf242e83f7775f8c35765a9965",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "8170a9c2ea8e70e0686b40e33ac338b9",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps/Sub-GHz/subghz_wardriving.fap",
+          "targetPath": "/ext/apps/Sub-GHz/subghz_wardriving.fap",
+          "sourceMD5": "c5ffb294251247d10fa51dae339e4765",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip keeps its API 88 and iPhone GPS bridge integration.",
+          "targetMD5s": [
+            "c91d7a06e4bfb8697d3dff8ad50b7502",
+            "c9c832b9172b064e249099116cc71a7d"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "c91d7a06e4bfb8697d3dff8ad50b7502",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "c9c832b9172b064e249099116cc71a7d",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps/Tools/quac.fap",
+          "targetPath": "/ext/apps/Tools/quac.fap",
+          "sourceMD5": "a278d93cf3d33be6d4f15bc2b10b9643",
+          "disposition": "auditedDifference",
+          "note": "No source was imported by this audit; license must be resolved before a future port.",
+          "targetMD5s": [
+            "6c5b8bcff802092ef008c0f39d56e250",
+            "c10c2807d5944f0c0bef7d4275f05618"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "6c5b8bcff802092ef008c0f39d56e250",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "c10c2807d5944f0c0bef7d4275f05618",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps/Tools/totp.fap",
+          "targetPath": "/ext/apps/Tools/totp.fap",
+          "sourceMD5": "ece2bfe5d6e5c6ccd0cc3653ccc19d13",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "a34e2657e5acb0f033bd62e06f85f98e",
+            "e18e7ae0eee268f5ca1cc3429cbc9e77"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "a34e2657e5acb0f033bd62e06f85f98e",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "e18e7ae0eee268f5ca1cc3429cbc9e77",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_add_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_add_plugin.fal",
+          "sourceMD5": "57f902956220b2a13e0c0cdf66673b52",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "65b3a83b8ed97e847085b7d1c6f0d6aa"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "65b3a83b8ed97e847085b7d1c6f0d6aa",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_automation_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_automation_plugin.fal",
+          "sourceMD5": "7bea84a51f9af0421b48b4e9ed2046c9",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "4aafe4d9cb200f3ccbffef580727416f"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "4aafe4d9cb200f3ccbffef580727416f",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_delete_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_delete_plugin.fal",
+          "sourceMD5": "6122b7e93e54fbb33c084f41c05c78ac",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "7938f82283de7c0d9bb56bc5aa9093b5"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "7938f82283de7c0d9bb56bc5aa9093b5",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_details_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_details_plugin.fal",
+          "sourceMD5": "a77e5c18756376870f5a642b01fe0dbd",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "700a254606cac3f36d9ad4737fc1836e"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "700a254606cac3f36d9ad4737fc1836e",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_export_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_export_plugin.fal",
+          "sourceMD5": "a36718e896a1e3375ab8a661091e9580",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "87e42248f3149b4ce89dec3373b89611"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "87e42248f3149b4ce89dec3373b89611",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_help_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_help_plugin.fal",
+          "sourceMD5": "871f895ea5a66eacf582042c73425932",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "8fd3ee1bdab9b4816234824627dcd8e5"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "8fd3ee1bdab9b4816234824627dcd8e5",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_list_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_list_plugin.fal",
+          "sourceMD5": "2d98f3ea1e5afe00707808f19e2b6066",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "0235714b6ce77836f0c5e2a5eb4b5bc5"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "0235714b6ce77836f0c5e2a5eb4b5bc5",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_move_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_move_plugin.fal",
+          "sourceMD5": "6fc428cfa133d5368fb99a8c22a45a3b",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "b555fb9f890f2338bbd0650c0f4f97f4"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "b555fb9f890f2338bbd0650c0f4f97f4",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_notification_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_notification_plugin.fal",
+          "sourceMD5": "ef3ed8f31b0e6498cf14934aeb3421ad",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "486cb5f61afcbc0e13a755c866cd7119"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "486cb5f61afcbc0e13a755c866cd7119",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_pin_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_pin_plugin.fal",
+          "sourceMD5": "593b9575956a7c92491c2b9ddd8e2821",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "39710343494a4d2921bc3d7269d77949"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "39710343494a4d2921bc3d7269d77949",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_reset_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_reset_plugin.fal",
+          "sourceMD5": "0350b001b35faf6356d18c0daa9258b1",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "de749192b3bf0140f02ddfef44e9a2a3"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "de749192b3bf0140f02ddfef44e9a2a3",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_timezone_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_timezone_plugin.fal",
+          "sourceMD5": "e9000c460a557969eb4e69d73242c731",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "c3cafa4b91be1c1205d04730709a1ec1"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "c3cafa4b91be1c1205d04730709a1ec1",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_update_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_update_plugin.fal",
+          "sourceMD5": "40bc6e8ccf06679536dfb113be0c1663",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "4c5657e85807f4c8ce9eb7abd4053e45"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "4c5657e85807f4c8ce9eb7abd4053e45",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_version_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_version_plugin.fal",
+          "sourceMD5": "faa96e593c0b642aba8dda791603dc62",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "targetMD5s": [
+            "cb6dd549f6ac602eef686b18a5335c94"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "cb6dd549f6ac602eef686b18a5335c94",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            }
+          ]
+        }
+      ],
+      "apps": [
+        {
+          "appId": "esp32_wifi_marauder",
+          "aliases": [
+            "wifi_marauder_companion"
+          ],
+          "packSourcePath": "base_pack/wifi_marauder_companion",
+          "localSourcePath": "applications_user/esp32_wifi_marauder",
+          "packSourceChanged": false,
+          "author": {
+            "repository": "https://github.com/0xchocolate/flipperzero-wifi-marauder.git",
+            "ref": "refs/heads/feature_wifi_marauder_app",
+            "previousCommit": "8f8b79e4a97b283faac41dda4e4da8d260ddc459",
+            "currentCommit": "8f8b79e4a97b283faac41dda4e4da8d260ddc459",
+            "changed": false,
+            "license": "GPL-3.0"
+          },
+          "status": "verified",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip keeps its Module One CLI-compatible protected build.",
+          "artifacts": [
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps/GPIO/esp32_wifi_marauder.fap",
+              "targetPath": "/ext/apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
+              "sourceMD5": "0433a99999562c15e80db5a1d1d6eee0",
+              "ledgerStatus": "accepted"
+            }
+          ]
+        },
+        {
+          "appId": "esp_flasher",
+          "aliases": [],
+          "packSourcePath": "non_catalog_apps/esp_flasher",
+          "localSourcePath": "applications_user/esp_flasher",
+          "packSourceChanged": false,
+          "author": {
+            "repository": "https://github.com/0xchocolate/flipperzero-esp-flasher.git",
+            "ref": "refs/heads/main",
+            "previousCommit": "1f6f801c3ebecbc4afbf6500564bf99748710e24",
+            "currentCommit": "1f6f801c3ebecbc4afbf6500564bf99748710e24",
+            "changed": false,
+            "license": "GPL-3.0"
+          },
+          "status": "verified",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip ships a package-aware protected ESP Flasher through FW Packages.",
+          "artifacts": [
+            {
+              "pack": "extra",
+              "remotePath": "/ext/apps/GPIO/esp_flasher.fap",
+              "targetPath": "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+              "sourceMD5": "5a42646fe63dafd2f44d572cbcc0ae9c",
+              "ledgerStatus": "accepted"
+            }
+          ]
+        },
+        {
+          "appId": "proto_pirate",
+          "aliases": [
+            "protopirate"
+          ],
+          "packSourcePath": "base_pack/protopirate",
+          "localSourcePath": "applications_user/protopirate",
+          "packSourceChanged": false,
+          "author": {
+            "repository": "https://protopirate.net/ProtoPirate/ProtoPirate.git",
+            "ref": "refs/heads/main",
+            "previousCommit": "4b039064a02d95c9bc23d390caacee1d40efe790",
+            "currentCommit": "4b039064a02d95c9bc23d390caacee1d40efe790",
+            "changed": false,
+            "license": "GPL-3.0"
+          },
+          "status": "verified",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip keeps the isolated ARF module build and radio broker integration.",
+          "artifacts": [
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps/Sub-GHz/proto_pirate.fap",
+              "targetPath": "/ext/apps_data/arf_subghz_full/modules/proto_pirate.fap",
+              "sourceMD5": "4e40ccf1f47c732dfbf9e891e12e0be0",
+              "ledgerStatus": "accepted"
+            }
+          ]
+        },
+        {
+          "appId": "subghz_bruteforcer",
+          "aliases": [
+            "subbrute"
+          ],
+          "packSourcePath": "base_pack/subbrute",
+          "localSourcePath": "applications_user/subghz_bruteforcer",
+          "packSourceChanged": false,
+          "author": {
+            "repository": "https://github.com/DarkFlippers/flipperzero-subbrute.git",
+            "ref": "refs/heads/master",
+            "previousCommit": "b199dcef9181a220cb665a84f893d1d6a6608099",
+            "currentCommit": "b199dcef9181a220cb665a84f893d1d6a6608099",
+            "changed": false,
+            "license": "MIT"
+          },
+          "status": "verified",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip keeps the isolated ARF module and radio broker integration.",
+          "artifacts": [
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps/Sub-GHz/subghz_bruteforcer.fap",
+              "targetPath": "/ext/apps_data/arf_subghz_full/modules/subghz_bruteforcer.fap",
+              "sourceMD5": "3fb146392dca6613161ab3b8be08a6d9",
+              "ledgerStatus": "accepted"
+            }
+          ]
+        },
+        {
+          "appId": "subghz_wardriving",
+          "aliases": [],
+          "packSourcePath": "base_pack/subghz_wardriving",
+          "localSourcePath": "applications_user/subghz_wardriving",
+          "packSourceChanged": false,
+          "author": {
+            "repository": "https://github.com/xMasterX/all-the-plugins.git",
+            "ref": "release-source",
+            "previousCommit": "0b71d9f34fec8ae3ba763b8de27ef15d1d604c5b",
+            "currentCommit": "0b71d9f34fec8ae3ba763b8de27ef15d1d604c5b",
+            "changed": false,
+            "license": "not-declared"
+          },
+          "status": "verified",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip keeps its API 88 and iPhone GPS bridge integration.",
+          "artifacts": [
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps/Sub-GHz/subghz_wardriving.fap",
+              "targetPath": "/ext/apps/Sub-GHz/subghz_wardriving.fap",
+              "sourceMD5": "c5ffb294251247d10fa51dae339e4765",
+              "ledgerStatus": "accepted"
+            }
+          ]
+        },
+        {
+          "appId": "quac",
+          "aliases": [],
+          "packSourcePath": "base_pack/quac",
+          "localSourcePath": "applications_user/quac",
+          "packSourceChanged": false,
+          "author": {
+            "repository": "https://github.com/rdefeo/quac.git",
+            "ref": "refs/heads/master",
+            "previousCommit": "54e897fe2d862963e5c19ef5d4feb3d025630610",
+            "currentCommit": "54e897fe2d862963e5c19ef5d4feb3d025630610",
+            "changed": false,
+            "license": "not-declared"
+          },
+          "status": "verified",
+          "disposition": "auditedDifference",
+          "note": "No source was imported by this audit; license must be resolved before a future port.",
+          "artifacts": [
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps/Tools/quac.fap",
+              "targetPath": "/ext/apps/Tools/quac.fap",
+              "sourceMD5": "a278d93cf3d33be6d4f15bc2b10b9643",
+              "ledgerStatus": "accepted"
+            }
+          ]
+        },
+        {
+          "appId": "totp",
+          "aliases": [
+            "authenticator"
+          ],
+          "packSourcePath": "base_pack/totp",
+          "localSourcePath": "applications_user/totp",
+          "packSourceChanged": false,
+          "author": {
+            "repository": "https://github.com/akopachov/flipper-zero_authenticator.git",
+            "ref": "refs/heads/master",
+            "previousCommit": "753e953baaaacad67e9054ef62177ef36a8f5f7e",
+            "currentCommit": "753e953baaaacad67e9054ef62177ef36a8f5f7e",
+            "changed": false,
+            "license": "GPL-3.0"
+          },
+          "status": "verified",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
+          "artifacts": [
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps/Tools/totp.fap",
+              "targetPath": "/ext/apps/Tools/totp.fap",
+              "sourceMD5": "ece2bfe5d6e5c6ccd0cc3653ccc19d13",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_add_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_add_plugin.fal",
+              "sourceMD5": "57f902956220b2a13e0c0cdf66673b52",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_automation_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_automation_plugin.fal",
+              "sourceMD5": "7bea84a51f9af0421b48b4e9ed2046c9",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_delete_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_delete_plugin.fal",
+              "sourceMD5": "6122b7e93e54fbb33c084f41c05c78ac",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_details_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_details_plugin.fal",
+              "sourceMD5": "a77e5c18756376870f5a642b01fe0dbd",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_export_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_export_plugin.fal",
+              "sourceMD5": "a36718e896a1e3375ab8a661091e9580",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_help_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_help_plugin.fal",
+              "sourceMD5": "871f895ea5a66eacf582042c73425932",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_list_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_list_plugin.fal",
+              "sourceMD5": "2d98f3ea1e5afe00707808f19e2b6066",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_move_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_move_plugin.fal",
+              "sourceMD5": "6fc428cfa133d5368fb99a8c22a45a3b",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_notification_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_notification_plugin.fal",
+              "sourceMD5": "ef3ed8f31b0e6498cf14934aeb3421ad",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_pin_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_pin_plugin.fal",
+              "sourceMD5": "593b9575956a7c92491c2b9ddd8e2821",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_reset_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_reset_plugin.fal",
+              "sourceMD5": "0350b001b35faf6356d18c0daa9258b1",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_timezone_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_timezone_plugin.fal",
+              "sourceMD5": "e9000c460a557969eb4e69d73242c731",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_update_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_update_plugin.fal",
+              "sourceMD5": "40bc6e8ccf06679536dfb113be0c1663",
+              "ledgerStatus": "accepted"
+            },
+            {
+              "pack": "base",
+              "remotePath": "/ext/apps_data/totp/plugins/totp_cli_version_plugin.fal",
+              "targetPath": "/ext/apps_data/totp/plugins/totp_cli_version_plugin.fal",
+              "sourceMD5": "faa96e593c0b642aba8dda791603dc62",
+              "ledgerStatus": "accepted"
+            }
+          ]
+        },
+        {
+          "appId": "claude_buddy",
+          "aliases": [
+            "claude_remote_ble"
+          ],
+          "packSourcePath": "non_catalog_apps/claude_remote_ble",
+          "localSourcePath": "applications_user/claude_buddy",
+          "packSourceChanged": false,
+          "author": {
+            "repository": "https://github.com/D4C1-Labs/Flipper-ARF.git",
+            "ref": "refs/heads/main",
+            "previousCommit": "56701a815b54121a4b4d102e361add5468ffa92b",
+            "currentCommit": "56701a815b54121a4b4d102e361add5468ffa92b",
+            "changed": false,
+            "license": "replacement-by-design"
+          },
+          "status": "verified",
+          "disposition": "intentionallyReplaced",
+          "note": "Claude Buddy replaces Agentic Remote by design; the upstream target remains absent.",
+          "artifacts": [
+            {
+              "pack": "extra",
+              "remotePath": "/ext/apps/Bluetooth/claude_remote_ble.fap",
+              "targetPath": "/ext/apps/Bluetooth/claude_remote_ble.fap",
+              "sourceMD5": "5e2047a5ffadd596d17171e17268777c",
+              "ledgerStatus": "accepted"
+            }
+          ]
+        },
+        {
+          "appId": "flipper_xremote",
+          "aliases": [
+            "xremote",
+            "tumoflip_xremote"
+          ],
+          "packSourcePath": "non_catalog_apps/xremote",
+          "localSourcePath": "applications_user/flipper_xremote",
+          "packSourceChanged": false,
+          "author": {
+            "repository": "https://github.com/kala13x/flipper-xremote.git",
+            "ref": "refs/heads/main",
+            "previousCommit": "95e629eff960c71754d0a2768a54883df066a588",
+            "currentCommit": "95e629eff960c71754d0a2768a54883df066a588",
+            "changed": false,
+            "license": "GPL-3.0"
+          },
+          "status": "verified",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip keeps its accepted profile editor and Module One route.",
+          "artifacts": [
+            {
+              "pack": "extra",
+              "remotePath": "/ext/apps/Infrared/flipper_xremote.fap",
+              "targetPath": "/ext/apps/Module One/IR Blaster/tumoflip_xremote.fap",
+              "sourceMD5": "f63a2449edae6ab7c0a1c5a96e426e14",
+              "ledgerStatus": "accepted"
+            }
+          ]
+        },
+        {
+          "appId": "subghz_raw_edit",
+          "aliases": [
+            "subghz_raw_editor"
+          ],
+          "packSourcePath": "non_catalog_apps/subghz_raw_editor",
+          "localSourcePath": "applications_user/subghz_raw_edit",
+          "packSourceChanged": false,
+          "author": {
+            "repository": "https://github.com/Lechnio/SubGHz-RAW-Edit.git",
+            "ref": "refs/heads/main",
+            "previousCommit": "49a12e37a8c940a1665477bb41eb25d21bc82721",
+            "currentCommit": "d60ee2a34fa87b89c99f1ba9056737765f9f921f",
+            "changed": true,
+            "license": "GPL-3.0"
+          },
+          "status": "needsReview",
+          "disposition": "needsReview",
+          "note": "Author changes after v1.7 require issue #281 port and FW Packages publication.",
+          "artifacts": [
+            {
+              "pack": "extra",
+              "remotePath": "/ext/apps/Sub-GHz/subghz_raw_edit.fap",
+              "targetPath": "/ext/apps/ARF Tools/subghz_raw_edit.fap",
+              "sourceMD5": "fdcdad31fa9afae657cc16eec7113816",
+              "ledgerStatus": "needsReview"
+            }
+          ]
+        }
+      ],
+      "unresolved": [
+        "subghz_raw_edit:/ext/apps/Sub-GHz/subghz_raw_edit.fap: author source changed or unavailable"
+      ],
+      "generatedAt": "2026-08-12T09:29:17+00:00"
+    }
+  ]
+}
