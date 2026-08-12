@@ -396,6 +396,9 @@ bool subghz_txrx_get_debug_pin_state(SubGhzTxRx* instance);
 
 void subghz_txrx_reset_dynamic_and_custom_btns(SubGhzTxRx* instance);
 
+/** Reset all decoder instances owned by this RX session. */
+void subghz_txrx_receiver_reset(SubGhzTxRx* instance);
+
 SubGhzReceiver* subghz_txrx_get_receiver(SubGhzTxRx* instance); // TODO use only in DecodeRaw
 
 /**

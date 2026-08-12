@@ -261,7 +261,12 @@ void subghz_scene_receiver_on_enter(void* context) {
         subghz_txrx_hopper_set_state(subghz->txrx, SubGhzHopperStateOFF);
     }
 
+    // Time spent in a scene above this one must not expire the duplicate filter.
+    // subghz_txrx_rx_start() resets both diversity decoders before async RX starts.
+    subghz_history_restart_duplicate_timeout(history);
+
     subghz_txrx_rx_start(subghz->txrx);
+
     subghz_view_receiver_set_idx_menu(subghz->subghz_receiver, subghz->idx_menu_chosen);
 
     //to use a universal decoder, we are looking for a link to it

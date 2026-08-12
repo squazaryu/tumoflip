@@ -425,6 +425,13 @@ bool subghz_txrx_get_debug_pin_state(SubGhzTxRx* instance);
 
 void subghz_txrx_reset_dynamic_and_custom_btns(SubGhzTxRx* instance);
 
+/** Reset all decoder instances owned by this RX session.
+ *
+ * In diversity mode the primary and secondary receivers keep independent parser
+ * state, so both must be reset before asynchronous RX is restarted.
+ */
+void subghz_txrx_receiver_reset(SubGhzTxRx* instance);
+
 SubGhzReceiver* subghz_txrx_get_receiver(SubGhzTxRx* instance); // TODO use only in DecodeRaw
 
 /**
