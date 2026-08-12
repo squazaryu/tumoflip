@@ -187,8 +187,7 @@ jobs:
               --limit 100 --json number,title,body > "$RUNNER_TEMP/issues.json"; \
               jq -r --arg title "$TITLE" --arg marker "$MARKER" \
                 --arg source "$SOURCE_COMMIT" --arg base "$BASE_SHA" --arg extra "$EXTRA_SHA" \
-                '.[] | select(.title == $title and ((.body | contains($marker)) or \
-                  ((.body | contains($source)) and (.body | contains($base)) and (.body | contains($extra))))) | .number' \
+                -f tools/tumoflip/protected_audit_issue_lookup.jq \
                 "$RUNNER_TEMP/issues.json" | head -n1)"
           fi
           if [[ -z "$ISSUE_NUMBER" ]]; then
