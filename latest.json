@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "sourceRepository": "xMasterX/all-the-plugins",
-  "generatedAt": "2026-08-12T13:00:42+00:00",
+  "generatedAt": "2026-08-12T15:06:12+00:00",
   "audits": [
     {
       "sequence": 20260809193105,
@@ -46,20 +46,19 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip keeps its Module One CLI-compatible protected build.",
           "targetMD5s": [
-            "4280fa5e1696248b5f21cd0157df6c07",
             "54b2ffcdb88cf3c25eacd99269c0db52",
             "79c91ceb33a6b99dbce73845a6d7f529"
           ],
           "targetProvenance": [
             {
-              "targetMD5": "4280fa5e1696248b5f21cd0157df6c07",
+              "targetMD5": "79c91ceb33a6b99dbce73845a6d7f529",
               "channel": "dev",
-              "releaseTag": "fw-packages-dev-004",
-              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "79c91ceb33a6b99dbce73845a6d7f529",
@@ -105,7 +104,8 @@
           "note": "Tumoflip ships a package-aware protected ESP Flasher through FW Packages.",
           "targetMD5s": [
             "0721d8da59efdfdf05c08e97b5e5b501",
-            "103a4aca9cce985b798bb705549c2ed0"
+            "103a4aca9cce985b798bb705549c2ed0",
+            "456526bc4c7af33325e962d5a0657e73"
           ],
           "targetProvenance": [
             {
@@ -113,10 +113,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "456526bc4c7af33325e962d5a0657e73",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "0721d8da59efdfdf05c08e97b5e5b501",
@@ -138,19 +149,18 @@
           "note": "Tumoflip keeps its accepted profile editor and Module One route.",
           "targetMD5s": [
             "0610b44187e3142cd8708242dff4199e",
-            "9173da206a2de38d231d4c6da8ae60d4",
-            "9b69cb41de4362ecfc5a217065916e3b"
+            "9173da206a2de38d231d4c6da8ae60d4"
           ],
           "targetProvenance": [
             {
-              "targetMD5": "9b69cb41de4362ecfc5a217065916e3b",
+              "targetMD5": "0610b44187e3142cd8708242dff4199e",
               "channel": "dev",
-              "releaseTag": "fw-packages-dev-004",
-              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "0610b44187e3142cd8708242dff4199e",
@@ -195,20 +205,19 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip keeps the isolated ARF module build and radio broker integration.",
           "targetMD5s": [
-            "56b13f6ee3b1513482ae6be63c83fc75",
             "6cf06ebf6c949ad817aa6978371430fe",
             "c2ee0aa6e97b3b24b64d32ebbf85e40f"
           ],
           "targetProvenance": [
             {
-              "targetMD5": "56b13f6ee3b1513482ae6be63c83fc75",
+              "targetMD5": "6cf06ebf6c949ad817aa6978371430fe",
               "channel": "dev",
-              "releaseTag": "fw-packages-dev-004",
-              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "6cf06ebf6c949ad817aa6978371430fe",
@@ -253,20 +262,19 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip keeps the isolated ARF module and radio broker integration.",
           "targetMD5s": [
-            "183c69bf242e83f7775f8c35765a9965",
             "8170a9c2ea8e70e0686b40e33ac338b9",
             "8f72844faf52f1b80539176257bed519"
           ],
           "targetProvenance": [
             {
-              "targetMD5": "183c69bf242e83f7775f8c35765a9965",
+              "targetMD5": "8f72844faf52f1b80539176257bed519",
               "channel": "dev",
-              "releaseTag": "fw-packages-dev-004",
-              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "8f72844faf52f1b80539176257bed519",
@@ -311,6 +319,7 @@
           "disposition": "auditedDifference",
           "note": "Ported bounded NumberInput controls for Merge gap (0-1000 ms) and Merge repeat (1-64), preserving Cancel without mutation and applying values only on Confirm. A 0 ms gap adds no artificial separator; non-zero gaps remain safely chunked. Hardware acceptance covered NumberInput, Cancel/Confirm, zero and non-zero merge gaps, save, reopen, and playback of the user's own RAW signal.",
           "targetMD5s": [
+            "ac9d4fab62499e8ea35ee20efa52063a",
             "b077a6bbcb9fc00fa094c00decfb3dd8"
           ],
           "targetProvenance": [
@@ -319,10 +328,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "ac9d4fab62499e8ea35ee20efa52063a",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             }
           ]
         },
@@ -334,19 +354,18 @@
           "note": "Tumoflip keeps its API 88 and iPhone GPS bridge integration.",
           "targetMD5s": [
             "40b56f7de3724b1bb295126166297ef5",
-            "c91d7a06e4bfb8697d3dff8ad50b7502",
             "c9c832b9172b064e249099116cc71a7d"
           ],
           "targetProvenance": [
             {
-              "targetMD5": "c91d7a06e4bfb8697d3dff8ad50b7502",
+              "targetMD5": "40b56f7de3724b1bb295126166297ef5",
               "channel": "dev",
-              "releaseTag": "fw-packages-dev-004",
-              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "40b56f7de3724b1bb295126166297ef5",
@@ -391,20 +410,19 @@
           "disposition": "auditedDifference",
           "note": "No source was imported by this audit; license must be resolved before a future port.",
           "targetMD5s": [
-            "6c5b8bcff802092ef008c0f39d56e250",
             "a60dfc973873c6bf010f977f2c90362a",
             "c10c2807d5944f0c0bef7d4275f05618"
           ],
           "targetProvenance": [
             {
-              "targetMD5": "6c5b8bcff802092ef008c0f39d56e250",
+              "targetMD5": "a60dfc973873c6bf010f977f2c90362a",
               "channel": "dev",
-              "releaseTag": "fw-packages-dev-004",
-              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "a60dfc973873c6bf010f977f2c90362a",
@@ -449,20 +467,19 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
-            "a34e2657e5acb0f033bd62e06f85f98e",
             "c9761825f7105047741cf6f38f9622bc",
             "e18e7ae0eee268f5ca1cc3429cbc9e77"
           ],
           "targetProvenance": [
             {
-              "targetMD5": "a34e2657e5acb0f033bd62e06f85f98e",
+              "targetMD5": "c9761825f7105047741cf6f38f9622bc",
               "channel": "dev",
-              "releaseTag": "fw-packages-dev-004",
-              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "c9761825f7105047741cf6f38f9622bc",
@@ -517,10 +534,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "21f5d592948ed9af6c8013a39055a6cc",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "21f5d592948ed9af6c8013a39055a6cc",
@@ -565,10 +593,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "a5ec96d81d3edd83914672953078f733",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "a5ec96d81d3edd83914672953078f733",
@@ -613,10 +652,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "f41acac1ef30ae6aa79f4bd9fd0e28bc",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "f41acac1ef30ae6aa79f4bd9fd0e28bc",
@@ -661,10 +711,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "6c5eebdbb27265d401313bb2721630d3",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "6c5eebdbb27265d401313bb2721630d3",
@@ -709,10 +770,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "dff3c643192d16608f853f4dc408cb77",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "dff3c643192d16608f853f4dc408cb77",
@@ -757,10 +829,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "0a9a45120a03c65707491d31039fb654",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "0a9a45120a03c65707491d31039fb654",
@@ -805,10 +888,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "ea1c90e469781b018f6d109229b69791",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "ea1c90e469781b018f6d109229b69791",
@@ -853,10 +947,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "5385e81d62d4d8262269be726c43e9fa",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "5385e81d62d4d8262269be726c43e9fa",
@@ -901,10 +1006,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "2a7fbd57dccae2731bba462c63fc7062",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "2a7fbd57dccae2731bba462c63fc7062",
@@ -949,10 +1065,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "96f9c2343bcb41e30884319476cee41b",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "96f9c2343bcb41e30884319476cee41b",
@@ -997,10 +1124,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "6c595c2b03b89bc7eb6a61ec64c89353",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "6c595c2b03b89bc7eb6a61ec64c89353",
@@ -1045,10 +1183,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "8225d84c410395ecf71256ec7e5c4626",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "8225d84c410395ecf71256ec7e5c4626",
@@ -1093,10 +1242,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "10f4fc37c0e94b302ab0973a8261cbcd",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "10f4fc37c0e94b302ab0973a8261cbcd",
@@ -1141,10 +1301,21 @@
               "channel": "dev",
               "releaseTag": "fw-packages-dev-004",
               "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesCompatibleBuild",
+              "containerSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "compatibilityCatalogTag": "fw-packages-dev-005"
+            },
+            {
+              "targetMD5": "baa1969dd4432b44cb65cad0ba43da39",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-005",
+              "manifestSHA256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
               "containerKind": "fwPackagesZip",
-              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
-              "targetReleaseTag": "t-dev-004-013",
-              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+              "containerSHA256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "8458827d6f0fd385661ce9da52cd73ce5ec21286"
             },
             {
               "targetMD5": "baa1969dd4432b44cb65cad0ba43da39",
@@ -1565,15 +1736,15 @@
             "implementationCommit": "485dad9c28ee59595c06023101efd14af8b42f21",
             "fwPackages": {
               "channel": "dev",
-              "revision": 4,
-              "releaseTag": "fw-packages-dev-004"
+              "revision": 5,
+              "releaseTag": "fw-packages-dev-005"
             },
             "hardwareAccepted": true
           }
         }
       ],
       "unresolved": [],
-      "generatedAt": "2026-08-12T12:59:53+00:00"
+      "generatedAt": "2026-08-12T15:06:12+00:00"
     },
     {
       "sequence": 20260812095117,
