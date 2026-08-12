@@ -1,6 +1,9 @@
+import io
 import hashlib
 import json
+import struct
 import subprocess
+import tarfile
 import tempfile
 import unittest
 import zipfile
@@ -8,6 +11,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
 from unittest import mock
+
+import heatshrink2
 
 from tools.tumoflip import protected_app_audit as audit
 
@@ -128,8 +133,69 @@ class ProtectedAppAuditTests(unittest.TestCase):
             author_heads=self.author_heads,
             target_manifest=[self.stable_manifest, self.dev_manifest],
             target_archive=[self.stable_archive, self.dev_archive],
+            firmware_updater_descriptor=[],
             generated_at="2026-08-12T00:00:00+00:00",
         )
+
+    def _write_firmware_updater(
+        self,
+        *,
+        release_tag: str = "t-dev-004-015",
+        firmware_version: str = "t-dev-004-015",
+        targets: Optional[dict[str, bytes]] = None,
+        manifest_data: Optional[dict[str, bytes]] = None,
+        target: str = "7",
+    ) -> Path:
+        targets = targets or {}
+        manifest_data = targets if manifest_data is None else manifest_data
+        manifest_lines = ["V:0", "T:1"]
+        for remote, data in sorted(manifest_data.items()):
+            relative = remote.removeprefix("/ext/")
+            manifest_lines.append(
+                f"F:{hashlib.md5(data).hexdigest()}:{len(data)}:{relative}"
+            )
+        manifest = ("\n".join(manifest_lines) + "\n").encode()
+        resource_tar = io.BytesIO()
+        with tarfile.open(fileobj=resource_tar, mode="w:") as archive:
+            all_files = {"Manifest": manifest}
+            all_files.update(
+                {remote.removeprefix("/ext/"): data for remote, data in targets.items()}
+            )
+            for name, data in sorted(all_files.items()):
+                info = tarfile.TarInfo(name)
+                info.size = len(data)
+                archive.addfile(info, io.BytesIO(data))
+        resources = struct.pack("<IBBB", 0x53445348, 1, 13, 6) + heatshrink2.compress(
+            resource_tar.getvalue(), window_sz2=13, lookahead_sz2=6
+        )
+        root = f"f7-update-{firmware_version}"
+        fuf = (
+            "Filetype: Flipper firmware upgrade configuration\n"
+            "Version: 2\n"
+            f"Info: {firmware_version}\n"
+            f"Target: {target}\n"
+            "Resources: resources.ths\n"
+        ).encode()
+        archive_path = self.root / f"flipper-z-f7-update-{firmware_version}.tgz"
+        with tarfile.open(archive_path, mode="w:gz") as archive:
+            for name, data in ((f"{root}/update.fuf", fuf), (f"{root}/resources.ths", resources)):
+                info = tarfile.TarInfo(name)
+                info.size = len(data)
+                archive.addfile(info, io.BytesIO(data))
+        descriptor = self.root / f"firmware-{release_tag}.json"
+        descriptor.write_text(
+            json.dumps(
+                {
+                    "schema": 1,
+                    "releaseTag": release_tag,
+                    "releaseCommit": self.after,
+                    "assetFileName": archive_path.name,
+                    "assetSHA256": audit.file_hash(archive_path, "sha256"),
+                }
+            ),
+            encoding="utf-8",
+        )
+        return descriptor
 
     def _write_target_manifest(self, channel: str, release_tag: str, seed: str) -> Path:
         data = seed.encode()
@@ -326,6 +392,12 @@ class ProtectedAppAuditTests(unittest.TestCase):
     def test_checked_in_raw_edit_decisions_accept_the_exact_live_sources(self) -> None:
         dev_manifest = self._write_target_manifest("dev", "fw-packages-dev-004", "c")
         dev_archive = self._write_target_archive("dev", "fw-packages-dev-004", "c")
+        raw_target = next(
+            app["artifacts"][0]["targetPath"]
+            for app in self.apps
+            if app["id"] == "subghz_raw_edit"
+        )
+        firmware = self._write_firmware_updater(targets={raw_target: b"firmware-raw"})
 
         for source_tag, source_commit in RAW_EDIT_DECISIONS.items():
             with self.subTest(source_tag=source_tag):
@@ -345,6 +417,7 @@ class ProtectedAppAuditTests(unittest.TestCase):
                 args.source_commit = source_commit
                 args.target_manifest = [self.stable_manifest, dev_manifest]
                 args.target_archive = [self.stable_archive, dev_archive]
+                args.firmware_updater_descriptor = [firmware]
 
                 def raw_edit_changed(
                     _repo: Path, _before: str, _after: str, path: str
@@ -373,6 +446,10 @@ class ProtectedAppAuditTests(unittest.TestCase):
                     {"fw-packages-dev-004"},
                 )
                 self.assertEqual(raw_entry["targetMD5s"], [hashlib.md5(b"c").hexdigest()])
+                self.assertNotIn(
+                    "firmwareUpdaterBundle",
+                    {item["containerKind"] for item in raw_entry["targetProvenance"]},
+                )
 
                 unchanged_entry = next(
                     entry
@@ -697,6 +774,261 @@ class ProtectedAppAuditTests(unittest.TestCase):
 
         with self.assertRaisesRegex(audit.AuditError, "manifest/ZIP bytes differ"):
             audit.audit_release(self._args())
+
+    def test_exact_firmware_updater_resources_add_target_provenance(self) -> None:
+        target = next(
+            app["artifacts"][0]["targetPath"]
+            for app in self.apps
+            if app["id"] == "esp32_wifi_marauder"
+        )
+        # Use the same byte as dev FW Packages to prove that one target MD5 can
+        # retain both exact provenances without widening the hash set.
+        descriptor = self._write_firmware_updater(targets={target: b"b"})
+        args = self._args()
+        args.firmware_updater_descriptor = [descriptor]
+
+        result, _ = audit.audit_release(args)
+
+        entry = next(item for item in result["entries"] if item["targetPath"] == target)
+        self.assertEqual(
+            entry["targetMD5s"],
+            sorted({hashlib.md5(b"a").hexdigest(), hashlib.md5(b"b").hexdigest()}),
+        )
+        firmware = next(
+            item
+            for item in entry["targetProvenance"]
+            if item["containerKind"] == "firmwareUpdaterBundle"
+        )
+        self.assertEqual(firmware["releaseTag"], "t-dev-004-015")
+        self.assertEqual(firmware["firmwareVersion"], "t-dev-004-015")
+        self.assertEqual(firmware["targetSourceCommit"], self.after)
+        self.assertRegex(firmware["containerSHA256"], audit.HEX_64)
+        self.assertRegex(firmware["manifestSHA256"], audit.HEX_64)
+        self.assertRegex(firmware["resourcesSHA256"], audit.HEX_64)
+        self.assertEqual(len(entry["targetProvenance"]), 3)
+        audit.validate_audit(result)
+
+    def test_firmware_updater_digest_mismatch_fails_closed(self) -> None:
+        descriptor = self._write_firmware_updater()
+        document = json.loads(descriptor.read_text(encoding="utf-8"))
+        document["assetSHA256"] = "0" * 64
+        descriptor.write_text(json.dumps(document), encoding="utf-8")
+        args = self._args()
+        args.firmware_updater_descriptor = [descriptor]
+
+        with self.assertRaisesRegex(audit.AuditError, "updater SHA-256 differs"):
+            audit.audit_release(args)
+
+    def test_firmware_resource_manifest_mismatch_fails_closed(self) -> None:
+        target = next(
+            app["artifacts"][0]["targetPath"]
+            for app in self.apps
+            if app["id"] == "esp32_wifi_marauder"
+        )
+        descriptor = self._write_firmware_updater(
+            targets={target: b"actual"}, manifest_data={target: b"declared"}
+        )
+        args = self._args()
+        args.firmware_updater_descriptor = [descriptor]
+
+        with self.assertRaisesRegex(audit.AuditError, "Manifest bytes differ"):
+            audit.audit_release(args)
+
+    def test_firmware_updater_wrong_hardware_target_fails_closed(self) -> None:
+        descriptor = self._write_firmware_updater(target="8")
+        args = self._args()
+        args.firmware_updater_descriptor = [descriptor]
+
+        with self.assertRaisesRegex(audit.AuditError, "Target differs"):
+            audit.audit_release(args)
+
+    def test_firmware_updater_release_identity_mismatch_fails_closed(self) -> None:
+        descriptor = self._write_firmware_updater(
+            release_tag="t-dev-004-015", firmware_version="t-dev-004-014"
+        )
+        args = self._args()
+        args.firmware_updater_descriptor = [descriptor]
+
+        with self.assertRaisesRegex(audit.AuditError, "release/Info differ"):
+            audit.audit_release(args)
+
+    def test_stable_firmware_updater_release_identity_mismatch_fails_closed(self) -> None:
+        descriptor = self._write_firmware_updater(
+            release_tag="v1.0.4", firmware_version="t-flppr-fw-003"
+        )
+        args = self._args()
+        args.firmware_updater_descriptor = [descriptor]
+
+        with self.assertRaisesRegex(audit.AuditError, "release/Info differ"):
+            audit.audit_release(args)
+
+    def test_firmware_updater_archive_limits_fail_closed(self) -> None:
+        descriptor = self._write_firmware_updater()
+        cases = (
+            ("MAX_UPDATER_MEMBERS", 1, "too many files"),
+            ("MAX_UPDATER_MEMBER_BYTES", 1, "member is too large"),
+            ("MAX_UPDATER_TOTAL_BYTES", 1, "expanded size exceeds limit"),
+        )
+        for constant, limit, message in cases:
+            with (
+                self.subTest(constant=constant),
+                mock.patch.object(audit, constant, limit),
+                self.assertRaisesRegex(audit.AuditError, message),
+            ):
+                audit.load_firmware_updaters([descriptor])
+
+    def test_firmware_updater_duplicate_normalized_path_fails_closed(self) -> None:
+        descriptor = self._write_firmware_updater()
+        document = json.loads(descriptor.read_text(encoding="utf-8"))
+        archive_path = descriptor.parent / document["assetFileName"]
+        root = "f7-update-t-dev-004-015"
+        with tarfile.open(archive_path, mode="w:gz") as archive:
+            for name in (f"{root}/", root):
+                info = tarfile.TarInfo(name)
+                info.type = tarfile.DIRTYPE
+                archive.addfile(info)
+        document["assetSHA256"] = audit.file_hash(archive_path, "sha256")
+        descriptor.write_text(json.dumps(document), encoding="utf-8")
+
+        with self.assertRaisesRegex(audit.AuditError, "duplicate firmware updater member"):
+            audit.load_firmware_updaters([descriptor])
+
+    def test_resource_decoder_reads_at_most_expansion_limit_plus_one(self) -> None:
+        class BombReader:
+            requested: Optional[int] = None
+
+            def __init__(self, *_args, **_kwargs) -> None:
+                pass
+
+            def __enter__(self) -> "BombReader":
+                return self
+
+            def __exit__(self, *_args) -> None:
+                pass
+
+            def read(self, size: int) -> bytes:
+                BombReader.requested = size
+                return b"x" * size
+
+        fake = SimpleNamespace(HeatshrinkFile=BombReader)
+        header = struct.pack("<IBBB", 0x53445348, 1, 13, 6)
+        with (
+            mock.patch.object(audit, "MAX_RESOURCE_TOTAL_BYTES", 1024),
+            mock.patch.object(audit, "_load_heatshrink2", return_value=fake),
+            self.assertRaisesRegex(audit.AuditError, "expanded size exceeds limit"),
+        ):
+            audit._decode_resources_ths(header + b"compressed")
+        self.assertEqual(BombReader.requested, 1025)
+
+    def test_resource_manifest_unknown_record_fails_closed(self) -> None:
+        with self.assertRaisesRegex(audit.AuditError, "record is invalid"):
+            audit._parse_resource_manifest(b"V:0\nT:1\nX:unknown\n")
+
+    def test_resource_header_parameters_are_exact(self) -> None:
+        header = struct.pack("<IBBB", 0x53445348, 1, 15, 14)
+        with self.assertRaisesRegex(audit.AuditError, "parameters differ"):
+            audit._decode_resources_ths(header + b"compressed")
+
+    def test_firmware_updater_missing_resource_target_remains_absent(self) -> None:
+        unrelated_target = next(
+            app["artifacts"][0]["targetPath"]
+            for app in self.apps
+            if app["id"] == "quac"
+        )
+        descriptor = self._write_firmware_updater(
+            targets={unrelated_target: b"firmware-quac"}
+        )
+        args = self._args()
+        args.firmware_updater_descriptor = [descriptor]
+
+        result, _ = audit.audit_release(args)
+
+        firmware_targets = {
+            entry["targetPath"]
+            for entry in result["entries"]
+            for item in entry["targetProvenance"]
+            if item["containerKind"] == "firmwareUpdaterBundle"
+        }
+        self.assertEqual(firmware_targets, {unrelated_target})
+
+    def test_firmware_updater_provenance_requires_firmware_fields(self) -> None:
+        target = next(
+            app["artifacts"][0]["targetPath"]
+            for app in self.apps
+            if app["id"] == "quac"
+        )
+        descriptor = self._write_firmware_updater(targets={target: b"firmware-quac"})
+        args = self._args()
+        args.firmware_updater_descriptor = [descriptor]
+        result, _ = audit.audit_release(args)
+        item = next(
+            provenance
+            for entry in result["entries"]
+            for provenance in entry["targetProvenance"]
+            if provenance["containerKind"] == "firmwareUpdaterBundle"
+        )
+        item.pop("resourcesSHA256")
+
+        with self.assertRaisesRegex(audit.AuditError, "resourcesSHA256"):
+            audit.validate_audit(result)
+
+    def test_fw_packages_provenance_rejects_firmware_only_fields(self) -> None:
+        result, _ = audit.audit_release(self._args())
+        item = next(
+            provenance
+            for entry in result["entries"]
+            for provenance in entry["targetProvenance"]
+            if provenance["containerKind"] == "fwPackagesZip"
+        )
+        item["firmwareVersion"] = "t-dev-004-015"
+
+        with self.assertRaisesRegex(audit.AuditError, "firmware-only fields"):
+            audit.validate_audit(result)
+
+    def test_unrelated_firmware_resource_does_not_accept_missing_target(self) -> None:
+        missing_target = next(
+            app["artifacts"][0]["targetPath"]
+            for app in self.apps
+            if app["id"] == "esp32_wifi_marauder"
+        )
+        unrelated_target = next(
+            app["artifacts"][0]["targetPath"]
+            for app in self.apps
+            if app["id"] == "quac"
+        )
+        for path in (self.stable_manifest, self.dev_manifest):
+            document = json.loads(path.read_text(encoding="utf-8"))
+            document["packages"]["protected"] = [
+                item
+                for item in document["packages"]["protected"]
+                if item["target"] != missing_target
+            ]
+            path.write_text(json.dumps(document), encoding="utf-8")
+        for path in (self.stable_archive, self.dev_archive):
+            with zipfile.ZipFile(path) as archive:
+                retained = {
+                    info.filename: archive.read(info)
+                    for info in archive.infolist()
+                    if "/ext/" + info.filename != missing_target
+                }
+            with zipfile.ZipFile(path, "w") as archive:
+                for name, data in retained.items():
+                    archive.writestr(name, data)
+        descriptor = self._write_firmware_updater(
+            targets={unrelated_target: b"firmware-quac"}
+        )
+        args = self._args()
+        args.firmware_updater_descriptor = [descriptor]
+
+        result, _ = audit.audit_release(args)
+
+        self.assertFalse(any(item["targetPath"] == missing_target for item in result["entries"]))
+        self.assertTrue(
+            any(
+                "esp32_wifi_marauder" in value and "firmware updater resources" in value
+                for value in result["unresolved"]
+            )
+        )
 
 
 if __name__ == "__main__":

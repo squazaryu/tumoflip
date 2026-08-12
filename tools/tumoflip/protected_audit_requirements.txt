@@ -1,0 +1,3 @@
+# Exact source archive from PyPI. --require-hashes makes decoder installation
+# deterministic on the Linux audit runner; no dependency resolution is needed.
+heatshrink2==0.13.0 --hash=sha256:5aa93c102ba9c4e6e4fb01974cb5b03194e10fa01bfda8bda233c632b22d3b4a
