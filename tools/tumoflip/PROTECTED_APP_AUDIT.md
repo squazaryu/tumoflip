@@ -25,7 +25,10 @@ not an identity: the audit key is the tag plus the named SHA-256 of both ZIPs.
 6. The issue remains open while any artifact is unresolved. Only a fully verified
    scan closes it automatically.
 
-The immutable history files and cumulative `latest.json` use schema 2. Accepted
+The immutable history files are content-addressed by the semantic audit payload
+(excluding only `generatedAt`), so a scheduled no-op never creates churn and new
+target evidence never overwrites an older record. The cumulative `latest.json`
+uses schema 2. Accepted
 target entries contain `targetMD5s` and one or more unique provenance records for
 each allowed hash. Stable and dev may legitimately prove the same target MD5.
 

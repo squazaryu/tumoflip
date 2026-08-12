@@ -74,6 +74,20 @@ def bytes_hash(data: bytes, algorithm: str) -> str:
     return digest.hexdigest()
 
 
+def semantic_audit_payload(audit: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in audit.items() if key != "generatedAt"}
+
+
+def semantic_audit_sha256(audit: dict[str, Any]) -> str:
+    encoded = json.dumps(
+        semantic_audit_payload(audit),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return bytes_hash(encoded, "sha256")
+
+
 def require_string(value: Any, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise AuditError(f"{label} must be a non-empty string")
@@ -745,6 +759,19 @@ def audit_release(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
                 "note": note,
             }
             if disposition == "intentionallyReplaced":
+                present_in = [
+                    f"{manifest['channel']}:{manifest['releaseTag']}"
+                    for manifest in target_manifests
+                    if artifact["targetPath"] in manifest["targets"]
+                ]
+                if present_in:
+                    artifact_result["ledgerStatus"] = "needsReview"
+                    app_unresolved.append(
+                        f"{app_id}:{artifact['remotePath']}: intentionally replaced target "
+                        f"is still shipped by exact FW Packages ({', '.join(present_in)})"
+                    )
+                    artifact_results.append(artifact_result)
+                    continue
                 entry["targetMD5s"] = []
                 entry["targetProvenance"] = []
                 artifact_result["ledgerStatus"] = "accepted"
@@ -1121,9 +1148,7 @@ def merge_ledger(existing: dict[str, Any] | None, audit: dict[str, Any]) -> dict
         None,
     )
     if existing_exact is not None:
-        old_payload = {key: value for key, value in existing_exact.items() if key != "generatedAt"}
-        new_payload = {key: value for key, value in audit.items() if key != "generatedAt"}
-        if old_payload == new_payload:
+        if semantic_audit_payload(existing_exact) == semantic_audit_payload(audit):
             return ledger
     ledger["audits"] = [
         item
@@ -1175,6 +1200,11 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
     merge.add_argument("--audit", type=Path, required=True)
     merge.add_argument("--output", type=Path, required=True)
 
+    identity = subparsers.add_parser(
+        "semantic-sha256", help="print content identity excluding generatedAt"
+    )
+    identity.add_argument("audit", type=Path)
+
     validate = subparsers.add_parser("validate", help="validate a cumulative ledger")
     validate.add_argument("ledger", type=Path)
     return parser.parse_args(list(argv))
@@ -1207,6 +1237,10 @@ def main(argv: Iterable[str] | None = None) -> int:
         elif args.command == "validate":
             validate_ledger(read_json(args.ledger))
             print(f"validated {args.ledger}")
+        elif args.command == "semantic-sha256":
+            audit = read_json(args.audit)
+            validate_audit(audit)
+            print(semantic_audit_sha256(audit))
     except AuditError as error:
         print(f"protected app audit failed: {error}", file=sys.stderr)
         return 1

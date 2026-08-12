@@ -410,6 +410,44 @@ class ProtectedAppAuditTests(unittest.TestCase):
         raw_app = next(item for item in result["apps"] if item["appId"] == "subghz_raw_edit")
         self.assertEqual(raw_app["decisionDisposition"], "rejected")
 
+    def test_intentionally_replaced_target_must_be_absent_from_exact_packages(self) -> None:
+        claude = next(app for app in self.apps if app["id"] == "claude_buddy")
+        target = claude["artifacts"][0]["targetPath"]
+        data = b"stale replaced app"
+        for manifest_path, archive_path in (
+            (self.stable_manifest, self.stable_archive),
+            (self.dev_manifest, self.dev_archive),
+        ):
+            document = json.loads(manifest_path.read_text(encoding="utf-8"))
+            document["packages"]["protected"].append(
+                {
+                    "target": target,
+                    "md5": hashlib.md5(data).hexdigest(),
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                    "bytes": len(data),
+                }
+            )
+            manifest_path.write_text(json.dumps(document), encoding="utf-8")
+            with zipfile.ZipFile(archive_path) as archive:
+                retained = {
+                    info.filename: archive.read(info)
+                    for info in archive.infolist()
+                    if not info.is_dir()
+                }
+            retained[target.removeprefix("/ext/")] = data
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                for name, content in sorted(retained.items()):
+                    archive.writestr(name, content)
+
+        result, _ = audit.audit_release(self._args())
+
+        self.assertFalse(
+            any(item["remotePath"].endswith("claude_remote_ble.fap") for item in result["entries"])
+        )
+        self.assertTrue(
+            any("intentionally replaced target is still shipped" in value for value in result["unresolved"])
+        )
+
     def test_source_matches_requires_exact_target_bytes(self) -> None:
         self._make_raw_target_match_source()
         decisions = self.root / "decisions.json"
@@ -501,6 +539,22 @@ class ProtectedAppAuditTests(unittest.TestCase):
         self.assertEqual(len(ledger["audits"]), 1)
         self.assertEqual(len(ledger["audits"][0]["entries"]), 23)
         self.assertEqual(len(ledger["audits"][0]["unresolved"]), 1)
+
+    def test_semantic_identity_ignores_time_but_changes_with_target_evidence(self) -> None:
+        first, _ = audit.audit_release(self._args())
+        time_only = json.loads(json.dumps(first))
+        time_only["generatedAt"] = "2026-08-13T00:00:00+00:00"
+        self.assertEqual(
+            audit.semantic_audit_sha256(first),
+            audit.semantic_audit_sha256(time_only),
+        )
+
+        self._add_totp_target_family()
+        targets_changed, _ = audit.audit_release(self._args())
+        self.assertNotEqual(
+            audit.semantic_audit_sha256(first),
+            audit.semantic_audit_sha256(targets_changed),
+        )
 
     def test_unresolved_disposition_cannot_be_published_as_entry(self) -> None:
         result, _ = audit.audit_release(self._args())
