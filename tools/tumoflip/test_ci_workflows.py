@@ -72,6 +72,7 @@ class CiWorkflowSecurityTests(unittest.TestCase):
         self.assertIn("--implementation-repo \"$GITHUB_WORKSPACE\"", workflow)
         self.assertIn("sha256sum -c -", workflow)
         self.assertIn("protected-app-audit:$SOURCE_TAG:$BASE_SHA:$EXTRA_SHA", workflow)
+        self.assertIn("-f tools/tumoflip/protected_audit_issue_lookup.jq", workflow)
         self.assertIn("repos/$GITHUB_REPOSITORY/releases?per_page=100", workflow)
         self.assertIn("^fw-packages-stable-[0-9]{3}$", workflow)
         self.assertIn("^fw-packages-dev-[0-9]{3}$", workflow)
@@ -143,6 +144,68 @@ class CiWorkflowSecurityTests(unittest.TestCase):
             json.loads(result.stdout),
             {"stable": "fw-packages-stable-001", "dev": "fw-packages-dev-003"},
         )
+
+    def test_protected_audit_issue_lookup_executes_exact_workflow_filter(self) -> None:
+        title = "Audit protected apps for Community Pack 12aug2026"
+        source = "585b144ac5b4d9a48a0e5a74570a6584353fdbba"
+        base = "79e95fff98ba3afd95f5a31f81882412ed3505237e8fdae4f6e053328847e430"
+        extra = "1cd57a12702343dbb5fcda6a4b37cbc10e80449fed9b67e04a19b5de5a87a1e0"
+        marker = f"<!-- protected-app-audit:12aug2026:{base}:{extra} -->"
+        issues = [
+            {
+                "number": 301,
+                "title": title,
+                "body": "Unrelated audit body",
+            },
+            {
+                "number": 302,
+                "title": title,
+                "body": f"Legacy identity: {source} {base} {extra}",
+            },
+            {
+                "number": 303,
+                "title": title,
+                "body": marker,
+            },
+            {
+                "number": 304,
+                "title": "Audit protected apps for Community Pack 9aug2026",
+                "body": marker,
+            },
+        ]
+        jq_filter = REPO_ROOT / "tools/tumoflip/protected_audit_issue_lookup.jq"
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Path(temporary) / "issues.json"
+            fixture.write_text(json.dumps(issues), encoding="utf-8")
+            result = subprocess.run(
+                [
+                    "jq",
+                    "-r",
+                    "--arg",
+                    "title",
+                    title,
+                    "--arg",
+                    "marker",
+                    marker,
+                    "--arg",
+                    "source",
+                    source,
+                    "--arg",
+                    "base",
+                    base,
+                    "--arg",
+                    "extra",
+                    extra,
+                    "-f",
+                    str(jq_filter),
+                    str(fixture),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.stdout.splitlines(), ["302", "303"])
 
 
 if __name__ == "__main__":
