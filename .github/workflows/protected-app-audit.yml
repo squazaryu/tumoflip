@@ -97,6 +97,7 @@ jobs:
           [[ "$TARGET_MANIFESTS" =~ ^fw-packages-(stable|dev)-[0-9]{3}(,fw-packages-(stable|dev)-[0-9]{3})+$ ]]
           if [[ -n "$DECISIONS_JSON" ]]; then
             [[ "$DECISIONS_JSON" =~ ^tools/tumoflip/protected_audit_decisions/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*\.json$ ]]
+            [[ "$DECISIONS_JSON" != *"/../"* && "$DECISIONS_JSON" != *"/./"* ]]
           fi
           {
             echo "source_tag=$SOURCE_TAG"
