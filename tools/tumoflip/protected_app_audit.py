@@ -14,10 +14,13 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import io
 import json
 import re
+import struct
 import subprocess
 import sys
+import tarfile
 import zipfile
 from pathlib import Path
 from typing import Any, Iterable
@@ -34,6 +37,15 @@ DECISION_DISPOSITIONS = ACCEPTED_DISPOSITIONS | {"rejected"}
 HEX_32 = re.compile(r"^[0-9a-f]{32}$")
 HEX_40 = re.compile(r"^[0-9a-f]{40}$")
 HEX_64 = re.compile(r"^[0-9a-f]{64}$")
+FIRMWARE_RELEASE_TAG = re.compile(r"^(?:v[0-9]+\.[0-9]+\.[0-9]+|t-dev-[0-9]{3}-[0-9]{3})$")
+FIRMWARE_VERSION = re.compile(r"^(?:t-flppr-fw-[0-9]{3}|t-dev-[0-9]{3}-[0-9]{3})$")
+UPDATER_MANIFEST_FILETYPE = "Flipper firmware upgrade configuration"
+MAX_UPDATER_MEMBERS = 64
+MAX_UPDATER_MEMBER_BYTES = 16 * 1024 * 1024
+MAX_UPDATER_TOTAL_BYTES = 32 * 1024 * 1024
+MAX_RESOURCE_MEMBERS = 10_000
+MAX_RESOURCE_MEMBER_BYTES = 16 * 1024 * 1024
+MAX_RESOURCE_TOTAL_BYTES = 64 * 1024 * 1024
 
 
 class AuditError(RuntimeError):
@@ -72,6 +84,22 @@ def bytes_hash(data: bytes, algorithm: str) -> str:
     digest = hashlib.new(algorithm)
     digest.update(data)
     return digest.hexdigest()
+
+
+def _load_heatshrink2() -> Any:
+    """Load the decoder used by the firmware resource bundle.
+
+    The protected-app audit intentionally decodes the exact updater asset instead
+    of trusting a sibling FW Packages manifest. The workflow installs the pinned
+    dependency; local firmware worktrees may also provide it through the bundled
+    toolchain paths.
+    """
+
+    try:
+        import heatshrink2  # type: ignore[import-not-found]
+    except ImportError as error:
+        raise AuditError("heatshrink2 is required to verify firmware updater resources") from error
+    return heatshrink2
 
 
 def semantic_audit_payload(audit: dict[str, Any]) -> dict[str, Any]:
@@ -541,6 +569,342 @@ def verify_target_archives(
                 )
 
 
+def _safe_archive_name(name: str, *, directory: bool, label: str) -> str:
+    normalized = name.rstrip("/") if directory else name
+    parts = normalized.split("/")
+    if (
+        not normalized
+        or name.startswith("/")
+        or "\\" in name
+        or any(part in {"", ".", ".."} for part in parts)
+    ):
+        raise AuditError(f"unsafe {label} member: {name}")
+    return normalized
+
+
+def _safe_tar_files(path: Path) -> dict[str, bytes]:
+    result: dict[str, bytes] = {}
+    seen_names: set[str] = set()
+    total_bytes = 0
+    try:
+        with tarfile.open(path, mode="r:gz") as archive:
+            seen_members = 0
+            for member in archive.getmembers():
+                seen_members += 1
+                if seen_members > MAX_UPDATER_MEMBERS:
+                    raise AuditError("firmware updater contains too many files")
+                name = member.name
+                normalized = _safe_archive_name(
+                    name, directory=member.isdir(), label="firmware updater"
+                )
+                if normalized in seen_names:
+                    raise AuditError(f"duplicate firmware updater member: {name}")
+                seen_names.add(normalized)
+                if member.issym() or member.islnk():
+                    raise AuditError(f"unsafe firmware updater member: {name}")
+                if member.isdir():
+                    continue
+                if not member.isfile():
+                    raise AuditError(f"unsupported firmware updater member: {name}")
+                if member.size < 0 or member.size > MAX_UPDATER_MEMBER_BYTES:
+                    raise AuditError(f"firmware updater member is too large: {name}")
+                total_bytes += member.size
+                if total_bytes > MAX_UPDATER_TOTAL_BYTES:
+                    raise AuditError("firmware updater expanded size exceeds limit")
+                stream = archive.extractfile(member)
+                if stream is None:
+                    raise AuditError(f"firmware updater member cannot be read: {name}")
+                content = stream.read(member.size + 1)
+                if len(content) != member.size:
+                    raise AuditError(f"firmware updater member size differs: {name}")
+                result[name] = content
+    except (OSError, tarfile.TarError) as error:
+        raise AuditError(f"invalid firmware updater archive {path}: {error}") from error
+    return result
+
+
+def _parse_update_fuf(data: bytes, path: Path) -> dict[str, str]:
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise AuditError(f"firmware update.fuf is not UTF-8: {path}") from error
+    fields: dict[str, str] = {}
+    for line in text.splitlines():
+        if not line or line.startswith("#"):
+            continue
+        key, separator, value = line.partition(":")
+        if not separator or not key.strip() or not value.strip():
+            raise AuditError(f"firmware update.fuf has an invalid line: {path}")
+        key = key.strip()
+        if key in fields:
+            raise AuditError(f"firmware update.fuf has a duplicate field {key}: {path}")
+        fields[key] = value.strip()
+    required = {
+        "Filetype": UPDATER_MANIFEST_FILETYPE,
+        "Version": "2",
+        "Target": "7",
+    }
+    for key, expected in required.items():
+        if fields.get(key) != expected:
+            raise AuditError(
+                f"firmware update.fuf {key} differs: {fields.get(key)!r} != {expected!r}"
+            )
+    require_string(fields.get("Info"), "firmware update.fuf Info")
+    resources = require_string(fields.get("Resources"), "firmware update.fuf Resources")
+    if Path(resources).name != resources or resources != "resources.ths":
+        raise AuditError(f"firmware update.fuf Resources is invalid: {resources}")
+    return fields
+
+
+def _parse_resource_manifest(data: bytes) -> dict[str, dict[str, Any]]:
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise AuditError("firmware resource Manifest is not UTF-8") from error
+    targets: dict[str, dict[str, Any]] = {}
+    directories: set[str] = set()
+    version_seen = False
+    timestamp_seen = False
+    for line in text.splitlines():
+        if line == "V:0":
+            if version_seen:
+                raise AuditError("firmware resource Manifest has duplicate version")
+            version_seen = True
+            continue
+        if line.startswith("T:"):
+            timestamp = line.removeprefix("T:")
+            if timestamp_seen or not timestamp.isdigit():
+                raise AuditError("firmware resource Manifest timestamp is invalid")
+            timestamp_seen = True
+            continue
+        if line.startswith("D:"):
+            relative = line.removeprefix("D:")
+            if (
+                not relative
+                or relative.startswith("/")
+                or ".." in Path(relative).parts
+                or "\\" in relative
+                or relative in directories
+            ):
+                raise AuditError(f"firmware resource Manifest directory is invalid: {relative}")
+            directories.add(relative)
+            continue
+        if not line.startswith("F:"):
+            raise AuditError(f"firmware resource Manifest record is invalid: {line}")
+        parts = line.split(":", 3)
+        if len(parts) != 4:
+            raise AuditError("firmware resource Manifest file entry is invalid")
+        _, md5, size_text, relative = parts
+        if (
+            not HEX_32.fullmatch(md5)
+            or not size_text.isdigit()
+            or relative.startswith("/")
+            or ".." in Path(relative).parts
+            or "\\" in relative
+        ):
+            raise AuditError(f"firmware resource Manifest entry is invalid: {relative}")
+        if relative in targets:
+            raise AuditError(f"duplicate firmware resource Manifest path: {relative}")
+        targets[relative] = {"md5": md5, "bytes": int(size_text)}
+    if not version_seen:
+        raise AuditError("firmware resource Manifest version is missing")
+    if not timestamp_seen:
+        raise AuditError("firmware resource Manifest timestamp is missing")
+    if not targets:
+        raise AuditError("firmware resource Manifest has no files")
+    return targets
+
+
+def _decode_resources_ths(data: bytes) -> tuple[dict[str, bytes], str]:
+    if len(data) < 7:
+        raise AuditError("firmware resources.ths is too small")
+    magic, version, window, lookahead = struct.unpack("<IBBB", data[:7])
+    if magic != 0x53445348 or version != 1:
+        raise AuditError("firmware resources.ths header is invalid")
+    if (window, lookahead) != (13, 6):
+        raise AuditError(
+            f"firmware resources.ths parameters differ: {window}/{lookahead} != 13/6"
+        )
+    if len(data) > MAX_UPDATER_MEMBER_BYTES:
+        raise AuditError("firmware resources.ths compressed size exceeds limit")
+    try:
+        with _load_heatshrink2().HeatshrinkFile(
+            io.BytesIO(data[7:]),
+            mode="rb",
+            window_sz2=window,
+            lookahead_sz2=lookahead,
+        ) as decoded:
+            plain_tar = decoded.read(MAX_RESOURCE_TOTAL_BYTES + 1)
+        if len(plain_tar) > MAX_RESOURCE_TOTAL_BYTES:
+            raise AuditError("firmware resources.ths expanded size exceeds limit")
+        with tarfile.open(fileobj=io.BytesIO(plain_tar), mode="r:") as archive:
+            files: dict[str, bytes] = {}
+            seen_names: set[str] = set()
+            total_bytes = 0
+            seen_members = 0
+            for member in archive.getmembers():
+                seen_members += 1
+                if seen_members > MAX_RESOURCE_MEMBERS:
+                    raise AuditError("firmware resources.ths contains too many files")
+                name = member.name
+                # The Flipper resource packer emits one explicit empty root
+                # directory entry before the canonical relative paths.
+                if member.isdir() and name == "":
+                    continue
+                normalized = _safe_archive_name(
+                    name, directory=member.isdir(), label="firmware resource"
+                )
+                if normalized in seen_names:
+                    raise AuditError(f"duplicate firmware resource member: {name}")
+                seen_names.add(normalized)
+                if member.issym() or member.islnk():
+                    raise AuditError(f"unsafe firmware resource member: {name}")
+                if member.isdir():
+                    continue
+                if not member.isfile():
+                    raise AuditError(f"unsupported firmware resource member: {name}")
+                if member.size < 0 or member.size > MAX_RESOURCE_MEMBER_BYTES:
+                    raise AuditError(f"firmware resource member is too large: {name}")
+                total_bytes += member.size
+                if total_bytes > MAX_RESOURCE_TOTAL_BYTES:
+                    raise AuditError("firmware resource files exceed expanded size limit")
+                stream = archive.extractfile(member)
+                if stream is None:
+                    raise AuditError(f"firmware resource member cannot be read: {name}")
+                content = stream.read(member.size + 1)
+                if len(content) != member.size:
+                    raise AuditError(f"firmware resource member size differs: {name}")
+                files[name] = content
+    except AuditError:
+        raise
+    except Exception as error:
+        raise AuditError(f"firmware resources.ths cannot be decoded: {error}") from error
+    manifest = files.pop("Manifest", None)
+    if manifest is None:
+        raise AuditError("firmware resources.ths has no Manifest")
+    declared = _parse_resource_manifest(manifest)
+    if set(declared) != set(files):
+        missing = sorted(set(declared) - set(files))
+        unexpected = sorted(set(files) - set(declared))
+        raise AuditError(
+            "firmware resource Manifest/archive paths differ: "
+            f"missing={missing[:3]} unexpected={unexpected[:3]}"
+        )
+    for relative, content in files.items():
+        expected = declared[relative]
+        if expected != {"md5": bytes_hash(content, "md5"), "bytes": len(content)}:
+            raise AuditError(f"firmware resource Manifest bytes differ for {relative}")
+    return files, bytes_hash(manifest, "sha256")
+
+
+def load_firmware_updaters(descriptor_paths: list[Path]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    identities: set[tuple[str, str]] = set()
+    for descriptor_path in descriptor_paths:
+        descriptor = read_json(descriptor_path)
+        if descriptor.get("schema") != 1:
+            raise AuditError(f"firmware updater descriptor schema is invalid: {descriptor_path}")
+        release_tag = require_string(
+            descriptor.get("releaseTag"), f"{descriptor_path}.releaseTag"
+        )
+        release_commit = require_string(
+            descriptor.get("releaseCommit"), f"{descriptor_path}.releaseCommit"
+        )
+        asset_name = require_string(
+            descriptor.get("assetFileName"), f"{descriptor_path}.assetFileName"
+        )
+        expected_sha256 = require_string(
+            descriptor.get("assetSHA256"), f"{descriptor_path}.assetSHA256"
+        )
+        if not FIRMWARE_RELEASE_TAG.fullmatch(release_tag):
+            raise AuditError(f"firmware updater release tag is invalid: {release_tag}")
+        if not HEX_40.fullmatch(release_commit):
+            raise AuditError(f"firmware updater release commit is invalid: {release_tag}")
+        if (
+            Path(asset_name).name != asset_name
+            or not asset_name.startswith("flipper-z-f7-update-")
+            or not asset_name.endswith(".tgz")
+        ):
+            raise AuditError(f"firmware updater asset filename is invalid: {asset_name}")
+        if not HEX_64.fullmatch(expected_sha256):
+            raise AuditError(f"firmware updater expected SHA-256 is invalid: {asset_name}")
+        path = descriptor_path.parent / asset_name
+        if not path.is_file():
+            raise AuditError(f"firmware updater asset is missing: {path}")
+        actual_sha256 = file_hash(path, "sha256")
+        if actual_sha256 != expected_sha256:
+            raise AuditError(
+                f"firmware updater SHA-256 differs for {asset_name}: "
+                f"{actual_sha256} != {expected_sha256}"
+            )
+        members = _safe_tar_files(path)
+        roots = {Path(name).parts[0] for name in members}
+        if len(roots) != 1:
+            raise AuditError(f"firmware updater must contain one root directory: {path}")
+        root = next(iter(roots))
+        if not root.startswith("f7-update-"):
+            raise AuditError(f"firmware updater root is invalid: {root}")
+        fuf_path = f"{root}/update.fuf"
+        fuf = members.get(fuf_path)
+        if fuf is None:
+            raise AuditError(f"firmware updater update.fuf is missing: {path}")
+        fields = _parse_update_fuf(fuf, path)
+        firmware_version = fields["Info"]
+        if not FIRMWARE_VERSION.fullmatch(firmware_version):
+            raise AuditError(f"firmware updater Info is invalid: {firmware_version}")
+        if root != f"f7-update-{firmware_version}":
+            raise AuditError(
+                f"firmware updater root/Info differ: {root} != f7-update-{firmware_version}"
+            )
+        if release_tag.startswith("t-dev-") and firmware_version != release_tag:
+            raise AuditError(
+                f"dev firmware updater release/Info differ: {release_tag} != {firmware_version}"
+            )
+        if release_tag.startswith("v"):
+            expected_suffix = int(release_tag.split(".")[-1])
+            if not firmware_version.startswith("t-flppr-fw-"):
+                raise AuditError(
+                    "stable firmware updater release/Info differ: "
+                    f"{release_tag} != {firmware_version}"
+                )
+            actual_suffix = int(firmware_version.removeprefix("t-flppr-fw-"))
+            if actual_suffix != expected_suffix:
+                raise AuditError(
+                    "stable firmware updater release/Info differ: "
+                    f"{release_tag} != {firmware_version}"
+                )
+        resources_path = f"{root}/{fields['Resources']}"
+        resources = members.get(resources_path)
+        if resources is None:
+            raise AuditError(f"firmware updater resources.ths is missing: {path}")
+        resource_files, manifest_sha256 = _decode_resources_ths(resources)
+        targets = {
+            f"/ext/{relative}": {
+                "md5": bytes_hash(content, "md5"),
+                "sha256": bytes_hash(content, "sha256"),
+                "bytes": len(content),
+            }
+            for relative, content in resource_files.items()
+        }
+        identity = (release_tag, actual_sha256)
+        if identity in identities:
+            raise AuditError(f"duplicate firmware updater provenance: {path}")
+        identities.add(identity)
+        result.append(
+            {
+                "channel": "dev" if release_tag.startswith("t-dev-") else "stable",
+                "releaseTag": release_tag,
+                "firmwareVersion": firmware_version,
+                "sourceCommit": release_commit,
+                "containerSHA256": actual_sha256,
+                "manifestSHA256": manifest_sha256,
+                "resourcesSHA256": bytes_hash(resources, "sha256"),
+                "targets": targets,
+            }
+        )
+    return result
+
+
 def materialize_artifacts(
     app: dict[str, Any], archives: dict[str, dict[str, bytes]]
 ) -> list[dict[str, str]]:
@@ -654,6 +1018,7 @@ def audit_release(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
     target_manifests = load_target_manifests(args.target_manifest)
     target_archives = load_target_archives(args.target_archive, target_manifests)
     verify_target_archives(target_manifests, target_archives)
+    firmware_updaters = load_firmware_updaters(args.firmware_updater_descriptor)
     decision_manifests: dict[str, dict[str, Any]] = {}
     for app_id, decision in decisions.items():
         if app_id not in {app["id"] for app in apps}:
@@ -767,6 +1132,11 @@ def audit_release(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
                     for manifest in target_manifests
                     if artifact["targetPath"] in manifest["targets"]
                 ]
+                present_in.extend(
+                    f"{updater['channel']}:{updater['releaseTag']}"
+                    for updater in firmware_updaters
+                    if artifact["targetPath"] in updater["targets"]
+                )
                 if present_in:
                     artifact_result["ledgerStatus"] = "needsReview"
                     app_unresolved.append(
@@ -783,12 +1153,14 @@ def audit_release(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
                 continue
 
             evidence_manifests = target_manifests
+            allow_firmware_evidence = True
             if decision_matches and decision_disposition in {
                 "auditedDifference",
                 "sourceMatches",
                 "rejected",
             }:
                 evidence_manifests = [decision_manifests[app_id]]
+                allow_firmware_evidence = False
 
             provenance: list[dict[str, Any]] = []
             for manifest in evidence_manifests:
@@ -808,11 +1180,33 @@ def audit_release(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
                         "targetSourceCommit": manifest["sourceCommit"],
                     }
                 )
+            # A decision for a changed source is tied to one explicit FW Packages
+            # revision. Do not broaden that hardware decision to firmware updater
+            # bytes merely because another release happens to contain the target.
+            if allow_firmware_evidence:
+                for updater in firmware_updaters:
+                    target = updater["targets"].get(artifact["targetPath"])
+                    if target is None:
+                        continue
+                    provenance.append(
+                        {
+                            "targetMD5": target["md5"],
+                            "channel": updater["channel"],
+                            "releaseTag": updater["releaseTag"],
+                            "manifestSHA256": updater["manifestSHA256"],
+                            "containerKind": "firmwareUpdaterBundle",
+                            "containerSHA256": updater["containerSHA256"],
+                            "targetReleaseTag": updater["releaseTag"],
+                            "targetSourceCommit": updater["sourceCommit"],
+                            "firmwareVersion": updater["firmwareVersion"],
+                            "resourcesSHA256": updater["resourcesSHA256"],
+                        }
+                    )
             if not provenance:
                 artifact_result["ledgerStatus"] = "needsReview"
                 app_unresolved.append(
                     f"{app_id}:{artifact['remotePath']}: target absent from exact "
-                    "FW Packages manifest/ZIP"
+                    "FW Packages or firmware updater resources"
                 )
                 artifact_results.append(artifact_result)
                 continue
@@ -835,6 +1229,7 @@ def audit_release(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
                 key=lambda item: (
                     item["channel"],
                     item["releaseTag"],
+                    item["containerKind"],
                     item["targetMD5"],
                 ),
             )
@@ -1013,7 +1408,7 @@ def validate_audit(audit: dict[str, Any]) -> None:
             if not isinstance(provenance, list) or not provenance:
                 raise AuditError("target-bearing entry targetProvenance is required")
             provenance_hashes = []
-            provenance_identities: set[tuple[str, str, str, str]] = set()
+            provenance_identities: set[tuple[str, str, str, str, str, str]] = set()
             for item in provenance:
                 if not isinstance(item, dict):
                     raise AuditError("target provenance must be an object")
@@ -1032,7 +1427,7 @@ def validate_audit(audit: dict[str, Any]) -> None:
                 require_string(release_tag, "target provenance releaseTag")
                 if not isinstance(manifest_sha, str) or not HEX_64.fullmatch(manifest_sha):
                     raise AuditError("target provenance manifestSHA256 is invalid")
-                if container_kind != "fwPackagesZip":
+                if container_kind not in {"fwPackagesZip", "firmwareUpdaterBundle"}:
                     raise AuditError("target provenance containerKind is invalid")
                 if not isinstance(container_sha, str) or not HEX_64.fullmatch(container_sha):
                     raise AuditError("target provenance containerSHA256 is invalid")
@@ -1041,7 +1436,25 @@ def validate_audit(audit: dict[str, Any]) -> None:
                     target_source_commit
                 ):
                     raise AuditError("target provenance targetSourceCommit is invalid")
-                identity = (target_md5, channel, release_tag, manifest_sha)
+                if container_kind == "firmwareUpdaterBundle":
+                    firmware_version = item.get("firmwareVersion")
+                    resources_sha = item.get("resourcesSHA256")
+                    if not isinstance(firmware_version, str) or not FIRMWARE_VERSION.fullmatch(
+                        firmware_version
+                    ):
+                        raise AuditError("firmware updater provenance version is invalid")
+                    if not isinstance(resources_sha, str) or not HEX_64.fullmatch(resources_sha):
+                        raise AuditError("firmware updater provenance resourcesSHA256 is invalid")
+                elif "firmwareVersion" in item or "resourcesSHA256" in item:
+                    raise AuditError("FW Packages provenance has firmware-only fields")
+                identity = (
+                    target_md5,
+                    channel,
+                    release_tag,
+                    manifest_sha,
+                    container_kind,
+                    container_sha,
+                )
                 if identity in provenance_identities:
                     raise AuditError("duplicate target provenance")
                 provenance_identities.add(identity)
@@ -1202,6 +1615,9 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
     scan.add_argument("--author-heads", type=Path)
     scan.add_argument("--target-manifest", type=Path, action="append", required=True)
     scan.add_argument("--target-archive", type=Path, action="append", default=[])
+    scan.add_argument(
+        "--firmware-updater-descriptor", type=Path, action="append", default=[]
+    )
     scan.add_argument("--generated-at")
     scan.add_argument("--output-audit", type=Path, required=True)
     scan.add_argument("--output-summary", type=Path, required=True)

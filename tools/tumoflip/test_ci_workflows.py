@@ -76,12 +76,43 @@ class CiWorkflowSecurityTests(unittest.TestCase):
         self.assertIn("repos/$GITHUB_REPOSITORY/releases?per_page=100", workflow)
         self.assertIn("^fw-packages-stable-[0-9]{3}$", workflow)
         self.assertIn("^fw-packages-dev-[0-9]{3}$", workflow)
+        self.assertIn("Download and verify exact firmware updater targets", workflow)
+        self.assertIn("firmwareUpdaterBundle", (
+            REPO_ROOT / "tools/tumoflip/protected_app_audit.py"
+        ).read_text(encoding="utf-8"))
+        self.assertIn("--firmware-updater-descriptor", workflow)
+        self.assertIn("--require-hashes", workflow)
+        self.assertIn("--no-deps", workflow)
+        self.assertIn("--no-build-isolation", workflow)
+        self.assertIn("protected_audit_requirements.txt", workflow)
+        requirements = (
+            REPO_ROOT / "tools/tumoflip/protected_audit_requirements.txt"
+        ).read_text(encoding="utf-8")
+        self.assertIn("heatshrink2==0.13.0", requirements)
+        self.assertIn(
+            "sha256:5aa93c102ba9c4e6e4fb01974cb5b03194e10fa01bfda8bda233c632b22d3b4a",
+            requirements,
+        )
         self.assertIn("(.draft == false) and (.prerelease == false)", workflow)
         self.assertIn("(.draft == false) and (.prerelease == true)", workflow)
         self.assertNotIn(
             "default: \"fw-packages-stable-001,fw-packages-dev-003\"",
             workflow,
         )
+        selection = workflow[workflow.index("if [[ -z \"$FIRMWARE_RELEASES\" ]]") :]
+        self.assertLess(
+            selection.index("(.draft == false) and (.prerelease == false)"),
+            selection.index('FIRMWARE_RELEASES="$STABLE_FIRMWARE,$DEV_FIRMWARE"'),
+        )
+        self.assertIn('(.tag_name | test("^v[0-9]+\\\\.[0-9]+\\\\.[0-9]+$"))', workflow)
+        self.assertIn('(.tag_name | test("^t-dev-[0-9]{3}-[0-9]{3}$"))', workflow)
+        self.assertIn("ASSET_SHA", workflow)
+        self.assertIn("RELEASE_TAG_COMMIT", workflow)
+        firmware_step = workflow[workflow.index("Download and verify exact firmware updater targets") :]
+        self.assertIn("jq -e '.draft == false'", firmware_step)
+        self.assertIn('if [[ "$TAG" == t-dev-* ]]', firmware_step)
+        self.assertIn("jq -e '.prerelease == true'", firmware_step)
+        self.assertIn("jq -e '.prerelease == false'", firmware_step)
 
     def test_protected_app_audit_does_not_interpolate_inputs_in_shell(self) -> None:
         workflow = (
@@ -90,10 +121,12 @@ class CiWorkflowSecurityTests(unittest.TestCase):
 
         self.assertIn("SOURCE_TAG: ${{ inputs.source_tag }}", workflow)
         self.assertIn("DECISIONS_JSON: ${{ inputs.decisions_json }}", workflow)
+        self.assertIn("FIRMWARE_RELEASES: ${{ inputs.firmware_releases }}", workflow)
         self.assertIn('"$DECISIONS_JSON" != *"/../"*', workflow)
         self.assertIn('"$DECISIONS_JSON" != *"/./"*', workflow)
         self.assertNotIn('SOURCE_TAG="${{ inputs.source_tag }}"', workflow)
         self.assertNotIn('DECISIONS_JSON="${{ inputs.decisions_json }}"', workflow)
+        self.assertNotIn('FIRMWARE_RELEASES="${{ inputs.firmware_releases }}"', workflow)
         self.assertNotIn("pull_request_target", workflow)
 
     def test_target_discovery_selects_stable_release_and_dev_prerelease(self) -> None:
