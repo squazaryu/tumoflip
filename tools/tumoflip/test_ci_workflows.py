@@ -1,4 +1,7 @@
 import unittest
+import json
+import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -48,6 +51,97 @@ class CiWorkflowSecurityTests(unittest.TestCase):
             "advanced-security/filter-sarif@"
             "f3b8118a9349d88f7b1c0c488476411145b6270d",
             workflow,
+        )
+
+    def test_protected_app_audit_serializes_partial_ledger_publication(self) -> None:
+        workflow = (
+            REPO_ROOT / ".github/workflows/protected-app-audit.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("group: protected-app-audit-ledger", workflow)
+        self.assertIn("contents: write", workflow)
+        self.assertIn("issues: write", workflow)
+        self.assertIn("Resolve exactly one canonical issue", workflow)
+        self.assertIn("Publish cumulative partial ledger atomically", workflow)
+        self.assertNotIn("Skip an already verified exact pack", workflow)
+        self.assertIn("semantic-sha256", workflow)
+        self.assertIn("$PAYLOAD_SHA.json", workflow)
+        self.assertNotIn("if: steps.scan.outputs.status == 'verified'\n        shell: bash\n        env:\n          SOURCE_TAG", workflow)
+        self.assertIn("Close only a fully verified canonical issue", workflow)
+        self.assertIn("git -C \"$WORK\" rev-parse", workflow)
+        self.assertIn("--implementation-repo \"$GITHUB_WORKSPACE\"", workflow)
+        self.assertIn("sha256sum -c -", workflow)
+        self.assertIn("protected-app-audit:$SOURCE_TAG:$BASE_SHA:$EXTRA_SHA", workflow)
+        self.assertIn("repos/$GITHUB_REPOSITORY/releases?per_page=100", workflow)
+        self.assertIn("^fw-packages-stable-[0-9]{3}$", workflow)
+        self.assertIn("^fw-packages-dev-[0-9]{3}$", workflow)
+        self.assertIn("(.draft == false) and (.prerelease == false)", workflow)
+        self.assertIn("(.draft == false) and (.prerelease == true)", workflow)
+        self.assertNotIn(
+            "default: \"fw-packages-stable-001,fw-packages-dev-003\"",
+            workflow,
+        )
+
+    def test_protected_app_audit_does_not_interpolate_inputs_in_shell(self) -> None:
+        workflow = (
+            REPO_ROOT / ".github/workflows/protected-app-audit.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("SOURCE_TAG: ${{ inputs.source_tag }}", workflow)
+        self.assertIn("DECISIONS_JSON: ${{ inputs.decisions_json }}", workflow)
+        self.assertIn('"$DECISIONS_JSON" != *"/../"*', workflow)
+        self.assertIn('"$DECISIONS_JSON" != *"/./"*', workflow)
+        self.assertNotIn('SOURCE_TAG="${{ inputs.source_tag }}"', workflow)
+        self.assertNotIn('DECISIONS_JSON="${{ inputs.decisions_json }}"', workflow)
+        self.assertNotIn("pull_request_target", workflow)
+
+    def test_target_discovery_selects_stable_release_and_dev_prerelease(self) -> None:
+        releases = [
+            {
+                "tag_name": "fw-packages-stable-001",
+                "draft": False,
+                "prerelease": False,
+            },
+            {
+                "tag_name": "fw-packages-dev-002",
+                "draft": False,
+                "prerelease": True,
+            },
+            {
+                "tag_name": "fw-packages-dev-003",
+                "draft": False,
+                "prerelease": True,
+            },
+            {
+                "tag_name": "fw-packages-dev-999",
+                "draft": True,
+                "prerelease": True,
+            },
+        ]
+        jq_filter = r'''
+          def revision: .tag_name | capture("-(?<revision>[0-9]{3})$").revision | tonumber;
+          {
+            stable: (map(select((.draft == false) and (.prerelease == false)
+              and (.tag_name | test("^fw-packages-stable-[0-9]{3}$"))))
+              | sort_by(revision) | reverse | .[0].tag_name),
+            dev: (map(select((.draft == false) and (.prerelease == true)
+              and (.tag_name | test("^fw-packages-dev-[0-9]{3}$"))))
+              | sort_by(revision) | reverse | .[0].tag_name)
+          }
+        '''
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Path(temporary) / "releases.json"
+            fixture.write_text(json.dumps(releases), encoding="utf-8")
+            result = subprocess.run(
+                ["jq", "-c", jq_filter, str(fixture)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(
+            json.loads(result.stdout),
+            {"stable": "fw-packages-stable-001", "dev": "fw-packages-dev-003"},
         )
 
 
