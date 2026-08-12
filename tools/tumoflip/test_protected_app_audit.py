@@ -390,13 +390,52 @@ class ProtectedAppAuditTests(unittest.TestCase):
         self.assertEqual(len(result["unresolved"]), 14)
 
     def test_checked_in_raw_edit_decisions_accept_the_exact_live_sources(self) -> None:
-        dev_manifest = self._write_target_manifest("dev", "fw-packages-dev-004", "c")
-        dev_archive = self._write_target_archive("dev", "fw-packages-dev-004", "c")
+        previous_manifest = self._write_target_manifest(
+            "dev", "fw-packages-dev-004", "c"
+        )
+        previous_document = json.loads(previous_manifest.read_text(encoding="utf-8"))
+        previous_document["release_id"] = audit.manifest_release_id(previous_document)
+        previous_manifest.write_text(json.dumps(previous_document), encoding="utf-8")
+
+        dev_manifest = self._write_target_manifest("dev", "fw-packages-dev-005", "d")
+        dev_archive = self._write_target_archive("dev", "fw-packages-dev-005", "d")
         raw_target = next(
             app["artifacts"][0]["targetPath"]
             for app in self.apps
             if app["id"] == "subghz_raw_edit"
         )
+        esp_target = next(
+            app["artifacts"][0]["targetPath"]
+            for app in self.apps
+            if app["id"] == "esp_flasher"
+        )
+        dev_document = json.loads(dev_manifest.read_text(encoding="utf-8"))
+        dev_document["package_release"]["compatible_releases"] = [
+            {
+                "release_tag": "fw-packages-dev-004",
+                "release_id": previous_document["release_id"],
+                "manifest_sha256": audit.file_hash(previous_manifest, "sha256"),
+                "source_commit": self.after,
+            }
+        ]
+        previous_entries = {
+            entry["target"]: entry
+            for entry in previous_document["packages"]["protected"]
+        }
+        for entry in dev_document["packages"]["protected"]:
+            if entry["target"] not in {raw_target, esp_target}:
+                continue
+            previous = previous_entries[entry["target"]]
+            entry["compatible_builds"] = [
+                {
+                    "release_id": previous_document["release_id"],
+                    "md5": previous["md5"],
+                    "sha256": previous["sha256"],
+                    "bytes": previous["bytes"],
+                }
+            ]
+        dev_document["release_id"] = audit.manifest_release_id(dev_document)
+        dev_manifest.write_text(json.dumps(dev_document), encoding="utf-8")
         firmware = self._write_firmware_updater(targets={raw_target: b"firmware-raw"})
 
         for source_tag, source_commit in RAW_EDIT_DECISIONS.items():
@@ -443,9 +482,21 @@ class ProtectedAppAuditTests(unittest.TestCase):
                 self.assertEqual(raw_entry["disposition"], "auditedDifference")
                 self.assertEqual(
                     {item["releaseTag"] for item in raw_entry["targetProvenance"]},
-                    {"fw-packages-dev-004"},
+                    {"fw-packages-dev-004", "fw-packages-dev-005"},
                 )
-                self.assertEqual(raw_entry["targetMD5s"], [hashlib.md5(b"c").hexdigest()])
+                self.assertEqual(
+                    raw_entry["targetMD5s"],
+                    sorted(
+                        {
+                            hashlib.md5(b"c").hexdigest(),
+                            hashlib.md5(b"d").hexdigest(),
+                        }
+                    ),
+                )
+                self.assertIn(
+                    "fwPackagesCompatibleBuild",
+                    {item["containerKind"] for item in raw_entry["targetProvenance"]},
+                )
                 self.assertNotIn(
                     "firmwareUpdaterBundle",
                     {item["containerKind"] for item in raw_entry["targetProvenance"]},
@@ -454,16 +505,51 @@ class ProtectedAppAuditTests(unittest.TestCase):
                 unchanged_entry = next(
                     entry
                     for entry in result["entries"]
-                    if entry["remotePath"].endswith("esp32_wifi_marauder.fap")
+                    if entry["remotePath"].endswith("esp_flasher.fap")
                 )
                 self.assertEqual(
                     {item["releaseTag"] for item in unchanged_entry["targetProvenance"]},
-                    {"fw-packages-stable-001", "fw-packages-dev-004"},
+                    {
+                        "fw-packages-stable-001",
+                        "fw-packages-dev-004",
+                        "fw-packages-dev-005",
+                    },
                 )
                 self.assertEqual(
                     unchanged_entry["targetMD5s"],
-                    sorted({hashlib.md5(b"a").hexdigest(), hashlib.md5(b"c").hexdigest()}),
+                    sorted(
+                        {
+                            hashlib.md5(b"a").hexdigest(),
+                            hashlib.md5(b"c").hexdigest(),
+                            hashlib.md5(b"d").hexdigest(),
+                        }
+                    ),
                 )
+
+    def test_compatible_target_build_requires_content_addressed_manifest(self) -> None:
+        manifest = self._write_target_manifest("dev", "fw-packages-dev-005", "d")
+        document = json.loads(manifest.read_text(encoding="utf-8"))
+        document["package_release"]["compatible_releases"] = [
+            {
+                "release_tag": "fw-packages-dev-004",
+                "release_id": "1" * 64,
+                "manifest_sha256": "2" * 64,
+                "source_commit": self.after,
+            }
+        ]
+        document["packages"]["protected"][0]["compatible_builds"] = [
+            {
+                "release_id": "1" * 64,
+                "md5": hashlib.md5(b"old").hexdigest(),
+                "sha256": hashlib.sha256(b"old").hexdigest(),
+                "bytes": 3,
+            }
+        ]
+        document["release_id"] = "f" * 64
+        manifest.write_text(json.dumps(document), encoding="utf-8")
+
+        with self.assertRaisesRegex(audit.AuditError, "release id differs"):
+            audit.load_target_manifests([manifest])
 
     def test_exact_targets_for_every_artifact_can_verify_release(self) -> None:
         self._add_totp_target_family()
