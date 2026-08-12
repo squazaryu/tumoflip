@@ -18,6 +18,10 @@ not an identity: the audit key is the tag plus the named SHA-256 of both ZIPs.
 4. A target-bearing entry is accepted only when its target bytes occur in an
    exact released FW Packages manifest *and* the corresponding ZIP. The scanner
    checks path, byte count, MD5, SHA-256, clean source commit, revision and tag.
+   A newer catalog may additionally retain a bounded older overlay through
+   `compatible_builds`; the scanner recomputes the current manifest `release_id`
+   and admits only aliases tied to one exact older catalog identity. Undeclared
+   files from that older catalog remain untrusted.
 5. Changed source needs an exact decision. A port records author and pack source
    commits, changelog, implementation commit, FW Packages channel/revision/tag,
    and hardware acceptance. Rejected changes still pin the exact retained target
@@ -47,8 +51,8 @@ each allowed hash. Stable and dev may legitimately prove the same target MD5.
       "implementationCommit": "<40 lowercase hex>",
       "fwPackages": {
         "channel": "dev",
-        "revision": 4,
-        "releaseTag": "fw-packages-dev-004"
+        "revision": 5,
+        "releaseTag": "fw-packages-dev-005"
       },
       "hardwareAccepted": true
     }
