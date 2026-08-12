@@ -104,6 +104,10 @@ class EspFlashPackageTests(unittest.TestCase):
         )
         self.assertIn("app->turbospeed = true;", quick)
         self.assertIn("fap_version=(1, 13)", manifest)
+        self.assertIn(
+            '#define ESP_FLASHER_APP_VERSION "v1.13-tumoflip"',
+            (APP_ROOT / "esp_flasher_app.h").read_text(encoding="utf-8"),
+        )
 
     def test_offline_c5_fallback_is_versioned_and_back_routes_to_c5(self):
         quick = (APP_ROOT / "scenes/esp_flasher_scene_quick.c").read_text(
