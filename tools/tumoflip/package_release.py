@@ -61,6 +61,7 @@ MAX_TARGET_PACKAGE_FILE_BYTES = 16 * 1024 * 1024
 MAX_TARGET_PACKAGE_TOTAL_BYTES = 64 * 1024 * 1024
 CATALOG_RELEASE_TAG = re.compile(r"^fw-packages-(stable|dev)-([0-9]{3})$")
 CATALOG_BASELINES_PATH = Path("tools/tumoflip/package_catalog_baselines.json")
+CATALOG_LINEAGE_PATH = Path("tools/tumoflip/package_catalog_lineage.json")
 
 # Selective catalog deltas are intentionally keyed by a small audited name rather
 # than accepting an arbitrary path from workflow_dispatch.  Adding another app is
@@ -108,8 +109,10 @@ def catalog_release_identity(tag: str) -> tuple[str, int]:
     return match.group(1), revision
 
 
-def selective_catalog_overlay_sources(value: str) -> frozenset[str]:
-    """Resolve a comma-separated audited overlay list, rejecting ambiguity."""
+def selective_catalog_overlay_names(value: str) -> tuple[str, ...]:
+    """Normalize an untrusted workflow value to sorted audited ASCII names."""
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in value):
+        raise ValidationError("Selective catalog overlays contain control characters")
     names = value.split(",")
     if not names or any(not name or name != name.strip() for name in names):
         raise ValidationError("Selective catalog overlays contain an empty name")
@@ -118,6 +121,12 @@ def selective_catalog_overlay_sources(value: str) -> frozenset[str]:
     unknown = sorted(set(names) - set(SELECTIVE_CATALOG_OVERLAYS))
     if unknown:
         raise ValidationError(f"Selective catalog overlays are not allowlisted: {unknown}")
+    return tuple(sorted(names))
+
+
+def selective_catalog_overlay_sources(value: str) -> frozenset[str]:
+    """Resolve a comma-separated audited overlay list, rejecting ambiguity."""
+    names = selective_catalog_overlay_names(value)
     return frozenset(
         str(SELECTIVE_CATALOG_OVERLAYS[name]["source"]) for name in names
     )
@@ -205,6 +214,48 @@ def catalog_baseline(
                 f"Package catalog baseline {channel}.{key} is invalid"
             )
     return baseline
+
+
+def catalog_lineage_base(
+    repo_root: Path,
+    channel: str,
+) -> dict[str, str]:
+    """Return the one immutable catalog authorized as a selective delta base."""
+    path = require_file(
+        repo_root / CATALOG_LINEAGE_PATH,
+        "package catalog lineage",
+    )
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise ValidationError(f"Package catalog lineage is invalid: {error}") from error
+    if document.get("schema") != 1:
+        raise ValidationError("Package catalog lineage must use schema 1")
+    entry = document.get(channel)
+    if not isinstance(entry, dict):
+        raise ValidationError(f"Package catalog lineage is missing for {channel}")
+    required = {
+        "firmware_version": None,
+        "manifest_sha256": 64,
+        "package_zip_sha256": 64,
+        "release_id": 64,
+        "release_tag": None,
+        "source_commit": 40,
+        "target_release_id": 64,
+        "target_release_tag": None,
+        "target_source_commit": 40,
+    }
+    validated: dict[str, str] = {}
+    for key, hex_length in required.items():
+        value = entry.get(key)
+        if not isinstance(value, str) or not value:
+            raise ValidationError(f"Package catalog lineage {channel}.{key} is invalid")
+        if hex_length is not None and not _is_lower_hex(value, hex_length):
+            raise ValidationError(f"Package catalog lineage {channel}.{key} is invalid")
+        validated[key] = value
+    if catalog_release_identity(validated["release_tag"])[0] != channel:
+        raise ValidationError(f"Package catalog lineage channel differs for {channel}")
+    return validated
 
 
 def resolve_target_firmware(
@@ -773,6 +824,7 @@ def _selective_base_release(
         compatible_ids.add(str(item_release_id))
 
     entries = _validated_target_entries(manifest)
+    referenced_compatible_ids: set[str] = set()
     for source, entry in entries.items():
         aliases = entry.get("compatible_builds")
         if aliases is None:
@@ -800,6 +852,11 @@ def _selective_base_release(
             ):
                 raise ValidationError(f"Base compatible build is invalid for {source}")
             seen_aliases.add(identity)
+            referenced_compatible_ids.add(str(alias["release_id"]))
+    if referenced_compatible_ids != compatible_ids:
+        raise ValidationError(
+            "Base compatible build references differ from compatible releases"
+        )
     return release
 
 
@@ -832,8 +889,11 @@ def build_selective_catalog_release(
         base_manifest,
         expected_channel=channel,
     )
+    lineage = catalog_lineage_base(repo_root, channel)
     if base_release.get("catalog_release_tag") != base_release_tag:
         raise ValidationError("Base catalog tag differs from its manifest")
+    if base_release_tag != lineage["release_tag"]:
+        raise ValidationError("Base catalog is not the pinned latest lineage entry")
     base_revision = base_release.get("catalog_revision")
     if not isinstance(base_revision, int) or base_revision >= revision:
         raise ValidationError("Base catalog must precede the new revision")
@@ -843,6 +903,20 @@ def build_selective_catalog_release(
         raise ValidationError("Base manifest SHA-256 is invalid")
     if not _is_lower_hex(target_source_commit, 40):
         raise ValidationError("Target firmware source commit is invalid")
+    package_zip_sha256 = file_sha256(base_package_zip)
+    pinned_values = {
+        "firmware_version": str(base_manifest.get("firmware", {}).get("version")),
+        "manifest_sha256": base_manifest_sha256,
+        "package_zip_sha256": package_zip_sha256,
+        "release_id": str(base_manifest["release_id"]),
+        "source_commit": base_source_commit,
+        "target_release_id": str(base_release.get("target_release_id")),
+        "target_release_tag": str(base_release.get("target_release_tag")),
+        "target_source_commit": target_source_commit,
+    }
+    for key, actual in pinned_values.items():
+        if actual != lineage[key]:
+            raise ValidationError(f"Base catalog pinned {key} differs")
 
     if not overlay_sources:
         raise ValidationError("Selective catalog overlay list is empty")
@@ -981,6 +1055,24 @@ def build_selective_catalog_release(
                 raise ValidationError(f"Selective catalog target is missing: {source}")
             packages[expected_group][matches[0]] = replacement
 
+        remaining_compatible_ids = {
+            str(alias["release_id"])
+            for entries in packages.values()
+            for entry in entries
+            for alias in entry.get("compatible_builds", [])
+        }
+        compatible_releases = [
+            copy.deepcopy(item)
+            for item in base_release.get("compatible_releases", [])
+            if item["release_id"] in remaining_compatible_ids
+        ]
+        if {str(item["release_id"]) for item in compatible_releases} != (
+            remaining_compatible_ids
+        ):
+            raise ValidationError(
+                "Selective catalog compatible references cannot be resolved"
+            )
+
         manifest["package_release"] = {
             "type": "package-only",
             "id": catalog_release_tag,
@@ -1001,11 +1093,10 @@ def build_selective_catalog_release(
                 "release_tag": base_release_tag,
                 "release_id": base_manifest["release_id"],
                 "manifest_sha256": base_manifest_sha256,
+                "package_zip_sha256": package_zip_sha256,
                 "source_commit": base_source_commit,
             },
-            "compatible_releases": copy.deepcopy(
-                base_release.get("compatible_releases", [])
-            ),
+            "compatible_releases": compatible_releases,
         }
         manifest["release_id"] = manifest_release_id(manifest)
         out_dir.mkdir(parents=True, exist_ok=True)

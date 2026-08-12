@@ -130,6 +130,24 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn('"$BASE_DIR/tumoflip-packages.json"', base_download)
         self.assertIn('"$BASE_DIR/tumoflip-packages.zip"', base_download)
         self.assertIn('if [[ "$BASE_COMMIT" != "$BASE_SOURCE" ]]', workflow)
+        self.assertIn("selective_catalog_overlay_names", workflow)
+        self.assertIn("NORMALIZED_SELECTIVE_OVERLAYS", workflow)
+        self.assertIn("package_catalog_lineage.json", (
+            REPO_ROOT / "tools/tumoflip/package_release.py"
+        ).read_text(encoding="utf-8"))
+        self.assertIn("LATEST_LIVE_BASE", workflow)
+        self.assertIn("max_by(.revision)", workflow)
+        self.assertIn(".revision < $new_revision", workflow)
+        self.assertIn("Base catalog must be latest live predecessor", workflow)
+        self.assertIn("Pinned base catalog", workflow)
+        self.assertNotIn(
+            'echo "selective_overlays=$SELECTIVE_OVERLAYS" >> "$GITHUB_OUTPUT"',
+            workflow,
+        )
+        self.assertIn(
+            'echo "selective_overlays=$NORMALIZED_SELECTIVE_OVERLAYS" >> "$GITHUB_OUTPUT"',
+            workflow,
+        )
         self.assertIn("--base-manifest", workflow)
         self.assertIn("--base-package-zip", workflow)
         self.assertIn("--base-release-tag", workflow)

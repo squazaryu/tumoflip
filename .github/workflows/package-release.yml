@@ -163,6 +163,60 @@ jobs:
             echo "Base catalog and selective overlays must be supplied together" >&2
             exit 1
           fi
+          NORMALIZED_SELECTIVE_OVERLAYS=""
+          if [[ -n "$BASE_TAG" ]]; then
+            NORMALIZED_SELECTIVE_OVERLAYS="$(
+              python3 - "$SELECTIVE_OVERLAYS" <<'PY'
+          import sys
+          from tools.tumoflip.package_release import selective_catalog_overlay_names
+          print(",".join(selective_catalog_overlay_names(sys.argv[1])))
+          PY
+            )"
+            PINNED_BASE_TAG="$(
+              python3 - "$CATALOG_CHANNEL" <<'PY'
+          import sys
+          from pathlib import Path
+          from tools.tumoflip.package_release import catalog_lineage_base
+          print(catalog_lineage_base(Path.cwd(), sys.argv[1])["release_tag"])
+          PY
+            )"
+            if [[ "$BASE_TAG" != "$PINNED_BASE_TAG" ]]; then
+              echo "Base catalog $BASE_TAG is not pinned latest $PINNED_BASE_TAG" >&2
+              exit 1
+            fi
+            CATALOG_REVISION_NUMBER=$((10#$CATALOG_REVISION))
+            LATEST_LIVE_BASE="$(
+              gh api --paginate --slurp \
+                "repos/$GITHUB_REPOSITORY/releases?per_page=100" | \
+              jq -er \
+                --arg channel "$CATALOG_CHANNEL" \
+                --argjson new_revision "$CATALOG_REVISION_NUMBER" '
+                  [
+                    .[][]
+                    | select(.draft == false)
+                    | select(
+                        (($channel == "dev") and (.prerelease == true)) or
+                        (($channel == "stable") and (.prerelease == false))
+                      )
+                    | .tag_name as $tag
+                    | try (
+                        $tag
+                        | capture("^fw-packages-(?<channel>stable|dev)-(?<revision>[0-9]{3})$")
+                      ) catch null
+                    | select(. != null and .channel == $channel)
+                    | .revision = (.revision | tonumber)
+                    | select(.revision < $new_revision)
+                    | {tag: $tag, revision: .revision}
+                  ]
+                  | max_by(.revision)
+                  | .tag
+                '
+            )"
+            if [[ "$BASE_TAG" != "$LATEST_LIVE_BASE" ]]; then
+              echo "Base catalog must be latest live predecessor $LATEST_LIVE_BASE" >&2
+              exit 1
+            fi
+          fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
           peel_tag() {
             local TYPE SHA
@@ -251,6 +305,32 @@ jobs:
               "$BASE_DIR/${BASE_TAG}-SHA256SUMS" \
               "$BASE_DIR/tumoflip-packages.json" \
               "$BASE_DIR/tumoflip-packages.zip"
+            python3 - \
+              "$CATALOG_CHANNEL" \
+              "$BASE_DIR/tumoflip-packages.json" \
+              "$BASE_DIR/tumoflip-packages.zip" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from tools.tumoflip.package_release import catalog_lineage_base, file_sha256
+          channel, manifest_path, package_zip = sys.argv[1:]
+          expected = catalog_lineage_base(Path.cwd(), channel)
+          manifest_file = Path(manifest_path)
+          manifest = json.loads(manifest_file.read_text())
+          release = manifest.get("package_release", {})
+          actual = {
+              "manifest_sha256": file_sha256(manifest_file),
+              "package_zip_sha256": file_sha256(Path(package_zip)),
+              "release_id": manifest.get("release_id"),
+              "source_commit": release.get("source_commit"),
+              "target_release_id": release.get("target_release_id"),
+              "target_release_tag": release.get("target_release_tag"),
+              "firmware_version": manifest.get("firmware", {}).get("version"),
+          }
+          for key, value in actual.items():
+              if value != expected[key]:
+                  raise SystemExit(f"Pinned base catalog {key} differs")
+          PY
             BASE_COMMIT="$(peel_tag "$BASE_TAG")"
             BASE_SOURCE="$(python3 - "$BASE_DIR/tumoflip-packages.json" <<'PY'
           import json
@@ -267,7 +347,7 @@ jobs:
             echo "base_source_commit=$BASE_SOURCE" >> "$GITHUB_OUTPUT"
             echo "base_manifest=$BASE_DIR/tumoflip-packages.json" >> "$GITHUB_OUTPUT"
             echo "base_package_zip=$BASE_DIR/tumoflip-packages.zip" >> "$GITHUB_OUTPUT"
-            echo "selective_overlays=$SELECTIVE_OVERLAYS" >> "$GITHUB_OUTPUT"
+            echo "selective_overlays=$NORMALIZED_SELECTIVE_OVERLAYS" >> "$GITHUB_OUTPUT"
           else
             echo "base_tag=" >> "$GITHUB_OUTPUT"
             echo "base_source_commit=" >> "$GITHUB_OUTPUT"

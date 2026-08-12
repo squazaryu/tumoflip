@@ -16,7 +16,9 @@ try:
         build_catalog_reconciliation,
         build_package_release,
         build_selective_catalog_release,
+        catalog_lineage_base,
         selective_catalog_build_targets,
+        selective_catalog_overlay_names,
         selective_catalog_overlay_sources,
     )
     from .validate_release import (
@@ -40,7 +42,9 @@ except ImportError:
         build_catalog_reconciliation,
         build_package_release,
         build_selective_catalog_release,
+        catalog_lineage_base,
         selective_catalog_build_targets,
+        selective_catalog_overlay_names,
         selective_catalog_overlay_sources,
     )
     from validate_release import (
@@ -330,9 +334,35 @@ def prepare_selective_catalogs(
         catalog_release_tag="fw-packages-dev-005",
     )
     build = repo / "build/f7-firmware-C"
+    base_manifest_path = base_dir / "tumoflip-packages.json"
+    base_zip = base_dir / "tumoflip-packages.zip"
+    base_release = base_manifest["package_release"]
+    lineage = {
+        "schema": 1,
+        "dev": {
+            "firmware_version": base_manifest["firmware"]["version"],
+            "manifest_sha256": sha256(base_manifest_path),
+            "package_zip_sha256": sha256(base_zip),
+            "release_id": base_manifest["release_id"],
+            "release_tag": base_release["catalog_release_tag"],
+            "source_commit": base_release["source_commit"],
+            "target_release_id": base_release["target_release_id"],
+            "target_release_tag": base_release["target_release_tag"],
+            "target_source_commit": target_source_commit,
+        },
+    }
+    (repo / "tools/tumoflip/package_catalog_lineage.json").write_text(
+        json.dumps(lineage, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     write_file(build / ".extapps/esp_flasher.fap", b"selective esp flasher update")
     subprocess.run(
-        ["git", "add", "build/f7-firmware-C/.extapps/esp_flasher.fap"],
+        [
+            "git",
+            "add",
+            "build/f7-firmware-C/.extapps/esp_flasher.fap",
+            "tools/tumoflip/package_catalog_lineage.json",
+        ],
         cwd=repo,
         check=True,
     )
@@ -350,7 +380,7 @@ def prepare_selective_catalogs(
         target_manifest,
         target_zip,
         base_manifest,
-        base_dir / "tumoflip-packages.zip",
+        base_zip,
         target_source_commit,
         base_source_commit,
     )
@@ -360,6 +390,10 @@ class PackageReleaseTest(unittest.TestCase):
     def test_selective_catalog_allowlist_resolves_only_esp_flasher(self) -> None:
         source = "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
         self.assertEqual(
+            selective_catalog_overlay_names("esp_flasher"),
+            ("esp_flasher",),
+        )
+        self.assertEqual(
             selective_catalog_overlay_sources("esp_flasher"),
             frozenset({source}),
         )
@@ -367,7 +401,16 @@ class PackageReleaseTest(unittest.TestCase):
             selective_catalog_build_targets("esp_flasher"),
             ("fap_esp_flasher",),
         )
-        for unsafe in ("subghz_raw_edit", "../esp_flasher", "esp_flasher,", "esp_flasher,esp_flasher"):
+        for unsafe in (
+            "subghz_raw_edit",
+            "../esp_flasher",
+            "esp_flasher,",
+            "esp_flasher,esp_flasher",
+            "esp_flasher\nforged=1",
+            "esp_flasher\r",
+            "esp_flasher\x00",
+            " esp_flasher",
+        ):
             with self.subTest(unsafe=unsafe), self.assertRaises(ValidationError):
                 selective_catalog_overlay_sources(unsafe)
 
@@ -469,6 +512,7 @@ class PackageReleaseTest(unittest.TestCase):
                     "release_tag": "fw-packages-dev-005",
                     "release_id": base_manifest["release_id"],
                     "manifest_sha256": sha256(base_manifest_path),
+                    "package_zip_sha256": sha256(base_zip),
                     "source_commit": base_source_commit,
                 },
             )
@@ -504,7 +548,7 @@ class PackageReleaseTest(unittest.TestCase):
             broken["package_release"]["target_release_id"] = "f" * 64
             broken.pop("release_id")
             broken["release_id"] = manifest_release_id(broken)
-            with self.assertRaisesRegex(ValidationError, "target lineage differs"):
+            with self.assertRaisesRegex(ValidationError, "pinned manifest_sha256 differs"):
                 build_selective_catalog_release(
                     repo,
                     build,
@@ -552,6 +596,113 @@ class PackageReleaseTest(unittest.TestCase):
                     catalog_release_tag="fw-packages-dev-007",
                     overlay_sources=frozenset({esp_source}),
                 )
+
+    def test_selective_catalog_rejects_unreferenced_compatible_release(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (
+                repo,
+                build,
+                outside,
+                target_manifest,
+                target_zip,
+                base_manifest,
+                base_zip,
+                target_source_commit,
+                base_source_commit,
+            ) = prepare_selective_catalogs(root)
+            broken = json.loads(json.dumps(base_manifest))
+            for entries in broken["packages"].values():
+                for entry in entries:
+                    entry.pop("compatible_builds", None)
+            broken.pop("release_id")
+            broken["release_id"] = manifest_release_id(broken)
+            with self.assertRaisesRegex(
+                ValidationError,
+                "references differ from compatible releases",
+            ):
+                build_selective_catalog_release(
+                    repo,
+                    build,
+                    outside / "orphan-output",
+                    target_release_tag="t-dev-004-015",
+                    target_source_commit=target_source_commit,
+                    target_manifest=target_manifest,
+                    target_package_zip=target_zip,
+                    base_manifest=broken,
+                    base_manifest_sha256="f" * 64,
+                    base_package_zip=base_zip,
+                    base_release_tag="fw-packages-dev-005",
+                    base_source_commit=base_source_commit,
+                    catalog_release_tag="fw-packages-dev-007",
+                    overlay_sources=frozenset(
+                        {"apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"}
+                    ),
+                )
+
+    def test_selective_catalog_prunes_compatible_release_when_last_alias_is_selected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (
+                repo,
+                build,
+                outside,
+                target_manifest,
+                target_zip,
+                base_manifest,
+                base_zip,
+                target_source_commit,
+                base_source_commit,
+            ) = prepare_selective_catalogs(root)
+            esp_source = "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
+            single_alias = json.loads(json.dumps(base_manifest))
+            for entries in single_alias["packages"].values():
+                for entry in entries:
+                    if entry["source"] != esp_source:
+                        entry.pop("compatible_builds", None)
+            single_alias.pop("release_id")
+            single_alias["release_id"] = manifest_release_id(single_alias)
+            single_manifest_path = outside / "single-alias.json"
+            single_manifest_path.write_text(
+                json.dumps(single_alias, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            single_zip = outside / "single-alias.zip"
+            with zipfile.ZipFile(base_zip) as archive:
+                resources = outside / "single-resources"
+                archive.extractall(resources)
+            build_packages_zip(single_alias, resources, single_zip)
+            lineage_path = repo / "tools/tumoflip/package_catalog_lineage.json"
+            lineage = json.loads(lineage_path.read_text())
+            lineage["dev"]["manifest_sha256"] = sha256(single_manifest_path)
+            lineage["dev"]["package_zip_sha256"] = sha256(single_zip)
+            lineage["dev"]["release_id"] = single_alias["release_id"]
+            lineage_path.write_text(json.dumps(lineage), encoding="utf-8")
+            subprocess.run(["git", "add", str(lineage_path)], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "test: pin single alias base"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+            )
+
+            manifest = build_selective_catalog_release(
+                repo,
+                build,
+                outside / "pruned-output",
+                target_release_tag="t-dev-004-015",
+                target_source_commit=target_source_commit,
+                target_manifest=target_manifest,
+                target_package_zip=target_zip,
+                base_manifest=single_alias,
+                base_manifest_sha256=sha256(single_manifest_path),
+                base_package_zip=single_zip,
+                base_release_tag="fw-packages-dev-005",
+                base_source_commit=base_source_commit,
+                catalog_release_tag="fw-packages-dev-007",
+                overlay_sources=frozenset({esp_source}),
+            )
+            self.assertEqual(manifest["package_release"]["compatible_releases"], [])
 
     def test_reconciled_catalog_accepts_only_exact_previous_overlays(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
