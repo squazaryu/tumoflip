@@ -844,11 +844,15 @@ void subghz_protocol_decoder_keeloq_reset(void* context) {
     furi_assert(context);
     SubGhzProtocolDecoderKeeloq* instance = context;
     instance->decoder.parser_step = KeeloqDecoderStepReset;
-    // TODO
+    // Per-frame KeeLoq identification must not leak into the next receive session.
     instance->keystore->mfname = "";
     instance->keystore->kl_type = 0;
-    // Reset seed?
     instance->generic.seed = 0;
+
+    // Drop only parser frame accumulation. Completed frames are handled synchronously
+    // before the receiver is reset; decoded button and custom-button state stay intact.
+    instance->generic.data = 0;
+    instance->header_count = 0;
 }
 
 void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t duration) {
