@@ -28,6 +28,7 @@ try:
         install_static_sd_resources,
         manifest_release_id,
         package_entries,
+        package_extapp_exports,
         require_file,
         release_cleanup_entries,
         sync_extapp_package_exports,
@@ -47,6 +48,7 @@ except ImportError:
         install_static_sd_resources,
         manifest_release_id,
         package_entries,
+        package_extapp_exports,
         require_file,
         release_cleanup_entries,
         sync_extapp_package_exports,
@@ -59,6 +61,16 @@ MAX_TARGET_PACKAGE_FILE_BYTES = 16 * 1024 * 1024
 MAX_TARGET_PACKAGE_TOTAL_BYTES = 64 * 1024 * 1024
 CATALOG_RELEASE_TAG = re.compile(r"^fw-packages-(stable|dev)-([0-9]{3})$")
 CATALOG_BASELINES_PATH = Path("tools/tumoflip/package_catalog_baselines.json")
+
+# Selective catalog deltas are intentionally keyed by a small audited name rather
+# than accepting an arbitrary path from workflow_dispatch.  Adding another app is
+# therefore a source-reviewed change, not a release-operator typo.
+SELECTIVE_CATALOG_OVERLAYS = {
+    "esp_flasher": {
+        "source": "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+        "fbt_target": "fap_esp_flasher",
+    },
+}
 
 
 def git_output(repo_root: Path, *args: str) -> str:
@@ -94,6 +106,69 @@ def catalog_release_identity(tag: str) -> tuple[str, int]:
     if revision < 1:
         raise ValidationError("Independent package revision must be greater than zero")
     return match.group(1), revision
+
+
+def selective_catalog_overlay_sources(value: str) -> frozenset[str]:
+    """Resolve a comma-separated audited overlay list, rejecting ambiguity."""
+    names = value.split(",")
+    if not names or any(not name or name != name.strip() for name in names):
+        raise ValidationError("Selective catalog overlays contain an empty name")
+    if len(names) != len(set(names)):
+        raise ValidationError("Selective catalog overlays contain duplicates")
+    unknown = sorted(set(names) - set(SELECTIVE_CATALOG_OVERLAYS))
+    if unknown:
+        raise ValidationError(f"Selective catalog overlays are not allowlisted: {unknown}")
+    return frozenset(
+        str(SELECTIVE_CATALOG_OVERLAYS[name]["source"]) for name in names
+    )
+
+
+def selective_catalog_build_targets(value: str) -> tuple[str, ...]:
+    """Return the exact FBT targets for a validated selective overlay list."""
+    sources = selective_catalog_overlay_sources(value)
+    return tuple(
+        str(spec["fbt_target"])
+        for spec in SELECTIVE_CATALOG_OVERLAYS.values()
+        if spec["source"] in sources
+    )
+
+
+def copy_selective_extapp_exports(
+    build_dir: Path,
+    resources: Path,
+    selected_sources: frozenset[str],
+) -> list[dict[str, object]]:
+    """Copy only selected build outputs without pruning or touching other files."""
+    exports: dict[str, list[str]] = {}
+    for filename, source in package_extapp_exports().items():
+        if source in selected_sources:
+            exports.setdefault(source, []).append(filename)
+
+    synced: list[dict[str, object]] = []
+    for source in sorted(selected_sources):
+        candidates = [
+            build_dir / ".extapps" / filename
+            for filename in exports.get(source, [])
+            if (build_dir / ".extapps" / filename).is_file()
+        ]
+        if len(candidates) != 1:
+            raise ValidationError(
+                f"Selective catalog requires exactly one build artifact for {source}; "
+                f"found={len(candidates)}"
+            )
+        output = resources / source
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(candidates[0].read_bytes())
+        synced.append(
+            {
+                "source": candidates[0].relative_to(build_dir).as_posix(),
+                "target": source,
+                "bytes": output.stat().st_size,
+                "sha256": file_sha256(output),
+                "md5": hashlib.md5(output.read_bytes()).hexdigest(),
+            }
+        )
+    return synced
 
 
 def catalog_baseline(
@@ -619,6 +694,349 @@ def build_catalog_reconciliation(
         compatible_resources_context.cleanup()
 
 
+def _is_lower_hex(value: object, length: int) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == length
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _selective_base_release(
+    manifest: dict[str, object],
+    *,
+    expected_channel: str,
+) -> dict[str, object]:
+    """Validate provenance carried by an immutable catalog used as a delta base."""
+    release = manifest.get("package_release")
+    if not isinstance(release, dict) or release.get("type") != "package-only":
+        raise ValidationError("Base manifest is not a package-only release")
+    tag = release.get("catalog_release_tag")
+    channel = release.get("catalog_channel")
+    revision = release.get("catalog_revision")
+    if (
+        not isinstance(tag, str)
+        or catalog_release_identity(tag) != (channel, revision)
+        or channel != expected_channel
+    ):
+        raise ValidationError("Base catalog identity is invalid")
+    if release.get("id") != tag or release.get("source_dirty") is not False:
+        raise ValidationError("Base catalog provenance is invalid")
+    if not _is_lower_hex(release.get("source_commit"), 40):
+        raise ValidationError("Base catalog source commit is invalid")
+
+    overlays = release.get("overlay_targets")
+    if (
+        not isinstance(overlays, list)
+        or len(overlays) != len(set(overlays))
+        or not all(isinstance(source, str) and source for source in overlays)
+        or not set(overlays) <= PACKAGE_RELEASE_OVERLAY_FILES
+    ):
+        raise ValidationError("Base catalog overlay targets are invalid")
+    modified = release.get("catalog_modified_targets", [])
+    if (
+        not isinstance(modified, list)
+        or len(modified) != len(set(modified))
+        or not all(isinstance(source, str) and source for source in modified)
+        or not set(modified) <= PACKAGE_RELEASE_OVERLAY_FILES
+    ):
+        raise ValidationError("Base catalog modified targets are invalid")
+
+    compatible = release.get("compatible_releases", [])
+    if not isinstance(compatible, list):
+        raise ValidationError("Base catalog compatible lineage is invalid")
+    compatible_ids: set[str] = set()
+    compatible_tags: set[str] = set()
+    for item in compatible:
+        if not isinstance(item, dict):
+            raise ValidationError("Base catalog compatible lineage is invalid")
+        item_tag = item.get("release_tag")
+        item_release_id = item.get("release_id")
+        if not isinstance(item_tag, str):
+            raise ValidationError("Base catalog compatible tag is invalid")
+        item_channel, item_revision = catalog_release_identity(item_tag)
+        if (
+            item_channel != channel
+            or not isinstance(revision, int)
+            or item_revision >= revision
+        ):
+            raise ValidationError("Base catalog compatible revision is invalid")
+        if (
+            item_tag in compatible_tags
+            or not _is_lower_hex(item_release_id, 64)
+            or item_release_id in compatible_ids
+            or not _is_lower_hex(item.get("manifest_sha256"), 64)
+            or not _is_lower_hex(item.get("source_commit"), 40)
+        ):
+            raise ValidationError("Base catalog compatible provenance is invalid")
+        compatible_tags.add(item_tag)
+        compatible_ids.add(str(item_release_id))
+
+    entries = _validated_target_entries(manifest)
+    for source, entry in entries.items():
+        aliases = entry.get("compatible_builds")
+        if aliases is None:
+            continue
+        if not isinstance(aliases, list) or not aliases:
+            raise ValidationError(f"Base compatible builds are invalid for {source}")
+        seen_aliases: set[tuple[object, ...]] = set()
+        for alias in aliases:
+            if not isinstance(alias, dict):
+                raise ValidationError(f"Base compatible build is invalid for {source}")
+            identity = (
+                alias.get("bytes"),
+                alias.get("sha256"),
+                alias.get("md5"),
+                alias.get("release_id"),
+            )
+            if (
+                identity in seen_aliases
+                or not isinstance(alias.get("bytes"), int)
+                or isinstance(alias.get("bytes"), bool)
+                or not 0 < int(alias["bytes"]) <= MAX_TARGET_PACKAGE_FILE_BYTES
+                or not _is_lower_hex(alias.get("sha256"), 64)
+                or not _is_lower_hex(alias.get("md5"), 32)
+                or alias.get("release_id") not in compatible_ids
+            ):
+                raise ValidationError(f"Base compatible build is invalid for {source}")
+            seen_aliases.add(identity)
+    return release
+
+
+def build_selective_catalog_release(
+    repo_root: Path,
+    build_dir: Path,
+    out_dir: Path,
+    *,
+    target_release_tag: str,
+    target_source_commit: str,
+    target_manifest: dict[str, object],
+    target_package_zip: Path,
+    base_manifest: dict[str, object],
+    base_manifest_sha256: str,
+    base_package_zip: Path,
+    base_release_tag: str,
+    base_source_commit: str,
+    catalog_release_tag: str,
+    overlay_sources: frozenset[str],
+) -> dict[str, object]:
+    """Publish a minimal catalog delta over one exact immutable predecessor.
+
+    The prior catalog is authoritative.  Only explicitly allowlisted entries are
+    rebuilt; every other manifest entry and ZIP payload is retained exactly.
+    """
+    validate_target_release_id(target_manifest)
+    validate_target_release_id(base_manifest)
+    channel, revision = catalog_release_identity(catalog_release_tag)
+    base_release = _selective_base_release(
+        base_manifest,
+        expected_channel=channel,
+    )
+    if base_release.get("catalog_release_tag") != base_release_tag:
+        raise ValidationError("Base catalog tag differs from its manifest")
+    base_revision = base_release.get("catalog_revision")
+    if not isinstance(base_revision, int) or base_revision >= revision:
+        raise ValidationError("Base catalog must precede the new revision")
+    if base_release.get("source_commit") != base_source_commit:
+        raise ValidationError("Base catalog tag commit differs from its manifest")
+    if not _is_lower_hex(base_manifest_sha256, 64):
+        raise ValidationError("Base manifest SHA-256 is invalid")
+    if not _is_lower_hex(target_source_commit, 40):
+        raise ValidationError("Target firmware source commit is invalid")
+
+    if not overlay_sources:
+        raise ValidationError("Selective catalog overlay list is empty")
+    allowed_sources = {
+        str(spec["source"]) for spec in SELECTIVE_CATALOG_OVERLAYS.values()
+    }
+    if not overlay_sources <= allowed_sources:
+        raise ValidationError(
+            f"Selective catalog targets are not allowlisted: "
+            f"{sorted(overlay_sources - allowed_sources)}"
+        )
+
+    baseline = catalog_baseline(repo_root, channel)
+    if target_release_tag != baseline["release_tag"]:
+        raise ValidationError(
+            f"Catalog {channel} baseline must be {baseline['release_tag']}, "
+            f"got {target_release_tag}"
+        )
+    target_firmware = target_manifest.get("firmware")
+    base_firmware = base_manifest.get("firmware")
+    expected_firmware = {
+        "name": "tumoflip",
+        "version": baseline["firmware_version"],
+        "api": baseline["api"],
+        "target": baseline["target"],
+    }
+    if not isinstance(target_firmware, dict) or not isinstance(base_firmware, dict):
+        raise ValidationError("Selective catalog firmware identity is missing")
+    for key, expected in expected_firmware.items():
+        if target_firmware.get(key) != expected:
+            raise ValidationError(
+                f"Catalog {channel} baseline firmware {key} must be {expected!r}"
+            )
+    if base_firmware != target_firmware:
+        raise ValidationError("Base catalog firmware identity differs from target")
+    if (
+        base_release.get("target_release_tag") != target_release_tag
+        or base_release.get("target_release_id") != target_manifest["release_id"]
+        or base_release.get("source_firmware_version") != target_firmware["version"]
+    ):
+        raise ValidationError("Base catalog target lineage differs from target firmware")
+    for key in ("schema", "safety", "artifacts", "cleanup"):
+        if base_manifest.get(key) != target_manifest.get(key):
+            raise ValidationError(f"Base catalog {key} differs from target firmware")
+
+    target_entries = _validated_target_entries(target_manifest)
+    base_entries = _validated_target_entries(base_manifest)
+    target_groups = {
+        entry["source"]: group
+        for group, entries in target_manifest["packages"].items()
+        for entry in entries
+    }
+    base_groups = {
+        entry["source"]: group
+        for group, entries in base_manifest["packages"].items()
+        for entry in entries
+    }
+    if set(base_entries) != set(target_entries) or base_groups != target_groups:
+        raise ValidationError("Base catalog package topology differs from target firmware")
+    modified_sources = set(base_release.get("catalog_modified_targets", []))
+    for source, base_entry in base_entries.items():
+        canonical_base = dict(base_entry)
+        canonical_base.pop("compatible_builds", None)
+        if canonical_base != target_entries[source] and source not in modified_sources:
+            raise ValidationError(f"Base catalog has untracked modified target: {source}")
+
+    commit, _short, dirty = git_identity(repo_root)
+    if dirty:
+        raise ValidationError("Selective catalog source worktree must be clean")
+
+    base_resources_context = tempfile.TemporaryDirectory(
+        prefix="tumoflip-selective-base-"
+    )
+    base_resources = Path(base_resources_context.name) / "resources"
+    base_resources.mkdir(parents=True)
+    try:
+        materialize_target_package(base_manifest, base_package_zip, base_resources)
+        with tempfile.TemporaryDirectory(
+            prefix="tumoflip-selective-target-"
+        ) as target_dir:
+            target_resources = Path(target_dir) / "resources"
+            target_resources.mkdir(parents=True)
+            materialize_target_package(
+                target_manifest,
+                target_package_zip,
+                target_resources,
+            )
+        synced = copy_selective_extapp_exports(
+            build_dir,
+            base_resources,
+            overlay_sources,
+        )
+        synced_targets = {str(entry["target"]) for entry in synced}
+        if synced_targets != overlay_sources:
+            missing = sorted(overlay_sources - synced_targets)
+            extra = sorted(synced_targets - overlay_sources)
+            raise ValidationError(
+                f"Selective catalog build artifacts are incomplete; "
+                f"missing={missing}, extra={extra}"
+            )
+
+        manifest = copy.deepcopy(base_manifest)
+        manifest.pop("release_id", None)
+        packages = manifest.get("packages")
+        if not isinstance(packages, dict):
+            raise ValidationError("Base catalog packages are missing")
+        for source in sorted(overlay_sources):
+            expected_group = PACKAGE_RELEASE_OVERLAY_GROUPS.get(source)
+            if expected_group is None or base_groups[source] != expected_group:
+                raise ValidationError(f"Selective catalog group is invalid for {source}")
+            data = require_file(
+                base_resources / source,
+                f"selective catalog file {source}",
+            ).read_bytes()
+            replacement = {
+                "source": source,
+                "target": f"/ext/{source}",
+                "bytes": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "md5": hashlib.md5(data).hexdigest(),
+            }
+            old_entry = base_entries[source]
+            if all(
+                replacement[key] == old_entry.get(key)
+                for key in ("bytes", "sha256", "md5")
+            ):
+                raise ValidationError(
+                    f"Selective catalog target is unchanged: {source}"
+                )
+            matches = [
+                index
+                for index, entry in enumerate(packages[expected_group])
+                if isinstance(entry, dict) and entry.get("source") == source
+            ]
+            if len(matches) != 1:
+                raise ValidationError(f"Selective catalog target is missing: {source}")
+            packages[expected_group][matches[0]] = replacement
+
+        manifest["package_release"] = {
+            "type": "package-only",
+            "id": catalog_release_tag,
+            "source_commit": commit,
+            "source_dirty": False,
+            "source_firmware_version": target_firmware["version"],
+            "target_release_tag": target_release_tag,
+            "target_release_id": target_manifest["release_id"],
+            "target_source_commit": target_source_commit,
+            "firmware_flash_unchanged": True,
+            "overlay_targets": sorted(overlay_sources),
+            "catalog_modified_targets": sorted(modified_sources | overlay_sources),
+            "synced_extapps": synced,
+            "catalog_channel": channel,
+            "catalog_revision": revision,
+            "catalog_release_tag": catalog_release_tag,
+            "base_catalog": {
+                "release_tag": base_release_tag,
+                "release_id": base_manifest["release_id"],
+                "manifest_sha256": base_manifest_sha256,
+                "source_commit": base_source_commit,
+            },
+            "compatible_releases": copy.deepcopy(
+                base_release.get("compatible_releases", [])
+            ),
+        }
+        manifest["release_id"] = manifest_release_id(manifest)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "tumoflip-packages.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        output_zip = out_dir / "tumoflip-packages.zip"
+        build_packages_zip(manifest, base_resources, output_zip)
+
+        output_entries = _validated_target_entries(manifest)
+        for source in set(base_entries) - overlay_sources:
+            if output_entries[source] != base_entries[source]:
+                raise ValidationError(
+                    f"Selective catalog changed non-selected manifest entry: {source}"
+                )
+        with zipfile.ZipFile(base_package_zip) as old_zip, zipfile.ZipFile(
+            output_zip
+        ) as new_zip:
+            if old_zip.namelist() != new_zip.namelist():
+                raise ValidationError("Selective catalog ZIP topology changed")
+            for source in set(base_entries) - overlay_sources:
+                if old_zip.read(source) != new_zip.read(source):
+                    raise ValidationError(
+                        f"Selective catalog changed non-selected ZIP payload: {source}"
+                    )
+        return manifest
+    finally:
+        base_resources_context.cleanup()
+
+
 def build_package_release(
     repo_root: Path,
     build_dir: Path,
@@ -812,6 +1230,14 @@ def main() -> int:
     parser.add_argument("--compatible-manifest", type=Path)
     parser.add_argument("--compatible-package-zip", type=Path)
     parser.add_argument("--compatible-release-tag")
+    parser.add_argument("--base-manifest", type=Path)
+    parser.add_argument("--base-package-zip", type=Path)
+    parser.add_argument("--base-release-tag")
+    parser.add_argument("--base-source-commit")
+    parser.add_argument(
+        "--selective-overlays",
+        help="Comma-separated audited overlay names, for example esp_flasher",
+    )
     args = parser.parse_args()
 
     repo_root = args.repo_root.resolve()
@@ -845,12 +1271,25 @@ def main() -> int:
                 "--target-package-zip requires --target-manifest"
             )
         reconciliation_requested = bool(
-            args.compatible_manifest or args.compatible_package_zip
+            args.compatible_manifest
+            or args.compatible_package_zip
+            or args.compatible_release_tag
         )
-        if reconciliation_requested:
+        selective_requested = bool(
+            args.base_manifest
+            or args.base_package_zip
+            or args.base_release_tag
+            or args.base_source_commit
+            or args.selective_overlays
+        )
+        if reconciliation_requested and selective_requested:
+            raise ValidationError(
+                "Catalog reconciliation and selective overlay are mutually exclusive"
+            )
+        if reconciliation_requested or selective_requested:
             if target_manifest is None:
                 raise ValidationError(
-                    "Catalog reconciliation requires a target manifest"
+                    "Catalog update requires a target manifest"
                 )
             output_firmware = target_manifest.get("firmware")
             if not isinstance(output_firmware, dict):
@@ -874,7 +1313,52 @@ def main() -> int:
             / "dist/f7-C"
             / f"f7-update-{output_version}"
         )
-        if reconciliation_requested:
+        if selective_requested:
+            if not (
+                args.base_manifest
+                and args.base_package_zip
+                and args.base_release_tag
+                and args.base_source_commit
+                and args.selective_overlays
+                and args.catalog_release_tag
+                and args.target_source_commit
+                and target_manifest is not None
+                and target_package_zip is not None
+            ):
+                raise ValidationError(
+                    "Selective catalog release requires target and base assets, "
+                    "catalog tags, source commits, and selective overlays"
+                )
+            base_manifest_path = require_file(
+                (repo_root / args.base_manifest).resolve(),
+                "base package manifest",
+            )
+            base_manifest = json.loads(
+                base_manifest_path.read_text(encoding="utf-8")
+            )
+            base_package_zip = require_file(
+                (repo_root / args.base_package_zip).resolve(),
+                "base package ZIP",
+            )
+            manifest = build_selective_catalog_release(
+                repo_root,
+                build_dir,
+                out_dir,
+                target_release_tag=args.target_release_tag,
+                target_source_commit=args.target_source_commit,
+                target_manifest=target_manifest,
+                target_package_zip=target_package_zip,
+                base_manifest=base_manifest,
+                base_manifest_sha256=file_sha256(base_manifest_path),
+                base_package_zip=base_package_zip,
+                base_release_tag=args.base_release_tag,
+                base_source_commit=args.base_source_commit,
+                catalog_release_tag=args.catalog_release_tag,
+                overlay_sources=selective_catalog_overlay_sources(
+                    args.selective_overlays
+                ),
+            )
+        elif reconciliation_requested:
             if not (
                 args.compatible_manifest
                 and args.compatible_package_zip
@@ -916,7 +1400,7 @@ def main() -> int:
         else:
             if args.target_source_commit:
                 raise ValidationError(
-                    "--target-source-commit requires a compatible catalog"
+                    "--target-source-commit requires a compatible or base catalog"
                 )
             manifest = build_package_release(
                 repo_root,

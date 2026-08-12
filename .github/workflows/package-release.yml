@@ -20,6 +20,14 @@ on:
         description: "Optional prior catalog whose exact overlays remain accepted"
         required: false
         type: string
+      base_catalog_tag:
+        description: "Optional exact immutable catalog used as a selective delta base"
+        required: false
+        type: string
+      selective_overlays:
+        description: "Audited comma-separated overlays (currently: esp_flasher)"
+        required: false
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.inputs.catalog_release_tag || github.event.inputs.target_release_tag }}
@@ -56,6 +64,8 @@ jobs:
           TAG: ${{ github.event.inputs.target_release_tag }}
           CATALOG_TAG: ${{ github.event.inputs.catalog_release_tag }}
           COMPATIBLE_TAG: ${{ github.event.inputs.compatible_catalog_tag }}
+          BASE_TAG: ${{ github.event.inputs.base_catalog_tag }}
+          SELECTIVE_OVERLAYS: ${{ github.event.inputs.selective_overlays }}
         run: |
           set -euo pipefail
           if [[ "$TAG" =~ ^v[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.]+)?$ ]]; then
@@ -123,8 +133,34 @@ jobs:
                 exit 1
               fi
             fi
-          elif [[ -n "$COMPATIBLE_TAG" ]]; then
-            echo "Compatible catalog requires an independent catalog tag" >&2
+            if [[ -n "$BASE_TAG" ]]; then
+              if [[ "$BASE_TAG" =~ ^fw-packages-(stable|dev)-([0-9]{3})$ ]]; then
+                BASE_CHANNEL="${BASH_REMATCH[1]}"
+                BASE_REVISION="${BASH_REMATCH[2]}"
+              else
+                echo "Base catalog tag is invalid: $BASE_TAG" >&2
+                exit 1
+              fi
+              if [[ "$BASE_CHANNEL" != "$CATALOG_CHANNEL" ]]; then
+                echo "Base catalog channel differs from $CATALOG_CHANNEL" >&2
+                exit 1
+              fi
+              if (( 10#$BASE_REVISION >= 10#$CATALOG_REVISION )); then
+                echo "Base catalog must precede $CATALOG_TAG" >&2
+                exit 1
+              fi
+            fi
+          elif [[ -n "$COMPATIBLE_TAG" || -n "$BASE_TAG" ]]; then
+            echo "Prior catalog inputs require an independent catalog tag" >&2
+            exit 1
+          fi
+          if [[ -n "$COMPATIBLE_TAG" && -n "$BASE_TAG" ]]; then
+            echo "Compatible and selective base catalogs are mutually exclusive" >&2
+            exit 1
+          fi
+          if [[ -n "$BASE_TAG" && -z "$SELECTIVE_OVERLAYS" ]] || \
+             [[ -z "$BASE_TAG" && -n "$SELECTIVE_OVERLAYS" ]]; then
+            echo "Base catalog and selective overlays must be supplied together" >&2
             exit 1
           fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
@@ -201,6 +237,44 @@ jobs:
             echo "compatible_manifest=" >> "$GITHUB_OUTPUT"
             echo "compatible_package_zip=" >> "$GITHUB_OUTPUT"
           fi
+          if [[ -n "$BASE_TAG" ]]; then
+            gh release view "$BASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+            BASE_DIR="$RUNNER_TEMP/tumoflip-base-catalog"
+            mkdir -p "$BASE_DIR"
+            gh release download "$BASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --dir "$BASE_DIR" \
+              --pattern "tumoflip-packages.json" \
+              --pattern "tumoflip-packages.zip" \
+              --pattern "${BASE_TAG}-SHA256SUMS"
+            python3 tools/tumoflip/verify_release_assets.py \
+              "$BASE_DIR/${BASE_TAG}-SHA256SUMS" \
+              "$BASE_DIR/tumoflip-packages.json" \
+              "$BASE_DIR/tumoflip-packages.zip"
+            BASE_COMMIT="$(peel_tag "$BASE_TAG")"
+            BASE_SOURCE="$(python3 - "$BASE_DIR/tumoflip-packages.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          print(json.loads(Path(sys.argv[1]).read_text())["package_release"]["source_commit"])
+          PY
+            )"
+            if [[ "$BASE_COMMIT" != "$BASE_SOURCE" ]]; then
+              echo "Base catalog tag commit differs from manifest provenance" >&2
+              exit 1
+            fi
+            echo "base_tag=$BASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "base_source_commit=$BASE_SOURCE" >> "$GITHUB_OUTPUT"
+            echo "base_manifest=$BASE_DIR/tumoflip-packages.json" >> "$GITHUB_OUTPUT"
+            echo "base_package_zip=$BASE_DIR/tumoflip-packages.zip" >> "$GITHUB_OUTPUT"
+            echo "selective_overlays=$SELECTIVE_OVERLAYS" >> "$GITHUB_OUTPUT"
+          else
+            echo "base_tag=" >> "$GITHUB_OUTPUT"
+            echo "base_source_commit=" >> "$GITHUB_OUTPUT"
+            echo "base_manifest=" >> "$GITHUB_OUTPUT"
+            echo "base_package_zip=" >> "$GITHUB_OUTPUT"
+            echo "selective_overlays=" >> "$GITHUB_OUTPUT"
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "target_commit=$TARGET_COMMIT" >> "$GITHUB_OUTPUT"
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
@@ -229,8 +303,30 @@ jobs:
             python3 tools/tumoflip/sync_readme_version.py --check
           fi
 
-      - name: Build firmware resources
-        if: steps.target.outputs.compatible_tag == ''
+      - name: Build selective package resources
+        if: steps.target.outputs.base_tag != ''
+        shell: bash
+        env:
+          SELECTIVE_OVERLAYS: ${{ steps.target.outputs.selective_overlays }}
+        run: |
+          set -euo pipefail
+          mapfile -t SELECTIVE_FBT_TARGETS < <(
+            python3 - "$SELECTIVE_OVERLAYS" <<'PY'
+          import sys
+          from tools.tumoflip.package_release import selective_catalog_build_targets
+          for target in selective_catalog_build_targets(sys.argv[1]):
+              print(target)
+          PY
+          )
+          if (( ${#SELECTIVE_FBT_TARGETS[@]} == 0 )); then
+            echo "Selective catalog resolved no build targets" >&2
+            exit 1
+          fi
+          ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
+            "${SELECTIVE_FBT_TARGETS[@]}" -j2
+
+      - name: Build full package resources
+        if: steps.target.outputs.compatible_tag == '' && steps.target.outputs.base_tag == ''
         shell: bash
         run: |
           set -euo pipefail
@@ -270,6 +366,11 @@ jobs:
           TARGET_COMMIT: ${{ steps.target.outputs.target_commit }}
           COMPATIBLE_MANIFEST: ${{ steps.target.outputs.compatible_manifest }}
           COMPATIBLE_PACKAGE_ZIP: ${{ steps.target.outputs.compatible_package_zip }}
+          BASE_MANIFEST: ${{ steps.target.outputs.base_manifest }}
+          BASE_PACKAGE_ZIP: ${{ steps.target.outputs.base_package_zip }}
+          BASE_TAG: ${{ steps.target.outputs.base_tag }}
+          BASE_SOURCE_COMMIT: ${{ steps.target.outputs.base_source_commit }}
+          SELECTIVE_OVERLAYS: ${{ steps.target.outputs.selective_overlays }}
         run: |
           set -euo pipefail
           PACKAGE_ARGS=(
@@ -287,6 +388,15 @@ jobs:
               --compatible-manifest "$COMPATIBLE_MANIFEST"
               --compatible-package-zip "$COMPATIBLE_PACKAGE_ZIP"
               --compatible-release-tag "${{ steps.target.outputs.compatible_tag }}"
+            )
+          elif [[ -n "$BASE_MANIFEST" ]]; then
+            PACKAGE_ARGS+=(
+              --target-source-commit "$TARGET_COMMIT"
+              --base-manifest "$BASE_MANIFEST"
+              --base-package-zip "$BASE_PACKAGE_ZIP"
+              --base-release-tag "$BASE_TAG"
+              --base-source-commit "$BASE_SOURCE_COMMIT"
+              --selective-overlays "$SELECTIVE_OVERLAYS"
             )
           fi
           python3 tools/tumoflip/package_release.py "${PACKAGE_ARGS[@]}"
@@ -360,6 +470,7 @@ jobs:
           CHANNEL: ${{ steps.target.outputs.channel }}
           TARGET_TAG: ${{ steps.target.outputs.tag }}
           COMPATIBLE_TAG: ${{ steps.target.outputs.compatible_tag }}
+          BASE_TAG: ${{ steps.target.outputs.base_tag }}
         run: |
           set -euo pipefail
           if [[ -n "$CATALOG_TAG" ]]; then
@@ -372,7 +483,7 @@ jobs:
               --repo "$GITHUB_REPOSITORY"
               --target "$SOURCE_COMMIT"
               --title "FW Packages ${CHANNEL^} ${CATALOG_TAG##*-}"
-              --notes "Independent ${CHANNEL} FW Packages revision. Compatible firmware is validated by Tumoflip lineage, hardware target, API and package channel. Baseline: ${TARGET_TAG}. Previous exact overlays: ${COMPATIBLE_TAG:-none}. Source: ${SOURCE_COMMIT}. This release contains no firmware image."
+              --notes "Independent ${CHANNEL} FW Packages revision. Compatible firmware is validated by Tumoflip lineage, hardware target, API and package channel. Baseline: ${TARGET_TAG}. Selective base: ${BASE_TAG:-none}. Previous exact overlays: ${COMPATIBLE_TAG:-none}. Source: ${SOURCE_COMMIT}. This release contains no firmware image."
             )
             if [[ "$CHANNEL" == "dev" ]]; then
               CREATE_ARGS+=(--prerelease)

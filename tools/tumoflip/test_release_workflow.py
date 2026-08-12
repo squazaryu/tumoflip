@@ -108,6 +108,44 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertNotIn("updater_package", publish_step)
         self.assertIn('if [[ -n "$CATALOG_TAG" ]]', publish_step)
 
+    def test_package_release_workflow_builds_a_verified_selective_delta(self) -> None:
+        workflow = (REPO_ROOT / ".github/workflows/package-release.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("base_catalog_tag:", workflow)
+        self.assertIn("selective_overlays:", workflow)
+        self.assertIn('BASE_TAG: ${{ github.event.inputs.base_catalog_tag }}', workflow)
+        self.assertIn(
+            'SELECTIVE_OVERLAYS: ${{ github.event.inputs.selective_overlays }}',
+            workflow,
+        )
+        self.assertIn('--pattern "${BASE_TAG}-SHA256SUMS"', workflow)
+        base_download = workflow.split(
+            'if [[ -n "$BASE_TAG" ]]',
+            maxsplit=1,
+        )[1].split('echo "tag=$TAG"', maxsplit=1)[0]
+        self.assertIn("verify_release_assets.py", base_download)
+        self.assertIn('"$BASE_DIR/${BASE_TAG}-SHA256SUMS"', base_download)
+        self.assertIn('"$BASE_DIR/tumoflip-packages.json"', base_download)
+        self.assertIn('"$BASE_DIR/tumoflip-packages.zip"', base_download)
+        self.assertIn('if [[ "$BASE_COMMIT" != "$BASE_SOURCE" ]]', workflow)
+        self.assertIn("--base-manifest", workflow)
+        self.assertIn("--base-package-zip", workflow)
+        self.assertIn("--base-release-tag", workflow)
+        self.assertIn("--base-source-commit", workflow)
+        self.assertIn("--selective-overlays", workflow)
+
+        selective_step = workflow.split(
+            "- name: Build selective package resources",
+            maxsplit=1,
+        )[1].split("- name: Build full package resources", maxsplit=1)[0]
+        self.assertIn("selective_catalog_build_targets", selective_step)
+        self.assertIn('"${SELECTIVE_FBT_TARGETS[@]}" -j2', selective_step)
+        self.assertNotIn("updater_package", selective_step)
+        self.assertNotIn("fap_subghz_raw_edit", selective_step)
+        self.assertNotIn("TOTP_CLI_PLUGIN", selective_step)
+
     def test_pr_build_compiles_package_only_faps(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/pr-build.yml").read_text(
             encoding="utf-8"
