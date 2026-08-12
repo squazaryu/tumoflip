@@ -155,8 +155,15 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf applications/main/clock_app/resources/apps/ || true
+          mapfile -t TOTP_PLUGIN_TARGETS < <(python3 - <<'PY'
+          from tools.tumoflip.validate_release import TOTP_CLI_PLUGIN_APP_IDS
+          for appid in TOTP_CLI_PLUGIN_APP_IDS:
+              print(f"fap_{appid}")
+          PY
+          )
           ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
-            updater_package fap_esp_flasher -j2
+            updater_package fap_esp_flasher fap_subghz_raw_edit \
+            "${TOTP_PLUGIN_TARGETS[@]}" -j2
 
       - name: Run package release tests
         shell: bash
