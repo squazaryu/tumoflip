@@ -89,6 +89,8 @@ class CiWorkflowSecurityTests(unittest.TestCase):
 
         self.assertIn("SOURCE_TAG: ${{ inputs.source_tag }}", workflow)
         self.assertIn("DECISIONS_JSON: ${{ inputs.decisions_json }}", workflow)
+        self.assertIn('"$DECISIONS_JSON" != *"/../"*', workflow)
+        self.assertIn('"$DECISIONS_JSON" != *"/./"*', workflow)
         self.assertNotIn('SOURCE_TAG="${{ inputs.source_tag }}"', workflow)
         self.assertNotIn('DECISIONS_JSON="${{ inputs.decisions_json }}"', workflow)
         self.assertNotIn("pull_request_target", workflow)
