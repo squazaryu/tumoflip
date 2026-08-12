@@ -1,0 +1,19 @@
+{
+  "schema": 2,
+  "decisions": [
+    {
+      "appId": "subghz_raw_edit",
+      "throughAuthorCommit": "d60ee2a34fa87b89c99f1ba9056737765f9f921f",
+      "sourceCommit": "585b144ac5b4d9a48a0e5a74570a6584353fdbba",
+      "disposition": "auditedDifference",
+      "changelog": "Ported bounded NumberInput controls for Merge gap (0-1000 ms) and Merge repeat (1-64), preserving Cancel without mutation and applying values only on Confirm. A 0 ms gap adds no artificial separator; non-zero gaps remain safely chunked. Hardware acceptance covered NumberInput, Cancel/Confirm, zero and non-zero merge gaps, save, reopen, and playback of the user's own RAW signal.",
+      "implementationCommit": "485dad9c28ee59595c06023101efd14af8b42f21",
+      "fwPackages": {
+        "channel": "dev",
+        "revision": 4,
+        "releaseTag": "fw-packages-dev-004"
+      },
+      "hardwareAccepted": true
+    }
+  ]
+}

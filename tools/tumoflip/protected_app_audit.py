@@ -654,6 +654,7 @@ def audit_release(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
     target_manifests = load_target_manifests(args.target_manifest)
     target_archives = load_target_archives(args.target_archive, target_manifests)
     verify_target_archives(target_manifests, target_archives)
+    decision_manifests: dict[str, dict[str, Any]] = {}
     for app_id, decision in decisions.items():
         if app_id not in {app["id"] for app in apps}:
             raise AuditError(f"decision references an unknown protected app: {app_id}")
@@ -671,6 +672,8 @@ def audit_release(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
         )
         if isinstance(package, dict) and decision_manifest is None:
             raise AuditError(f"FW Packages decision has no exact target manifest for {app_id}")
+        if decision_manifest is not None:
+            decision_manifests[app_id] = decision_manifest
         if decision.get("disposition") == "auditedDifference":
             if decision_manifest is None or not git_commit_is_ancestor(
                 args.implementation_repo,
@@ -779,8 +782,16 @@ def audit_release(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
                 artifact_results.append(artifact_result)
                 continue
 
+            evidence_manifests = target_manifests
+            if decision_matches and decision_disposition in {
+                "auditedDifference",
+                "sourceMatches",
+                "rejected",
+            }:
+                evidence_manifests = [decision_manifests[app_id]]
+
             provenance: list[dict[str, Any]] = []
-            for manifest in target_manifests:
+            for manifest in evidence_manifests:
                 target = manifest["targets"].get(artifact["targetPath"])
                 if target is None:
                     continue
