@@ -2,11 +2,11 @@
   "schema": 1,
   "dev": {
     "firmware_version": "t-dev-004-015",
-    "manifest_sha256": "f469e91db78f77449f1d6ff2853a8b70479a6cb635f5f6205818cef421b759be",
-    "package_zip_sha256": "4ed1b743291a06c5fb45ce95a5843fcadf3de96a75811fb50a9ddad808bfc19c",
-    "release_id": "a0918ef86334966e9e05ee27213f021170f5d07c8cc4af5a76cf86c11521b633",
-    "release_tag": "fw-packages-dev-005",
-    "source_commit": "8458827d6f0fd385661ce9da52cd73ce5ec21286",
+    "manifest_sha256": "f2ab7b5b164780c313a268043a3115bac6e7b41d9b746fee47def242ad3cd6c1",
+    "package_zip_sha256": "8d0d08d4728d9ace2b3fae62c7e5b903d8e1296cc176fb924025cb0148c0aed0",
+    "release_id": "3dd166c8afbd98208ef30428ff0124aaba5e5a10226153e99ef15e7b18b8954e",
+    "release_tag": "fw-packages-dev-007",
+    "source_commit": "89905fa8da20f1ad165b6b2615578d5b66326e75",
     "target_release_id": "5799604a854b34c1bb67c67e63733e9c396af1167dfe829c2b144791c07a2ebf",
     "target_release_tag": "t-dev-004-015",
     "target_source_commit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
