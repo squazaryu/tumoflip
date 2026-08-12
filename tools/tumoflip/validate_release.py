@@ -127,8 +127,43 @@ PACKAGE_ONLY_PACKAGE_FILES = frozenset(
         "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
     }
 )
+TOTP_CLI_PLUGIN_APP_IDS = (
+    "totp_cli_add_plugin",
+    "totp_cli_automation_plugin",
+    "totp_cli_delete_plugin",
+    "totp_cli_details_plugin",
+    "totp_cli_export_plugin",
+    "totp_cli_help_plugin",
+    "totp_cli_list_plugin",
+    "totp_cli_move_plugin",
+    "totp_cli_notification_plugin",
+    "totp_cli_pin_plugin",
+    "totp_cli_reset_plugin",
+    "totp_cli_timezone_plugin",
+    "totp_cli_update_plugin",
+    "totp_cli_version_plugin",
+)
+TOTP_CLI_PLUGIN_PACKAGE_FILES = tuple(
+    f"apps_data/totp/plugins/{appid}.fal" for appid in TOTP_CLI_PLUGIN_APP_IDS
+)
+
+# Independent FW Packages revisions may replace files that are also bundled in
+# updater resources. This is intentionally broader than PACKAGE_ONLY_PACKAGE_FILES:
+# the latter remains reserved for artifacts that must never inflate resources.ths.
+PACKAGE_RELEASE_OVERLAY_FILES = frozenset(
+    {
+        *PACKAGE_ONLY_PACKAGE_FILES,
+        "apps/ARF Tools/subghz_raw_edit.fap",
+        *TOTP_CLI_PLUGIN_PACKAGE_FILES,
+    }
+)
 PACKAGE_ONLY_PACKAGE_GROUPS = {
     "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap": "module_one",
+}
+PACKAGE_RELEASE_OVERLAY_GROUPS = {
+    **PACKAGE_ONLY_PACKAGE_GROUPS,
+    "apps/ARF Tools/subghz_raw_edit.fap": "arf",
+    **{relative: "base" for relative in TOTP_CLI_PLUGIN_PACKAGE_FILES},
 }
 MODULE_ONE_PACKAGE_DATA_FILES = (
     "apps_data/tumoflow/workflows/field_demo.tflow",
@@ -285,6 +320,12 @@ def package_extapp_exports() -> dict[str, str]:
         {
             source_filename: resource_path_from_ext_target(target)
             for source_filename, target in ARF_EXTAPP_TARGETS.items()
+        }
+    )
+    exports.update(
+        {
+            Path(relative).name: relative
+            for relative in TOTP_CLI_PLUGIN_PACKAGE_FILES
         }
     )
     return exports
@@ -646,7 +687,8 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             resources / "apps/Tools/quac.fap",
             resources / "apps/Tools/tumoflip_packages.fap",
             resources / "apps/Tools/totp.fap",
-        ],
+        ]
+        + [resources / relative for relative in TOTP_CLI_PLUGIN_PACKAGE_FILES],
         "module_one": [
             resources / relative
             for relative in (*MODULE_ONE_PACKAGE_FILES, *MODULE_ONE_PACKAGE_DATA_FILES)

@@ -612,6 +612,8 @@ bool subghz_txrx_rebuild_from_fff(SubGhzTxRx* instance, FlipperFormat* flipper_f
 void subghz_txrx_rx_start(SubGhzTxRx* instance) {
     furi_assert(instance);
     subghz_txrx_stop(instance);
+    // Start a fresh asynchronous session only after every decoder is reset.
+    subghz_txrx_receiver_reset(instance);
     subghz_txrx_begin(
         instance,
         subghz_setting_get_preset_data_by_name(
@@ -1169,6 +1171,15 @@ void subghz_txrx_reset_dynamic_and_custom_btns(SubGhzTxRx* instance) {
     faac_slh_reset_prog_mode();
 
     subghz_custom_btns_reset();
+}
+
+void subghz_txrx_receiver_reset(SubGhzTxRx* instance) {
+    furi_assert(instance);
+
+    subghz_receiver_reset(instance->receiver);
+    if(instance->diversity_receiver) {
+        subghz_receiver_reset(instance->diversity_receiver);
+    }
 }
 
 SubGhzReceiver* subghz_txrx_get_receiver(SubGhzTxRx* instance) {

@@ -17,7 +17,9 @@ try:
         ARF_VISIBLE_APP_IDS,
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
+        PACKAGE_RELEASE_OVERLAY_FILES,
         PROTOCOL_PACKS,
+        TOTP_CLI_PLUGIN_PACKAGE_FILES,
         ValidationError,
         manifest_release_id,
         md5,
@@ -33,7 +35,9 @@ except ImportError:
         ARF_VISIBLE_APP_IDS,
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
+        PACKAGE_RELEASE_OVERLAY_FILES,
         PROTOCOL_PACKS,
+        TOTP_CLI_PLUGIN_PACKAGE_FILES,
         ValidationError,
         manifest_release_id,
         md5,
@@ -118,6 +122,17 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
         )
     for protocol in PROTOCOL_PACKS:
         write_file(resources / f"apps_data/subghz/plugins/{protocol}", protocol.encode())
+
+    for relative in TOTP_CLI_PLUGIN_PACKAGE_FILES:
+        write_file(resources / relative, relative.encode())
+
+    # Package-only overlays are sourced from exact build outputs. Keep fixture
+    # bytes identical to the resource tree unless a test explicitly replaces
+    # one of them.
+    for relative in PACKAGE_RELEASE_OVERLAY_FILES:
+        source = resources / relative
+        if source.is_file():
+            write_file(build / ".extapps" / Path(relative).name, source.read_bytes())
 
     subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=repo)
@@ -340,7 +355,7 @@ class PackageReleaseTest(unittest.TestCase):
                     target_package_zip=target_zip,
                 )
 
-    def test_existing_stable_release_overlays_only_esp_flasher(self) -> None:
+    def test_existing_stable_release_overlays_only_audited_targets(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo, build, resources = prepare_package_tree(Path(directory))
             flasher_source = "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
@@ -353,6 +368,13 @@ class PackageReleaseTest(unittest.TestCase):
             old_wifi_bytes = old_wifi.read_bytes()
             write_file(build / ".extapps/wifi_mapper.fap", b"unaccepted dev wifi mapper")
             write_file(build / ".extapps/esp_flasher.fap", b"protected esp flasher")
+            raw_source = "apps/ARF Tools/subghz_raw_edit.fap"
+            totp_plugin_source = TOTP_CLI_PLUGIN_PACKAGE_FILES[0]
+            write_file(build / ".extapps/subghz_raw_edit.fap", b"accepted raw edit")
+            write_file(
+                build / ".extapps" / Path(totp_plugin_source).name,
+                b"accepted totp plugin",
+            )
 
             manifest = build_package_release(
                 repo,
@@ -373,9 +395,18 @@ class PackageReleaseTest(unittest.TestCase):
             old_entries = by_target(target_manifest)
             new_entries = by_target(manifest)
             flasher_target = f"/ext/{flasher_source}"
+            overlay_targets = {f"/ext/{source}" for source in PACKAGE_RELEASE_OVERLAY_FILES}
             self.assertEqual(
-                {key: value for key, value in new_entries.items() if key != flasher_target},
-                old_entries,
+                {
+                    key: value
+                    for key, value in new_entries.items()
+                    if key not in overlay_targets
+                },
+                {
+                    key: value
+                    for key, value in old_entries.items()
+                    if key not in overlay_targets
+                },
             )
             self.assertEqual(
                 set(new_entries) - set(old_entries),
@@ -385,16 +416,30 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertEqual(manifest["safety"], target_manifest["safety"])
             self.assertEqual(
                 manifest["package_release"]["overlay_targets"],
-                [flasher_source],
+                sorted(PACKAGE_RELEASE_OVERLAY_FILES),
+            )
+            self.assertEqual(
+                new_entries[f"/ext/{raw_source}"]["md5"],
+                md5(build / ".extapps/subghz_raw_edit.fap"),
+            )
+            self.assertEqual(
+                new_entries[f"/ext/{totp_plugin_source}"]["md5"],
+                md5(build / ".extapps" / Path(totp_plugin_source).name),
             )
 
             output_zip = repo / "dist/f7-C/f7-update-t-flppr-fw-004/tumoflip-packages.zip"
             with zipfile.ZipFile(target_zip) as old_archive, zipfile.ZipFile(output_zip) as new_archive:
                 for name in old_archive.namelist():
-                    self.assertEqual(new_archive.read(name), old_archive.read(name))
+                    if name not in PACKAGE_RELEASE_OVERLAY_FILES:
+                        self.assertEqual(new_archive.read(name), old_archive.read(name))
                 self.assertEqual(
                     new_archive.read(flasher_source),
                     b"protected esp flasher",
+                )
+                self.assertEqual(new_archive.read(raw_source), b"accepted raw edit")
+                self.assertEqual(
+                    new_archive.read(totp_plugin_source),
+                    b"accepted totp plugin",
                 )
                 self.assertEqual(new_archive.read(old_wifi.relative_to(resources).as_posix()), old_wifi_bytes)
 
