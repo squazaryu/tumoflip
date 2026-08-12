@@ -353,8 +353,17 @@ jobs:
             git -C "$PUBLISH" rm -rf --ignore-unmatch .
           fi
           mkdir -p "$PUBLISH/history"
-          HISTORY="$SEQUENCE-$SOURCE_TAG-${BASE_SHA:0:12}-${EXTRA_SHA:0:12}.json"
-          cp "$RUNNER_TEMP/audit.json" "$PUBLISH/history/$HISTORY"
+          PAYLOAD_SHA="$(python3 "$GITHUB_WORKSPACE/tools/tumoflip/protected_app_audit.py" \
+            semantic-sha256 "$RUNNER_TEMP/audit.json")"
+          [[ "$PAYLOAD_SHA" =~ ^[0-9a-f]{64}$ ]]
+          HISTORY="$SEQUENCE-$SOURCE_TAG-${BASE_SHA:0:12}-${EXTRA_SHA:0:12}-$PAYLOAD_SHA.json"
+          if [[ -e "$PUBLISH/history/$HISTORY" ]]; then
+            EXISTING_PAYLOAD_SHA="$(python3 "$GITHUB_WORKSPACE/tools/tumoflip/protected_app_audit.py" \
+              semantic-sha256 "$PUBLISH/history/$HISTORY")"
+            [[ "$EXISTING_PAYLOAD_SHA" == "$PAYLOAD_SHA" ]]
+          else
+            cp "$RUNNER_TEMP/audit.json" "$PUBLISH/history/$HISTORY"
+          fi
           python3 "$GITHUB_WORKSPACE/tools/tumoflip/protected_app_audit.py" merge \
             --existing "$PUBLISH/latest.json" --audit "$RUNNER_TEMP/audit.json" \
             --output "$PUBLISH/latest.json"

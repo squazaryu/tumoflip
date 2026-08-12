@@ -64,6 +64,8 @@ class CiWorkflowSecurityTests(unittest.TestCase):
         self.assertIn("Resolve exactly one canonical issue", workflow)
         self.assertIn("Publish cumulative partial ledger atomically", workflow)
         self.assertNotIn("Skip an already verified exact pack", workflow)
+        self.assertIn("semantic-sha256", workflow)
+        self.assertIn("$PAYLOAD_SHA.json", workflow)
         self.assertNotIn("if: steps.scan.outputs.status == 'verified'\n        shell: bash\n        env:\n          SOURCE_TAG", workflow)
         self.assertIn("Close only a fully verified canonical issue", workflow)
         self.assertIn("git -C \"$WORK\" rev-parse", workflow)
