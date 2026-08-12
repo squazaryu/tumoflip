@@ -285,7 +285,7 @@
       "author": {
         "repository": "https://github.com/Lechnio/SubGHz-RAW-Edit.git",
         "ref": "refs/heads/main",
-        "lastReviewedCommit": "49a12e37a8c940a1665477bb41eb25d21bc82721",
+        "lastReviewedCommit": "d60ee2a34fa87b89c99f1ba9056737765f9f921f",
         "license": "GPL-3.0"
       },
       "artifacts": [
@@ -297,7 +297,7 @@
         }
       ],
       "defaultDisposition": "auditedDifference",
-      "note": "Author changes after v1.7 require issue #281 port and FW Packages publication."
+      "note": "Author changes through d60ee2a34fa87b89c99f1ba9056737765f9f921f were ported by issue #281 at implementation commit 485dad9c28ee59595c06023101efd14af8b42f21 and hardware-accepted from fw-packages-dev-004; later author changes require a new exact audit."
     }
   ]
 }

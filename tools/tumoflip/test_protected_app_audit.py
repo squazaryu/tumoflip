@@ -7,6 +7,7 @@ import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
+from unittest import mock
 
 from tools.tumoflip import protected_app_audit as audit
 
@@ -14,6 +15,10 @@ from tools.tumoflip import protected_app_audit as audit
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REGISTRY_PATH = REPO_ROOT / "tools/tumoflip/protected_apps_registry.json"
 RAW_EDIT_HEAD = "d60ee2a34fa87b89c99f1ba9056737765f9f921f"
+RAW_EDIT_DECISIONS = {
+    "9aug2026": "0b71d9f34fec8ae3ba763b8de27ef15d1d604c5b",
+    "12aug2026": "585b144ac5b4d9a48a0e5a74570a6584353fdbba",
+}
 
 
 class ProtectedAppAuditTests(unittest.TestCase):
@@ -240,7 +245,13 @@ class ProtectedAppAuditTests(unittest.TestCase):
                 for name, content in sorted(retained.items()):
                     archive.writestr(name, content)
 
+    def _set_raw_author_head(self, commit: str) -> None:
+        document = json.loads(self.author_heads.read_text(encoding="utf-8"))
+        document["heads"]["subghz_raw_edit"] = commit
+        self.author_heads.write_text(json.dumps(document), encoding="utf-8")
+
     def test_changed_raw_edit_is_explicitly_unresolved_and_omitted(self) -> None:
+        self._set_raw_author_head("e" * 40)
         result, _ = audit.audit_release(self._args())
 
         self.assertEqual(result["overallStatus"], "pending")
@@ -311,6 +322,71 @@ class ProtectedAppAuditTests(unittest.TestCase):
         self.assertEqual(result["overallStatus"], "pending")
         self.assertEqual(len(result["entries"]), 10)
         self.assertEqual(len(result["unresolved"]), 14)
+
+    def test_checked_in_raw_edit_decisions_accept_the_exact_live_sources(self) -> None:
+        dev_manifest = self._write_target_manifest("dev", "fw-packages-dev-004", "c")
+        dev_archive = self._write_target_archive("dev", "fw-packages-dev-004", "c")
+
+        for source_tag, source_commit in RAW_EDIT_DECISIONS.items():
+            with self.subTest(source_tag=source_tag):
+                decision_path = (
+                    REPO_ROOT
+                    / "tools/tumoflip/protected_audit_decisions"
+                    / f"{source_tag}.json"
+                )
+                decisions = audit.load_decisions(decision_path)
+                decision = decisions["subghz_raw_edit"]
+                self.assertEqual(decision["sourceCommit"], source_commit)
+                self.assertEqual(decision["throughAuthorCommit"], RAW_EDIT_HEAD)
+                self.assertTrue(decision["hardwareAccepted"])
+
+                args = self._args(decisions=decision_path)
+                args.source_tag = source_tag
+                args.source_commit = source_commit
+                args.target_manifest = [self.stable_manifest, dev_manifest]
+                args.target_archive = [self.stable_archive, dev_archive]
+
+                def raw_edit_changed(
+                    _repo: Path, _before: str, _after: str, path: str
+                ) -> bool:
+                    return path == "applications_user/subghz_raw_edit"
+
+                with (
+                    mock.patch.object(audit, "git_path_changed", side_effect=raw_edit_changed),
+                    mock.patch.object(audit, "git_commit_is_ancestor", return_value=True),
+                ):
+                    result, _ = audit.audit_release(args)
+
+                raw_app = next(
+                    app for app in result["apps"] if app["appId"] == "subghz_raw_edit"
+                )
+                raw_entry = next(
+                    entry
+                    for entry in result["entries"]
+                    if entry["remotePath"].endswith("subghz_raw_edit.fap")
+                )
+                self.assertEqual(raw_app["status"], "verified")
+                self.assertEqual(raw_app["decision"], decision)
+                self.assertEqual(raw_entry["disposition"], "auditedDifference")
+                self.assertEqual(
+                    {item["releaseTag"] for item in raw_entry["targetProvenance"]},
+                    {"fw-packages-dev-004"},
+                )
+                self.assertEqual(raw_entry["targetMD5s"], [hashlib.md5(b"c").hexdigest()])
+
+                unchanged_entry = next(
+                    entry
+                    for entry in result["entries"]
+                    if entry["remotePath"].endswith("esp32_wifi_marauder.fap")
+                )
+                self.assertEqual(
+                    {item["releaseTag"] for item in unchanged_entry["targetProvenance"]},
+                    {"fw-packages-stable-001", "fw-packages-dev-004"},
+                )
+                self.assertEqual(
+                    unchanged_entry["targetMD5s"],
+                    sorted({hashlib.md5(b"a").hexdigest(), hashlib.md5(b"c").hexdigest()}),
+                )
 
     def test_exact_targets_for_every_artifact_can_verify_release(self) -> None:
         self._add_totp_target_family()
@@ -407,6 +483,11 @@ class ProtectedAppAuditTests(unittest.TestCase):
             item for item in result["entries"] if item["remotePath"].endswith("subghz_raw_edit.fap")
         )
         self.assertEqual(raw_entry["disposition"], "auditedDifference")
+        self.assertEqual(raw_entry["targetMD5s"], [hashlib.md5(b"b").hexdigest()])
+        self.assertEqual(
+            {item["releaseTag"] for item in raw_entry["targetProvenance"]},
+            {"fw-packages-dev-003"},
+        )
         raw_app = next(item for item in result["apps"] if item["appId"] == "subghz_raw_edit")
         self.assertEqual(raw_app["decisionDisposition"], "rejected")
 
@@ -482,6 +563,10 @@ class ProtectedAppAuditTests(unittest.TestCase):
         )
         self.assertEqual(raw_entry["disposition"], "sourceMatches")
         self.assertEqual(raw_entry["targetMD5s"], [raw_entry["sourceMD5"]])
+        self.assertEqual(
+            {item["releaseTag"] for item in raw_entry["targetProvenance"]},
+            {"fw-packages-dev-003"},
+        )
 
     def test_archive_digest_mismatch_fails_closed(self) -> None:
         args = self._args()
@@ -525,6 +610,7 @@ class ProtectedAppAuditTests(unittest.TestCase):
         self.assertEqual(ledger["audits"][1]["generatedAt"], updated["generatedAt"])
 
     def test_same_pack_is_reaudited_when_target_release_changes(self) -> None:
+        self._set_raw_author_head("e" * 40)
         first, _ = audit.audit_release(self._args())
         self.assertEqual(len(first["entries"]), 9)
         self.assertEqual(len(first["unresolved"]), 15)
