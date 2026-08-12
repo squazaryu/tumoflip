@@ -77,9 +77,10 @@ visually, on the device.
 - **Controlled merge.** `Merge .sub files` can repeat each selected signal.
   Repeats keep the signal's native synchronization gap; a configurable manual
   separator is used only between different files. In `Config`, **Merge gap**
-  accepts 1-1000 ms and **Merge repeat** accepts 1-64 copies. The app checks
-  overflow, sample count, output RAM and decoded-file temporary RAM before
-  allocating the output buffer.
+  accepts 0-1000 ms and **Merge repeat** accepts 1-64 copies. A zero gap keeps
+  the previous signal's trailing timing and adds no artificial separator. The
+  app checks overflow, sample count, output RAM and decoded-file temporary RAM
+  before allocating the output buffer.
 
   Note:
   Some signal receivers will reject a signal if it's "too clean" due to a built-in security layer.
@@ -104,8 +105,8 @@ confirms the highlighted action and **Back** closes the menu without doing
 anything.
 
 In `Config`, **Left / Right** adjust Normalize jitter, Merge gap and Merge
-repeat. Press **OK** on Merge gap or Merge repeat to enter an exact numeric
-value; out-of-range values are clamped to the supported limits.
+repeat. Press **OK** on Merge gap or Merge repeat to choose an exact value in a
+bounded number picker.
 
 The active marker is the one drawn as a solid line with a small box on top, and
 marked with `>` in the bottom bar. The other marker is dotted.
