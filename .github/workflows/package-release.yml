@@ -30,7 +30,9 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.inputs.catalog_release_tag || github.event.inputs.target_release_tag }}
+  # Catalog deltas form one ordered lineage. Serialize publication globally so
+  # two revisions cannot both validate the same predecessor and race to publish.
+  group: ${{ github.workflow }}-catalog-lineage
   cancel-in-progress: false
 
 permissions:
@@ -554,6 +556,39 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -n "$CATALOG_TAG" ]]; then
+            if [[ -n "$BASE_TAG" ]]; then
+              # Re-check immediately before publication. The earlier check may
+              # be minutes old after the build and test steps.
+              LATEST_LIVE_BASE="$(
+                gh api --paginate --slurp \
+                  "repos/$GITHUB_REPOSITORY/releases?per_page=100" | \
+                jq -er \
+                  --arg channel "$CHANNEL" '
+                    [
+                      .[][]
+                      | select(.draft == false)
+                      | select(
+                          (($channel == "dev") and (.prerelease == true)) or
+                          (($channel == "stable") and (.prerelease == false))
+                        )
+                      | .tag_name as $tag
+                      | try (
+                          $tag
+                          | capture("^fw-packages-(?<channel>stable|dev)-(?<revision>[0-9]{3})$")
+                        ) catch null
+                      | select(. != null and .channel == $channel)
+                      | .revision = (.revision | tonumber)
+                      | {tag: $tag, revision: .revision}
+                    ]
+                    | max_by(.revision)
+                    | .tag
+                  '
+              )"
+              if [[ "$BASE_TAG" != "$LATEST_LIVE_BASE" ]]; then
+                echo "Selective base changed before publish; latest is $LATEST_LIVE_BASE" >&2
+                exit 1
+              fi
+            fi
             SOURCE_COMMIT="$(git rev-parse HEAD)"
             CREATE_ARGS=(
               "$CATALOG_TAG"

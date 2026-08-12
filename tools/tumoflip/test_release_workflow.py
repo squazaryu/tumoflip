@@ -139,6 +139,9 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("max_by(.revision)", workflow)
         self.assertIn(".revision < $new_revision", workflow)
         self.assertIn("Base catalog must be latest live predecessor", workflow)
+        self.assertIn("${{ github.workflow }}-catalog-lineage", workflow)
+        self.assertIn("Selective base changed before publish", workflow)
+        self.assertGreaterEqual(workflow.count("LATEST_LIVE_BASE"), 2)
         self.assertIn("Pinned base catalog", workflow)
         self.assertNotIn(
             'echo "selective_overlays=$SELECTIVE_OVERLAYS" >> "$GITHUB_OUTPUT"',
