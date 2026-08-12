@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "sourceRepository": "xMasterX/all-the-plugins",
-  "generatedAt": "2026-08-12T10:26:25+00:00",
+  "generatedAt": "2026-08-12T12:59:53+00:00",
   "audits": [
     {
       "sequence": 20260809193105,
@@ -14,9 +14,9 @@
       "issue": {
         "number": 302,
         "url": "https://github.com/squazaryu/tumoflip/issues/302",
-        "state": "open"
+        "state": "closed"
       },
-      "overallStatus": "pending",
+      "overallStatus": "verified",
       "archives": [
         {
           "pack": "base",
@@ -47,7 +47,8 @@
           "note": "Tumoflip keeps its Module One CLI-compatible protected build.",
           "targetMD5s": [
             "4280fa5e1696248b5f21cd0157df6c07",
-            "54b2ffcdb88cf3c25eacd99269c0db52"
+            "54b2ffcdb88cf3c25eacd99269c0db52",
+            "79c91ceb33a6b99dbce73845a6d7f529"
           ],
           "targetProvenance": [
             {
@@ -61,6 +62,18 @@
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
             },
             {
+              "targetMD5": "79c91ceb33a6b99dbce73845a6d7f529",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
               "targetMD5": "54b2ffcdb88cf3c25eacd99269c0db52",
               "channel": "stable",
               "releaseTag": "fw-packages-stable-001",
@@ -69,6 +82,18 @@
               "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
               "targetReleaseTag": "v1.0.4",
               "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            },
+            {
+              "targetMD5": "54b2ffcdb88cf3c25eacd99269c0db52",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -112,6 +137,7 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip keeps its accepted profile editor and Module One route.",
           "targetMD5s": [
+            "0610b44187e3142cd8708242dff4199e",
             "9173da206a2de38d231d4c6da8ae60d4",
             "9b69cb41de4362ecfc5a217065916e3b"
           ],
@@ -127,6 +153,18 @@
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
             },
             {
+              "targetMD5": "0610b44187e3142cd8708242dff4199e",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
               "targetMD5": "9173da206a2de38d231d4c6da8ae60d4",
               "channel": "stable",
               "releaseTag": "fw-packages-stable-001",
@@ -135,6 +173,18 @@
               "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
               "targetReleaseTag": "v1.0.4",
               "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            },
+            {
+              "targetMD5": "9173da206a2de38d231d4c6da8ae60d4",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -146,6 +196,7 @@
           "note": "Tumoflip keeps the isolated ARF module build and radio broker integration.",
           "targetMD5s": [
             "56b13f6ee3b1513482ae6be63c83fc75",
+            "6cf06ebf6c949ad817aa6978371430fe",
             "c2ee0aa6e97b3b24b64d32ebbf85e40f"
           ],
           "targetProvenance": [
@@ -160,6 +211,18 @@
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
             },
             {
+              "targetMD5": "6cf06ebf6c949ad817aa6978371430fe",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
               "targetMD5": "c2ee0aa6e97b3b24b64d32ebbf85e40f",
               "channel": "stable",
               "releaseTag": "fw-packages-stable-001",
@@ -168,6 +231,18 @@
               "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
               "targetReleaseTag": "v1.0.4",
               "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            },
+            {
+              "targetMD5": "c2ee0aa6e97b3b24b64d32ebbf85e40f",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -179,7 +254,8 @@
           "note": "Tumoflip keeps the isolated ARF module and radio broker integration.",
           "targetMD5s": [
             "183c69bf242e83f7775f8c35765a9965",
-            "8170a9c2ea8e70e0686b40e33ac338b9"
+            "8170a9c2ea8e70e0686b40e33ac338b9",
+            "8f72844faf52f1b80539176257bed519"
           ],
           "targetProvenance": [
             {
@@ -193,6 +269,18 @@
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
             },
             {
+              "targetMD5": "8f72844faf52f1b80539176257bed519",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
               "targetMD5": "8170a9c2ea8e70e0686b40e33ac338b9",
               "channel": "stable",
               "releaseTag": "fw-packages-stable-001",
@@ -201,6 +289,40 @@
               "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
               "targetReleaseTag": "v1.0.4",
               "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            },
+            {
+              "targetMD5": "8170a9c2ea8e70e0686b40e33ac338b9",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
+            }
+          ]
+        },
+        {
+          "remotePath": "/ext/apps/Sub-GHz/subghz_raw_edit.fap",
+          "targetPath": "/ext/apps/ARF Tools/subghz_raw_edit.fap",
+          "sourceMD5": "fdcdad31fa9afae657cc16eec7113816",
+          "disposition": "auditedDifference",
+          "note": "Ported bounded NumberInput controls for Merge gap (0-1000 ms) and Merge repeat (1-64), preserving Cancel without mutation and applying values only on Confirm. A 0 ms gap adds no artificial separator; non-zero gaps remain safely chunked. Hardware acceptance covered NumberInput, Cancel/Confirm, zero and non-zero merge gaps, save, reopen, and playback of the user's own RAW signal.",
+          "targetMD5s": [
+            "b077a6bbcb9fc00fa094c00decfb3dd8"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "b077a6bbcb9fc00fa094c00decfb3dd8",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-004",
+              "manifestSHA256": "b7ec500ffb58c620c253327d950d6dece1ef3e9c4be0da2b7bb433e210d5c425",
+              "containerKind": "fwPackagesZip",
+              "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
+              "targetReleaseTag": "t-dev-004-013",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
             }
           ]
         },
@@ -211,6 +333,7 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip keeps its API 88 and iPhone GPS bridge integration.",
           "targetMD5s": [
+            "40b56f7de3724b1bb295126166297ef5",
             "c91d7a06e4bfb8697d3dff8ad50b7502",
             "c9c832b9172b064e249099116cc71a7d"
           ],
@@ -226,6 +349,18 @@
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
             },
             {
+              "targetMD5": "40b56f7de3724b1bb295126166297ef5",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
               "targetMD5": "c9c832b9172b064e249099116cc71a7d",
               "channel": "stable",
               "releaseTag": "fw-packages-stable-001",
@@ -234,6 +369,18 @@
               "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
               "targetReleaseTag": "v1.0.4",
               "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            },
+            {
+              "targetMD5": "c9c832b9172b064e249099116cc71a7d",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -245,6 +392,7 @@
           "note": "No source was imported by this audit; license must be resolved before a future port.",
           "targetMD5s": [
             "6c5b8bcff802092ef008c0f39d56e250",
+            "a60dfc973873c6bf010f977f2c90362a",
             "c10c2807d5944f0c0bef7d4275f05618"
           ],
           "targetProvenance": [
@@ -259,6 +407,18 @@
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
             },
             {
+              "targetMD5": "a60dfc973873c6bf010f977f2c90362a",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
               "targetMD5": "c10c2807d5944f0c0bef7d4275f05618",
               "channel": "stable",
               "releaseTag": "fw-packages-stable-001",
@@ -267,6 +427,18 @@
               "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
               "targetReleaseTag": "v1.0.4",
               "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            },
+            {
+              "targetMD5": "c10c2807d5944f0c0bef7d4275f05618",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -278,6 +450,7 @@
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
             "a34e2657e5acb0f033bd62e06f85f98e",
+            "c9761825f7105047741cf6f38f9622bc",
             "e18e7ae0eee268f5ca1cc3429cbc9e77"
           ],
           "targetProvenance": [
@@ -292,6 +465,18 @@
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
             },
             {
+              "targetMD5": "c9761825f7105047741cf6f38f9622bc",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
               "targetMD5": "e18e7ae0eee268f5ca1cc3429cbc9e77",
               "channel": "stable",
               "releaseTag": "fw-packages-stable-001",
@@ -300,6 +485,18 @@
               "containerSHA256": "efb1d259115fcd938eb16b7548231052d75a739870a9fb66af075116aca9b552",
               "targetReleaseTag": "v1.0.4",
               "targetSourceCommit": "49b47de9044c1b135b31c0612740f4533c8d6eef"
+            },
+            {
+              "targetMD5": "e18e7ae0eee268f5ca1cc3429cbc9e77",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -310,7 +507,9 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
-            "65b3a83b8ed97e847085b7d1c6f0d6aa"
+            "21f5d592948ed9af6c8013a39055a6cc",
+            "65b3a83b8ed97e847085b7d1c6f0d6aa",
+            "b5979c345df413e94c396f31f9269f06"
           ],
           "targetProvenance": [
             {
@@ -322,6 +521,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "21f5d592948ed9af6c8013a39055a6cc",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "b5979c345df413e94c396f31f9269f06",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -332,7 +555,9 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
-            "4aafe4d9cb200f3ccbffef580727416f"
+            "4aafe4d9cb200f3ccbffef580727416f",
+            "4cbc1fdf3a4740118750d2d144e780cb",
+            "a5ec96d81d3edd83914672953078f733"
           ],
           "targetProvenance": [
             {
@@ -344,6 +569,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "a5ec96d81d3edd83914672953078f733",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "4cbc1fdf3a4740118750d2d144e780cb",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -354,7 +603,9 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
-            "7938f82283de7c0d9bb56bc5aa9093b5"
+            "7938f82283de7c0d9bb56bc5aa9093b5",
+            "ecccdaf462eef322f41741dc8def0912",
+            "f41acac1ef30ae6aa79f4bd9fd0e28bc"
           ],
           "targetProvenance": [
             {
@@ -366,6 +617,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "f41acac1ef30ae6aa79f4bd9fd0e28bc",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "ecccdaf462eef322f41741dc8def0912",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -376,6 +651,8 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
+            "0c8dd44eb563dc8bb8578239271091da",
+            "6c5eebdbb27265d401313bb2721630d3",
             "700a254606cac3f36d9ad4737fc1836e"
           ],
           "targetProvenance": [
@@ -388,6 +665,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "6c5eebdbb27265d401313bb2721630d3",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "0c8dd44eb563dc8bb8578239271091da",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -398,7 +699,9 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
-            "87e42248f3149b4ce89dec3373b89611"
+            "87e42248f3149b4ce89dec3373b89611",
+            "99290fa59525e25eae820d903b40bd24",
+            "dff3c643192d16608f853f4dc408cb77"
           ],
           "targetProvenance": [
             {
@@ -410,6 +713,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "dff3c643192d16608f853f4dc408cb77",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "99290fa59525e25eae820d903b40bd24",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -420,7 +747,9 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
-            "8fd3ee1bdab9b4816234824627dcd8e5"
+            "0a9a45120a03c65707491d31039fb654",
+            "8fd3ee1bdab9b4816234824627dcd8e5",
+            "c2c09310d8129433132dd3be993ca18a"
           ],
           "targetProvenance": [
             {
@@ -432,6 +761,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "0a9a45120a03c65707491d31039fb654",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "c2c09310d8129433132dd3be993ca18a",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -442,7 +795,9 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
-            "0235714b6ce77836f0c5e2a5eb4b5bc5"
+            "0235714b6ce77836f0c5e2a5eb4b5bc5",
+            "8c4a66bf1f1de0a9b134b42d35c2d386",
+            "ea1c90e469781b018f6d109229b69791"
           ],
           "targetProvenance": [
             {
@@ -454,6 +809,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "ea1c90e469781b018f6d109229b69791",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "8c4a66bf1f1de0a9b134b42d35c2d386",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -464,6 +843,8 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
+            "49f086f137dd3703b5dc7b383154f2ee",
+            "5385e81d62d4d8262269be726c43e9fa",
             "b555fb9f890f2338bbd0650c0f4f97f4"
           ],
           "targetProvenance": [
@@ -476,6 +857,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "5385e81d62d4d8262269be726c43e9fa",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "49f086f137dd3703b5dc7b383154f2ee",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -486,7 +891,9 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
-            "486cb5f61afcbc0e13a755c866cd7119"
+            "2a7fbd57dccae2731bba462c63fc7062",
+            "486cb5f61afcbc0e13a755c866cd7119",
+            "fea52acf03cf4feb61690417ceeee2c7"
           ],
           "targetProvenance": [
             {
@@ -498,6 +905,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "2a7fbd57dccae2731bba462c63fc7062",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "fea52acf03cf4feb61690417ceeee2c7",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -508,7 +939,9 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
-            "39710343494a4d2921bc3d7269d77949"
+            "39710343494a4d2921bc3d7269d77949",
+            "6dd64227514f5c1a8acd1891a5d14921",
+            "96f9c2343bcb41e30884319476cee41b"
           ],
           "targetProvenance": [
             {
@@ -520,6 +953,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "96f9c2343bcb41e30884319476cee41b",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "6dd64227514f5c1a8acd1891a5d14921",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -530,6 +987,8 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
+            "6c595c2b03b89bc7eb6a61ec64c89353",
+            "952520314d4f32df5c047416588f9efa",
             "de749192b3bf0140f02ddfef44e9a2a3"
           ],
           "targetProvenance": [
@@ -542,6 +1001,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "6c595c2b03b89bc7eb6a61ec64c89353",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "952520314d4f32df5c047416588f9efa",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -552,7 +1035,9 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
-            "c3cafa4b91be1c1205d04730709a1ec1"
+            "8225d84c410395ecf71256ec7e5c4626",
+            "c3cafa4b91be1c1205d04730709a1ec1",
+            "dec1f146e731ead8a5b865cd57c7b4a5"
           ],
           "targetProvenance": [
             {
@@ -564,6 +1049,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "8225d84c410395ecf71256ec7e5c4626",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "dec1f146e731ead8a5b865cd57c7b4a5",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -574,7 +1083,9 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
-            "4c5657e85807f4c8ce9eb7abd4053e45"
+            "10f4fc37c0e94b302ab0973a8261cbcd",
+            "4c5657e85807f4c8ce9eb7abd4053e45",
+            "e12c2180db33b8d4642f080404b5cbdc"
           ],
           "targetProvenance": [
             {
@@ -586,6 +1097,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "10f4fc37c0e94b302ab0973a8261cbcd",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "e12c2180db33b8d4642f080404b5cbdc",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         },
@@ -596,6 +1131,8 @@
           "disposition": "auditedDifference",
           "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family.",
           "targetMD5s": [
+            "6de0ccbd472050b95c8072edee87bcbb",
+            "baa1969dd4432b44cb65cad0ba43da39",
             "cb6dd549f6ac602eef686b18a5335c94"
           ],
           "targetProvenance": [
@@ -608,6 +1145,30 @@
               "containerSHA256": "56282f83e274298a34c08ff1046dee4c6d906562d54c1e870527440df0213fe7",
               "targetReleaseTag": "t-dev-004-013",
               "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d"
+            },
+            {
+              "targetMD5": "baa1969dd4432b44cb65cad0ba43da39",
+              "channel": "dev",
+              "releaseTag": "t-dev-004-015",
+              "manifestSHA256": "d79e8508d9c2bd1494cda991e0f3d06300844276510b6df28c5c439a80ec0a48",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "55e23f1976e73e7bff27b345695d484fac8b21cddd522b3c4e96c6b0758028ab",
+              "targetReleaseTag": "t-dev-004-015",
+              "targetSourceCommit": "2906aad680e5468a9b4adb88cf4f356850d61c8d",
+              "firmwareVersion": "t-dev-004-015",
+              "resourcesSHA256": "ed6532ae775a63efa56c4847719821b93b7f01c28100530b304400bb368d3386"
+            },
+            {
+              "targetMD5": "6de0ccbd472050b95c8072edee87bcbb",
+              "channel": "stable",
+              "releaseTag": "v1.0.4",
+              "manifestSHA256": "dc71dde47d3f68c38ec771ba8b6b3fb1409cab708a95b332df79f5fd1637a7f9",
+              "containerKind": "firmwareUpdaterBundle",
+              "containerSHA256": "fe2580df2aaad3991a225fc5f2637bb5f6d775990880307490158c36729f240a",
+              "targetReleaseTag": "v1.0.4",
+              "targetSourceCommit": "b5f8f76ea564fe0e4d447b1f3d85dbac168bad25",
+              "firmwareVersion": "t-flppr-fw-004",
+              "resourcesSHA256": "267c7a2c86d98f383a3898b25ad38337088e0af581b8be2d0561220affd4996a"
             }
           ]
         }
@@ -978,29 +1539,41 @@
           "author": {
             "repository": "https://github.com/Lechnio/SubGHz-RAW-Edit.git",
             "ref": "refs/heads/main",
-            "previousCommit": "49a12e37a8c940a1665477bb41eb25d21bc82721",
+            "previousCommit": "d60ee2a34fa87b89c99f1ba9056737765f9f921f",
             "currentCommit": "d60ee2a34fa87b89c99f1ba9056737765f9f921f",
-            "changed": true,
+            "changed": false,
             "license": "GPL-3.0"
           },
-          "status": "needsReview",
-          "disposition": "needsReview",
-          "note": "Author changes after v1.7 require issue #281 port and FW Packages publication.",
+          "status": "verified",
+          "disposition": "auditedDifference",
+          "note": "Ported bounded NumberInput controls for Merge gap (0-1000 ms) and Merge repeat (1-64), preserving Cancel without mutation and applying values only on Confirm. A 0 ms gap adds no artificial separator; non-zero gaps remain safely chunked. Hardware acceptance covered NumberInput, Cancel/Confirm, zero and non-zero merge gaps, save, reopen, and playback of the user's own RAW signal.",
           "artifacts": [
             {
               "pack": "extra",
               "remotePath": "/ext/apps/Sub-GHz/subghz_raw_edit.fap",
               "targetPath": "/ext/apps/ARF Tools/subghz_raw_edit.fap",
               "sourceMD5": "fdcdad31fa9afae657cc16eec7113816",
-              "ledgerStatus": "needsReview"
+              "ledgerStatus": "accepted"
             }
-          ]
+          ],
+          "decision": {
+            "appId": "subghz_raw_edit",
+            "throughAuthorCommit": "d60ee2a34fa87b89c99f1ba9056737765f9f921f",
+            "sourceCommit": "0b71d9f34fec8ae3ba763b8de27ef15d1d604c5b",
+            "disposition": "auditedDifference",
+            "changelog": "Ported bounded NumberInput controls for Merge gap (0-1000 ms) and Merge repeat (1-64), preserving Cancel without mutation and applying values only on Confirm. A 0 ms gap adds no artificial separator; non-zero gaps remain safely chunked. Hardware acceptance covered NumberInput, Cancel/Confirm, zero and non-zero merge gaps, save, reopen, and playback of the user's own RAW signal.",
+            "implementationCommit": "485dad9c28ee59595c06023101efd14af8b42f21",
+            "fwPackages": {
+              "channel": "dev",
+              "revision": 4,
+              "releaseTag": "fw-packages-dev-004"
+            },
+            "hardwareAccepted": true
+          }
         }
       ],
-      "unresolved": [
-        "subghz_raw_edit:/ext/apps/Sub-GHz/subghz_raw_edit.fap: author source changed or unavailable"
-      ],
-      "generatedAt": "2026-08-12T09:29:17+00:00"
+      "unresolved": [],
+      "generatedAt": "2026-08-12T12:59:53+00:00"
     },
     {
       "sequence": 20260812095117,
