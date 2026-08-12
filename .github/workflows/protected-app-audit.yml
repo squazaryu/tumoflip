@@ -25,6 +25,10 @@ on:
         description: "Optional exact FW Packages tags; empty discovers latest stable/dev"
         required: false
         type: string
+      firmware_releases:
+        description: "Optional exact firmware release tags; empty discovers latest stable/dev"
+        required: false
+        type: string
       decisions_json:
         description: "Optional repository-relative reviewed decisions JSON"
         required: false
@@ -55,6 +59,7 @@ jobs:
           ISSUE_NUMBER: ${{ inputs.issue_number }}
           SEQUENCE: ${{ inputs.sequence }}
           TARGET_MANIFESTS: ${{ inputs.target_manifests }}
+          FIRMWARE_RELEASES: ${{ inputs.firmware_releases }}
           DECISIONS_JSON: ${{ inputs.decisions_json }}
         run: |
           set -euo pipefail
@@ -90,11 +95,31 @@ jobs:
             [[ "$STABLE_TARGET" != null && "$DEV_TARGET" != null ]]
             TARGET_MANIFESTS="$STABLE_TARGET,$DEV_TARGET"
           fi
+          if [[ -z "$FIRMWARE_RELEASES" ]]; then
+            test -f "$RUNNER_TEMP/tumoflip-releases.json" || \
+              gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+                > "$RUNNER_TEMP/tumoflip-releases.json"
+            STABLE_FIRMWARE="$(jq -r '
+              map(select((.draft == false) and (.prerelease == false)
+                and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))
+                and any(.assets[]; .name | test("^flipper-z-f7-update-.+\\.tgz$"))))
+              | sort_by(.published_at) | reverse | .[0].tag_name
+            ' "$RUNNER_TEMP/tumoflip-releases.json")"
+            DEV_FIRMWARE="$(jq -r '
+              map(select((.draft == false) and (.prerelease == true)
+                and (.tag_name | test("^t-dev-[0-9]{3}-[0-9]{3}$"))
+                and any(.assets[]; .name | test("^flipper-z-f7-update-.+\\.tgz$"))))
+              | sort_by(.published_at) | reverse | .[0].tag_name
+            ' "$RUNNER_TEMP/tumoflip-releases.json")"
+            [[ "$STABLE_FIRMWARE" != null && "$DEV_FIRMWARE" != null ]]
+            FIRMWARE_RELEASES="$STABLE_FIRMWARE,$DEV_FIRMWARE"
+          fi
           [[ "$SOURCE_TAG" =~ ^[0-9]{1,2}[a-z]{3}[0-9]{4}(p[0-9]+)?$ ]]
           [[ "$PREVIOUS_TAG" =~ ^[0-9]{1,2}[a-z]{3}[0-9]{4}(p[0-9]+)?$ ]]
           [[ -z "$ISSUE_NUMBER" || "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]
           [[ -z "$SEQUENCE" || "$SEQUENCE" =~ ^[1-9][0-9]*$ ]]
           [[ "$TARGET_MANIFESTS" =~ ^fw-packages-(stable|dev)-[0-9]{3}(,fw-packages-(stable|dev)-[0-9]{3})+$ ]]
+          [[ "$FIRMWARE_RELEASES" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+|t-dev-[0-9]{3}-[0-9]{3})(,(v[0-9]+\.[0-9]+\.[0-9]+|t-dev-[0-9]{3}-[0-9]{3}))+$ ]]
           if [[ -n "$DECISIONS_JSON" ]]; then
             [[ "$DECISIONS_JSON" =~ ^tools/tumoflip/protected_audit_decisions/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*\.json$ ]]
             [[ "$DECISIONS_JSON" != *"/../"* && "$DECISIONS_JSON" != *"/./"* ]]
@@ -103,6 +128,7 @@ jobs:
             echo "source_tag=$SOURCE_TAG"
             echo "previous_tag=$PREVIOUS_TAG"
             echo "target_manifests=$TARGET_MANIFESTS"
+            echo "firmware_releases=$FIRMWARE_RELEASES"
           } >> "$GITHUB_OUTPUT"
 
       - name: Checkout exact Tumoflip source
@@ -165,6 +191,14 @@ jobs:
             echo "sequence=$SEQUENCE"
             echo "repo=$WORK"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned firmware resource decoder
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --no-deps \
+            --no-build-isolation --require-hashes \
+            -r tools/tumoflip/protected_audit_requirements.txt
 
       - name: Resolve exactly one canonical issue
         id: issue
@@ -244,6 +278,12 @@ jobs:
             mkdir -p "$DEST"
             RELEASE_JSON="$DEST/release.json"
             gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > "$RELEASE_JSON"
+            jq -e '.draft == false' "$RELEASE_JSON" >/dev/null
+            if [[ "$CHANNEL" == dev ]]; then
+              jq -e '.prerelease == true' "$RELEASE_JSON" >/dev/null
+            else
+              jq -e '.prerelease == false' "$RELEASE_JSON" >/dev/null
+            fi
             TAG_OBJECT="$DEST/tag-object.json"
             gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" > "$TAG_OBJECT"
             RELEASE_TAG_COMMIT="$(jq -r .object.sha "$TAG_OBJECT")"
@@ -263,6 +303,46 @@ jobs:
             [[ "$RELEASE_TAG_COMMIT" == "$MANIFEST_SOURCE" ]]
             cp "$DEST/tumoflip-packages.json" "$RUNNER_TEMP/targets/$CHANNEL:$TAG=manifest.json"
             cp "$DEST/tumoflip-packages.zip" "$RUNNER_TEMP/targets/$CHANNEL:$TAG=targets.zip"
+          done
+
+      - name: Download and verify exact firmware updater targets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FIRMWARE_RELEASES: ${{ steps.selection.outputs.firmware_releases }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/firmware-targets"
+          IFS=',' read -ra TAGS <<< "$FIRMWARE_RELEASES"
+          for TAG in "${TAGS[@]}"; do
+            DEST="$RUNNER_TEMP/firmware-targets/$TAG"
+            mkdir -p "$DEST"
+            RELEASE_JSON="$DEST/release.json"
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > "$RELEASE_JSON"
+            jq -e '.draft == false' "$RELEASE_JSON" >/dev/null
+            if [[ "$TAG" == t-dev-* ]]; then
+              jq -e '.prerelease == true' "$RELEASE_JSON" >/dev/null
+            else
+              jq -e '.prerelease == false' "$RELEASE_JSON" >/dev/null
+            fi
+            TAG_OBJECT="$DEST/tag-object.json"
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" > "$TAG_OBJECT"
+            RELEASE_TAG_COMMIT="$(jq -r .object.sha "$TAG_OBJECT")"
+            if [[ "$(jq -r .object.type "$TAG_OBJECT")" == tag ]]; then
+              RELEASE_TAG_COMMIT="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$RELEASE_TAG_COMMIT" --jq .object.sha)"
+            fi
+            [[ "$RELEASE_TAG_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+            ASSET_NAME="$(jq -r '[.assets[] | select(.name | test("^flipper-z-f7-update-.+\\.tgz$"))] | if length == 1 then .[0].name else empty end' "$RELEASE_JSON")"
+            [[ "$ASSET_NAME" =~ ^flipper-z-f7-update-[A-Za-z0-9._-]+\.tgz$ ]]
+            ASSET_SHA="$(jq -r --arg name "$ASSET_NAME" '.assets[] | select(.name == $name) | .digest' "$RELEASE_JSON" | sed 's/^sha256://')"
+            [[ "$ASSET_SHA" =~ ^[0-9a-f]{64}$ ]]
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --dir "$DEST" --pattern "$ASSET_NAME"
+            printf '%s  %s\n' "$ASSET_SHA" "$DEST/$ASSET_NAME" | sha256sum -c -
+            jq -n --arg tag "$TAG" --arg commit "$RELEASE_TAG_COMMIT" \
+              --arg file "$ASSET_NAME" --arg sha "$ASSET_SHA" \
+              '{schema:1,releaseTag:$tag,releaseCommit:$commit,assetFileName:$file,assetSHA256:$sha}' \
+              > "$DEST/firmware-updater.json"
           done
 
       - name: Scan protected intersections
@@ -297,6 +377,7 @@ jobs:
             --output-summary "$RUNNER_TEMP/summary.md")
           while IFS= read -r MANIFEST; do ARGS+=(--target-manifest "$MANIFEST"); done < <(find "$RUNNER_TEMP/targets" -name '*=manifest.json' -type f | sort)
           while IFS= read -r ARCHIVE; do ARGS+=(--target-archive "$ARCHIVE"); done < <(find "$RUNNER_TEMP/targets" -name '*=targets.zip' -type f | sort)
+          while IFS= read -r DESCRIPTOR; do ARGS+=(--firmware-updater-descriptor "$DESCRIPTOR"); done < <(find "$RUNNER_TEMP/firmware-targets" -name firmware-updater.json -type f | sort)
           if [[ -z "$DECISIONS_JSON" && -f "tools/tumoflip/protected_audit_decisions/$SOURCE_TAG.json" ]]; then
             DECISIONS_JSON="tools/tumoflip/protected_audit_decisions/$SOURCE_TAG.json"
           fi
