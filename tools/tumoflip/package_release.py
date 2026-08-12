@@ -184,6 +184,14 @@ def validate_target_release_id(target_manifest: dict[str, object]) -> None:
         )
 
 
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _validated_target_entries(
     target_manifest: dict[str, object],
 ) -> dict[str, dict[str, object]]:
@@ -362,6 +370,253 @@ def merge_package_only_entries(
             merged.setdefault(group, []).append(replacement)
 
     return merged
+
+
+def _catalog_release(
+    manifest: dict[str, object],
+    *,
+    expected_channel: str,
+) -> dict[str, object]:
+    release = manifest.get("package_release")
+    if not isinstance(release, dict) or release.get("type") != "package-only":
+        raise ValidationError("Compatible manifest is not a package-only release")
+    tag = release.get("catalog_release_tag")
+    channel = release.get("catalog_channel")
+    revision = release.get("catalog_revision")
+    if (
+        not isinstance(tag, str)
+        or catalog_release_identity(tag) != (channel, revision)
+        or channel != expected_channel
+    ):
+        raise ValidationError("Compatible catalog identity is invalid")
+    if release.get("id") != tag or release.get("source_dirty") is not False:
+        raise ValidationError("Compatible catalog provenance is invalid")
+    source_commit = release.get("source_commit")
+    if (
+        not isinstance(source_commit, str)
+        or len(source_commit) != 40
+        or any(character not in "0123456789abcdef" for character in source_commit)
+    ):
+        raise ValidationError("Compatible catalog source commit is invalid")
+    overlays = release.get("overlay_targets")
+    if (
+        not isinstance(overlays, list)
+        or not overlays
+        or len(overlays) != len(set(overlays))
+        or not all(isinstance(source, str) and source for source in overlays)
+    ):
+        raise ValidationError("Compatible catalog overlay targets are invalid")
+    if release.get("compatible_releases") not in (None, []):
+        raise ValidationError("Nested compatible catalogs are not supported")
+    return release
+
+
+def build_catalog_reconciliation(
+    repo_root: Path,
+    out_dir: Path,
+    *,
+    target_release_tag: str,
+    target_source_commit: str,
+    target_manifest: dict[str, object],
+    target_package_zip: Path,
+    compatible_manifest: dict[str, object],
+    compatible_manifest_sha256: str,
+    compatible_package_zip: Path,
+    compatible_release_tag: str,
+    catalog_release_tag: str,
+) -> dict[str, object]:
+    """Move a catalog to an accepted firmware baseline without false mass updates.
+
+    The new ZIP remains the accepted firmware release's exact package set. Only the
+    previous catalog's explicit overlays may be admitted as equivalent builds, and
+    only when that catalog was built from the exact accepted firmware source commit.
+    Unknown, inherited baseline, or nested aliases remain fail-closed.
+    """
+    validate_target_release_id(target_manifest)
+    validate_target_release_id(compatible_manifest)
+    channel, revision = catalog_release_identity(catalog_release_tag)
+    if revision < 2:
+        raise ValidationError("A reconciled catalog requires revision 002 or newer")
+    if (
+        len(target_source_commit) != 40
+        or any(character not in "0123456789abcdef" for character in target_source_commit)
+    ):
+        raise ValidationError("Target firmware source commit is invalid")
+    if (
+        len(compatible_manifest_sha256) != 64
+        or any(
+            character not in "0123456789abcdef"
+            for character in compatible_manifest_sha256
+        )
+    ):
+        raise ValidationError("Compatible manifest SHA-256 is invalid")
+
+    if channel == "dev":
+        expected_prefix = "t-dev-"
+    else:
+        expected_prefix = "v"
+    if not target_release_tag.startswith(expected_prefix):
+        raise ValidationError("Catalog channel does not match target firmware release")
+    baseline = catalog_baseline(repo_root, channel)
+    if target_release_tag != baseline["release_tag"]:
+        raise ValidationError(
+            f"Catalog {channel} baseline must be {baseline['release_tag']}, "
+            f"got {target_release_tag}"
+        )
+
+    target_firmware = target_manifest.get("firmware")
+    compatible_firmware = compatible_manifest.get("firmware")
+    if not isinstance(target_firmware, dict) or not isinstance(compatible_firmware, dict):
+        raise ValidationError("Catalog firmware identity is missing")
+    for key, expected in {
+        "name": "tumoflip",
+        "version": baseline["firmware_version"],
+        "api": baseline["api"],
+        "target": baseline["target"],
+    }.items():
+        if target_firmware.get(key) != expected:
+            raise ValidationError(
+                f"Catalog {channel} baseline firmware {key} must be {expected!r}"
+            )
+    for key in ("name", "api", "target"):
+        if compatible_firmware.get(key) != target_firmware.get(key):
+            raise ValidationError(f"Compatible firmware {key} differs")
+
+    compatible_release = _catalog_release(
+        compatible_manifest,
+        expected_channel=channel,
+    )
+    if compatible_release["catalog_release_tag"] != compatible_release_tag:
+        raise ValidationError("Compatible catalog tag differs from its manifest")
+    compatible_revision = compatible_release["catalog_revision"]
+    if not isinstance(compatible_revision, int) or compatible_revision >= revision:
+        raise ValidationError("Compatible catalog revision must precede the new revision")
+    if compatible_release["source_commit"] != target_source_commit:
+        raise ValidationError(
+            "Compatible overlays were not built from the accepted firmware source commit"
+        )
+    if compatible_release.get("source_firmware_version") != target_firmware["version"]:
+        raise ValidationError(
+            "Compatible catalog source firmware differs from the accepted baseline"
+        )
+
+    target_entries = _validated_target_entries(target_manifest)
+    compatible_entries = _validated_target_entries(compatible_manifest)
+    overlay_sources = set(compatible_release["overlay_targets"])
+    if not overlay_sources <= set(target_entries) or not overlay_sources <= set(
+        compatible_entries
+    ):
+        raise ValidationError("Compatible catalog overlay target is missing")
+    for entries in (target_entries, compatible_entries):
+        for entry in entries.values():
+            if entry.get("compatible_builds") not in (None, []):
+                raise ValidationError("Nested compatible package builds are not supported")
+
+    target_groups = {
+        entry["source"]: group
+        for group, entries in target_manifest["packages"].items()
+        for entry in entries
+    }
+    compatible_groups = {
+        entry["source"]: group
+        for group, entries in compatible_manifest["packages"].items()
+        for entry in entries
+    }
+    for source in overlay_sources:
+        if target_groups[source] != compatible_groups[source]:
+            raise ValidationError(f"Compatible overlay group differs for {source}")
+
+    target_resources_context = tempfile.TemporaryDirectory(
+        prefix="tumoflip-reconciled-target-"
+    )
+    compatible_resources_context = tempfile.TemporaryDirectory(
+        prefix="tumoflip-reconciled-compatible-"
+    )
+    target_resources = Path(target_resources_context.name) / "resources"
+    compatible_resources = Path(compatible_resources_context.name) / "resources"
+    target_resources.mkdir(parents=True)
+    compatible_resources.mkdir(parents=True)
+    try:
+        materialize_target_package(target_manifest, target_package_zip, target_resources)
+        materialize_target_package(
+            compatible_manifest,
+            compatible_package_zip,
+            compatible_resources,
+        )
+
+        manifest = copy.deepcopy(target_manifest)
+        manifest.pop("release_id", None)
+        packages = manifest.get("packages")
+        if not isinstance(packages, dict):
+            raise ValidationError("Target package manifest packages are missing")
+        aliases = 0
+        compatible_release_id = compatible_manifest["release_id"]
+        for entries in packages.values():
+            for entry in entries:
+                source = entry["source"]
+                entry.pop("compatible_builds", None)
+                if source not in overlay_sources:
+                    continue
+                old = compatible_entries[source]
+                if old["md5"] == entry["md5"]:
+                    continue
+                entry["compatible_builds"] = [
+                    {
+                        "bytes": old["bytes"],
+                        "sha256": old["sha256"],
+                        "md5": old["md5"],
+                        "release_id": compatible_release_id,
+                    }
+                ]
+                aliases += 1
+        if aliases == 0:
+            raise ValidationError("Compatible catalog has no distinct overlay builds")
+
+        commit, _short, dirty = git_identity(repo_root)
+        if dirty:
+            raise ValidationError("Reconciled catalog source worktree must be clean")
+        manifest["package_release"] = {
+            "type": "package-only",
+            "id": catalog_release_tag,
+            "source_commit": commit,
+            "source_dirty": False,
+            "source_firmware_version": target_firmware["version"],
+            "target_release_tag": target_release_tag,
+            "target_release_id": target_manifest["release_id"],
+            "firmware_flash_unchanged": True,
+            "overlay_targets": [],
+            "synced_extapps": [],
+            "catalog_channel": channel,
+            "catalog_revision": revision,
+            "catalog_release_tag": catalog_release_tag,
+            "compatible_releases": [
+                {
+                    "release_tag": compatible_release["catalog_release_tag"],
+                    "release_id": compatible_release_id,
+                    "manifest_sha256": compatible_manifest_sha256,
+                    "source_commit": compatible_release["source_commit"],
+                }
+            ],
+        }
+        manifest["release_id"] = manifest_release_id(manifest)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "tumoflip-packages.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        build_packages_zip(
+            manifest,
+            target_resources,
+            out_dir / "tumoflip-packages.zip",
+        )
+        if file_sha256(out_dir / "tumoflip-packages.zip") != file_sha256(
+            target_package_zip
+        ):
+            raise ValidationError("Reconciled package ZIP differs from target firmware ZIP")
+        return manifest
+    finally:
+        target_resources_context.cleanup()
+        compatible_resources_context.cleanup()
 
 
 def build_package_release(
@@ -553,18 +808,18 @@ def main() -> int:
     parser.add_argument("--target-manifest", type=Path)
     parser.add_argument("--target-package-zip", type=Path)
     parser.add_argument("--catalog-release-tag")
+    parser.add_argument("--target-source-commit")
+    parser.add_argument("--compatible-manifest", type=Path)
+    parser.add_argument("--compatible-package-zip", type=Path)
+    parser.add_argument("--compatible-release-tag")
     args = parser.parse_args()
 
     repo_root = args.repo_root.resolve()
     build_dir = (repo_root / args.build_dir).resolve()
     try:
-        firmware = json.loads(
-            require_file(build_dir / "firmware.json", "firmware metadata").read_text(
-                encoding="utf-8"
-            )
-        )
         target_manifest = None
         target_package_zip = None
+        target_manifest_path = None
         if args.target_manifest:
             if not args.target_release_tag:
                 raise ValidationError(
@@ -589,11 +844,28 @@ def main() -> int:
             raise ValidationError(
                 "--target-package-zip requires --target-manifest"
             )
-        output_firmware = resolve_target_firmware(
-            repo_root,
-            firmware,
-            target_manifest,
+        reconciliation_requested = bool(
+            args.compatible_manifest or args.compatible_package_zip
         )
+        if reconciliation_requested:
+            if target_manifest is None:
+                raise ValidationError(
+                    "Catalog reconciliation requires a target manifest"
+                )
+            output_firmware = target_manifest.get("firmware")
+            if not isinstance(output_firmware, dict):
+                raise ValidationError("Target package manifest firmware is missing")
+        else:
+            firmware = json.loads(
+                require_file(
+                    build_dir / "firmware.json", "firmware metadata"
+                ).read_text(encoding="utf-8")
+            )
+            output_firmware = resolve_target_firmware(
+                repo_root,
+                firmware,
+                target_manifest,
+            )
         output_version = str(output_firmware["version"])
         out_dir = (
             (repo_root / args.out_dir).resolve()
@@ -602,16 +874,60 @@ def main() -> int:
             / "dist/f7-C"
             / f"f7-update-{output_version}"
         )
-        manifest = build_package_release(
-            repo_root,
-            build_dir,
-            out_dir,
-            package_id=args.package_id,
-            target_release_tag=args.target_release_tag,
-            target_manifest=target_manifest,
-            target_package_zip=target_package_zip,
-            catalog_release_tag=args.catalog_release_tag,
-        )
+        if reconciliation_requested:
+            if not (
+                args.compatible_manifest
+                and args.compatible_package_zip
+                and args.compatible_release_tag
+                and args.catalog_release_tag
+                and args.target_source_commit
+                and target_manifest is not None
+                and target_manifest_path is not None
+                and target_package_zip is not None
+            ):
+                raise ValidationError(
+                    "Catalog reconciliation requires target and compatible assets, "
+                    "catalog tag, and target source commit"
+                )
+            compatible_manifest_path = require_file(
+                (repo_root / args.compatible_manifest).resolve(),
+                "compatible package manifest",
+            )
+            compatible_manifest = json.loads(
+                compatible_manifest_path.read_text(encoding="utf-8")
+            )
+            compatible_package_zip = require_file(
+                (repo_root / args.compatible_package_zip).resolve(),
+                "compatible package ZIP",
+            )
+            manifest = build_catalog_reconciliation(
+                repo_root,
+                out_dir,
+                target_release_tag=args.target_release_tag,
+                target_source_commit=args.target_source_commit,
+                target_manifest=target_manifest,
+                target_package_zip=target_package_zip,
+                compatible_manifest=compatible_manifest,
+                compatible_manifest_sha256=file_sha256(compatible_manifest_path),
+                compatible_package_zip=compatible_package_zip,
+                compatible_release_tag=args.compatible_release_tag,
+                catalog_release_tag=args.catalog_release_tag,
+            )
+        else:
+            if args.target_source_commit:
+                raise ValidationError(
+                    "--target-source-commit requires a compatible catalog"
+                )
+            manifest = build_package_release(
+                repo_root,
+                build_dir,
+                out_dir,
+                package_id=args.package_id,
+                target_release_tag=args.target_release_tag,
+                target_manifest=target_manifest,
+                target_package_zip=target_package_zip,
+                catalog_release_tag=args.catalog_release_tag,
+            )
     except (
         OSError,
         KeyError,

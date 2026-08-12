@@ -7,8 +7,8 @@
     "target": 7
   },
   "dev": {
-    "release_tag": "t-dev-004-013",
-    "firmware_version": "t-dev-004-013",
+    "release_tag": "t-dev-004-015",
+    "firmware_version": "t-dev-004-015",
     "api": "88.0",
     "target": 7
   }
