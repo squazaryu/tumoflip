@@ -28,7 +28,7 @@
 #define DEFAULT_FLASH_TIMEOUT 3000
 #define LOAD_RAM_TIMEOUT_PER_MB 2000000
 #define MD5_TIMEOUT_PER_MB 8000
-#define ESP32C5_MD5_MIN_TIMEOUT 10000
+#define ESP32_ROM_MD5_MIN_TIMEOUT 10000
 #define ERASE_FLASH_TIMEOUT_PER_MB 10000
 
 #define FLASH_SECTOR_SIZE 4096
@@ -83,8 +83,8 @@ static uint32_t timeout_per_mb(uint32_t size_bytes, uint32_t time_per_mb)
 static uint32_t md5_timeout(uint32_t size_bytes)
 {
     uint32_t timeout = timeout_per_mb(size_bytes, MD5_TIMEOUT_PER_MB);
-    if (s_target == ESP32C5_CHIP) {
-        timeout = MAX(timeout, ESP32C5_MD5_MIN_TIMEOUT);
+    if (s_target == ESP32_CHIP || s_target == ESP32C5_CHIP) {
+        timeout = MAX(timeout, ESP32_ROM_MD5_MIN_TIMEOUT);
     }
     return timeout;
 }
