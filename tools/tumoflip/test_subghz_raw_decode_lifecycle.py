@@ -27,6 +27,10 @@ CORE_RECEIVER = "applications/main/subghz/scenes/subghz_scene_receiver.c"
 ARF_RECEIVER = "applications_user/arf_subghz_full/scenes/subghz_scene_receiver.c"
 CORE_HISTORY = "applications/main/subghz/subghz_history.c"
 ARF_HISTORY = "applications_user/arf_subghz_full/subghz_history.c"
+RAW_ENCODERS = (
+    "lib/subghz/protocols/raw.c",
+    "applications_user/garage_door_remote/protocols/raw.c",
+)
 
 
 class SubGhzRawDecodeLifecycleTest(unittest.TestCase):
@@ -204,6 +208,37 @@ class SubGhzRawDecodeLifecycleTest(unittest.TestCase):
                     self.assertIn(
                         "subghz->decode_raw_file_worker_encoder = NULL;", contents
                     )
+
+    def test_failed_raw_encoder_start_frees_unstarted_worker_for_retry(self) -> None:
+        expected_cleanup = """if(instance->file_worker_encoder) {
+        if(subghz_file_encoder_worker_is_running(instance->file_worker_encoder)) {
+            subghz_file_encoder_worker_stop(instance->file_worker_encoder);
+        }
+        subghz_file_encoder_worker_free(instance->file_worker_encoder);
+        instance->file_worker_encoder = NULL;
+    }"""
+
+        for relative in RAW_ENCODERS:
+            with self.subTest(path=relative):
+                raw = source(relative)
+                stop = region(
+                    raw,
+                    "void subghz_protocol_encoder_raw_stop(",
+                    "void subghz_protocol_encoder_raw_free(",
+                )
+                self.assertIn(expected_cleanup, stop)
+
+                worker_init = region(
+                    raw,
+                    "static bool subghz_protocol_encoder_raw_worker_init(",
+                    "void subghz_protocol_raw_gen_fff_data(",
+                )
+                self.assertIn(
+                    "furi_check(!instance->file_worker_encoder);", worker_init
+                )
+                self.assertIn(
+                    "subghz_protocol_encoder_raw_stop(instance);", worker_init
+                )
 
     def test_keeloq_reset_drops_frame_state_without_touching_custom_buttons(
         self,
