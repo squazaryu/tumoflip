@@ -16,7 +16,7 @@ DEBUG = 0
 
 # Suffix to add to files when building distribution
 # If OS environment has DIST_SUFFIX set, it will be used instead
-DIST_SUFFIX = "t-dev-004-014"
+DIST_SUFFIX = "t-dev-004-015"
 
 # Post-update slideshow shown by the updater package
 UPDATE_SPLASH = "tumoflip_update"
