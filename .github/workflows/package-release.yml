@@ -16,6 +16,10 @@ on:
         description: "Optional immutable catalog tag, for example fw-packages-dev-001"
         required: false
         type: string
+      compatible_catalog_tag:
+        description: "Optional prior catalog whose exact overlays remain accepted"
+        required: false
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.inputs.catalog_release_tag || github.event.inputs.target_release_tag }}
@@ -51,6 +55,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.inputs.target_release_tag }}
           CATALOG_TAG: ${{ github.event.inputs.catalog_release_tag }}
+          COMPATIBLE_TAG: ${{ github.event.inputs.compatible_catalog_tag }}
         run: |
           set -euo pipefail
           if [[ "$TAG" =~ ^v[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.]+)?$ ]]; then
@@ -101,8 +106,47 @@ jobs:
               echo "Catalog tag $CATALOG_TAG already exists; publish a new revision instead" >&2
               exit 1
             fi
+            if [[ -n "$COMPATIBLE_TAG" ]]; then
+              if [[ "$COMPATIBLE_TAG" =~ ^fw-packages-(stable|dev)-([0-9]{3})$ ]]; then
+                COMPATIBLE_CHANNEL="${BASH_REMATCH[1]}"
+                COMPATIBLE_REVISION="${BASH_REMATCH[2]}"
+              else
+                echo "Compatible catalog tag is invalid: $COMPATIBLE_TAG" >&2
+                exit 1
+              fi
+              if [[ "$COMPATIBLE_CHANNEL" != "$CATALOG_CHANNEL" ]]; then
+                echo "Compatible catalog channel differs from $CATALOG_CHANNEL" >&2
+                exit 1
+              fi
+              if (( 10#$COMPATIBLE_REVISION >= 10#$CATALOG_REVISION )); then
+                echo "Compatible catalog must precede $CATALOG_TAG" >&2
+                exit 1
+              fi
+            fi
+          elif [[ -n "$COMPATIBLE_TAG" ]]; then
+            echo "Compatible catalog requires an independent catalog tag" >&2
+            exit 1
           fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          peel_tag() {
+            local TYPE SHA
+            read -r TYPE SHA < <(
+              gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$1" \
+                --jq '.object.type + " " + .object.sha'
+            )
+            while [[ "$TYPE" == "tag" ]]; do
+              read -r TYPE SHA < <(
+                gh api "repos/$GITHUB_REPOSITORY/git/tags/$SHA" \
+                  --jq '.object.type + " " + .object.sha'
+              )
+            done
+            if [[ "$TYPE" != "commit" || ! "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Release tag $1 does not resolve to a commit" >&2
+              return 1
+            fi
+            printf '%s\n' "$SHA"
+          }
+          TARGET_COMMIT="$(peel_tag "$TAG")"
           TARGET_DIR="$RUNNER_TEMP/tumoflip-target-release"
           mkdir -p "$TARGET_DIR"
           gh release download "$TAG" \
@@ -123,7 +167,42 @@ jobs:
               exit 1
             fi
           fi
+          if [[ -n "$COMPATIBLE_TAG" ]]; then
+            gh release view "$COMPATIBLE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+            COMPATIBLE_DIR="$RUNNER_TEMP/tumoflip-compatible-catalog"
+            mkdir -p "$COMPATIBLE_DIR"
+            gh release download "$COMPATIBLE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --dir "$COMPATIBLE_DIR" \
+              --pattern "tumoflip-packages.json" \
+              --pattern "tumoflip-packages.zip" \
+              --pattern "${COMPATIBLE_TAG}-SHA256SUMS"
+            python3 tools/tumoflip/verify_release_assets.py \
+              "$COMPATIBLE_DIR/${COMPATIBLE_TAG}-SHA256SUMS" \
+              "$COMPATIBLE_DIR/tumoflip-packages.json" \
+              "$COMPATIBLE_DIR/tumoflip-packages.zip"
+            COMPATIBLE_COMMIT="$(peel_tag "$COMPATIBLE_TAG")"
+            COMPATIBLE_SOURCE="$(python3 - "$COMPATIBLE_DIR/tumoflip-packages.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          print(json.loads(Path(sys.argv[1]).read_text())["package_release"]["source_commit"])
+          PY
+            )"
+            if [[ "$COMPATIBLE_COMMIT" != "$TARGET_COMMIT" || "$COMPATIBLE_SOURCE" != "$TARGET_COMMIT" ]]; then
+              echo "Compatible catalog was not published from target commit $TARGET_COMMIT" >&2
+              exit 1
+            fi
+            echo "compatible_tag=$COMPATIBLE_TAG" >> "$GITHUB_OUTPUT"
+            echo "compatible_manifest=$COMPATIBLE_DIR/tumoflip-packages.json" >> "$GITHUB_OUTPUT"
+            echo "compatible_package_zip=$COMPATIBLE_DIR/tumoflip-packages.zip" >> "$GITHUB_OUTPUT"
+          else
+            echo "compatible_tag=" >> "$GITHUB_OUTPUT"
+            echo "compatible_manifest=" >> "$GITHUB_OUTPUT"
+            echo "compatible_package_zip=" >> "$GITHUB_OUTPUT"
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "target_commit=$TARGET_COMMIT" >> "$GITHUB_OUTPUT"
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "manifest=$TARGET_DIR/tumoflip-packages.json" >> "$GITHUB_OUTPUT"
           echo "package_zip=$TARGET_DIR/tumoflip-packages.zip" >> "$GITHUB_OUTPUT"
@@ -151,6 +230,7 @@ jobs:
           fi
 
       - name: Build firmware resources
+        if: steps.target.outputs.compatible_tag == ''
         shell: bash
         run: |
           set -euo pipefail
@@ -187,6 +267,9 @@ jobs:
           TARGET_MANIFEST: ${{ steps.target.outputs.manifest }}
           TARGET_PACKAGE_ZIP: ${{ steps.target.outputs.package_zip }}
           CATALOG_TAG: ${{ steps.target.outputs.catalog_tag }}
+          TARGET_COMMIT: ${{ steps.target.outputs.target_commit }}
+          COMPATIBLE_MANIFEST: ${{ steps.target.outputs.compatible_manifest }}
+          COMPATIBLE_PACKAGE_ZIP: ${{ steps.target.outputs.compatible_package_zip }}
         run: |
           set -euo pipefail
           PACKAGE_ARGS=(
@@ -197,6 +280,14 @@ jobs:
           )
           if [[ -n "$CATALOG_TAG" ]]; then
             PACKAGE_ARGS+=(--catalog-release-tag "$CATALOG_TAG")
+          fi
+          if [[ -n "$COMPATIBLE_MANIFEST" ]]; then
+            PACKAGE_ARGS+=(
+              --target-source-commit "$TARGET_COMMIT"
+              --compatible-manifest "$COMPATIBLE_MANIFEST"
+              --compatible-package-zip "$COMPATIBLE_PACKAGE_ZIP"
+              --compatible-release-tag "${{ steps.target.outputs.compatible_tag }}"
+            )
           fi
           python3 tools/tumoflip/package_release.py "${PACKAGE_ARGS[@]}"
           VERSION="$(python3 - "$TARGET_MANIFEST" <<'PY'
@@ -268,6 +359,7 @@ jobs:
           CATALOG_TAG: ${{ steps.target.outputs.catalog_tag }}
           CHANNEL: ${{ steps.target.outputs.channel }}
           TARGET_TAG: ${{ steps.target.outputs.tag }}
+          COMPATIBLE_TAG: ${{ steps.target.outputs.compatible_tag }}
         run: |
           set -euo pipefail
           if [[ -n "$CATALOG_TAG" ]]; then
@@ -280,7 +372,7 @@ jobs:
               --repo "$GITHUB_REPOSITORY"
               --target "$SOURCE_COMMIT"
               --title "FW Packages ${CHANNEL^} ${CATALOG_TAG##*-}"
-              --notes "Independent ${CHANNEL} FW Packages revision. Compatible firmware is validated by Tumoflip lineage, hardware target, API and package channel. Baseline: ${TARGET_TAG}. Source: ${SOURCE_COMMIT}. This release contains no firmware image."
+              --notes "Independent ${CHANNEL} FW Packages revision. Compatible firmware is validated by Tumoflip lineage, hardware target, API and package channel. Baseline: ${TARGET_TAG}. Previous exact overlays: ${COMPATIBLE_TAG:-none}. Source: ${SOURCE_COMMIT}. This release contains no firmware image."
             )
             if [[ "$CHANNEL" == "dev" ]]; then
               CREATE_ARGS+=(--prerelease)

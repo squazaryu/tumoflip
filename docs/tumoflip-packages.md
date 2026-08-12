@@ -97,6 +97,17 @@ unaccepted firmware package set from making unrelated FAPs appear as updates.
 Change a baseline only when that firmware/package set has completed its own
 acceptance; ordinary FAP updates do not change it.
 
+When an accepted firmware advances the channel baseline, use catalog
+reconciliation instead of treating every separately linked FAP/FAL as a new
+application update. The canonical manifest and ZIP must come from the newly
+accepted firmware release. A previous independent catalog may contribute exact
+`compatible_builds` only for its explicit `overlay_targets`, only when its clean
+package source commit equals the accepted firmware tag commit, and only with its
+content-addressed manifest provenance recorded in `compatible_releases`.
+Unrelated files from the previous firmware baseline are never grandfathered.
+Clients may use these exact aliases for status/adoption/cleanup, but must always
+download, hash, stage, and install the canonical ZIP payload.
+
 TumoCompanion selects the newest catalog revision for the device's package
 channel. Firmware version is not package identity. Installation remains
 fail-closed on Tumoflip origin, channel, hardware target, firmware API, embedded

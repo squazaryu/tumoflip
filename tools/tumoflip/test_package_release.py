@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -11,7 +12,7 @@ from pathlib import Path
 try:
     from .apply_packages import load_manifest
     from .make_packages_zip import build_packages_zip
-    from .package_release import build_package_release
+    from .package_release import build_catalog_reconciliation, build_package_release
     from .validate_release import (
         ARF_MODULE_APP_IDS,
         ARF_VISIBLE_APP_IDS,
@@ -29,7 +30,7 @@ try:
 except ImportError:
     from apply_packages import load_manifest
     from make_packages_zip import build_packages_zip
-    from package_release import build_package_release
+    from package_release import build_catalog_reconciliation, build_package_release
     from validate_release import (
         ARF_MODULE_APP_IDS,
         ARF_VISIBLE_APP_IDS,
@@ -179,7 +180,231 @@ def prepare_target_package(
     return manifest, package_zip
 
 
+def prepare_reconciliation_catalogs(
+    root: Path,
+) -> tuple[Path, Path, dict[str, object], Path, dict[str, object], Path, str]:
+    repo, _build, resources = prepare_package_tree(root)
+    baselines = json.loads(
+        (repo / "tools/tumoflip/package_catalog_baselines.json").read_text()
+    )
+    baselines["dev"]["release_tag"] = "t-dev-004-015"
+    baselines["dev"]["firmware_version"] = "t-dev-004-015"
+    (repo / "tools/tumoflip/package_catalog_baselines.json").write_text(
+        json.dumps(baselines), encoding="utf-8"
+    )
+    subprocess.run(
+        ["git", "add", "tools/tumoflip/package_catalog_baselines.json"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "accept dev baseline"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    source_commit = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=repo, text=True
+    ).strip()
+
+    outside = root / "catalog-assets"
+    outside.mkdir()
+    target_manifest, generated_target_zip = prepare_target_package(repo, resources)
+    target_manifest["firmware"]["version"] = "t-dev-004-015"
+    target_manifest.pop("release_id")
+    target_manifest["release_id"] = manifest_release_id(target_manifest)
+    target_zip = outside / "target.zip"
+    shutil.move(generated_target_zip, target_zip)
+    shutil.rmtree(repo / "target-release")
+
+    compatible_resources = outside / "compatible-resources"
+    shutil.copytree(resources, compatible_resources)
+    overlay_sources = [
+        "apps/ARF Tools/subghz_raw_edit.fap",
+        "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+    ]
+    write_file(compatible_resources / overlay_sources[0], b"accepted raw overlay")
+    write_file(compatible_resources / overlay_sources[1], b"accepted esp overlay")
+    # This old-baseline difference was never an explicit overlay and must not be
+    # grandfathered by reconciliation.
+    write_file(
+        compatible_resources / "apps/Tools/quac.fap",
+        b"old non-overlay quac",
+    )
+    compatible_manifest = {
+        "schema": 2,
+        "firmware": {
+            **target_manifest["firmware"],
+            "version": "t-dev-004-013",
+        },
+        "safety": target_manifest["safety"],
+        "artifacts": target_manifest["artifacts"],
+        "packages": package_entries(compatible_resources),
+        "cleanup": target_manifest["cleanup"],
+        "package_release": {
+            "type": "package-only",
+            "id": "fw-packages-dev-004",
+            "source_commit": source_commit,
+            "source_dirty": False,
+            "source_firmware_version": "t-dev-004-015",
+            "target_release_tag": "t-dev-004-013",
+            "target_release_id": "a" * 64,
+            "firmware_flash_unchanged": True,
+            "overlay_targets": overlay_sources,
+            "synced_extapps": [],
+            "catalog_channel": "dev",
+            "catalog_revision": 4,
+            "catalog_release_tag": "fw-packages-dev-004",
+        },
+    }
+    compatible_manifest["release_id"] = manifest_release_id(compatible_manifest)
+    compatible_manifest_path = outside / "compatible.json"
+    compatible_manifest_path.write_text(
+        json.dumps(compatible_manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    compatible_zip = outside / "compatible.zip"
+    build_packages_zip(compatible_manifest, compatible_resources, compatible_zip)
+    self_status = subprocess.check_output(
+        ["git", "status", "--porcelain"], cwd=repo, text=True
+    ).strip()
+    if self_status:
+        raise AssertionError(f"fixture repo is dirty: {self_status}")
+    return (
+        repo,
+        outside,
+        target_manifest,
+        target_zip,
+        compatible_manifest,
+        compatible_zip,
+        source_commit,
+    )
+
+
 class PackageReleaseTest(unittest.TestCase):
+    def test_reconciled_catalog_accepts_only_exact_previous_overlays(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (
+                repo,
+                outside,
+                target_manifest,
+                target_zip,
+                compatible_manifest,
+                compatible_zip,
+                source_commit,
+            ) = prepare_reconciliation_catalogs(root)
+
+            manifest = build_catalog_reconciliation(
+                repo,
+                outside / "output",
+                target_release_tag="t-dev-004-015",
+                target_source_commit=source_commit,
+                target_manifest=target_manifest,
+                target_package_zip=target_zip,
+                compatible_manifest=compatible_manifest,
+                compatible_manifest_sha256=sha256(outside / "compatible.json"),
+                compatible_package_zip=compatible_zip,
+                compatible_release_tag="fw-packages-dev-004",
+                catalog_release_tag="fw-packages-dev-005",
+            )
+
+            entries = {
+                entry["source"]: entry
+                for group in manifest["packages"].values()
+                for entry in group
+            }
+            overlays = compatible_manifest["package_release"]["overlay_targets"]
+            self.assertEqual(
+                {
+                    source
+                    for source, entry in entries.items()
+                    if "compatible_builds" in entry
+                },
+                set(overlays),
+            )
+            self.assertNotIn("compatible_builds", entries["apps/Tools/quac.fap"])
+            for source in overlays:
+                alias = entries[source]["compatible_builds"]
+                self.assertEqual(len(alias), 1)
+                self.assertEqual(alias[0]["release_id"], compatible_manifest["release_id"])
+            release = manifest["package_release"]
+            self.assertEqual(release["overlay_targets"], [])
+            self.assertEqual(release["target_release_tag"], "t-dev-004-015")
+            self.assertEqual(release["catalog_revision"], 5)
+            self.assertEqual(
+                release["compatible_releases"][0]["manifest_sha256"],
+                sha256(outside / "compatible.json"),
+            )
+            unsigned = dict(manifest)
+            unsigned.pop("release_id")
+            self.assertEqual(manifest["release_id"], manifest_release_id(unsigned))
+            self.assertEqual(
+                (outside / "output/tumoflip-packages.zip").read_bytes(),
+                target_zip.read_bytes(),
+            )
+
+    def test_reconciled_catalog_rejects_different_overlay_source_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (
+                repo,
+                outside,
+                target_manifest,
+                target_zip,
+                compatible_manifest,
+                compatible_zip,
+                source_commit,
+            ) = prepare_reconciliation_catalogs(root)
+
+            with self.assertRaisesRegex(
+                ValidationError,
+                "not built from the accepted firmware source commit",
+            ):
+                build_catalog_reconciliation(
+                    repo,
+                    outside / "output",
+                    target_release_tag="t-dev-004-015",
+                    target_source_commit="f" * 40,
+                    target_manifest=target_manifest,
+                    target_package_zip=target_zip,
+                    compatible_manifest=compatible_manifest,
+                    compatible_manifest_sha256=sha256(outside / "compatible.json"),
+                    compatible_package_zip=compatible_zip,
+                    compatible_release_tag="fw-packages-dev-004",
+                    catalog_release_tag="fw-packages-dev-005",
+                )
+
+    def test_reconciled_catalog_rejects_corrupt_compatible_zip(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (
+                repo,
+                outside,
+                target_manifest,
+                target_zip,
+                compatible_manifest,
+                compatible_zip,
+                source_commit,
+            ) = prepare_reconciliation_catalogs(root)
+            with zipfile.ZipFile(compatible_zip, "a") as archive:
+                archive.writestr("unexpected.fap", b"bad")
+
+            with self.assertRaisesRegex(ValidationError, "contents differ"):
+                build_catalog_reconciliation(
+                    repo,
+                    outside / "output",
+                    target_release_tag="t-dev-004-015",
+                    target_source_commit=source_commit,
+                    target_manifest=target_manifest,
+                    target_package_zip=target_zip,
+                    compatible_manifest=compatible_manifest,
+                    compatible_manifest_sha256=sha256(outside / "compatible.json"),
+                    compatible_package_zip=compatible_zip,
+                    compatible_release_tag="fw-packages-dev-004",
+                    catalog_release_tag="fw-packages-dev-005",
+                )
+
     def test_package_release_can_target_existing_dev_identity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo, build, resources = prepare_package_tree(Path(directory))
