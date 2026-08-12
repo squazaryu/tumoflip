@@ -106,11 +106,10 @@ static esp_loader_error_t _flash_file(
         expected_md5_hex[32] = '\0';
         err = esp_loader_flash_verify_known_md5(
             addr, (uint32_t)total_size, expected_md5_hex);
-        if(err == ESP_LOADER_ERROR_TIMEOUT && app->package_mode &&
-           app->package_plan.target == EspFlashPackageTargetEsp32C5) {
+        if(err == ESP_LOADER_ERROR_TIMEOUT && app->package_mode) {
             // Retrying the read-only ROM digest command is safe: the segment is not
             // erased or written again, and a second failure remains fail-closed.
-            loader_port_debug_print("C5 MD5 timed out; retrying verification once\n");
+            loader_port_debug_print("Package MD5 timed out; retrying verification once\n");
             err = esp_loader_flash_verify_known_md5(
                 addr, (uint32_t)total_size, expected_md5_hex);
         }

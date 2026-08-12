@@ -70,24 +70,40 @@ class EspFlashPackageTests(unittest.TestCase):
         self.assertIn('"Flash Package"', start)
         self.assertIn('"Manual Flash"', start)
 
-    def test_c5_package_uses_conservative_verified_transport(self):
+    def test_packages_use_conservative_verified_transport(self):
+        manifest = (APP_ROOT / "application.fam").read_text(encoding="utf-8")
         confirm = (
             APP_ROOT / "scenes/esp_flasher_scene_package_confirm.c"
         ).read_text(encoding="utf-8")
+        manual = (APP_ROOT / "scenes/esp_flasher_scene_browse.c").read_text(
+            encoding="utf-8"
+        )
+        quick = (APP_ROOT / "scenes/esp_flasher_scene_quick.c").read_text(
+            encoding="utf-8"
+        )
         worker = (APP_ROOT / "esp_flasher_worker.c").read_text(encoding="utf-8")
         loader = (
             APP_ROOT / "lib/esp-serial-flasher/src/esp_loader.c"
         ).read_text(encoding="utf-8")
 
-        self.assertIn(
+        self.assertIn("app->turbospeed = false;", confirm)
+        self.assertNotIn(
             "app->package_plan.target != EspFlashPackageTargetEsp32C5",
             confirm,
         )
-        self.assertIn("C5 MD5 timed out; retrying verification once", worker)
+        self.assertIn("Package MD5 timed out; retrying verification once", worker)
+        self.assertIn("err == ESP_LOADER_ERROR_TIMEOUT && app->package_mode", worker)
+        self.assertEqual(worker.count("esp_loader_flash_verify_known_md5("), 2)
         self.assertIn("Segment %s failed with error %u", worker)
-        self.assertIn("ESP32C5_MD5_MIN_TIMEOUT 10000", loader)
+        self.assertIn("ESP32_ROM_MD5_MIN_TIMEOUT 10000", loader)
+        self.assertIn("s_target == ESP32_CHIP || s_target == ESP32C5_CHIP", loader)
         self.assertIn("ESP32C5_DEFAULT_FLASH_SIZE 4 * 1024 * 1024", loader)
         self.assertIn("loader_port_start_timer(md5_timeout(size))", loader)
+        self.assertIn(
+            "app->turbospeed = (index == SubmenuIndexFlashTurbo)", manual
+        )
+        self.assertIn("app->turbospeed = true;", quick)
+        self.assertIn("fap_version=(1, 13)", manifest)
 
     def test_offline_c5_fallback_is_versioned_and_back_routes_to_c5(self):
         quick = (APP_ROOT / "scenes/esp_flasher_scene_quick.c").read_text(

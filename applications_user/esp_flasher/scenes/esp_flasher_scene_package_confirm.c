@@ -32,11 +32,10 @@ bool esp_flasher_scene_package_confirm_on_event(void* context, SceneManagerEvent
         app->reset = false;
         app->boot = true;
         app->quickflash = true;
-        // Physical C5 acceptance showed that programming at 921600 can complete while
-        // the following ROM MD5 command times out. Keep the exact C5 package profile at
-        // the conservative UART rate; other accepted package profiles retain turbo.
-        app->turbospeed =
-            app->package_plan.target != EspFlashPackageTargetEsp32C5;
+        // Physical C5 acceptance and a Module One failure showed that programming can
+        // complete at 921600 while the following ROM MD5 response is lost. Flash Package
+        // prioritizes exact target verification over speed; Manual and Quick retain turbo.
+        app->turbospeed = false;
         scene_manager_next_scene(app->scene_manager, EspFlasherSceneConsoleOutput);
         return true;
     }
