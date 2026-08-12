@@ -1,0 +1,303 @@
+{
+  "schema": 2,
+  "sourceRepository": "xMasterX/all-the-plugins",
+  "protectedKeys": [
+    "ai_dashboard",
+    "app_bridge_terminal",
+    "arf_car_emulate",
+    "arf_counter_bf",
+    "arf_frequency_analyzer",
+    "arf_keeloq",
+    "arf_psa_decrypt",
+    "arf_status",
+    "arf_subghz",
+    "arf_subghz_full",
+    "authenticator",
+    "ble_gatt_lab",
+    "claude_buddy",
+    "claude_remote_ble",
+    "esp32_wifi_marauder",
+    "esp_flasher",
+    "field_logger",
+    "flipper_companion",
+    "flipper_relay",
+    "flipper_xremote",
+    "garage_door_remote",
+    "keeloq_keystore_decryptor",
+    "module_one_cockpit",
+    "module_one_sensor_logger",
+    "nfc_ccid_bridge",
+    "proto_pirate",
+    "protocol_compiler",
+    "protopirate",
+    "quac",
+    "rolljam",
+    "rolljam_standalone",
+    "runtime_trace_viewer",
+    "signal_workbench",
+    "subbrute",
+    "subghz_bruteforcer",
+    "subghz_protocols",
+    "subghz_raw_edit",
+    "subghz_raw_editor",
+    "subghz_wardriving",
+    "totp",
+    "tumo_acceptance_suite",
+    "tumo_ir_lab",
+    "tumo_macro_deck",
+    "tumocard_os",
+    "tumofabric_node",
+    "tumoflip_packages",
+    "tumoflip_xremote",
+    "tumokey",
+    "tumokey_phase_a",
+    "tumomodule_runtime",
+    "tumonet_bench",
+    "tumonet_gateway",
+    "tumoscope",
+    "tumoscript",
+    "tumovgm_bridge",
+    "tumovm_peripherals",
+    "tumovm_poc",
+    "usb_sd_mode",
+    "wifi_mapper",
+    "wifi_marauder_companion",
+    "xremote"
+  ],
+  "protectedDataFamilies": [
+    {"prefix": "/ext/apps_data/arf_subghz_full/", "owner": "arf_subghz_full"},
+    {"prefix": "/ext/apps_data/rolljam_standalone/", "owner": "rolljam"},
+    {"prefix": "/ext/apps_data/subghz/plugins/", "owner": "subghz_protocols"},
+    {"prefix": "/ext/apps_data/totp/", "owner": "totp"}
+  ],
+  "apps": [
+    {
+      "id": "esp32_wifi_marauder",
+      "aliases": ["wifi_marauder_companion"],
+      "packSourcePath": "base_pack/wifi_marauder_companion",
+      "localSourcePath": "applications_user/esp32_wifi_marauder",
+      "author": {
+        "repository": "https://github.com/0xchocolate/flipperzero-wifi-marauder.git",
+        "ref": "refs/heads/feature_wifi_marauder_app",
+        "lastReviewedCommit": "8f8b79e4a97b283faac41dda4e4da8d260ddc459",
+        "license": "GPL-3.0"
+      },
+      "artifacts": [
+        {
+          "pack": "base",
+          "remotePath": "/ext/apps/GPIO/esp32_wifi_marauder.fap",
+          "archivePath": "base_pack_build/artifacts-base/GPIO/esp32_wifi_marauder.fap",
+          "targetPath": "/ext/apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap"
+        }
+      ],
+      "defaultDisposition": "auditedDifference",
+      "note": "Tumoflip keeps its Module One CLI-compatible protected build."
+    },
+    {
+      "id": "esp_flasher",
+      "aliases": [],
+      "packSourcePath": "non_catalog_apps/esp_flasher",
+      "localSourcePath": "applications_user/esp_flasher",
+      "author": {
+        "repository": "https://github.com/0xchocolate/flipperzero-esp-flasher.git",
+        "ref": "refs/heads/main",
+        "lastReviewedCommit": "1f6f801c3ebecbc4afbf6500564bf99748710e24",
+        "license": "GPL-3.0"
+      },
+      "artifacts": [
+        {
+          "pack": "extra",
+          "remotePath": "/ext/apps/GPIO/esp_flasher.fap",
+          "archivePath": "extra_pack_build/artifacts-extra/GPIO/esp_flasher.fap",
+          "targetPath": "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
+        }
+      ],
+      "defaultDisposition": "auditedDifference",
+      "note": "Tumoflip ships a package-aware protected ESP Flasher through FW Packages."
+    },
+    {
+      "id": "proto_pirate",
+      "aliases": ["protopirate"],
+      "packSourcePath": "base_pack/protopirate",
+      "localSourcePath": "applications_user/protopirate",
+      "author": {
+        "repository": "https://protopirate.net/ProtoPirate/ProtoPirate.git",
+        "ref": "refs/heads/main",
+        "lastReviewedCommit": "4b039064a02d95c9bc23d390caacee1d40efe790",
+        "license": "GPL-3.0"
+      },
+      "artifacts": [
+        {
+          "pack": "base",
+          "remotePath": "/ext/apps/Sub-GHz/proto_pirate.fap",
+          "archivePath": "base_pack_build/artifacts-base/Sub-GHz/proto_pirate.fap",
+          "targetPath": "/ext/apps_data/arf_subghz_full/modules/proto_pirate.fap"
+        }
+      ],
+      "defaultDisposition": "auditedDifference",
+      "note": "Tumoflip keeps the isolated ARF module build and radio broker integration."
+    },
+    {
+      "id": "subghz_bruteforcer",
+      "aliases": ["subbrute"],
+      "packSourcePath": "base_pack/subbrute",
+      "localSourcePath": "applications_user/subghz_bruteforcer",
+      "author": {
+        "repository": "https://github.com/DarkFlippers/flipperzero-subbrute.git",
+        "ref": "refs/heads/master",
+        "lastReviewedCommit": "b199dcef9181a220cb665a84f893d1d6a6608099",
+        "license": "MIT"
+      },
+      "artifacts": [
+        {
+          "pack": "base",
+          "remotePath": "/ext/apps/Sub-GHz/subghz_bruteforcer.fap",
+          "archivePath": "base_pack_build/artifacts-base/Sub-GHz/subghz_bruteforcer.fap",
+          "targetPath": "/ext/apps_data/arf_subghz_full/modules/subghz_bruteforcer.fap"
+        }
+      ],
+      "defaultDisposition": "auditedDifference",
+      "note": "Tumoflip keeps the isolated ARF module and radio broker integration."
+    },
+    {
+      "id": "subghz_wardriving",
+      "aliases": [],
+      "packSourcePath": "base_pack/subghz_wardriving",
+      "localSourcePath": "applications_user/subghz_wardriving",
+      "author": {
+        "repository": "https://github.com/xMasterX/all-the-plugins.git",
+        "ref": "release-source",
+        "lastReviewedCommit": "0b71d9f34fec8ae3ba763b8de27ef15d1d604c5b",
+        "license": "not-declared"
+      },
+      "artifacts": [
+        {
+          "pack": "base",
+          "remotePath": "/ext/apps/Sub-GHz/subghz_wardriving.fap",
+          "archivePath": "base_pack_build/artifacts-base/Sub-GHz/subghz_wardriving.fap",
+          "targetPath": "/ext/apps/Sub-GHz/subghz_wardriving.fap"
+        }
+      ],
+      "defaultDisposition": "auditedDifference",
+      "note": "Tumoflip keeps its API 88 and iPhone GPS bridge integration."
+    },
+    {
+      "id": "quac",
+      "aliases": [],
+      "packSourcePath": "base_pack/quac",
+      "localSourcePath": "applications_user/quac",
+      "author": {
+        "repository": "https://github.com/rdefeo/quac.git",
+        "ref": "refs/heads/master",
+        "lastReviewedCommit": "54e897fe2d862963e5c19ef5d4feb3d025630610",
+        "license": "not-declared"
+      },
+      "artifacts": [
+        {
+          "pack": "base",
+          "remotePath": "/ext/apps/Tools/quac.fap",
+          "archivePath": "base_pack_build/artifacts-base/Tools/quac.fap",
+          "targetPath": "/ext/apps/Tools/quac.fap"
+        }
+      ],
+      "defaultDisposition": "auditedDifference",
+      "note": "No source was imported by this audit; license must be resolved before a future port."
+    },
+    {
+      "id": "totp",
+      "aliases": ["authenticator"],
+      "packSourcePath": "base_pack/totp",
+      "localSourcePath": "applications_user/totp",
+      "author": {
+        "repository": "https://github.com/akopachov/flipper-zero_authenticator.git",
+        "ref": "refs/heads/master",
+        "lastReviewedCommit": "753e953baaaacad67e9054ef62177ef36a8f5f7e",
+        "license": "GPL-3.0"
+      },
+      "artifactFamily": {
+        "pack": "base",
+        "archivePrefix": "base_pack_build/apps_data/totp/plugins/",
+        "remotePrefix": "/ext/apps_data/totp/plugins/",
+        "targetPrefix": "/ext/apps_data/totp/plugins/",
+        "extension": ".fal",
+        "expectedCount": 14
+      },
+      "artifacts": [
+        {
+          "pack": "base",
+          "remotePath": "/ext/apps/Tools/totp.fap",
+          "archivePath": "base_pack_build/artifacts-base/Tools/totp.fap",
+          "targetPath": "/ext/apps/Tools/totp.fap"
+        }
+      ],
+      "defaultDisposition": "auditedDifference",
+      "note": "Tumoflip adds system time synchronization and keeps the full CLI plugin family."
+    },
+    {
+      "id": "claude_buddy",
+      "aliases": ["claude_remote_ble"],
+      "packSourcePath": "non_catalog_apps/claude_remote_ble",
+      "localSourcePath": "applications_user/claude_buddy",
+      "author": {
+        "repository": "https://github.com/D4C1-Labs/Flipper-ARF.git",
+        "ref": "refs/heads/main",
+        "lastReviewedCommit": "56701a815b54121a4b4d102e361add5468ffa92b",
+        "license": "replacement-by-design"
+      },
+      "artifacts": [
+        {
+          "pack": "extra",
+          "remotePath": "/ext/apps/Bluetooth/claude_remote_ble.fap",
+          "archivePath": "extra_pack_build/artifacts-extra/Bluetooth/claude_remote_ble.fap",
+          "targetPath": "/ext/apps/Bluetooth/claude_remote_ble.fap"
+        }
+      ],
+      "defaultDisposition": "intentionallyReplaced",
+      "note": "Claude Buddy replaces Agentic Remote by design; the upstream target remains absent."
+    },
+    {
+      "id": "flipper_xremote",
+      "aliases": ["xremote", "tumoflip_xremote"],
+      "packSourcePath": "non_catalog_apps/xremote",
+      "localSourcePath": "applications_user/flipper_xremote",
+      "author": {
+        "repository": "https://github.com/kala13x/flipper-xremote.git",
+        "ref": "refs/heads/main",
+        "lastReviewedCommit": "95e629eff960c71754d0a2768a54883df066a588",
+        "license": "GPL-3.0"
+      },
+      "artifacts": [
+        {
+          "pack": "extra",
+          "remotePath": "/ext/apps/Infrared/flipper_xremote.fap",
+          "archivePath": "extra_pack_build/artifacts-extra/Infrared/flipper_xremote.fap",
+          "targetPath": "/ext/apps/Module One/IR Blaster/tumoflip_xremote.fap"
+        }
+      ],
+      "defaultDisposition": "auditedDifference",
+      "note": "Tumoflip keeps its accepted profile editor and Module One route."
+    },
+    {
+      "id": "subghz_raw_edit",
+      "aliases": ["subghz_raw_editor"],
+      "packSourcePath": "non_catalog_apps/subghz_raw_editor",
+      "localSourcePath": "applications_user/subghz_raw_edit",
+      "author": {
+        "repository": "https://github.com/Lechnio/SubGHz-RAW-Edit.git",
+        "ref": "refs/heads/main",
+        "lastReviewedCommit": "49a12e37a8c940a1665477bb41eb25d21bc82721",
+        "license": "GPL-3.0"
+      },
+      "artifacts": [
+        {
+          "pack": "extra",
+          "remotePath": "/ext/apps/Sub-GHz/subghz_raw_edit.fap",
+          "archivePath": "extra_pack_build/artifacts-extra/Sub-GHz/subghz_raw_edit.fap",
+          "targetPath": "/ext/apps/ARF Tools/subghz_raw_edit.fap"
+        }
+      ],
+      "defaultDisposition": "auditedDifference",
+      "note": "Author changes after v1.7 require issue #281 port and FW Packages publication."
+    }
+  ]
+}
