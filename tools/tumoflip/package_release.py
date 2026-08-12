@@ -21,8 +21,8 @@ try:
         iter_package_sources,
     )
     from .validate_release import (
-        PACKAGE_ONLY_PACKAGE_FILES,
-        PACKAGE_ONLY_PACKAGE_GROUPS,
+        PACKAGE_RELEASE_OVERLAY_FILES,
+        PACKAGE_RELEASE_OVERLAY_GROUPS,
         ValidationError,
         api_version,
         install_static_sd_resources,
@@ -40,8 +40,8 @@ except ImportError:
         iter_package_sources,
     )
     from validate_release import (
-        PACKAGE_ONLY_PACKAGE_FILES,
-        PACKAGE_ONLY_PACKAGE_GROUPS,
+        PACKAGE_RELEASE_OVERLAY_FILES,
+        PACKAGE_RELEASE_OVERLAY_GROUPS,
         ValidationError,
         api_version,
         install_static_sd_resources,
@@ -323,8 +323,8 @@ def merge_package_only_entries(
     if not isinstance(packages, dict):
         raise ValidationError("Target package manifest packages are missing")
     merged = copy.deepcopy(packages)
-    for source in sorted(PACKAGE_ONLY_PACKAGE_FILES):
-        group = PACKAGE_ONLY_PACKAGE_GROUPS.get(source)
+    for source in sorted(PACKAGE_RELEASE_OVERLAY_FILES):
+        group = PACKAGE_RELEASE_OVERLAY_GROUPS.get(source)
         if not group:
             raise ValidationError(f"Package-only group is missing for {source}")
         path = require_file(resources / source, f"package-only file {source}")
@@ -479,12 +479,12 @@ def build_package_release(
             synced = sync_extapp_package_exports(
                 build_dir,
                 package_resources,
-                only_targets=PACKAGE_ONLY_PACKAGE_FILES,
+                only_targets=PACKAGE_RELEASE_OVERLAY_FILES,
             )
             synced_targets = {str(entry["target"]) for entry in synced}
-            if synced_targets != PACKAGE_ONLY_PACKAGE_FILES:
-                missing = sorted(PACKAGE_ONLY_PACKAGE_FILES - synced_targets)
-                extra = sorted(synced_targets - PACKAGE_ONLY_PACKAGE_FILES)
+            if synced_targets != PACKAGE_RELEASE_OVERLAY_FILES:
+                missing = sorted(PACKAGE_RELEASE_OVERLAY_FILES - synced_targets)
+                extra = sorted(synced_targets - PACKAGE_RELEASE_OVERLAY_FILES)
                 raise ValidationError(
                     f"Package-only build artifacts are incomplete; "
                     f"missing={missing}, extra={extra}"
@@ -509,7 +509,7 @@ def build_package_release(
             target_manifest.get("release_id") if target_manifest else None
         ),
         "firmware_flash_unchanged": True,
-        "overlay_targets": sorted(PACKAGE_ONLY_PACKAGE_FILES)
+        "overlay_targets": sorted(PACKAGE_RELEASE_OVERLAY_FILES)
         if target_manifest
         else [],
         "synced_extapps": synced,
