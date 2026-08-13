@@ -39,6 +39,7 @@ HEX_40 = re.compile(r"^[0-9a-f]{40}$")
 HEX_64 = re.compile(r"^[0-9a-f]{64}$")
 FIRMWARE_RELEASE_TAG = re.compile(r"^(?:v[0-9]+\.[0-9]+\.[0-9]+|t-dev-[0-9]{3}-[0-9]{3})$")
 FIRMWARE_VERSION = re.compile(r"^(?:t-flppr-fw-[0-9]{3}|t-dev-[0-9]{3}-[0-9]{3})$")
+FW_PACKAGES_RELEASE_TAG = re.compile(r"^fw-packages-(?:stable|dev)-([0-9]{3})$")
 UPDATER_MANIFEST_FILETYPE = "Flipper firmware upgrade configuration"
 MAX_UPDATER_MEMBERS = 64
 MAX_UPDATER_MEMBER_BYTES = 16 * 1024 * 1024
@@ -86,6 +87,14 @@ def bytes_hash(data: bytes, algorithm: str) -> str:
     return digest.hexdigest()
 
 
+def manifest_release_id(document: dict[str, Any]) -> str:
+    """Return the content-addressed id used by Tumoflip package manifests."""
+
+    unsigned = {key: value for key, value in document.items() if key != "release_id"}
+    encoded = json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()
+    return bytes_hash(encoded, "sha256")
+
+
 def _load_heatshrink2() -> Any:
     """Load the decoder used by the firmware resource bundle.
 
@@ -120,6 +129,86 @@ def require_string(value: Any, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise AuditError(f"{label} must be a non-empty string")
     return value
+
+
+def tumocompanion_target_provenance_identity(
+    item: dict[str, Any],
+) -> tuple[Any, Any, Any, Any]:
+    """Return the exact provenance identity decoded by TumoCompanion 1.10.27.
+
+    The app intentionally ignores the generator-only evidence fields. Publishing two
+    records that differ only in those richer fields makes its fail-closed validator
+    reject the entire ledger, so generation and validation must share this boundary.
+    """
+
+    return (
+        item.get("targetMD5"),
+        item.get("channel"),
+        item.get("releaseTag"),
+        item.get("manifestSHA256"),
+    )
+
+
+def _target_provenance_preference(item: dict[str, Any]) -> tuple[int, int, str]:
+    """Prefer the richest proof, then its newest compatibility catalog."""
+
+    compatibility_tag = item.get("compatibilityCatalogTag")
+    match = (
+        FW_PACKAGES_RELEASE_TAG.fullmatch(compatibility_tag)
+        if isinstance(compatibility_tag, str)
+        else None
+    )
+    revision = int(match.group(1)) if match else -1
+    canonical = json.dumps(item, sort_keys=True, separators=(",", ":"))
+    return (len(item), revision, canonical)
+
+
+def deduplicate_target_provenance(
+    provenance: Iterable[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep one deterministic rich proof per identity in canonical total order."""
+
+    selected: dict[tuple[Any, Any, Any, Any], dict[str, Any]] = {}
+    for item in provenance:
+        identity = tumocompanion_target_provenance_identity(item)
+        current = selected.get(identity)
+        if current is None or _target_provenance_preference(item) > _target_provenance_preference(
+            current
+        ):
+            selected[identity] = item
+    return sorted(
+        selected.values(),
+        key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":")),
+    )
+
+
+def normalize_ledger_target_provenance(ledger: dict[str, Any]) -> dict[str, Any]:
+    """Normalize legacy rich evidence before strict client-contract validation.
+
+    Only well-shaped provenance arrays are changed here. Every other structural or
+    cryptographic invariant is still checked by ``validate_ledger`` immediately after.
+    """
+
+    normalized = json.loads(json.dumps(ledger))
+    audits = normalized.get("audits")
+    if not isinstance(audits, list):
+        return normalized
+    for audit in audits:
+        if not isinstance(audit, dict):
+            continue
+        entries = audit.get("entries")
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            provenance = entry.get("targetProvenance")
+            if not isinstance(provenance, list) or not all(
+                isinstance(item, dict) for item in provenance
+            ):
+                continue
+            entry["targetProvenance"] = deduplicate_target_provenance(provenance)
+    return normalized
 
 
 def validate_registry(registry: dict[str, Any]) -> list[dict[str, Any]]:
@@ -447,6 +536,61 @@ def load_target_manifests(paths: list[Path]) -> list[dict[str, Any]]:
         if not HEX_64.fullmatch(target_release_id):
             raise AuditError(f"target manifest release id is invalid: {path}")
         manifest_sha256 = file_hash(path, "sha256")
+        compatible_releases_raw = release.get("compatible_releases", [])
+        if not isinstance(compatible_releases_raw, list) or len(compatible_releases_raw) > 8:
+            raise AuditError(f"target manifest compatible releases are invalid: {path}")
+        compatible_releases: dict[str, dict[str, Any]] = {}
+        compatible_tags: set[str] = set()
+        for item in compatible_releases_raw:
+            if not isinstance(item, dict):
+                raise AuditError(f"target manifest compatible release is invalid: {path}")
+            compatible_tag = require_string(
+                item.get("release_tag"), f"{path}.compatible release tag"
+            )
+            compatible_release_id = require_string(
+                item.get("release_id"), f"{path}.compatible release id"
+            )
+            compatible_manifest_sha = require_string(
+                item.get("manifest_sha256"), f"{path}.compatible manifest SHA-256"
+            )
+            compatible_source_commit = require_string(
+                item.get("source_commit"), f"{path}.compatible source commit"
+            )
+            if not HEX_64.fullmatch(compatible_release_id):
+                raise AuditError(f"target manifest compatible release id is invalid: {path}")
+            if not HEX_64.fullmatch(compatible_manifest_sha):
+                raise AuditError(f"target manifest compatible manifest SHA-256 is invalid: {path}")
+            if not HEX_40.fullmatch(compatible_source_commit):
+                raise AuditError(f"target manifest compatible source commit is invalid: {path}")
+            expected_prefix = f"fw-packages-{channel}-"
+            if not compatible_tag.startswith(expected_prefix):
+                raise AuditError(f"target manifest compatible channel differs: {path}")
+            try:
+                compatible_revision = int(compatible_tag.removeprefix(expected_prefix))
+            except ValueError as error:
+                raise AuditError(
+                    f"target manifest compatible revision is invalid: {path}"
+                ) from error
+            if compatible_revision < 1 or compatible_revision >= revision:
+                raise AuditError(f"target manifest compatible revision is not older: {path}")
+            if (
+                compatible_release_id in compatible_releases
+                or compatible_tag in compatible_tags
+            ):
+                raise AuditError(f"duplicate target manifest compatible release: {path}")
+            compatible_tags.add(compatible_tag)
+            compatible_releases[compatible_release_id] = {
+                "releaseTag": compatible_tag,
+                "releaseID": compatible_release_id,
+                "manifestSHA256": compatible_manifest_sha,
+                "sourceCommit": compatible_source_commit,
+            }
+        if compatible_releases:
+            release_id = document.get("release_id")
+            if not isinstance(release_id, str) or not HEX_64.fullmatch(release_id):
+                raise AuditError(f"compatible target manifest release id is invalid: {path}")
+            if manifest_release_id(document) != release_id:
+                raise AuditError(f"compatible target manifest release id differs: {path}")
         targets: dict[str, dict[str, Any]] = {}
         packages = document.get("packages")
         if not isinstance(packages, dict):
@@ -473,7 +617,72 @@ def load_target_manifests(paths: list[Path]) -> list[dict[str, Any]]:
                     raise AuditError(f"target manifest size is invalid for {target}: {path}")
                 if target in targets:
                     raise AuditError(f"duplicate target manifest path: {target}")
-                targets[target] = {"md5": md5, "sha256": sha256, "bytes": size}
+                compatible_builds_raw = entry.get("compatible_builds", [])
+                if not isinstance(compatible_builds_raw, list) or len(compatible_builds_raw) > 8:
+                    raise AuditError(
+                        f"target manifest compatible builds are invalid for {target}: {path}"
+                    )
+                compatible_builds: list[dict[str, Any]] = []
+                build_release_ids: set[str] = set()
+                for build in compatible_builds_raw:
+                    if not isinstance(build, dict):
+                        raise AuditError(
+                            f"target manifest compatible build is invalid for {target}: {path}"
+                        )
+                    build_release_id = build.get("release_id")
+                    build_md5 = build.get("md5")
+                    build_sha256 = build.get("sha256")
+                    build_size = build.get("bytes")
+                    if (
+                        not isinstance(build_release_id, str)
+                        or not HEX_64.fullmatch(build_release_id)
+                    ):
+                        raise AuditError(
+                            f"target manifest compatible build release is invalid for {target}: {path}"
+                        )
+                    if build_release_id not in compatible_releases:
+                        raise AuditError(
+                            f"target manifest compatible build release is unknown for {target}: {path}"
+                        )
+                    if not isinstance(build_md5, str) or not HEX_32.fullmatch(build_md5):
+                        raise AuditError(
+                            f"target manifest compatible build MD5 is invalid for {target}: {path}"
+                        )
+                    if not isinstance(build_sha256, str) or not HEX_64.fullmatch(build_sha256):
+                        raise AuditError(
+                            f"target manifest compatible build SHA-256 is invalid for {target}: {path}"
+                        )
+                    if (
+                        not isinstance(build_size, int)
+                        or isinstance(build_size, bool)
+                        or build_size < 0
+                    ):
+                        raise AuditError(
+                            f"target manifest compatible build size is invalid for {target}: {path}"
+                        )
+                    if build_release_id in build_release_ids:
+                        raise AuditError(
+                            f"duplicate target manifest compatible build for {target}: {path}"
+                        )
+                    if (build_md5, build_sha256, build_size) == (md5, sha256, size):
+                        raise AuditError(
+                            f"target manifest compatible build duplicates canonical bytes for {target}: {path}"
+                        )
+                    build_release_ids.add(build_release_id)
+                    compatible_builds.append(
+                        {
+                            "releaseID": build_release_id,
+                            "md5": build_md5,
+                            "sha256": build_sha256,
+                            "bytes": build_size,
+                        }
+                    )
+                targets[target] = {
+                    "md5": md5,
+                    "sha256": sha256,
+                    "bytes": size,
+                    "compatibleBuilds": compatible_builds,
+                }
         identity = (channel, release_tag, manifest_sha256)
         if identity in identities:
             raise AuditError(f"duplicate target manifest provenance: {path}")
@@ -487,6 +696,7 @@ def load_target_manifests(paths: list[Path]) -> list[dict[str, Any]]:
                 "targetReleaseTag": target_release_tag,
                 "targetReleaseID": target_release_id,
                 "manifestSHA256": manifest_sha256,
+                "compatibleReleases": compatible_releases,
                 "targets": targets,
             }
         )
@@ -562,7 +772,10 @@ def verify_target_archives(
                 f"unexpected={unexpected[:3]}"
             )
         for target, expected in manifest_targets.items():
-            if archive_targets[target] != expected:
+            expected_bytes = {
+                key: expected[key] for key in ("md5", "sha256", "bytes")
+            }
+            if archive_targets[target] != expected_bytes:
                 raise AuditError(
                     f"FW Packages manifest/ZIP bytes differ for {target}: "
                     f"{manifest['releaseTag']}"
@@ -1180,6 +1393,26 @@ def audit_release(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
                         "targetSourceCommit": manifest["sourceCommit"],
                     }
                 )
+                # Independent package catalogs may explicitly retain a bounded
+                # set of older, content-addressed overlay builds. The current
+                # manifest is the authoritative proof: its own release_id is
+                # recomputed above, every alias is tied to one exact predecessor,
+                # and aliases exist only on entries selected by the publisher.
+                for build in target["compatibleBuilds"]:
+                    compatible = manifest["compatibleReleases"][build["releaseID"]]
+                    provenance.append(
+                        {
+                            "targetMD5": build["md5"],
+                            "channel": manifest["channel"],
+                            "releaseTag": compatible["releaseTag"],
+                            "manifestSHA256": compatible["manifestSHA256"],
+                            "containerKind": "fwPackagesCompatibleBuild",
+                            "containerSHA256": manifest["manifestSHA256"],
+                            "targetReleaseTag": manifest["targetReleaseTag"],
+                            "targetSourceCommit": compatible["sourceCommit"],
+                            "compatibilityCatalogTag": manifest["releaseTag"],
+                        }
+                    )
             # A decision for a changed source is tied to one explicit FW Packages
             # revision. Do not broaden that hardware decision to firmware updater
             # bytes merely because another release happens to contain the target.
@@ -1211,6 +1444,7 @@ def audit_release(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
                 artifact_results.append(artifact_result)
                 continue
 
+            provenance = deduplicate_target_provenance(provenance)
             target_md5s = sorted({item["targetMD5"] for item in provenance})
             operational_disposition = (
                 "sourceMatches"
@@ -1349,7 +1583,9 @@ implementation commit and FW Packages revision before closing this issue.
 """
 
 
-def validate_audit(audit: dict[str, Any]) -> None:
+def validate_audit(
+    audit: dict[str, Any], *, allow_client_duplicate_provenance: bool = False
+) -> None:
     sequence = audit.get("sequence")
     if not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1:
         raise AuditError("audit sequence is invalid")
@@ -1408,7 +1644,7 @@ def validate_audit(audit: dict[str, Any]) -> None:
             if not isinstance(provenance, list) or not provenance:
                 raise AuditError("target-bearing entry targetProvenance is required")
             provenance_hashes = []
-            provenance_identities: set[tuple[str, str, str, str, str, str]] = set()
+            provenance_identities: set[tuple[Any, Any, Any, Any]] = set()
             for item in provenance:
                 if not isinstance(item, dict):
                     raise AuditError("target provenance must be an object")
@@ -1427,7 +1663,11 @@ def validate_audit(audit: dict[str, Any]) -> None:
                 require_string(release_tag, "target provenance releaseTag")
                 if not isinstance(manifest_sha, str) or not HEX_64.fullmatch(manifest_sha):
                     raise AuditError("target provenance manifestSHA256 is invalid")
-                if container_kind not in {"fwPackagesZip", "firmwareUpdaterBundle"}:
+                if container_kind not in {
+                    "fwPackagesZip",
+                    "fwPackagesCompatibleBuild",
+                    "firmwareUpdaterBundle",
+                }:
                     raise AuditError("target provenance containerKind is invalid")
                 if not isinstance(container_sha, str) or not HEX_64.fullmatch(container_sha):
                     raise AuditError("target provenance containerSHA256 is invalid")
@@ -1447,16 +1687,26 @@ def validate_audit(audit: dict[str, Any]) -> None:
                         raise AuditError("firmware updater provenance resourcesSHA256 is invalid")
                 elif "firmwareVersion" in item or "resourcesSHA256" in item:
                     raise AuditError("FW Packages provenance has firmware-only fields")
-                identity = (
-                    target_md5,
-                    channel,
-                    release_tag,
-                    manifest_sha,
-                    container_kind,
-                    container_sha,
-                )
+                if container_kind == "fwPackagesCompatibleBuild":
+                    compatibility_tag = require_string(
+                        item.get("compatibilityCatalogTag"),
+                        "compatible build provenance catalog tag",
+                    )
+                    if not compatibility_tag.startswith(f"fw-packages-{channel}-"):
+                        raise AuditError(
+                            "compatible build provenance catalog channel differs"
+                        )
+                elif "compatibilityCatalogTag" in item:
+                    raise AuditError(
+                        "non-compatible provenance has compatibilityCatalogTag"
+                    )
+                # TumoCompanion 1.10.27 decodes only these four fields. Richer
+                # generator evidence must not create duplicate client identities,
+                # otherwise its fail-closed validator rejects the whole ledger.
+                identity = tumocompanion_target_provenance_identity(item)
                 if identity in provenance_identities:
-                    raise AuditError("duplicate target provenance")
+                    if not allow_client_duplicate_provenance:
+                        raise AuditError("duplicate TumoCompanion target provenance")
                 provenance_identities.add(identity)
                 provenance_hashes.append(target_md5)
             if set(provenance_hashes) != set(target_md5s):
@@ -1527,7 +1777,9 @@ def validate_audit(audit: dict[str, Any]) -> None:
         raise AuditError("audit unresolved list does not cover every unresolved artifact")
 
 
-def validate_ledger(ledger: dict[str, Any]) -> None:
+def validate_ledger(
+    ledger: dict[str, Any], *, allow_client_duplicate_provenance: bool = False
+) -> None:
     if ledger.get("schema") != SCHEMA:
         raise AuditError(f"ledger must use schema {SCHEMA}")
     if ledger.get("sourceRepository") != SOURCE_REPOSITORY:
@@ -1540,7 +1792,10 @@ def validate_ledger(ledger: dict[str, Any]) -> None:
     for audit in audits:
         if not isinstance(audit, dict):
             raise AuditError("ledger audit must be an object")
-        validate_audit(audit)
+        validate_audit(
+            audit,
+            allow_client_duplicate_provenance=allow_client_duplicate_provenance,
+        )
         archive_map = {item["pack"]: item["sha256"] for item in audit["archives"]}
         identity = (audit["sourceTag"], archive_map["base"], archive_map["extra"])
         if identity in identities:
@@ -1558,7 +1813,12 @@ def merge_ledger(existing: dict[str, Any] | None, audit: dict[str, Any]) -> dict
             "audits": [],
         }
     else:
-        ledger = json.loads(json.dumps(existing))
+        # Schema 2 historically permitted generator-only evidence to distinguish
+        # records that TumoCompanion 1.10.27 decodes as one identity. Validate every
+        # legacy record first, temporarily allowing only that exact duplicate class,
+        # then normalize and strictly validate before republishing it.
+        validate_ledger(existing, allow_client_duplicate_provenance=True)
+        ledger = normalize_ledger_target_provenance(existing)
         validate_ledger(ledger)
     new_archives = {item["pack"]: item["sha256"] for item in audit["archives"]}
     existing_exact = next(

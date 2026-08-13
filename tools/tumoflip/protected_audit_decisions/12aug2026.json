@@ -10,8 +10,8 @@
       "implementationCommit": "485dad9c28ee59595c06023101efd14af8b42f21",
       "fwPackages": {
         "channel": "dev",
-        "revision": 4,
-        "releaseTag": "fw-packages-dev-004"
+        "revision": 5,
+        "releaseTag": "fw-packages-dev-005"
       },
       "hardwareAccepted": true
     }
