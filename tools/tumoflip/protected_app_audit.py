@@ -39,6 +39,7 @@ HEX_40 = re.compile(r"^[0-9a-f]{40}$")
 HEX_64 = re.compile(r"^[0-9a-f]{64}$")
 FIRMWARE_RELEASE_TAG = re.compile(r"^(?:v[0-9]+\.[0-9]+\.[0-9]+|t-dev-[0-9]{3}-[0-9]{3})$")
 FIRMWARE_VERSION = re.compile(r"^(?:t-flppr-fw-[0-9]{3}|t-dev-[0-9]{3}-[0-9]{3})$")
+FW_PACKAGES_RELEASE_TAG = re.compile(r"^fw-packages-(?:stable|dev)-([0-9]{3})$")
 UPDATER_MANIFEST_FILETYPE = "Flipper firmware upgrade configuration"
 MAX_UPDATER_MEMBERS = 64
 MAX_UPDATER_MEMBER_BYTES = 16 * 1024 * 1024
@@ -128,6 +129,86 @@ def require_string(value: Any, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise AuditError(f"{label} must be a non-empty string")
     return value
+
+
+def tumocompanion_target_provenance_identity(
+    item: dict[str, Any],
+) -> tuple[Any, Any, Any, Any]:
+    """Return the exact provenance identity decoded by TumoCompanion 1.10.27.
+
+    The app intentionally ignores the generator-only evidence fields. Publishing two
+    records that differ only in those richer fields makes its fail-closed validator
+    reject the entire ledger, so generation and validation must share this boundary.
+    """
+
+    return (
+        item.get("targetMD5"),
+        item.get("channel"),
+        item.get("releaseTag"),
+        item.get("manifestSHA256"),
+    )
+
+
+def _target_provenance_preference(item: dict[str, Any]) -> tuple[int, int, str]:
+    """Prefer the richest proof, then its newest compatibility catalog."""
+
+    compatibility_tag = item.get("compatibilityCatalogTag")
+    match = (
+        FW_PACKAGES_RELEASE_TAG.fullmatch(compatibility_tag)
+        if isinstance(compatibility_tag, str)
+        else None
+    )
+    revision = int(match.group(1)) if match else -1
+    canonical = json.dumps(item, sort_keys=True, separators=(",", ":"))
+    return (len(item), revision, canonical)
+
+
+def deduplicate_target_provenance(
+    provenance: Iterable[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep one deterministic rich proof per identity in canonical total order."""
+
+    selected: dict[tuple[Any, Any, Any, Any], dict[str, Any]] = {}
+    for item in provenance:
+        identity = tumocompanion_target_provenance_identity(item)
+        current = selected.get(identity)
+        if current is None or _target_provenance_preference(item) > _target_provenance_preference(
+            current
+        ):
+            selected[identity] = item
+    return sorted(
+        selected.values(),
+        key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":")),
+    )
+
+
+def normalize_ledger_target_provenance(ledger: dict[str, Any]) -> dict[str, Any]:
+    """Normalize legacy rich evidence before strict client-contract validation.
+
+    Only well-shaped provenance arrays are changed here. Every other structural or
+    cryptographic invariant is still checked by ``validate_ledger`` immediately after.
+    """
+
+    normalized = json.loads(json.dumps(ledger))
+    audits = normalized.get("audits")
+    if not isinstance(audits, list):
+        return normalized
+    for audit in audits:
+        if not isinstance(audit, dict):
+            continue
+        entries = audit.get("entries")
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            provenance = entry.get("targetProvenance")
+            if not isinstance(provenance, list) or not all(
+                isinstance(item, dict) for item in provenance
+            ):
+                continue
+            entry["targetProvenance"] = deduplicate_target_provenance(provenance)
+    return normalized
 
 
 def validate_registry(registry: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1363,6 +1444,7 @@ def audit_release(args: argparse.Namespace) -> tuple[dict[str, Any], str]:
                 artifact_results.append(artifact_result)
                 continue
 
+            provenance = deduplicate_target_provenance(provenance)
             target_md5s = sorted({item["targetMD5"] for item in provenance})
             operational_disposition = (
                 "sourceMatches"
@@ -1501,7 +1583,9 @@ implementation commit and FW Packages revision before closing this issue.
 """
 
 
-def validate_audit(audit: dict[str, Any]) -> None:
+def validate_audit(
+    audit: dict[str, Any], *, allow_client_duplicate_provenance: bool = False
+) -> None:
     sequence = audit.get("sequence")
     if not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1:
         raise AuditError("audit sequence is invalid")
@@ -1560,7 +1644,7 @@ def validate_audit(audit: dict[str, Any]) -> None:
             if not isinstance(provenance, list) or not provenance:
                 raise AuditError("target-bearing entry targetProvenance is required")
             provenance_hashes = []
-            provenance_identities: set[tuple[str, str, str, str, str, str]] = set()
+            provenance_identities: set[tuple[Any, Any, Any, Any]] = set()
             for item in provenance:
                 if not isinstance(item, dict):
                     raise AuditError("target provenance must be an object")
@@ -1616,16 +1700,13 @@ def validate_audit(audit: dict[str, Any]) -> None:
                     raise AuditError(
                         "non-compatible provenance has compatibilityCatalogTag"
                     )
-                identity = (
-                    target_md5,
-                    channel,
-                    release_tag,
-                    manifest_sha,
-                    container_kind,
-                    container_sha,
-                )
+                # TumoCompanion 1.10.27 decodes only these four fields. Richer
+                # generator evidence must not create duplicate client identities,
+                # otherwise its fail-closed validator rejects the whole ledger.
+                identity = tumocompanion_target_provenance_identity(item)
                 if identity in provenance_identities:
-                    raise AuditError("duplicate target provenance")
+                    if not allow_client_duplicate_provenance:
+                        raise AuditError("duplicate TumoCompanion target provenance")
                 provenance_identities.add(identity)
                 provenance_hashes.append(target_md5)
             if set(provenance_hashes) != set(target_md5s):
@@ -1696,7 +1777,9 @@ def validate_audit(audit: dict[str, Any]) -> None:
         raise AuditError("audit unresolved list does not cover every unresolved artifact")
 
 
-def validate_ledger(ledger: dict[str, Any]) -> None:
+def validate_ledger(
+    ledger: dict[str, Any], *, allow_client_duplicate_provenance: bool = False
+) -> None:
     if ledger.get("schema") != SCHEMA:
         raise AuditError(f"ledger must use schema {SCHEMA}")
     if ledger.get("sourceRepository") != SOURCE_REPOSITORY:
@@ -1709,7 +1792,10 @@ def validate_ledger(ledger: dict[str, Any]) -> None:
     for audit in audits:
         if not isinstance(audit, dict):
             raise AuditError("ledger audit must be an object")
-        validate_audit(audit)
+        validate_audit(
+            audit,
+            allow_client_duplicate_provenance=allow_client_duplicate_provenance,
+        )
         archive_map = {item["pack"]: item["sha256"] for item in audit["archives"]}
         identity = (audit["sourceTag"], archive_map["base"], archive_map["extra"])
         if identity in identities:
@@ -1727,7 +1813,12 @@ def merge_ledger(existing: dict[str, Any] | None, audit: dict[str, Any]) -> dict
             "audits": [],
         }
     else:
-        ledger = json.loads(json.dumps(existing))
+        # Schema 2 historically permitted generator-only evidence to distinguish
+        # records that TumoCompanion 1.10.27 decodes as one identity. Validate every
+        # legacy record first, temporarily allowing only that exact duplicate class,
+        # then normalize and strictly validate before republishing it.
+        validate_ledger(existing, allow_client_duplicate_provenance=True)
+        ledger = normalize_ledger_target_provenance(existing)
         validate_ledger(ledger)
     new_archives = {item["pack"]: item["sha256"] for item in audit["archives"]}
     existing_exact = next(
