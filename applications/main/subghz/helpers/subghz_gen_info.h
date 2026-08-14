@@ -14,6 +14,7 @@ typedef enum {
     GenKingGatesStylo4k,
     GenBenincaARC,
     GenJarolift,
+    GenSuperrollo,
     GenDitecGOL4,
     GenNiceFlorS,
     GenSecPlus1,
@@ -86,6 +87,11 @@ typedef struct {
             uint8_t btn;
             uint16_t cnt;
         } jarolift;
+        struct {
+            uint32_t serial;
+            uint8_t btn;
+            uint16_t cnt;
+        } superrollo;
         struct {
             uint32_t serial;
             uint8_t btn;

@@ -58,6 +58,10 @@ void subghz_scene_set_serial_on_enter(void* context) {
         byte_ptr = (uint8_t*)&subghz->gen_info->jarolift.serial;
         byte_count = sizeof(subghz->gen_info->jarolift.serial);
         break;
+    case GenSuperrollo:
+        byte_ptr = (uint8_t*)&subghz->gen_info->superrollo.serial;
+        byte_count = sizeof(subghz->gen_info->superrollo.serial);
+        break;
     case GenDitecGOL4:
         byte_ptr = (uint8_t*)&subghz->gen_info->ditec_gol4.serial;
         byte_count = sizeof(subghz->gen_info->ditec_gol4.serial);
@@ -141,6 +145,9 @@ bool subghz_scene_set_serial_on_event(void* context, SceneManagerEvent event) {
             case GenJarolift:
                 subghz->gen_info->jarolift.serial = __bswap32(subghz->gen_info->jarolift.serial);
                 break;
+            case GenSuperrollo:
+                subghz->gen_info->superrollo.serial = __bswap32(subghz->gen_info->superrollo.serial);
+                break;
             case GenDitecGOL4:
                 subghz->gen_info->ditec_gol4.serial =
                     __bswap32(subghz->gen_info->ditec_gol4.serial);
@@ -179,6 +186,7 @@ bool subghz_scene_set_serial_on_event(void* context, SceneManagerEvent event) {
             case GenKingGatesStylo4k:
             case GenBenincaARC:
             case GenJarolift:
+            case GenSuperrollo:
             case GenDitecGOL4:
             case GenNiceFlorS:
             case GenSecPlus2:

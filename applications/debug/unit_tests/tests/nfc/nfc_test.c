@@ -204,6 +204,14 @@ MU_TEST(mf_ultralight_ev1_h21_file_test) {
     nfc_file_test_with_generator(NfcDataGeneratorTypeMfUltralightEV1_H21);
 }
 
+MU_TEST(mf_ultralight_c_file_test) {
+    nfc_file_test_with_generator(NfcDataGeneratorTypeMfUltralightC);
+}
+
+MU_TEST(mf_ultralight_aes_file_test) {
+    nfc_file_test_with_generator(NfcDataGeneratorTypeMfUltralightAES);
+}
+
 MU_TEST(mf_ultralight_ntag_203_file_test) {
     nfc_file_test_with_generator(NfcDataGeneratorTypeNTAG203);
 }
@@ -1422,6 +1430,8 @@ MU_TEST_SUITE(nfc) {
     MU_RUN_TEST(mf_ultralight_ev1_h11_file_test);
     MU_RUN_TEST(mf_ultralight_ev1_21_file_test);
     MU_RUN_TEST(mf_ultralight_ev1_h21_file_test);
+    MU_RUN_TEST(mf_ultralight_c_file_test);
+    MU_RUN_TEST(mf_ultralight_aes_file_test);
     MU_RUN_TEST(mf_ultralight_ntag_203_file_test);
     MU_RUN_TEST(mf_ultralight_ntag_213_file_test);
     MU_RUN_TEST(mf_ultralight_ntag_215_file_test);
