@@ -73,9 +73,36 @@ class CiWorkflowSecurityTests(unittest.TestCase):
         self.assertIn("sha256sum -c -", workflow)
         self.assertIn("protected-app-audit:$SOURCE_TAG:$BASE_SHA:$EXTRA_SHA", workflow)
         self.assertIn("-f tools/tumoflip/protected_audit_issue_lookup.jq", workflow)
+        self.assertIn(
+            "FW_PACKAGES_REPOSITORY: squazaryu/tumoflip-fw-packages",
+            workflow,
+        )
+        self.assertIn(
+            "repos/$FW_PACKAGES_REPOSITORY/releases?per_page=100",
+            workflow,
+        )
+        self.assertIn(
+            'gh release download "$TAG" --repo "$FW_PACKAGES_REPOSITORY"',
+            workflow,
+        )
         self.assertIn("repos/$GITHUB_REPOSITORY/releases?per_page=100", workflow)
+        self.assertIn("fw-package-releases.json", workflow)
+        self.assertIn("firmware-releases.json", workflow)
+        self.assertNotIn("tumoflip-releases.json", workflow)
+        self.assertIn("migration-provenance.json", workflow)
+        self.assertIn("catalog-provenance.json", workflow)
+        self.assertIn('(.publisher.commit == $publisher)', workflow)
+        self.assertIn('(.firmwareSourceCommit == $source)', workflow)
+        self.assertIn('(.firmwareSource.commit == $source)', workflow)
+        self.assertIn('(.manifestReleaseId == $release_id)', workflow)
+        self.assertIn(
+            '(.assets["tumoflip-packages.zip"].sha256 == $zip_sha)',
+            workflow,
+        )
         self.assertIn("^fw-packages-stable-[0-9]{3}$", workflow)
         self.assertIn("^fw-packages-dev-[0-9]{3}$", workflow)
+        self.assertNotIn('[[ "$RELEASE_TAG_COMMIT" == "$MANIFEST_SOURCE" ]]', workflow)
+        self.assertIn('git cat-file -e "$MANIFEST_SOURCE^{commit}"', workflow)
         self.assertIn("Download and verify exact firmware updater targets", workflow)
         self.assertIn("firmwareUpdaterBundle", (
             REPO_ROOT / "tools/tumoflip/protected_app_audit.py"
@@ -177,6 +204,52 @@ class CiWorkflowSecurityTests(unittest.TestCase):
             json.loads(result.stdout),
             {"stable": "fw-packages-stable-001", "dev": "fw-packages-dev-003"},
         )
+
+    def test_package_discovery_is_independent_of_firmware_repo_releases(self) -> None:
+        package_releases = [
+            {
+                "tag_name": "fw-packages-stable-001",
+                "draft": False,
+                "prerelease": False,
+            },
+            {
+                "tag_name": "fw-packages-dev-008",
+                "draft": False,
+                "prerelease": True,
+            },
+        ]
+        firmware_releases = [
+            {
+                "tag_name": "v1.0.4",
+                "draft": False,
+                "prerelease": False,
+            },
+            {
+                "tag_name": "t-dev-004-015",
+                "draft": False,
+                "prerelease": True,
+            },
+        ]
+        self.assertFalse(
+            any(
+                item["tag_name"].startswith("fw-packages-")
+                for item in firmware_releases
+            )
+        )
+
+        def latest(channel: str) -> str:
+            prerelease = channel == "dev"
+            candidates = [
+                item["tag_name"]
+                for item in package_releases
+                if item["draft"] is False
+                and item["prerelease"] is prerelease
+                and item["tag_name"].startswith(f"fw-packages-{channel}-")
+            ]
+            return max(candidates)
+
+        self.assertEqual(latest("stable"), "fw-packages-stable-001")
+        self.assertEqual(latest("dev"), "fw-packages-dev-008")
 
     def test_protected_audit_issue_lookup_executes_exact_workflow_filter(self) -> None:
         title = "Audit protected apps for Community Pack 12aug2026"
