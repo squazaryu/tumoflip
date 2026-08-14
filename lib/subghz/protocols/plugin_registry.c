@@ -22,8 +22,10 @@ typedef struct {
 } SubGhzProtocolPackEntry;
 
 #define PACK_GROUP(group) (1UL << (group))
+#define PACK_GROUP_ALL ((1UL << SubGhzProtocolPackGroupCount) - 1UL)
 
 static const SubGhzProtocolPackEntry subghz_protocol_pack_entries[] = {
+    {PACK_GROUP_ALL, "protocol_superrollo.fal"},
     {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia),
      "protocol_kia_v0.fal"},
     {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia),

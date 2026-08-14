@@ -7,6 +7,7 @@
 #include <lib/subghz/protocols/secplus_v2.h>
 #include <lib/subghz/protocols/nice_flor_s.h>
 #include <lib/subghz/protocols/marantec.h>
+#include <lib/subghz/protocols/superrollo.h>
 
 #include <flipper_format/flipper_format_i.h>
 #include <lib/toolbox/stream/stream.h>

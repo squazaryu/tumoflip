@@ -53,6 +53,7 @@ PROTOCOL_PACKS = {
     "protocol_sheriff_cfm.fal",
     "protocol_star_line.fal",
     "protocol_subaru.fal",
+    "protocol_superrollo.fal",
     "protocol_toyota_lexus.fal",
     "protocol_vag.fal",
 }
