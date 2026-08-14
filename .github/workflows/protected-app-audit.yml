@@ -43,6 +43,10 @@ permissions:
   contents: write
   issues: write
 
+env:
+  # FW Packages releases are authoritative in the independent catalog repository.
+  FW_PACKAGES_REPOSITORY: squazaryu/tumoflip-fw-packages
+
 jobs:
   audit:
     runs-on: ubuntu-latest
@@ -78,39 +82,40 @@ jobs:
             PREVIOUS_TAG="$(sed -n '2p' "$RUNNER_TEMP/community-tags.txt")"
           fi
           if [[ -z "$TARGET_MANIFESTS" ]]; then
-            gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
-              > "$RUNNER_TEMP/tumoflip-releases.json"
+            gh api --paginate --slurp \
+              "repos/$FW_PACKAGES_REPOSITORY/releases?per_page=100" \
+              | jq 'add' > "$RUNNER_TEMP/fw-package-releases.json"
             STABLE_TARGET="$(jq -r '
               map(select((.draft == false) and (.prerelease == false)
                 and (.tag_name | test("^fw-packages-stable-[0-9]{3}$"))))
               | sort_by(.tag_name | capture("-(?<revision>[0-9]{3})$").revision | tonumber)
               | reverse | .[0].tag_name
-            ' "$RUNNER_TEMP/tumoflip-releases.json")"
+            ' "$RUNNER_TEMP/fw-package-releases.json")"
             DEV_TARGET="$(jq -r '
               map(select((.draft == false) and (.prerelease == true)
                 and (.tag_name | test("^fw-packages-dev-[0-9]{3}$"))))
               | sort_by(.tag_name | capture("-(?<revision>[0-9]{3})$").revision | tonumber)
               | reverse | .[0].tag_name
-            ' "$RUNNER_TEMP/tumoflip-releases.json")"
+            ' "$RUNNER_TEMP/fw-package-releases.json")"
             [[ "$STABLE_TARGET" != null && "$DEV_TARGET" != null ]]
             TARGET_MANIFESTS="$STABLE_TARGET,$DEV_TARGET"
           fi
           if [[ -z "$FIRMWARE_RELEASES" ]]; then
-            test -f "$RUNNER_TEMP/tumoflip-releases.json" || \
-              gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
-                > "$RUNNER_TEMP/tumoflip-releases.json"
+            gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+              | jq 'add' > "$RUNNER_TEMP/firmware-releases.json"
             STABLE_FIRMWARE="$(jq -r '
               map(select((.draft == false) and (.prerelease == false)
                 and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))
                 and any(.assets[]; .name | test("^flipper-z-f7-update-.+\\.tgz$"))))
               | sort_by(.published_at) | reverse | .[0].tag_name
-            ' "$RUNNER_TEMP/tumoflip-releases.json")"
+            ' "$RUNNER_TEMP/firmware-releases.json")"
             DEV_FIRMWARE="$(jq -r '
               map(select((.draft == false) and (.prerelease == true)
                 and (.tag_name | test("^t-dev-[0-9]{3}-[0-9]{3}$"))
                 and any(.assets[]; .name | test("^flipper-z-f7-update-.+\\.tgz$"))))
               | sort_by(.published_at) | reverse | .[0].tag_name
-            ' "$RUNNER_TEMP/tumoflip-releases.json")"
+            ' "$RUNNER_TEMP/firmware-releases.json")"
             [[ "$STABLE_FIRMWARE" != null && "$DEV_FIRMWARE" != null ]]
             FIRMWARE_RELEASES="$STABLE_FIRMWARE,$DEV_FIRMWARE"
           fi
@@ -277,7 +282,8 @@ jobs:
             DEST="$RUNNER_TEMP/targets/$TAG"
             mkdir -p "$DEST"
             RELEASE_JSON="$DEST/release.json"
-            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > "$RELEASE_JSON"
+            gh api "repos/$FW_PACKAGES_REPOSITORY/releases/tags/$TAG" > "$RELEASE_JSON"
+            jq -e --arg tag "$TAG" '.tag_name == $tag' "$RELEASE_JSON" >/dev/null
             jq -e '.draft == false' "$RELEASE_JSON" >/dev/null
             if [[ "$CHANNEL" == dev ]]; then
               jq -e '.prerelease == true' "$RELEASE_JSON" >/dev/null
@@ -285,22 +291,95 @@ jobs:
               jq -e '.prerelease == false' "$RELEASE_JSON" >/dev/null
             fi
             TAG_OBJECT="$DEST/tag-object.json"
-            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" > "$TAG_OBJECT"
+            gh api "repos/$FW_PACKAGES_REPOSITORY/git/ref/tags/$TAG" > "$TAG_OBJECT"
             RELEASE_TAG_COMMIT="$(jq -r .object.sha "$TAG_OBJECT")"
             if [[ "$(jq -r .object.type "$TAG_OBJECT")" == tag ]]; then
-              RELEASE_TAG_COMMIT="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$RELEASE_TAG_COMMIT" --jq .object.sha)"
+              RELEASE_TAG_COMMIT="$(gh api "repos/$FW_PACKAGES_REPOSITORY/git/tags/$RELEASE_TAG_COMMIT" --jq .object.sha)"
             fi
             [[ "$RELEASE_TAG_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+            [[ "$(jq '[.assets[] | select(.name == "tumoflip-packages.json")] | length' "$RELEASE_JSON")" == 1 ]]
+            [[ "$(jq '[.assets[] | select(.name == "tumoflip-packages.zip")] | length' "$RELEASE_JSON")" == 1 ]]
+            PROVENANCE_NAME="$(jq -r '
+              [.assets[] | select(
+                .name == "migration-provenance.json"
+                or .name == "catalog-provenance.json"
+              )] | if length == 1 then .[0].name else empty end
+            ' "$RELEASE_JSON")"
+            [[ "$PROVENANCE_NAME" == migration-provenance.json || "$PROVENANCE_NAME" == catalog-provenance.json ]]
             MANIFEST_SHA="$(jq -r '.assets[] | select(.name == "tumoflip-packages.json") | .digest' "$RELEASE_JSON" | sed 's/^sha256://')"
             ZIP_SHA="$(jq -r '.assets[] | select(.name == "tumoflip-packages.zip") | .digest' "$RELEASE_JSON" | sed 's/^sha256://')"
+            PROVENANCE_SHA="$(jq -r --arg name "$PROVENANCE_NAME" '.assets[] | select(.name == $name) | .digest' "$RELEASE_JSON" | sed 's/^sha256://')"
             [[ "$MANIFEST_SHA" =~ ^[0-9a-f]{64}$ ]]
             [[ "$ZIP_SHA" =~ ^[0-9a-f]{64}$ ]]
-            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$DEST" \
-              --pattern tumoflip-packages.json --pattern tumoflip-packages.zip
+            [[ "$PROVENANCE_SHA" =~ ^[0-9a-f]{64}$ ]]
+            gh release download "$TAG" --repo "$FW_PACKAGES_REPOSITORY" --dir "$DEST" \
+              --pattern tumoflip-packages.json --pattern tumoflip-packages.zip \
+              --pattern "$PROVENANCE_NAME"
             printf '%s  %s\n' "$MANIFEST_SHA" "$DEST/tumoflip-packages.json" | sha256sum -c -
             printf '%s  %s\n' "$ZIP_SHA" "$DEST/tumoflip-packages.zip" | sha256sum -c -
+            printf '%s  %s\n' "$PROVENANCE_SHA" "$DEST/$PROVENANCE_NAME" | sha256sum -c -
             MANIFEST_SOURCE="$(jq -r .package_release.source_commit "$DEST/tumoflip-packages.json")"
-            [[ "$RELEASE_TAG_COMMIT" == "$MANIFEST_SOURCE" ]]
+            [[ "$MANIFEST_SOURCE" =~ ^[0-9a-f]{40}$ ]]
+            jq -e --arg tag "$TAG" --arg channel "$CHANNEL" \
+              --arg source "$MANIFEST_SOURCE" '
+                (.package_release.catalog_release_tag == $tag)
+                and (.package_release.catalog_channel == $channel)
+                and (.package_release.source_commit == $source)
+                and (.package_release.source_dirty == false)
+                and (.package_release.firmware_flash_unchanged == true)
+              ' "$DEST/tumoflip-packages.json" >/dev/null
+            MANIFEST_RELEASE_ID="$(jq -r .release_id "$DEST/tumoflip-packages.json")"
+            MANIFEST_BYTES="$(jq -r '.assets[] | select(.name == "tumoflip-packages.json") | .size' "$RELEASE_JSON")"
+            ZIP_BYTES="$(jq -r '.assets[] | select(.name == "tumoflip-packages.zip") | .size' "$RELEASE_JSON")"
+            case "$PROVENANCE_NAME" in
+              migration-provenance.json)
+                jq -e --arg channel "$CHANNEL" --arg tag "$TAG" \
+                  --arg package_repo "$FW_PACKAGES_REPOSITORY" \
+                  --arg firmware_repo "$GITHUB_REPOSITORY" \
+                  --arg publisher "$RELEASE_TAG_COMMIT" --arg source "$MANIFEST_SOURCE" \
+                  --arg release_id "$MANIFEST_RELEASE_ID" --arg manifest_sha "$MANIFEST_SHA" \
+                  --arg zip_sha "$ZIP_SHA" --argjson manifest_bytes "$MANIFEST_BYTES" \
+                  --argjson zip_bytes "$ZIP_BYTES" '
+                    (.schema == 1) and (.kind == "legacyByteMirror")
+                    and (.channel == $channel)
+                    and (.publisher.repository == $package_repo)
+                    and (.publisher.commit == $publisher)
+                    and (.firmwareSourceCommit == $source)
+                    and (.manifestReleaseId == $release_id)
+                    and (.legacy.repository == $firmware_repo)
+                    and (.legacy.tag == $tag) and (.legacy.tagCommit == $source)
+                    and (.assets["tumoflip-packages.json"].sha256 == $manifest_sha)
+                    and (.assets["tumoflip-packages.json"].bytes == $manifest_bytes)
+                    and (.assets["tumoflip-packages.zip"].sha256 == $zip_sha)
+                    and (.assets["tumoflip-packages.zip"].bytes == $zip_bytes)
+                  ' "$DEST/$PROVENANCE_NAME" >/dev/null
+                ;;
+              catalog-provenance.json)
+                jq -e --arg channel "$CHANNEL" --arg tag "$TAG" \
+                  --arg package_repo "$FW_PACKAGES_REPOSITORY" \
+                  --arg firmware_repo "$GITHUB_REPOSITORY" \
+                  --arg publisher "$RELEASE_TAG_COMMIT" --arg source "$MANIFEST_SOURCE" \
+                  --arg release_id "$MANIFEST_RELEASE_ID" --arg manifest_sha "$MANIFEST_SHA" \
+                  --arg zip_sha "$ZIP_SHA" --argjson manifest_bytes "$MANIFEST_BYTES" \
+                  --argjson zip_bytes "$ZIP_BYTES" '
+                    (.schema == 1) and (.kind == "nativePackageRelease")
+                    and (.channel == $channel) and (.tag == $tag)
+                    and (.publisher.repository == $package_repo)
+                    and (.publisher.commit == $publisher)
+                    and (.firmwareSource.repository == $firmware_repo)
+                    and (.firmwareSource.commit == $source)
+                    and (.manifestReleaseId == $release_id)
+                    and (.assets["tumoflip-packages.json"].sha256 == $manifest_sha)
+                    and (.assets["tumoflip-packages.json"].bytes == $manifest_bytes)
+                    and (.assets["tumoflip-packages.zip"].sha256 == $zip_sha)
+                    and (.assets["tumoflip-packages.zip"].bytes == $zip_bytes)
+                  ' "$DEST/$PROVENANCE_NAME" >/dev/null
+                ;;
+            esac
+            git cat-file -e "$MANIFEST_SOURCE^{commit}" 2>/dev/null || {
+              git fetch --no-tags --depth=1 origin "$MANIFEST_SOURCE"
+              [[ "$(git rev-parse FETCH_HEAD^{commit})" == "$MANIFEST_SOURCE" ]]
+            }
             cp "$DEST/tumoflip-packages.json" "$RUNNER_TEMP/targets/$CHANNEL:$TAG=manifest.json"
             cp "$DEST/tumoflip-packages.zip" "$RUNNER_TEMP/targets/$CHANNEL:$TAG=targets.zip"
           done
