@@ -99,6 +99,69 @@ class MfUltralightAesTest(unittest.TestCase):
         self.assertIn("furi_hal_random_fill_buf", aes)
         self.assertIn("aes_signature_present = true", aes)
 
+    def test_manual_generator_ids_are_append_only(self) -> None:
+        generator_enum = self.generator_header[
+            self.generator_header.index("typedef enum {") :
+            self.generator_header.index("} NfcDataGeneratorType;")
+        ]
+        names = re.findall(r"\b(NfcDataGeneratorType[A-Za-z0-9_]+)\s*,", generator_enum)
+        legacy_names = [
+            "NfcDataGeneratorTypeMfUltralight",
+            "NfcDataGeneratorTypeMfUltralightEV1_11",
+            "NfcDataGeneratorTypeMfUltralightEV1_H11",
+            "NfcDataGeneratorTypeMfUltralightEV1_21",
+            "NfcDataGeneratorTypeMfUltralightEV1_H21",
+            "NfcDataGeneratorTypeNTAG203",
+            "NfcDataGeneratorTypeNTAG213",
+            "NfcDataGeneratorTypeNTAG215",
+            "NfcDataGeneratorTypeNTAG216",
+            "NfcDataGeneratorTypeNTAGI2C1k",
+            "NfcDataGeneratorTypeNTAGI2C2k",
+            "NfcDataGeneratorTypeNTAGI2CPlus1k",
+            "NfcDataGeneratorTypeNTAGI2CPlus2k",
+            "NfcDataGeneratorTypeMfClassicMini",
+            "NfcDataGeneratorTypeMfClassic1k_4b",
+            "NfcDataGeneratorTypeMfClassic1k_7b",
+            "NfcDataGeneratorTypeMfClassic4k_4b",
+            "NfcDataGeneratorTypeMfClassic4k_7b",
+            "NfcDataGeneratorTypeMfPlusSE_4b",
+            "NfcDataGeneratorTypeMfPlusSE_7b",
+            "NfcDataGeneratorTypeMfPlusS2k_4b",
+            "NfcDataGeneratorTypeMfPlusS2k_7b",
+            "NfcDataGeneratorTypeMfPlusS4k_4b",
+            "NfcDataGeneratorTypeMfPlusS4k_7b",
+            "NfcDataGeneratorTypeMfPlusX2k_4b",
+            "NfcDataGeneratorTypeMfPlusX2k_7b",
+            "NfcDataGeneratorTypeMfPlusX4k_4b",
+            "NfcDataGeneratorTypeMfPlusX4k_7b",
+            "NfcDataGeneratorTypeMfPlusEV1_2k_4b",
+            "NfcDataGeneratorTypeMfPlusEV1_2k_7b",
+            "NfcDataGeneratorTypeMfPlusEV1_4k_4b",
+            "NfcDataGeneratorTypeMfPlusEV1_4k_7b",
+            "NfcDataGeneratorTypeMfPlusEV2_2k_4b",
+            "NfcDataGeneratorTypeMfPlusEV2_2k_7b",
+            "NfcDataGeneratorTypeMfPlusEV2_4k_4b",
+            "NfcDataGeneratorTypeMfPlusEV2_4k_7b",
+        ]
+        self.assertEqual(names[: len(legacy_names)], legacy_names)
+        self.assertEqual(
+            names[len(legacy_names) :],
+            [
+                "NfcDataGeneratorTypeMfUltralightC",
+                "NfcDataGeneratorTypeMfUltralightAES",
+                "NfcDataGeneratorTypeNum",
+            ],
+        )
+
+        scene = (
+            REPO_ROOT / "applications/main/nfc/scenes/nfc_scene_set_type.c"
+        ).read_text(encoding="utf-8")
+        order = function_body(
+            scene, "static NfcDataGeneratorType nfc_scene_set_type_generator_at("
+        )
+        self.assertIn("NfcDataGeneratorTypeMfUltralightC", order)
+        self.assertIn("NfcDataGeneratorTypeMfUltralightAES", order)
+
     def test_public_data_layout_is_append_only_and_api_stays_88(self) -> None:
         struct = self.header[
             self.header.index("typedef struct {\n    Iso14443_3aData*") :

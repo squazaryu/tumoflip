@@ -12,8 +12,6 @@ typedef enum {
     NfcDataGeneratorTypeMfUltralightEV1_H11,
     NfcDataGeneratorTypeMfUltralightEV1_21,
     NfcDataGeneratorTypeMfUltralightEV1_H21,
-    NfcDataGeneratorTypeMfUltralightC,
-    NfcDataGeneratorTypeMfUltralightAES,
     NfcDataGeneratorTypeNTAG203,
     NfcDataGeneratorTypeNTAG213,
     NfcDataGeneratorTypeNTAG215,
@@ -47,6 +45,11 @@ typedef enum {
     NfcDataGeneratorTypeMfPlusEV2_2k_7b,
     NfcDataGeneratorTypeMfPlusEV2_4k_4b,
     NfcDataGeneratorTypeMfPlusEV2_4k_7b,
+
+    // Public enum: append new values so FAPs compiled against older API 88.0 headers keep their
+    // established numeric generator IDs.
+    NfcDataGeneratorTypeMfUltralightC,
+    NfcDataGeneratorTypeMfUltralightAES,
 
     NfcDataGeneratorTypeNum,
 

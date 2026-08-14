@@ -711,9 +711,10 @@ static bool nfc_data_generator_type_is_mf_plus(NfcDataGeneratorType type) {
 }
 
 // Handler-based table for the Ultralight/NTAG and Classic types, whose per-variant layouts are
-// bespoke. The MIFARE Plus types are parametric and dispatched from mf_plus_generator_configs, so
-// this table intentionally stops before them.
-static const NfcDataGenerator nfc_data_generator[NfcDataGeneratorTypeMfPlusSE_4b] = {
+// bespoke. The MIFARE Plus entries remain empty because they are dispatched parametrically from
+// mf_plus_generator_configs. The full enum-sized table also accommodates append-only generators
+// without renumbering the public IDs used by existing FAPs.
+static const NfcDataGenerator nfc_data_generator[NfcDataGeneratorTypeNum] = {
     [NfcDataGeneratorTypeMfUltralight] =
         {
             .name = "Mifare Ultralight",
@@ -823,6 +824,7 @@ const char* nfc_data_generator_get_name(NfcDataGeneratorType type) {
         return mf_plus_generator_configs[type - NfcDataGeneratorTypeMfPlusSE_4b].name;
     }
 
+    furi_check(nfc_data_generator[type].name);
     return nfc_data_generator[type].name;
 }
 
@@ -842,5 +844,6 @@ void nfc_data_generator_fill_data(NfcDataGeneratorType type, NfcDevice* nfc_devi
         return;
     }
 
+    furi_check(nfc_data_generator[type].handler);
     nfc_data_generator[type].handler(nfc_device);
 }

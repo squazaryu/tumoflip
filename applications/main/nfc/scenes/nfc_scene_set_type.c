@@ -8,6 +8,22 @@ enum SubmenuIndex {
     SubmenuIndexNFCA7,
 };
 
+// Display the appended Ultralight generators with their family while keeping their public numeric
+// IDs append-only for API 88.0 FAP compatibility.
+static NfcDataGeneratorType nfc_scene_set_type_generator_at(size_t position) {
+    const size_t ultralight_family_end = NfcDataGeneratorTypeMfUltralightEV1_H21 + 1U;
+
+    if(position < ultralight_family_end) {
+        return (NfcDataGeneratorType)position;
+    } else if(position == ultralight_family_end) {
+        return NfcDataGeneratorTypeMfUltralightC;
+    } else if(position == ultralight_family_end + 1U) {
+        return NfcDataGeneratorTypeMfUltralightAES;
+    }
+
+    return (NfcDataGeneratorType)(position - 2U);
+}
+
 static void nfc_scene_set_type_init_edit_data(Iso14443_3aData* data, size_t uid_len) {
     // Easiest way to create a zero'd buffer of given length
     uint8_t* uid = calloc(1, uid_len);
@@ -33,8 +49,10 @@ void nfc_scene_set_type_on_enter(void* context) {
         instance);
 
     for(size_t i = 0; i < NfcDataGeneratorTypeNum; i++) {
-        const char* name = nfc_data_generator_get_name(i);
-        submenu_add_item(submenu, name, i, nfc_protocol_support_common_submenu_callback, instance);
+        const NfcDataGeneratorType type = nfc_scene_set_type_generator_at(i);
+        const char* name = nfc_data_generator_get_name(type);
+        submenu_add_item(
+            submenu, name, type, nfc_protocol_support_common_submenu_callback, instance);
     }
 
     // Restore the previously picked row when returning from a generated card (stored +1, so the
