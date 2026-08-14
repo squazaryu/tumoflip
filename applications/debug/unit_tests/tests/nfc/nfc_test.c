@@ -10,6 +10,7 @@
 #include <nfc/protocols/iso14443_3a/iso14443_3a_poller.h>
 #include <nfc/protocols/iso14443_3a/iso14443_3a_poller_sync.h>
 #include <nfc/protocols/mf_ultralight/mf_ultralight.h>
+#include <nfc/protocols/mf_ultralight/mf_ultralight_aes_crypto.h>
 #include <nfc/protocols/mf_ultralight/mf_ultralight_poller_sync.h>
 #include <nfc/protocols/mf_classic/mf_classic_poller_sync.h>
 #include <nfc/protocols/felica/felica.h>
@@ -1170,6 +1171,142 @@ MU_TEST(mf_plus_crypto_cmac_rfc4493) {
     mu_assert(memcmp(mac8, exp8, 8) == 0, "cmac8 RFC4493 len=16 mismatch");
 }
 
+MU_TEST(mf_ultralight_aes_crypto_vectors) {
+    const uint8_t key[MF_ULTRALIGHT_AES_KEY_SIZE] = {
+        0x2b,
+        0x7e,
+        0x15,
+        0x16,
+        0x28,
+        0xae,
+        0xd2,
+        0xa6,
+        0xab,
+        0xf7,
+        0x15,
+        0x88,
+        0x09,
+        0xcf,
+        0x4f,
+        0x3c};
+    const uint8_t msg[64] = {0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96, 0xe9, 0x3d, 0x7e,
+                             0x11, 0x73, 0x93, 0x17, 0x2a, 0xae, 0x2d, 0x8a, 0x57, 0x1e, 0x03,
+                             0xac, 0x9c, 0x9e, 0xb7, 0x6f, 0xac, 0x45, 0xaf, 0x8e, 0x51, 0x30,
+                             0xc8, 0x1c, 0x46, 0xa3, 0x5c, 0xe4, 0x11, 0xe5, 0xfb, 0xc1, 0x19,
+                             0x1a, 0x0a, 0x52, 0xef, 0xf6, 0x9f, 0x24, 0x45, 0xdf, 0x4f, 0x9b,
+                             0x17, 0xad, 0x2b, 0x41, 0x7b, 0xe6, 0x6c, 0x37, 0x10};
+    const uint8_t expected[4][MF_ULTRALIGHT_AES_BLOCK_SIZE] = {
+        {0xbb, 0x1d, 0x69, 0x29, 0xe9, 0x59, 0x37, 0x28, 0x7f, 0xa3, 0x7d, 0x12, 0x9b, 0x75,
+         0x67, 0x46},
+        {0x07, 0x0a, 0x16, 0xb4, 0x6b, 0x4d, 0x41, 0x44, 0xf7, 0x9b, 0xdd, 0x9d, 0xd0, 0x4a,
+         0x28, 0x7c},
+        {0xdf, 0xa6, 0x67, 0x47, 0xde, 0x9a, 0xe6, 0x30, 0x30, 0xca, 0x32, 0x61, 0x14, 0x97,
+         0xc8, 0x27},
+        {0x51, 0xf0, 0xbe, 0xbf, 0x7e, 0x3b, 0x9d, 0x92, 0xfc, 0x49, 0x74, 0x17, 0x79, 0x36,
+         0x3c, 0xfe},
+    };
+    const size_t lengths[4] = {0, 16, 40, 64};
+    uint8_t mac[MF_ULTRALIGHT_AES_BLOCK_SIZE] = {0};
+
+    for(size_t i = 0; i < COUNT_OF(lengths); i++) {
+        mu_assert(
+            mf_ultralight_aes_cmac(key, msg, lengths[i], mac),
+            "UL-AES CMAC unexpectedly failed");
+        mu_assert(
+            mf_ultralight_aes_equal(mac, expected[i], sizeof(mac)),
+            "UL-AES RFC4493 CMAC mismatch");
+    }
+
+    const uint8_t expected_ctr[MF_ULTRALIGHT_AES_CMAC_SIZE] = {
+        0x4d, 0xec, 0x6b, 0x09, 0xb0, 0xad, 0x2b, 0xb0};
+    uint8_t mac8[MF_ULTRALIGHT_AES_CMAC_SIZE] = {0};
+    mu_assert(
+        mf_ultralight_aes_cmac8_ctr(key, 0x1234, msg, 16, mac8),
+        "UL-AES counter CMAC unexpectedly failed");
+    mu_assert(
+        mf_ultralight_aes_equal(mac8, expected_ctr, sizeof(mac8)),
+        "UL-AES counter CMAC mismatch");
+}
+
+MU_TEST(mf_ultralight_aes_session_key_vector) {
+    const uint8_t key[MF_ULTRALIGHT_AES_KEY_SIZE] = {
+        0x00,
+        0x01,
+        0x02,
+        0x03,
+        0x04,
+        0x05,
+        0x06,
+        0x07,
+        0x08,
+        0x09,
+        0x0a,
+        0x0b,
+        0x0c,
+        0x0d,
+        0x0e,
+        0x0f};
+    const uint8_t rnd_a_rot[MF_ULTRALIGHT_AES_BLOCK_SIZE] = {
+        0x11,
+        0x12,
+        0x13,
+        0x14,
+        0x15,
+        0x16,
+        0x17,
+        0x18,
+        0x19,
+        0x1a,
+        0x1b,
+        0x1c,
+        0x1d,
+        0x1e,
+        0x1f,
+        0x10};
+    const uint8_t rnd_b_rot[MF_ULTRALIGHT_AES_BLOCK_SIZE] = {
+        0x21,
+        0x22,
+        0x23,
+        0x24,
+        0x25,
+        0x26,
+        0x27,
+        0x28,
+        0x29,
+        0x2a,
+        0x2b,
+        0x2c,
+        0x2d,
+        0x2e,
+        0x2f,
+        0x20};
+    const uint8_t expected[MF_ULTRALIGHT_AES_KEY_SIZE] = {
+        0x30,
+        0xec,
+        0xf7,
+        0xa3,
+        0x51,
+        0x93,
+        0xfb,
+        0x46,
+        0xde,
+        0x0c,
+        0x85,
+        0x05,
+        0xdc,
+        0x92,
+        0x91,
+        0xbe};
+    uint8_t session_key[MF_ULTRALIGHT_AES_KEY_SIZE] = {0};
+
+    mu_assert(
+        mf_ultralight_aes_derive_session_key(key, rnd_a_rot, rnd_b_rot, session_key),
+        "UL-AES session derivation unexpectedly failed");
+    mu_assert(
+        mf_ultralight_aes_equal(session_key, expected, sizeof(session_key)),
+        "UL-AES session key mismatch");
+}
+
 // Locks the data-encryption IV byte layout to the reference fork's (U-Prox-validated) layout: both
 // IVs pack the little-endian {R_ctr, W_ctr} word {R_lo, R_hi, W_lo, W_hi}. Read repeats it across
 // IV[0..11] with TI at IV[12..15]; write puts TI at IV[0..3] then repeats it across IV[4..15].
@@ -1319,6 +1456,8 @@ MU_TEST_SUITE(nfc) {
 
     MU_RUN_TEST(mf_plus_crypto_cmac_rfc4493);
     MU_RUN_TEST(mf_plus_crypto_data_iv_layout);
+    MU_RUN_TEST(mf_ultralight_aes_crypto_vectors);
+    MU_RUN_TEST(mf_ultralight_aes_session_key_vector);
 
     nfc_test_free();
 }

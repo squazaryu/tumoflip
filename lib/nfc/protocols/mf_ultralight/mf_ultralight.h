@@ -32,6 +32,7 @@ extern "C" {
 #define MF_ULTRALIGHT_MAX_PAGE_NUM       (510)
 #define MF_ULTRALIGHT_PAGE_SIZE          (4U)
 #define MF_ULTRALIGHT_SIGNATURE_SIZE     (32)
+#define MF_ULTRALIGHT_AES_SIGNATURE_SIZE (48) // secp192r1, MF0AES20 only
 #define MF_ULTRALIGHT_COUNTER_SIZE       (3)
 #define MF_ULTRALIGHT_COUNTER_NUM        (3)
 #define MF_ULTRALIGHT_TEARING_FLAG_SIZE  (1)
@@ -47,6 +48,39 @@ extern "C" {
 #define MF_ULTRALIGHT_C_AUTH_RND_A_BLOCK_OFFSET (0)
 #define MF_ULTRALIGHT_C_AUTH_RND_B_BLOCK_OFFSET (8)
 #define MF_ULTRALIGHT_C_ENCRYPTED_PACK_SIZE     (MF_ULTRALIGHT_C_AUTH_DATA_SIZE + 1)
+
+// MIFARE Ultralight AES (MF0AES20): AES-128, 3-pass mutual auth (CBC, zero IV) sharing the
+// AUTHENTICATE (0x1A / 0xAF) command bytes with Ultralight-C; the algorithm is disambiguated by
+// MfUltralightType. 144-byte user memory, 60 pages (0x00-0x3B).
+#define MF_ULTRALIGHT_AES_KEY_SIZE          (16)
+#define MF_ULTRALIGHT_AES_BLOCK_SIZE        (16)
+// Secure-messaging (CMAC) message MAC: the 8 odd-indexed bytes of the full AES-CMAC.
+#define MF_ULTRALIGHT_AES_CMAC_SIZE         (8)
+// AUTHENTICATE part 1 response: 0xAF + ek(RndB)
+#define MF_ULTRALIGHT_AES_AUTH_P1_RESP_SIZE (1 + MF_ULTRALIGHT_AES_BLOCK_SIZE)
+// AUTHENTICATE part 2 command: 0xAF + ek(RndA || RndB')
+#define MF_ULTRALIGHT_AES_AUTH_P2_CMD_SIZE  (1 + 2 * MF_ULTRALIGHT_AES_BLOCK_SIZE)
+// AUTHENTICATE part 2 response: 0x00 + ek(RndA')
+#define MF_ULTRALIGHT_AES_AUTH_P2_RESP_SIZE (1 + MF_ULTRALIGHT_AES_BLOCK_SIZE)
+// DataProtKey lives at pages 0x30-0x33. Real tags always return zero for these pages. Recovered key
+// material therefore lives in explicit metadata appended to MfUltralightData; it must never be
+// written into the page dump because that would make the dump claim bytes the card never returned.
+#define MF_ULTRALIGHT_AES_DATA_KEY_PAGE     (0x30)
+
+// UL-AES configuration page layout (datasheet Tables 7-15). CFG page 0x29: RID_ACT/SEC_MSG_ACT in
+// byte 0, AUTH0 in byte 3. ACCESS page 0x2A: the access byte 0 (bits below), VCTID in byte 1,
+// AUTH_LIM in bytes 2-3. LOCK_KEYS page 0x2D byte 0: per-key lock bits.
+#define MF_ULTRALIGHT_AES_CFG_PAGE          (0x29)
+#define MF_ULTRALIGHT_AES_ACCESS_PAGE       (0x2A)
+#define MF_ULTRALIGHT_AES_LOCK_KEYS_PAGE    (0x2D)
+#define MF_ULTRALIGHT_AES_CFG_RID_ACT       (1U << 0) // page 0x29 byte 0
+#define MF_ULTRALIGHT_AES_CFG_SEC_MSG_ACT   (1U << 1) // page 0x29 byte 0
+#define MF_ULTRALIGHT_AES_ACCESS_CNT_RD_EN  (1U << 2) // page 0x2A byte 0
+#define MF_ULTRALIGHT_AES_ACCESS_CNT_INC_EN (1U << 3) // page 0x2A byte 0
+#define MF_ULTRALIGHT_AES_ACCESS_CFGLCK     (1U << 6) // page 0x2A byte 0 (LOCK_USER_CFG)
+#define MF_ULTRALIGHT_AES_ACCESS_PROT       (1U << 7) // page 0x2A byte 0
+#define MF_ULTRALIGHT_AES_LOCK_KEY0         (1U << 6) // page 0x2D byte 0 (LOCK_AES_KEY0)
+#define MF_ULTRALIGHT_AES_LOCK_KEY1         (1U << 7) // page 0x2D byte 0 (LOCK_AES_KEY1)
 
 typedef enum {
     MfUltralightErrorNone,
@@ -139,6 +173,17 @@ typedef struct {
 } MfUltralightC3DesAuthKey;
 
 typedef struct {
+    uint8_t data[MF_ULTRALIGHT_AES_KEY_SIZE];
+} MfUltralightAesKey;
+
+// Argument to AUTHENTICATE part 1 (Arg byte) selecting which stored AES key to authenticate with.
+typedef enum {
+    MfUltralightAesKeyTypeData = 0x00, // DataProtKey (pages 0x30-0x33)
+    MfUltralightAesKeyTypeUid = 0x01, // UIDRetrKey (pages 0x34-0x37)
+    MfUltralightAesKeyTypeOriginality = 0x02, // OriginalityKey
+} MfUltralightAesKeyType;
+
+typedef struct {
     uint8_t data[MF_ULTRALIGHT_AUTH_PACK_SIZE];
 } MfUltralightAuthPack;
 
@@ -192,6 +237,13 @@ typedef struct {
     uint16_t pages_read;
     uint16_t pages_total;
     uint32_t auth_attempts;
+
+    // Keep all new fields append-only. Shipped external FAPs use the legacy public fields above,
+    // so inserting data in the middle would silently change their ABI while API 88.0 is retained.
+    bool aes_signature_present;
+    uint8_t aes_signature[MF_ULTRALIGHT_AES_SIGNATURE_SIZE];
+    bool aes_data_key_present;
+    MfUltralightAesKey aes_data_key;
 } MfUltralightData;
 
 extern const NfcDeviceBase nfc_device_mf_ultralight;
@@ -252,6 +304,17 @@ void mf_ultralight_3des_shift_data(uint8_t* const arr);
 bool mf_ultralight_3des_key_valid(const MfUltralightData* data);
 
 const uint8_t* mf_ultralight_3des_get_key(const MfUltralightData* data);
+
+// Header-only on purpose: NFC render plugins can consume the appended metadata without adding a
+// firmware API symbol or changing API 88.0. Returns false and clears key when no key was recovered.
+static inline bool mf_ultralight_aes_get_key(const MfUltralightData* data, uint8_t* key) {
+    if(!data || !key) return false;
+
+    for(size_t i = 0; i < MF_ULTRALIGHT_AES_KEY_SIZE; i++) {
+        key[i] = data->aes_data_key_present ? data->aes_data_key.data[i] : 0;
+    }
+    return data->aes_data_key_present;
+}
 
 void mf_ultralight_3des_encrypt(
     mbedtls_des3_context* ctx,

@@ -64,7 +64,7 @@ class NfcUnleashed090FollowupTest(unittest.TestCase):
         self.assertNotIn("mf_plus_ats_t1_tk_values", mf_plus)
         self.assertEqual(mf_plus_poller_header.count("} MfPlusProbeResult;"), 1)
 
-    def test_ultralight_aes_uses_identity_only_presentation(self) -> None:
+    def test_ultralight_aes_uses_full_protocol_emulation(self) -> None:
         support = source(
             "applications/main/nfc/helpers/protocol_support/mf_ultralight/"
             "mf_ultralight.c"
@@ -74,8 +74,12 @@ class NfcUnleashed090FollowupTest(unittest.TestCase):
             "mf_ultralight_render.c"
         )
         self.assertIn("MfUltralightTypeUltralightAES", support)
-        self.assertIn("NfcProtocolFeatureEmulateUid", support)
-        self.assertIn("NfcProtocolIso14443_3a", support)
+        self.assertIn("NfcProtocolFeatureEmulateFull", support)
+        self.assertIn(
+            "nfc_listener_alloc(instance->nfc, NfcProtocolMfUltralight, data)",
+            support,
+        )
+        self.assertNotIn("NfcProtocolFeatureEmulateUid", support)
         self.assertIn("MfUltralightTypeUltralightAES", render)
 
 
