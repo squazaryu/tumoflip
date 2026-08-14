@@ -39,6 +39,12 @@ API `88.0` is a deliberate breaking migration. External FAP/FAL binaries built
 for API `87.x` must be rebuilt or replaced with the versions shipped in the
 matching Tumoflip FW Packages release.
 
+FW Packages catalogs, package-only releases, and the protected-app audit
+control plane are maintained independently in
+[squazaryu/tumoflip-fw-packages](https://github.com/squazaryu/tumoflip-fw-packages).
+This firmware repository retains only the source and build interfaces needed
+to produce compatible binaries; it does not publish or audit FW Packages.
+
 ## Version Scheme
 
 Stable `main` firmware versions use this format:
