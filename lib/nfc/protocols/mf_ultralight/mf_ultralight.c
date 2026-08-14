@@ -2,12 +2,14 @@
 
 #include <bit_lib/bit_lib.h>
 #include <furi.h>
+#include <mbedtls/platform_util.h>
 
 #define MF_ULTRALIGHT_PROTOCOL_NAME "NTAG/Ultralight"
 
 #define MF_ULTRALIGHT_FORMAT_VERSION_KEY  "Data format version"
 #define MF_ULTRALIGHT_TYPE_KEY            MF_ULTRALIGHT_PROTOCOL_NAME " type"
 #define MF_ULTRALIGHT_SIGNATURE_KEY       "Signature"
+#define MF_ULTRALIGHT_AES_SIGNATURE_KEY   "AES signature"
 #define MF_ULTRALIGHT_MIFARE_VERSION_KEY  "Mifare version"
 #define MF_ULTRALIGHT_COUNTER_KEY         "Counter"
 #define MF_ULTRALIGHT_TEARING_KEY         "Tearing"
@@ -15,6 +17,7 @@
 #define MF_ULTRALIGHT_PAGES_READ_KEY      "Pages read"
 #define MF_ULTRALIGHT_PAGE_KEY            "Page"
 #define MF_ULTRALIGHT_FAILED_ATTEMPTS_KEY "Failed authentication attempts"
+#define MF_ULTRALIGHT_AES_DATA_KEY         "AES Data Key"
 
 typedef struct {
     const char* device_name;
@@ -174,15 +177,18 @@ static const MfUltralightFeatures mf_ultralight_features[MfUltralightTypeNum] = 
         },
     [MfUltralightTypeUltralightAES] =
         {
-            // Read-only: AES auth is not implemented, so only the unauthenticated area is captured
-            // and the read is never reported complete.
-            // TODO: confirm page count against the MF0AES20 datasheet (user memory 144 B, pages 4-39).
+            // 144-byte user memory, 60 pages (0x00-0x3B). AES 3-pass auth = the Authenticate feature
+            // (shared with UL-C, branched on type). Three 24-bit one-way counters (ReadCounter /
+            // IncCounter), no tearing-flag command. No ReadSignature feature flag (the 48-byte
+            // secp192r1 sig doesn't fit the shared 32-byte struct - it's read/served via a type-branch
+            // instead) and no FastRead (plain READ suffices); config_page = 0 as the UL-AES config
+            // layout isn't modeled.
             .device_name = "Mifare Ultralight AES",
-            .total_pages = 40,
+            .total_pages = 60,
             .config_page = 0,
-            .feature_set = MfUltralightFeatureSupportReadVersion |
-                           MfUltralightFeatureSupportReadSignature |
-                           MfUltralightFeatureSupportFastRead,
+            .feature_set =
+                MfUltralightFeatureSupportReadVersion | MfUltralightFeatureSupportAuthenticate |
+                MfUltralightFeatureSupportReadCounter | MfUltralightFeatureSupportIncCounter,
         },
     [MfUltralightTypeUnknown] =
         {
@@ -211,7 +217,8 @@ const NfcDeviceBase nfc_device_mf_ultralight = {
 };
 
 MfUltralightData* mf_ultralight_alloc(void) {
-    MfUltralightData* data = malloc(sizeof(MfUltralightData));
+    MfUltralightData* data = calloc(1, sizeof(MfUltralightData));
+    furi_check(data);
     data->iso14443_3a_data = iso14443_3a_alloc();
     return data;
 }
@@ -220,6 +227,7 @@ void mf_ultralight_free(MfUltralightData* data) {
     furi_check(data);
 
     iso14443_3a_free(data->iso14443_3a_data);
+    mbedtls_platform_zeroize(data, sizeof(*data));
     free(data);
 }
 
@@ -227,6 +235,10 @@ void mf_ultralight_reset(MfUltralightData* data) {
     furi_check(data);
 
     iso14443_3a_reset(data->iso14443_3a_data);
+    data->aes_signature_present = false;
+    memset(data->aes_signature, 0, sizeof(data->aes_signature));
+    data->aes_data_key_present = false;
+    mbedtls_platform_zeroize(&data->aes_data_key, sizeof(data->aes_data_key));
 }
 
 void mf_ultralight_copy(MfUltralightData* data, const MfUltralightData* other) {
@@ -247,6 +259,10 @@ void mf_ultralight_copy(MfUltralightData* data, const MfUltralightData* other) {
     data->type = other->type;
     data->version = other->version;
     data->signature = other->signature;
+    data->aes_signature_present = other->aes_signature_present;
+    memcpy(data->aes_signature, other->aes_signature, sizeof(data->aes_signature));
+    data->aes_data_key_present = other->aes_data_key_present;
+    data->aes_data_key = other->aes_data_key;
 
     data->pages_read = other->pages_read;
     data->pages_total = other->pages_total;
@@ -373,6 +389,25 @@ bool mf_ultralight_load(MfUltralightData* data, FlipperFormat* ff, uint32_t vers
             data->auth_attempts = 0;
         }
 
+        // Optional UL-AES 48-byte originality signature: written only when captured, so its absence
+        // (legacy dumps, non-UL-AES cards) simply loads as "no signature".
+        data->aes_signature_present = flipper_format_read_hex(
+            ff,
+            MF_ULTRALIGHT_AES_SIGNATURE_KEY,
+            data->aes_signature,
+            MF_ULTRALIGHT_AES_SIGNATURE_SIZE);
+
+        // Explicit optional metadata. Legacy dumps do not contain it and remain loadable. Never
+        // infer presence from an all-zero key: zero is a valid AES key and key pages read as zero.
+        data->aes_data_key_present = flipper_format_read_hex(
+            ff,
+            MF_ULTRALIGHT_AES_DATA_KEY,
+            data->aes_data_key.data,
+            sizeof(data->aes_data_key.data));
+        if(!data->aes_data_key_present) {
+            mbedtls_platform_zeroize(&data->aes_data_key, sizeof(data->aes_data_key));
+        }
+
         parsed = true;
     } while(false);
 
@@ -455,6 +490,24 @@ bool mf_ultralight_save(const MfUltralightData* data, FlipperFormat* ff) {
                ff, MF_ULTRALIGHT_FAILED_ATTEMPTS_KEY, &data->auth_attempts, 1))
             break;
 
+        // UL-AES originality sig: emit only when captured (keeps legacy/other-type dumps unchanged).
+        if(data->aes_signature_present) {
+            if(!flipper_format_write_hex(
+                   ff,
+                   MF_ULTRALIGHT_AES_SIGNATURE_KEY,
+                   data->aes_signature,
+                   MF_ULTRALIGHT_AES_SIGNATURE_SIZE))
+                break;
+        }
+        if(data->aes_data_key_present) {
+            if(!flipper_format_write_hex(
+                   ff,
+                   MF_ULTRALIGHT_AES_DATA_KEY,
+                   data->aes_data_key.data,
+                   sizeof(data->aes_data_key.data)))
+                break;
+        }
+
         saved = true;
     } while(false);
 
@@ -479,6 +532,13 @@ bool mf_ultralight_is_equal(const MfUltralightData* data, const MfUltralightData
 
         if(memcmp(&data->version, &other->version, sizeof(data->version)) != 0) break;
         if(memcmp(&data->signature, &other->signature, sizeof(data->signature)) != 0) break;
+        if(data->aes_signature_present != other->aes_signature_present) break;
+        if(memcmp(data->aes_signature, other->aes_signature, sizeof(data->aes_signature)) != 0)
+            break;
+        if(data->aes_data_key_present != other->aes_data_key_present) break;
+        if(data->aes_data_key_present &&
+           memcmp(&data->aes_data_key, &other->aes_data_key, sizeof(data->aes_data_key)) != 0)
+            break;
 
         for(size_t i = 0; i < COUNT_OF(data->counter); i++) {
             if(memcmp(&data->counter[i], &other->counter[i], sizeof(data->counter[i])) != 0) {
@@ -625,7 +685,7 @@ uint8_t mf_ultralight_get_write_end_page(MfUltralightType type) {
         type == MfUltralightTypeUL11 || type == MfUltralightTypeUL21 ||
         type == MfUltralightTypeNTAG213 || type == MfUltralightTypeNTAG215 ||
         type == MfUltralightTypeNTAG216 || type == MfUltralightTypeOrigin ||
-        type == MfUltralightTypeMfulC);
+        type == MfUltralightTypeMfulC || type == MfUltralightTypeUltralightAES);
 
     uint8_t end_page = mf_ultralight_get_config_page_num(type);
     if(type == MfUltralightTypeNTAG213 || type == MfUltralightTypeNTAG215 ||
@@ -634,6 +694,11 @@ uint8_t mf_ultralight_get_write_end_page(MfUltralightType type) {
     } else if(type == MfUltralightTypeOrigin || type == MfUltralightTypeMfulC) {
         // ULC: 48 pages total, write pages 4-47 (includes auth config + 3DES key)
         end_page = mf_ultralight_features[type].total_pages;
+    } else if(type == MfUltralightTypeUltralightAES) {
+        // UL-AES: write only the user data pages 4-0x27 here. The DataProtKey (0x30-0x33) is
+        // handled separately (copy-key), and the config/lock pages (0x28-0x2F) are deliberately
+        // NOT written to avoid ever locking the target (AUTH0/LOCK_KEYS are one-way).
+        end_page = 0x28;
     }
 
     return end_page;
@@ -678,17 +743,13 @@ bool mf_ultralight_is_all_data_read(const MfUltralightData* data) {
 
     if(data->pages_read == data->pages_total) {
         uint32_t feature_set = mf_ultralight_get_feature_support_set(data->type);
-        if((data->type == MfUltralightTypeMfulC) &&
-           mf_ultralight_support_feature(feature_set, MfUltralightFeatureSupportAuthenticate)) {
+        if(mf_ultralight_support_feature(feature_set, MfUltralightFeatureSupportAuthenticate)) {
+            // Auth-capable types (UL-C / UL-AES): reaching pages_total means every page was read
+            // (after auth for the protected region, or an unprotected card with AUTH0 disabled).
             all_read = true;
-        } else if(
-            data->type != MfUltralightTypeUltralightAES &&
-            !mf_ultralight_support_feature(feature_set, MfUltralightFeatureSupportPasswordAuth)) {
+        } else if(!mf_ultralight_support_feature(
+                      feature_set, MfUltralightFeatureSupportPasswordAuth)) {
             all_read = true;
-        } else if(data->type == MfUltralightTypeUltralightAES) {
-            // AES-protected memory is never fully captured without AES auth (not implemented),
-            // so the read is never complete even after all advertised pages are read.
-            all_read = false;
         } else {
             // Having read all the pages doesn't mean that we've got everything.
             // By default PWD is 0xFFFFFFFF, but if read back it is always 0x00000000,
