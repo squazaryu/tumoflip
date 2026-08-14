@@ -297,3 +297,16 @@ App(
     requires=["subghz"],
     sources=["toyota_lexus_plugin.c", "../../lib/subghz/protocols/toyota_lexus.c"],
 )
+
+App(
+    appid="protocol_superrollo",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_superrollo_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "superrollo_plugin.c",
+        "../../lib/subghz/protocols/superrollo.c",
+        "../../lib/subghz/protocols/keeloq_common.c",
+    ],
+)

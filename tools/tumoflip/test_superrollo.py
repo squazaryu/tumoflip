@@ -6,6 +6,9 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PROTOCOL = ROOT / "lib/subghz/protocols/superrollo.c"
 HEADER = ROOT / "lib/subghz/protocols/superrollo.h"
+PLUGIN = ROOT / "applications_user/subghz_protocols/superrollo_plugin.c"
+PLUGIN_FAM = ROOT / "applications_user/subghz_protocols/application.fam"
+PLUGIN_REGISTRY = ROOT / "lib/subghz/protocols/plugin_registry.c"
 PUBLIC_API = ROOT / "lib/subghz/protocols/public_api.h"
 API_SYMBOLS = ROOT / "targets/f7/api_symbols.csv"
 
@@ -175,9 +178,21 @@ class SuperrolloProtocolTests(unittest.TestCase):
         scene = (
             ROOT / "applications/main/subghz/scenes/subghz_scene_set_type.c"
         ).read_text(encoding="utf-8")
-        self.assertIn("&subghz_protocol_superrollo", registry)
+        self.assertNotIn("&subghz_protocol_superrollo", registry)
         self.assertIn("subghz_protocol_superrollo_create_data", create)
         self.assertIn('"Superrollo 433MHz"', scene)
+
+    def test_protocol_is_an_always_loaded_plugin(self) -> None:
+        self.assertIn(
+            "SUBGHZ_PROTOCOL_PLUGIN(subghz_protocol_superrollo",
+            PLUGIN.read_text(encoding="utf-8"),
+        )
+        fam = PLUGIN_FAM.read_text(encoding="utf-8")
+        self.assertIn('appid="protocol_superrollo"', fam)
+        self.assertIn('"../../lib/subghz/protocols/superrollo.c"', fam)
+        self.assertIn('"../../lib/subghz/protocols/keeloq_common.c"', fam)
+        registry = PLUGIN_REGISTRY.read_text(encoding="utf-8")
+        self.assertIn('{PACK_GROUP_ALL, "protocol_superrollo.fal"}', registry)
 
 
 if __name__ == "__main__":
