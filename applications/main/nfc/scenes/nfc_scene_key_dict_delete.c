@@ -1,6 +1,8 @@
 #include "../nfc_app_i.h"
 #include <mbedtls/platform_util.h>
 
+#define TAG "NfcKeyDict"
+
 // Load the key at user-dictionary index `key_index`. Returns false if the index no longer
 // exists (e.g. the file changed under us).
 static bool
@@ -28,23 +30,33 @@ void nfc_scene_key_dict_delete_on_enter(void* context) {
     uint32_t key_index =
         scene_manager_get_scene_state(instance->scene_manager, NfcSceneKeyDictDelete);
 
+    uint8_t key[NFC_BYTE_INPUT_STORE_SIZE] = {0};
+    const bool key_loaded = nfc_scene_key_dict_delete_load_key(dict, key_index, key);
+
     widget_add_string_element(
-        instance->widget, 64, 0, AlignCenter, AlignTop, FontPrimary, "Delete this key?");
+        instance->widget,
+        64,
+        0,
+        AlignCenter,
+        AlignTop,
+        FontPrimary,
+        key_loaded ? "Delete this key?" : "Key Not Found");
     widget_add_button_element(
         instance->widget,
         GuiButtonTypeLeft,
-        "Cancel",
-        nfc_scene_key_dict_delete_widget_callback,
-        instance);
-    widget_add_button_element(
-        instance->widget,
-        GuiButtonTypeRight,
-        "Delete",
+        key_loaded ? "Cancel" : "Back",
         nfc_scene_key_dict_delete_widget_callback,
         instance);
 
-    uint8_t key[NFC_BYTE_INPUT_STORE_SIZE] = {0};
-    if(nfc_scene_key_dict_delete_load_key(dict, key_index, key)) {
+    if(key_loaded) {
+        // Only offer Delete for a key we could read back. Otherwise the dialog would ask the user
+        // to confirm deleting a blank line, and act on a stale index if they did.
+        widget_add_button_element(
+            instance->widget,
+            GuiButtonTypeRight,
+            "Delete",
+            nfc_scene_key_dict_delete_widget_callback,
+            instance);
         FuriString* key_str = furi_string_alloc();
         for(size_t i = 0; i < dict->key_size; i++) {
             furi_string_cat_printf(key_str, "%02X", key[i]);
@@ -58,6 +70,8 @@ void nfc_scene_key_dict_delete_on_enter(void* context) {
             FontSecondary,
             furi_string_get_cstr(key_str));
         furi_string_free(key_str);
+    } else {
+        FURI_LOG_W(TAG, "Key %lu is gone from %s", key_index, dict->user_path);
     }
     mbedtls_platform_zeroize(key, sizeof(key));
 
@@ -85,6 +99,8 @@ bool nfc_scene_key_dict_delete_on_event(void* context, SceneManagerEvent event) 
             if(deleted) {
                 scene_manager_next_scene(instance->scene_manager, NfcSceneDeleteSuccess);
             } else {
+                FURI_LOG_E(TAG, "Failed to delete key %lu from %s", key_index, dict->user_path);
+                notification_message(instance->notifications, &sequence_error);
                 scene_manager_previous_scene(instance->scene_manager);
             }
         } else if(event.event == GuiButtonTypeLeft) {

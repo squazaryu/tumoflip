@@ -1,6 +1,8 @@
 #include "../nfc_app_i.h"
 #include <mbedtls/platform_util.h>
 
+#define TAG "NfcKeyDict"
+
 void nfc_scene_key_dict_add_byte_input_callback(void* context) {
     NfcApp* instance = context;
 
@@ -41,6 +43,10 @@ bool nfc_scene_key_dict_add_on_event(void* context, SceneManagerEvent event) {
                 scene_manager_next_scene(instance->scene_manager, NfcSceneSaveSuccess);
                 dolphin_deed(DolphinDeedNfcKeyAdd);
             } else {
+                // Full SD, missing /ext/nfc/assets, read-only card: the user would otherwise just
+                // land back on an unchanged counter.
+                FURI_LOG_E(TAG, "Failed to add a key to %s", dict->user_path);
+                notification_message(instance->notifications, &sequence_error);
                 scene_manager_previous_scene(instance->scene_manager);
             }
 
