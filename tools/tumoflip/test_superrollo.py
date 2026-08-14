@@ -136,6 +136,23 @@ class SuperrolloProtocolTests(unittest.TestCase):
         self.assertIsNotNone(upload)
         self.assertEqual(upload.group(0).count("generic.cnt ="), 1)
 
+    def test_upload_capacity_is_proven_before_writes(self) -> None:
+        self.assertIn("_Static_assert(", self.source)
+        self.assertIn(
+            "SUPERROLLO_UPLOAD_SIZE <= SUPERROLLO_UPLOAD_CAPACITY", self.source
+        )
+        upload = re.search(
+            r"static bool subghz_protocol_encoder_superrollo_get_upload\(.+?\n}\n",
+            self.source,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(upload)
+        body = upload.group(0)
+        self.assertLess(
+            body.index("size_upload >= SUPERROLLO_UPLOAD_SIZE"),
+            body.index("encoder.upload[index++]"),
+        )
+
     def test_protocol_is_internal_and_does_not_bump_public_api(self) -> None:
         self.assertIn("subghz_protocol_superrollo_create_data", self.header)
         self.assertNotIn(

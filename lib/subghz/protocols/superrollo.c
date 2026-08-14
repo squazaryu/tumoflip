@@ -16,7 +16,12 @@
 #define SUPERROLLO_MANUFACTURER_NAME "Superrollo"
 #define SUPERROLLO_FRAME_BITS        67U
 #define SUPERROLLO_UPLOAD_CAPACITY   160U
+#define SUPERROLLO_UPLOAD_SIZE       (9U * 2U + 2U + SUPERROLLO_FRAME_BITS * 2U)
 #define SUPERROLLO_DEFAULT_REPEAT    4U
+
+_Static_assert(
+    SUPERROLLO_UPLOAD_SIZE <= SUPERROLLO_UPLOAD_CAPACITY,
+    "Superrollo upload buffer must fit the complete frame");
 
 static const SubGhzBlockConst subghz_protocol_superrollo_const = {
     .te_short = 450,
@@ -305,6 +310,7 @@ static bool subghz_protocol_encoder_superrollo_get_upload(
     SubGhzProtocolEncoderSuperrollo* instance,
     uint8_t original_button) {
     furi_assert(instance);
+    furi_check(instance->encoder.size_upload >= SUPERROLLO_UPLOAD_SIZE);
 
     uint64_t manufacturer_key = 0;
     if(!subghz_protocol_superrollo_get_manufacturer_key(
@@ -354,7 +360,7 @@ static bool subghz_protocol_encoder_superrollo_get_upload(
                   (uint32_t)subghz_protocol_superrollo_const.te_short);
     }
 
-    furi_check(index <= instance->encoder.size_upload);
+    furi_check(index == SUPERROLLO_UPLOAD_SIZE);
     instance->encoder.upload[index - 1U].duration +=
         (uint32_t)subghz_protocol_superrollo_const.te_short * 18U;
     instance->encoder.size_upload = index;
