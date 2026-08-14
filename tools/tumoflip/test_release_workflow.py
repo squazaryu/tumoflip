@@ -37,16 +37,12 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("already exists; publish a new tag instead", workflow)
         self.assertIn('--repo "$GITHUB_REPOSITORY"', workflow)
 
-    def test_legacy_package_release_workflow_is_retired(self) -> None:
+    def test_legacy_package_and_audit_workflows_are_retired(self) -> None:
         self.assertFalse(
             (REPO_ROOT / ".github/workflows/package-release.yml").exists()
         )
-        audit = (
-            REPO_ROOT / ".github/workflows/protected-app-audit.yml"
-        ).read_text(encoding="utf-8")
-        self.assertIn(
-            "FW_PACKAGES_REPOSITORY: squazaryu/tumoflip-fw-packages",
-            audit,
+        self.assertFalse(
+            (REPO_ROOT / ".github/workflows/protected-app-audit.yml").exists()
         )
 
     def test_subghz_architecture_is_documented_as_core_first(self) -> None:
