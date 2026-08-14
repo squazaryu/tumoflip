@@ -58,6 +58,10 @@ void subghz_scene_set_counter_on_enter(void* context) {
         byte_ptr = (uint8_t*)&subghz->gen_info->jarolift.cnt;
         byte_count = sizeof(subghz->gen_info->jarolift.cnt);
         break;
+    case GenSuperrollo:
+        byte_ptr = (uint8_t*)&subghz->gen_info->superrollo.cnt;
+        byte_count = sizeof(subghz->gen_info->superrollo.cnt);
+        break;
     case GenDitecGOL4:
         byte_ptr = (uint8_t*)&subghz->gen_info->ditec_gol4.cnt;
         byte_count = sizeof(subghz->gen_info->ditec_gol4.cnt);
@@ -145,6 +149,9 @@ bool subghz_scene_set_counter_on_event(void* context, SceneManagerEvent event) {
                 break;
             case GenJarolift:
                 subghz->gen_info->jarolift.cnt = __bswap16(subghz->gen_info->jarolift.cnt);
+                break;
+            case GenSuperrollo:
+                subghz->gen_info->superrollo.cnt = __bswap16(subghz->gen_info->superrollo.cnt);
                 break;
             case GenDitecGOL4:
                 subghz->gen_info->ditec_gol4.cnt = __bswap16(subghz->gen_info->ditec_gol4.cnt);
@@ -242,6 +249,15 @@ bool subghz_scene_set_counter_on_event(void* context, SceneManagerEvent event) {
                     subghz->gen_info->jarolift.serial,
                     subghz->gen_info->jarolift.btn,
                     subghz->gen_info->jarolift.cnt);
+                break;
+            case GenSuperrollo:
+                generated_protocol = subghz_txrx_gen_superrollo_protocol(
+                    subghz->txrx,
+                    subghz->gen_info->mod,
+                    subghz->gen_info->freq,
+                    subghz->gen_info->superrollo.serial,
+                    subghz->gen_info->superrollo.btn,
+                    subghz->gen_info->superrollo.cnt);
                 break;
             case GenDitecGOL4:
                 generated_protocol = subghz_txrx_gen_ditec_gol4_protocol(
