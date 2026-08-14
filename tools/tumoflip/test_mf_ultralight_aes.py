@@ -31,6 +31,8 @@ DICT_SCENE = (
 )
 API_SYMBOLS = REPO_ROOT / "targets/f7/api_symbols.csv"
 HOST_TEST = REPO_ROOT / "tools/tumoflip/fixtures/mf_ultralight_aes_host_test.c"
+GENERATOR = REPO_ROOT / "lib/nfc/helpers/nfc_data_generator.c"
+GENERATOR_HEADER = REPO_ROOT / "lib/nfc/helpers/nfc_data_generator.h"
 
 
 def function_body(contents: str, signature: str) -> str:
@@ -57,6 +59,45 @@ class MfUltralightAesTest(unittest.TestCase):
         cls.app_support = APP_SUPPORT.read_text(encoding="utf-8")
         cls.dict_scene = DICT_SCENE.read_text(encoding="utf-8")
         cls.api_symbols = API_SYMBOLS.read_text(encoding="utf-8")
+        cls.generator = GENERATOR.read_text(encoding="utf-8")
+        cls.generator_header = GENERATOR_HEADER.read_text(encoding="utf-8")
+
+    def test_manual_ultralight_generators_use_reviewed_factory_layouts(self) -> None:
+        generator_enum = self.generator_header[
+            self.generator_header.index("typedef enum {") :
+            self.generator_header.index("} NfcDataGeneratorType;")
+        ]
+        self.assertLess(
+            generator_enum.index("NfcDataGeneratorTypeMfUltralightC"),
+            generator_enum.index("NfcDataGeneratorTypeMfUltralightAES"),
+        )
+
+        ulc = function_body(
+            self.generator, "static void nfc_generate_mf_ultralight_c("
+        )
+        self.assertIn("MfUltralightTypeMfulC", ulc)
+        self.assertIn("pages_total = 48", ulc)
+        self.assertIn("pages_read = 48", ulc)
+        self.assertIn("page[2].data[1] = 0x48", ulc)
+        self.assertIn("page[0x2A].data[0] = 0x30", ulc)
+        self.assertIn("mf_ultralight_c_default_key", ulc)
+        self.assertIn('"BREAKMEIFYOUCAN!"', self.generator)
+
+        aes = function_body(
+            self.generator, "static void nfc_generate_mf_ultralight_aes("
+        )
+        self.assertIn("MfUltralightTypeUltralightAES", aes)
+        self.assertIn("pages_total = 60", aes)
+        self.assertIn("pages_read = 60", aes)
+        self.assertIn("version_bytes_mf0aes20", aes)
+        self.assertIn("MF_ULTRALIGHT_AES_CFG_PAGE", aes)
+        self.assertIn(".data[3] = 0x3C", aes)
+        self.assertIn("MF_ULTRALIGHT_AES_ACCESS_PROT", aes)
+        self.assertIn("MF_ULTRALIGHT_AES_ACCESS_CNT_INC_EN", aes)
+        self.assertIn("MF_ULTRALIGHT_AES_ACCESS_CNT_RD_EN", aes)
+        self.assertIn(".data[1] = 0x05", aes)
+        self.assertIn("furi_hal_random_fill_buf", aes)
+        self.assertIn("aes_signature_present = true", aes)
 
     def test_public_data_layout_is_append_only_and_api_stays_88(self) -> None:
         struct = self.header[
