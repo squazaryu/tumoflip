@@ -8,12 +8,17 @@ import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLASSIC_DICT = (
-    REPO_ROOT / "applications/main/nfc/scenes/nfc_scene_mf_classic_dict_attack.c"
+    REPO_ROOT
+    / "applications/main/nfc/helpers/protocol_support/mf_classic/mf_classic_extra_scenes.c"
 )
 CLASSIC_UPDATE = (
-    REPO_ROOT / "applications/main/nfc/scenes/nfc_scene_mf_classic_update_initial.c"
+    REPO_ROOT
+    / "applications/main/nfc/helpers/protocol_support/mf_classic/mf_classic_extra_scenes.c"
 )
-PLUS_DICT = REPO_ROOT / "applications/main/nfc/scenes/nfc_scene_mf_plus_dict_attack.c"
+PLUS_DICT = (
+    REPO_ROOT
+    / "applications/main/nfc/helpers/protocol_support/mf_plus/mf_plus_extra_scenes.c"
+)
 APP_HEADER = REPO_ROOT / "applications/main/nfc/nfc_app_i.h"
 POLLER_HEADER = REPO_ROOT / "lib/nfc/nfc_poller.h"
 
@@ -48,12 +53,12 @@ class NfcPreserveLoadedMifareTest(unittest.TestCase):
         self.assertLess(seed, latch)
 
         start = function_body(
-            self.classic_dict, "nfc_scene_mf_classic_dict_attack_start_poller("
+            self.classic_dict, "mf_classic_scene_dict_attack_start_poller("
         )
         self.assertIn("poller_has_card_data = false;", start)
 
         handler = function_body(
-            self.classic_dict, "nfc_scene_mf_classic_dict_attack_on_event("
+            self.classic_dict, "mf_classic_scene_dict_attack_on_event("
         )
         skip = handler.index("NfcCustomEventDictAttackSkip")
         guard = handler.index("if(instance->nfc_dict_context.poller_has_card_data)", skip)
@@ -64,14 +69,14 @@ class NfcPreserveLoadedMifareTest(unittest.TestCase):
 
     def test_classic_results_and_refresh_overlay_the_loaded_dump(self) -> None:
         notify = function_body(
-            self.classic_dict, "nfc_scene_mf_classic_dict_attack_notify_read("
+            self.classic_dict, "mf_classic_scene_dict_attack_notify_read("
         )
         self.assertIn("nfc_device_get_data", notify)
         self.assertNotIn("nfc_poller_get_data", notify)
 
         merge = function_body(
             self.classic_update,
-            "nfc_scene_mf_classic_update_initial_merge(",
+            "mf_classic_scene_update_initial_merge(",
         )
         for required in (
             "mf_classic_is_block_read(fresh",
@@ -88,14 +93,14 @@ class NfcPreserveLoadedMifareTest(unittest.TestCase):
             "nfc_mf_classic_update_initial_worker_callback(",
         )
         copy = callback.index("nfc_device_copy_data")
-        overlay = callback.index("nfc_scene_mf_classic_update_initial_merge", copy)
+        overlay = callback.index("mf_classic_scene_update_initial_merge", copy)
         commit = callback.index("nfc_device_set_data", overlay)
         self.assertLess(copy, overlay)
         self.assertLess(overlay, commit)
 
     def test_plus_dictionary_finish_merges_instead_of_replacing(self) -> None:
         finish = function_body(
-            self.plus_dict, "nfc_scene_mf_plus_dict_attack_finish("
+            self.plus_dict, "mf_plus_scene_dict_attack_finish("
         )
         copy = finish.index("nfc_device_copy_data")
         overlay = finish.index("mf_plus_merge_update", copy)

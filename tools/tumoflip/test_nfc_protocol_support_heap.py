@@ -11,6 +11,7 @@ SOURCE_PATH = (
     REPO_ROOT
     / "applications/main/nfc/helpers/protocol_support/nfc_protocol_support.c"
 )
+MANIFEST_PATH = REPO_ROOT / "applications/main/nfc/application.fam"
 
 
 def function_body(source: str, signature: str) -> str:
@@ -28,6 +29,7 @@ class NfcProtocolSupportHeapTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.source = SOURCE_PATH.read_text(encoding="utf-8")
+        cls.manifest = MANIFEST_PATH.read_text(encoding="utf-8")
 
     def test_protocol_support_has_a_fail_closed_default(self) -> None:
         alloc = function_body(self.source, "void nfc_protocol_support_alloc(")
@@ -50,19 +52,24 @@ class NfcProtocolSupportHeapTest(unittest.TestCase):
         plugin_load = enter.index("nfc_protocol_support_get(protocol, instance)")
         poller_alloc = enter.index("nfc_poller_alloc(instance->nfc, protocol)")
         self.assertLess(plugin_load, poller_alloc)
-        self.assertIn("protocol_base->scene_read.on_enter(instance);", enter)
+        self.assertIn("base->scene_read.on_enter(instance);", enter)
 
     def test_failed_protocol_load_returns_before_poller_allocation(self) -> None:
         enter = function_body(
             self.source, "static void nfc_protocol_support_scene_read_on_enter("
         )
-        failure = enter.index("if(protocol_base == &nfc_protocol_support_empty)")
-        release = enter.index("nfc_protocol_support_free(instance);")
-        early_return = enter.index("return;", release)
+        failure = enter.index("if(nfc_protocol_support_failed(base))")
+        explanation = enter.index("base->scene_read.on_enter(instance);", failure)
+        early_return = enter.index("return;", explanation)
         poller_alloc = enter.index("nfc_poller_alloc(instance->nfc, protocol)")
-        self.assertLess(failure, release)
-        self.assertLess(release, early_return)
+        self.assertLess(failure, explanation)
+        self.assertLess(explanation, early_return)
         self.assertLess(early_return, poller_alloc)
+
+    def test_protocol_scenes_are_excluded_from_the_resident_app(self) -> None:
+        self.assertIn('"!*_extra_scenes.c"', self.manifest)
+        self.assertIn('"helpers/mfkey32_logger.c"', self.manifest)
+        self.assertIn('"helpers/slix_unlock.c"', self.manifest)
 
 
 if __name__ == "__main__":

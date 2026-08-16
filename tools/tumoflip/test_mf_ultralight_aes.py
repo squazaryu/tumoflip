@@ -27,7 +27,7 @@ APP_SUPPORT = (
 )
 DICT_SCENE = (
     REPO_ROOT
-    / "applications/main/nfc/scenes/nfc_scene_mf_ultralight_aes_dict_attack.c"
+    / "applications/main/nfc/helpers/protocol_support/mf_ultralight/mf_ultralight_extra_scenes.c"
 )
 API_SYMBOLS = REPO_ROOT / "targets/f7/api_symbols.csv"
 HOST_TEST = REPO_ROOT / "tools/tumoflip/fixtures/mf_ultralight_aes_host_test.c"
