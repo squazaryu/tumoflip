@@ -1,10 +1,12 @@
 #include "mf_ultralight_auth.h"
 
 #include <furi.h>
+#include <mbedtls/platform_util.h>
 #include <mbedtls/sha1.h>
 
 MfUltralightAuth* mf_ultralight_auth_alloc(void) {
-    MfUltralightAuth* instance = malloc(sizeof(MfUltralightAuth));
+    MfUltralightAuth* instance = calloc(1, sizeof(MfUltralightAuth));
+    furi_check(instance);
 
     return instance;
 }
@@ -12,6 +14,7 @@ MfUltralightAuth* mf_ultralight_auth_alloc(void) {
 void mf_ultralight_auth_free(MfUltralightAuth* instance) {
     furi_assert(instance);
 
+    mbedtls_platform_zeroize(instance, sizeof(*instance));
     free(instance);
 }
 
@@ -19,9 +22,10 @@ void mf_ultralight_auth_reset(MfUltralightAuth* instance) {
     furi_assert(instance);
 
     instance->type = MfUltralightAuthTypeNone;
-    memset(&instance->password, 0, sizeof(MfUltralightAuthPassword));
-    memset(&instance->tdes_key, 0, sizeof(MfUltralightC3DesAuthKey));
-    memset(&instance->pack, 0, sizeof(MfUltralightAuthPack));
+    mbedtls_platform_zeroize(&instance->password, sizeof(instance->password));
+    mbedtls_platform_zeroize(&instance->tdes_key, sizeof(instance->tdes_key));
+    mbedtls_platform_zeroize(&instance->aes_key, sizeof(instance->aes_key));
+    mbedtls_platform_zeroize(&instance->pack, sizeof(instance->pack));
 }
 
 bool mf_ultralight_generate_amiibo_pass(MfUltralightAuth* instance, uint8_t* uid, uint16_t uid_len) {
@@ -47,7 +51,10 @@ bool mf_ultralight_generate_xiaomi_pass(MfUltralightAuth* instance, uint8_t* uid
     uint8_t hash[20];
     bool generated = false;
     if(uid_len == 7) {
-        mbedtls_sha1(uid, uid_len, hash);
+        if(mbedtls_sha1(uid, uid_len, hash) != 0) {
+            mbedtls_platform_zeroize(hash, sizeof(hash));
+            return false;
+        }
         instance->password.data[0] = (hash[hash[0] % 20]);
         instance->password.data[1] = (hash[(hash[0] + 5) % 20]);
         instance->password.data[2] = (hash[(hash[0] + 13) % 20]);
@@ -55,5 +62,6 @@ bool mf_ultralight_generate_xiaomi_pass(MfUltralightAuth* instance, uint8_t* uid
         generated = true;
     }
 
+    mbedtls_platform_zeroize(hash, sizeof(hash));
     return generated;
 }

@@ -14,22 +14,35 @@ void nfc_scene_des_auth_unlock_warn_on_enter(void* context) {
     dialog_ex_set_context(dialog_ex, nfc);
     dialog_ex_set_result_callback(dialog_ex, nfc_scene_des_auth_unlock_warn_dialog_callback);
 
-    dialog_ex_set_header(dialog_ex, message, 64, 0, AlignCenter, AlignTop);
-
     FuriString* str = furi_string_alloc();
-    furi_string_cat_printf(str, "Unlock with key: ");
 
     NfcProtocol protocol = nfc_device_get_protocol(nfc->nfc_device);
-    uint8_t* key = (protocol == NfcProtocolFelica) ? nfc->felica_auth->card_key.data :
-                                                     nfc->mf_ul_auth->tdes_key.data;
+    uint8_t* key;
+    bool is_ultralight_aes = false;
+    if(protocol == NfcProtocolFelica) {
+        key = nfc->felica_auth->card_key.data;
+    } else {
+        const MfUltralightData* data =
+            nfc_device_get_data(nfc->nfc_device, NfcProtocolMfUltralight);
+        is_ultralight_aes = data->type == MfUltralightTypeUltralightAES;
+        key = is_ultralight_aes ? nfc->mf_ul_auth->aes_key.data : nfc->mf_ul_auth->tdes_key.data;
+    }
 
-    for(uint8_t i = 0; i < FELICA_DATA_BLOCK_SIZE; i++)
-        furi_string_cat_printf(str, "%02X ", key[i]);
-    furi_string_cat_printf(str, "?");
+    if(is_ultralight_aes) {
+        message = "May lock card!";
+        furi_string_set_str(str, "Wrong AES key uses\none AUTH_LIM try.\nContinue?");
+    } else {
+        furi_string_set_str(str, "Unlock with key: ");
+        for(uint8_t i = 0; i < FELICA_DATA_BLOCK_SIZE; i++) {
+            furi_string_cat_printf(str, "%02X ", key[i]);
+        }
+        furi_string_cat_str(str, "?");
+    }
 
     nfc_text_store_set(nfc, furi_string_get_cstr(str));
     furi_string_free(str);
 
+    dialog_ex_set_header(dialog_ex, message, 64, 0, AlignCenter, AlignTop);
     dialog_ex_set_text(dialog_ex, nfc->text_store, 0, 12, AlignLeft, AlignTop);
 
     dialog_ex_set_left_button_text(dialog_ex, "Cancel");

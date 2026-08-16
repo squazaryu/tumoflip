@@ -27,7 +27,8 @@ class FieldLoggerTest(unittest.TestCase):
         self.assertIn('apptype=FlipperAppType.EXTERNAL', self.manifest)
         self.assertIn('fap_category="Module One/Field"', self.manifest)
         self.assertIn('fap_dist_path="apps/Module One/Field/field_logger.fap"', self.manifest)
-        self.assertIn('requires=["gui", "storage", "notification"]', self.manifest)
+        self.assertIn('requires=["gui", "storage", "notification", "bt"]', self.manifest)
+        self.assertIn('fap_libs=["tumoflip_device_services"]', self.manifest)
         self.assertIn('fap_icon="icon.png"', self.manifest)
         self.assertTrue((APP_DIR / "icon.png").is_file())
 
@@ -54,7 +55,13 @@ class FieldLoggerTest(unittest.TestCase):
     def test_missing_sources_degrade_gracefully(self) -> None:
         self.assertIn("FIELD_LOGGER_SENSOR_SESSIONS_DIR", self.source)
         self.assertIn("No ARF Frequency Analyzer notebook observation", self.source)
-        self.assertIn('\\"gps_fix\\":false', self.source)
+        self.assertIn('\\"gps_fix\\":%s', self.source)
+        self.assertIn('\\"gps_accuracy_m\\":null', self.source)
+        self.assertIn('"Phone GPS unavailable"', self.source)
+        self.assertIn(
+            '"gps_timestamp,temperature_c,pressure_hpa,humidity_percent,rf_frequency_hz,"',
+            self.source,
+        )
         self.assertIn('\\"temperature_c\\":null', self.source)
         self.assertIn('\\"rf\\":null', self.source)
 

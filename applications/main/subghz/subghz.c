@@ -11,6 +11,29 @@
 
 #define TAG "SubGhzApp"
 
+static void
+    subghz_device_services_callback(const TumoflipDeviceServicesResult* result, void* context) {
+    SubGhz* subghz = context;
+    if(result->request == TumoflipDeviceServicesRequestLocation &&
+       result->code == TumoflipDeviceServicesResultOk &&
+       !furi_string_empty(subghz->sidecar_path)) {
+        if(!tumoflip_device_services_write_sidecar(
+               subghz->storage,
+               furi_string_get_cstr(subghz->sidecar_path),
+               "subghz",
+               &result->value.location)) {
+            FURI_LOG_W(TAG, "Could not write optional location sidecar");
+        }
+    }
+}
+
+void subghz_request_location_sidecar(SubGhz* subghz) {
+    furi_assert(subghz);
+    tumoflip_device_services_client_cancel(subghz->device_services);
+    furi_string_set(subghz->sidecar_path, subghz->file_path);
+    tumoflip_device_services_client_request_location(subghz->device_services, "sidecar");
+}
+
 static bool
     subghz_parse_tumospectrum_capture_frequency(const char* argument, uint32_t* frequency) {
     static const char prefix[] = "tumospectrum_raw:";
@@ -144,6 +167,10 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
 
     subghz->file_path = furi_string_alloc();
     subghz->file_path_tmp = furi_string_alloc();
+    subghz->sidecar_path = furi_string_alloc();
+    subghz->storage = furi_record_open(RECORD_STORAGE);
+    subghz->device_services =
+        tumoflip_device_services_client_alloc(subghz_device_services_callback, subghz);
 
     // GUI
     subghz->gui = furi_record_open(RECORD_GUI);
@@ -384,8 +411,11 @@ void subghz_free(SubGhz* subghz, bool alloc_for_tx_only) {
     subghz->notifications = NULL;
 
     // Path strings
+    tumoflip_device_services_client_free(subghz->device_services);
+    furi_record_close(RECORD_STORAGE);
     furi_string_free(subghz->file_path);
     furi_string_free(subghz->file_path_tmp);
+    furi_string_free(subghz->sidecar_path);
 
     // The rest
     free(subghz);

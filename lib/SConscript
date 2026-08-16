@@ -47,6 +47,7 @@ libs = env.BuildModules(
         "datetime",
         "ieee754_parse_wrap",
         "usb_mass_storage",
+        "tumoflip_device_services",
     ],
 )
 

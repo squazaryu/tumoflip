@@ -22,7 +22,6 @@
 #include <gui/modules/widget.h>
 #include "views/dict_attack.h"
 #include "views/detect_reader.h"
-#include "views/dict_attack.h"
 #include "views/loading_label.h"
 
 #include <nfc/scenes/nfc_scene.h>
@@ -38,8 +37,10 @@
 #include "helpers/nfc_supported_cards.h"
 #include "helpers/felica_auth.h"
 #include "helpers/slix_unlock.h"
+#include "plugins/location_sidecar/nfc_location_sidecar_plugin.h"
 
 #include <flipper_application/plugins/composite_resolver.h>
+#include <flipper_application/plugins/plugin_manager.h>
 #include <loader/loader.h>
 #include <dialogs/dialogs.h>
 #include <storage/storage.h>
@@ -90,6 +91,10 @@
     (NFC_APP_FOLDER "/assets/mf_ultralight_c_dict_user.nfc")
 #define NFC_APP_MF_ULTRALIGHT_C_DICT_SYSTEM_PATH \
     (NFC_APP_FOLDER "/assets/mf_ultralight_c_dict.nfc")
+#define NFC_APP_MF_ULTRALIGHT_AES_DICT_USER_PATH \
+    (NFC_APP_FOLDER "/assets/mf_ultralight_aes_dict_user.nfc")
+#define NFC_APP_MF_ULTRALIGHT_AES_DICT_SYSTEM_PATH \
+    (NFC_APP_FOLDER "/assets/mf_ultralight_aes_dict.nfc")
 #define NFC_APP_MF_PLUS_DICT_USER_PATH   (NFC_APP_FOLDER "/assets/mf_plus_dict_user.nfc")
 #define NFC_APP_MF_PLUS_DICT_SYSTEM_PATH (NFC_APP_FOLDER "/assets/mf_plus_dict.nfc")
 
@@ -115,6 +120,9 @@ typedef struct {
     bool is_key_attack;
     uint8_t key_attack_current_sector;
     bool is_card_present;
+    // Latched at RequestMode, where the poller takes our dump; not is_card_present, which drops
+    // again on CardLost -- a Skip after the card is pulled must still adopt what was recovered.
+    bool poller_has_card_data;
     MfClassicNestedPhase nested_phase;
     MfClassicPrngType prng_type;
     MfClassicBackdoor backdoor;
@@ -133,6 +141,11 @@ typedef struct {
     size_t dict_keys_total;
     size_t dict_keys_current;
 } NfcMfUltralightCDictContext;
+
+// Same shape as the UL-C dict context. Isolation between the UL-C and UL-AES attacks comes from the
+// two separate NfcApp fields (mf_ultralight_c_dict_context vs mf_ultralight_aes_dict_context), not
+// this alias; the typedef is only for readability.
+typedef NfcMfUltralightCDictContext NfcMfUltralightAesDictContext;
 
 typedef struct {
     // User keys are tried before the built-in system dictionary, both within a single poller pass
@@ -213,6 +226,7 @@ struct NfcApp {
     SlixUnlock* slix_unlock;
     NfcMfClassicDictAttackContext nfc_dict_context;
     NfcMfUltralightCDictContext mf_ultralight_c_dict_context;
+    NfcMfUltralightAesDictContext mf_ultralight_aes_dict_context;
     NfcMfPlusDictAttackContext mf_plus_dict_context;
     NfcMfUltralightCWriteContext mf_ultralight_c_write_context;
     Mfkey32Logger* mfkey32_logger;
@@ -226,6 +240,9 @@ struct NfcApp {
     Iso14443_3aData* iso14443_3a_edit_data;
     FuriString* file_path;
     FuriString* file_name;
+    PluginManager* location_sidecar_plugin_manager;
+    const NfcLocationSidecarPlugin* location_sidecar_plugin;
+    NfcLocationSidecarSession* location_sidecar_session;
     FuriTimer* timer;
     bool tumotag_verify_capture;
 };
@@ -258,6 +275,9 @@ int32_t nfc_task(void* p);
 void nfc_text_store_set(NfcApp* nfc, const char* text, ...);
 
 void nfc_text_store_clear(NfcApp* nfc);
+void nfc_request_location_sidecar(NfcApp* nfc);
+
+void nfc_release_location_sidecar(NfcApp* nfc);
 
 void nfc_blink_read_start(NfcApp* nfc);
 
@@ -281,6 +301,13 @@ bool nfc_delete_shadow_file(NfcApp* instance);
 bool nfc_save(NfcApp* instance);
 
 bool nfc_delete(NfcApp* instance);
+
+bool nfc_delete_file(NfcApp* instance, const FuriString* path);
+
+bool nfc_reconcile_replaced_file(
+    NfcApp* instance,
+    const FuriString* old_path,
+    const FuriString* new_path);
 
 bool nfc_load_from_file_select(NfcApp* instance);
 

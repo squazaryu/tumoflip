@@ -39,9 +39,9 @@ The system app ID is `runtime`.
 - `capabilities` returns `runtime/capabilities` with a semicolon-separated
   `key=value` payload. Runtime v2 keeps backward-compatible keys
   `runtime=1`, `fab=2`, and `session=3`, and advertises `status=2`,
-  `trace=1`, `twin=1`, `pkg=1`, `radio=2`, `sd=1`, `fabric=1`, plus compact feature
+  `trace=1`, `twin=1`, `pkg=1`, `radio=2`, `sd=1`, `fabric=1`, `time=1`, plus compact feature
   flags in `feat`, currently `pkg`, `radio`, `trace`, `twin`, and
-  `transfer`, and `fabric`.
+  `transfer`, `fabric`, `time`, `gps`, and `net`.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
   `sd`, `pkg`, `sid`, `bo`, `radio`, and `owner`. `sd=1` means the SD card is
@@ -84,7 +84,7 @@ The system app ID is `runtime`.
   plus the live `active` and `owner` discovery fields.
   `fabric_open`, `fabric_state`, `fabric_step`, and `fabric_cancel` implement
   the fixed `counter` package described below.
-- `gps=1` and `net=1`, plus the matching `gps` and `net` feature tokens,
+- `time=1`, `gps=1`, and `net=1`, plus the matching feature tokens,
   advertise the opt-in `device_services` Companion contract described below.
 - An unknown command returns `runtime/error`, sets response and error flags,
   and carries `badcmd`.
@@ -189,6 +189,7 @@ TumoCompanion replies with the same request ID and the response flag.
 
 | Command | Request payload | Successful response |
 |---|---|---|
+| `time_once` | `schema=1;purpose=<clock|totp>` | `schema=1;unix=...;offset=...` |
 | `gps_once` | `schema=1;purpose=<manual|survey|sidecar>` | `schema=1;lat=...;lon=...;alt=...;acc=...;ts=...` |
 | `weather_now` | `schema=1` | `schema=1;temp=...;feels=...;wind=...;code=...;at=...` |
 | `place_once` | `schema=1` | `schema=1;place=...;region=...;country=...` |
@@ -204,6 +205,8 @@ Location, network sharing, last-known storage, journal storage, and webhook
 delivery are separate switches and are disabled by default in TumoCompanion.
 One request runs at a time and receives a bounded background execution window;
 background GPS requires Always Location and stops after the one-shot reply.
+`time_once` uses the authenticated iPhone session and the iPhone system clock,
+but does not require the location or network switches.
 
 Weather, reverse geocoding, and stable-release lookup are named services with
 fixed hosts, paths, fields, timeouts, redirect policy, and response limits in
@@ -220,6 +223,17 @@ file, obtains one GPS fix, and atomically writes
 `<source>.tumoflip.json`. The capture itself is never modified; a previous
 sidecar is backed up, the new file is read back byte-for-byte, and any failure
 rolls the operation back.
+
+The same transaction is used automatically after successful saves in core
+Sub-GHz, NFC, and LF RFID. TumoSurvey writes a sidecar for its committed CSV
+session, Field Logger embeds the one-shot iPhone fix in CSV/JSONL/GPX records,
+and TumoSpectrum writes sidecars beside saved signal reports. Location failure
+never changes or blocks the primary capture.
+
+In `Settings -> Clock`, holding `OK` on the Time row requests `time_once` and
+sets the Flipper RTC from the returned local time. Authenticator/TOTP performs
+a non-mutating check against the same phone time and shows `TIME!` only when
+the RTC or configured time-zone offset is inconsistent.
 
 ### BLE GATT Lab diagnostics
 

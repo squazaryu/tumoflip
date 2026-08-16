@@ -7,6 +7,7 @@ void nfc_scene_save_success_popup_callback(void* context) {
 
 void nfc_scene_save_success_on_enter(void* context) {
     NfcApp* nfc = context;
+    nfc_request_location_sidecar(nfc);
 
     // Setup view
     Popup* popup = nfc->popup;
@@ -32,6 +33,10 @@ bool nfc_scene_save_success_on_event(void* context, SceneManagerEvent event) {
                           nfc->scene_manager, NfcSceneMfUltralightCKeys)) {
                 consumed = scene_manager_search_and_switch_to_previous_scene(
                     nfc->scene_manager, NfcSceneMfUltralightCKeys);
+            } else if(scene_manager_has_previous_scene(
+                          nfc->scene_manager, NfcSceneMfUltralightAesKeys)) {
+                consumed = scene_manager_search_and_switch_to_previous_scene(
+                    nfc->scene_manager, NfcSceneMfUltralightAesKeys);
             } else if(scene_manager_has_previous_scene(nfc->scene_manager, NfcSceneMfPlusKeys)) {
                 consumed = scene_manager_search_and_switch_to_previous_scene(
                     nfc->scene_manager, NfcSceneMfPlusKeys);

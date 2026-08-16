@@ -26,13 +26,13 @@ issue, report it in this repository:
 ## Current Build
 
 - Distribution: Tumoflip standalone release line
-- Firmware version: `t-flppr-fw-004`
+- Firmware version: `t-flppr-fw-005`
 - Firmware origin/fork: `tumoflip`
 - Firmware API: `88.0`
 - Target: Flipper Zero F7
 - Release channel: `main stable line`
-- Target stable SemVer: `v1.0.4`
-- Release package: `flipper-z-f7-update-t-flppr-fw-004.tgz`
+- Target stable SemVer: `v1.0.5`
+- Release package: `flipper-z-f7-update-t-flppr-fw-005.tgz`
 - Flash profile: JS Runner / MJS runtime excluded to preserve internal flash headroom.
 
 API `88.0` is a deliberate breaking migration. External FAP/FAL binaries built
@@ -62,7 +62,7 @@ t-dev-<release>-<iteration>
 - `t-flppr-fw`: Tumowuh Flipper Firmware stable build prefix.
 - `tmwhflpprarf`: legacy stable prefix kept for existing releases.
 - `t-dev`: Tumoflip development build prefix for unstable builds.
-- `004`: standalone Tumoflip release number.
+- `005`: standalone Tumoflip release number.
 - `<iteration>`: monotonically increasing revision used only by `t-dev` builds.
 
 `main` should only receive builds that are stable enough to publish as tagged
@@ -260,7 +260,7 @@ package contract, and release process.
 
 | Area | Baseline behavior | Tumoflip |
 | --- | --- | --- |
-| Firmware identity | Uses another distribution identity. | Reports `firmware_version: t-flppr-fw-004` and `firmware_origin_fork: tumoflip`. |
+| Firmware identity | Uses another distribution identity. | Reports `firmware_version: t-flppr-fw-005` and `firmware_origin_fork: tumoflip`. |
 | Desktop layouts | Uses the baseline Desktop style set. | Adds custom main menu styles, including Wii, DSi, Vertical, and Wii Vertical variants. |
 | Dummy Mode | Included and reachable from Desktop shortcuts. | Removed from firmware and removed from shortcuts. |
 | Short-Up quick menu | Includes the standard quick actions, including Dummy Mode in the original layout. | Replaces the removed Dummy Mode shortcut with Settings. |
@@ -273,7 +273,7 @@ package contract, and release process.
 | Sub-GHz hopping | Frequency hopping only. | Adds preset and combined hopping plus an adaptive scan dwell, signal hold, post-signal grace period, and bounded hold time to system Sub-GHz. |
 | NFC additions | Uses the baseline NFC feature set. | Shows captured MIFARE Ultralight/NTAG PWD and PACK, adds Bambu Lab and Moscow social-card subscription parsers, and supports large ISO15693 multi-block emulation with bounded parser writes. |
 | User apps | External/local apps are not part of the base repository. | Vendors selected local apps into `applications_user` so the firmware builds reproducibly. |
-| Build metadata | Uses upstream build metadata conventions. | Uses `t-flppr-fw-004` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
+| Build metadata | Uses upstream build metadata conventions. | Uses `t-flppr-fw-005` for the installed firmware version and release artifact suffix, while keeping `tumoflip` as the fork origin. |
 
 ## Notes on Custom UI
 
@@ -380,6 +380,8 @@ ProtoPirate FAP, so ARF Status no longer checks obsolete `apps_assets` paths.
 - `Authenticator` / TOTP:
   vendored modified version based on
   [akopachov/flipper-zero_authenticator](https://github.com/akopachov/flipper-zero_authenticator).
+  It checks the RTC against the authenticated iPhone bridge and warns when the
+  system time or configured time-zone offset would produce incorrect codes.
 - `quac`:
   vendored modified version based on
   [rdefeo/quac](https://github.com/rdefeo/quac).
@@ -400,6 +402,15 @@ The background Tumoflip Runtime adds the backward-compatible `FAB2` protocol:
 request IDs, explicit response/error flags, ordered chunks, capability
 discovery, and Runtime commands that do not require opening a FAP. Legacy
 `FAB1` remains supported. See [the App Bridge v2 wire contract](docs/app-bridge-v2.md).
+
+Holding `OK` in `Settings -> Clock & Alarm` synchronizes the RTC with the
+connected iPhone. A dedicated bottom action shows `Hold to sync`, request
+progress, and the result without covering the clock controls; the long press is
+fully consumed and never opens manual time editing. Successful Sub-GHz, NFC,
+and LF RFID saves can receive an optional transactional `.tumoflip.json`
+location sidecar; TumoSurvey, Field Logger, and TumoSpectrum consume the same
+bounded phone service without adding always-running GPS or network daemons to
+the firmware.
 
 The system Sub-GHz application and all current ARF radio applications acquire
 their radio through the [Radio Broker](docs/subghz-radio-broker.md). Custom
@@ -432,8 +443,11 @@ host-side atomic installer with rollback. See
 For package-only changes, such as a fixed external FAP, use the `Package
 Release` workflow instead of creating a new firmware tag. It rebuilds package
 resources from the selected ref, keeps the firmware version unchanged, and
-replaces only `tumoflip-packages.json`, `tumoflip-packages.zip`, and the release
-SHA-256 sums in the existing GitHub Release.
+publishes a new immutable `fw-packages-stable-NNN` or `fw-packages-dev-NNN`
+catalog containing only `tumoflip-packages.json`, `tumoflip-packages.zip`, and
+their SHA-256 sums. The accepted per-channel baseline is pinned in
+`tools/tumoflip/package_catalog_baselines.json`; the workflow rejects a different
+firmware package set instead of surfacing unrelated rebuilt FAPs as updates.
 
 The standalone FlipperRelay repository lives at
 [squazaryu/flipper_relay](https://github.com/squazaryu/flipper_relay).
@@ -457,7 +471,7 @@ Stable `main` update packages and `dev` prereleases are published on
 [GitHub Releases](https://github.com/squazaryu/tumoflip/releases). The currently
 selected branch build uses this artifact name:
 
-- `flipper-z-f7-update-t-flppr-fw-004.tgz`
+- `flipper-z-f7-update-t-flppr-fw-005.tgz`
 
 Before flashing, make a backup of important data:
 
@@ -479,7 +493,7 @@ python3 tools/tumoflip/validate_release.py --write-manifest
 The update package is produced under:
 
 ```text
-dist/f7-C/flipper-z-f7-update-t-flppr-fw-004.tgz
+dist/f7-C/flipper-z-f7-update-t-flppr-fw-005.tgz
 ```
 
 ## Provenance and third-party sources

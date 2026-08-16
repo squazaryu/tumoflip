@@ -45,7 +45,9 @@ installed firmware version unchanged and emit a manifest with
 ```sh
 python3 tools/tumoflip/package_release.py \
   --build-dir build/f7-firmware-C \
-  --target-release-tag v0.3.1
+  --target-release-tag v0.3.1 \
+  --target-manifest downloaded-release/tumoflip-packages.json \
+  --target-package-zip downloaded-release/tumoflip-packages.zip
 ```
 
 Before writing the package manifest, the package-only builder syncs current
@@ -53,11 +55,66 @@ Before writing the package manifest, the package-only builder syncs current
 This makes targeted FAP fixes, such as WiFi Mapper, publishable through FW
 Packages without rebuilding or reinstalling flash firmware.
 
+Large optional FAPs may set `fap_package_only=True` in `application.fam`.
+They are still compiled and APPCHK-validated, but are not copied into the
+updater's `resources.ths`. Release validation stages them from `.extapps` only
+while creating `tumoflip-packages.zip` and fails if one leaks into the updater.
+`ESP Flasher` uses this mode because its offline Quick Flash images make the FAP
+several megabytes larger than ordinary apps.
+
+Every workflow that produces package assets must therefore build both
+`updater_package` and the explicit package-only targets. At present the command
+ends with `updater_package fap_esp_flasher`; omitting the second target is a hard
+validation failure instead of a silent partial release.
+
+When package source comes from a newer branch than the installed firmware,
+`--target-manifest` and `--target-package-zip` preserve the existing release's
+exact firmware identity and every existing package payload. Only files declared
+with `fap_package_only=True` are overlaid from the newer build; all other
+manifest entries are retained byte-for-byte from the published ZIP.
+The builder accepts this only when the target is Tumoflip for Flipper Zero and
+its API exactly matches the package build API. This allows an API-compatible
+stable release to receive a protected FAP update without changing or relabeling
+its firmware artifacts.
+
 Use the `Package Release` GitHub Actions workflow to publish updated
-`tumoflip-packages.json`, `tumoflip-packages.zip`, and refreshed SHA-256 sums to
-an existing firmware release. The workflow downloads the already-published
-firmware assets for that tag, hashes those unchanged files together with the new
-package assets, and does not create or upload new firmware artifacts.
+`tumoflip-packages.json`, `tumoflip-packages.zip`, and SHA-256 sums. New updates
+must use an immutable catalog tag such as `fw-packages-stable-001` or
+`fw-packages-dev-001`. The catalog revision has its own lifecycle, analogous to
+Community Apps: updating a FAP never renames, replaces, or republishes firmware.
+
+The workflow still downloads a stable/dev firmware release as the verified
+baseline, checks its existing firmware and package assets against its SHA-256
+ledger, and overlays only declared package-only exports. The resulting manifest
+records `catalog_channel`, `catalog_revision`, and `catalog_release_tag`. The
+independent GitHub release contains only the package manifest, package ZIP, and
+their checksum ledger; it contains no DFU, updater, or SDK.
+
+The accepted baseline for each channel is pinned in
+`tools/tumoflip/package_catalog_baselines.json`. Publishing a catalog from any
+other firmware tag fails before package generation. This prevents a rebuilt but
+unaccepted firmware package set from making unrelated FAPs appear as updates.
+Change a baseline only when that firmware/package set has completed its own
+acceptance; ordinary FAP updates do not change it.
+
+When an accepted firmware advances the channel baseline, use catalog
+reconciliation instead of treating every separately linked FAP/FAL as a new
+application update. The canonical manifest and ZIP must come from the newly
+accepted firmware release. A previous independent catalog may contribute exact
+`compatible_builds` only for its explicit `overlay_targets`, only when its clean
+package source commit equals the accepted firmware tag commit, and only with its
+content-addressed manifest provenance recorded in `compatible_releases`.
+Unrelated files from the previous firmware baseline are never grandfathered.
+Clients may use these exact aliases for status/adoption/cleanup, but must always
+download, hash, stage, and install the canonical ZIP payload.
+
+TumoCompanion selects the newest catalog revision for the device's package
+channel. Firmware version is not package identity. Installation remains
+fail-closed on Tumoflip origin, channel, hardware target, firmware API, embedded
+FAP metadata, content hashes, and the existing rollback journal. The workflow's
+legacy mode can still replace package assets attached to an older firmware tag
+for clients predating independent catalogs, but it must not be used for new
+revisions.
 
 Apply all package groups to a directly mounted SD card:
 

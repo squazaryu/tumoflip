@@ -22,6 +22,7 @@
 #include <notification/notification_messages.h>
 #include <dialogs/dialogs.h>
 #include <storage/storage.h>
+#include <tumoflip_device_services/tumoflip_device_services.h>
 #include <flipper_format/flipper_format.h>
 
 #include <rpc/rpc_app.h>
@@ -90,6 +91,8 @@ struct LfRfid {
     FuriString* file_path;
     FuriString* file_name;
     FuriString* raw_file_name;
+    FuriString* sidecar_path;
+    TumoflipDeviceServicesClient* device_services;
 
     ProtocolDict* dict;
     ProtocolId protocol_id;
@@ -140,6 +143,10 @@ bool lfrfid_load_raw_key_from_file_select(LfRfid* app);
 
 bool lfrfid_delete_key(LfRfid* app);
 
+bool lfrfid_delete_key_file(LfRfid* app, const FuriString* path);
+
+bool lfrfid_reconcile_replaced_key(LfRfid* app, const FuriString* old_path);
+
 bool lfrfid_load_key_data(LfRfid* app, FuriString* path, bool show_dialog);
 
 bool lfrfid_save_key_data(LfRfid* app, FuriString* path);
@@ -149,6 +156,7 @@ void lfrfid_make_app_folder(LfRfid* app);
 void lfrfid_text_store_set(LfRfid* app, const char* text, ...);
 
 void lfrfid_text_store_clear(LfRfid* app);
+void lfrfid_request_location_sidecar(LfRfid* app);
 
 void lfrfid_popup_timeout_callback(void* context);
 

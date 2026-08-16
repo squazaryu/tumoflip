@@ -14,6 +14,17 @@ App(
     fap_category="NFC",
 )
 
+App(
+    appid="nfc_location_sidecar",
+    targets=["f7"],
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="nfc_location_sidecar_plugin_ep",
+    requires=["nfc"],
+    sources=["plugins/location_sidecar/*.c"],
+    fap_libs=["tumoflip_device_services"],
+    fal_embedded=True,
+)
+
 # Protocol support plugins
 
 App(

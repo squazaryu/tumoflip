@@ -581,6 +581,15 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .jarolift.btn = 0x02,
             .jarolift.cnt = 0x03};
         break;
+    case SetTypeSuperrollo:
+        gen_info = (GenInfo){
+            .type = GenSuperrollo,
+            .mod = "AM650",
+            .freq = 433920000,
+            .superrollo.serial = key & 0xFFFFFF0,
+            .superrollo.btn = 0x03, /* UP (valid: 0x03=Up 0x05=Down 0x07=Stop) */
+            .superrollo.cnt = 0x0001};
+        break;
     case SetTypeDitecGOL4:
         gen_info = (GenInfo){
             .type = GenDitecGOL4,

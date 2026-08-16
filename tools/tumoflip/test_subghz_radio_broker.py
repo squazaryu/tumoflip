@@ -92,6 +92,8 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
         allowed_direct_without_broker = {
             # Powers the external ESP32 over OTG; it does not access the CC1101.
             "applications_user/esp32_wifi_marauder/wifi_marauder_app.c",
+            "applications_user/esp_flasher/esp_flasher_app.c",
+            "applications_user/esp_flasher/esp_flasher_worker.c",
             "applications_user/flipper_xremote/xremote.c",
             "applications_user/quac/actions/action_ir.c",
         }

@@ -12,4 +12,5 @@ App(
     fap_description="Module One survey with iPhone GPS fallback, pinned baselines, bounded AP changes, atomic sessions, GeoJSON export, and Companion live relay.",
     fap_icon="wifi_mapper_10px.png",
     fap_icon_assets="icons",
+    fap_libs=["tumoflip_device_services"],
 )

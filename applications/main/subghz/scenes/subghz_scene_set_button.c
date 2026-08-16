@@ -52,6 +52,10 @@ void subghz_scene_set_button_on_enter(void* context) {
         byte_ptr = &subghz->gen_info->jarolift.btn;
         byte_count = sizeof(subghz->gen_info->jarolift.btn);
         break;
+    case GenSuperrollo:
+        byte_ptr = &subghz->gen_info->superrollo.btn;
+        byte_count = sizeof(subghz->gen_info->superrollo.btn);
+        break;
     case GenDitecGOL4:
         byte_ptr = &subghz->gen_info->ditec_gol4.btn;
         byte_count = sizeof(subghz->gen_info->ditec_gol4.btn);
@@ -105,6 +109,7 @@ bool subghz_scene_set_button_on_event(void* context, SceneManagerEvent event) {
             case GenKingGatesStylo4k:
             case GenBenincaARC:
             case GenJarolift:
+            case GenSuperrollo:
             case GenDitecGOL4:
             case GenNiceFlorS:
             case GenSomfyKeytis:

@@ -33,6 +33,8 @@
 
 #include <gui/modules/variable_item_list.h>
 #include <lib/toolbox/path.h>
+#include <storage/storage.h>
+#include <tumoflip_device_services/tumoflip_device_services.h>
 
 #include "rpc/rpc_app.h"
 
@@ -62,6 +64,9 @@ struct SubGhz {
     DialogsApp* dialogs;
     FuriString* file_path;
     FuriString* file_path_tmp;
+    FuriString* sidecar_path;
+    Storage* storage;
+    TumoflipDeviceServicesClient* device_services;
     char file_name_tmp[SUBGHZ_MAX_LEN_NAME];
     SubGhzNotificationState state_notifications;
 
@@ -128,6 +133,7 @@ SubGhzRxKeyState subghz_rx_key_state_get(SubGhz* subghz);
 
 void subghz_ensure_frequency_analyzer_view(SubGhz* subghz);
 void subghz_ensure_receiver_view(SubGhz* subghz);
+void subghz_request_location_sidecar(SubGhz* subghz);
 
 extern const NotificationSequence subghz_sequence_rx;
 extern const NotificationSequence subghz_sequence_rx_locked;

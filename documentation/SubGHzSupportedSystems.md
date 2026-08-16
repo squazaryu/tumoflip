@@ -73,6 +73,10 @@ That list is only for default SubGHz app, apps like *Weather Station* have their
 - Honeywell WDB `AM650` (48 bits, Static) - Doorbell
 - Magellan `433.92MHz` `AM650` (32 bits, Static) - Sensor, alarm
 - Jarolift `433.92MHz` `AM650` (72 bits, Dynamic, KeeLoq based) - Automatic roller shutters
+- Superrollo `433.92MHz` `AM650` (67 bits, Dynamic, KeeLoq based) - Automatic roller shutters
+
+  Decoding counters and transmitting require a user-provided Normal Learning key named
+  `Superrollo`. No manufacturer key is distributed with the firmware.
 
 ### Alarms
 - Hollarm `433.92MHz` `AM650` (42 bits, Static) - Bike alarms

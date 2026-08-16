@@ -67,3 +67,5 @@
 !tumokey/**
 !tumo_uart_console/
 !tumo_uart_console/**
+!esp_flasher/
+!esp_flasher/**

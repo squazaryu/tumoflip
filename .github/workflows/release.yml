@@ -116,7 +116,8 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf applications/main/clock_app/resources/apps/ || true
-          ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" updater_package
+          ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
+            updater_package fap_esp_flasher
 
       - name: Run release tests
         shell: bash
@@ -133,6 +134,7 @@ jobs:
             tools/tumoflip/test_subghz_protocol_packs.py \
             tools/tumoflip/test_update_splash.py \
             tools/tumoflip/test_validate_release.py \
+            tools/tumoflip/test_esp_flash_package.py \
             tools/tumoflip/test_apply_packages.py \
             tools/tumoflip/test_make_packages_zip.py
 
