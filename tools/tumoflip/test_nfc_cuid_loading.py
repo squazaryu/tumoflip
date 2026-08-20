@@ -29,14 +29,15 @@ class NfcCuidLoadingTest(unittest.TestCase):
 
     def test_cuid_scan_shows_and_hides_label_around_prepare(self) -> None:
         scene = source(
-            "applications/main/nfc/scenes/nfc_scene_mf_classic_dict_attack.c"
+            "applications/main/nfc/helpers/protocol_support/mf_classic/"
+            "mf_classic_extra_scenes.c"
         )
         show = scene.index(
             'nfc_show_loading_label_popup(instance, "CUID dictionary\\n'
             'is loading", true);'
         )
         prepare = scene.index(
-            "nfc_scene_mf_classic_dict_attack_prepare_view(instance);",
+            "mf_classic_scene_dict_attack_prepare_view(instance);",
             show,
         )
         hide = scene.index(
