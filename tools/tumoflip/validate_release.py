@@ -23,7 +23,8 @@ FLASH_BASE = 0x08000000
 UPDATER_LIMIT = 128 * 1024
 # Keep at least one complete STM32WB55 flash erase page between the C1 image
 # and the C2/radio region. This prevents a C1 erase operation from touching C2.
-DEFAULT_MIN_C2_GAP = 4096
+STM32WB55_FLASH_ERASE_PAGE_BYTES = 4096
+DEFAULT_MIN_C2_GAP = STM32WB55_FLASH_ERASE_PAGE_BYTES
 PROTOCOL_PACKS = {
     "protocol_chrysler.fal",
     "protocol_fiat_marelli.fal",
@@ -425,6 +426,38 @@ def elf_flash_end(repo_root: Path, elf_path: Path, radio_address: int) -> int:
     return flash_end
 
 
+def align_up(value: int, alignment: int) -> int:
+    if alignment <= 0:
+        raise ValueError("alignment must be positive")
+    return (value + alignment - 1) // alignment * alignment
+
+
+def validate_c2_safety(
+    radio_address: int,
+    flash_end: int,
+    dfu_container_gap: int,
+    min_c2_gap: int,
+) -> tuple[int, int]:
+    """Require a full erase-page-safe C1-to-C2 gap from the ELF layout.
+
+    The DfuSe file contains metadata that is not flashed to C1. Its byte size
+    is retained as a release diagnostic, but must not shrink the physical gap.
+    """
+    required_gap = max(min_c2_gap, STM32WB55_FLASH_ERASE_PAGE_BYTES)
+    erase_aligned_flash_end = align_up(
+        flash_end, STM32WB55_FLASH_ERASE_PAGE_BYTES
+    )
+    physical_gap = radio_address - erase_aligned_flash_end
+    section_gap = radio_address - flash_end
+    if physical_gap < required_gap:
+        raise ValidationError(
+            "C2 physical safety gap is too small: "
+            f"physical={physical_gap}, sections={section_gap}, "
+            f"DFU container={dfu_container_gap}, required={required_gap} bytes"
+        )
+    return erase_aligned_flash_end, physical_gap
+
+
 def api_version(api_symbols: Path) -> str:
     for line in api_symbols.read_text(encoding="utf-8").splitlines():
         if line.startswith("Version,+,"):
@@ -796,15 +829,16 @@ def validate_release(
         raise ValidationError("Radio CRC does not match update.fuf")
 
     radio_address = little_endian_hex(fuf["Radio address"])
-    coarse_gap = radio_address - FLASH_BASE - firmware.stat().st_size
+    # firmware.dfu includes DfuSe container metadata that is not flashed to C1.
+    # Keep this coarse value in the manifest for diagnostics only; the gate below
+    # uses the erase-page-aligned ELF image layout.
+    dfu_container_gap = radio_address - FLASH_BASE - firmware.stat().st_size
     elf_path = require_file(build_dir / "firmware.elf", "firmware ELF")
     flash_end = elf_flash_end(repo_root, elf_path, radio_address)
     section_gap = radio_address - flash_end
-    if coarse_gap < min_c2_gap or section_gap < min_c2_gap:
-        raise ValidationError(
-            f"C2 safety gap is too small: DFU={coarse_gap}, sections={section_gap}, "
-            f"required={min_c2_gap} bytes"
-        )
+    erase_aligned_flash_end, physical_c2_gap = validate_c2_safety(
+        radio_address, flash_end, dfu_container_gap, min_c2_gap
+    )
 
     firmware_json = json.loads(
         require_file(build_dir / "firmware.json", "firmware metadata").read_text(
@@ -858,9 +892,13 @@ def validate_release(
                 "radio_address": f"0x{radio_address:08X}",
             },
             "safety": {
-                "minimum_c2_gap_bytes": min_c2_gap,
-                "dfu_gap_bytes": coarse_gap,
+                "minimum_c2_gap_bytes": max(
+                    min_c2_gap, STM32WB55_FLASH_ERASE_PAGE_BYTES
+                ),
+                "dfu_gap_bytes": dfu_container_gap,
                 "section_gap_bytes": section_gap,
+                "erase_aligned_flash_end": f"0x{erase_aligned_flash_end:08X}",
+                "physical_c2_gap_bytes": physical_c2_gap,
                 "updater_bytes": loader.stat().st_size,
                 "updater_limit_bytes": UPDATER_LIMIT,
             },
@@ -929,7 +967,9 @@ def main() -> int:
     safety = manifest["safety"]
     print(
         "OK: updater validated; "
-        f"C2 section gap={safety['section_gap_bytes']} bytes; "
+        f"C2 physical gap={safety['physical_c2_gap_bytes']} bytes; "
+        f"section gap={safety['section_gap_bytes']} bytes; "
+        f"DFU container gap={safety['dfu_gap_bytes']} bytes; "
         f"updater={safety['updater_bytes']} bytes; "
         f"API={manifest['firmware']['api']}"
     )

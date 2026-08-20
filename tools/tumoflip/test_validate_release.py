@@ -21,6 +21,7 @@ try:
         PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
+        DEFAULT_MIN_C2_GAP,
         ValidationError,
         _load_heatshrink2,
         crc32,
@@ -32,6 +33,7 @@ try:
         runtime_capabilities,
         validate_runtime_contract,
         validate_resources_archive,
+        validate_c2_safety,
         validate_static_sd_resources,
     )
 except ImportError:
@@ -44,6 +46,7 @@ except ImportError:
         PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
+        DEFAULT_MIN_C2_GAP,
         ValidationError,
         _load_heatshrink2,
         crc32,
@@ -55,6 +58,7 @@ except ImportError:
         runtime_capabilities,
         validate_runtime_contract,
         validate_resources_archive,
+        validate_c2_safety,
         validate_static_sd_resources,
     )
 
@@ -101,6 +105,39 @@ class ValidateReleaseTest(unittest.TestCase):
             path = Path(directory) / "data.bin"
             path.write_bytes(b"tumoflip")
             self.assertEqual(crc32(path), zlib.crc32(b"tumoflip") & 0xFFFFFFFF)
+
+    def test_c2_safety_uses_physical_elf_layout_not_dfuse_metadata(self) -> None:
+        radio_address = 0x080D7000
+        # This matches the release layout that has a 4 KiB physical erase-page
+        # gap even though the DfuSe container adds 309 non-flashed bytes.
+        flash_end = radio_address - 4332
+        dfu_container_gap = 4023
+
+        erase_aligned_end, physical_gap = validate_c2_safety(
+            radio_address,
+            flash_end,
+            dfu_container_gap,
+            DEFAULT_MIN_C2_GAP,
+        )
+
+        self.assertLess(dfu_container_gap, DEFAULT_MIN_C2_GAP)
+        self.assertEqual(erase_aligned_end, radio_address - DEFAULT_MIN_C2_GAP)
+        self.assertEqual(physical_gap, DEFAULT_MIN_C2_GAP)
+
+    def test_c2_safety_rejects_layout_without_a_complete_erase_page(self) -> None:
+        radio_address = 0x080D7000
+        flash_end = radio_address - DEFAULT_MIN_C2_GAP + 1
+
+        with self.assertRaisesRegex(
+            ValidationError,
+            r"C2 physical safety gap is too small: physical=0",
+        ):
+            validate_c2_safety(
+                radio_address,
+                flash_end,
+                DEFAULT_MIN_C2_GAP,
+                DEFAULT_MIN_C2_GAP,
+            )
 
     def test_static_sd_resources_are_build_inputs(self) -> None:
         firmware = (REPO_ROOT / "firmware.scons").read_text(encoding="utf-8")
