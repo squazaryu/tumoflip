@@ -49,6 +49,19 @@ class PackageAuditAppTest(unittest.TestCase):
         ):
             self.assertIn(expected, source)
 
+    def test_package_audit_app_distinguishes_recorded_and_running_firmware(self) -> None:
+        source = (APP_ROOT / "tumoflip_packages.c").read_text(encoding="utf-8")
+        for expected in (
+            '#include <furi_hal_version.h>',
+            '"FirmwareApi:"',
+            '"Recorded FW: %s"',
+            "Running FW: %s\\n",
+            "historic package provenance",
+            "TumoCompanion checks current compatibility separately.",
+            "version_get_version(running)",
+        ):
+            self.assertIn(expected, source)
+
     def test_known_release_cleanup_paths_are_visible_in_audit(self) -> None:
         source = (APP_ROOT / "tumoflip_packages.c").read_text(encoding="utf-8")
         for legacy, canonical in RELEASE_CLEANUP_PATHS.items():

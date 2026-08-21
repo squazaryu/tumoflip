@@ -1,4 +1,5 @@
 #include <furi.h>
+#include <furi_hal_version.h>
 #include <gui/gui.h>
 #include <gui/modules/submenu.h>
 #include <gui/modules/text_box.h>
@@ -151,6 +152,7 @@ typedef struct {
     FuriString* release_id;
     FuriString* transaction;
     FuriString* firmware;
+    FuriString* firmware_api;
     FuriString* package_release;
     FuriString* groups;
     FuriString* installed_files;
@@ -305,6 +307,7 @@ static void tumo_state_init(TumoPackageState* state) {
     state->release_id = furi_string_alloc();
     state->transaction = furi_string_alloc();
     state->firmware = furi_string_alloc();
+    state->firmware_api = furi_string_alloc();
     state->package_release = furi_string_alloc();
     state->groups = furi_string_alloc();
     state->installed_files = furi_string_alloc();
@@ -316,6 +319,7 @@ static void tumo_state_free(TumoPackageState* state) {
     furi_string_free(state->release_id);
     furi_string_free(state->transaction);
     furi_string_free(state->firmware);
+    furi_string_free(state->firmware_api);
     furi_string_free(state->package_release);
     furi_string_free(state->groups);
     furi_string_free(state->installed_files);
@@ -452,6 +456,8 @@ static void tumo_read_package_state(Storage* storage, TumoPackageState* state) {
             } else if(tumo_state_value(line, "Transaction:", state->transaction)) {
                 continue;
             } else if(tumo_state_value(line, "Firmware:", state->firmware)) {
+                continue;
+            } else if(tumo_state_value(line, "FirmwareApi:", state->firmware_api)) {
                 continue;
             } else if(tumo_state_value(line, "PackageRelease:", state->package_release)) {
                 continue;
@@ -623,6 +629,26 @@ static void tumo_packages_append_missing_state_note(FuriString* text) {
         "No files are changed by this app.");
 }
 
+static void tumo_packages_append_firmware_context(
+    FuriString* text,
+    const TumoPackageState* state) {
+    const Version* running = furi_hal_version_get_firmware_version();
+    const char* running_version = version_get_version(running);
+    const char* recorded_version = furi_string_get_cstr(state->firmware);
+
+    furi_string_cat_printf(text, "Recorded FW: %s", recorded_version);
+    if(!furi_string_empty(state->firmware_api)) {
+        furi_string_cat_printf(text, " (API %s)", furi_string_get_cstr(state->firmware_api));
+    }
+    furi_string_cat_printf(text, "\nRunning FW: %s\n", running_version);
+    if(strcmp(recorded_version, running_version) != 0) {
+        furi_string_cat_printf(
+            text,
+            "Note: this is historic package provenance. "
+            "TumoCompanion checks current compatibility separately.\n");
+    }
+}
+
 static void tumo_packages_show_state(TumoPackagesApp* app) {
     TumoPackageState state;
     tumo_state_init(&state);
@@ -639,7 +665,7 @@ static void tumo_packages_show_state(TumoPackagesApp* app) {
             app->text, "Release: %s\n", furi_string_get_cstr(state.release_id));
         furi_string_cat_printf(
             app->text, "Package: %s\n", furi_string_get_cstr(state.package_release));
-        furi_string_cat_printf(app->text, "FW: %s\n", furi_string_get_cstr(state.firmware));
+        tumo_packages_append_firmware_context(app->text, &state);
         furi_string_cat_printf(app->text, "Groups: %s\n", furi_string_get_cstr(state.groups));
         furi_string_cat_printf(
             app->text, "Installed: %s\n", furi_string_get_cstr(state.installed_files));
@@ -688,7 +714,7 @@ static void tumo_packages_show_audit(TumoPackagesApp* app) {
     furi_string_cat_printf(
         app->text, "Install state: %s\n", stats.install_state_present ? "OK" : "not recorded");
     if(state.present) {
-        furi_string_cat_printf(app->text, "FW: %s\n", furi_string_get_cstr(state.firmware));
+        tumo_packages_append_firmware_context(app->text, &state);
         furi_string_cat_printf(app->text, "Groups: %s\n", furi_string_get_cstr(state.groups));
     } else if(metadata_missing) {
         furi_string_cat_printf(app->text, "\n");
