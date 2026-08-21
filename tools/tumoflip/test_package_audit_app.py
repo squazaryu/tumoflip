@@ -62,6 +62,21 @@ class PackageAuditAppTest(unittest.TestCase):
         ):
             self.assertIn(expected, source)
 
+    def test_package_audit_app_reads_verified_catalog_snapshot_separately(self) -> None:
+        source = (APP_ROOT / "tumoflip_packages.c").read_text(encoding="utf-8")
+        for expected in (
+            "TUMO_CATALOG_STATE_PATH",
+            "Tumoflip Package Catalog State",
+            '"CatalogRelease:"',
+            '"FirmwareBaselineFiles:"',
+            "tumo_read_catalog_state",
+            "tumo_packages_append_catalog_context",
+            "Catalog: not synchronized",
+            "Install history",
+            "Refresh FW Packages in TumoCompanion.",
+        ):
+            self.assertIn(expected, source)
+
     def test_known_release_cleanup_paths_are_visible_in_audit(self) -> None:
         source = (APP_ROOT / "tumoflip_packages.c").read_text(encoding="utf-8")
         for legacy, canonical in RELEASE_CLEANUP_PATHS.items():
