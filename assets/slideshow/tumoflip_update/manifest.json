@@ -2,7 +2,7 @@
   "frames": {
     "frame_00.png": {
       "mode": "1",
-      "pixels_sha256": "5b4d83333ccc6e30b77567764e23ce16c61af81b97532f00ca527ecf9f032e4a",
+      "pixels_sha256": "db4314716a1e8144bad639c6e6a118496988454d900b9dd8d6d276cf863d3957",
       "size": [
         128,
         64
@@ -10,7 +10,7 @@
     },
     "frame_01.png": {
       "mode": "1",
-      "pixels_sha256": "30504ab93d453dd091b3156746814da6f7799930feb3b1bf1ba7187aacb5b5f7",
+      "pixels_sha256": "421d3ec031558bd7268207fbb277def673b669eb1ac0436a8ec83c28961de773",
       "size": [
         128,
         64
@@ -18,7 +18,7 @@
     },
     "frame_02.png": {
       "mode": "1",
-      "pixels_sha256": "e0712d77223e37542a21db65ef62d36dd997482a968edea6cb9f9afcbdbf9a4d",
+      "pixels_sha256": "75e321ceaa82c229ed703ea3e6fd554b140dc086b9d6a91cadf57518cbf44d93",
       "size": [
         128,
         64
@@ -35,5 +35,5 @@
   },
   "schema": 1,
   "title": "T-DEV",
-  "version": "007-001"
+  "version": "007-002"
 }
