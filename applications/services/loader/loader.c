@@ -744,33 +744,42 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
             break;
         }
 
+        // Resolve the launch target before Desktop starts its transition. For a FAP this is
+        // important: Desktop's synchronous pre-launch handshake can outlast a fast SD read,
+        // leaving the previous screen visible without a loading frame.
+        const FlipperInternalApplication* internal_app = loader_find_application_by_name(name);
+        const char* external_path = NULL;
+        bool loading_shown = false;
+
+        if(!internal_app) {
+            external_path = loader_find_external_application_by_name(name);
+            if(external_path) name = external_path;
+
+            Storage* storage = furi_record_open(RECORD_STORAGE);
+            if(storage_file_exists(storage, name)) {
+                loading_shown = loader_do_show_loading(loader);
+            }
+            furi_record_close(RECORD_STORAGE);
+        }
+
         LoaderEvent event;
         event.type = LoaderEventTypeApplicationBeforeLoad;
         furi_pubsub_publish(loader->pubsub, &event);
 
-        // check internal apps
-        {
-            const FlipperInternalApplication* app = loader_find_application_by_name(name);
-            if(app) {
-                loader_start_internal_app(loader, app, args);
-                status.value = loader_make_success_status(error_message);
-                break;
-            }
-        }
-
-        // check External Applications
-        {
-            const char* path = loader_find_external_application_by_name(name);
-            if(path) {
-                name = path;
-            }
+        // Internal applications do not read from SD and should not flash a loading frame.
+        if(internal_app) {
+            loader_start_internal_app(loader, internal_app, args);
+            status.value = loader_make_success_status(error_message);
+            break;
         }
 
         // check Faps
         {
             Storage* storage = furi_record_open(RECORD_STORAGE);
             if(storage_file_exists(storage, name)) {
-                const bool loading_shown = loader_do_show_loading(loader);
+                // The card may have been mounted after the preflight above. Still cover its
+                // blocking read, even though it cannot be armed before Desktop in that case.
+                if(!loading_shown) loading_shown = loader_do_show_loading(loader);
                 status =
                     loader_start_external_app(loader, storage, name, args, error_message, false);
                 if(status.value == LoaderStatusErrorApiMismatch) {
@@ -782,6 +791,9 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
                 break;
             }
             furi_record_close(RECORD_STORAGE);
+            // A card can disappear between preflight and the actual read. Do not leave the
+            // prearmed view above the unknown-app error path in that case.
+            if(loading_shown) loader_do_hide_loading(loader);
         }
 
         status.value = loader_make_status_error(
