@@ -73,12 +73,14 @@ class LoaderFapLoadingTest(unittest.TestCase):
 
     def test_external_fap_read_is_bracketed_as_one_span(self) -> None:
         start = function_body(self.loader, "static LoaderMessageLoaderStatusResult loader_do_start_by_name(")
+        exists = start.index("if(storage_file_exists(storage, name)) {")
         show = start.index("loading_shown = loader_do_show_loading(loader);")
         first_load = start.index("loader_start_external_app(loader, storage, name, args, error_message, false)")
         retry = start.index("loader_start_external_app(loader, storage, name, args, error_message, true)")
-        hide = start.index("loader_do_hide_loading(loader);", retry)
+        hide = start.index("if(loading_shown) loader_do_hide_loading(loader);", retry)
         close = start.index("furi_record_close(RECORD_STORAGE);", hide)
 
+        self.assertLess(exists, show)
         self.assertLess(show, first_load)
         self.assertLess(first_load, retry)
         self.assertLess(retry, hide)
@@ -87,15 +89,33 @@ class LoaderFapLoadingTest(unittest.TestCase):
 
     def test_prearmed_overlay_is_removed_when_the_fap_disappears(self) -> None:
         start = function_body(self.loader, "static LoaderMessageLoaderStatusResult loader_do_start_by_name(")
-        fap_block = start[start.index("if(loading_shown) {") :]
+        fap_block = start[
+            start.index("if(loading_shown || storage_file_exists(storage, name)) {") :
+        ]
         first_load = fap_block.index(
             "loader_start_external_app(loader, storage, name, args, error_message, false)"
         )
-        hide = fap_block.index("loader_do_hide_loading(loader);", first_load)
+        hide = fap_block.index("if(loading_shown) loader_do_hide_loading(loader);", first_load)
         close = fap_block.index("furi_record_close(RECORD_STORAGE);", hide)
 
         self.assertLess(first_load, hide)
         self.assertLess(hide, close)
+
+    def test_existing_fap_launch_does_not_depend_on_overlay_visibility(self) -> None:
+        start = function_body(self.loader, "static LoaderMessageLoaderStatusResult loader_do_start_by_name(")
+        existence_check = start.index("if(storage_file_exists(storage, name)) {")
+        launch_guard = start.index(
+            "if(loading_shown || storage_file_exists(storage, name)) {",
+            existence_check + 1,
+        )
+        launch = start.index(
+            "loader_start_external_app(loader, storage, name, args, error_message, false)",
+            launch_guard,
+        )
+
+        self.assertLess(existence_check, launch_guard)
+        self.assertLess(launch_guard, launch)
+        self.assertIn("if(loading_shown) loader_do_hide_loading(loader);", start)
 
     def test_direct_fap_prearms_overlay_before_desktop_transition(self) -> None:
         start = function_body(self.loader, "static LoaderMessageLoaderStatusResult loader_do_start_by_name(")
