@@ -147,7 +147,7 @@ class ArfSubGhzFullTest(unittest.TestCase):
             cockpit.index("loader_enqueue_launch(app->loader, target->target"),
         )
 
-    def test_loader_keeps_deferred_launch_loading_overlay_balanced(self) -> None:
+    def test_loader_keeps_only_the_existing_deferred_launch_indicator(self) -> None:
         loader = (REPO_ROOT / "applications/services/loader/loader.c").read_text(
             encoding="utf-8"
         )
@@ -160,18 +160,16 @@ class ArfSubGhzFullTest(unittest.TestCase):
         )
         self.assertIsNotNone(deferred_launch)
         self.assertIn(
-            "const bool loading_shown = loader_do_show_loading(loader)",
+            "view_holder_set_view(loader->view_holder, loading_get_view(loader->loading))",
             deferred_launch.group(0),
         )
+        self.assertIn("view_holder_send_to_front(loader->view_holder)", deferred_launch.group(0))
         self.assertIn(
-            "if(loading_shown) loader_do_hide_loading(loader)",
+            "if(!is_successful) view_holder_set_view(loader->view_holder, NULL)",
             deferred_launch.group(0),
         )
-        self.assertNotIn(
-            "\n    if(!is_successful) view_holder_set_view(loader->view_holder, NULL);\n"
-            "    furi_string_free(error_message);",
-            deferred_launch.group(0),
-        )
+        self.assertNotIn("loader_do_show_loading", deferred_launch.group(0))
+        self.assertNotIn("loader_do_hide_loading", deferred_launch.group(0))
 
         queue_empty = re.search(
             r"static void loader_do_emit_queue_empty_event\(.*?\n}\n\n"

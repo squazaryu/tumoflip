@@ -87,12 +87,6 @@ struct Desktop {
     bool shortcut_animation_retain_pending;
 };
 
-/** Internal query used by Loader without copying the full settings payload. */
-static inline bool desktop_is_fap_loading_animation_enabled(const Desktop* desktop) {
-    furi_assert(desktop);
-    return desktop->settings.fap_loading_animation;
-}
-
 void desktop_lock(Desktop* desktop);
 void desktop_unlock(Desktop* desktop);
 void desktop_set_stealth_mode_state(Desktop* desktop, bool enabled);

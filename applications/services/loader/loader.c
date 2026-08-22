@@ -369,7 +369,6 @@ static Loader* loader_alloc(void) {
     loader->gui = furi_record_open(RECORD_GUI);
     loader->view_holder = view_holder_alloc();
     loader->loading = loading_alloc();
-    loader->loading_depth = 0;
     view_holder_attach_to_gui(loader->view_holder, loader->gui);
     return loader;
 }
@@ -669,44 +668,6 @@ static bool loader_do_is_locked(Loader* loader) {
     return loader->app.thread != NULL;
 }
 
-static bool loader_is_fap_loading_animation_enabled(void) {
-    // Loader can be reached during early boot before Desktop publishes its API.
-    // Keep the product default enabled until Settings becomes available.
-    if(!furi_record_exists(RECORD_DESKTOP)) return true;
-
-    Desktop* desktop = furi_record_open(RECORD_DESKTOP);
-    const bool fap_loading_animation = desktop_is_fap_loading_animation_enabled(desktop);
-    furi_record_close(RECORD_DESKTOP);
-    return fap_loading_animation;
-}
-
-// Deferred launches may nest and an external .fap read may happen inside one.
-// Pair every successful show with hide so the overlay remains visible through
-// the whole chain without ever underflowing its reference count.
-static bool loader_do_show_loading(Loader* loader) {
-    furi_assert(loader);
-
-    if(loader->loading_depth == 0) {
-        if(!loader_is_fap_loading_animation_enabled()) return false;
-        view_holder_send_to_front(loader->view_holder);
-        view_holder_set_view(loader->view_holder, loading_get_view(loader->loading));
-    }
-
-    furi_assert(loader->loading_depth < UINT8_MAX);
-    loader->loading_depth++;
-    return true;
-}
-
-static void loader_do_hide_loading(Loader* loader) {
-    furi_assert(loader);
-    furi_check(loader->loading_depth > 0);
-
-    loader->loading_depth--;
-    if(loader->loading_depth == 0) {
-        view_holder_set_view(loader->view_holder, NULL);
-    }
-}
-
 static LoaderMessageLoaderStatusResult loader_do_start_by_name(
     Loader* loader,
     const char* name,
@@ -744,44 +705,41 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
             break;
         }
 
-        // Resolve the launch target before Desktop starts its transition. For a FAP this is
-        // important: Desktop's synchronous pre-launch handshake can outlast a fast SD read,
-        // leaving the previous screen visible without a loading frame.
-        const FlipperInternalApplication* internal_app = loader_find_application_by_name(name);
-        bool loading_shown = false;
-        Storage* storage = NULL;
-
-        if(!internal_app) {
-            const char* external_path = loader_find_external_application_by_name(name);
-            if(external_path) name = external_path;
-
-            storage = furi_record_open(RECORD_STORAGE);
-            if(storage_file_exists(storage, name)) {
-                loading_shown = loader_do_show_loading(loader);
-            }
-        }
-
         LoaderEvent event;
         event.type = LoaderEventTypeApplicationBeforeLoad;
         furi_pubsub_publish(loader->pubsub, &event);
 
-        // Internal applications do not read from SD and should not flash a loading frame.
-        if(internal_app) {
-            loader_start_internal_app(loader, internal_app, args);
-            status.value = loader_make_success_status(error_message);
-            break;
+        // check internal apps
+        {
+            const FlipperInternalApplication* app = loader_find_application_by_name(name);
+            if(app) {
+                loader_start_internal_app(loader, app, args);
+                status.value = loader_make_success_status(error_message);
+                break;
+            }
         }
 
-        if(loading_shown || storage_file_exists(storage, name)) {
-            status = loader_start_external_app(loader, storage, name, args, error_message, false);
-            if(status.value == LoaderStatusErrorApiMismatch) {
-                status = loader_start_external_app(loader, storage, name, args, error_message, true);
-            }
-            if(loading_shown) loader_do_hide_loading(loader);
-            furi_record_close(RECORD_STORAGE);
-            break;
+        // check External Applications
+        {
+            const char* path = loader_find_external_application_by_name(name);
+            if(path) name = path;
         }
-        furi_record_close(RECORD_STORAGE);
+
+        // check FAPs
+        {
+            Storage* storage = furi_record_open(RECORD_STORAGE);
+            if(storage_file_exists(storage, name)) {
+                status =
+                    loader_start_external_app(loader, storage, name, args, error_message, false);
+                if(status.value == LoaderStatusErrorApiMismatch) {
+                    status = loader_start_external_app(
+                        loader, storage, name, args, error_message, true);
+                }
+                furi_record_close(RECORD_STORAGE);
+                break;
+            }
+            furi_record_close(RECORD_STORAGE);
+        }
 
         status.value = loader_make_status_error(
             LoaderStatusErrorUnknownApp, error_message, "%s not found", name);
@@ -835,7 +793,8 @@ static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord
 
     bool is_successful = false;
     FuriString* error_message = furi_string_alloc();
-    const bool loading_shown = loader_do_show_loading(loader);
+    view_holder_set_view(loader->view_holder, loading_get_view(loader->loading));
+    view_holder_send_to_front(loader->view_holder);
 
     do {
         const char* app_name_str = record->name_or_path;
@@ -855,7 +814,7 @@ static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord
         loader_do_next_deferred_launch_if_available(loader);
     } while(false);
 
-    if(loading_shown) loader_do_hide_loading(loader);
+    if(!is_successful) view_holder_set_view(loader->view_holder, NULL);
     furi_string_free(error_message);
     return is_successful;
 }
