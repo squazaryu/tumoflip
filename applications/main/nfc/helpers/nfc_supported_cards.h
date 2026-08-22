@@ -69,7 +69,8 @@ bool nfc_supported_cards_read(NfcSupportedCards* instance, NfcDevice* device, Nf
  *
  * @param[in, out] instance pointer to NfcSupportedCards instance.
  * @param[in] device pointer to a device instance holding the data is to be parsed.
- * @param[out] parsed_data pointer to the string to contain the formatted result.
+ * @param[out] parsed_data pointer to the formatted result. It is reset before
+ * each plug-in runs, and its contents are meaningful only on a true result.
  * @returns true if the card was successfully parsed, false otherwise.
  *
  * @see NfcSupportedCardPluginParse for detailed description.

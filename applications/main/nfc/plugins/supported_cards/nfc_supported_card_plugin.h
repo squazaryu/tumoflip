@@ -16,6 +16,15 @@
  * Then, register the plugin in the `application.fam` file in the `nfc` directory. Use the existing
  * entries as an example. After being registered, the plugin will be automatically deployed with the application.
  *
+ * @note for MIFARE Classic, known sector keys do not prove that data blocks
+ * were read. Reject values the card cannot contain; when zero is legal, use
+ * mf_classic_parser_block_has_data(). The raw read mask alone is false for
+ * legacy pre-v2 dumps even when their non-zero block bytes remain valid.
+ *
+ * @note parsed_data is empty when parse() is called. A plug-in may build text
+ * before rejecting an unrelated card, but that text is discarded unless it
+ * returns true.
+ *
  * @note the APPID field MUST end with `_parser` so the applicaton would know that this particular file
  * is a supported card plugin.
  *
