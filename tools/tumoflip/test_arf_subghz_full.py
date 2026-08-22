@@ -147,7 +147,7 @@ class ArfSubGhzFullTest(unittest.TestCase):
             cockpit.index("loader_enqueue_launch(app->loader, target->target"),
         )
 
-    def test_loader_prearms_deferred_launch_loading_overlay(self) -> None:
+    def test_loader_keeps_deferred_launch_loading_overlay_balanced(self) -> None:
         loader = (REPO_ROOT / "applications/services/loader/loader.c").read_text(
             encoding="utf-8"
         )
@@ -159,14 +159,16 @@ class ArfSubGhzFullTest(unittest.TestCase):
             re.S,
         )
         self.assertIsNotNone(deferred_launch)
-        self.assertIn("loading_get_view(loader->loading)", deferred_launch.group(0))
-        self.assertIn("view_holder_send_to_front(loader->view_holder)", deferred_launch.group(0))
         self.assertIn(
-            "if(!is_successful) view_holder_set_view(loader->view_holder, NULL)",
+            "const bool loading_shown = loader_do_show_loading(loader)",
+            deferred_launch.group(0),
+        )
+        self.assertIn(
+            "if(loading_shown) loader_do_hide_loading(loader)",
             deferred_launch.group(0),
         )
         self.assertNotIn(
-            "\n    view_holder_set_view(loader->view_holder, NULL);\n"
+            "\n    if(!is_successful) view_holder_set_view(loader->view_holder, NULL);\n"
             "    furi_string_free(error_message);",
             deferred_launch.group(0),
         )
