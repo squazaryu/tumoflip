@@ -723,7 +723,7 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
         if(loader_do_is_locked(loader)) {
             if(loader->app.thread == (FuriThread*)LOADER_MAGIC_THREAD_VALUE) {
                 status.value = loader_make_status_error(
-                    LoaderStatusErrorAppStarted, error_message, "Loader is locked");
+                    LoaderStatusErrorAppStarted, error_message, "Loader locked");
             } else {
                 const char* current_thread_name =
                     furi_thread_get_name(furi_thread_get_id(loader->app.thread));
@@ -731,7 +731,7 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
                 status.value = loader_make_status_error(
                     LoaderStatusErrorAppStarted,
                     error_message,
-                    "Loader is locked, please close the \"%s\" first",
+                    "Close \"%s\" first",
                     current_thread_name);
             }
             break;
@@ -772,19 +772,19 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
             break;
         }
 
-        if(loading_shown) {
+        if(loading_shown || storage_file_exists(storage, name)) {
             status = loader_start_external_app(loader, storage, name, args, error_message, false);
             if(status.value == LoaderStatusErrorApiMismatch) {
                 status = loader_start_external_app(loader, storage, name, args, error_message, true);
             }
-            loader_do_hide_loading(loader);
+            if(loading_shown) loader_do_hide_loading(loader);
             furi_record_close(RECORD_STORAGE);
             break;
         }
         furi_record_close(RECORD_STORAGE);
 
         status.value = loader_make_status_error(
-            LoaderStatusErrorUnknownApp, error_message, "App \"%s\" not found", name);
+            LoaderStatusErrorUnknownApp, error_message, "%s not found", name);
     } while(false);
 
     if(status.value == LoaderStatusOk) {
