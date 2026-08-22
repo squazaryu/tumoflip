@@ -4,7 +4,7 @@
 #include <storage/storage.h>
 #include <furi_hal.h>
 #include <assets_icons.h>
-#include <desktop/desktop.h>
+#include <desktop/desktop_i.h>
 
 #include <dialogs/dialogs.h>
 #include <toolbox/path.h>
@@ -675,10 +675,9 @@ static bool loader_is_fap_loading_animation_enabled(void) {
     if(!furi_record_exists(RECORD_DESKTOP)) return true;
 
     Desktop* desktop = furi_record_open(RECORD_DESKTOP);
-    DesktopSettings settings;
-    desktop_api_get_settings(desktop, &settings);
+    const bool fap_loading_animation = desktop_is_fap_loading_animation_enabled(desktop);
     furi_record_close(RECORD_DESKTOP);
-    return settings.fap_loading_animation;
+    return fap_loading_animation;
 }
 
 // Deferred launches may nest and an external .fap read may happen inside one.
@@ -693,7 +692,7 @@ static bool loader_do_show_loading(Loader* loader) {
         view_holder_set_view(loader->view_holder, loading_get_view(loader->loading));
     }
 
-    furi_check(loader->loading_depth < UINT8_MAX);
+    furi_assert(loader->loading_depth < UINT8_MAX);
     loader->loading_depth++;
     return true;
 }
