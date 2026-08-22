@@ -73,7 +73,7 @@ class LoaderFapLoadingTest(unittest.TestCase):
 
     def test_external_fap_read_is_bracketed_as_one_span(self) -> None:
         start = function_body(self.loader, "static LoaderMessageLoaderStatusResult loader_do_start_by_name(")
-        show = start.index("const bool loading_shown = loader_do_show_loading(loader);")
+        show = start.index("loading_shown = loader_do_show_loading(loader);")
         first_load = start.index("loader_start_external_app(loader, storage, name, args, error_message, false)")
         retry = start.index("loader_start_external_app(\n                        loader, storage")
         hide = start.index("if(loading_shown) loader_do_hide_loading(loader);")
@@ -81,6 +81,32 @@ class LoaderFapLoadingTest(unittest.TestCase):
         self.assertLess(show, first_load)
         self.assertLess(first_load, retry)
         self.assertLess(retry, hide)
+
+    def test_prearmed_overlay_is_removed_when_the_fap_disappears(self) -> None:
+        start = function_body(self.loader, "static LoaderMessageLoaderStatusResult loader_do_start_by_name(")
+        fap_block = start[start.index("// check Faps") :]
+        missing_card_cleanup = fap_block.index(
+            "// A card can disappear between preflight and the actual read."
+        )
+        hide = fap_block.index("if(loading_shown) loader_do_hide_loading(loader);", missing_card_cleanup)
+
+        self.assertLess(missing_card_cleanup, hide)
+
+    def test_direct_fap_prearms_overlay_before_desktop_transition(self) -> None:
+        start = function_body(self.loader, "static LoaderMessageLoaderStatusResult loader_do_start_by_name(")
+        target_resolution = start.index(
+            "const FlipperInternalApplication* internal_app = loader_find_application_by_name(name);"
+        )
+        prearmed_show = start.index("loading_shown = loader_do_show_loading(loader);")
+        desktop_transition = start.index("furi_pubsub_publish(loader->pubsub, &event);")
+        external_load = start.index(
+            "loader_start_external_app(loader, storage, name, args, error_message, false)"
+        )
+
+        self.assertIn("if(!internal_app)", start[target_resolution:prearmed_show])
+        self.assertLess(target_resolution, prearmed_show)
+        self.assertLess(prearmed_show, desktop_transition)
+        self.assertLess(desktop_transition, external_load)
 
     def test_deferred_launch_uses_the_same_balanced_overlay(self) -> None:
         deferred = re.search(
