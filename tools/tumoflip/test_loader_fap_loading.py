@@ -75,22 +75,27 @@ class LoaderFapLoadingTest(unittest.TestCase):
         start = function_body(self.loader, "static LoaderMessageLoaderStatusResult loader_do_start_by_name(")
         show = start.index("loading_shown = loader_do_show_loading(loader);")
         first_load = start.index("loader_start_external_app(loader, storage, name, args, error_message, false)")
-        retry = start.index("loader_start_external_app(\n                        loader, storage")
-        hide = start.index("if(loading_shown) loader_do_hide_loading(loader);")
+        retry = start.index("loader_start_external_app(loader, storage, name, args, error_message, true)")
+        hide = start.index("loader_do_hide_loading(loader);", retry)
+        close = start.index("furi_record_close(RECORD_STORAGE);", hide)
 
         self.assertLess(show, first_load)
         self.assertLess(first_load, retry)
         self.assertLess(retry, hide)
+        self.assertLess(hide, close)
+        self.assertEqual(start.count("furi_record_open(RECORD_STORAGE)"), 1)
 
     def test_prearmed_overlay_is_removed_when_the_fap_disappears(self) -> None:
         start = function_body(self.loader, "static LoaderMessageLoaderStatusResult loader_do_start_by_name(")
-        fap_block = start[start.index("// check Faps") :]
-        missing_card_cleanup = fap_block.index(
-            "// A card can disappear between preflight and the actual read."
+        fap_block = start[start.index("if(loading_shown) {") :]
+        first_load = fap_block.index(
+            "loader_start_external_app(loader, storage, name, args, error_message, false)"
         )
-        hide = fap_block.index("if(loading_shown) loader_do_hide_loading(loader);", missing_card_cleanup)
+        hide = fap_block.index("loader_do_hide_loading(loader);", first_load)
+        close = fap_block.index("furi_record_close(RECORD_STORAGE);", hide)
 
-        self.assertLess(missing_card_cleanup, hide)
+        self.assertLess(first_load, hide)
+        self.assertLess(hide, close)
 
     def test_direct_fap_prearms_overlay_before_desktop_transition(self) -> None:
         start = function_body(self.loader, "static LoaderMessageLoaderStatusResult loader_do_start_by_name(")
