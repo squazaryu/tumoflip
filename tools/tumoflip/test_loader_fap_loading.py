@@ -62,9 +62,11 @@ class LoaderFapLoadingTest(unittest.TestCase):
 
         self.assertIn("loader_is_fap_loading_animation_enabled", show)
         self.assertIn("if(!loader_is_fap_loading_animation_enabled()) return false;", show)
-        self.assertIn("desktop_api_get_settings(desktop, &settings);", preference)
-        self.assertIn("return settings.fap_loading_animation;", preference)
-        self.assertIn("furi_check(loader->loading_depth < UINT8_MAX);", show)
+        self.assertIn(
+            "desktop_is_fap_loading_animation_enabled(desktop)", preference
+        )
+        self.assertIn("return fap_loading_animation;", preference)
+        self.assertIn("furi_assert(loader->loading_depth < UINT8_MAX);", show)
         self.assertIn("view_holder_send_to_front(loader->view_holder);", show)
         self.assertIn("furi_check(loader->loading_depth > 0);", hide)
         self.assertIn("if(loader->loading_depth == 0)", hide)
