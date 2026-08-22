@@ -4,6 +4,7 @@
 #include <storage/storage.h>
 #include <furi_hal.h>
 #include <assets_icons.h>
+#include <desktop/desktop.h>
 
 #include <dialogs/dialogs.h>
 #include <toolbox/path.h>
@@ -368,6 +369,7 @@ static Loader* loader_alloc(void) {
     loader->gui = furi_record_open(RECORD_GUI);
     loader->view_holder = view_holder_alloc();
     loader->loading = loading_alloc();
+    loader->loading_depth = 0;
     view_holder_attach_to_gui(loader->view_holder, loader->gui);
     return loader;
 }
@@ -667,6 +669,45 @@ static bool loader_do_is_locked(Loader* loader) {
     return loader->app.thread != NULL;
 }
 
+static bool loader_is_fap_loading_animation_enabled(void) {
+    // Loader can be reached during early boot before Desktop publishes its API.
+    // Keep the product default enabled until Settings becomes available.
+    if(!furi_record_exists(RECORD_DESKTOP)) return true;
+
+    Desktop* desktop = furi_record_open(RECORD_DESKTOP);
+    DesktopSettings settings;
+    desktop_api_get_settings(desktop, &settings);
+    furi_record_close(RECORD_DESKTOP);
+    return settings.fap_loading_animation;
+}
+
+// Deferred launches may nest and an external .fap read may happen inside one.
+// Pair every successful show with hide so the overlay remains visible through
+// the whole chain without ever underflowing its reference count.
+static bool loader_do_show_loading(Loader* loader) {
+    furi_assert(loader);
+
+    if(loader->loading_depth == 0) {
+        if(!loader_is_fap_loading_animation_enabled()) return false;
+        view_holder_send_to_front(loader->view_holder);
+        view_holder_set_view(loader->view_holder, loading_get_view(loader->loading));
+    }
+
+    furi_check(loader->loading_depth < UINT8_MAX);
+    loader->loading_depth++;
+    return true;
+}
+
+static void loader_do_hide_loading(Loader* loader) {
+    furi_assert(loader);
+    furi_check(loader->loading_depth > 0);
+
+    loader->loading_depth--;
+    if(loader->loading_depth == 0) {
+        view_holder_set_view(loader->view_holder, NULL);
+    }
+}
+
 static LoaderMessageLoaderStatusResult loader_do_start_by_name(
     Loader* loader,
     const char* name,
@@ -730,12 +771,14 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
         {
             Storage* storage = furi_record_open(RECORD_STORAGE);
             if(storage_file_exists(storage, name)) {
+                const bool loading_shown = loader_do_show_loading(loader);
                 status =
                     loader_start_external_app(loader, storage, name, args, error_message, false);
                 if(status.value == LoaderStatusErrorApiMismatch) {
                     status = loader_start_external_app(
                         loader, storage, name, args, error_message, true);
                 }
+                if(loading_shown) loader_do_hide_loading(loader);
                 furi_record_close(RECORD_STORAGE);
                 break;
             }
@@ -794,8 +837,7 @@ static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord
 
     bool is_successful = false;
     FuriString* error_message = furi_string_alloc();
-    view_holder_set_view(loader->view_holder, loading_get_view(loader->loading));
-    view_holder_send_to_front(loader->view_holder);
+    const bool loading_shown = loader_do_show_loading(loader);
 
     do {
         const char* app_name_str = record->name_or_path;
@@ -815,7 +857,7 @@ static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord
         loader_do_next_deferred_launch_if_available(loader);
     } while(false);
 
-    if(!is_successful) view_holder_set_view(loader->view_holder, NULL);
+    if(loading_shown) loader_do_hide_loading(loader);
     furi_string_free(error_message);
     return is_successful;
 }
