@@ -70,8 +70,8 @@ void subghz_scene_set_serial_on_enter(void* context) {
     case GenData:
     case GenSecPlus1:
     default:
-        furi_crash("Not implemented");
-        break;
+        subghz_scene_show_unsupported(subghz);
+        return;
     }
 
     furi_assert(byte_ptr);
@@ -149,8 +149,8 @@ bool subghz_scene_set_serial_on_event(void* context, SceneManagerEvent event) {
             case GenData:
             case GenSecPlus1:
             default:
-                furi_crash("Not implemented");
-                break;
+                subghz_scene_show_unsupported(subghz);
+                return true;
             }
 
             switch(subghz->gen_info->type) {
@@ -174,8 +174,8 @@ bool subghz_scene_set_serial_on_event(void* context, SceneManagerEvent event) {
             case GenData:
             case GenSecPlus1:
             default:
-                furi_crash("Not implemented");
-                break;
+                subghz_scene_show_unsupported(subghz);
+                return true;
             }
 
             consumed = true;

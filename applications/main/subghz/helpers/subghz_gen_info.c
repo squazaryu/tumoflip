@@ -953,7 +953,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .phoenix_v2.cnt = 0x025D};
         break;
     default:
-        furi_crash("Not implemented");
+        gen_info.type = GenUnsupported;
         break;
     }
     *infos_dest = gen_info;
