@@ -1,5 +1,4 @@
 #include "subghz_i.h"
-
 #include "assets_icons.h"
 #include "subghz/types.h"
 #include <furi.h>
@@ -9,6 +8,12 @@
 #include <flipper_format/flipper_format_i.h>
 
 #define TAG "SubGhz"
+
+void subghz_scene_show_unsupported(SubGhz* subghz) {
+    furi_check(subghz);
+    furi_string_set(subghz->error_str, "Protocol not\nsupported.");
+    scene_manager_next_scene(subghz->scene_manager, SubGhzSceneShowError);
+}
 
 void subghz_blink_start(SubGhz* subghz) {
     furi_assert(subghz);
