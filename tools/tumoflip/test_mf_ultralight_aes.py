@@ -312,6 +312,24 @@ class MfUltralightAesTest(unittest.TestCase):
         self.assertIn("mf_ultralight_is_pwd_pack_read(data)", render)
         self.assertIn("Password not captured.", render)
 
+    def test_unlshd_092_parser_conventions_are_preserved(self) -> None:
+        plugin_header = (
+            REPO_ROOT / "applications/main/nfc/plugins/supported_cards/nfc_supported_card_plugin.h"
+        ).read_text(encoding="utf-8")
+        smartrider = (
+            REPO_ROOT / "applications/main/nfc/plugins/supported_cards/smartrider.c"
+        ).read_text(encoding="utf-8")
+        mosgortrans = (
+            REPO_ROOT / "applications/main/nfc/api/mosgortrans/mosgortrans_util.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("log checks that decline a card at FURI_LOG_D", plugin_header)
+        self.assertIn("mf_classic_parser_block_has_data()", plugin_header)
+        self.assertNotIn("#define MAX_BLOCKS", smartrider)
+        self.assertIn('FURI_LOG_D(TAG, "Invalid card type")', smartrider)
+        self.assertIn('FURI_LOG_D(TAG, "Key verification failed for sector 0")', smartrider)
+        self.assertIn('FURI_LOG_D(TAG, "Required block %d holds no data"', smartrider)
+        self.assertIn('FURI_LOG_D(TAG, "Layout %x is not supported"', mosgortrans)
+
     def test_aes_write_uses_one_recovered_key_and_skips_config_pages(self) -> None:
         callback = function_body(
             self.app_support, "nfc_scene_write_poller_callback_mf_ultralight("
