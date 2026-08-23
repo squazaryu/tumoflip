@@ -357,6 +357,14 @@ static bool nfc_scene_read_and_saved_menu_on_event_mf_ultralight(
                 return true;
             }
             uint32_t dict_scene = nfc_mf_ultralight_dict_attack_scene(data->type);
+            if(data->type == MfUltralightTypeUltralightAES) {
+                scene_manager_set_scene_state(
+                    instance->scene_manager, NfcSceneMfUltralightAesDictAttackWarn, dict_scene);
+                scene_manager_next_scene(
+                    instance->scene_manager, NfcSceneMfUltralightAesDictAttackWarn);
+                consumed = true;
+                return consumed;
+            }
             if(!scene_manager_search_and_switch_to_previous_scene(
                    instance->scene_manager, dict_scene)) {
                 scene_manager_next_scene(instance->scene_manager, dict_scene);

@@ -54,7 +54,7 @@ static const NfcProtocolSupportCommonSceneBase nfc_protocol_support_scenes[];
  * @brief Draw the explanation every scene shows when the protocol's plugin could not be loaded.
  *
  * Without it the app silently behaves as if the card had no features at all, which reads as a
- * broken card rather than as a missing plugin or an out-of-memory condition.
+ * broken card rather than as a missing plugin or an outdated resource.
  */
 static void nfc_protocol_support_on_enter_load_failed(NfcApp* instance) {
     // Reset first: several common scenes' on_exit clear something other than the widget - the
@@ -71,7 +71,8 @@ static void nfc_protocol_support_on_enter_load_failed(NfcApp* instance) {
         AlignLeft,
         AlignTop,
         FontSecondary,
-        "Out of memory, or\nthe plugin file is\nmissing. Reboot and\ntry again.");
+        "Plugin file missing\nor outdated. Update\nthe firmware\nresources.");
+    notification_message(instance->notifications, &sequence_error);
     view_dispatcher_switch_to_view(instance->view_dispatcher, NfcViewWidget);
 }
 
@@ -526,6 +527,7 @@ static bool nfc_protocol_support_scene_read_on_event(NfcApp* instance, SceneMana
 
 static void nfc_protocol_support_scene_read_on_exit(NfcApp* instance) {
     popup_reset(instance->popup);
+    widget_reset(instance->widget);
 
     nfc_blink_stop(instance);
 }
@@ -640,6 +642,7 @@ static bool
 // Same for read_menu and saved_menu
 static void nfc_protocol_support_scene_read_saved_menu_on_exit(NfcApp* instance) {
     submenu_reset(instance->submenu);
+    widget_reset(instance->widget);
 }
 
 // SceneReadSuccess
@@ -1079,6 +1082,8 @@ static bool
 }
 
 static void nfc_protocol_support_scene_emulate_stop_listener(NfcApp* instance) {
+    if(!instance->listener) return;
+
     nfc_listener_stop(instance->listener);
 
     const NfcProtocol protocol = nfc_device_get_protocol(instance->nfc_device);
@@ -1093,6 +1098,7 @@ static void nfc_protocol_support_scene_emulate_stop_listener(NfcApp* instance) {
     }
 
     nfc_listener_free(instance->listener);
+    instance->listener = NULL;
 }
 
 static void nfc_protocol_support_scene_emulate_on_exit(NfcApp* instance) {
@@ -1215,8 +1221,16 @@ static void nfc_protocol_support_scene_write_on_enter(NfcApp* instance) {
 
     const NfcProtocol protocol = nfc_device_get_protocol(instance->nfc_device);
 
+    const NfcProtocolSupportBase* base = nfc_protocol_support_get(protocol, instance);
+    if(nfc_protocol_support_failed(base)) {
+        // Do not allocate a poller or arm the write UI when the protocol plugin is unavailable.
+        instance->poller = NULL;
+        base->scene_write.on_enter(instance);
+        return;
+    }
+
     // instance->poller is allocated in the respective on_enter() handler
-    nfc_protocol_support_get(protocol, instance)->scene_write.on_enter(instance);
+    base->scene_write.on_enter(instance);
 
     nfc_protocol_support_scene_write_setup_view(instance);
     nfc_blink_emulate_start(instance);

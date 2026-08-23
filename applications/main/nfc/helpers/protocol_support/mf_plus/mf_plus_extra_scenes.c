@@ -274,8 +274,11 @@ static bool mf_plus_scene_dict_attack_on_event(NfcApp* instance, SceneManagerEve
 static void mf_plus_scene_dict_attack_on_exit(NfcApp* instance) {
     NfcMfPlusDictAttackContext* ctx = &instance->mf_plus_dict_context;
 
-    nfc_poller_stop(instance->poller);
-    nfc_poller_free(instance->poller);
+    if(instance->poller) {
+        nfc_poller_stop(instance->poller);
+        nfc_poller_free(instance->poller);
+        instance->poller = NULL;
+    }
 
     dict_attack_reset(instance->dict_attack);
 
@@ -689,8 +692,11 @@ static bool mf_plus_scene_update_initial_on_event(NfcApp* instance, SceneManager
 }
 
 static void mf_plus_scene_update_initial_on_exit(NfcApp* instance) {
-    nfc_poller_stop(instance->poller);
-    nfc_poller_free(instance->poller);
+    if(instance->poller) {
+        nfc_poller_stop(instance->poller);
+        nfc_poller_free(instance->poller);
+        instance->poller = NULL;
+    }
 
     scene_manager_set_scene_state(instance->scene_manager, NfcSceneMfPlusUpdateInitial, 0);
     popup_reset(instance->popup);

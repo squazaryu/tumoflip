@@ -129,6 +129,10 @@ void detect_reader_reset(DetectReader* detect_reader) {
             furi_string_reset(model->uid_str);
         },
         false);
+
+    // The callback belongs to the MIFARE Classic plugin and must not survive its unload.
+    detect_reader->callback = NULL;
+    detect_reader->context = NULL;
 }
 
 View* detect_reader_get_view(DetectReader* detect_reader) {

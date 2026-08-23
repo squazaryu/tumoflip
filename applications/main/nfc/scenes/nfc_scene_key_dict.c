@@ -1,4 +1,5 @@
 #include "../nfc_app_i.h"
+#include "../helpers/protocol_support/nfc_protocol_support_gui_common.h"
 
 static uint32_t nfc_scene_key_dict_count(const char* path, KeysDictMode mode, size_t key_size) {
     KeysDict* dict = keys_dict_alloc(path, mode, key_size);
@@ -8,16 +9,13 @@ static uint32_t nfc_scene_key_dict_count(const char* path, KeysDictMode mode, si
     return total;
 }
 
-void nfc_scene_key_dict_widget_callback(GuiButtonType result, InputType type, void* context) {
-    NfcApp* instance = context;
-    if(type == InputTypeShort) {
-        view_dispatcher_send_custom_event(instance->view_dispatcher, result);
-    }
-}
-
 void nfc_scene_key_dict_on_enter(void* context) {
     NfcApp* instance = context;
     const NfcKeyDict* dict = nfc_key_dict(instance->key_dict_type);
+
+    // Counting the Classic dictionary can take a visible moment. Show the reset widget first so
+    // the previous scene is not left on screen while the SD file is scanned.
+    view_dispatcher_switch_to_view(instance->view_dispatcher, NfcViewWidget);
 
     const uint32_t system_keys_total =
         nfc_scene_key_dict_count(dict->system_path, KeysDictModeOpenExisting, dict->key_size);
@@ -47,18 +45,21 @@ void nfc_scene_key_dict_on_enter(void* context) {
         furi_string_get_cstr(temp_str));
     widget_add_icon_element(instance->widget, 87, 13, &I_Keychain_39x36);
     widget_add_button_element(
-        instance->widget, GuiButtonTypeCenter, "Add", nfc_scene_key_dict_widget_callback, instance);
+        instance->widget,
+        GuiButtonTypeCenter,
+        "Add",
+        nfc_protocol_support_common_widget_callback,
+        instance);
     if(user_keys_total > 0) {
         widget_add_button_element(
             instance->widget,
             GuiButtonTypeRight,
             "List",
-            nfc_scene_key_dict_widget_callback,
+            nfc_protocol_support_common_widget_callback,
             instance);
     }
     furi_string_free(temp_str);
 
-    view_dispatcher_switch_to_view(instance->view_dispatcher, NfcViewWidget);
 }
 
 bool nfc_scene_key_dict_on_event(void* context, SceneManagerEvent event) {
@@ -67,6 +68,9 @@ bool nfc_scene_key_dict_on_event(void* context, SceneManagerEvent event) {
 
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == GuiButtonTypeCenter) {
+            // The input buffer is shared by all dictionaries. Clear it before entering Add so a
+            // previously entered Classic key cannot appear as the prefix of an AES key.
+            memset(instance->byte_input_store, 0, sizeof(instance->byte_input_store));
             scene_manager_next_scene(instance->scene_manager, NfcSceneKeyDictAdd);
             consumed = true;
         } else if(event.event == GuiButtonTypeRight) {
