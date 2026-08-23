@@ -9,7 +9,6 @@
 
 #define MAX_TRIPS           10
 #define TAG                 "SmartRider"
-#define MAX_BLOCKS          64
 #define MAX_DATE_ITERATIONS 366
 
 static const uint8_t STANDARD_KEYS[3][6] = {
@@ -216,13 +215,13 @@ static bool smartrider_parse(const NfcDevice* device, FuriString* parsed_data) {
     SmartRiderData sr_data = {0};
 
     if(data->type != MfClassicType1k) {
-        FURI_LOG_E(TAG, "Invalid card type");
+        FURI_LOG_D(TAG, "Invalid card type");
         return false;
     }
 
     const MfClassicSectorTrailer* sec_tr = mf_classic_get_sector_trailer_by_sector(data, 0);
     if(!sec_tr || memcmp(sec_tr->key_a.data, STANDARD_KEYS[0], 6) != 0) {
-        FURI_LOG_E(TAG, "Key verification failed for sector 0");
+        FURI_LOG_D(TAG, "Key verification failed for sector 0");
         return false;
     }
 
@@ -230,9 +229,8 @@ static bool smartrider_parse(const NfcDevice* device, FuriString* parsed_data) {
     // do not reject them solely because mf_classic_is_block_read() is false.
     static const uint8_t required_blocks[] = {14, 4, 5, 1, 52, 50, 0};
     for(size_t i = 0; i < COUNT_OF(required_blocks); i++) {
-        if(required_blocks[i] >= MAX_BLOCKS ||
-           !mf_classic_parser_block_has_data(data, required_blocks[i])) {
-            FURI_LOG_E(TAG, "Required block %d has no data or is out of range", required_blocks[i]);
+        if(!mf_classic_parser_block_has_data(data, required_blocks[i])) {
+            FURI_LOG_D(TAG, "Required block %d holds no data", required_blocks[i]);
             return false;
         }
     }

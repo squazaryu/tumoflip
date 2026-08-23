@@ -25,6 +25,10 @@ APP_SUPPORT = (
     REPO_ROOT
     / "applications/main/nfc/helpers/protocol_support/mf_ultralight/mf_ultralight.c"
 )
+AUTH_HEADER = REPO_ROOT / "applications/main/nfc/helpers/mf_ultralight_auth.h"
+AUTH_SOURCE = REPO_ROOT / "applications/main/nfc/helpers/mf_ultralight_auth.c"
+RENDER = REPO_ROOT / "applications/main/nfc/helpers/protocol_support/mf_ultralight/mf_ultralight_render.c"
+PLUGIN_BASE = REPO_ROOT / "applications/main/nfc/helpers/protocol_support/nfc_protocol_support_base.h"
 DICT_SCENE = (
     REPO_ROOT
     / "applications/main/nfc/helpers/protocol_support/mf_ultralight/mf_ultralight_extra_scenes.c"
@@ -57,6 +61,10 @@ class MfUltralightAesTest(unittest.TestCase):
         cls.listener = LISTENER.read_text(encoding="utf-8")
         cls.unlock_warn = UNLOCK_WARN.read_text(encoding="utf-8")
         cls.app_support = APP_SUPPORT.read_text(encoding="utf-8")
+        cls.auth_header = AUTH_HEADER.read_text(encoding="utf-8")
+        cls.auth_source = AUTH_SOURCE.read_text(encoding="utf-8")
+        cls.render = RENDER.read_text(encoding="utf-8")
+        cls.plugin_base = PLUGIN_BASE.read_text(encoding="utf-8")
         cls.dict_scene = DICT_SCENE.read_text(encoding="utf-8")
         cls.api_symbols = API_SYMBOLS.read_text(encoding="utf-8")
         cls.generator = GENERATOR.read_text(encoding="utf-8")
@@ -247,6 +255,80 @@ class MfUltralightAesTest(unittest.TestCase):
     def test_manual_aes_warning_names_auth_limit_risk(self) -> None:
         self.assertIn("Wrong AES key uses\\none AUTH_LIM try", self.unlock_warn)
         self.assertIn('message = "May lock card!"', self.unlock_warn)
+
+    def test_unlshd_092_skips_unsafe_generated_passwords(self) -> None:
+        xiaomi = self.app_support[
+            self.app_support.index("instance->mf_ul_auth->type == MfUltralightAuthTypeXiaomi") :
+            self.app_support.index("} else if(instance->mf_ul_auth->type == MfUltralightAuthTypeAmiibo)")
+        ]
+        amiibo = self.app_support[
+            self.app_support.index("instance->mf_ul_auth->type == MfUltralightAuthTypeAmiibo") :
+            self.app_support.index("} else if(\n            instance->mf_ul_auth->type", self.app_support.index("instance->mf_ul_auth->type == MfUltralightAuthTypeAmiibo"))
+        ]
+        for branch, generator in ((xiaomi, "mf_ultralight_generate_xiaomi_pass"), (amiibo, "mf_ultralight_generate_amiibo_pass")):
+            self.assertIn(generator, branch)
+            self.assertIn("const bool generated", branch)
+            self.assertIn("skip_auth = !generated", branch)
+            self.assertIn("needs a 7-byte UID, skipping auth", branch)
+
+    def test_unlshd_092_does_not_probe_unknown_auth_limit(self) -> None:
+        handler = function_body(self.poller, "mf_ultralight_poller_handler_try_default_pass(")
+        self.assertIn("if(!mf_ultralight_get_config_page(instance->data, &config)) break;", handler)
+        self.assertIn("const bool authlim_known", handler)
+        self.assertIn("!authlim_known && !writing_to_target", handler)
+        self.assertIn("AUTHLIM unreadable, not probing the default password", handler)
+        self.assertIn("instance->mode == MfUltralightPollerModeWrite", handler)
+
+    def test_unlshd_092_reports_auth_outcome_without_scrubbing_it_early(self) -> None:
+        for outcome in (
+            "MfUltralightAuthOutcomeSuccess",
+            "MfUltralightAuthOutcomeFailed",
+            "MfUltralightAuthOutcomeSkippedUid",
+        ):
+            self.assertIn(outcome, self.auth_header)
+        self.assertIn("MfUltralightAuthOutcome outcome;", self.auth_header)
+        self.assertIn("instance->outcome = MfUltralightAuthOutcomeNone", self.auth_source)
+        reset = function_body(self.auth_source, "void mf_ultralight_auth_reset(")
+        self.assertNotIn("outcome", reset)
+
+        read = function_body(
+            self.app_support, "nfc_scene_read_poller_callback_mf_ultralight("
+        )
+        self.assertIn("AuthSuccess", read)
+        self.assertIn("AuthFailed", read)
+        self.assertIn("outcome = MfUltralightAuthOutcomeSuccess", read)
+        self.assertIn("outcome = MfUltralightAuthOutcomeFailed", read)
+
+        result = function_body(
+            self.app_support, "nfc_scene_read_success_on_enter_mf_ultralight("
+        )
+        self.assertIn("Auth Failed", result)
+        self.assertIn("Auth Skipped", result)
+        self.assertLess(result.index("Auth Failed"), result.index("mf_ultralight_auth_reset"))
+        self.assertEqual(self.plugin_base.count("#define NFC_PROTOCOL_SUPPORT_PLUGIN_API_VERSION 3"), 1)
+
+    def test_unlshd_092_does_not_render_masked_password_as_captured(self) -> None:
+        render = function_body(self.render, "void nfc_render_mf_ultralight_pwd_pack(")
+        self.assertIn("mf_ultralight_is_pwd_pack_read(data)", render)
+        self.assertIn("Password not captured.", render)
+
+    def test_unlshd_092_parser_conventions_are_preserved(self) -> None:
+        plugin_header = (
+            REPO_ROOT / "applications/main/nfc/plugins/supported_cards/nfc_supported_card_plugin.h"
+        ).read_text(encoding="utf-8")
+        smartrider = (
+            REPO_ROOT / "applications/main/nfc/plugins/supported_cards/smartrider.c"
+        ).read_text(encoding="utf-8")
+        mosgortrans = (
+            REPO_ROOT / "applications/main/nfc/api/mosgortrans/mosgortrans_util.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("log checks that decline a card at FURI_LOG_D", plugin_header)
+        self.assertIn("mf_classic_parser_block_has_data()", plugin_header)
+        self.assertNotIn("#define MAX_BLOCKS", smartrider)
+        self.assertIn('FURI_LOG_D(TAG, "Invalid card type")', smartrider)
+        self.assertIn('FURI_LOG_D(TAG, "Key verification failed for sector 0")', smartrider)
+        self.assertIn('FURI_LOG_D(TAG, "Required block %d holds no data"', smartrider)
+        self.assertIn('FURI_LOG_D(TAG, "Layout %x is not supported"', mosgortrans)
 
     def test_aes_write_uses_one_recovered_key_and_skips_config_pages(self) -> None:
         callback = function_body(
