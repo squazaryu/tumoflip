@@ -773,7 +773,7 @@ static NfcCommand mf_ultralight_poller_handler_try_default_pass(MfUltralightPoll
             config->password = instance->auth_context.password;
             config->pack = instance->auth_context.pack;
         } else if(!authlim_known && !writing_to_target) {
-            FURI_LOG_W(TAG, "AUTHLIM unreadable, not probing the default password");
+            // Keep the card untouched until the ACCESS page has been read.
         } else if(config->access.authlim == 0) {
             FURI_LOG_D(TAG, "No limits in authentication. Trying default password");
             bit_lib_num_to_bytes_be(
