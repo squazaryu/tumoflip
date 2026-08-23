@@ -32,6 +32,7 @@ ADD_SCENE(nfc, mf_ultralight_unlock_menu, MfUltralightUnlockMenu)
 ADD_SCENE(nfc, mf_ultralight_unlock_warn, MfUltralightUnlockWarn)
 ADD_SCENE(nfc, mf_ultralight_key_input, MfUltralightKeyInput)
 ADD_SCENE(nfc, mf_ultralight_capture_pass, MfUltralightCapturePass)
+ADD_SCENE(nfc, mf_ultralight_aes_dict_attack_warn, MfUltralightAesDictAttackWarn)
 ADD_SCENE(nfc, des_auth_key_input, DesAuthKeyInput)
 ADD_SCENE(nfc, des_auth_unlock_warn, DesAuthUnlockWarn)
 

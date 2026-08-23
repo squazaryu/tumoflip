@@ -52,5 +52,10 @@ static_assert(
 const NfcKeyDict* nfc_key_dict(NfcKeyDictType type) {
     furi_check(type > NfcKeyDictTypeNone && type < NfcKeyDictTypeNum);
 
-    return &nfc_key_dicts[type];
+    const NfcKeyDict* dict = &nfc_key_dicts[type];
+    // Every key scene writes key_size bytes into the shared byte-input store.
+    // Keep the check next to the table so a future row cannot silently exceed it.
+    furi_check(dict->key_size > 0 && dict->key_size <= NFC_BYTE_INPUT_STORE_SIZE);
+
+    return dict;
 }
