@@ -74,8 +74,8 @@ void subghz_scene_set_button_on_enter(void* context) {
     case GenSecPlus1:
     case GenCameAtomo:
     default:
-        furi_crash("Not implemented");
-        break;
+        subghz_scene_show_unsupported(subghz);
+        return;
     }
 
     furi_assert(byte_ptr);
@@ -122,8 +122,8 @@ bool subghz_scene_set_button_on_event(void* context, SceneManagerEvent event) {
             case GenData:
             case GenSecPlus1:
             default:
-                furi_crash("Not implemented");
-                break;
+                subghz_scene_show_unsupported(subghz);
+                return true;
             }
 
             consumed = true;

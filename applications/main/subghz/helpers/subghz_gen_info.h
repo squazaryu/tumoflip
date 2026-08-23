@@ -20,6 +20,7 @@ typedef enum {
     GenSecPlus1,
     GenSecPlus2,
     GenPhoenixV2,
+    GenUnsupported,
 } GenType;
 
 typedef struct {

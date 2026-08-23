@@ -21,7 +21,8 @@ void subghz_scene_set_key_on_enter(void* context) {
         byte_ptr = (uint8_t*)&subghz->gen_info->data.key;
         byte_count = sizeof(subghz->gen_info->data.key);
     } else {
-        furi_crash("Not implemented");
+        subghz_scene_show_unsupported(subghz);
+        return;
     }
 
     furi_assert(byte_ptr);
@@ -65,6 +66,9 @@ bool subghz_scene_set_key_on_event(void* context, SceneManagerEvent event) {
                         subghz->gen_info->data.key,
                         subghz->gen_info->data.bits);
                 }
+            } else {
+                subghz_scene_show_unsupported(subghz);
+                return true;
             }
 
             consumed = true;

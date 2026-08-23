@@ -135,5 +135,7 @@ void subghz_ensure_frequency_analyzer_view(SubGhz* subghz);
 void subghz_ensure_receiver_view(SubGhz* subghz);
 void subghz_request_location_sidecar(SubGhz* subghz);
 
+void subghz_scene_show_unsupported(SubGhz* subghz);
+
 extern const NotificationSequence subghz_sequence_rx;
 extern const NotificationSequence subghz_sequence_rx_locked;
