@@ -137,6 +137,13 @@ void cli_command_date(PipeSide* pipe, FuriString* args, void* context) {
 
 void cli_command_log_tx_callback(const uint8_t* buffer, size_t size, void* context) {
     PipeSide* pipe = context;
+    // furi_log holds its global mutex while invoking handlers. Never wait for
+    // a slow USB host here: blocking would stall every log producer, including
+    // the NFC worker while it loads protocol FALs. Dropping a complete log
+    // fragment is preferable to holding the logger (and the caller) hostage.
+    const size_t available = pipe_spaces_available(pipe);
+    if(available < size) return;
+
     pipe_send(pipe, buffer, size);
 }
 
