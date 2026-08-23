@@ -143,18 +143,24 @@ static NfcCommand
                 mf_ultralight_event->data->auth_context.skip_auth = true;
             }
         } else if(instance->mf_ul_auth->type == MfUltralightAuthTypeXiaomi) {
-            if(mf_ultralight_generate_xiaomi_pass(
-                   instance->mf_ul_auth,
-                   data->iso14443_3a_data->uid,
-                   data->iso14443_3a_data->uid_len)) {
-                mf_ultralight_event->data->auth_context.skip_auth = false;
+            // Both generators require a 7-byte UID. If generation fails, leave authentication
+            // explicitly skipped instead of allowing a stale/zero password to consume AUTHLIM.
+            const bool generated = mf_ultralight_generate_xiaomi_pass(
+                instance->mf_ul_auth,
+                data->iso14443_3a_data->uid,
+                data->iso14443_3a_data->uid_len);
+            mf_ultralight_event->data->auth_context.skip_auth = !generated;
+            if(!generated) {
+                FURI_LOG_W("MfUltralightApp", "Xiaomi password needs a 7-byte UID, skipping auth");
             }
         } else if(instance->mf_ul_auth->type == MfUltralightAuthTypeAmiibo) {
-            if(mf_ultralight_generate_amiibo_pass(
-                   instance->mf_ul_auth,
-                   data->iso14443_3a_data->uid,
-                   data->iso14443_3a_data->uid_len)) {
-                mf_ultralight_event->data->auth_context.skip_auth = false;
+            const bool generated = mf_ultralight_generate_amiibo_pass(
+                instance->mf_ul_auth,
+                data->iso14443_3a_data->uid,
+                data->iso14443_3a_data->uid_len);
+            mf_ultralight_event->data->auth_context.skip_auth = !generated;
+            if(!generated) {
+                FURI_LOG_W("MfUltralightApp", "Amiibo password needs a 7-byte UID, skipping auth");
             }
         } else if(
             instance->mf_ul_auth->type == MfUltralightAuthTypeManual ||

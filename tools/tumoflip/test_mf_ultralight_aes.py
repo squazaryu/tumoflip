@@ -248,6 +248,29 @@ class MfUltralightAesTest(unittest.TestCase):
         self.assertIn("Wrong AES key uses\\none AUTH_LIM try", self.unlock_warn)
         self.assertIn('message = "May lock card!"', self.unlock_warn)
 
+    def test_unlshd_092_skips_unsafe_generated_passwords(self) -> None:
+        xiaomi = self.app_support[
+            self.app_support.index("instance->mf_ul_auth->type == MfUltralightAuthTypeXiaomi") :
+            self.app_support.index("} else if(instance->mf_ul_auth->type == MfUltralightAuthTypeAmiibo)")
+        ]
+        amiibo = self.app_support[
+            self.app_support.index("instance->mf_ul_auth->type == MfUltralightAuthTypeAmiibo") :
+            self.app_support.index("} else if(\n            instance->mf_ul_auth->type", self.app_support.index("instance->mf_ul_auth->type == MfUltralightAuthTypeAmiibo"))
+        ]
+        for branch, generator in ((xiaomi, "mf_ultralight_generate_xiaomi_pass"), (amiibo, "mf_ultralight_generate_amiibo_pass")):
+            self.assertIn(generator, branch)
+            self.assertIn("const bool generated", branch)
+            self.assertIn("skip_auth = !generated", branch)
+            self.assertIn("needs a 7-byte UID, skipping auth", branch)
+
+    def test_unlshd_092_does_not_probe_unknown_auth_limit(self) -> None:
+        handler = function_body(self.poller, "mf_ultralight_poller_handler_try_default_pass(")
+        self.assertIn("if(!mf_ultralight_get_config_page(instance->data, &config)) break;", handler)
+        self.assertIn("const bool authlim_known", handler)
+        self.assertIn("!authlim_known && !writing_to_target", handler)
+        self.assertIn("AUTHLIM unreadable, not probing the default password", handler)
+        self.assertIn("instance->mode == MfUltralightPollerModeWrite", handler)
+
     def test_aes_write_uses_one_recovered_key_and_skips_config_pages(self) -> None:
         callback = function_body(
             self.app_support, "nfc_scene_write_poller_callback_mf_ultralight("

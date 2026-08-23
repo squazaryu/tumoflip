@@ -15,6 +15,7 @@
 * Apps: **NFC Magic** - Gen2 CUID/static-nonce detection, Gen1 4b/7b UID, length-aware wipe & write guard (by @mishamyte)
 * Apps: Build tag (**10jun2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
 ## Other changes
+* NFC: **Never probe a generated Ultralight password when the UID is unsuitable, or when AUTHLIM is unreadable**; explicit skips preserve the card's remaining authentication attempts (Unleashed PRs #1086/#1089)
 * Apps: Update FindMy app
 * Fix BLE sync, fix possible delay related issues
 * Disabled debug and trace logs in the FW binary (apps .fap's are not affected) to free up some flash space for new features
