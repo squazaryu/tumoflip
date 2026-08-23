@@ -25,6 +25,10 @@ APP_SUPPORT = (
     REPO_ROOT
     / "applications/main/nfc/helpers/protocol_support/mf_ultralight/mf_ultralight.c"
 )
+AUTH_HEADER = REPO_ROOT / "applications/main/nfc/helpers/mf_ultralight_auth.h"
+AUTH_SOURCE = REPO_ROOT / "applications/main/nfc/helpers/mf_ultralight_auth.c"
+RENDER = REPO_ROOT / "applications/main/nfc/helpers/protocol_support/mf_ultralight/mf_ultralight_render.c"
+PLUGIN_BASE = REPO_ROOT / "applications/main/nfc/helpers/protocol_support/nfc_protocol_support_base.h"
 DICT_SCENE = (
     REPO_ROOT
     / "applications/main/nfc/helpers/protocol_support/mf_ultralight/mf_ultralight_extra_scenes.c"
@@ -57,6 +61,10 @@ class MfUltralightAesTest(unittest.TestCase):
         cls.listener = LISTENER.read_text(encoding="utf-8")
         cls.unlock_warn = UNLOCK_WARN.read_text(encoding="utf-8")
         cls.app_support = APP_SUPPORT.read_text(encoding="utf-8")
+        cls.auth_header = AUTH_HEADER.read_text(encoding="utf-8")
+        cls.auth_source = AUTH_SOURCE.read_text(encoding="utf-8")
+        cls.render = RENDER.read_text(encoding="utf-8")
+        cls.plugin_base = PLUGIN_BASE.read_text(encoding="utf-8")
         cls.dict_scene = DICT_SCENE.read_text(encoding="utf-8")
         cls.api_symbols = API_SYMBOLS.read_text(encoding="utf-8")
         cls.generator = GENERATOR.read_text(encoding="utf-8")
@@ -270,6 +278,39 @@ class MfUltralightAesTest(unittest.TestCase):
         self.assertIn("!authlim_known && !writing_to_target", handler)
         self.assertIn("AUTHLIM unreadable, not probing the default password", handler)
         self.assertIn("instance->mode == MfUltralightPollerModeWrite", handler)
+
+    def test_unlshd_092_reports_auth_outcome_without_scrubbing_it_early(self) -> None:
+        for outcome in (
+            "MfUltralightAuthOutcomeSuccess",
+            "MfUltralightAuthOutcomeFailed",
+            "MfUltralightAuthOutcomeSkippedUid",
+        ):
+            self.assertIn(outcome, self.auth_header)
+        self.assertIn("MfUltralightAuthOutcome outcome;", self.auth_header)
+        self.assertIn("instance->outcome = MfUltralightAuthOutcomeNone", self.auth_source)
+        reset = function_body(self.auth_source, "void mf_ultralight_auth_reset(")
+        self.assertNotIn("outcome", reset)
+
+        read = function_body(
+            self.app_support, "nfc_scene_read_poller_callback_mf_ultralight("
+        )
+        self.assertIn("AuthSuccess", read)
+        self.assertIn("AuthFailed", read)
+        self.assertIn("outcome = MfUltralightAuthOutcomeSuccess", read)
+        self.assertIn("outcome = MfUltralightAuthOutcomeFailed", read)
+
+        result = function_body(
+            self.app_support, "nfc_scene_read_success_on_enter_mf_ultralight("
+        )
+        self.assertIn("Auth Failed", result)
+        self.assertIn("Auth Skipped", result)
+        self.assertLess(result.index("Auth Failed"), result.index("mf_ultralight_auth_reset"))
+        self.assertEqual(self.plugin_base.count("#define NFC_PROTOCOL_SUPPORT_PLUGIN_API_VERSION 3"), 1)
+
+    def test_unlshd_092_does_not_render_masked_password_as_captured(self) -> None:
+        render = function_body(self.render, "void nfc_render_mf_ultralight_pwd_pack(")
+        self.assertIn("mf_ultralight_is_pwd_pack_read(data)", render)
+        self.assertIn("Password not captured.", render)
 
     def test_aes_write_uses_one_recovered_key_and_skips_config_pages(self) -> None:
         callback = function_body(

@@ -182,10 +182,11 @@ typedef struct {
 /**
  * @brief Currently supported plugin API version.
  *
- * Bumped to 2 when NfcProtocolSupportBase gained extra_scenes: the struct layout changed, so a
- * plugin built against version 1 must be refused rather than read past its own end.
+ * Bumped to 2 when NfcProtocolSupportBase gained extra_scenes, and to 3 when MfUltralightAuth
+ * gained its outcome field: the struct layout changed, so older plugins must be refused rather
+ * than read or write past their own layout.
  */
-#define NFC_PROTOCOL_SUPPORT_PLUGIN_API_VERSION 2
+#define NFC_PROTOCOL_SUPPORT_PLUGIN_API_VERSION 3
 
 /**
  * @brief Protocol support plugin interface.

@@ -7,6 +7,7 @@
 MfUltralightAuth* mf_ultralight_auth_alloc(void) {
     MfUltralightAuth* instance = calloc(1, sizeof(MfUltralightAuth));
     furi_check(instance);
+    instance->outcome = MfUltralightAuthOutcomeNone;
 
     return instance;
 }

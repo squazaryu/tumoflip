@@ -151,6 +151,7 @@ static NfcCommand
                 data->iso14443_3a_data->uid_len);
             mf_ultralight_event->data->auth_context.skip_auth = !generated;
             if(!generated) {
+                instance->mf_ul_auth->outcome = MfUltralightAuthOutcomeSkippedUid;
                 FURI_LOG_W("MfUltralightApp", "Xiaomi password needs a 7-byte UID, skipping auth");
             }
         } else if(instance->mf_ul_auth->type == MfUltralightAuthTypeAmiibo) {
@@ -160,6 +161,7 @@ static NfcCommand
                 data->iso14443_3a_data->uid_len);
             mf_ultralight_event->data->auth_context.skip_auth = !generated;
             if(!generated) {
+                instance->mf_ul_auth->outcome = MfUltralightAuthOutcomeSkippedUid;
                 FURI_LOG_W("MfUltralightApp", "Amiibo password needs a 7-byte UID, skipping auth");
             }
         } else if(
@@ -186,12 +188,17 @@ static NfcCommand
         }
     } else if(mf_ultralight_event->type == MfUltralightPollerEventTypeAuthSuccess) {
         instance->mf_ul_auth->pack = mf_ultralight_event->data->auth_context.pack;
+        instance->mf_ul_auth->outcome = MfUltralightAuthOutcomeSuccess;
+    } else if(mf_ultralight_event->type == MfUltralightPollerEventTypeAuthFailed) {
+        // The default-password probe is deliberately silent; this event is user-driven auth.
+        instance->mf_ul_auth->outcome = MfUltralightAuthOutcomeFailed;
     }
 
     return NfcCommandContinue;
 }
 
 static void nfc_scene_read_on_enter_mf_ultralight(NfcApp* instance) {
+    instance->mf_ul_auth->outcome = MfUltralightAuthOutcomeNone;
     nfc_unlock_helper_setup_from_state(instance);
     nfc_poller_start(instance->poller, nfc_scene_read_poller_callback_mf_ultralight, instance);
 }
@@ -304,6 +311,15 @@ static void nfc_scene_read_success_on_enter_mf_ultralight(NfcApp* instance) {
     const MfUltralightData* data = nfc_device_get_data(device, NfcProtocolMfUltralight);
 
     FuriString* temp_str = furi_string_alloc();
+
+    if(instance->mf_ul_auth->outcome == MfUltralightAuthOutcomeFailed) {
+        furi_string_cat_printf(
+            temp_str, "\e#Auth Failed\nCards with an auth limit\ncounted this attempt.\n\n");
+    } else if(instance->mf_ul_auth->outcome == MfUltralightAuthOutcomeSkippedUid) {
+        furi_string_cat_printf(
+            temp_str,
+            "\e#Auth Skipped\nThis password needs a\n7-byte UID. Nothing was\nsent to the card.\n\n");
+    }
 
     bool unlocked =
         scene_manager_has_previous_scene(instance->scene_manager, NfcSceneMfUltralightUnlockWarn);

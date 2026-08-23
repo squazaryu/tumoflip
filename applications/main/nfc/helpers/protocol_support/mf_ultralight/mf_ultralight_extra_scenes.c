@@ -141,6 +141,7 @@ static void mf_ultralight_scene_c_dict_attack_prepare_view(NfcApp* instance) {
 }
 
 static void mf_ultralight_scene_c_dict_attack_on_enter(NfcApp* instance) {
+    instance->mf_ul_auth->outcome = MfUltralightAuthOutcomeNone;
     scene_manager_set_scene_state(
         instance->scene_manager,
         NfcSceneMfUltralightCDictAttack,
@@ -397,6 +398,7 @@ static void mf_ultralight_scene_aes_dict_attack_prepare_view(NfcApp* instance) {
 }
 
 static void mf_ultralight_scene_aes_dict_attack_on_enter(NfcApp* instance) {
+    instance->mf_ul_auth->outcome = MfUltralightAuthOutcomeNone;
     scene_manager_set_scene_state(
         instance->scene_manager,
         NfcSceneMfUltralightAesDictAttack,
