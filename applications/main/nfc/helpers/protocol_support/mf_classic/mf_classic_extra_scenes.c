@@ -412,6 +412,7 @@ static bool mf_classic_scene_dict_attack_on_event(NfcApp* instance, SceneManager
             if(state == DictAttackStateCUIDDictInProgress) {
                 nfc_poller_stop(instance->poller);
                 nfc_poller_free(instance->poller);
+                instance->poller = NULL;
                 keys_dict_free(instance->nfc_dict_context.dict);
                 if(instance->nfc_dict_context.cuid_key_indices_bitmap) {
                     free(instance->nfc_dict_context.cuid_key_indices_bitmap);
@@ -427,6 +428,7 @@ static bool mf_classic_scene_dict_attack_on_event(NfcApp* instance, SceneManager
             } else if(state == DictAttackStateUserDictInProgress && !(ran_nested_dict)) {
                 nfc_poller_stop(instance->poller);
                 nfc_poller_free(instance->poller);
+                instance->poller = NULL;
                 keys_dict_free(instance->nfc_dict_context.dict);
                 scene_manager_set_scene_state(
                     instance->scene_manager,
@@ -464,6 +466,7 @@ static bool mf_classic_scene_dict_attack_on_event(NfcApp* instance, SceneManager
                 if(instance->nfc_dict_context.is_card_present) {
                     nfc_poller_stop(instance->poller);
                     nfc_poller_free(instance->poller);
+                    instance->poller = NULL;
                     keys_dict_free(instance->nfc_dict_context.dict);
                     if(instance->nfc_dict_context.cuid_key_indices_bitmap) {
                         free(instance->nfc_dict_context.cuid_key_indices_bitmap);
@@ -485,6 +488,7 @@ static bool mf_classic_scene_dict_attack_on_event(NfcApp* instance, SceneManager
                 if(instance->nfc_dict_context.is_card_present) {
                     nfc_poller_stop(instance->poller);
                     nfc_poller_free(instance->poller);
+                    instance->poller = NULL;
                     keys_dict_free(instance->nfc_dict_context.dict);
                     scene_manager_set_scene_state(
                         instance->scene_manager,
@@ -513,8 +517,11 @@ static bool mf_classic_scene_dict_attack_on_event(NfcApp* instance, SceneManager
 }
 
 static void mf_classic_scene_dict_attack_on_exit(NfcApp* instance) {
-    nfc_poller_stop(instance->poller);
-    nfc_poller_free(instance->poller);
+    if(instance->poller) {
+        nfc_poller_stop(instance->poller);
+        nfc_poller_free(instance->poller);
+        instance->poller = NULL;
+    }
 
     dict_attack_reset(instance->dict_attack);
     scene_manager_set_scene_state(
@@ -1132,8 +1139,11 @@ static bool mf_classic_scene_update_initial_on_event(NfcApp* instance, SceneMana
 }
 
 static void mf_classic_scene_update_initial_on_exit(NfcApp* instance) {
-    nfc_poller_stop(instance->poller);
-    nfc_poller_free(instance->poller);
+    if(instance->poller) {
+        nfc_poller_stop(instance->poller);
+        nfc_poller_free(instance->poller);
+        instance->poller = NULL;
+    }
 
     scene_manager_set_scene_state(
         instance->scene_manager,

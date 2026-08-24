@@ -12,7 +12,17 @@ typedef enum {
     MfUltralightAuthTypeManual,
     MfUltralightAuthTypeXiaomi,
     MfUltralightAuthTypeAmiibo,
+    // UL-AES Random ID: user-requested reveal of the hidden real UID.
+    MfUltralightAuthTypeUidReveal,
 } MfUltralightAuthType;
+
+/** Result of the authentication requested by the current read/unlock flow. */
+typedef enum {
+    MfUltralightAuthOutcomeNone,
+    MfUltralightAuthOutcomeSuccess,
+    MfUltralightAuthOutcomeFailed,
+    MfUltralightAuthOutcomeSkippedUid,
+} MfUltralightAuthOutcome;
 
 typedef struct {
     MfUltralightAuthType type;
@@ -20,6 +30,9 @@ typedef struct {
     MfUltralightC3DesAuthKey tdes_key;
     MfUltralightAesKey aes_key;
     MfUltralightAuthPack pack;
+    // Cleared when a new read/attack starts, not by auth_reset(), because reset runs after the
+    // read result is rendered and only scrubs credentials.
+    MfUltralightAuthOutcome outcome;
 } MfUltralightAuth;
 
 MfUltralightAuth* mf_ultralight_auth_alloc(void);

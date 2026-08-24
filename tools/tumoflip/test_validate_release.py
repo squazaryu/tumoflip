@@ -21,9 +21,13 @@ try:
         PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
+        DEFAULT_MIN_C2_GAP,
+        STM32WB55_FLASH_ERASE_PAGE_BYTES,
+        FLASH_BASE,
         ValidationError,
         _load_heatshrink2,
         crc32,
+        dfuse_c1_flash_end,
         find_objdump,
         little_endian_hex,
         manifest_release_id,
@@ -32,6 +36,8 @@ try:
         runtime_capabilities,
         validate_runtime_contract,
         validate_resources_archive,
+        validate_c2_safety,
+        validate_dfuse_matches_elf,
         validate_static_sd_resources,
     )
 except ImportError:
@@ -44,9 +50,13 @@ except ImportError:
         PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
+        DEFAULT_MIN_C2_GAP,
+        STM32WB55_FLASH_ERASE_PAGE_BYTES,
+        FLASH_BASE,
         ValidationError,
         _load_heatshrink2,
         crc32,
+        dfuse_c1_flash_end,
         find_objdump,
         little_endian_hex,
         manifest_release_id,
@@ -55,11 +65,38 @@ except ImportError:
         runtime_capabilities,
         validate_runtime_contract,
         validate_resources_archive,
+        validate_c2_safety,
+        validate_dfuse_matches_elf,
         validate_static_sd_resources,
     )
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def make_dfuse(elements: list[tuple[int, bytes]]) -> bytes:
+    element_data = b"".join(
+        struct.pack("<II", address, len(payload)) + payload
+        for address, payload in elements
+    )
+    target = struct.pack(
+        "<6sBB3s255sII",
+        b"Target",
+        0,
+        1,
+        b"\0" * 3,
+        b"C1".ljust(255, b"\0"),
+        len(element_data),
+        len(elements),
+    ) + element_data
+    image = struct.pack(
+        "<5sBIB", b"DfuSe", 1, struct.calcsize("<5sBIB") + len(target), 1
+    ) + target
+    suffix = struct.pack(
+        "<HHHH3sB", 0xFFFF, 0xDF11, 0x0483, 0x011A, b"UFD", 16
+    )
+    crc = ~zlib.crc32(image + suffix) & 0xFFFFFFFF
+    return image + suffix + struct.pack("<I", crc)
 
 
 class ValidateReleaseTest(unittest.TestCase):
@@ -101,6 +138,88 @@ class ValidateReleaseTest(unittest.TestCase):
             path = Path(directory) / "data.bin"
             path.write_bytes(b"tumoflip")
             self.assertEqual(crc32(path), zlib.crc32(b"tumoflip") & 0xFFFFFFFF)
+
+    def test_c2_safety_uses_physical_elf_layout_not_dfuse_metadata(self) -> None:
+        radio_address = 0x080D7000
+        # The final C1 page may be populated up to the C2 page boundary. The
+        # updater erases 0x080D6000..0x080D6FFF, never the C2 page itself.
+        flash_end = radio_address - 0xF8C
+        dfu_container_gap = 4023
+
+        erase_aligned_end, physical_gap = validate_c2_safety(
+            radio_address,
+            flash_end,
+            dfu_container_gap,
+            DEFAULT_MIN_C2_GAP,
+        )
+
+        self.assertLess(dfu_container_gap, STM32WB55_FLASH_ERASE_PAGE_BYTES)
+        self.assertEqual(erase_aligned_end, radio_address)
+        self.assertEqual(physical_gap, 0)
+
+    def test_c2_safety_rejects_layout_that_crosses_the_radio_boundary(self) -> None:
+        radio_address = 0x080D7000
+        flash_end = radio_address + 1
+
+        with self.assertRaisesRegex(
+            ValidationError,
+            r"C1 erase range reaches the C2/radio region: physical=-4096",
+        ):
+            validate_c2_safety(
+                radio_address,
+                flash_end,
+                0,
+                DEFAULT_MIN_C2_GAP,
+            )
+
+    def test_dfuse_c1_flash_end_matches_an_ordinary_elf_layout(self) -> None:
+        radio_address = 0x080D7000
+        payload = b"\xAA" * 16
+        elf_end = FLASH_BASE + len(payload)
+
+        with tempfile.TemporaryDirectory() as directory:
+            dfu_path = Path(directory) / "firmware.dfu"
+            dfu_path.write_bytes(make_dfuse([(FLASH_BASE, payload)]))
+
+            self.assertEqual(dfuse_c1_flash_end(dfu_path, radio_address), elf_end)
+            self.assertEqual(
+                validate_dfuse_matches_elf(dfu_path, radio_address, elf_end),
+                elf_end,
+            )
+
+    def test_dfuse_rejects_c2_element_even_with_an_ordinary_c1_elf(self) -> None:
+        radio_address = 0x080D7000
+        c1_payload = b"\xAA" * 16
+        elf_end = FLASH_BASE + len(c1_payload)
+
+        with tempfile.TemporaryDirectory() as directory:
+            dfu_path = Path(directory) / "firmware.dfu"
+            dfu_path.write_bytes(
+                make_dfuse(
+                    [
+                        (FLASH_BASE, c1_payload),
+                        (radio_address, b"\xBB" * 16),
+                    ]
+                )
+            )
+
+            with self.assertRaisesRegex(ValidationError, "writes C2/radio region"):
+                validate_dfuse_matches_elf(dfu_path, radio_address, elf_end)
+
+    def test_dfuse_flash_end_must_match_elf(self) -> None:
+        radio_address = 0x080D7000
+        payload = b"\xAA" * 16
+
+        with tempfile.TemporaryDirectory() as directory:
+            dfu_path = Path(directory) / "firmware.dfu"
+            dfu_path.write_bytes(make_dfuse([(FLASH_BASE, payload)]))
+
+            with self.assertRaisesRegex(ValidationError, "does not match ELF"):
+                validate_dfuse_matches_elf(
+                    dfu_path,
+                    radio_address,
+                    FLASH_BASE + len(payload) + 1,
+                )
 
     def test_static_sd_resources_are_build_inputs(self) -> None:
         firmware = (REPO_ROOT / "firmware.scons").read_text(encoding="utf-8")

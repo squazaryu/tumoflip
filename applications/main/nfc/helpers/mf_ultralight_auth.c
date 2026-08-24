@@ -7,6 +7,10 @@
 MfUltralightAuth* mf_ultralight_auth_alloc(void) {
     MfUltralightAuth* instance = calloc(1, sizeof(MfUltralightAuth));
     furi_check(instance);
+    // Keep allocation semantics explicit: authentication must start with no intent, even if the
+    // allocator implementation changes from zero-filled memory in the future.
+    mf_ultralight_auth_reset(instance);
+    instance->outcome = MfUltralightAuthOutcomeNone;
 
     return instance;
 }

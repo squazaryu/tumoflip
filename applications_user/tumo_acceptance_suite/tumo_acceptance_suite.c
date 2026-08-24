@@ -1,4 +1,5 @@
 #include <furi.h>
+#include <furi/core/thread_list.h>
 #include <furi_hal_info.h>
 #include <furi_hal_infrared.h>
 #include <furi_hal_power.h>
@@ -10,14 +11,17 @@
 #include <gui/modules/text_box.h>
 #include <gui/view_dispatcher.h>
 #include <storage/storage.h>
+#include <subghz_radio_broker/subghz_radio_broker.h>
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define TUMO_ACCEPTANCE_DATA_DIR EXT_PATH("apps_data/tumo_acceptance_suite")
 #define TUMO_ACCEPTANCE_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
 #define TUMO_ACCEPTANCE_REPORT_PATH_SIZE 128U
+#define TUMO_ACCEPTANCE_MAX_THREAD_LINES 12U
 
 typedef enum {
     TumoAcceptanceViewMenu,
@@ -126,7 +130,132 @@ static void tumo_acceptance_append_info(FuriString* output, const char* name, co
     furi_string_cat(output, "\n");
 }
 
-static void tumo_acceptance_build_report(TumoAcceptanceApp* app, FuriString* output) {
+static const char* tumo_acceptance_radio_device_name(SubGhzRadioBrokerDevice device) {
+    switch(device) {
+    case SubGhzRadioBrokerDeviceInternal:
+        return "internal";
+    case SubGhzRadioBrokerDeviceExternalCC1101:
+        return "external_cc1101";
+    case SubGhzRadioBrokerDeviceDual:
+        return "dual";
+    default:
+        return "unknown";
+    }
+}
+
+static const char* tumo_acceptance_radio_state_name(SubGhzRadioBrokerState state) {
+    switch(state) {
+    case SubGhzRadioBrokerStateIdle:
+        return "idle";
+    case SubGhzRadioBrokerStateAcquired:
+        return "acquired";
+    case SubGhzRadioBrokerStateProbing:
+        return "probing";
+    case SubGhzRadioBrokerStateInitialized:
+        return "initialized";
+    case SubGhzRadioBrokerStateRx:
+        return "rx";
+    case SubGhzRadioBrokerStateTx:
+        return "tx";
+    case SubGhzRadioBrokerStateAsyncRx:
+        return "async_rx";
+    case SubGhzRadioBrokerStateAsyncTx:
+        return "async_tx";
+    case SubGhzRadioBrokerStateCleaningUp:
+        return "cleaning_up";
+    case SubGhzRadioBrokerStateExternalPowerOn:
+        return "external_power_on";
+    case SubGhzRadioBrokerStateReleasing:
+        return "releasing";
+    case SubGhzRadioBrokerStateError:
+        return "error";
+    default:
+        return "unknown";
+    }
+}
+
+static bool tumo_acceptance_thread_is_relevant(const FuriThreadListItem* item) {
+    const char* name = item->name ? item->name : "";
+    const char* app_id = item->app_id ? item->app_id : "";
+    return item->stack_min_free < 512U || strstr(name, "nfc") || strstr(name, "Nfc") ||
+           strstr(name, "subghz") || strstr(name, "SubGhz") || strstr(name, "radio") ||
+           strstr(name, "Radio") || strstr(name, "loader") || strstr(name, "Loader") ||
+           strstr(name, "cli") || strstr(name, "Cli") || strstr(app_id, "nfc") ||
+           strstr(app_id, "subghz") || strstr(app_id, "radio");
+}
+
+static void tumo_acceptance_append_runtime_snapshot(
+    TumoAcceptanceApp* app,
+    FuriString* output,
+    const char* stage) {
+    furi_string_cat_printf(output, "\nRuntime snapshot (%s)\n", stage);
+    furi_string_cat_printf(
+        output,
+        "Heap: total=%lu free=%lu min=%lu max_block=%lu\n",
+        (unsigned long)memmgr_get_total_heap(),
+        (unsigned long)memmgr_get_free_heap(),
+        (unsigned long)memmgr_get_minimum_free_heap(),
+        (unsigned long)memmgr_heap_get_max_free_block());
+
+    FuriThreadList* thread_list = furi_thread_list_alloc();
+    if(furi_thread_enumerate(thread_list)) {
+        size_t relevant_count = 0;
+        size_t printed_count = 0;
+        uint32_t minimum_stack_free = UINT32_MAX;
+        for(size_t i = 0; i < furi_thread_list_size(thread_list); i++) {
+            const FuriThreadListItem* item = furi_thread_list_get_at(thread_list, i);
+            if(item->stack_min_free < minimum_stack_free) {
+                minimum_stack_free = item->stack_min_free;
+            }
+            if(!tumo_acceptance_thread_is_relevant(item)) continue;
+            relevant_count++;
+            if(printed_count >= TUMO_ACCEPTANCE_MAX_THREAD_LINES) continue;
+            furi_string_cat_printf(
+                output,
+                "Thread: %s app=%s state=%s stack_min=%lu heap=%lu\n",
+                item->name ? item->name : "?",
+                item->app_id ? item->app_id : "?",
+                item->state ? item->state : "?",
+                (unsigned long)item->stack_min_free,
+                (unsigned long)item->heap);
+            printed_count++;
+        }
+        furi_string_cat_printf(
+            output,
+            "Threads: total=%zu relevant=%zu min_stack_free=%lu%s\n",
+            furi_thread_list_size(thread_list),
+            relevant_count,
+            (unsigned long)minimum_stack_free,
+            relevant_count > printed_count ? " (truncated)" : "");
+    } else {
+        tumo_acceptance_append_info(output, "Thread enumeration", "unavailable");
+    }
+    furi_thread_list_free(thread_list);
+
+    SubGhzRadioBroker* radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+    SubGhzRadioBrokerStatusV2 radio_status;
+    subghz_radio_broker_get_status_v2(radio_broker, &radio_status);
+    furi_string_cat_printf(
+        output,
+        "Radio broker: state=%s busy=%s device=%s external_power=%s owner=%s\n",
+        tumo_acceptance_radio_state_name(radio_status.state),
+        radio_status.base.busy ? "yes" : "no",
+        tumo_acceptance_radio_device_name(radio_status.base.selected_device),
+        radio_status.base.external_powered ? "yes" : "no",
+        radio_status.base.owner[0] ? radio_status.base.owner : "none");
+    furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
+
+    tumo_acceptance_append_info(
+        output,
+        "USB CLI log drops",
+        "query with `log stats` after a USB log session");
+    UNUSED(app);
+}
+
+static void tumo_acceptance_build_report(
+    TumoAcceptanceApp* app,
+    FuriString* output,
+    const char* stage) {
     furi_string_reset(output);
 
     const Version* version = furi_hal_version_get_firmware_version();
@@ -184,6 +313,7 @@ static void tumo_acceptance_build_report(TumoAcceptanceApp* app, FuriString* out
         "heap headroom",
         memmgr_heap_get_max_free_block() >= 4096U,
         heap_detail);
+    tumo_acceptance_append_runtime_snapshot(app, output, stage);
 
     furi_string_cat(output, "\nPassive hardware state\n");
     tumo_acceptance_append_info(
@@ -256,7 +386,7 @@ static void tumo_acceptance_export_report(TumoAcceptanceApp* app) {
     snprintf(path, sizeof(path), TUMO_ACCEPTANCE_DATA_DIR "/acceptance_%s.txt", timestamp);
 
     FuriString* report = furi_string_alloc();
-    tumo_acceptance_build_report(app, report);
+    tumo_acceptance_build_report(app, report, "export");
 
     const bool dir_ok = tumo_acceptance_mkdir(app->storage, TUMO_ACCEPTANCE_DATA_DIR);
     const bool write_ok =
@@ -293,7 +423,7 @@ static void tumo_acceptance_menu_callback(void* context, uint32_t index) {
 
     switch(index) {
     case TumoAcceptanceActionRun:
-        tumo_acceptance_build_report(app, app->text);
+        tumo_acceptance_build_report(app, app->text, "run");
         break;
     case TumoAcceptanceActionExport:
         tumo_acceptance_export_report(app);

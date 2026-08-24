@@ -293,9 +293,10 @@ bool subghz_scene_set_type_generate_protocol_from_infos(SubGhz* subghz) {
             gen_info.phoenix_v2.serial,
             gen_info.phoenix_v2.cnt);
         break;
+    case GenUnsupported:
     default:
-        furi_crash("Not implemented");
-        break;
+        subghz_scene_show_unsupported(subghz);
+        return false;
     }
 
     if(generated_protocol) {
@@ -351,6 +352,9 @@ bool subghz_scene_set_type_on_event(void* context, SceneManagerEvent event) {
             case GenSecPlus2: // Serial (u32), Button (u8), Counter (u32)
             case GenPhoenixV2: // Serial (u32), Counter (u16)
                 scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSetSerial);
+                break;
+            case GenUnsupported:
+                subghz_scene_show_unsupported(subghz);
                 break;
             }
             return true;

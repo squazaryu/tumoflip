@@ -75,6 +75,49 @@ class ArfSubGhzFullTest(unittest.TestCase):
     def test_legacy_duplicate_is_removed(self) -> None:
         self.assertFalse((REPO_ROOT / "applications_user/arf_subghz").exists())
 
+    def test_protopirate_uses_upstream_v32_feature_gate_without_losing_tumoflip_broker(self) -> None:
+        manifest = (
+            REPO_ROOT / "applications_user/protopirate/application.fam"
+        ).read_text(encoding="utf-8")
+        defines = (
+            REPO_ROOT / "applications_user/protopirate/defines.h"
+        ).read_text(encoding="utf-8")
+        app = (
+            REPO_ROOT / "applications_user/protopirate/protopirate_app.c"
+        ).read_text(encoding="utf-8")
+        protocol_items = (
+            REPO_ROOT / "applications_user/protopirate/protocols/protocol_items.c"
+        ).read_text(encoding="utf-8")
+        kia_v1 = (
+            REPO_ROOT / "applications_user/protopirate/protocols/kia_v1.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('fap_version="3.2"', manifest)
+        self.assertIn('_ENABLE_EMULATE = ProtoPirateDefineEnabled', manifest)
+        self.assertIn('if not _ENABLE_EMULATE:', manifest)
+        self.assertIn('if _ENABLE_EMULATE:', manifest)
+        self.assertIn("#define ENABLE_EMULATE_FEATURE", defines)
+        self.assertIn("RECORD_SUBGHZ_RADIO_BROKER", app)
+        self.assertIn("APP_ASSETS_PATH(\"setting_user\")", app)
+        self.assertIn("PROTOPIRATE_TX_KEY", protocol_items)
+        self.assertIn("instance->crc = crc;", kia_v1)
+        self.assertNotIn("instance->crc = cnt_high << 4 | crc;", kia_v1)
+
+    def test_arf_generation_defaults_show_error_instead_of_crashing(self) -> None:
+        source_roots = (
+            REPO_ROOT / "applications_user/arf_subghz_full",
+            REPO_ROOT / "applications/main/subghz",
+        )
+        source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for root in source_roots
+            for path in root.rglob("*.c")
+        )
+
+        self.assertIn("GenUnsupported", source)
+        self.assertIn("subghz_scene_show_unsupported", source)
+        self.assertNotIn('furi_crash("Not implemented")', source)
+
     def test_desktop_routes_subghz_to_arf_hub_and_arf_tools_to_cockpit(self) -> None:
         loader_menu = (
             REPO_ROOT / "applications/services/loader/loader_menu.c"
@@ -147,7 +190,7 @@ class ArfSubGhzFullTest(unittest.TestCase):
             cockpit.index("loader_enqueue_launch(app->loader, target->target"),
         )
 
-    def test_loader_prearms_deferred_launch_loading_overlay(self) -> None:
+    def test_loader_keeps_only_the_existing_deferred_launch_indicator(self) -> None:
         loader = (REPO_ROOT / "applications/services/loader/loader.c").read_text(
             encoding="utf-8"
         )
@@ -159,17 +202,17 @@ class ArfSubGhzFullTest(unittest.TestCase):
             re.S,
         )
         self.assertIsNotNone(deferred_launch)
-        self.assertIn("loading_get_view(loader->loading)", deferred_launch.group(0))
+        self.assertIn(
+            "view_holder_set_view(loader->view_holder, loading_get_view(loader->loading))",
+            deferred_launch.group(0),
+        )
         self.assertIn("view_holder_send_to_front(loader->view_holder)", deferred_launch.group(0))
         self.assertIn(
             "if(!is_successful) view_holder_set_view(loader->view_holder, NULL)",
             deferred_launch.group(0),
         )
-        self.assertNotIn(
-            "\n    view_holder_set_view(loader->view_holder, NULL);\n"
-            "    furi_string_free(error_message);",
-            deferred_launch.group(0),
-        )
+        self.assertNotIn("loader_do_show_loading", deferred_launch.group(0))
+        self.assertNotIn("loader_do_hide_loading", deferred_launch.group(0))
 
         queue_empty = re.search(
             r"static void loader_do_emit_queue_empty_event\(.*?\n}\n\n"

@@ -18,9 +18,15 @@ class DesktopLockscreenTest(unittest.TestCase):
 
         self.assertIn("uint8_t lockscreen_skip_animation;", header)
         self.assertIn("#define DESKTOP_SETTINGS_VER_18 (18)", source)
-        self.assertIn("#define DESKTOP_SETTINGS_VER    (19)", source)
+        self.assertIn("#define DESKTOP_SETTINGS_VER_19 (19)", source)
+        self.assertIn("#define DESKTOP_SETTINGS_VER_20 (20)", source)
+        self.assertIn("#define DESKTOP_SETTINGS_VER    (21)", source)
         self.assertIn("DesktopSettingsV18", source)
+        self.assertIn("DesktopSettingsV19", source)
+        self.assertIn("DesktopSettingsV20", source)
         self.assertIn("desktop_settings_migrate_from_v18", source)
+        self.assertIn("desktop_settings_migrate_from_v19", source)
+        self.assertIn("desktop_settings_migrate_from_v20", source)
         self.assertGreaterEqual(source.count("settings->lockscreen_skip_animation = 0;"), 3)
 
     def test_desktop_settings_exposes_lock_animation_toggle(self) -> None:

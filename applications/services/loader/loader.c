@@ -4,6 +4,7 @@
 #include <storage/storage.h>
 #include <furi_hal.h>
 #include <assets_icons.h>
+#include <desktop/desktop_i.h>
 
 #include <dialogs/dialogs.h>
 #include <toolbox/path.h>
@@ -683,7 +684,7 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
         if(loader_do_is_locked(loader)) {
             if(loader->app.thread == (FuriThread*)LOADER_MAGIC_THREAD_VALUE) {
                 status.value = loader_make_status_error(
-                    LoaderStatusErrorAppStarted, error_message, "Loader is locked");
+                    LoaderStatusErrorAppStarted, error_message, "Loader locked");
             } else {
                 const char* current_thread_name =
                     furi_thread_get_name(furi_thread_get_id(loader->app.thread));
@@ -691,7 +692,7 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
                 status.value = loader_make_status_error(
                     LoaderStatusErrorAppStarted,
                     error_message,
-                    "Loader is locked, please close the \"%s\" first",
+                    "Close \"%s\" first",
                     current_thread_name);
             }
             break;
@@ -721,12 +722,10 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
         // check External Applications
         {
             const char* path = loader_find_external_application_by_name(name);
-            if(path) {
-                name = path;
-            }
+            if(path) name = path;
         }
 
-        // check Faps
+        // check FAPs
         {
             Storage* storage = furi_record_open(RECORD_STORAGE);
             if(storage_file_exists(storage, name)) {
@@ -743,7 +742,7 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
         }
 
         status.value = loader_make_status_error(
-            LoaderStatusErrorUnknownApp, error_message, "Application \"%s\" not found", name);
+            LoaderStatusErrorUnknownApp, error_message, "%s not found", name);
     } while(false);
 
     if(status.value == LoaderStatusOk) {

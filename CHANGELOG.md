@@ -1,5 +1,6 @@
-## Main changes
-- Current API: 87.18
+## Tumoflip v1.0.7 / t-flppr-fw-007
+- Current API: 88.4 (F7 stable API for t-flppr-fw-007)
+* JS Runner and NFC FAPs can resolve shared soft-float helpers from the F7 firmware, reducing duplicated libgcc code while keeping the shared-library path explicit for compatible FAPs.
 * SubGHz: **Fix endless TX causing RAW files to be transmitted and crash the system** (via RPC / Mobile App) (Fixes issue #1008)
 * SubGHz: **Add Telcoma/Cardin EDGE protocol** (32bit, Static) (by @half2me | PR #1001)
 * LFRFID: **Support of Hitag Micro chips** (8265/8210/H5.5) (by @mishamyte | PR #1002)
@@ -15,11 +16,24 @@
 * Apps: **NFC Magic** - Gen2 CUID/static-nonce detection, Gen1 4b/7b UID, length-aware wipe & write guard (by @mishamyte)
 * Apps: Build tag (**10jun2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
 ## Other changes
+* NFC: **Remove unreachable EMV render helpers and stale NFC/backdoor exports**, eliminating an undefined plugin symbol and reducing link-time surface (Unleashed PR #1085)
+* NFC: **Parser declines and unknown ticket layouts are now logged at debug level**, while MIFARE Classic parser guidance explicitly requires checking block data (Unleashed PR #1097)
+* NFC: **Ultralight read results now distinguish failed authentication from an intentionally skipped attempt**, and never display masked zero bytes as a captured password (Unleashed PR #1090)
+* NFC: **Never probe a generated Ultralight password when the UID is unsuitable, or when AUTHLIM is unreadable**; explicit skips preserve the card's remaining authentication attempts (Unleashed PRs #1086/#1089)
 * Apps: Update FindMy app
 * Fix BLE sync, fix possible delay related issues
 * Disabled debug and trace logs in the FW binary (apps .fap's are not affected) to free up some flash space for new features
 * NFC: Fix typo in SLIX poller (by @WillyJL)
 * NFC: Internal MIFARE Plus cleanup - data-drive the "Add Manually" generator variants and unify the admin-key address mapping into one source of truth; small internal-flash saving, no functional change (by @mishamyte | PR #1035)
+* NFC: Preserve the reviewed protocol-scene plugin split and API-v3 dispatch contract, keeping protocol-only scenes and transit parsers out of the resident NFC app (Tumoflip #346 / Unleashed #1073)
+* GUI: FileBrowser entries retain only their names and reconstruct paths on demand, reducing RAM use in large directories (Momentum #362 / upstream b8757a5e7a)
+* Archive: Keep the cursor valid when a directory has more than 220 entries (Momentum #362 / upstream 757cca0279b)
+* Sub-GHz: Guard transmitter cleanup when no transmitter is available (Unleashed #1104 / Tumoflip #394)
+* Sub-GHz: Reject BinRAW encoder writes that would exceed the upload buffer (Unleashed #1105 / Tumoflip #394)
+* NFC: Reject FeliCa Lite dumps with invalid block counts (Unleashed #1106 / Tumoflip #394)
+* Toolbox: Compare the complete storage of each SimpleArray element (Unleashed #1107 / Tumoflip #394)
+* F7 serial: Reject the invalid expansion serial sentinel (Unleashed #1108 / Tumoflip #394)
+* Release validation: model the updater's page-aligned C1 erase range so the final C1 page can end at the C2 boundary without weakening DfuSe address checks
 <br><br>
 
 ----

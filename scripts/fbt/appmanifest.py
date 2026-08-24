@@ -72,6 +72,10 @@ class FlipperApplication:
     fap_version: Union[str, Tuple[int]] = "0.1"
     fap_icon: Optional[str] = None
     fap_libs: List[str] = field(default_factory=list)
+    # Toolchain libraries that this FAP intentionally leaves unresolved. The firmware API must
+    # export the corresponding symbols before an app opts in; keeping this opt-in makes the
+    # libgcc-sharing experiment safe for existing API-88.0 packages.
+    fap_exclude_libs: List[str] = field(default_factory=list)
     fap_category: str = ""
     fap_dist_path: Optional[str] = None
     fap_description: str = ""

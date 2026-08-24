@@ -1315,11 +1315,10 @@ bool mosgortrans_parse_transport_block(const MfClassicBlock* block, FuriString* 
         break;
     }
     default:
-        furi_string_cat_printf(
-            result,
-            "Ticket data detected\nLayout: %04X\nValidity: not decoded",
-            layout_type);
-        return true;
+        // The layout value is already logged above; an unsupported ticket must not claim a
+        // successful parse and hide the generic NFC view.
+        FURI_LOG_D(TAG, "Layout %x is not supported", layout_type);
+        return false;
     }
 
     return true;

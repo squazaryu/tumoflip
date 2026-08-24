@@ -556,6 +556,7 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
         }
         if(ret != SubGhzTxRxStartTxStateOk) {
             subghz_transmitter_free(instance->transmitter);
+            instance->transmitter = NULL;
             if(instance->txrx_state != SubGhzTxRxStateIDLE) {
                 subghz_txrx_idle(instance);
             }

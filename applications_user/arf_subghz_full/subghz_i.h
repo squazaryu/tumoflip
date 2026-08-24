@@ -163,3 +163,9 @@ void subghz_ensure_transmitter_view(SubGhz* subghz);
 void subghz_ensure_frequency_analyzer_view(SubGhz* subghz);
 void subghz_ensure_receiver_view(SubGhz* subghz);
 void subghz_ensure_read_raw_view(SubGhz* subghz, bool raw_send_only);
+
+static inline void subghz_scene_show_unsupported(SubGhz* subghz) {
+    furi_check(subghz);
+    furi_string_set(subghz->error_str, "Protocol not\nsupported.");
+    scene_manager_next_scene(subghz->scene_manager, SubGhzSceneShowError);
+}

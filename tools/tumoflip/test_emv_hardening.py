@@ -62,6 +62,21 @@ class EmvHardeningTest(unittest.TestCase):
         self.assertIn("emv_trans_writable(app)", poller)
         self.assertIn("COUNT_OF(instance->data->emv_application.trans)", poller)
 
+    def test_unlshd_092_removes_unreachable_emv_exports(self) -> None:
+        render = source("applications/main/nfc/helpers/protocol_support/emv/emv_render.c")
+        header = source("applications/main/nfc/helpers/protocol_support/emv/emv_render.h")
+        nfc_app = source("applications/main/nfc/nfc_app.c")
+        nfc_app_i = source("applications/main/nfc/nfc_app_i.h")
+        classic_i = source("lib/nfc/protocols/mf_classic/mf_classic_poller_i.h")
+        self.assertNotIn("nfc_render_emv_data", render + header)
+        self.assertNotIn("nfc_render_emv_pan", render + header)
+        self.assertNotIn("nfc_render_emv_name", render + header)
+        self.assertIn("static void nfc_make_app_folders", nfc_app)
+        self.assertNotIn("nfc_make_app_folder", nfc_app_i)
+        self.assertNotIn("nfc_task(void* p)", nfc_app_i)
+        for symbol in ("auth1_backdoor_key", "auth2_backdoor_key", "auth3_backdoor_key"):
+            self.assertNotIn(symbol, classic_i)
+
     def test_native_emv_fixtures_cover_valid_and_rejected_files(self) -> None:
         unit_test = source("applications/debug/unit_tests/tests/nfc/nfc_test.c")
         for fixture in (

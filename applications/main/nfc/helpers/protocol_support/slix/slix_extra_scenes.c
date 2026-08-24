@@ -162,8 +162,11 @@ static bool slix_scene_unlock_on_event(NfcApp* instance, SceneManagerEvent event
 }
 
 static void slix_scene_unlock_on_exit(NfcApp* instance) {
-    nfc_poller_stop(instance->poller);
-    nfc_poller_free(instance->poller);
+    if(instance->poller) {
+        nfc_poller_stop(instance->poller);
+        nfc_poller_free(instance->poller);
+        instance->poller = NULL;
+    }
 
     popup_reset(instance->popup);
 

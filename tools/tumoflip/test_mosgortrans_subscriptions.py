@@ -122,7 +122,7 @@ class MosgortransSubscriptionsTest(unittest.TestCase):
             self.social_source,
         )
         self.assertIn(
-            "!mf_classic_is_block_read(data, block_num + 1)",
+            "!mf_classic_parser_block_has_data(data, block_num + 1)",
             self.social_source,
         )
         self.assertIn(

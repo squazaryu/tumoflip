@@ -6,6 +6,7 @@
 #include <nfc/nfc_device.h>
 #include <bit_lib/bit_lib.h>
 #include <nfc/protocols/mf_classic/mf_classic_poller_sync.h>
+#include "mf_classic_parser_util.h"
 #include "../../api/mosgortrans/mosgortrans_util.h"
 #include "furi_hal_rtc.h"
 
@@ -252,8 +253,8 @@ static size_t social_moscow_render_transport_data(
     // Sector 0 is manufacturer data; data_sector contains the social-card identity.
     for(uint8_t sector = 1; sector < data_sector; sector++) {
         const uint8_t block_num = mf_classic_get_first_block_num_of_sector(sector);
-        if(!mf_classic_is_block_read(data, block_num) ||
-           !mf_classic_is_block_read(data, block_num + 1)) {
+        if(!mf_classic_parser_block_has_data(data, block_num) ||
+           !mf_classic_parser_block_has_data(data, block_num + 1)) {
             continue;
         }
 
@@ -312,6 +313,14 @@ static bool social_moscow_parse(const NfcDevice* device, FuriString* parsed_data
         number = number * 10000000000ULL + social_moscow_bcd_to_uint64(card_number, 10);
         number = number * 10 + social_moscow_bcd_to_uint64(card_control, 1);
 
+        // A known sector key does not prove that this block was read. A blank
+        // identity also passes its Luhn check, while legacy dumps keep valid
+        // non-zero bytes after their read mask is cleared.
+        if(number == 0) {
+            FURI_LOG_D(TAG, "Identity block is empty");
+            break;
+        }
+
         uint8_t luhn = calculate_luhn(number);
         if(luhn != card_control) break;
 
@@ -324,12 +333,19 @@ static bool social_moscow_parse(const NfcDevice* device, FuriString* parsed_data
         render_section_header(parsed_data, "Card", 24, 24);
         furi_string_cat_printf(
             parsed_data,
-            "\nNumber: %lx %x %llx %x\nOMC: %llx\nCard valid: %02x/%02x %02x%02x\n",
+            "\nNumber: %lx %x %llx %x\n",
             card_code,
             card_region,
             card_number,
-            card_control,
-            omc_number,
+            card_control);
+        if(mf_classic_parser_block_has_data(data, 21)) {
+            furi_string_cat_printf(parsed_data, "OMC: %llx\n", omc_number);
+        } else {
+            furi_string_cat(parsed_data, "OMC: Unknown\n");
+        }
+        furi_string_cat_printf(
+            parsed_data,
+            "Card valid: %02x/%02x %02x%02x\n",
             month,
             year,
             data->block[60].data[13],

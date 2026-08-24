@@ -1,4 +1,5 @@
 #include <furi.h>
+#include <furi_hal_version.h>
 #include <gui/gui.h>
 #include <gui/modules/submenu.h>
 #include <gui/modules/text_box.h>
@@ -10,6 +11,7 @@
 
 #define TUMO_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
 #define TUMO_INSTALL_STATE_PATH EXT_PATH(".tumoflip/install-state.json")
+#define TUMO_CATALOG_STATE_PATH EXT_PATH(".tumoflip/catalog-state.txt")
 #define TUMO_SHA256_HEX_LEN     64
 #define TUMO_MAX_AUDIT_FILES    256
 #define TUMO_MAX_LINE_LEN       256
@@ -151,12 +153,35 @@ typedef struct {
     FuriString* release_id;
     FuriString* transaction;
     FuriString* firmware;
+    FuriString* firmware_api;
     FuriString* package_release;
     FuriString* groups;
     FuriString* installed_files;
     FuriString* cleanup_candidates;
     FuriString* rollback;
 } TumoPackageState;
+
+/// The companion writes this separate projection after it has selected an
+/// authoritative catalog and revalidated the connected firmware. Unlike
+/// TumoPackageState, it is not an install-history record.
+typedef struct {
+    bool present;
+    bool complete;
+    bool filetype_valid;
+    bool schema_valid;
+    uint16_t parse_errors;
+    FuriString* catalog_release;
+    FuriString* catalog_channel;
+    FuriString* catalog_revision;
+    FuriString* catalog_scope;
+    FuriString* catalog_source_fw;
+    FuriString* device_fw;
+    FuriString* device_api;
+    FuriString* device_target;
+    FuriString* managed_files;
+    FuriString* firmware_baseline_files;
+    FuriString* compatibility;
+} TumoCatalogState;
 
 typedef struct {
     Gui* gui;
@@ -305,6 +330,7 @@ static void tumo_state_init(TumoPackageState* state) {
     state->release_id = furi_string_alloc();
     state->transaction = furi_string_alloc();
     state->firmware = furi_string_alloc();
+    state->firmware_api = furi_string_alloc();
     state->package_release = furi_string_alloc();
     state->groups = furi_string_alloc();
     state->installed_files = furi_string_alloc();
@@ -316,11 +342,45 @@ static void tumo_state_free(TumoPackageState* state) {
     furi_string_free(state->release_id);
     furi_string_free(state->transaction);
     furi_string_free(state->firmware);
+    furi_string_free(state->firmware_api);
     furi_string_free(state->package_release);
     furi_string_free(state->groups);
     furi_string_free(state->installed_files);
     furi_string_free(state->cleanup_candidates);
     furi_string_free(state->rollback);
+}
+
+static void tumo_catalog_state_init(TumoCatalogState* state) {
+    state->present = false;
+    state->complete = false;
+    state->filetype_valid = false;
+    state->schema_valid = false;
+    state->parse_errors = 0;
+    state->catalog_release = furi_string_alloc();
+    state->catalog_channel = furi_string_alloc();
+    state->catalog_revision = furi_string_alloc();
+    state->catalog_scope = furi_string_alloc();
+    state->catalog_source_fw = furi_string_alloc();
+    state->device_fw = furi_string_alloc();
+    state->device_api = furi_string_alloc();
+    state->device_target = furi_string_alloc();
+    state->managed_files = furi_string_alloc();
+    state->firmware_baseline_files = furi_string_alloc();
+    state->compatibility = furi_string_alloc();
+}
+
+static void tumo_catalog_state_free(TumoCatalogState* state) {
+    furi_string_free(state->catalog_release);
+    furi_string_free(state->catalog_channel);
+    furi_string_free(state->catalog_revision);
+    furi_string_free(state->catalog_scope);
+    furi_string_free(state->catalog_source_fw);
+    furi_string_free(state->device_fw);
+    furi_string_free(state->device_api);
+    furi_string_free(state->device_target);
+    furi_string_free(state->managed_files);
+    furi_string_free(state->firmware_baseline_files);
+    furi_string_free(state->compatibility);
 }
 
 static void tumo_packages_set_text(TumoPackagesApp* app) {
@@ -453,6 +513,8 @@ static void tumo_read_package_state(Storage* storage, TumoPackageState* state) {
                 continue;
             } else if(tumo_state_value(line, "Firmware:", state->firmware)) {
                 continue;
+            } else if(tumo_state_value(line, "FirmwareApi:", state->firmware_api)) {
+                continue;
             } else if(tumo_state_value(line, "PackageRelease:", state->package_release)) {
                 continue;
             } else if(tumo_state_value(line, "Groups:", state->groups)) {
@@ -475,6 +537,68 @@ static void tumo_read_package_state(Storage* storage, TumoPackageState* state) {
                       !furi_string_empty(state->transaction) &&
                       !furi_string_empty(state->firmware) &&
                       !furi_string_empty(state->installed_files);
+}
+
+static void tumo_read_catalog_state(Storage* storage, TumoCatalogState* state) {
+    Stream* stream = file_stream_alloc(storage);
+    FuriString* line = furi_string_alloc();
+    FuriString* value = furi_string_alloc();
+
+    state->present =
+        file_stream_open(stream, TUMO_CATALOG_STATE_PATH, FSAM_READ, FSOM_OPEN_EXISTING);
+    if(state->present) {
+        while(stream_read_line(stream, line)) {
+            if(furi_string_size(line) > TUMO_MAX_LINE_LEN) {
+                state->parse_errors++;
+                continue;
+            }
+
+            if(tumo_state_value(line, "Filetype:", value)) {
+                state->filetype_valid = furi_string_equal_str(
+                    value, "Tumoflip Package Catalog State");
+            } else if(tumo_state_value(line, "Schema:", value)) {
+                state->schema_valid = furi_string_equal_str(value, "1");
+            } else if(tumo_state_value(line, "CatalogRelease:", state->catalog_release)) {
+                continue;
+            } else if(tumo_state_value(line, "CatalogChannel:", state->catalog_channel)) {
+                continue;
+            } else if(tumo_state_value(line, "CatalogRevision:", state->catalog_revision)) {
+                continue;
+            } else if(tumo_state_value(line, "CatalogScope:", state->catalog_scope)) {
+                continue;
+            } else if(tumo_state_value(line, "CatalogSourceFW:", state->catalog_source_fw)) {
+                continue;
+            } else if(tumo_state_value(line, "DeviceFW:", state->device_fw)) {
+                continue;
+            } else if(tumo_state_value(line, "DeviceApi:", state->device_api)) {
+                continue;
+            } else if(tumo_state_value(line, "DeviceTarget:", state->device_target)) {
+                continue;
+            } else if(tumo_state_value(line, "ManagedFiles:", state->managed_files)) {
+                continue;
+            } else if(tumo_state_value(
+                          line, "FirmwareBaselineFiles:", state->firmware_baseline_files)) {
+                continue;
+            } else if(tumo_state_value(line, "Compatibility:", state->compatibility)) {
+                continue;
+            }
+        }
+    }
+
+    file_stream_close(stream);
+    stream_free(stream);
+    furi_string_free(value);
+    furi_string_free(line);
+
+    state->complete = state->present && state->filetype_valid && state->schema_valid &&
+                      !furi_string_empty(state->catalog_release) &&
+                      !furi_string_empty(state->catalog_scope) &&
+                      !furi_string_empty(state->device_fw) &&
+                      !furi_string_empty(state->device_api) &&
+                      !furi_string_empty(state->device_target) &&
+                      !furi_string_empty(state->managed_files) &&
+                      !furi_string_empty(state->firmware_baseline_files) &&
+                      furi_string_equal_str(state->compatibility, "verified");
 }
 
 static bool tumo_json_string_value(const FuriString* line, const char* key, FuriString* out) {
@@ -623,12 +747,99 @@ static void tumo_packages_append_missing_state_note(FuriString* text) {
         "No files are changed by this app.");
 }
 
+static void tumo_packages_append_firmware_context(
+    FuriString* text,
+    const TumoPackageState* state) {
+    const Version* running = furi_hal_version_get_firmware_version();
+    const char* running_version = version_get_version(running);
+    const char* recorded_version = furi_string_get_cstr(state->firmware);
+
+    furi_string_cat_printf(text, "Recorded FW: %s", recorded_version);
+    if(!furi_string_empty(state->firmware_api)) {
+        furi_string_cat_printf(text, " (API %s)", furi_string_get_cstr(state->firmware_api));
+    }
+    furi_string_cat_printf(text, "\nRunning FW: %s\n", running_version);
+    if(strcmp(recorded_version, running_version) != 0) {
+        furi_string_cat_printf(
+            text,
+            "Note: this is historic package provenance. "
+            "TumoCompanion checks current compatibility separately.\n");
+    }
+}
+
+static void tumo_packages_append_catalog_context(
+    FuriString* text,
+    const TumoCatalogState* state) {
+    const Version* running = furi_hal_version_get_firmware_version();
+    const char* running_version = version_get_version(running);
+
+    if(!state->present) {
+        furi_string_cat_printf(
+            text,
+            "Catalog: not synchronized\n"
+            "Open FW Packages in TumoCompanion to revalidate the current catalog and "
+            "write this display snapshot.\n");
+        return;
+    }
+
+    furi_string_cat_printf(text, "Catalog: %s", furi_string_get_cstr(state->catalog_release));
+    if(!furi_string_empty(state->catalog_channel)) {
+        furi_string_cat_printf(text, " (%s", furi_string_get_cstr(state->catalog_channel));
+        if(!furi_string_empty(state->catalog_revision)) {
+            furi_string_cat_printf(text, " #%s", furi_string_get_cstr(state->catalog_revision));
+        }
+        furi_string_cat_printf(text, ")");
+    }
+    furi_string_cat_printf(text, "\n");
+
+    if(!state->complete) {
+        furi_string_cat_printf(
+            text,
+            "Compatibility: untrusted snapshot\n"
+            "Refresh FW Packages in TumoCompanion before relying on this information.\n");
+        return;
+    }
+
+    furi_string_cat_printf(text, "Scope: %s\n", furi_string_get_cstr(state->catalog_scope));
+    furi_string_cat_printf(
+        text,
+        "Managed: %s\nFirmware baseline: %s\n",
+        furi_string_get_cstr(state->managed_files),
+        furi_string_get_cstr(state->firmware_baseline_files));
+    furi_string_cat_printf(
+        text,
+        "Catalog source FW: %s\n",
+        furi_string_get_cstr(state->catalog_source_fw));
+    furi_string_cat_printf(
+        text,
+        "Verified device: %s (API %s · target %s)\n",
+        furi_string_get_cstr(state->device_fw),
+        furi_string_get_cstr(state->device_api),
+        furi_string_get_cstr(state->device_target));
+    furi_string_cat_printf(text, "Running FW: %s\n", running_version);
+    furi_string_cat_printf(text, "Compatibility: verified\n");
+    if(strcmp(furi_string_get_cstr(state->device_fw), running_version) != 0) {
+        furi_string_cat_printf(
+            text,
+            "Note: the snapshot was recorded for a different firmware. "
+            "Refresh FW Packages in TumoCompanion.\n");
+    }
+}
+
 static void tumo_packages_show_state(TumoPackagesApp* app) {
     TumoPackageState state;
+    TumoCatalogState catalog;
     tumo_state_init(&state);
+    tumo_catalog_state_init(&catalog);
     tumo_read_package_state(app->storage, &state);
+    tumo_read_catalog_state(app->storage, &catalog);
 
-    furi_string_set_str(app->text, "Package state\n\n");
+    furi_string_set_str(app->text, "Package catalog\n\n");
+    tumo_packages_append_catalog_context(app->text, &catalog);
+    if(catalog.parse_errors) {
+        furi_string_cat_printf(app->text, "Catalog parse warnings: %u\n", catalog.parse_errors);
+    }
+    furi_string_cat_printf(app->text, "\nInstall history\n");
     if(!state.present) {
         furi_string_cat_printf(
             app->text, "State: not recorded\nPath: %s\n\n", TUMO_PACKAGE_STATE_PATH);
@@ -639,7 +850,7 @@ static void tumo_packages_show_state(TumoPackagesApp* app) {
             app->text, "Release: %s\n", furi_string_get_cstr(state.release_id));
         furi_string_cat_printf(
             app->text, "Package: %s\n", furi_string_get_cstr(state.package_release));
-        furi_string_cat_printf(app->text, "FW: %s\n", furi_string_get_cstr(state.firmware));
+        tumo_packages_append_firmware_context(app->text, &state);
         furi_string_cat_printf(app->text, "Groups: %s\n", furi_string_get_cstr(state.groups));
         furi_string_cat_printf(
             app->text, "Installed: %s\n", furi_string_get_cstr(state.installed_files));
@@ -653,15 +864,19 @@ static void tumo_packages_show_state(TumoPackagesApp* app) {
         }
     }
 
+    tumo_catalog_state_free(&catalog);
     tumo_state_free(&state);
     tumo_packages_set_text(app);
 }
 
 static void tumo_packages_show_audit(TumoPackagesApp* app) {
     TumoPackageState state;
+    TumoCatalogState catalog;
     TumoAuditStats stats = {0};
     tumo_state_init(&state);
+    tumo_catalog_state_init(&catalog);
     tumo_read_package_state(app->storage, &state);
+    tumo_read_catalog_state(app->storage, &catalog);
     stats.package_state_present = state.present;
     stats.parse_errors += state.parse_errors;
 
@@ -687,8 +902,13 @@ static void tumo_packages_show_audit(TumoPackagesApp* app) {
         state.complete ? "OK" : (state.present ? "partial" : "not recorded"));
     furi_string_cat_printf(
         app->text, "Install state: %s\n", stats.install_state_present ? "OK" : "not recorded");
+    furi_string_cat_printf(
+        app->text,
+        "Catalog snapshot: %s\n",
+        catalog.complete ? "verified" : (catalog.present ? "partial" : "not synchronized"));
+    tumo_packages_append_catalog_context(app->text, &catalog);
     if(state.present) {
-        furi_string_cat_printf(app->text, "FW: %s\n", furi_string_get_cstr(state.firmware));
+        tumo_packages_append_firmware_context(app->text, &state);
         furi_string_cat_printf(app->text, "Groups: %s\n", furi_string_get_cstr(state.groups));
     } else if(metadata_missing) {
         furi_string_cat_printf(app->text, "\n");
@@ -720,6 +940,7 @@ static void tumo_packages_show_audit(TumoPackagesApp* app) {
     }
 
     furi_string_cat_printf(app->text, "\nRead-only. No cleanup is performed.");
+    tumo_catalog_state_free(&catalog);
     tumo_state_free(&state);
     tumo_packages_set_text(app);
 }

@@ -21,9 +21,21 @@ from pathlib import Path
 
 FLASH_BASE = 0x08000000
 UPDATER_LIMIT = 128 * 1024
-# Keep at least one complete STM32WB55 flash erase page between the C1 image
-# and the C2/radio region. This prevents a C1 erase operation from touching C2.
-DEFAULT_MIN_C2_GAP = 4096
+# The updater erases the page containing each DfuSe element and the radio stack
+# starts on an erase-page boundary. The C1 image may therefore occupy the last
+# C1 page; validation must ensure that the aligned erase range does not cross
+# the C2/radio boundary rather than requiring an unused page of headroom.
+STM32WB55_FLASH_ERASE_PAGE_BYTES = 4096
+DEFAULT_MIN_C2_GAP = 0
+DFUSE_PREFIX = struct.Struct("<5sBIB")
+DFUSE_TARGET_PREFIX = struct.Struct("<6sBB3s255sII")
+DFUSE_ELEMENT_HEADER = struct.Struct("<II")
+DFUSE_SUFFIX = struct.Struct("<HHHH3sBI")
+DFUSE_DEVICE_CODE = 0xFFFF
+DFUSE_PRODUCT_ID = 0xDF11
+DFUSE_VENDOR_ID = 0x0483
+DFUSE_SUFFIX_VERSION = 0x011A
+DFUSE_WHOLE_FILE_CRC = 0xFFFFFFFF
 PROTOCOL_PACKS = {
     "protocol_chrysler.fal",
     "protocol_fiat_marelli.fal",
@@ -425,6 +437,177 @@ def elf_flash_end(repo_root: Path, elf_path: Path, radio_address: int) -> int:
     return flash_end
 
 
+def dfuse_c1_flash_end(dfu_path: Path, radio_address: int) -> int:
+    """Parse a DfuSe image and return the highest C1 byte written, exclusive.
+
+    Release validation must derive the C1 layout from the addresses that the
+    updater will actually flash. A DfuSe container may hold more than one
+    element, so its total byte size is not a valid memory-layout proxy.
+    """
+    data = dfu_path.read_bytes()
+    if len(data) < DFUSE_PREFIX.size + DFUSE_SUFFIX.size:
+        raise ValidationError(f"DfuSe image is too small: {dfu_path}")
+
+    signature, version, image_size, target_count = DFUSE_PREFIX.unpack_from(data)
+    if signature != b"DfuSe" or version != 1:
+        raise ValidationError(f"Invalid DfuSe prefix: {dfu_path}")
+    if image_size != len(data) - DFUSE_SUFFIX.size:
+        raise ValidationError(
+            f"DfuSe image size does not match its suffix: {dfu_path}"
+        )
+    if target_count == 0:
+        raise ValidationError(f"DfuSe image has no targets: {dfu_path}")
+
+    (
+        device_code,
+        product_id,
+        vendor_id,
+        suffix_version,
+        suffix_signature,
+        suffix_length,
+        _,
+    ) = DFUSE_SUFFIX.unpack_from(data, image_size)
+    if (
+        device_code != DFUSE_DEVICE_CODE
+        or product_id != DFUSE_PRODUCT_ID
+        or vendor_id != DFUSE_VENDOR_ID
+        or suffix_version != DFUSE_SUFFIX_VERSION
+        or suffix_signature != b"UFD"
+        or suffix_length != DFUSE_SUFFIX.size
+    ):
+        raise ValidationError(f"Invalid DfuSe suffix: {dfu_path}")
+    if (zlib.crc32(data) & 0xFFFFFFFF) != DFUSE_WHOLE_FILE_CRC:
+        raise ValidationError(f"DfuSe CRC is invalid: {dfu_path}")
+
+    offset = DFUSE_PREFIX.size
+    flash_end = FLASH_BASE
+    for target_index in range(target_count):
+        if offset + DFUSE_TARGET_PREFIX.size > image_size:
+            raise ValidationError(
+                f"DfuSe target {target_index} header is truncated: {dfu_path}"
+            )
+        (
+            target_signature,
+            _,
+            _,
+            _,
+            _,
+            target_size,
+            element_count,
+        ) = DFUSE_TARGET_PREFIX.unpack_from(data, offset)
+        if target_signature != b"Target":
+            raise ValidationError(f"Invalid DfuSe target {target_index}: {dfu_path}")
+        if element_count == 0:
+            raise ValidationError(
+                f"DfuSe target {target_index} has no elements: {dfu_path}"
+            )
+
+        offset += DFUSE_TARGET_PREFIX.size
+        target_end = offset + target_size
+        if target_end > image_size:
+            raise ValidationError(
+                f"DfuSe target {target_index} exceeds image bounds: {dfu_path}"
+            )
+
+        for element_index in range(element_count):
+            if offset + DFUSE_ELEMENT_HEADER.size > target_end:
+                raise ValidationError(
+                    "DfuSe element header is truncated: "
+                    f"target={target_index}, element={element_index}, file={dfu_path}"
+                )
+            element_address, element_size = DFUSE_ELEMENT_HEADER.unpack_from(
+                data, offset
+            )
+            offset += DFUSE_ELEMENT_HEADER.size
+            if element_size == 0:
+                raise ValidationError(
+                    "DfuSe element is empty: "
+                    f"target={target_index}, element={element_index}, file={dfu_path}"
+                )
+            element_end = element_address + element_size
+            if element_end > 0x1_0000_0000 or offset + element_size > target_end:
+                raise ValidationError(
+                    "DfuSe element exceeds image bounds: "
+                    f"target={target_index}, element={element_index}, file={dfu_path}"
+                )
+            if element_address % STM32WB55_FLASH_ERASE_PAGE_BYTES != 0:
+                raise ValidationError(
+                    "DfuSe element is not erase-page aligned: "
+                    f"target={target_index}, element={element_index}, file={dfu_path}"
+                )
+            if element_address < FLASH_BASE:
+                raise ValidationError(
+                    "DfuSe element starts outside C1 flash: "
+                    f"target={target_index}, element={element_index}, "
+                    f"address=0x{element_address:08X}"
+                )
+            if element_address >= radio_address or element_end >= radio_address:
+                raise ValidationError(
+                    "DfuSe element writes C2/radio region: "
+                    f"target={target_index}, element={element_index}, "
+                    f"range=0x{element_address:08X}-0x{element_end:08X}, "
+                    f"radio=0x{radio_address:08X}"
+                )
+            flash_end = max(flash_end, element_end)
+            offset += element_size
+
+        if offset != target_end:
+            raise ValidationError(
+                "DfuSe target size does not match its elements: "
+                f"target={target_index}, file={dfu_path}"
+            )
+
+    if offset != image_size:
+        raise ValidationError(f"DfuSe image has trailing data: {dfu_path}")
+    if flash_end == FLASH_BASE:
+        raise ValidationError(f"DfuSe image has no C1 elements: {dfu_path}")
+    return flash_end
+
+
+def validate_dfuse_matches_elf(
+    dfu_path: Path, radio_address: int, elf_end: int
+) -> int:
+    dfuse_end = dfuse_c1_flash_end(dfu_path, radio_address)
+    if dfuse_end != elf_end:
+        raise ValidationError(
+            "DfuSe C1 flash end does not match ELF: "
+            f"DfuSe=0x{dfuse_end:08X}, ELF=0x{elf_end:08X}"
+        )
+    return dfuse_end
+
+
+def align_up(value: int, alignment: int) -> int:
+    if alignment <= 0:
+        raise ValueError("alignment must be positive")
+    return (value + alignment - 1) // alignment * alignment
+
+
+def validate_c2_safety(
+    radio_address: int,
+    flash_end: int,
+    dfu_container_gap: int,
+    min_c2_gap: int,
+) -> tuple[int, int]:
+    """Require the updater's aligned C1 erase range to stay below C2.
+
+    The DfuSe file contains metadata that is not flashed to C1. Its byte size
+    is retained as a release diagnostic; its flashed elements must match ELF.
+    """
+    required_gap = max(min_c2_gap, 0)
+    erase_aligned_flash_end = align_up(
+        flash_end, STM32WB55_FLASH_ERASE_PAGE_BYTES
+    )
+    physical_gap = radio_address - erase_aligned_flash_end
+    section_gap = radio_address - flash_end
+    if physical_gap < required_gap:
+        raise ValidationError(
+            "C1 erase range reaches the C2/radio region: "
+            f"physical={physical_gap}, sections={section_gap}, "
+            f"DFU container={dfu_container_gap}, required={required_gap} bytes"
+        )
+    return erase_aligned_flash_end, physical_gap
+
+
 def api_version(api_symbols: Path) -> str:
     for line in api_symbols.read_text(encoding="utf-8").splitlines():
         if line.startswith("Version,+,"):
@@ -796,15 +979,17 @@ def validate_release(
         raise ValidationError("Radio CRC does not match update.fuf")
 
     radio_address = little_endian_hex(fuf["Radio address"])
-    coarse_gap = radio_address - FLASH_BASE - firmware.stat().st_size
+    # firmware.dfu includes DfuSe container metadata that is not flashed to C1.
+    # Keep this coarse value in the manifest for diagnostics only. Its flashed
+    # address range is parsed and cross-checked against the ELF below.
+    dfu_container_gap = radio_address - FLASH_BASE - firmware.stat().st_size
     elf_path = require_file(build_dir / "firmware.elf", "firmware ELF")
     flash_end = elf_flash_end(repo_root, elf_path, radio_address)
+    dfuse_flash_end = validate_dfuse_matches_elf(firmware, radio_address, flash_end)
     section_gap = radio_address - flash_end
-    if coarse_gap < min_c2_gap or section_gap < min_c2_gap:
-        raise ValidationError(
-            f"C2 safety gap is too small: DFU={coarse_gap}, sections={section_gap}, "
-            f"required={min_c2_gap} bytes"
-        )
+    erase_aligned_flash_end, physical_c2_gap = validate_c2_safety(
+        radio_address, flash_end, dfu_container_gap, min_c2_gap
+    )
 
     firmware_json = json.loads(
         require_file(build_dir / "firmware.json", "firmware metadata").read_text(
@@ -858,9 +1043,12 @@ def validate_release(
                 "radio_address": f"0x{radio_address:08X}",
             },
             "safety": {
-                "minimum_c2_gap_bytes": min_c2_gap,
-                "dfu_gap_bytes": coarse_gap,
+                "minimum_c2_gap_bytes": max(min_c2_gap, 0),
+                "dfu_gap_bytes": dfu_container_gap,
+                "dfuse_flash_end": f"0x{dfuse_flash_end:08X}",
                 "section_gap_bytes": section_gap,
+                "erase_aligned_flash_end": f"0x{erase_aligned_flash_end:08X}",
+                "physical_c2_gap_bytes": physical_c2_gap,
                 "updater_bytes": loader.stat().st_size,
                 "updater_limit_bytes": UPDATER_LIMIT,
             },
@@ -929,7 +1117,10 @@ def main() -> int:
     safety = manifest["safety"]
     print(
         "OK: updater validated; "
-        f"C2 section gap={safety['section_gap_bytes']} bytes; "
+        f"C2 physical gap={safety['physical_c2_gap_bytes']} bytes; "
+        f"DfuSe C1 end={safety['dfuse_flash_end']}; "
+        f"section gap={safety['section_gap_bytes']} bytes; "
+        f"DFU container gap={safety['dfu_gap_bytes']} bytes; "
         f"updater={safety['updater_bytes']} bytes; "
         f"API={manifest['firmware']['api']}"
     )

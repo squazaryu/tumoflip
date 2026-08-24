@@ -228,6 +228,9 @@ bool nfc_supported_cards_parse(
             if(plugin == NULL) break;
             if((plugin->protocol != protocol) || (plugin->parse == NULL)) continue;
 
+            // A candidate may append output before identifying a different card.
+            // Keep failed-plugin text from leaking into the next candidate.
+            furi_string_reset(parsed_data);
             if(plugin->parse(device, parsed_data)) {
                 card_parsed = true;
                 break;

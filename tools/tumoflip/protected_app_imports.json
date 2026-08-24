@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "implementation": {
+    "repository": "squazaryu/tumoflip",
+    "commit": "0c4274f3561eb064d9edc17350ffe4a78cacdfb0"
+  },
+  "imports": [
+    {
+      "appId": "esp32_wifi_marauder",
+      "localSourcePath": "applications_user/esp32_wifi_marauder",
+      "implementationCommit": "5e2383bbf4d8ad8bae93560c69b38662c701991b",
+      "upstreamRepository": "https://github.com/0xchocolate/flipperzero-wifi-marauder.git",
+      "upstreamRef": "refs/heads/feature_wifi_marauder_app",
+      "upstreamCommit": "8f8b79e4a97b283faac41dda4e4da8d260ddc459"
+    },
+    {
+      "appId": "esp_flasher",
+      "localSourcePath": "applications_user/esp_flasher",
+      "implementationCommit": "b4db428c5834edc51ebccd1a224f6779e70f5448",
+      "upstreamRepository": "https://github.com/0xchocolate/flipperzero-esp-flasher.git",
+      "upstreamRef": "refs/heads/main",
+      "upstreamCommit": "1f6f801c3ebecbc4afbf6500564bf99748710e24"
+    },
+    {
+      "appId": "proto_pirate",
+      "localSourcePath": "applications_user/protopirate",
+      "implementationCommit": "59427d618c58ad71d2c7a3259cbcccbd60fa0e0b",
+      "upstreamRepository": "https://protopirate.net/ProtoPirate/ProtoPirate.git",
+      "upstreamRef": "refs/heads/main",
+      "upstreamCommit": "4b039064a02d95c9bc23d390caacee1d40efe790"
+    },
+    {
+      "appId": "subghz_bruteforcer",
+      "localSourcePath": "applications_user/subghz_bruteforcer",
+      "implementationCommit": "22af76478aff0f6d0f203731fd49f2af5c3c3bc2",
+      "upstreamRepository": "https://github.com/DarkFlippers/flipperzero-subbrute.git",
+      "upstreamRef": "refs/heads/master",
+      "upstreamCommit": "b199dcef9181a220cb665a84f893d1d6a6608099"
+    },
+    {
+      "appId": "subghz_wardriving",
+      "localSourcePath": "applications_user/subghz_wardriving",
+      "implementationCommit": "660b0edd50ffc88d667adc2696f79479e75c59d2",
+      "upstreamRepository": "https://github.com/xMasterX/all-the-plugins.git",
+      "upstreamRef": "release-source",
+      "upstreamCommit": "0b71d9f34fec8ae3ba763b8de27ef15d1d604c5b"
+    },
+    {
+      "appId": "quac",
+      "localSourcePath": "applications_user/quac",
+      "implementationCommit": "5e2383bbf4d8ad8bae93560c69b38662c701991b",
+      "upstreamRepository": "https://github.com/rdefeo/quac.git",
+      "upstreamRef": "refs/heads/master",
+      "upstreamCommit": "54e897fe2d862963e5c19ef5d4feb3d025630610"
+    },
+    {
+      "appId": "totp",
+      "localSourcePath": "applications_user/totp",
+      "implementationCommit": "47821f082bb4e5d99ec3d8a8a1ecdcda2b12072d",
+      "upstreamRepository": "https://github.com/akopachov/flipper-zero_authenticator.git",
+      "upstreamRef": "refs/heads/master",
+      "upstreamCommit": "753e953baaaacad67e9054ef62177ef36a8f5f7e"
+    },
+    {
+      "appId": "claude_buddy",
+      "localSourcePath": "applications_user/claude_buddy",
+      "implementationCommit": "99f7d68ba985e81e726179e74404a4d927dcd03a",
+      "upstreamRepository": "https://github.com/D4C1-Labs/Flipper-ARF.git",
+      "upstreamRef": "refs/heads/main",
+      "upstreamCommit": "56701a815b54121a4b4d102e361add5468ffa92b"
+    },
+    {
+      "appId": "arf_frequency_analyzer",
+      "localSourcePath": "applications_user/arf_subghz_full",
+      "implementationCommit": "59427d618c58ad71d2c7a3259cbcccbd60fa0e0b",
+      "upstreamRepository": "https://github.com/xMasterX/all-the-plugins.git",
+      "upstreamRef": "release-source",
+      "upstreamCommit": "ce2650948899b50b8a8ec114784e025a117b0885"
+    },
+    {
+      "appId": "wifi_mapper",
+      "localSourcePath": "applications_user/wifi_mapper",
+      "implementationCommit": "e4d1993029cd38908bb7c2b5c810f5712327394f",
+      "upstreamRepository": "https://github.com/xMasterX/all-the-plugins.git",
+      "upstreamRef": "release-source",
+      "upstreamCommit": "ce2650948899b50b8a8ec114784e025a117b0885"
+    },
+    {
+      "appId": "flipper_xremote",
+      "localSourcePath": "applications_user/flipper_xremote",
+      "implementationCommit": "0c965c2c4dd34e7fac2cbac6676addb51c7e4099",
+      "upstreamRepository": "https://github.com/kala13x/flipper-xremote.git",
+      "upstreamRef": "refs/heads/main",
+      "upstreamCommit": "95e629eff960c71754d0a2768a54883df066a588"
+    },
+    {
+      "appId": "subghz_raw_edit",
+      "localSourcePath": "applications_user/subghz_raw_edit",
+      "implementationCommit": "35554da4aff2bf4a2ed1b6b151a3c96e642af5e7",
+      "upstreamRepository": "https://github.com/Lechnio/SubGHz-RAW-Edit.git",
+      "upstreamRef": "refs/heads/main",
+      "upstreamCommit": "d60ee2a34fa87b89c99f1ba9056737765f9f921f"
+    }
+  ]
+}
