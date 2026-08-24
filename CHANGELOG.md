@@ -1,6 +1,6 @@
-## Main changes
-- Current API: 88.4 (experimental F7 Dev API for t-dev-007-013)
-* JS Runner and NFC FAPs can resolve shared soft-float helpers from the F7 firmware, reducing duplicated libgcc code and leaving the API change opt-in for this Dev test.
+## Tumoflip v1.0.7 / t-flppr-fw-007
+- Current API: 88.4 (F7 stable API for t-flppr-fw-007)
+* JS Runner and NFC FAPs can resolve shared soft-float helpers from the F7 firmware, reducing duplicated libgcc code while keeping the shared-library path explicit for compatible FAPs.
 * SubGHz: **Fix endless TX causing RAW files to be transmitted and crash the system** (via RPC / Mobile App) (Fixes issue #1008)
 * SubGHz: **Add Telcoma/Cardin EDGE protocol** (32bit, Static) (by @half2me | PR #1001)
 * LFRFID: **Support of Hitag Micro chips** (8265/8210/H5.5) (by @mishamyte | PR #1002)
