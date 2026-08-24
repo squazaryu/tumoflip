@@ -27,6 +27,11 @@
 * NFC: Preserve the reviewed protocol-scene plugin split and API-v3 dispatch contract, keeping protocol-only scenes and transit parsers out of the resident NFC app (Tumoflip #346 / Unleashed #1073)
 * GUI: FileBrowser entries retain only their names and reconstruct paths on demand, reducing RAM use in large directories (Momentum #362 / upstream b8757a5e7a)
 * Archive: Keep the cursor valid when a directory has more than 220 entries (Momentum #362 / upstream 757cca0279b)
+* Sub-GHz: Guard transmitter cleanup when no transmitter is available (Unleashed #1104 / Tumoflip #394)
+* Sub-GHz: Reject BinRAW encoder writes that would exceed the upload buffer (Unleashed #1105 / Tumoflip #394)
+* NFC: Reject FeliCa Lite dumps with invalid block counts (Unleashed #1106 / Tumoflip #394)
+* Toolbox: Compare the complete storage of each SimpleArray element (Unleashed #1107 / Tumoflip #394)
+* F7 serial: Reject the invalid expansion serial sentinel (Unleashed #1108 / Tumoflip #394)
 <br><br>
 
 ----

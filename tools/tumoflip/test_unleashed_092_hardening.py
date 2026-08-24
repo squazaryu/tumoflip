@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression contracts for the selected post-unlshd-092 hardening ports."""
+"""Regression contracts for Unleashed #1104-#1108 hardening ports."""
 
 from pathlib import Path
 import unittest
