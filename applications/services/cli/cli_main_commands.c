@@ -135,6 +135,8 @@ void cli_command_date(PipeSide* pipe, FuriString* args, void* context) {
 #define CLI_COMMAND_LOG_RING_SIZE   2048
 #define CLI_COMMAND_LOG_BUFFER_SIZE 64
 
+static uint32_t cli_command_log_dropped_fragments = 0;
+
 void cli_command_log_tx_callback(const uint8_t* buffer, size_t size, void* context) {
     PipeSide* pipe = context;
     // furi_log holds its global mutex while invoking handlers. Never wait for
@@ -142,7 +144,10 @@ void cli_command_log_tx_callback(const uint8_t* buffer, size_t size, void* conte
     // the NFC worker while it loads protocol FALs. Dropping a complete log
     // fragment is preferable to holding the logger (and the caller) hostage.
     const size_t available = pipe_spaces_available(pipe);
-    if(available < size) return;
+    if(available < size) {
+        cli_command_log_dropped_fragments++;
+        return;
+    }
 
     pipe_send(pipe, buffer, size);
 }
@@ -168,6 +173,14 @@ bool cli_command_log_level_set_from_string(FuriString* level) {
 
 void cli_command_log(PipeSide* pipe, FuriString* args, void* context) {
     UNUSED(context);
+
+    if(!furi_string_cmp(args, "stats")) {
+        printf(
+            "Dropped USB log fragments: %lu\r\n",
+            (unsigned long)cli_command_log_dropped_fragments);
+        return;
+    }
+
     FuriLogLevel previous_level = furi_log_get_level();
     bool restore_log_level = false;
 
@@ -187,6 +200,7 @@ void cli_command_log(PipeSide* pipe, FuriString* args, void* context) {
         .context = pipe,
     };
 
+    cli_command_log_dropped_fragments = 0;
     furi_log_add_handler(log_handler);
 
     printf("Use <log ?> to list available log levels\r\n");

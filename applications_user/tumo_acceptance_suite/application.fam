@@ -4,7 +4,7 @@ App(
     apptype=FlipperAppType.EXTERNAL,
     targets=["f7"],
     entry_point="tumo_acceptance_suite_app",
-    requires=["gui", "storage"],
+    requires=["gui", "storage", "subghz_radio_broker", "cli"],
     stack_size=4 * 1024,
     icon="A_Plugins_14",
     fap_icon="icon.png",

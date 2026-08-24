@@ -23,7 +23,10 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
     def test_app_is_safe_module_one_external_fap(self) -> None:
         self.assertIn('appid="tumo_acceptance_suite"', self.manifest)
         self.assertIn('apptype=FlipperAppType.EXTERNAL', self.manifest)
-        self.assertIn('requires=["gui", "storage"]', self.manifest)
+        self.assertIn(
+            'requires=["gui", "storage", "subghz_radio_broker", "cli"]',
+            self.manifest,
+        )
         self.assertIn('fap_category="Module One/Diagnostics"', self.manifest)
         self.assertIn('fap_icon="icon.png"', self.manifest)
         self.assertTrue((APP_DIR / "icon.png").is_file())
@@ -41,6 +44,11 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
             "memmgr_get_free_heap()",
             "memmgr_get_minimum_free_heap()",
             "memmgr_heap_get_max_free_block()",
+            "Runtime snapshot (",
+            "furi_thread_enumerate(thread_list)",
+            "stack_min_free",
+            "subghz_radio_broker_get_status_v2",
+            "USB CLI log drops",
             "furi_hal_infrared_is_busy()",
             "furi_hal_power_check_otg_fault()",
             "Hardware-only transmit/receive tests: SKIP by design",

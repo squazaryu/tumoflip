@@ -31,6 +31,7 @@ class CliLogBackpressureTest(unittest.TestCase):
 
         self.assertIn("pipe_spaces_available(pipe)", callback)
         self.assertIn("if(available < size)", callback)
+        self.assertIn("cli_command_log_dropped_fragments++", callback)
         self.assertIn("return;", callback)
         self.assertLess(
             callback.index("if(available < size)"),
@@ -41,7 +42,14 @@ class CliLogBackpressureTest(unittest.TestCase):
         callback = function_body(self.source, "void cli_command_log_tx_callback(")
 
         self.assertIn("pipe_send(pipe, buffer, size)", callback)
-        self.assertIn("if(available < size) return;", callback)
+        self.assertNotIn("pipe_send(pipe, buffer, available)", callback)
+
+    def test_log_stats_reports_dropped_fragments_and_sessions_reset_counter(self) -> None:
+        command = function_body(self.source, "void cli_command_log(PipeSide* pipe")
+
+        self.assertIn('furi_string_cmp(args, "stats")', command)
+        self.assertIn("Dropped USB log fragments:", command)
+        self.assertIn("cli_command_log_dropped_fragments = 0", command)
 
 
 if __name__ == "__main__":
