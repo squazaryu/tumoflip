@@ -235,12 +235,16 @@ class MfUltralightAesTest(unittest.TestCase):
         )
         aes_branch = callback[
             callback.index("if(data->type == MfUltralightTypeUltralightAES)") :
-            callback.index("} else if(instance->mf_ul_auth->type", callback.index("if(data->type == MfUltralightTypeUltralightAES)"))
+            callback.index(
+                "} else if(instance->mf_ul_auth->type == MfUltralightAuthTypeXiaomi)",
+                callback.index("if(data->type == MfUltralightTypeUltralightAES)"),
+            )
         ]
         self.assertIn("MfUltralightAuthTypeManual", aes_branch)
+        self.assertIn("MfUltralightAuthTypeUidReveal", aes_branch)
         self.assertIn("skip_auth = true", aes_branch)
         self.assertNotIn("random_id", aes_branch)
-        self.assertNotIn("MfUltralightAesKeyTypeUid", aes_branch)
+        self.assertIn("MfUltralightAesKeyTypeUid", aes_branch)
         self.assertIn("AUTH_LIM", aes_branch)
 
     def test_listener_rejects_unsupported_aes_key_slots(self) -> None:
@@ -269,15 +273,39 @@ class MfUltralightAesTest(unittest.TestCase):
             self.assertIn(generator, branch)
             self.assertIn("const bool generated", branch)
             self.assertIn("skip_auth = !generated", branch)
-            self.assertIn("needs a 7-byte UID, skipping auth", branch)
+            self.assertIn("outcome = MfUltralightAuthOutcomeSkippedUid", branch)
 
     def test_unlshd_092_does_not_probe_unknown_auth_limit(self) -> None:
         handler = function_body(self.poller, "mf_ultralight_poller_handler_try_default_pass(")
         self.assertIn("if(!mf_ultralight_get_config_page(instance->data, &config)) break;", handler)
         self.assertIn("const bool authlim_known", handler)
         self.assertIn("!authlim_known && !writing_to_target", handler)
-        self.assertIn("AUTHLIM unreadable, not probing the default password", handler)
+        self.assertIn("Keep the card untouched", handler)
         self.assertIn("instance->mode == MfUltralightPollerModeWrite", handler)
+
+    def test_unlshd_092_random_id_reveal_is_explicit_and_warned(self) -> None:
+        self.assertIn("MfUltralightAuthTypeUidReveal", self.auth_header)
+        self.assertIn('"Reveal Real UID"', self.app_support)
+        self.assertIn("data->iso14443_3a_data->uid_len == 4", self.app_support)
+        self.assertIn("data->iso14443_3a_data->uid[0] == 0x08", self.app_support)
+        self.assertIn("nfc_mf_ultralight_aes_warn(instance, NfcSceneRead)", self.app_support)
+        self.assertIn("NfcSceneMfUltralightAesDictAttackWarn", self.app_support)
+
+        unlock_helper = (
+            REPO_ROOT
+            / "applications/main/nfc/helpers/protocol_support/nfc_protocol_support_unlock_helper.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("if(!unlocking) mf_ultralight_auth_reset", unlock_helper)
+        self.assertIn("NfcSceneMfUltralightAesDictAttackWarn", unlock_helper)
+
+    def test_unlshd_092_protected_writes_are_warned(self) -> None:
+        self.assertIn("static void nfc_mf_ultralight_write_confirm", self.app_support)
+        self.assertIn("nfc_mf_ultralight_write_confirm(instance)", self.app_support)
+        write_confirm = function_body(
+            self.app_support, "static void nfc_mf_ultralight_write_confirm("
+        )
+        self.assertIn("MfUltralightTypeUltralightAES", write_confirm)
+        self.assertIn("nfc_mf_ultralight_aes_warn(instance, NfcSceneWrite)", write_confirm)
 
     def test_unlshd_092_reports_auth_outcome_without_scrubbing_it_early(self) -> None:
         for outcome in (
