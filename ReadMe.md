@@ -63,7 +63,7 @@ t-dev-<release>-<iteration>
 - `tmwhflpprarf`: legacy stable prefix kept for existing releases.
 - `t-dev`: Tumoflip development build prefix for unstable builds.
 - `007`: standalone Tumoflip release number.
-- `011`: development iteration inside the standalone Tumoflip release number.
+- `012`: development iteration inside the standalone Tumoflip release number.
 
 `main` should only receive builds that are stable enough to publish as tagged
 releases. Active firmware work lands on `dev` first. A dev identity refers to
