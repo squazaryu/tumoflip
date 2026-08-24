@@ -24,6 +24,8 @@
 * Disabled debug and trace logs in the FW binary (apps .fap's are not affected) to free up some flash space for new features
 * NFC: Fix typo in SLIX poller (by @WillyJL)
 * NFC: Internal MIFARE Plus cleanup - data-drive the "Add Manually" generator variants and unify the admin-key address mapping into one source of truth; small internal-flash saving, no functional change (by @mishamyte | PR #1035)
+* GUI: FileBrowser entries retain only their names and reconstruct paths on demand, reducing RAM use in large directories (Momentum #362 / upstream b8757a5e7a)
+* Archive: Keep the cursor valid when a directory has more than 220 entries (Momentum #362 / upstream 757cca0279b)
 <br><br>
 
 ----
