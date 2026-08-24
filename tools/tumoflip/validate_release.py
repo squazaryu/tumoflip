@@ -21,10 +21,12 @@ from pathlib import Path
 
 FLASH_BASE = 0x08000000
 UPDATER_LIMIT = 128 * 1024
-# Keep at least one complete STM32WB55 flash erase page between the C1 image
-# and the C2/radio region. This prevents a C1 erase operation from touching C2.
+# The updater erases the page containing each DfuSe element and the radio stack
+# starts on an erase-page boundary. The C1 image may therefore occupy the last
+# C1 page; validation must ensure that the aligned erase range does not cross
+# the C2/radio boundary rather than requiring an unused page of headroom.
 STM32WB55_FLASH_ERASE_PAGE_BYTES = 4096
-DEFAULT_MIN_C2_GAP = STM32WB55_FLASH_ERASE_PAGE_BYTES
+DEFAULT_MIN_C2_GAP = 0
 DFUSE_PREFIX = struct.Struct("<5sBIB")
 DFUSE_TARGET_PREFIX = struct.Struct("<6sBB3s255sII")
 DFUSE_ELEMENT_HEADER = struct.Struct("<II")
@@ -539,7 +541,7 @@ def dfuse_c1_flash_end(dfu_path: Path, radio_address: int) -> int:
                     f"target={target_index}, element={element_index}, "
                     f"address=0x{element_address:08X}"
                 )
-            if element_address >= radio_address or element_end > radio_address:
+            if element_address >= radio_address or element_end >= radio_address:
                 raise ValidationError(
                     "DfuSe element writes C2/radio region: "
                     f"target={target_index}, element={element_index}, "
@@ -586,12 +588,12 @@ def validate_c2_safety(
     dfu_container_gap: int,
     min_c2_gap: int,
 ) -> tuple[int, int]:
-    """Require a full erase-page-safe C1-to-C2 gap from the flash layout.
+    """Require the updater's aligned C1 erase range to stay below C2.
 
     The DfuSe file contains metadata that is not flashed to C1. Its byte size
     is retained as a release diagnostic; its flashed elements must match ELF.
     """
-    required_gap = max(min_c2_gap, STM32WB55_FLASH_ERASE_PAGE_BYTES)
+    required_gap = max(min_c2_gap, 0)
     erase_aligned_flash_end = align_up(
         flash_end, STM32WB55_FLASH_ERASE_PAGE_BYTES
     )
@@ -599,7 +601,7 @@ def validate_c2_safety(
     section_gap = radio_address - flash_end
     if physical_gap < required_gap:
         raise ValidationError(
-            "C2 physical safety gap is too small: "
+            "C1 erase range reaches the C2/radio region: "
             f"physical={physical_gap}, sections={section_gap}, "
             f"DFU container={dfu_container_gap}, required={required_gap} bytes"
         )
@@ -1041,9 +1043,7 @@ def validate_release(
                 "radio_address": f"0x{radio_address:08X}",
             },
             "safety": {
-                "minimum_c2_gap_bytes": max(
-                    min_c2_gap, STM32WB55_FLASH_ERASE_PAGE_BYTES
-                ),
+                "minimum_c2_gap_bytes": max(min_c2_gap, 0),
                 "dfu_gap_bytes": dfu_container_gap,
                 "dfuse_flash_end": f"0x{dfuse_flash_end:08X}",
                 "section_gap_bytes": section_gap,

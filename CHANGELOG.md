@@ -32,6 +32,7 @@
 * NFC: Reject FeliCa Lite dumps with invalid block counts (Unleashed #1106 / Tumoflip #394)
 * Toolbox: Compare the complete storage of each SimpleArray element (Unleashed #1107 / Tumoflip #394)
 * F7 serial: Reject the invalid expansion serial sentinel (Unleashed #1108 / Tumoflip #394)
+* Release validation: model the updater's page-aligned C1 erase range so the final C1 page can end at the C2 boundary without weakening DfuSe address checks
 <br><br>
 
 ----

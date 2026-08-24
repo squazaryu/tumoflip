@@ -39,7 +39,7 @@ class FileBrowserMomentumPortTests(unittest.TestCase):
 
     def test_selection_reconstructs_current_path(self):
         self.assertIn("file_browser_worker_get_path_current", self.file_browser)
-        self.assertGreaterEqual(self.file_browser.count("path_concat("), 2)
+        self.assertGreaterEqual(self.file_browser.count("path_concat("), 1)
         self.assertIn("furi_string_get_cstr(selected_item->name)", self.file_browser)
 
     def test_current_path_is_internal_only(self):

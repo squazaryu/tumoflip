@@ -746,20 +746,17 @@ static bool file_browser_view_input_callback(InputEvent* event, void* context) {
             if(selected_item) {
                 if(selected_item->type == BrowserItemTypeBack) {
                     file_browser_worker_folder_exit(browser->worker);
-                } else if(selected_item->type == BrowserItemTypeFolder) {
-                    FuriString* path = furi_string_alloc();
-                    path_concat(
-                        file_browser_worker_get_path_current(browser->worker),
-                        furi_string_get_cstr(selected_item->name),
-                        path);
-                    file_browser_worker_folder_enter(browser->worker, path, select_index);
-                    furi_string_free(path);
-                } else if(selected_item->type == BrowserItemTypeFile) {
+                } else if(
+                    (selected_item->type == BrowserItemTypeFolder) ||
+                    (selected_item->type == BrowserItemTypeFile)) {
                     path_concat(
                         file_browser_worker_get_path_current(browser->worker),
                         furi_string_get_cstr(selected_item->name),
                         browser->result_path);
-                    if(browser->callback) {
+                    if(selected_item->type == BrowserItemTypeFolder) {
+                        file_browser_worker_folder_enter(
+                            browser->worker, browser->result_path, select_index);
+                    } else if(browser->callback) {
                         browser->callback(browser->context);
                     }
                 }
