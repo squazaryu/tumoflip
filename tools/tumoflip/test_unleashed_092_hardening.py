@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression contracts for the selected post-unlshd-092 hardening ports."""
+"""Regression contracts for Unleashed #1104-#1108 hardening ports."""
 
 from pathlib import Path
 import unittest
@@ -16,7 +16,9 @@ class Unleashed092HardeningTest(unittest.TestCase):
     def test_subghz_cleanup_is_null_safe_and_clears_transmitter(self) -> None:
         txrx = source("applications/main/subghz/helpers/subghz_txrx.c")
         error_path = txrx[txrx.index("if(ret != SubGhzTxRxStartTxStateOk)") :]
-        self.assertIn("if(instance->transmitter)", error_path)
+        transmitter = source("lib/subghz/transmitter.c")
+        self.assertIn("if(!instance) return", transmitter)
+        self.assertIn("subghz_transmitter_free(instance->transmitter)", error_path)
         self.assertIn("instance->transmitter = NULL", error_path)
 
     def test_binraw_encoder_checks_capacity_before_each_write(self) -> None:

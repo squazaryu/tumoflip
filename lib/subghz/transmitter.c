@@ -26,7 +26,7 @@ SubGhzTransmitter*
 }
 
 void subghz_transmitter_free(SubGhzTransmitter* instance) {
-    furi_check(instance);
+    if(!instance) return;
     instance->protocol->encoder->free(instance->protocol_instance);
     free(instance);
 }

@@ -24,6 +24,15 @@
 * Disabled debug and trace logs in the FW binary (apps .fap's are not affected) to free up some flash space for new features
 * NFC: Fix typo in SLIX poller (by @WillyJL)
 * NFC: Internal MIFARE Plus cleanup - data-drive the "Add Manually" generator variants and unify the admin-key address mapping into one source of truth; small internal-flash saving, no functional change (by @mishamyte | PR #1035)
+* NFC: Preserve the reviewed protocol-scene plugin split and API-v3 dispatch contract, keeping protocol-only scenes and transit parsers out of the resident NFC app (Tumoflip #346 / Unleashed #1073)
+* GUI: FileBrowser entries retain only their names and reconstruct paths on demand, reducing RAM use in large directories (Momentum #362 / upstream b8757a5e7a)
+* Archive: Keep the cursor valid when a directory has more than 220 entries (Momentum #362 / upstream 757cca0279b)
+* Sub-GHz: Guard transmitter cleanup when no transmitter is available (Unleashed #1104 / Tumoflip #394)
+* Sub-GHz: Reject BinRAW encoder writes that would exceed the upload buffer (Unleashed #1105 / Tumoflip #394)
+* NFC: Reject FeliCa Lite dumps with invalid block counts (Unleashed #1106 / Tumoflip #394)
+* Toolbox: Compare the complete storage of each SimpleArray element (Unleashed #1107 / Tumoflip #394)
+* F7 serial: Reject the invalid expansion serial sentinel (Unleashed #1108 / Tumoflip #394)
+* Release validation: model the updater's page-aligned C1 erase range so the final C1 page can end at the C2 boundary without weakening DfuSe address checks
 <br><br>
 
 ----

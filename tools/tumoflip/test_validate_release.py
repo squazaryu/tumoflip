@@ -22,6 +22,7 @@ try:
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
         DEFAULT_MIN_C2_GAP,
+        STM32WB55_FLASH_ERASE_PAGE_BYTES,
         FLASH_BASE,
         ValidationError,
         _load_heatshrink2,
@@ -50,6 +51,7 @@ except ImportError:
         PROTOCOL_PACKS,
         STATIC_SD_RESOURCES,
         DEFAULT_MIN_C2_GAP,
+        STM32WB55_FLASH_ERASE_PAGE_BYTES,
         FLASH_BASE,
         ValidationError,
         _load_heatshrink2,
@@ -139,9 +141,9 @@ class ValidateReleaseTest(unittest.TestCase):
 
     def test_c2_safety_uses_physical_elf_layout_not_dfuse_metadata(self) -> None:
         radio_address = 0x080D7000
-        # This matches the release layout that has a 4 KiB physical erase-page
-        # gap even though the DfuSe container adds 309 non-flashed bytes.
-        flash_end = radio_address - 4332
+        # The final C1 page may be populated up to the C2 page boundary. The
+        # updater erases 0x080D6000..0x080D6FFF, never the C2 page itself.
+        flash_end = radio_address - 0xF8C
         dfu_container_gap = 4023
 
         erase_aligned_end, physical_gap = validate_c2_safety(
@@ -151,22 +153,22 @@ class ValidateReleaseTest(unittest.TestCase):
             DEFAULT_MIN_C2_GAP,
         )
 
-        self.assertLess(dfu_container_gap, DEFAULT_MIN_C2_GAP)
-        self.assertEqual(erase_aligned_end, radio_address - DEFAULT_MIN_C2_GAP)
-        self.assertEqual(physical_gap, DEFAULT_MIN_C2_GAP)
+        self.assertLess(dfu_container_gap, STM32WB55_FLASH_ERASE_PAGE_BYTES)
+        self.assertEqual(erase_aligned_end, radio_address)
+        self.assertEqual(physical_gap, 0)
 
-    def test_c2_safety_rejects_layout_without_a_complete_erase_page(self) -> None:
+    def test_c2_safety_rejects_layout_that_crosses_the_radio_boundary(self) -> None:
         radio_address = 0x080D7000
-        flash_end = radio_address - DEFAULT_MIN_C2_GAP + 1
+        flash_end = radio_address + 1
 
         with self.assertRaisesRegex(
             ValidationError,
-            r"C2 physical safety gap is too small: physical=0",
+            r"C1 erase range reaches the C2/radio region: physical=-4096",
         ):
             validate_c2_safety(
                 radio_address,
                 flash_end,
-                DEFAULT_MIN_C2_GAP,
+                0,
                 DEFAULT_MIN_C2_GAP,
             )
 
