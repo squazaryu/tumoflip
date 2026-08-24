@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" role="img" aria-labelledby="title desc">
+  <title id="title">Tumoflip firmware for Flipper Zero</title>
+  <desc id="desc">A visual overview of Tumoflip stable 007: NFC, radio tools, and companion workflow.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="0.55" stop-color="#172033"/>
+      <stop offset="1" stop-color="#24152a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff8a24"/>
+      <stop offset="1" stop-color="#ffbd66"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="430" rx="28" fill="url(#background)"/>
+  <circle cx="1080" cy="-10" r="250" fill="#f97316" opacity="0.08"/>
+  <circle cx="80" cy="430" r="230" fill="#38bdf8" opacity="0.07"/>
+  <path d="M0 334 C230 270 344 386 566 328 S968 252 1200 310" fill="none" stroke="#fff" stroke-opacity="0.06" stroke-width="2"/>
+  <text x="72" y="92" fill="#ffab52" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="18" font-weight="700" letter-spacing="3">FLIPPER ZERO • F7</text>
+  <text x="68" y="164" fill="#fff" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="66" font-weight="800">tumoflip</text>
+  <rect x="72" y="187" width="126" height="8" rx="4" fill="url(#accent)"/>
+  <text x="72" y="232" fill="#d6deeb" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="23">A focused firmware distribution for NFC, RF,</text>
+  <text x="72" y="266" fill="#d6deeb" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="23">ARF tools, and a reliable companion workflow.</text>
+  <rect x="72" y="303" width="190" height="48" rx="24" fill="#fff" fill-opacity="0.1" stroke="#fff" stroke-opacity="0.18"/>
+  <text x="167" y="334" text-anchor="middle" fill="#fff" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="18" font-weight="700">STABLE 007</text>
+  <text x="72" y="383" fill="#aab7c9" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="16">API 88.4  •  v1.0.7  •  open source</text>
+  <g filter="url(#shadow)">
+    <rect x="640" y="70" width="470" height="270" rx="24" fill="#0b1220" fill-opacity="0.78" stroke="#fff" stroke-opacity="0.12"/>
+    <rect x="670" y="103" width="126" height="88" rx="18" fill="#f97316" fill-opacity="0.18" stroke="#ff9c4a" stroke-opacity="0.65"/>
+    <text x="733" y="149" text-anchor="middle" fill="#ffb16a" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="30">NFC</text>
+    <text x="733" y="174" text-anchor="middle" fill="#d9e2ef" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14">safe parsing</text>
+    <rect x="814" y="103" width="126" height="88" rx="18" fill="#38bdf8" fill-opacity="0.16" stroke="#6dcff5" stroke-opacity="0.6"/>
+    <text x="877" y="149" text-anchor="middle" fill="#89dcff" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="30">RF</text>
+    <text x="877" y="174" text-anchor="middle" fill="#d9e2ef" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14">ARF + ProtoPirate</text>
+    <rect x="958" y="103" width="126" height="88" rx="18" fill="#a78bfa" fill-opacity="0.17" stroke="#c4b5fd" stroke-opacity="0.6"/>
+    <text x="1021" y="149" text-anchor="middle" fill="#d4c6ff" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="30">BLE</text>
+    <text x="1021" y="174" text-anchor="middle" fill="#d9e2ef" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14">Companion bridge</text>
+    <path d="M733 228 H1021" stroke="url(#accent)" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="733" cy="228" r="7" fill="#ff9c4a"/>
+    <circle cx="877" cy="228" r="7" fill="#6dcff5"/>
+    <circle cx="1021" cy="228" r="7" fill="#c4b5fd"/>
+    <text x="875" y="276" text-anchor="middle" fill="#fff" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="21" font-weight="700">one coherent workflow</text>
+    <text x="875" y="304" text-anchor="middle" fill="#aab7c9" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="15">firmware • apps • packages • iOS</text>
+  </g>
+</svg>
