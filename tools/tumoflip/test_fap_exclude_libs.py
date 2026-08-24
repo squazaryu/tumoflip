@@ -23,9 +23,31 @@ class FapExcludeLibsTest(unittest.TestCase):
             BUILDER,
         )
 
-    def test_api_88_0_remains_unchanged_until_exports_are_proven(self) -> None:
-        self.assertIn("Version,+,88.0,,", API)
-        self.assertNotIn("Version,+,88.4,,", API)
+    def test_f7_api_88_4_exports_shared_libgcc_experiment(self) -> None:
+        self.assertIn("Version,+,88.4,,", API)
+        for symbol in (
+            "__adddf3",
+            "__aeabi_d2f",
+            "__aeabi_ddiv",
+            "__fixdfsi",
+            "__muldf3",
+            "__udivmoddi4",
+        ):
+            self.assertIn(f"Function,+,{symbol},", API)
+
+    def test_only_f7_nfc_and_js_manifests_opt_in(self) -> None:
+        nfc = (REPO_ROOT / "applications/main/nfc/application.fam").read_text(
+            encoding="utf-8"
+        )
+        js = (REPO_ROOT / "applications/system/js_app/application.fam").read_text(
+            encoding="utf-8"
+        )
+        self.assertGreaterEqual(nfc.count('fap_exclude_libs=["gcc"]'), 60)
+        self.assertGreaterEqual(js.count('fap_exclude_libs=["gcc"]'), 30)
+        self.assertIn('appid="js_app_start"', js)
+        self.assertNotIn(
+            'appid="js_app_start",\n    fap_exclude_libs=["gcc"]', js
+        )
 
 
 if __name__ == "__main__":

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Measure toolchain-helper residency in FAP build artifacts.
+"""Measure toolchain-helper residency in firmware and FAP build artifacts.
 
-This is deliberately a read-only measurement tool. It does not change the FAP ABI or mark any
-application to consume firmware-provided libgcc symbols; that decision belongs to the API-88.4
-compatibility gate tracked in issue #345.
+This is deliberately a read-only measurement tool. The API-88.4 compatibility decision and
+the ``fap_exclude_libs=["gcc"]`` opt-in remain in the manifests and build configuration.
 """
 
 from __future__ import annotations
