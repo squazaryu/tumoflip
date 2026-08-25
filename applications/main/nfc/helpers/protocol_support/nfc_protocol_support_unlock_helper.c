@@ -22,7 +22,15 @@ void nfc_unlock_helper_setup_from_state(NfcApp* instance) {
     bool unlocking =
         scene_manager_has_previous_scene(
             instance->scene_manager, NfcSceneMfUltralightUnlockWarn) ||
-        scene_manager_has_previous_scene(instance->scene_manager, NfcSceneDesAuthUnlockWarn);
+        scene_manager_has_previous_scene(instance->scene_manager, NfcSceneDesAuthUnlockWarn) ||
+        // UL-AES UID reveal is routed through the shared warning scene and then re-enters Read.
+        scene_manager_has_previous_scene(
+            instance->scene_manager, NfcSceneMfUltralightAesDictAttackWarn);
+
+    // Read is also reachable through retry, protocol selection, and back-navigation. Clear any
+    // stale authentication intent on those plain-read paths so an aborted reveal/key flow cannot
+    // authenticate a different card and consume its AUTHLIM counter.
+    if(!unlocking) mf_ultralight_auth_reset(instance->mf_ul_auth);
 
     uint32_t state = unlocking ? NfcSceneReadMenuStateCardSearch : NfcSceneReadMenuStateCardFound;
 

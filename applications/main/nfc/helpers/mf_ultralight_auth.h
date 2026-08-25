@@ -12,6 +12,8 @@ typedef enum {
     MfUltralightAuthTypeManual,
     MfUltralightAuthTypeXiaomi,
     MfUltralightAuthTypeAmiibo,
+    // UL-AES Random ID: user-requested reveal of the hidden real UID.
+    MfUltralightAuthTypeUidReveal,
 } MfUltralightAuthType;
 
 /** Result of the authentication requested by the current read/unlock flow. */
