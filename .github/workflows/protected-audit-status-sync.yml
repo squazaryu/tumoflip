@@ -1,0 +1,82 @@
+name: Sync protected audit status
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: tumoflip-protected-audit-status-sync
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      LEDGER_URL: https://raw.githubusercontent.com/squazaryu/tumoflip-fw-packages/protected-app-audit-ledger/latest.json
+    steps:
+      - name: Checkout trusted sync code
+        uses: actions/checkout@v6
+
+      - name: Download immutable audit ledger
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 --retry-all-errors \
+            --output "$RUNNER_TEMP/protected-audit-ledger.json" \
+            "$LEDGER_URL"
+
+      - name: Collect release-inventory issues
+        shell: bash
+        run: |
+          gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state all \
+            --limit 200 \
+            --json number,title,state,labels \
+            > "$RUNNER_TEMP/tumoflip-issues.json"
+
+      - name: Build deterministic sync plan
+        shell: bash
+        run: |
+          python3 tools/tumoflip/sync_protected_audit_status.py \
+            --ledger "$RUNNER_TEMP/protected-audit-ledger.json" \
+            --issues "$RUNNER_TEMP/tumoflip-issues.json" \
+            --output "$RUNNER_TEMP/protected-audit-plan.json"
+          cat "$RUNNER_TEMP/protected-audit-plan.json" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply audit comments, labels, and verified closures
+        shell: bash
+        run: |
+          jq -c '.updates[]' "$RUNNER_TEMP/protected-audit-plan.json" | while read -r update; do
+            number="$(jq -r '.issueNumber' <<<"$update")"
+            marker="$(jq -r '.marker' <<<"$update")"
+            comments="$(gh api \
+              "repos/$GITHUB_REPOSITORY/issues/$number/comments?per_page=100" \
+              --paginate --slurp)"
+
+            if ! jq -e --arg marker "$marker" \
+                '[.[][] | select((.body // "") | contains($marker))] | length > 0' \
+                <<<"$comments" >/dev/null; then
+              jq -r '.comment' <<<"$update" > "$RUNNER_TEMP/audit-comment-$number.md"
+              gh issue comment "$number" \
+                --repo "$GITHUB_REPOSITORY" \
+                --body-file "$RUNNER_TEMP/audit-comment-$number.md"
+            fi
+
+            gh issue edit "$number" \
+              --repo "$GITHUB_REPOSITORY" \
+              --add-label "status:audit-only"
+
+            if jq -e '.shouldClose == true' <<<"$update" >/dev/null; then
+              gh issue close "$number" \
+                --repo "$GITHUB_REPOSITORY" \
+                --reason completed
+            fi
+          done
+
