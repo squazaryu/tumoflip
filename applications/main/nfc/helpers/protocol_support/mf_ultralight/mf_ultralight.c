@@ -18,6 +18,7 @@ enum {
     SubmenuIndexDictAttack,
     SubmenuIndexWriteKeepKey, // ULC: write data pages, keep target card's existing key
     SubmenuIndexWriteCopyKey, // ULC: write all pages including key from source card
+    SubmenuIndexRevealUid, // UL-AES Random ID: reveal the hidden real UID
 };
 
 enum {
@@ -131,14 +132,19 @@ static NfcCommand
         const MfUltralightData* data =
             nfc_device_get_data(instance->nfc_device, NfcProtocolMfUltralight);
         if(data->type == MfUltralightTypeUltralightAES) {
-            // UL-AES auth is AES, not password. Never guess a key during an ordinary read: the
-            // card's protected ACCESS page (and therefore AUTH_LIM) is not known yet, so even a
-            // single automatic failure could consume a finite attempt counter. Only the explicit
-            // manual key-entry flow is allowed to authenticate.
+            // UL-AES auth is AES, not password, and it has an AUTH_LIM - a failed auth is counted
+            // and can permanently lock the card. Never authenticate automatically on a plain read.
+            // The only non-manual operation that may authenticate is an explicit user-requested
+            // Random-ID reveal using the all-zero UIDRetrKey.
             if(instance->mf_ul_auth->type == MfUltralightAuthTypeManual) {
                 mf_ultralight_event->data->auth_context.skip_auth = false;
                 mf_ultralight_event->data->auth_context.aes_key = instance->mf_ul_auth->aes_key;
                 mf_ultralight_event->data->auth_context.aes_key_type = MfUltralightAesKeyTypeData;
+            } else if(instance->mf_ul_auth->type == MfUltralightAuthTypeUidReveal) {
+                const MfUltralightAesKey uid_key = {0};
+                mf_ultralight_event->data->auth_context.skip_auth = false;
+                mf_ultralight_event->data->auth_context.aes_key = uid_key;
+                mf_ultralight_event->data->auth_context.aes_key_type = MfUltralightAesKeyTypeUid;
             } else {
                 mf_ultralight_event->data->auth_context.skip_auth = true;
             }
@@ -216,6 +222,24 @@ static bool nfc_mf_ultralight_aes_dictionary_is_safe(const MfUltralightData* dat
     const uint8_t* access = data->page[MF_ULTRALIGHT_AES_ACCESS_PAGE].data;
     const uint16_t auth_limit = access[2] | ((access[3] & 0x03U) << 8);
     return auth_limit == 0;
+}
+
+// Keep every operation that may authenticate an UL-AES target behind the same warning. This is
+// used by dictionary attack, manual key entry, UID reveal, and protected writes.
+static void nfc_mf_ultralight_aes_warn(NfcApp* instance, uint32_t next_scene) {
+    scene_manager_set_scene_state(
+        instance->scene_manager, NfcSceneMfUltralightAesDictAttackWarn, next_scene);
+    scene_manager_next_scene(instance->scene_manager, NfcSceneMfUltralightAesDictAttackWarn);
+}
+
+static void nfc_mf_ultralight_write_confirm(NfcApp* instance) {
+    const MfUltralightData* data =
+        nfc_device_get_data(instance->nfc_device, NfcProtocolMfUltralight);
+    if(data->type == MfUltralightTypeUltralightAES) {
+        nfc_mf_ultralight_aes_warn(instance, NfcSceneWrite);
+    } else {
+        scene_manager_next_scene(instance->scene_manager, NfcSceneWrite);
+    }
 }
 
 bool nfc_scene_read_on_event_mf_ultralight(NfcApp* instance, SceneManagerEvent event) {
@@ -302,6 +326,18 @@ static void nfc_scene_read_and_saved_menu_on_enter_mf_ultralight(NfcApp* instanc
                 instance);
         }
     }
+
+    // A Random-ID MF0AES20 presents a 4-byte UID beginning with 0x08. Revealing the real UID
+    // consumes an AUTHLIM attempt, so it is explicit and warned rather than part of plain reading.
+    if(data->type == MfUltralightTypeUltralightAES && data->iso14443_3a_data->uid_len == 4 &&
+       data->iso14443_3a_data->uid[0] == 0x08) {
+        submenu_add_item(
+            submenu,
+            "Reveal Real UID",
+            SubmenuIndexRevealUid,
+            nfc_protocol_support_common_submenu_callback,
+            instance);
+    }
 }
 
 static void nfc_scene_read_success_on_enter_mf_ultralight(NfcApp* instance) {
@@ -367,7 +403,13 @@ static bool nfc_scene_read_and_saved_menu_on_event_mf_ultralight(
                                    data->type == MfUltralightTypeUltralightAES) ?
                                       NfcSceneDesAuthKeyInput :
                                       NfcSceneMfUltralightUnlockMenu;
+            // DesAuthUnlockWarn already displays the entered AES key and its AUTHLIM warning, so
+            // keep manual entry to a single confirmation dialog.
             scene_manager_next_scene(instance->scene_manager, next_scene);
+            consumed = true;
+        } else if(event.event == SubmenuIndexRevealUid) {
+            instance->mf_ul_auth->type = MfUltralightAuthTypeUidReveal;
+            nfc_mf_ultralight_aes_warn(instance, NfcSceneRead);
             consumed = true;
         } else if(event.event == SubmenuIndexDictAttack) {
             const MfUltralightData* data =
@@ -392,11 +434,11 @@ static bool nfc_scene_read_and_saved_menu_on_event_mf_ultralight(
             consumed = true;
         } else if(event.event == SubmenuIndexWriteKeepKey) {
             instance->mf_ultralight_c_write_context.copy_key = false;
-            scene_manager_next_scene(instance->scene_manager, NfcSceneWrite);
+            nfc_mf_ultralight_write_confirm(instance);
             consumed = true;
         } else if(event.event == SubmenuIndexWriteCopyKey) {
             instance->mf_ultralight_c_write_context.copy_key = true;
-            scene_manager_next_scene(instance->scene_manager, NfcSceneWrite);
+            nfc_mf_ultralight_write_confirm(instance);
             consumed = true;
         }
     }
