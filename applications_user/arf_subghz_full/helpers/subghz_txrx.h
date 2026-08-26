@@ -401,6 +401,12 @@ void subghz_txrx_receiver_reset(SubGhzTxRx* instance);
 
 SubGhzReceiver* subghz_txrx_get_receiver(SubGhzTxRx* instance); // TODO use only in DecodeRaw
 
+/** Feed one sample to the decoders and count it against the decoded air-time clock. */
+void subghz_txrx_decode(SubGhzTxRx* instance, bool level, uint32_t duration);
+
+/** Return decoded air time in milliseconds; wall-clock pauses are excluded. */
+uint32_t subghz_txrx_get_air_time_ms(SubGhzTxRx* instance);
+
 /**
  * @brief Set current preset AM650 without additional params
  *

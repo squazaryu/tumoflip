@@ -9,6 +9,7 @@ const SubGhzProtocolPackReport* subghz_txrx_get_protocol_pack_report(SubGhzTxRx*
 typedef struct {
     SubGhzTxRx* instance;
     SubGhzRadioDeviceType source;
+    SubGhzReceiver* receiver;
 } SubGhzTxRxReceiverContext;
 
 struct SubGhzTxRx {
@@ -52,6 +53,8 @@ struct SubGhzTxRx {
     bool diversity_rx_active;
 
     FuriMutex* rx_callback_mutex;
+    FuriMutex* air_time_mutex;
+    uint64_t air_time_us;
     SubGhzTxRxReceiverContext primary_receiver_context;
     SubGhzTxRxReceiverContext diversity_receiver_context;
 

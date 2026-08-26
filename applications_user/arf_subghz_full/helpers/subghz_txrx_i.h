@@ -43,4 +43,5 @@ struct SubGhzTxRx {
     SubGhzProtocolFlag receiver_filter;
 
     bool debug_pin_state;
+    uint64_t air_time_us;
 };

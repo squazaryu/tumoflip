@@ -233,6 +233,8 @@ class SubGhzDiversityTest(unittest.TestCase):
         self.assertIn("rssi > item->rssi", history)
         self.assertIn("item->source = source", history)
         self.assertIn("SubGhzHistoryAddResultUpdated", history)
+        self.assertIn("air_time_ms - instance->last_update_air_time", history)
+        self.assertIn("subghz_txrx_get_air_time_ms(subghz->txrx)", receiver_scene)
         self.assertIn('"%.2d:%.2d %s%.0f"', history)
         self.assertIn('"D:%s"', receiver_scene)
         self.assertIn("subghz_view_receiver_update_item_time", receiver_scene)

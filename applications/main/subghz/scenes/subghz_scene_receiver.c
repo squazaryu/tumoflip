@@ -165,7 +165,8 @@ static void subghz_scene_add_to_history_callback(
             decoder_base,
             &preset,
             subghz_txrx_radio_device_get_last_rx(subghz->txrx),
-            subghz_txrx_radio_device_get_last_rx_rssi(subghz->txrx));
+            subghz_txrx_radio_device_get_last_rx_rssi(subghz->txrx),
+            subghz_txrx_get_air_time_ms(subghz->txrx));
         if(add_result == SubGhzHistoryAddResultAdded) {
             furi_string_reset(item_name);
             furi_string_reset(item_time);

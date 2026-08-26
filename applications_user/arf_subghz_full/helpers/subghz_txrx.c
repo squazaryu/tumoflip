@@ -13,6 +13,21 @@
 
 #define SUBGHZ_PROTOCOL_PLUGIN_PATH EXT_PATH("apps_data/subghz/plugins")
 
+static void subghz_txrx_worker_pair_callback(void* context, bool level, uint32_t duration) {
+    SubGhzTxRx* instance = context;
+    furi_check(instance);
+    subghz_receiver_decode(instance->receiver, level, duration);
+    // Count samples after decode so callbacks observe frame data before the
+    // terminating gap is consumed.
+    instance->air_time_us += duration;
+}
+
+static void subghz_txrx_worker_overrun_callback(void* context) {
+    SubGhzTxRx* instance = context;
+    furi_check(instance);
+    subghz_receiver_reset(instance->receiver);
+}
+
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
     subghz_radio_broker_external_power_on(instance->radio_broker, &instance->radio_lease);
 }
@@ -47,6 +62,7 @@ SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group) {
     subghz_txrx_set_debug_pin_state(instance, false);
 
     instance->worker = subghz_worker_alloc();
+    instance->air_time_us = 0;
     instance->fff_data = flipper_format_string_alloc();
     instance->rx_callback = NULL;
     instance->rx_context = NULL;
@@ -69,11 +85,9 @@ SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group) {
     instance->receiver = subghz_receiver_alloc_init(instance->environment);
     subghz_receiver_set_filter(instance->receiver, instance->receiver_filter);
 
-    subghz_worker_set_overrun_callback(
-        instance->worker, (SubGhzWorkerOverrunCallback)subghz_receiver_reset);
-    subghz_worker_set_pair_callback(
-        instance->worker, (SubGhzWorkerPairCallback)subghz_receiver_decode);
-    subghz_worker_set_context(instance->worker, instance->receiver);
+    subghz_worker_set_overrun_callback(instance->worker, subghz_txrx_worker_overrun_callback);
+    subghz_worker_set_pair_callback(instance->worker, subghz_txrx_worker_pair_callback);
+    subghz_worker_set_context(instance->worker, instance);
 
     //set default device External
     subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateProbing);
@@ -113,7 +127,7 @@ bool subghz_txrx_reload_protocol_pack(
     subghz_receiver_set_filter(instance->receiver, instance->receiver_filter);
     subghz_receiver_set_rx_callback(
         instance->receiver, instance->rx_callback, instance->rx_context);
-    subghz_worker_set_context(instance->worker, instance->receiver);
+    subghz_worker_set_context(instance->worker, instance);
     instance->decoder_result = subghz_receiver_search_decoder_base_by_name(
         instance->receiver, SUBGHZ_PROTOCOL_BIN_RAW_NAME);
 
@@ -1105,6 +1119,17 @@ void subghz_txrx_receiver_reset(SubGhzTxRx* instance) {
 SubGhzReceiver* subghz_txrx_get_receiver(SubGhzTxRx* instance) {
     furi_assert(instance);
     return instance->receiver;
+}
+
+void subghz_txrx_decode(SubGhzTxRx* instance, bool level, uint32_t duration) {
+    furi_assert(instance);
+    subghz_receiver_decode(instance->receiver, level, duration);
+    instance->air_time_us += duration;
+}
+
+uint32_t subghz_txrx_get_air_time_ms(SubGhzTxRx* instance) {
+    furi_assert(instance);
+    return (uint32_t)(instance->air_time_us / 1000U);
 }
 
 void subghz_txrx_set_default_preset(SubGhzTxRx* instance, uint32_t frequency) {
