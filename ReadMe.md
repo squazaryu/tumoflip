@@ -215,10 +215,10 @@ settings, IR files, and Sub-GHz files should be copied somewhere safe.
 
 Download the update package from the
 [GitHub release](https://github.com/squazaryu/tumoflip/releases/latest) and use
-the normal qFlipper or Flipper SD-card update flow. The stable artifact is:
+the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-flppr-fw-007.tgz
+flipper-z-f7-update-t-dev-008-001.tgz
 ```
 
 ## Compatibility notes
