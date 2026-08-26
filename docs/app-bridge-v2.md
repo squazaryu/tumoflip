@@ -39,13 +39,15 @@ The system app ID is `runtime`.
 - `capabilities` returns `runtime/capabilities` with a semicolon-separated
   `key=value` payload. Runtime v2 keeps backward-compatible keys
   `runtime=1`, `fab=2`, and `session=3`, and advertises `status=2`,
-  `trace=1`, `twin=1`, `pkg=1`, `radio=2`, `sd=1`, and `diag=1`. The compact
-  aliases `rc=1`, `rs=2`, and `rp=1` advertise the read-only `radio_caps`,
-  `radio_sessions` plus `radio_sessions_export`, and `radio_protocols`
-  commands respectively. The legacy `time=1`, `gps=1`, and `net=1` keys are
-  retained for clients that probe those services directly. The `feat` value
-  retains the core feature tokens (`pkg`, `radio`, `trace`, `twin`, `transfer`,
-  and `fabric`) while the complete
+  `twin=1`, `pkg=1`, `radio=2`, and `sd=1`. The engineering profile adds
+  `trace=1`, `diag=1`, `rc=1`, `rs=2`, and `rp=1` for the trace, diagnostics,
+  and read-only radio-observability commands. The compact release profile
+  advertises `trace=0`, `diag=0`, `rc=0`, `rs=0`, and `rp=0`; its public API
+  entry points remain present and return explicit empty/unsupported results,
+  but Companion should hide those optional actions. The legacy `time=1`,
+  `gps=1`, and `net=1` keys are retained for clients that probe those
+  services directly. The `feat` value retains only the core compact tokens
+  (`pkg`, `radio`, `twin`, `transfer`, and `fabric`) while the complete
   capability payload remains within one FAB2 frame.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,

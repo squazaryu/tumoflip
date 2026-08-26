@@ -558,14 +558,18 @@ class ValidateReleaseTest(unittest.TestCase):
             "fab=2",
             "session=3",
             "status=2",
-            "trace=1",
+            "trace=0",
             "twin=1",
             "pkg=1",
             "radio=2",
             "sd=1",
-            "feat=pkg,radio,trace,twin",
+            "feat=pkg,radio,twin,transfer,fabric",
         ):
             self.assertIn(required, capabilities)
+
+        full_capabilities = runtime_capabilities(REPO_ROOT, full_profile=True)
+        self.assertIn("trace=1", full_capabilities)
+        self.assertIn("feat=pkg,radio,trace,twin,transfer,fabric", full_capabilities)
 
         validate_runtime_contract(REPO_ROOT)
 

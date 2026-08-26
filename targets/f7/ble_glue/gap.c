@@ -10,6 +10,15 @@
 #include <furi.h>
 #include <stdint.h>
 
+/* Full-stack GATT client support is available for engineering builds. The
+ * default release profile keeps the existing light-stack image within the
+ * STM32WB C2 boundary; callers receive a deterministic unsupported result. */
+#ifndef TUMOFLIP_ROADMAP_FULL
+#define TUMOFLIP_ROADMAP_FULL 0
+#endif
+#define TUMOFLIP_BLE_GATT_CLIENT TUMOFLIP_ROADMAP_FULL
+#define TUMOFLIP_BLE_SCAN TUMOFLIP_ROADMAP_FULL
+
 #define TAG "BleGap"
 
 #define FAST_ADV_TIMEOUT    30000
@@ -54,6 +63,7 @@ typedef struct {
     bool is_secure;
     uint8_t negotiation_round;
     GapSvcEventHandler* client_event_handler;
+#if TUMOFLIP_BLE_SCAN
     FuriTimer* scan_timer;
     bool scan_start_pending;
     bool scan_active;
@@ -61,6 +71,8 @@ typedef struct {
     uint32_t scan_duration_ms;
     FuriHalBtScanResultCallback scan_callback;
     void* scan_context;
+#endif
+#if TUMOFLIP_BLE_GATT_CLIENT
     bool gatt_connect_pending;
     bool gatt_client_connected;
     bool gatt_restore_adv;
@@ -78,14 +90,18 @@ typedef struct {
        read completions look like they refer to a write-only field. */
     uint16_t gatt_attribute_handle;
     uint8_t gatt_write_data[FURI_HAL_BT_GATT_DATA_MAX];
+#endif
 } Gap;
 
 typedef enum {
     GapCommandAdvFast,
     GapCommandAdvLowPower,
     GapCommandAdvStop,
+#if TUMOFLIP_BLE_SCAN
     GapCommandScanStart,
     GapCommandScanStop,
+#endif
+#if TUMOFLIP_BLE_GATT_CLIENT
     GapCommandGattConnect,
     GapCommandGattDisconnect,
     GapCommandGattDiscoverServices,
@@ -93,6 +109,7 @@ typedef enum {
     GapCommandGattRead,
     GapCommandGattWrite,
     GapCommandGattNotifications,
+#endif
     GapCommandKillThread,
 } GapCommand;
 
@@ -100,13 +117,18 @@ static Gap* gap = NULL;
 
 static void gap_advertise_start(GapState new_state);
 static int32_t gap_app(void* context);
+#if TUMOFLIP_BLE_SCAN
 static void gap_scan_stop_locked(bool restore_advertising);
+#endif
+#if TUMOFLIP_BLE_GATT_CLIENT
 static void gap_gatt_disconnect_locked(void);
+#endif
 
 static bool gap_client_stack_available(void) {
     return furi_hal_bt_get_radio_stack() == FuriHalBtStackFull;
 }
 
+#if TUMOFLIP_BLE_GATT_CLIENT
 static void gap_emit_gatt_event(const FuriHalBtGattEvent* event) {
     if(gap->gatt_callback && event) {
         gap->gatt_callback(event, gap->gatt_context);
@@ -121,7 +143,9 @@ static void gap_emit_gatt_error(uint8_t status) {
     };
     gap_emit_gatt_event(&event);
 }
+#endif
 
+#if TUMOFLIP_BLE_SCAN
 static uint8_t gap_copy_advertising_name(
     const uint8_t* data,
     uint8_t data_len,
@@ -182,7 +206,9 @@ static void gap_handle_advertising_reports(const hci_event_pckt* event_pckt) {
         remaining -= 10U + data_len;
     }
 }
+#endif
 
+#if TUMOFLIP_BLE_GATT_CLIENT
 static void gap_handle_gatt_event(const hci_event_pckt* event_pckt) {
     if(!gap->gatt_client_connected || event_pckt->plen < 3U) return;
 
@@ -295,6 +321,7 @@ static void gap_handle_gatt_event(const hci_event_pckt* event_pckt) {
         gap_emit_gatt_event(&event);
     }
 }
+#endif
 
 static BleEventAckStatus gap_client_event_handler(void* event, void* context) {
     UNUSED(context);
@@ -304,11 +331,16 @@ static BleEventAckStatus gap_client_event_handler(void* event, void* context) {
     if(!uart_packet) return BleEventNotAck;
     const hci_event_pckt* event_pckt = (const hci_event_pckt*)uart_packet->data;
     if(event_pckt->plen == 0U) return BleEventNotAck;
+#if TUMOFLIP_BLE_SCAN
     if(event_pckt->evt == HCI_LE_META_EVT_CODE) {
         gap_handle_advertising_reports(event_pckt);
-    } else if(event_pckt->evt == HCI_VENDOR_SPECIFIC_DEBUG_EVT_CODE) {
+    }
+#endif
+#if TUMOFLIP_BLE_GATT_CLIENT
+    else if(event_pckt->evt == HCI_VENDOR_SPECIFIC_DEBUG_EVT_CODE) {
         gap_handle_gatt_event(event_pckt);
     }
+#endif
     return BleEventNotAck;
 }
 
@@ -386,9 +418,11 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
     case HCI_DISCONNECTION_COMPLETE_EVT_CODE: {
         hci_disconnection_complete_event_rp0* disconnection_complete_event =
             (hci_disconnection_complete_event_rp0*)event_pckt->data;
+#if TUMOFLIP_BLE_GATT_CLIENT
         const bool was_gatt_client =
             gap->gatt_client_connected || gap->gatt_connect_pending ||
             (gap->gatt_connection_handle == disconnection_complete_event->Connection_Handle);
+#endif
         if(disconnection_complete_event->Connection_Handle == gap->service.connection_handle) {
             gap->service.connection_handle = 0;
             gap->state = GapStateIdle;
@@ -397,6 +431,7 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
         }
         gap->is_secure = false;
         gap->negotiation_round = 0;
+#if TUMOFLIP_BLE_GATT_CLIENT
         if(was_gatt_client) {
             gap->gatt_client_connected = false;
             gap->gatt_connect_pending = false;
@@ -409,13 +444,16 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
             };
             gap_emit_gatt_event(&gatt_event);
         }
+#endif
         // Enterprise sleep
         furi_delay_us(666 + 666);
+#if TUMOFLIP_BLE_GATT_CLIENT
         if(gap->enable_adv && gap->gatt_restore_adv && !gap->scan_active) {
             // Restart advertising
             gap_advertise_start(GapStateAdvFast);
         }
         gap->gatt_restore_adv = false;
+#endif
         GapEvent event = {.type = GapEventTypeDisconnected};
         gap->on_event_cb(event, gap->context);
     } break;
@@ -455,6 +493,7 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
             hci_le_connection_complete_event_rp0* event =
                 (hci_le_connection_complete_event_rp0*)meta_evt->data;
             if(event->Status != BLE_STATUS_SUCCESS) {
+#if TUMOFLIP_BLE_GATT_CLIENT
                 if(gap->gatt_connect_pending) {
                     gap_emit_gatt_error(event->Status);
                     gap->gatt_connect_pending = false;
@@ -464,6 +503,7 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
                     }
                     gap->gatt_restore_adv = false;
                 }
+#endif
                 break;
             }
             gap->connection_params.conn_interval = event->Conn_Interval;
@@ -477,6 +517,7 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
             gap->state = GapStateConnected;
             gap->service.connection_handle = event->Connection_Handle;
 
+#if TUMOFLIP_BLE_GATT_CLIENT
             if(gap->gatt_connect_pending && event->Role == 0U) {
                 gap->gatt_connect_pending = false;
                 gap->gatt_client_connected = true;
@@ -489,6 +530,7 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
                 };
                 gap_emit_gatt_event(&gatt_event);
             }
+#endif
 
             gap_verify_connection_parameters(gap);
 
@@ -780,10 +822,13 @@ static void gap_advertise_start(GapState new_state) {
 static void gap_advertise_stop(void) {
     FURI_LOG_D(TAG, "Stop");
     tBleStatus ret;
+#if TUMOFLIP_BLE_SCAN
     if(gap->scan_active || gap->scan_start_pending) {
         gap_scan_stop_locked(false);
     }
+#endif
     if(gap->state > GapStateIdle) {
+#if TUMOFLIP_BLE_GATT_CLIENT
         if((gap->state == GapStateConnected && gap->gatt_client_connected) ||
            gap->state == GapStateConnecting || gap->gatt_connect_pending) {
             gap_gatt_disconnect_locked();
@@ -796,6 +841,16 @@ static void gap_advertise_stop(void) {
                 FURI_LOG_D(TAG, "terminate success");
             }
         }
+#else
+        if(gap->state == GapStateConnected) {
+            ret = aci_gap_terminate(gap->service.connection_handle, 0x13);
+            if(ret != BLE_STATUS_SUCCESS) {
+                FURI_LOG_E(TAG, "terminate failed %d", ret);
+            } else {
+                FURI_LOG_D(TAG, "terminate success");
+            }
+        }
+#endif
         // Stop advertising
         furi_timer_stop(gap->advertise_timer);
         if((gap->state == GapStateAdvFast) || (gap->state == GapStateAdvLowPower) ||
@@ -807,12 +862,17 @@ static void gap_advertise_stop(void) {
                 FURI_LOG_D(TAG, "set_non_discoverable success");
             }
         }
+#if TUMOFLIP_BLE_GATT_CLIENT
         if(!gap->gatt_client_connected) gap->state = GapStateIdle;
+#else
+        gap->state = GapStateIdle;
+#endif
     }
     GapEvent event = {.type = GapEventTypeStopAdvertising};
     gap->on_event_cb(event, gap->context);
 }
 
+#if TUMOFLIP_BLE_SCAN
 static void gap_scan_timer_callback(void* context) {
     UNUSED(context);
     if(!gap || !gap->command_queue) return;
@@ -885,7 +945,9 @@ static void gap_scan_stop_locked(bool restore_advertising) {
     gap->scan_restore_adv = false;
     FURI_LOG_I(TAG, "Passive scan stopped");
 }
+#endif
 
+#if TUMOFLIP_BLE_GATT_CLIENT
 static void gap_gatt_connect_locked(void) {
     furi_check(gap->gatt_connect_pending);
 
@@ -1008,6 +1070,7 @@ static void gap_gatt_notifications_locked(void) {
         gap_emit_gatt_error(status);
     }
 }
+#endif
 
 void gap_start_advertising(void) {
     furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
@@ -1054,7 +1117,9 @@ bool gap_init(
     gap->config = config;
     // Create advertising timer
     gap->advertise_timer = furi_timer_alloc(gap_advertise_timer_callback, FuriTimerTypeOnce, NULL);
+#if TUMOFLIP_BLE_SCAN
     gap->scan_timer = furi_timer_alloc(gap_scan_timer_callback, FuriTimerTypeOnce, NULL);
+#endif
     // Initialization of GATT & GAP layer
     gap->service.adv_name = config->adv_name;
     gap_init_svc(gap, root_keys);
@@ -1063,7 +1128,9 @@ bool gap_init(
     gap->state_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     gap->state = GapStateIdle;
     gap->service.connection_handle = 0xFFFF;
+#if TUMOFLIP_BLE_GATT_CLIENT
     gap->gatt_connection_handle = 0xFFFF;
+#endif
     gap->enable_adv = true;
 
     // Command queue allocation
@@ -1136,8 +1203,10 @@ void gap_thread_stop(void) {
         gap->command_queue = NULL;
         furi_timer_free(gap->advertise_timer);
         gap->advertise_timer = NULL;
+#if TUMOFLIP_BLE_SCAN
         furi_timer_free(gap->scan_timer);
         gap->scan_timer = NULL;
+#endif
 
         if(gap->client_event_handler) {
             ble_event_dispatcher_unregister_svc_handler(gap->client_event_handler);
@@ -1160,8 +1229,12 @@ static int32_t gap_app(void* context) {
         }
         furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
         if(command == GapCommandKillThread) {
+#if TUMOFLIP_BLE_SCAN
             gap_scan_stop_locked(false);
+#endif
+#if TUMOFLIP_BLE_GATT_CLIENT
             gap_gatt_disconnect_locked();
+#endif
             break;
         }
         if(command == GapCommandAdvFast) {
@@ -1170,11 +1243,15 @@ static int32_t gap_app(void* context) {
             gap_advertise_start(GapStateAdvLowPower);
         } else if(command == GapCommandAdvStop) {
             gap_advertise_stop();
+#if TUMOFLIP_BLE_SCAN
         } else if(command == GapCommandScanStart) {
             gap_scan_start_locked();
         } else if(command == GapCommandScanStop) {
             gap_scan_stop_locked(true);
-        } else if(command == GapCommandGattConnect) {
+#endif
+        }
+#if TUMOFLIP_BLE_GATT_CLIENT
+        else if(command == GapCommandGattConnect) {
             gap_gatt_connect_locked();
         } else if(command == GapCommandGattDisconnect) {
             gap_gatt_disconnect_locked();
@@ -1189,6 +1266,7 @@ static int32_t gap_app(void* context) {
         } else if(command == GapCommandGattNotifications) {
             gap_gatt_notifications_locked();
         }
+#endif
         furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
     }
 
@@ -1201,6 +1279,7 @@ void gap_emit_ble_beacon_status_event(bool active) {
     FURI_LOG_I(TAG, "Beacon status event: %d", active);
 }
 
+#if TUMOFLIP_BLE_SCAN
 bool furi_hal_bt_scan_start(
     uint32_t duration_ms,
     FuriHalBtScanResultCallback callback,
@@ -1210,10 +1289,15 @@ bool furi_hal_bt_scan_start(
     if(duration_ms > GAP_SCAN_MAX_DURATION_MS) duration_ms = GAP_SCAN_MAX_DURATION_MS;
 
     furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
+#if TUMOFLIP_BLE_GATT_CLIENT
     const bool can_start =
         !gap->scan_active && !gap->scan_start_pending && !gap->gatt_client_connected &&
         !gap->gatt_connect_pending && gap->state != GapStateConnecting &&
         gap->state != GapStateConnected;
+#else
+    const bool can_start =
+        !gap->scan_active && !gap->scan_start_pending && gap->state != GapStateConnected;
+#endif
     bool queued = false;
     if(can_start) {
         gap->scan_restore_adv =
@@ -1259,7 +1343,27 @@ bool furi_hal_bt_scan_is_active(void) {
     furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
     return active;
 }
+#else
+bool furi_hal_bt_scan_start(
+    uint32_t duration_ms,
+    FuriHalBtScanResultCallback callback,
+    void* context) {
+    UNUSED(duration_ms);
+    UNUSED(callback);
+    UNUSED(context);
+    return false;
+}
 
+bool furi_hal_bt_scan_stop(void) {
+    return false;
+}
+
+bool furi_hal_bt_scan_is_active(void) {
+    return false;
+}
+#endif
+
+#if TUMOFLIP_BLE_GATT_CLIENT
 bool furi_hal_bt_gatt_connect(
     const FuriHalBtPeer* peer,
     FuriHalBtGattEventCallback callback,
@@ -1408,3 +1512,55 @@ bool furi_hal_bt_gatt_set_notifications(
     furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
     return active;
 }
+#else
+bool furi_hal_bt_gatt_connect(
+    const FuriHalBtPeer* peer,
+    FuriHalBtGattEventCallback callback,
+    void* context) {
+    UNUSED(peer);
+    UNUSED(callback);
+    UNUSED(context);
+    return false;
+}
+
+bool furi_hal_bt_gatt_disconnect(void) {
+    return false;
+}
+
+bool furi_hal_bt_gatt_discover_services(void) {
+    return false;
+}
+
+bool furi_hal_bt_gatt_discover_characteristics(uint16_t start_handle, uint16_t end_handle) {
+    UNUSED(start_handle);
+    UNUSED(end_handle);
+    return false;
+}
+
+bool furi_hal_bt_gatt_read(uint16_t attribute_handle) {
+    UNUSED(attribute_handle);
+    return false;
+}
+
+bool furi_hal_bt_gatt_write(
+    uint16_t attribute_handle,
+    const uint8_t* data,
+    size_t data_len,
+    bool user_confirmed) {
+    UNUSED(attribute_handle);
+    UNUSED(data);
+    UNUSED(data_len);
+    UNUSED(user_confirmed);
+    return false;
+}
+
+bool furi_hal_bt_gatt_set_notifications(
+    uint16_t cccd_handle,
+    bool enabled,
+    bool user_confirmed) {
+    UNUSED(cccd_handle);
+    UNUSED(enabled);
+    UNUSED(user_confirmed);
+    return false;
+}
+#endif

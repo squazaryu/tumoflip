@@ -16,6 +16,19 @@
 #include <toolbox/cli/cli_command.h>
 #include <toolbox/saved_struct.h>
 
+/* The full diagnostics and history export surfaces are retained for
+ * engineering builds.  The default light-stack release profile keeps the
+ * runtime service within the STM32WB C2 boundary while preserving the public
+ * API and returning deterministic compact-profile results. */
+#ifndef TUMOFLIP_ROADMAP_FULL
+#define TUMOFLIP_ROADMAP_FULL 0
+#endif
+#define TUMOFLIP_EXTENDED_RUNTIME_DIAGNOSTICS TUMOFLIP_ROADMAP_FULL
+#define TUMOFLIP_RUNTIME_RADIO_OBSERVABILITY TUMOFLIP_ROADMAP_FULL
+#define TUMOFLIP_RADIO_HISTORY_EXPORT TUMOFLIP_ROADMAP_FULL
+#define TUMOFLIP_RUNTIME_JOURNAL TUMOFLIP_ROADMAP_FULL
+#define TUMOFLIP_RUNTIME_TRACE TUMOFLIP_ROADMAP_FULL
+
 #define TUMOFLIP_RUNTIME_APP_ID             "runtime"
 #define TUMOFLIP_RUNTIME_QUEUE_DEPTH        8U
 #define TUMOFLIP_RUNTIME_STATUS_MAX         160U
@@ -27,6 +40,9 @@
 #define TUMOFLIP_RUNTIME_RADIO_MAX          192U
 #define TUMOFLIP_RUNTIME_RADIO_PROTOCOL_MAX 192U
 #define TUMOFLIP_RUNTIME_JOURNAL_MAX        192U
+#define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX  24U
+/* Radio payload helpers live with the bridge handlers below. */
+#if TUMOFLIP_RUNTIME_JOURNAL
 #define TUMOFLIP_RUNTIME_JOURNAL_PATH       EXT_PATH(".tumoflip/runtime-journal.bin")
 #define TUMOFLIP_RUNTIME_JOURNAL_TMP_PATH   EXT_PATH(".tumoflip/runtime-journal.bin.tmp")
 #define TUMOFLIP_RUNTIME_JOURNAL_BAK_PATH   EXT_PATH(".tumoflip/runtime-journal.bin.bak")
@@ -38,14 +54,25 @@
 #define TUMOFLIP_RUNTIME_RADIO_SESSIONS_PATH EXT_PATH(".tumoflip/radio-sessions.csv")
 #define TUMOFLIP_RUNTIME_RADIO_SESSIONS_TMP_PATH EXT_PATH(".tumoflip/radio-sessions.csv.tmp")
 #define TUMOFLIP_RUNTIME_RADIO_SESSIONS_BAK_PATH EXT_PATH(".tumoflip/radio-sessions.csv.bak")
-#define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX  24U
 #define TUMOFLIP_RUNTIME_JOURNAL_APP_MAX    15U
 #define TUMOFLIP_RUNTIME_JOURNAL_SCENE_MAX  23U
+#endif
 #define TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
+#if TUMOFLIP_RUNTIME_TRACE
 #define TUMOFLIP_RUNTIME_CAPABILITIES                                       \
-    "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;pkg=1;radio=2;sd=1;" \
-    "fabric=1;diag=1;rc=1;rs=2;rp=1;" \
-    "feat=pkg,radio,trace,twin,transfer,fabric;time=1;gps=1;net=1"
+    "runtime=1;fab=2;session=3;status=2;trace=1;"                         \
+    "twin=1;pkg=1;radio=2;sd=1;"                                           \
+    "fabric=1;diag=1;rc=1;rs=2;rp=1;"                                      \
+    "feat=pkg,radio,trace,twin,transfer,fabric;"                            \
+    "time=1;gps=1;net=1"
+#else
+#define TUMOFLIP_RUNTIME_CAPABILITIES                                       \
+    "runtime=1;fab=2;session=3;status=2;trace=0;"                         \
+    "twin=1;pkg=1;radio=2;sd=1;"                                           \
+    "fabric=1;diag=0;rc=0;rs=0;rp=0;"                                      \
+    "feat=pkg,radio,twin,transfer,fabric;"                                 \
+    "time=1;gps=1;net=1"
+#endif
 
 typedef struct {
     BtAppBridgeEvent event;
@@ -62,6 +89,7 @@ typedef struct {
     bool error;
 } TumoflipRuntimeTraceEvent;
 
+#if TUMOFLIP_RUNTIME_JOURNAL
 typedef enum {
     TumoflipRuntimeJournalNone,
     TumoflipRuntimeJournalCrash,
@@ -81,24 +109,31 @@ typedef struct {
     char app_id[TUMOFLIP_RUNTIME_JOURNAL_APP_MAX + 1U];
     char scene[TUMOFLIP_RUNTIME_JOURNAL_SCENE_MAX + 1U];
 } TumoflipRuntimeJournal;
+#endif
 
 typedef struct {
     Bt* bt;
     Storage* storage;
     SubGhzRadioBroker* radio_broker;
     FuriMessageQueue* queue;
+#if TUMOFLIP_RUNTIME_TRACE
     FuriMutex* trace_mutex;
+#endif
     FuriMutex* fabric_mutex;
     FuriPubSubSubscription* subscription;
     TumoflipRuntimeApi api;
     TumoflipRuntimeSession session;
     TumoFabricState fabric;
+#if TUMOFLIP_RUNTIME_TRACE
     TumoflipRuntimeTraceEvent trace[TUMOFLIP_RUNTIME_TRACE_DEPTH];
     uint8_t trace_head;
     uint8_t trace_count;
     uint32_t trace_dropped;
+#endif
     bool transfer_active;
+#if TUMOFLIP_RUNTIME_JOURNAL
     TumoflipRuntimeJournal journal;
+#endif
 } TumoflipRuntime;
 
 static void tumoflip_runtime_trace_add(
@@ -117,11 +152,14 @@ static bool tumoflip_runtime_api_step_local_fabric(TumoflipRuntimeApi* api, int8
 static bool tumoflip_runtime_api_get_diagnostics(
     TumoflipRuntimeApi* api,
     TumoflipRuntimeDiagnosticReport* report);
+#if TUMOFLIP_EXTENDED_RUNTIME_DIAGNOSTICS
 static bool tumoflip_runtime_diagnostics_export(
     TumoflipRuntime* runtime,
     const TumoflipRuntimeDiagnosticReport* report);
+#endif
 static const char* tumoflip_runtime_str_or_unknown(const char* value);
 
+#if TUMOFLIP_EXTENDED_RUNTIME_DIAGNOSTICS
 static const char* tumoflip_runtime_diagnostic_check_name(
     TumoflipRuntimeDiagnosticCheckId id) {
     static const char* const names[TUMOFLIP_RUNTIME_DIAGNOSTIC_CHECK_COUNT] = {
@@ -150,20 +188,6 @@ static const char* tumoflip_runtime_diagnostic_status_name(
     case TumoflipRuntimeDiagnosticStatusSkipped:
     default:
         return "skip";
-    }
-}
-
-static const char* tumoflip_runtime_radio_session_state_name(
-    SubGhzRadioBrokerSessionState state) {
-    switch(state) {
-    case SubGhzRadioBrokerSessionStateActive:
-        return "active";
-    case SubGhzRadioBrokerSessionStatePaused:
-        return "paused";
-    case SubGhzRadioBrokerSessionStateClosed:
-        return "closed";
-    default:
-        return "unknown";
     }
 }
 
@@ -230,7 +254,25 @@ static bool tumoflip_runtime_storage_self_test(Storage* storage) {
     storage_file_free(file);
     return success;
 }
+#endif
 
+#if TUMOFLIP_RUNTIME_RADIO_OBSERVABILITY
+static const char* tumoflip_runtime_radio_session_state_name(
+    SubGhzRadioBrokerSessionState state) {
+    switch(state) {
+    case SubGhzRadioBrokerSessionStateActive:
+        return "active";
+    case SubGhzRadioBrokerSessionStatePaused:
+        return "paused";
+    case SubGhzRadioBrokerSessionStateClosed:
+        return "closed";
+    default:
+        return "unknown";
+    }
+}
+#endif
+
+#if TUMOFLIP_RUNTIME_JOURNAL
 static const char* tumoflip_runtime_journal_kind_name(uint8_t kind) {
     switch((TumoflipRuntimeJournalKind)kind) {
     case TumoflipRuntimeJournalCrash:
@@ -377,7 +419,9 @@ static void tumoflip_runtime_journal_init(TumoflipRuntime* runtime) {
     RCC->CSR |= RCC_CSR_RMVF;
 #endif
 }
+#endif
 
+#if TUMOFLIP_EXTENDED_RUNTIME_DIAGNOSTICS
 bool tumoflip_runtime_diagnostics_run(
     TumoflipRuntimeApi* api,
     TumoflipRuntimeDiagnosticReport* report) {
@@ -499,7 +543,22 @@ bool tumoflip_runtime_diagnostics_run(
         "interactive-check-required");
     return true;
 }
+#else
+bool tumoflip_runtime_diagnostics_run(
+    TumoflipRuntimeApi* api,
+    TumoflipRuntimeDiagnosticReport* report) {
+    if(!api || !report || !api->context) return false;
+    memset(report, 0, sizeof(*report));
+    report->schema_version = 1U;
+    /* The full non-destructive checks are enabled in the engineering profile.
+     * Keeping this compact result explicit prevents callers from mistaking a
+     * skipped check for a passing hardware test. */
+    report->check_count = 0U;
+    return true;
+}
+#endif
 
+#if TUMOFLIP_EXTENDED_RUNTIME_DIAGNOSTICS
 bool tumoflip_runtime_diagnostics_format(
     const TumoflipRuntimeDiagnosticReport* report,
     char* output,
@@ -528,6 +587,20 @@ bool tumoflip_runtime_diagnostics_format(
 
     return true;
 }
+#else
+bool tumoflip_runtime_diagnostics_format(
+    const TumoflipRuntimeDiagnosticReport* report,
+    char* output,
+    size_t output_size) {
+    if(!report || !output || output_size == 0U || report->schema_version == 0U) return false;
+    const int written = snprintf(
+        output,
+        output_size,
+        "schema=%u;status=compact;reason=extended-checks-disabled",
+        report->schema_version);
+    return written > 0 && (size_t)written < output_size;
+}
+#endif
 
 static void tumoflip_runtime_cli_print_error(const char* error) {
     printf("FABRIC schema=1;status=error;error=%s\r\n", error);
@@ -548,6 +621,7 @@ static void tumoflip_runtime_cli_print_snapshot(TumoflipRuntime* runtime) {
         snapshot.counter);
 }
 
+#if TUMOFLIP_EXTENDED_RUNTIME_DIAGNOSTICS
 static void tumoflip_runtime_cli_print_diagnostics(TumoflipRuntime* runtime) {
     TumoflipRuntimeDiagnosticReport report;
     if(!tumoflip_runtime_api_get_diagnostics(&runtime->api, &report)) {
@@ -569,7 +643,9 @@ static void tumoflip_runtime_cli_print_diagnostics(TumoflipRuntime* runtime) {
         tumoflip_runtime_diagnostics_export(runtime, &report) ? "ok" : "failed",
         TUMOFLIP_RUNTIME_DIAGNOSTIC_REPORT_PATH);
 }
+#endif
 
+#if TUMOFLIP_EXTENDED_RUNTIME_DIAGNOSTICS
 static bool tumoflip_runtime_diagnostics_export(
     TumoflipRuntime* runtime,
     const TumoflipRuntimeDiagnosticReport* report) {
@@ -612,7 +688,9 @@ static bool tumoflip_runtime_diagnostics_export(
     if(!success) storage_simply_remove(runtime->storage, TUMOFLIP_RUNTIME_DIAGNOSTIC_REPORT_TMP_PATH);
     return success;
 }
+#endif
 
+#if TUMOFLIP_RUNTIME_RADIO_OBSERVABILITY
 static const char* tumoflip_runtime_radio_device_name(SubGhzRadioBrokerDevice device) {
     switch(device) {
     case SubGhzRadioBrokerDeviceInternal:
@@ -676,6 +754,7 @@ static void tumoflip_runtime_cli_print_radio_sessions(TumoflipRuntime* runtime) 
     }
 }
 
+#if TUMOFLIP_RADIO_HISTORY_EXPORT
 static void tumoflip_runtime_sanitize_csv_token(
     const char* input,
     char* output,
@@ -692,7 +771,9 @@ static void tumoflip_runtime_sanitize_csv_token(
     }
     output[offset] = '\0';
 }
+#endif
 
+#if TUMOFLIP_RADIO_HISTORY_EXPORT
 static bool tumoflip_runtime_radio_sessions_export(TumoflipRuntime* runtime) {
     if(!runtime) return false;
     if(storage_simply_mkdir(runtime->storage, EXT_PATH(".tumoflip")) == false) return false;
@@ -783,6 +864,7 @@ static bool tumoflip_runtime_radio_sessions_export(TumoflipRuntime* runtime) {
     storage_simply_remove(runtime->storage, TUMOFLIP_RUNTIME_RADIO_SESSIONS_BAK_PATH);
     return true;
 }
+#endif
 
 static void tumoflip_runtime_cli_print_radio_protocols(TumoflipRuntime* runtime) {
     static const char* const protocols[] = {"RAW", "ProtoPirate", "Keeloq"};
@@ -896,7 +978,9 @@ static void tumoflip_runtime_make_radio_sessions_payload(
         (unsigned long)latest->sequence,
         (unsigned long)latest->frequency);
 }
+#endif
 
+#if TUMOFLIP_RUNTIME_JOURNAL
 static void tumoflip_runtime_make_journal_payload(
     TumoflipRuntime* runtime,
     char* payload,
@@ -916,6 +1000,7 @@ static void tumoflip_runtime_make_journal_payload(
         journal->scene[0] ? journal->scene : "unknown",
         journal->firmware_commit[0] ? journal->firmware_commit : "unknown");
 }
+#endif
 
 static void tumoflip_runtime_cli(PipeSide* pipe, FuriString* args, void* context) {
     UNUSED(pipe);
@@ -997,6 +1082,7 @@ static void tumoflip_runtime_cli(PipeSide* pipe, FuriString* args, void* context
         } else {
             printf("FABRIC schema=1;status=ok;trace=%s\r\n", trace);
         }
+#if TUMOFLIP_EXTENDED_RUNTIME_DIAGNOSTICS
     } else if(strcmp(command, "diagnostics") == 0 || strcmp(command, "run") == 0) {
         if(args_length(args) != 0U) {
             tumoflip_runtime_cli_print_error("args");
@@ -1011,6 +1097,8 @@ static void tumoflip_runtime_cli(PipeSide* pipe, FuriString* args, void* context
         } else {
             printf("DIAG export=ok;path=%s\r\n", TUMOFLIP_RUNTIME_DIAGNOSTIC_REPORT_PATH);
         }
+#endif
+#if TUMOFLIP_RUNTIME_RADIO_OBSERVABILITY
     } else if(strcmp(command, "radio_caps") == 0) {
         if(args_length(args) != 0U) {
             tumoflip_runtime_cli_print_error("args");
@@ -1023,6 +1111,7 @@ static void tumoflip_runtime_cli(PipeSide* pipe, FuriString* args, void* context
         } else {
             tumoflip_runtime_cli_print_radio_sessions(runtime);
         }
+#if TUMOFLIP_RADIO_HISTORY_EXPORT
     } else if(strcmp(command, "radio_sessions_export") == 0) {
         if(args_length(args) != 0U || !tumoflip_runtime_radio_sessions_export(runtime)) {
             tumoflip_runtime_cli_print_error("radio_sessions_export");
@@ -1031,12 +1120,15 @@ static void tumoflip_runtime_cli(PipeSide* pipe, FuriString* args, void* context
                 "RADIO_SESSIONS export=ok;path=%s\r\n",
                 TUMOFLIP_RUNTIME_RADIO_SESSIONS_PATH);
         }
+#endif
     } else if(strcmp(command, "radio_protocols") == 0) {
         if(args_length(args) != 0U) {
             tumoflip_runtime_cli_print_error("args");
         } else {
             tumoflip_runtime_cli_print_radio_protocols(runtime);
         }
+#endif
+#if TUMOFLIP_RUNTIME_JOURNAL
     } else if(strcmp(command, "journal") == 0) {
         char payload[TUMOFLIP_RUNTIME_JOURNAL_MAX];
         if(args_length(args) != 0U) {
@@ -1051,6 +1143,7 @@ static void tumoflip_runtime_cli(PipeSide* pipe, FuriString* args, void* context
         } else {
             printf("JOURNAL schema=1;status=cleared\r\n");
         }
+#endif
     } else {
         tumoflip_runtime_cli_print_error("verb");
     }
@@ -1101,6 +1194,7 @@ static void tumoflip_runtime_transfer_activity(TumoflipRuntime* runtime, bool ac
     api_lock_wait_unlock_and_free(message.lock);
 }
 
+#if TUMOFLIP_RUNTIME_TRACE
 static void tumoflip_runtime_trace_add(
     TumoflipRuntime* runtime,
     char code,
@@ -1171,6 +1265,32 @@ static bool
     output[output_size - 1U] = '\0';
     return true;
 }
+#else
+static void tumoflip_runtime_trace_add(
+    TumoflipRuntime* runtime,
+    char code,
+    const char* command,
+    bool error) {
+    UNUSED(runtime);
+    UNUSED(code);
+    UNUSED(command);
+    UNUSED(error);
+}
+
+static void
+    tumoflip_runtime_make_trace_payload(TumoflipRuntime* runtime, char* payload, size_t size) {
+    UNUSED(runtime);
+    if(!payload || size == 0U) return;
+    strlcpy(payload, "schema=1;depth=0;count=0;drop=0", size);
+}
+
+static bool
+    tumoflip_runtime_api_get_trace(TumoflipRuntimeApi* api, char* output, size_t output_size) {
+    if(!api || !api->context || !output || output_size == 0U) return false;
+    tumoflip_runtime_make_trace_payload(api->context, output, output_size);
+    return true;
+}
+#endif
 
 static bool tumoflip_runtime_api_get_fabric_state(
     TumoflipRuntimeApi* api,
@@ -1387,6 +1507,7 @@ static void
         char payload[TUMOFLIP_RUNTIME_TWIN_MAX];
         tumoflip_runtime_make_twin_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "twin", payload, false);
+#if TUMOFLIP_EXTENDED_RUNTIME_DIAGNOSTICS
     } else if(strcmp(command, "diagnostics") == 0) {
         TumoflipRuntimeDiagnosticReport report;
         char payload[TUMOFLIP_RUNTIME_DIAGNOSTIC_MAX];
@@ -1410,6 +1531,8 @@ static void
                 "path=/.tumoflip/diagnostics-last.txt",
                 false);
         }
+#endif
+#if TUMOFLIP_RUNTIME_RADIO_OBSERVABILITY
     } else if(strcmp(command, "radio_caps") == 0) {
         char payload[TUMOFLIP_RUNTIME_RADIO_MAX];
         if(payload_len != 0U) {
@@ -1426,6 +1549,7 @@ static void
             tumoflip_runtime_make_radio_sessions_payload(runtime, payload, sizeof(payload));
             tumoflip_runtime_reply(runtime, event->request_id, "radio_sessions", payload, false);
         }
+#if TUMOFLIP_RADIO_HISTORY_EXPORT
     } else if(strcmp(command, "radio_sessions_export") == 0) {
         if(payload_len != 0U || !tumoflip_runtime_radio_sessions_export(runtime)) {
             tumoflip_runtime_reply(
@@ -1438,6 +1562,7 @@ static void
                 "path=/.tumoflip/radio-sessions.csv",
                 false);
         }
+#endif
     } else if(strcmp(command, "radio_protocols") == 0) {
         char payload[TUMOFLIP_RUNTIME_RADIO_PROTOCOL_MAX];
         if(payload_len != 0U) {
@@ -1446,6 +1571,8 @@ static void
             tumoflip_runtime_make_radio_protocols_payload(runtime, payload, sizeof(payload));
             tumoflip_runtime_reply(runtime, event->request_id, "radio_protocols", payload, false);
         }
+#endif
+#if TUMOFLIP_RUNTIME_JOURNAL
     } else if(strcmp(command, "journal") == 0) {
         char payload[TUMOFLIP_RUNTIME_JOURNAL_MAX];
         if(payload_len != 0U) {
@@ -1454,6 +1581,7 @@ static void
             tumoflip_runtime_make_journal_payload(runtime, payload, sizeof(payload));
             tumoflip_runtime_reply(runtime, event->request_id, "journal", payload, false);
         }
+#endif
     } else if(strcmp(command, "fabric_caps") == 0) {
         char payload[TUMOFLIP_RUNTIME_FABRIC_MAX];
         tumoflip_runtime_make_fabric_capabilities_payload(runtime, payload, sizeof(payload));
@@ -1511,7 +1639,9 @@ int32_t tumoflip_runtime_srv(void* context) {
     memset(runtime, 0, sizeof(TumoflipRuntime));
     runtime->queue =
         furi_message_queue_alloc(TUMOFLIP_RUNTIME_QUEUE_DEPTH, sizeof(TumoflipRuntimeMessage));
+#if TUMOFLIP_RUNTIME_TRACE
     runtime->trace_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
+#endif
     runtime->fabric_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     runtime->api.get_trace = tumoflip_runtime_api_get_trace;
     runtime->api.get_fabric_state = tumoflip_runtime_api_get_fabric_state;
@@ -1524,7 +1654,9 @@ int32_t tumoflip_runtime_srv(void* context) {
     runtime->bt = furi_record_open(RECORD_BT);
     runtime->storage = furi_record_open(RECORD_STORAGE);
     runtime->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+#if TUMOFLIP_RUNTIME_JOURNAL
     tumoflip_runtime_journal_init(runtime);
+#endif
     furi_record_create(RECORD_TUMOFLIP_RUNTIME, &runtime->api);
 
     CliRegistry* cli = furi_record_open(RECORD_CLI);

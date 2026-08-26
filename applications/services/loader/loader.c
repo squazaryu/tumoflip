@@ -40,12 +40,14 @@ static const char* loader_find_external_application_by_name(const char* app_name
     return NULL;
 }
 
+#if TUMOFLIP_LOADER_DIAGNOSTICS_FULL
 static void loader_diagnostic_update_memory(LoaderDiagnostic* diagnostic) {
     if(!diagnostic) return;
 
     diagnostic->free_heap = (uint32_t)memmgr_get_free_heap();
     diagnostic->max_free_block = (uint32_t)memmgr_heap_get_max_free_block();
 }
+#endif
 
 static void loader_diagnostic_set_code(
     LoaderDiagnostic* diagnostic,
@@ -55,9 +57,12 @@ static void loader_diagnostic_set_code(
 
     diagnostic->code = code;
     diagnostic->action = action;
+#if TUMOFLIP_LOADER_DIAGNOSTICS_FULL
     loader_diagnostic_update_memory(diagnostic);
+#endif
 }
 
+#if TUMOFLIP_LOADER_DIAGNOSTICS_FULL
 static void loader_diagnostic_set_manifest(
     LoaderDiagnostic* diagnostic,
     const FlipperApplicationManifest* manifest) {
@@ -70,6 +75,7 @@ static void loader_diagnostic_set_manifest(
     diagnostic->firmware_api_minor = firmware_api_interface->api_version_minor;
     diagnostic->firmware_target = version_get_target(NULL);
 }
+#endif
 
 static LoaderDiagnosticCode loader_diagnostic_code_from_preload_status(
     FlipperApplicationPreloadStatus status) {
@@ -171,6 +177,7 @@ static void loader_show_gui_error(
     FuriString* error_message,
     const LoaderDiagnostic* diagnostic) {
     furi_check(name);
+#if TUMOFLIP_LOADER_DIAGNOSTICS_FULL
     if(diagnostic && diagnostic->code != LoaderDiagnosticCodeNone &&
        diagnostic->code != LoaderDiagnosticCodeSuccess) {
         char diagnostic_text[256];
@@ -178,6 +185,12 @@ static void loader_show_gui_error(
             FURI_LOG_E(TAG, "GUI launch diagnostic: %s", diagnostic_text);
         }
     }
+#else
+    /* GUI errors are already rendered as a bounded dialog.  The compact
+     * profile keeps structured diagnostics for CLI/RPC callers, but avoids
+     * formatting a second payload and its stack buffer on this hot path. */
+    UNUSED(diagnostic);
+#endif
     DialogsApp* dialogs = furi_record_open(RECORD_DIALOGS);
     DialogMessage* message = dialog_message_alloc();
 
@@ -299,10 +312,15 @@ LoaderStatus loader_start_with_gui_error(Loader* loader, const char* name, const
     furi_check(name);
 
     FuriString* error_message = furi_string_alloc();
+#if TUMOFLIP_LOADER_DIAGNOSTICS_FULL
     LoaderDiagnostic diagnostic;
+    LoaderDiagnostic* diagnostic_ptr = &diagnostic;
+#else
+    LoaderDiagnostic* diagnostic_ptr = NULL;
+#endif
     LoaderMessageLoaderStatusResult result =
-        loader_start_internal(loader, name, args, error_message, &diagnostic);
-    loader_show_gui_error(result, name, error_message, &diagnostic);
+        loader_start_internal(loader, name, args, error_message, diagnostic_ptr);
+    loader_show_gui_error(result, name, error_message, diagnostic_ptr);
     furi_string_free(error_message);
     return result.value;
 }
@@ -311,8 +329,12 @@ void loader_start_detached_with_gui_error(Loader* loader, const char* name, cons
     furi_check(loader);
     furi_check(name);
 
+#if TUMOFLIP_LOADER_DIAGNOSTICS_FULL
     LoaderDiagnostic* diagnostic = malloc(sizeof(LoaderDiagnostic));
     loader_diagnostic_reset(diagnostic, name);
+#else
+    LoaderDiagnostic* diagnostic = NULL;
+#endif
     LoaderMessage message = {
         .type = LoaderMessageTypeStartByNameDetachedWithGuiError,
         .start.name = strdup(name),
@@ -633,10 +655,16 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
 
     do {
         loader->app.fap = flipper_application_alloc(storage, firmware_api_interface);
+#if TUMOFLIP_LOADER_DIAGNOSTICS_FULL
         if(diagnostic) {
             strlcpy(diagnostic->app_id, path, sizeof(diagnostic->app_id));
             loader_diagnostic_update_memory(diagnostic);
         }
+#else
+        /* Public callers reset the diagnostic with the requested app name;
+         * copying the resolved SD path is redundant in the compact profile. */
+        UNUSED(diagnostic);
+#endif
         size_t start = furi_get_tick();
 
         FURI_LOG_I(TAG, "Loading %s", path);
@@ -652,8 +680,10 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
                 if((preload_res == FlipperApplicationPreloadStatusApiTooOld) ||
                    (preload_res == FlipperApplicationPreloadStatusApiTooNew) ||
                    (preload_res == FlipperApplicationPreloadStatusTargetMismatch)) {
+#if TUMOFLIP_LOADER_DIAGNOSTICS_FULL
                     loader_diagnostic_set_manifest(
                         diagnostic, flipper_application_get_manifest(loader->app.fap));
+#endif
                     diagnostic->action =
                         (preload_res == FlipperApplicationPreloadStatusTargetMismatch) ?
                             LoaderDiagnosticActionUpdateApp :
@@ -953,16 +983,21 @@ static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord
         const char* app_args = record->args;
         FURI_LOG_I(TAG, "Deferred launch: %s", app_name_str);
 
-        LoaderDiagnostic diagnostic;
+#if TUMOFLIP_LOADER_DIAGNOSTICS_FULL
+        LoaderDiagnostic diagnostic_storage;
+        LoaderDiagnostic* diagnostic = &diagnostic_storage;
+#else
+        LoaderDiagnostic* diagnostic = NULL;
+#endif
         LoaderMessageLoaderStatusResult result =
-            loader_do_start_by_name(loader, app_name_str, app_args, error_message, &diagnostic);
+            loader_do_start_by_name(loader, app_name_str, app_args, error_message, diagnostic);
         if(result.value == LoaderStatusOk) {
             is_successful = true;
             break;
         }
 
         if(record->flags & LoaderDeferredLaunchFlagGui)
-            loader_show_gui_error(result, app_name_str, error_message, &diagnostic);
+            loader_show_gui_error(result, app_name_str, error_message, diagnostic);
 
         loader_do_next_deferred_launch_if_available(loader);
     } while(false);

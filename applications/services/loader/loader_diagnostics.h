@@ -8,6 +8,17 @@
 extern "C" {
 #endif
 
+#ifndef TUMOFLIP_ROADMAP_FULL
+#define TUMOFLIP_ROADMAP_FULL 0
+#endif
+
+/*
+ * The compact release profile keeps the public diagnostic contract but omits
+ * optional manifest and heap-detail collection.  Engineering builds can opt
+ * into the complete payload with --extra-define=TUMOFLIP_ROADMAP_FULL=1.
+ */
+#define TUMOFLIP_LOADER_DIAGNOSTICS_FULL TUMOFLIP_ROADMAP_FULL
+
 /** Version of the machine-readable loader diagnostic contract. */
 #define LOADER_DIAGNOSTIC_SCHEMA_VERSION 1U
 #define LOADER_DIAGNOSTIC_APP_ID_MAX      48U

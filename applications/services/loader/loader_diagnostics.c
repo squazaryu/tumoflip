@@ -12,6 +12,10 @@ void loader_diagnostic_reset(LoaderDiagnostic* diagnostic, const char* app_id) {
 }
 
 const char* loader_diagnostic_code_to_string(LoaderDiagnosticCode code) {
+#if !TUMOFLIP_LOADER_DIAGNOSTICS_FULL
+    (void)code;
+    return "compact";
+#else
     switch(code) {
     case LoaderDiagnosticCodeSuccess:
         return "success";
@@ -45,9 +49,14 @@ const char* loader_diagnostic_code_to_string(LoaderDiagnosticCode code) {
     default:
         return "none";
     }
+#endif
 }
 
 const char* loader_diagnostic_action_to_string(LoaderDiagnosticAction action) {
+#if !TUMOFLIP_LOADER_DIAGNOSTICS_FULL
+    (void)action;
+    return "compact";
+#else
     switch(action) {
     case LoaderDiagnosticActionLaunch:
         return "launch";
@@ -69,6 +78,7 @@ const char* loader_diagnostic_action_to_string(LoaderDiagnosticAction action) {
     default:
         return "none";
     }
+#endif
 }
 
 bool loader_diagnostic_format(
@@ -77,6 +87,7 @@ bool loader_diagnostic_format(
     size_t output_size) {
     if(!diagnostic || !output || output_size == 0U) return false;
 
+#if TUMOFLIP_LOADER_DIAGNOSTICS_FULL
     const int written = snprintf(
         output,
         output_size,
@@ -94,6 +105,18 @@ bool loader_diagnostic_format(
         diagnostic->firmware_target,
         (unsigned long)diagnostic->free_heap,
         (unsigned long)diagnostic->max_free_block);
+#else
+    /* Keep the error code/action usable by CLI, RPC and companion apps while
+     * omitting optional heap/manifest fields from the compact image. */
+    const int written = snprintf(
+        output,
+        output_size,
+        "schema=%u;code=%u;action=%u;app=%s",
+        diagnostic->schema_version,
+        diagnostic->code,
+        diagnostic->action,
+        diagnostic->app_id[0] ? diagnostic->app_id : "none");
+#endif
 
     return written >= 0 && (size_t)written < output_size;
 }

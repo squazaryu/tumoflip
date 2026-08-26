@@ -259,7 +259,6 @@ RUNTIME_REQUIRED_CAPABILITIES = {
     "fab=2",
     "session=3",
     "status=2",
-    "trace=1",
     "twin=1",
     "pkg=1",
     "radio=2",
@@ -274,6 +273,10 @@ RUNTIME_REQUIRED_FEATURES = {
     "twin",
     "fabric",
 }
+RUNTIME_COMPACT_CAPABILITIES = RUNTIME_REQUIRED_CAPABILITIES | {"trace=0"}
+RUNTIME_COMPACT_FEATURES = RUNTIME_REQUIRED_FEATURES - {"trace"}
+RUNTIME_FULL_CAPABILITIES = RUNTIME_REQUIRED_CAPABILITIES | {"trace=1"}
+RUNTIME_FULL_FEATURES = RUNTIME_REQUIRED_FEATURES
 RUNTIME_REQUIRED_STATUS_FIELDS = (
     "schema=2",
     "fw=%.8s",
@@ -622,52 +625,93 @@ def require_file(path: Path, label: str) -> Path:
     return path
 
 
-def runtime_capabilities(repo_root: Path) -> str:
+def runtime_capabilities(repo_root: Path, full_profile: bool = False) -> str:
+    """Extract the capabilities for one compile-time runtime profile.
+
+    The source deliberately declares both compact and engineering payloads in
+    separate preprocessor branches.  Release validation must inspect the
+    compact branch by default, while CI can also validate the full branch.
+    """
     runtime = require_file(
         repo_root / "applications/services/tumoflip_runtime/tumoflip_runtime.c",
         "Tumoflip Runtime source",
     ).read_text(encoding="utf-8")
     lines = runtime.splitlines()
-    for index, line in enumerate(lines):
-        if not line.startswith("#define TUMOFLIP_RUNTIME_CAPABILITIES"):
-            continue
+    define_indexes = [
+        index
+        for index, line in enumerate(lines)
+        if line.startswith("#define TUMOFLIP_RUNTIME_CAPABILITIES")
+    ]
+    if not define_indexes:
+        raise ValidationError("Tumoflip Runtime capabilities macro is missing")
 
-        parts = []
-        for value_line in lines[index + 1 :]:
-            strings = re.findall(r'"([^"]*)"', value_line)
-            if not strings:
-                break
-            parts.extend(strings)
-            if not value_line.rstrip().endswith("\\"):
-                break
-        if not parts:
-            raise ValidationError("Tumoflip Runtime capabilities payload is empty")
-        return "".join(parts)
+    index = define_indexes[0]
+    trace_branch = next(
+        (
+            branch_index
+            for branch_index, line in enumerate(lines[:index])
+            if line.strip() == "#if TUMOFLIP_RUNTIME_TRACE"
+        ),
+        None,
+    )
+    if trace_branch is not None and len(define_indexes) >= 2:
+        index = define_indexes[0] if full_profile else define_indexes[1]
 
-    raise ValidationError("Tumoflip Runtime capabilities macro is missing")
+    parts = []
+    for value_line in lines[index + 1 :]:
+        strings = re.findall(r'"([^"]*)"', value_line)
+        if not strings:
+            break
+        parts.extend(strings)
+        if not value_line.rstrip().endswith("\\"):
+            break
+    if not parts:
+        raise ValidationError("Tumoflip Runtime capabilities payload is empty")
+    return "".join(parts)
 
 
-def validate_runtime_contract(repo_root: Path) -> None:
-    capabilities = runtime_capabilities(repo_root)
+def _validate_runtime_capabilities_profile(
+    capabilities: str,
+    required_capabilities: set[str],
+    required_features: set[str],
+    profile_name: str,
+) -> None:
     capability_bytes = len(capabilities.encode("ascii"))
     if capability_bytes > RUNTIME_CAPABILITIES_MAX_BYTES:
         raise ValidationError(
-            "Tumoflip Runtime capabilities payload is too large: "
+            f"Tumoflip Runtime {profile_name} capabilities payload is too large: "
             f"{capability_bytes} > {RUNTIME_CAPABILITIES_MAX_BYTES} bytes"
         )
 
     capability_fields = set(capabilities.split(";"))
-    missing = sorted(RUNTIME_REQUIRED_CAPABILITIES - capability_fields)
+    missing = sorted(required_capabilities - capability_fields)
     if missing:
-        raise ValidationError(f"Tumoflip Runtime capabilities missing: {missing}")
+        raise ValidationError(
+            f"Tumoflip Runtime {profile_name} capabilities missing: {missing}"
+        )
 
     feature_field = next((field for field in capability_fields if field.startswith("feat=")), "")
     features = set(feature_field.removeprefix("feat=").split(","))
-    missing_features = sorted(RUNTIME_REQUIRED_FEATURES - features)
+    missing_features = sorted(required_features - features)
     if missing_features:
         raise ValidationError(
-            f"Tumoflip Runtime capabilities features missing: {missing_features}"
+            f"Tumoflip Runtime {profile_name} capabilities features missing: {missing_features}"
         )
+
+
+def validate_runtime_contract(repo_root: Path) -> None:
+    _validate_runtime_capabilities_profile(
+        runtime_capabilities(repo_root),
+        RUNTIME_COMPACT_CAPABILITIES,
+        RUNTIME_COMPACT_FEATURES,
+        "compact",
+    )
+    _validate_runtime_capabilities_profile(
+        runtime_capabilities(repo_root, full_profile=True),
+        RUNTIME_FULL_CAPABILITIES,
+        RUNTIME_FULL_FEATURES,
+        "full",
+    )
 
     runtime = (
         repo_root / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
@@ -683,7 +727,6 @@ def validate_runtime_contract(repo_root: Path) -> None:
             raise ValidationError(f"Tumoflip Runtime twin field is missing: {required}")
     if "storage_sd_status(runtime->storage)" not in runtime:
         raise ValidationError("Tumoflip Runtime status must expose SD readiness")
-
 
 def install_static_sd_resources(repo_root: Path, resources: Path) -> None:
     source_root = repo_root / STATIC_SD_RESOURCES

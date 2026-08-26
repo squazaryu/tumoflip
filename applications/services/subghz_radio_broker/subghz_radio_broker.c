@@ -333,6 +333,14 @@ bool subghz_radio_broker_get_protocol_capability(
     memset(capability, 0, sizeof(*capability));
     capability->schema_version = 1U;
     capability->device = device;
+#if !TUMOFLIP_RADIO_BROKER_EXTENDED_METADATA
+    /* Protocol capability enumeration is a diagnostic surface.  Keep the
+     * ABI entry stable, but do not carry its string registry in the compact
+     * release image; radio acquisition, RX/TX policy and session tracking are
+     * unchanged. */
+    strlcpy(capability->reason, "compact", sizeof(capability->reason));
+    return false;
+#else
     strlcpy(capability->protocol, protocol, sizeof(capability->protocol));
 
     SubGhzRadioBrokerCapability device_capability;
@@ -380,6 +388,7 @@ bool subghz_radio_broker_get_protocol_capability(
     }
     capability->reason[0] = '\0';
     return true;
+#endif
 }
 
 SubGhzRadioBrokerPolicyResult subghz_radio_broker_validate_tx(
@@ -610,6 +619,11 @@ size_t subghz_radio_broker_session_history(
     furi_check(records || record_capacity == 0U);
     if(record_capacity == 0U) return 0U;
 
+#if !TUMOFLIP_RADIO_BROKER_EXTENDED_METADATA
+    UNUSED(records);
+    UNUSED(record_capacity);
+    return 0U;
+#else
     furi_check(furi_mutex_acquire(broker->state_mutex, FuriWaitForever) == FuriStatusOk);
     const size_t count =
         broker->session_history_count < record_capacity ? broker->session_history_count :
@@ -626,6 +640,7 @@ size_t subghz_radio_broker_session_history(
     }
     furi_mutex_release(broker->state_mutex);
     return count;
+#endif
 }
 
 int32_t subghz_radio_broker_srv(void* context) {

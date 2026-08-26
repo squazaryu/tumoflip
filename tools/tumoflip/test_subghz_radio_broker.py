@@ -126,6 +126,21 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
         for required in ("`radio_protocols`", "diagnostics_export", "rp=1"):
             self.assertIn(required, bridge_docs)
 
+    def test_compact_profile_keeps_radio_control_and_drops_history_export(self) -> None:
+        header = (
+            REPO_ROOT
+            / "applications/services/subghz_radio_broker/subghz_radio_broker.h"
+        ).read_text(encoding="utf-8")
+        broker = (
+            REPO_ROOT
+            / "applications/services/subghz_radio_broker/subghz_radio_broker.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("TUMOFLIP_RADIO_BROKER_EXTENDED_METADATA", header)
+        self.assertIn("#define SUBGHZ_RADIO_BROKER_SESSION_HISTORY_DEPTH    1U", header)
+        self.assertIn("return false;", broker)
+        self.assertIn("return 0U;", broker)
+
     def test_direct_radio_control_paths_are_brokered_or_allowlisted(self) -> None:
         direct_control = re.compile(
             r"furi_hal_power_(?:enable|disable)_otg\(|"

@@ -7,6 +7,12 @@
 extern "C" {
 #endif
 
+#ifndef TUMOFLIP_ROADMAP_FULL
+#define TUMOFLIP_ROADMAP_FULL 0
+#endif
+
+#define TUMOFLIP_RADIO_BROKER_EXTENDED_METADATA TUMOFLIP_ROADMAP_FULL
+
 #define RECORD_SUBGHZ_RADIO_BROKER    "subghz_radio_broker"
 #define SUBGHZ_RADIO_BROKER_OWNER_MAX 31U
 
@@ -76,7 +82,13 @@ typedef enum {
  * Bounded metadata for one receive/transmit operation. Payloads and decoded
  * samples are deliberately excluded so this is safe to expose diagnostically.
  */
+#if TUMOFLIP_RADIO_BROKER_EXTENDED_METADATA
 #define SUBGHZ_RADIO_BROKER_SESSION_HISTORY_DEPTH    8U
+#else
+/* The release profile retains the active session, while the optional history
+ * export is reserved for engineering builds. */
+#define SUBGHZ_RADIO_BROKER_SESSION_HISTORY_DEPTH    1U
+#endif
 #define SUBGHZ_RADIO_BROKER_SESSION_SOURCE_MAX      15U
 #define SUBGHZ_RADIO_BROKER_SESSION_PROTOCOL_MAX    23U
 #define SUBGHZ_RADIO_BROKER_SESSION_MODULATION_MAX  15U

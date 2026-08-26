@@ -96,6 +96,18 @@ class LoaderFapLaunchTest(unittest.TestCase):
         self.assertIn("loader_start_with_diagnostic(", cli)
         self.assertIn('printf("DIAG %s\\r\\n", diagnostic_text)', cli)
 
+    def test_compact_profile_keeps_diagnostics_abi_without_heap_snapshot(self) -> None:
+        diagnostics = (
+            REPO_ROOT / "applications/services/loader/loader_diagnostics.c"
+        ).read_text(encoding="utf-8")
+        diagnostics_header = (
+            REPO_ROOT / "applications/services/loader/loader_diagnostics.h"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("TUMOFLIP_LOADER_DIAGNOSTICS_FULL", diagnostics_header)
+        self.assertIn('"schema=%u;code=%u;action=%u;app=%s"', diagnostics)
+        self.assertIn("optional manifest and heap-detail collection", diagnostics_header)
+
     def test_rpc_and_gui_launch_paths_use_the_same_diagnostic_contract(self) -> None:
         self.assertIn("loader_start_with_diagnostic(", self.rpc_app)
         self.assertIn("loader_diagnostic_format(", self.rpc_app)

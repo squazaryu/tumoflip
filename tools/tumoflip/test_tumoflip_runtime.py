@@ -47,6 +47,9 @@ class TumoflipRuntimeTest(unittest.TestCase):
             },
         )
         self.assertIn("diag=1;rc=1;rs=2;rp=1;", runtime)
+        self.assertIn("trace=0;", runtime)
+        self.assertIn("trace=1;", runtime)
+        self.assertIn('"feat=pkg,radio,twin,transfer,fabric;"', runtime)
         self.assertIn("feat=pkg,radio,trace,twin,transfer,fabric", runtime)
 
     def test_runtime_status_schema_is_documented_and_bounded(self) -> None:
@@ -66,10 +69,12 @@ class TumoflipRuntimeTest(unittest.TestCase):
             self.assertRegex(runtime, rf"#define\s+{macro}\s+160U")
         self.assertRegex(runtime, r"#define\s+TUMOFLIP_RUNTIME_TRACE_DEPTH\s+8U")
         self.assertIn("session=3", runtime)
+        self.assertIn("trace=0;", runtime)
         self.assertIn("trace=1", runtime)
         self.assertIn("twin=1", runtime)
         self.assertIn("diag=1;rc=1;rs=2;rp=1;", runtime)
         self.assertIn("feat=pkg,radio,trace,twin,transfer,fabric", runtime)
+        self.assertIn('"feat=pkg,radio,twin,transfer,fabric;"', runtime)
         self.assertNotIn('"radio_status"', runtime)
         self.assertNotIn("tumoflip_runtime_radio_state_name", runtime)
         self.assertIn('strcmp(command, "status") == 0', runtime)
@@ -160,6 +165,17 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "fabric",
         ):
             self.assertIn(required, capabilities)
+
+    def test_compact_profile_disables_only_optional_trace(self) -> None:
+        runtime = (
+            REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("#define TUMOFLIP_RUNTIME_TRACE TUMOFLIP_ROADMAP_FULL", runtime)
+        self.assertIn("schema=1;depth=0;count=0;drop=0", runtime)
+        self.assertIn("trace=0;", runtime)
+        self.assertIn("fabric=1;diag=0;rc=0;rs=0;rp=0;", runtime)
+        self.assertIn('"feat=pkg,radio,twin,transfer,fabric;"', runtime)
 
     def test_runtime_device_twin_payload_is_live_and_bounded(self) -> None:
         runtime = (
