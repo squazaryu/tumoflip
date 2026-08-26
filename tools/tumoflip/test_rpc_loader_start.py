@@ -43,7 +43,12 @@ class RpcLoaderStartTests(unittest.TestCase):
         self.assertEqual(len(statuses), 6)
         for status in statuses:
             self.assertIn(status, body)
-        self.assertIn("switch(loader_start(loader, app_name, app_args, NULL))", body)
+        self.assertIn(
+            "switch(loader_start_with_diagnostic(loader, app_name, app_args, NULL, &diagnostic))",
+            body,
+        )
+        self.assertIn("rpc_system_app_set_error_code", body)
+        self.assertIn("rpc_system_app_set_error_text", body)
         self.assertIn("result = PB_CommandStatus_ERROR_APP_CANT_START", body)
         self.assertNotIn("furi_crash", body)
 

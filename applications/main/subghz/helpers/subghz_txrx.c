@@ -404,6 +404,14 @@ static void subghz_txrx_begin(SubGhzTxRx* instance, uint8_t* preset_data) {
     subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateInitialized);
 }
 
+static SubGhzRadioBrokerDevice subghz_txrx_broker_device(const SubGhzTxRx* instance) {
+    return instance->radio_device_type == SubGhzRadioDeviceTypeInternal ?
+               SubGhzRadioBrokerDeviceInternal :
+               (instance->radio_device_type == SubGhzRadioDeviceTypeAuto ?
+                    SubGhzRadioBrokerDeviceDual :
+                    SubGhzRadioBrokerDeviceExternalCC1101);
+}
+
 static uint32_t subghz_txrx_rx(SubGhzTxRx* instance, uint32_t frequency) {
     furi_assert(instance);
     furi_assert(
@@ -444,6 +452,21 @@ static uint32_t subghz_txrx_rx(SubGhzTxRx* instance, uint32_t frequency) {
             instance->diversity_worker);
         instance->diversity_rx_active = true;
     }
+    if(!subghz_radio_broker_session_open(
+           instance->radio_broker,
+           &instance->radio_lease,
+           subghz_txrx_broker_device(instance),
+           "standard")) {
+        FURI_LOG_W(TAG, "Unable to record Standard Sub-GHz RX session");
+    } else {
+        subghz_radio_broker_session_observe(
+            instance->radio_broker,
+            &instance->radio_lease,
+            frequency,
+            NULL,
+            furi_string_get_cstr(instance->preset->name),
+            0);
+    }
     subghz_worker_start(instance->worker);
     if(instance->diversity_rx_active) subghz_worker_start(instance->diversity_worker);
     instance->txrx_state = SubGhzTxRxStateRx;
@@ -482,6 +505,7 @@ static void subghz_txrx_rx_end(SubGhzTxRx* instance) {
         instance->diversity_rx_active = false;
     }
     subghz_txrx_speaker_off(instance);
+    subghz_radio_broker_session_close(instance->radio_broker, &instance->radio_lease);
     instance->txrx_state = SubGhzTxRxStateIDLE;
     subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateInitialized);
 }
@@ -500,6 +524,14 @@ static bool subghz_txrx_tx(SubGhzTxRx* instance, uint32_t frequency) {
     furi_assert(instance);
     furi_assert(instance->txrx_state != SubGhzTxRxStateSleep);
 
+    const SubGhzRadioBrokerDevice broker_device = subghz_txrx_broker_device(instance);
+    const SubGhzRadioBrokerPolicyResult policy = subghz_radio_broker_validate_tx(
+        instance->radio_broker, &instance->radio_lease, broker_device, frequency, true);
+    if(policy != SubGhzRadioBrokerPolicyOk) {
+        FURI_LOG_W(TAG, "TX blocked by radio policy: %s", subghz_radio_broker_policy_result_to_string(policy));
+        return false;
+    }
+
     subghz_devices_idle(instance->radio_device);
     if(instance->radio_device_type == SubGhzRadioDeviceTypeAuto &&
        instance->diversity_radio_device) {
@@ -509,6 +541,18 @@ static bool subghz_txrx_tx(SubGhzTxRx* instance, uint32_t frequency) {
 
     bool ret = subghz_devices_set_tx(instance->radio_device);
     if(ret) {
+        if(!subghz_radio_broker_session_open(
+               instance->radio_broker, &instance->radio_lease, broker_device, "standard")) {
+            FURI_LOG_W(TAG, "Unable to record Standard Sub-GHz TX session");
+        } else {
+            subghz_radio_broker_session_observe(
+                instance->radio_broker,
+                &instance->radio_lease,
+                frequency,
+                NULL,
+                furi_string_get_cstr(instance->preset->name),
+                0);
+        }
         subghz_txrx_speaker_on(instance);
         instance->txrx_state = SubGhzTxRxStateTx;
         subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateTx);
@@ -664,6 +708,7 @@ static void subghz_txrx_tx_stop(SubGhzTxRx* instance) {
     subghz_devices_stop_async_tx(instance->radio_device);
     subghz_transmitter_stop(instance->transmitter);
     subghz_transmitter_free(instance->transmitter);
+    subghz_radio_broker_session_close(instance->radio_broker, &instance->radio_lease);
 
     // Persist a dynamic counter only when TX used the format bound to file_path.
     if(instance->tx_from_internal_fff &&
@@ -1147,6 +1192,21 @@ bool subghz_txrx_analyzer_begin(SubGhzTxRx* instance, size_t preset_index, uint3
     subghz_devices_set_frequency(instance->radio_device, frequency);
     subghz_devices_flush_rx(instance->radio_device);
     subghz_devices_set_rx(instance->radio_device);
+    if(!subghz_radio_broker_session_open(
+           instance->radio_broker,
+           &instance->radio_lease,
+           subghz_txrx_broker_device(instance),
+           "analyzer")) {
+        FURI_LOG_W(TAG, "Unable to record analyzer RX session");
+    } else {
+        subghz_radio_broker_session_observe(
+            instance->radio_broker,
+            &instance->radio_lease,
+            frequency,
+            "binraw",
+            furi_string_get_cstr(instance->preset->name),
+            0);
+    }
     instance->txrx_state = SubGhzTxRxStateRx;
     subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateRx);
     return true;
@@ -1157,27 +1217,20 @@ void subghz_txrx_analyzer_end(SubGhzTxRx* instance) {
 
     if(instance->txrx_state == SubGhzTxRxStateRx) {
         subghz_devices_idle(instance->radio_device);
+        subghz_radio_broker_session_close(instance->radio_broker, &instance->radio_lease);
         instance->txrx_state = SubGhzTxRxStateIDLE;
         subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateInitialized);
     }
 }
 
 bool subghz_txrx_radio_device_is_tx_allowed(SubGhzTxRx* instance, uint32_t frequency) {
-    // TODO: Remake this function to check if the frequency is allowed on specific module - for modules not based on CC1101
     furi_assert(instance);
-    UNUSED(frequency);
-    /*
-    furi_assert(instance->txrx_state != SubGhzTxRxStateSleep);
-
-    subghz_devices_idle(instance->radio_device);
-    subghz_devices_set_frequency(instance->radio_device, frequency);
-
-    bool ret = subghz_devices_set_tx(instance->radio_device);
-    subghz_devices_idle(instance->radio_device);
-
-    return ret;
-    */
-    return true;
+    return subghz_radio_broker_validate_tx(
+               instance->radio_broker,
+               &instance->radio_lease,
+               subghz_txrx_broker_device(instance),
+               frequency,
+               true) == SubGhzRadioBrokerPolicyOk;
 }
 
 void subghz_txrx_set_debug_pin_state(SubGhzTxRx* instance, bool state) {

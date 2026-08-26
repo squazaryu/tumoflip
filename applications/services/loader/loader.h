@@ -1,5 +1,6 @@
 #pragma once
 #include <furi.h>
+#include "loader_diagnostics.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,6 +46,19 @@ typedef enum {
  */
 LoaderStatus
     loader_start(Loader* instance, const char* name, const char* args, FuriString* error_message);
+
+/**
+ * @brief Start an application and return a bounded compatibility diagnostic.
+ *
+ * The diagnostic is filled before this synchronous call returns and contains
+ * no pointers owned by the loader, so callers may forward it over a transport.
+ */
+LoaderStatus loader_start_with_diagnostic(
+    Loader* instance,
+    const char* name,
+    const char* args,
+    FuriString* error_message,
+    LoaderDiagnostic* diagnostic);
 
 /**
  * @brief Start application with GUI error message

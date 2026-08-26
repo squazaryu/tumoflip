@@ -80,7 +80,18 @@ static void loader_cli_open(FuriString* args, Loader* loader) {
         const char* app_name_str = furi_string_get_cstr(app_name);
 
         FuriString* error_message = furi_string_alloc();
-        if(loader_start(loader, app_name_str, args_str, error_message) != LoaderStatusOk) {
+        LoaderDiagnostic diagnostic;
+        const LoaderStatus status = loader_start_with_diagnostic(
+            loader, app_name_str, args_str, error_message, &diagnostic);
+        char diagnostic_text[256];
+        if(!loader_diagnostic_format(&diagnostic, diagnostic_text, sizeof(diagnostic_text))) {
+            strlcpy(
+                diagnostic_text,
+                "schema=1;code=internal;action=inspect_logs",
+                sizeof(diagnostic_text));
+        }
+        printf("DIAG %s\r\n", diagnostic_text);
+        if(status != LoaderStatusOk) {
             printf("%s\r\n", furi_string_get_cstr(error_message));
         } else {
 #ifdef SRV_NOTIFICATION

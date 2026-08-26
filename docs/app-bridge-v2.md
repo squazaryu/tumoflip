@@ -39,9 +39,14 @@ The system app ID is `runtime`.
 - `capabilities` returns `runtime/capabilities` with a semicolon-separated
   `key=value` payload. Runtime v2 keeps backward-compatible keys
   `runtime=1`, `fab=2`, and `session=3`, and advertises `status=2`,
-  `trace=1`, `twin=1`, `pkg=1`, `radio=2`, `sd=1`, `fabric=1`, `time=1`, plus compact feature
-  flags in `feat`, currently `pkg`, `radio`, `trace`, `twin`, and
-  `transfer`, `fabric`, `time`, `gps`, and `net`.
+  `trace=1`, `twin=1`, `pkg=1`, `radio=2`, `sd=1`, and `diag=1`. The compact
+  aliases `rc=1`, `rs=2`, and `rp=1` advertise the read-only `radio_caps`,
+  `radio_sessions` plus `radio_sessions_export`, and `radio_protocols`
+  commands respectively. The legacy `time=1`, `gps=1`, and `net=1` keys are
+  retained for clients that probe those services directly. The `feat` value
+  retains the core feature tokens (`pkg`, `radio`, `trace`, `twin`, `transfer`,
+  and `fabric`) while the complete
+  capability payload remains within one FAB2 frame.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
   `sd`, `pkg`, `sid`, `bo`, `radio`, and `owner`. `sd=1` means the SD card is
@@ -74,6 +79,26 @@ The system app ID is `runtime`.
   heap block, `rf` Radio Broker state, `ro` radio owner, `sid` App Bridge
   session ID, and `bo` bridge owner. The payload is read-only and bounded to
   one FAB2 response frame.
+- `diagnostics` runs bounded, non-destructive checks and returns one status per
+  check: `identity`, `heap`, `storage`, `battery`, `radio`, `ble`, `display`,
+  `nfc`, `gpio`, and `input`. Display, NFC, GPIO, and input are explicitly marked `skip`
+  because they require an interactive or external fixture; this is not a
+  failure.
+- `radio_caps` returns the supported internal, external, and dual-radio
+  profiles with bounded RX/TX envelopes and the external-power requirement.
+- `radio_sessions` returns the last eight bounded Standard, ARF, and analyzer
+  sessions without payload data.
+- `radio_sessions_export` atomically replaces the deterministic CSV snapshot
+  at `/.tumoflip/radio-sessions.csv`; it is also available from the USB CLI as
+  `tumoflip radio_sessions_export`.
+- `radio_protocols` returns a bounded registry for protocol families shared by
+  Standard Sub-GHz and ARF. Each entry reports receive/transmit support,
+  modulation, and the permitted receive range; unknown protocol names are
+  rejected rather than treated as implicitly safe.
+- `journal` returns the last persisted crash/watchdog/reset classification;
+  the journal never contains application payloads or user data.
+- `diagnostics_export` runs the same checks as `diagnostics` and persists the
+  redacted report at `/.tumoflip/diagnostics-last.txt` using an atomic replace.
 - `transfer_begin`, `transfer_progress`, and `transfer_end` return matching
   `runtime/*` `ok` replies and drive the on-device BLE transfer activity
   indicator. Repeated progress pulses keep the indicator alive; `transfer_end`
@@ -84,8 +109,9 @@ The system app ID is `runtime`.
   plus the live `active` and `owner` discovery fields.
   `fabric_open`, `fabric_state`, `fabric_step`, and `fabric_cancel` implement
   the fixed `counter` package described below.
-- `time=1`, `gps=1`, and `net=1`, plus the matching feature tokens,
-  advertise the opt-in `device_services` Companion contract described below.
+- The legacy `time=1`, `gps=1`, and `net=1` capability keys advertise the
+  opt-in `device_services` Companion contract described below; they are kept
+  outside the compact `feat` list so the whole payload fits one FAB2 frame.
 - An unknown command returns `runtime/error`, sets response and error flags,
   and carries `badcmd`.
 - Chunked Runtime requests return `runtime/error` with `chunk`.
@@ -237,22 +263,54 @@ the RTC or configured time-zone offset is inconsistent.
 
 ### BLE GATT Lab diagnostics
 
-`BLE GATT Lab` is a development FAP for safe App Bridge request/response tests.
-It does not scan BLE devices and it does not install a custom GATT profile; it
-uses the existing authenticated App Bridge service.
+`BLE GATT Lab` is a development FAP for safe App Bridge request/response tests
+and opt-in BLE client diagnostics.  Passive scanning and GATT client actions
+are available only with the full STM32WB stack; on the normal light stack the
+commands fail closed and the existing App Bridge remains unchanged.  The FAP
+never sends raw HCI commands and all callbacks are bounded.
 
 | Field | Value |
 |---|---|
 | App ID | `ble_gatt_lab` |
-| Commands | `ping`, `status`, `echo` |
-| Responses | `pong`, `status`, `echo`, `error` |
+| Commands | `ping`, `status`, `echo`, `scan_start`, `scan_stop`, `connect`, `disconnect`, `services`, `characteristics`, `read`, `write`, `notify` |
+| Responses | `pong`, `status`, `echo`, `scan_start`, `scan_stop`, `connect`, `disconnect`, `services`, `characteristics`, `read`, `write`, `notify`, `scan_result`, `gatt_event`, `error` |
 | Flags | Responses set `0x02`; errors set `0x02 | 0x04` |
 | Payload limit | UTF-8 text, clipped to one FAB2 frame |
 | Local log | `/ext/apps_data/ble_gatt_lab/ble_gatt_lab_YYYYMMDD_HHMMSS.csv` |
 
+Binary command payloads are intentionally small and explicit: `scan_start` is
+an optional little-endian `uint32_t` duration (the default is 5 seconds and the
+HAL clamps it to 1...30 seconds); `connect` is one address-type byte followed
+by six address bytes; `characteristics` is two little-endian `uint16_t`
+handles; `read` is one little-endian handle; and `write` is a little-endian
+handle, a confirmation byte set to `1`, then 1...244 value bytes.  Writes are
+always acknowledged by the peer; unconfirmed or oversized writes are rejected.
+After a valid write or notification request the Flipper shows an on-device
+confirmation screen; only `OK` sends the operation to the peer and `Back`
+cancels it.  The request remains pending until one of those keys is pressed.
+`notify` is a little-endian CCCD handle, an enabled byte (`0` or `1`), and a
+confirmation byte set to `1`. Notification changes require an authenticated
+App Bridge request and explicit user confirmation; the FAP never subscribes to
+a descriptor implicitly.
+Scan results include a bounded address, RSSI, optional local name, and raw
+advertising bytes in the authenticated App Bridge response.  The local CSV
+log stores only counts, RSSI, lengths, and GATT metadata; peer addresses,
+advertising names, write values, and read/notification values are redacted.
+GATT events expose bounded handles, UUIDs, a short value preview, and status
+codes rather than raw HCI frames.
+
 The FAP also emits best-effort `ble_gatt_lab/event` frames when opened and when
 the user presses `OK`. These event frames use request IDs generated locally and
 do not request acknowledgements.
+
+### BLE Scanner
+
+`BLE Scanner` is a separate Module One FAP for an explicitly authorized,
+receive-only advertising scan. It keeps at most 16 deduplicated peers on the
+device, limits one scan to eight seconds, and exposes no GATT or raw-HCI
+operation. The FAP reports `UNAVAILABLE` on the light BLE stack; it does not
+silently fall back to a peripheral-mode operation. Use `BLE GATT Lab` when a
+selected peer must be connected to or inspected.
 
 ### App Bridge Terminal
 

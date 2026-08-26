@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include <furi_hal_version.h>
+#include <furi_hal_bt_client.h>
 
 #define GAP_MAC_ADDR_SIZE (6)
 #define GAP_KEY_SIZE      (0x10)
@@ -47,6 +48,9 @@ typedef enum {
     GapStateAdvFast,
     GapStateAdvLowPower,
     GapStateConnected,
+    GapStateStartingScan,
+    GapStateScanning,
+    GapStateConnecting,
 } GapState;
 
 typedef enum {

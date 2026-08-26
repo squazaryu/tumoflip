@@ -237,6 +237,7 @@ NfcApp* nfc_app_alloc(void) {
     instance->iso14443_3a_edit_data = iso14443_3a_alloc();
     instance->file_path = furi_string_alloc_set(NFC_APP_FOLDER);
     instance->file_name = furi_string_alloc();
+    instance->checkpoint_protocol = NfcProtocolInvalid;
 
     return instance;
 }
@@ -331,6 +332,115 @@ void nfc_app_free(NfcApp* instance) {
     furi_string_free(instance->file_name);
 
     free(instance);
+}
+
+const char* nfc_checkpoint_path_for_protocol(NfcProtocol protocol) {
+    switch(protocol) {
+    case NfcProtocolMfClassic:
+        return NFC_APP_MF_CLASSIC_CHECKPOINT_PATH;
+    case NfcProtocolMfPlus:
+        return NFC_APP_MF_PLUS_CHECKPOINT_PATH;
+    case NfcProtocolMfUltralight:
+        return NFC_APP_MF_ULTRALIGHT_CHECKPOINT_PATH;
+    case NfcProtocolType4Tag:
+        return NFC_APP_TYPE4_CHECKPOINT_PATH;
+    default:
+        return NULL;
+    }
+}
+
+bool nfc_checkpoint_exists(NfcApp* instance, NfcProtocol protocol) {
+    furi_assert(instance);
+    const char* path = nfc_checkpoint_path_for_protocol(protocol);
+    return path != NULL && storage_file_exists(instance->storage, path);
+}
+
+static FuriString* nfc_checkpoint_sibling_path(const char* path, const char* suffix) {
+    furi_assert(path);
+    furi_assert(suffix);
+    return furi_string_alloc_printf("%s%s", path, suffix);
+}
+
+bool nfc_checkpoint_save(
+    NfcApp* instance,
+    NfcProtocol protocol,
+    const NfcDeviceData* data) {
+    furi_assert(instance);
+    furi_assert(data);
+
+    const char* path = nfc_checkpoint_path_for_protocol(protocol);
+    if(path == NULL) return false;
+
+    storage_simply_mkdir(instance->storage, NFC_APP_FOLDER);
+    FuriString* temporary = nfc_checkpoint_sibling_path(path, ".tmp");
+    FuriString* backup = nfc_checkpoint_sibling_path(path, ".bak");
+    storage_simply_remove(instance->storage, furi_string_get_cstr(temporary));
+    storage_simply_remove(instance->storage, furi_string_get_cstr(backup));
+
+    NfcDevice* checkpoint = nfc_device_alloc();
+    nfc_device_set_data(checkpoint, protocol, data);
+    const bool saved = nfc_device_save(checkpoint, furi_string_get_cstr(temporary));
+    nfc_device_free(checkpoint);
+    if(!saved) {
+        storage_simply_remove(instance->storage, furi_string_get_cstr(temporary));
+        furi_string_free(backup);
+        furi_string_free(temporary);
+        return false;
+    }
+
+    const bool destination_exists = storage_file_exists(instance->storage, path);
+    bool backup_moved = false;
+    if(destination_exists) {
+        if(storage_common_rename(
+               instance->storage,
+               path,
+               furi_string_get_cstr(backup)) != FSE_OK) {
+            storage_simply_remove(instance->storage, furi_string_get_cstr(temporary));
+            furi_string_free(backup);
+            furi_string_free(temporary);
+            return false;
+        }
+        backup_moved = true;
+    }
+
+    const bool moved = storage_common_rename(
+                           instance->storage,
+                           furi_string_get_cstr(temporary),
+                           path) == FSE_OK;
+    if(!moved) {
+        storage_simply_remove(instance->storage, path);
+        if(backup_moved) {
+            storage_common_rename(
+                instance->storage,
+                furi_string_get_cstr(backup),
+                path);
+        }
+        storage_simply_remove(instance->storage, furi_string_get_cstr(temporary));
+        furi_string_free(backup);
+        furi_string_free(temporary);
+        return false;
+    }
+
+    storage_simply_remove(instance->storage, furi_string_get_cstr(backup));
+    furi_string_free(backup);
+    furi_string_free(temporary);
+    return true;
+}
+
+bool nfc_checkpoint_clear(NfcApp* instance, NfcProtocol protocol) {
+    furi_assert(instance);
+    const char* path = nfc_checkpoint_path_for_protocol(protocol);
+    if(path == NULL) return false;
+
+    FuriString* temporary = nfc_checkpoint_sibling_path(path, ".tmp");
+    FuriString* backup = nfc_checkpoint_sibling_path(path, ".bak");
+    const bool removed = storage_simply_remove(instance->storage, path);
+    storage_simply_remove(instance->storage, furi_string_get_cstr(temporary));
+    storage_simply_remove(instance->storage, furi_string_get_cstr(backup));
+    const bool clear = removed || !storage_file_exists(instance->storage, path);
+    furi_string_free(backup);
+    furi_string_free(temporary);
+    return clear;
 }
 
 void nfc_text_store_set(NfcApp* nfc, const char* text, ...) {
@@ -523,6 +633,20 @@ bool nfc_delete_file(NfcApp* instance, const FuriString* path) {
         removed_file &&
         storage_simply_remove(instance->storage, furi_string_get_cstr(sidecar_path));
     result = removed_sidecar && result;
+
+    for(uint8_t protocol = 0U; protocol < NfcProtocolNum; protocol++) {
+        const char* checkpoint = nfc_checkpoint_path_for_protocol((NfcProtocol)protocol);
+        if(checkpoint && storage_common_equivalent_path(
+                            instance->storage,
+                            furi_string_get_cstr(target),
+                            checkpoint)) {
+            result = nfc_checkpoint_clear(instance, (NfcProtocol)protocol) && result;
+            if(instance->checkpoint_protocol == (NfcProtocol)protocol) {
+                instance->checkpoint_recovered = false;
+                instance->checkpoint_protocol = NfcProtocolInvalid;
+            }
+        }
+    }
 
     furi_string_free(sidecar_path);
     furi_string_free(shadow_path);

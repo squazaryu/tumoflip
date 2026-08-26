@@ -2,6 +2,7 @@
 
 #include <storage/storage.h>
 #include <flipper_format/flipper_format.h>
+#include <string.h>
 
 #include "nfc_common.h"
 #include "protocols/nfc_device_defs.h"
@@ -16,6 +17,7 @@
 
 NfcDevice* nfc_device_alloc(void) {
     NfcDevice* instance = malloc(sizeof(NfcDevice));
+    memset(instance, 0, sizeof(NfcDevice));
     instance->protocol = NfcProtocolInvalid;
 
     return instance;
@@ -160,14 +162,23 @@ bool nfc_device_save(NfcDevice* instance, const char* path) {
     Storage* storage = furi_record_open(RECORD_STORAGE);
     FlipperFormat* ff = flipper_format_buffered_file_alloc(storage);
     FuriString* temp_str = furi_string_alloc();
+    FuriString* temporary_path = furi_string_alloc_printf("%s.tmp", path);
+    FuriString* backup_path = furi_string_alloc_printf("%s.bak", path);
+    bool file_opened = false;
 
     if(instance->loading_callback) {
         instance->loading_callback(instance->loading_callback_context, true);
     }
 
     do {
-        // Open file
-        if(!flipper_format_buffered_file_open_always(ff, path)) break;
+        /* Serialize into a sibling checkpoint first. The user's last valid
+         * dump is not touched until every field has been written and the
+         * buffered stream has been closed. */
+        storage_simply_remove(storage, furi_string_get_cstr(temporary_path));
+        if(!flipper_format_buffered_file_open_always(
+               ff, furi_string_get_cstr(temporary_path)))
+            break;
+        file_opened = true;
 
         // Write header
         if(!flipper_format_write_header_cstr(ff, NFC_FILE_HEADER, NFC_CURRENT_FORMAT_VERSION))
@@ -200,14 +211,60 @@ bool nfc_device_save(NfcDevice* instance, const char* path) {
         // Write protocol-dependent data
         if(!nfc_devices[instance->protocol]->save(instance->protocol_data, ff)) break;
 
-        saved = true;
+        saved = flipper_format_buffered_file_close(ff);
+        file_opened = false;
+        if(!saved) break;
+
+        /* Keep a recoverable backup while replacing the destination. The
+         * storage rename API is copy-and-remove on some media, so restore the
+         * backup if either leg fails. */
+        const bool destination_exists = storage_file_exists(storage, path);
+        bool backup_moved = false;
+        bool destination_moved = false;
+        storage_simply_remove(storage, furi_string_get_cstr(backup_path));
+        if(destination_exists) {
+            if(storage_common_rename(
+                   storage, path, furi_string_get_cstr(backup_path)) != FSE_OK) {
+                saved = false;
+                break;
+            }
+            backup_moved = true;
+        }
+
+        if(storage_common_rename(
+               storage, furi_string_get_cstr(temporary_path), path) != FSE_OK) {
+            saved = false;
+        } else {
+            destination_moved = true;
+        }
+
+        if(!saved) {
+            storage_simply_remove(storage, path);
+            if(destination_moved) {
+                storage_simply_remove(storage, furi_string_get_cstr(temporary_path));
+            }
+            if(backup_moved) {
+                storage_common_rename(storage, furi_string_get_cstr(backup_path), path);
+            }
+        } else {
+            storage_simply_remove(storage, furi_string_get_cstr(backup_path));
+        }
     } while(false);
+
+    if(file_opened) {
+        flipper_format_buffered_file_close(ff);
+        file_opened = false;
+    }
+
+    if(!saved) storage_simply_remove(storage, furi_string_get_cstr(temporary_path));
 
     if(instance->loading_callback) {
         instance->loading_callback(instance->loading_callback_context, false);
     }
 
     furi_string_free(temp_str);
+    furi_string_free(backup_path);
+    furi_string_free(temporary_path);
     flipper_format_free(ff);
     furi_record_close(RECORD_STORAGE);
 

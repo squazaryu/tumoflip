@@ -36,6 +36,25 @@ typedef enum {
     DictAttackStateSystemDictInProgress,
 } DictAttackState;
 
+static void mf_classic_scene_dict_attack_save_checkpoint(NfcApp* instance) {
+    if(!instance->poller || !instance->nfc_dict_context.poller_has_card_data ||
+       instance->nfc_dict_context.sectors_read == 0U ||
+       instance->nfc_dict_context.sectors_read <= instance->nfc_dict_context.checkpoint_sectors) {
+        return;
+    }
+
+    const NfcDeviceData* data = nfc_poller_get_data(instance->poller);
+    if(!data) return;
+
+    const bool saved = nfc_checkpoint_save(instance, NfcProtocolMfClassic, data);
+    if(saved) {
+        instance->nfc_dict_context.checkpoint_sectors =
+            instance->nfc_dict_context.sectors_read;
+    } else {
+        FURI_LOG_W(TAG, "Unable to persist MIFARE Classic recovery checkpoint");
+    }
+}
+
 static NfcCommand nfc_dict_attack_worker_callback(NfcGenericEvent event, void* context) {
     furi_assert(context);
     furi_assert(event.event_data);
@@ -148,6 +167,7 @@ static NfcCommand nfc_dict_attack_worker_callback(NfcGenericEvent event, void* c
         instance->nfc_dict_context.backdoor = data_update->backdoor;
         instance->nfc_dict_context.nested_target_key = data_update->nested_target_key;
         instance->nfc_dict_context.msb_count = data_update->msb_count;
+        mf_classic_scene_dict_attack_save_checkpoint(instance);
         view_dispatcher_send_custom_event(
             instance->view_dispatcher, NfcCustomEventDictAttackDataUpdate);
     } else if(mfc_event->type == MfClassicPollerEventTypeNextSector) {
@@ -171,6 +191,8 @@ static NfcCommand nfc_dict_attack_worker_callback(NfcGenericEvent event, void* c
             instance->nfc_dict_context.current_sector =
                 mfc_event->data->next_sector_data.current_sector;
         }
+
+        mf_classic_scene_dict_attack_save_checkpoint(instance);
 
         view_dispatcher_send_custom_event(
             instance->view_dispatcher, NfcCustomEventDictAttackDataUpdate);
@@ -368,6 +390,10 @@ static void mf_classic_scene_dict_attack_start_poller(NfcApp* instance) {
 }
 
 static void mf_classic_scene_dict_attack_on_enter(NfcApp* instance) {
+    /* A new attack starts a new recovery chain.  The snapshot from a previous
+     * run is intentionally not presented as if it belonged to this card. */
+    nfc_checkpoint_clear(instance, NfcProtocolMfClassic);
+    instance->nfc_dict_context.checkpoint_sectors = 0U;
     scene_manager_set_scene_state(
         instance->scene_manager, NfcSceneMfClassicDictAttack, DictAttackStateCUIDDictInProgress);
 
@@ -439,6 +465,7 @@ static bool mf_classic_scene_dict_attack_on_event(NfcApp* instance, SceneManager
                 consumed = true;
             } else {
                 mf_classic_scene_dict_attack_notify_read(instance);
+                nfc_checkpoint_clear(instance, NfcProtocolMfClassic);
                 scene_manager_next_scene(instance->scene_manager, NfcSceneReadSuccess);
                 dolphin_deed(DolphinDeedNfcReadSuccess);
                 consumed = true;
@@ -480,6 +507,7 @@ static bool mf_classic_scene_dict_attack_on_event(NfcApp* instance, SceneManager
                     mf_classic_scene_dict_attack_start_poller(instance);
                 } else {
                     mf_classic_scene_dict_attack_notify_read(instance);
+                    nfc_checkpoint_clear(instance, NfcProtocolMfClassic);
                     scene_manager_next_scene(instance->scene_manager, NfcSceneReadSuccess);
                     dolphin_deed(DolphinDeedNfcReadSuccess);
                 }
@@ -498,12 +526,14 @@ static bool mf_classic_scene_dict_attack_on_event(NfcApp* instance, SceneManager
                     mf_classic_scene_dict_attack_start_poller(instance);
                 } else {
                     mf_classic_scene_dict_attack_notify_read(instance);
+                    nfc_checkpoint_clear(instance, NfcProtocolMfClassic);
                     scene_manager_next_scene(instance->scene_manager, NfcSceneReadSuccess);
                     dolphin_deed(DolphinDeedNfcReadSuccess);
                 }
                 consumed = true;
             } else {
                 mf_classic_scene_dict_attack_notify_read(instance);
+                nfc_checkpoint_clear(instance, NfcProtocolMfClassic);
                 scene_manager_next_scene(instance->scene_manager, NfcSceneReadSuccess);
                 dolphin_deed(DolphinDeedNfcReadSuccess);
                 consumed = true;
@@ -552,6 +582,7 @@ static void mf_classic_scene_dict_attack_on_exit(NfcApp* instance) {
     instance->nfc_dict_context.msb_count = 0;
     instance->nfc_dict_context.enhanced_dict = false;
     instance->nfc_dict_context.current_key_idx = 0;
+    instance->nfc_dict_context.checkpoint_sectors = 0;
 
     // Clean up temporary files used for nested dictionary attack
     if(keys_dict_check_presence(NFC_APP_MF_CLASSIC_DICT_USER_NESTED_PATH)) {

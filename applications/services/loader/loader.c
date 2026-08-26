@@ -17,6 +17,13 @@
 
 // helpers
 
+static LoaderStatus loader_start_detailed(
+    Loader* loader,
+    const char* name,
+    const char* args,
+    FuriString* error_message,
+    LoaderDiagnostic* diagnostic);
+
 static const char* loader_find_external_application_by_name(const char* app_name) {
     for(size_t i = 0; i < FLIPPER_EXTERNAL_APPS_COUNT; i++) {
         if(strcmp(FLIPPER_EXTERNAL_APPS[i].name, app_name) == 0) {
@@ -33,13 +40,79 @@ static const char* loader_find_external_application_by_name(const char* app_name
     return NULL;
 }
 
+static void loader_diagnostic_update_memory(LoaderDiagnostic* diagnostic) {
+    if(!diagnostic) return;
+
+    diagnostic->free_heap = (uint32_t)memmgr_get_free_heap();
+    diagnostic->max_free_block = (uint32_t)memmgr_heap_get_max_free_block();
+}
+
+static void loader_diagnostic_set_code(
+    LoaderDiagnostic* diagnostic,
+    LoaderDiagnosticCode code,
+    LoaderDiagnosticAction action) {
+    if(!diagnostic) return;
+
+    diagnostic->code = code;
+    diagnostic->action = action;
+    loader_diagnostic_update_memory(diagnostic);
+}
+
+static void loader_diagnostic_set_manifest(
+    LoaderDiagnostic* diagnostic,
+    const FlipperApplicationManifest* manifest) {
+    if(!diagnostic || !manifest) return;
+
+    diagnostic->required_api_major = manifest->base.api_version.major;
+    diagnostic->required_api_minor = manifest->base.api_version.minor;
+    diagnostic->required_target = manifest->base.hardware_target_id;
+    diagnostic->firmware_api_major = firmware_api_interface->api_version_major;
+    diagnostic->firmware_api_minor = firmware_api_interface->api_version_minor;
+    diagnostic->firmware_target = version_get_target(NULL);
+}
+
+static LoaderDiagnosticCode loader_diagnostic_code_from_preload_status(
+    FlipperApplicationPreloadStatus status) {
+    switch(status) {
+    case FlipperApplicationPreloadStatusInvalidFile:
+        return LoaderDiagnosticCodeInvalidFile;
+    case FlipperApplicationPreloadStatusNotEnoughMemory:
+        return LoaderDiagnosticCodeInsufficientContiguousMemory;
+    case FlipperApplicationPreloadStatusInvalidManifest:
+        return LoaderDiagnosticCodeInvalidManifest;
+    case FlipperApplicationPreloadStatusApiTooOld:
+        return LoaderDiagnosticCodeApiTooOld;
+    case FlipperApplicationPreloadStatusApiTooNew:
+        return LoaderDiagnosticCodeApiTooNew;
+    case FlipperApplicationPreloadStatusTargetMismatch:
+        return LoaderDiagnosticCodeTargetMismatch;
+    case FlipperApplicationPreloadStatusSuccess:
+    default:
+        return LoaderDiagnosticCodeNone;
+    }
+}
+
+static LoaderDiagnosticCode loader_diagnostic_code_from_load_status(
+    FlipperApplicationLoadStatus status) {
+    switch(status) {
+    case FlipperApplicationLoadStatusMissingImports:
+        return LoaderDiagnosticCodeMissingImports;
+    case FlipperApplicationLoadStatusUnspecifiedError:
+        return LoaderDiagnosticCodeInternal;
+    case FlipperApplicationLoadStatusSuccess:
+    default:
+        return LoaderDiagnosticCodeNone;
+    }
+}
+
 // API
 
 static LoaderMessageLoaderStatusResult loader_start_internal(
     Loader* loader,
     const char* name,
     const char* args,
-    FuriString* error_message) {
+    FuriString* error_message,
+    LoaderDiagnostic* diagnostic) {
     LoaderMessage message;
     LoaderMessageLoaderStatusResult result;
 
@@ -47,6 +120,7 @@ static LoaderMessageLoaderStatusResult loader_start_internal(
     message.start.name = name;
     message.start.args = args;
     message.start.error_message = error_message;
+    message.start.diagnostic = diagnostic;
     message.api_lock = api_lock_alloc_locked();
     message.status_value = &result;
     furi_message_queue_put(loader->queue, &message, FuriWaitForever);
@@ -94,8 +168,16 @@ static void loader_dialog_prepare_and_show(DialogsApp* dialogs, const LoaderErro
 static void loader_show_gui_error(
     LoaderMessageLoaderStatusResult status,
     const char* name,
-    FuriString* error_message) {
+    FuriString* error_message,
+    const LoaderDiagnostic* diagnostic) {
     furi_check(name);
+    if(diagnostic && diagnostic->code != LoaderDiagnosticCodeNone &&
+       diagnostic->code != LoaderDiagnosticCodeSuccess) {
+        char diagnostic_text[256];
+        if(loader_diagnostic_format(diagnostic, diagnostic_text, sizeof(diagnostic_text))) {
+            FURI_LOG_E(TAG, "GUI launch diagnostic: %s", diagnostic_text);
+        }
+    }
     DialogsApp* dialogs = furi_record_open(RECORD_DIALOGS);
     DialogMessage* message = dialog_message_alloc();
 
@@ -185,11 +267,30 @@ static void loader_generic_synchronous_request(Loader* loader, LoaderMessage* me
 
 LoaderStatus
     loader_start(Loader* loader, const char* name, const char* args, FuriString* error_message) {
+    return loader_start_detailed(loader, name, args, error_message, NULL);
+}
+
+LoaderStatus loader_start_with_diagnostic(
+    Loader* loader,
+    const char* name,
+    const char* args,
+    FuriString* error_message,
+    LoaderDiagnostic* diagnostic) {
+    return loader_start_detailed(loader, name, args, error_message, diagnostic);
+}
+
+static LoaderStatus loader_start_detailed(
+    Loader* loader,
+    const char* name,
+    const char* args,
+    FuriString* error_message,
+    LoaderDiagnostic* diagnostic) {
     furi_check(loader);
     furi_check(name);
 
+    loader_diagnostic_reset(diagnostic, name);
     LoaderMessageLoaderStatusResult result =
-        loader_start_internal(loader, name, args, error_message);
+        loader_start_internal(loader, name, args, error_message, diagnostic);
     return result.value;
 }
 
@@ -198,9 +299,10 @@ LoaderStatus loader_start_with_gui_error(Loader* loader, const char* name, const
     furi_check(name);
 
     FuriString* error_message = furi_string_alloc();
+    LoaderDiagnostic diagnostic;
     LoaderMessageLoaderStatusResult result =
-        loader_start_internal(loader, name, args, error_message);
-    loader_show_gui_error(result, name, error_message);
+        loader_start_internal(loader, name, args, error_message, &diagnostic);
+    loader_show_gui_error(result, name, error_message, &diagnostic);
     furi_string_free(error_message);
     return result.value;
 }
@@ -209,10 +311,13 @@ void loader_start_detached_with_gui_error(Loader* loader, const char* name, cons
     furi_check(loader);
     furi_check(name);
 
+    LoaderDiagnostic* diagnostic = malloc(sizeof(LoaderDiagnostic));
+    loader_diagnostic_reset(diagnostic, name);
     LoaderMessage message = {
         .type = LoaderMessageTypeStartByNameDetachedWithGuiError,
         .start.name = strdup(name),
         .start.args = args ? strdup(args) : NULL,
+        .start.diagnostic = diagnostic,
     };
     furi_message_queue_put(loader->queue, &message, FuriWaitForever);
 }
@@ -520,13 +625,18 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
     const char* path,
     const char* args,
     FuriString* error_message,
-    bool ignore_api_mismatch) {
+    bool ignore_api_mismatch,
+    LoaderDiagnostic* diagnostic) {
     LoaderMessageLoaderStatusResult result;
     result.value = loader_make_success_status(error_message);
     result.error = LoaderStatusErrorUnknown;
 
     do {
         loader->app.fap = flipper_application_alloc(storage, firmware_api_interface);
+        if(diagnostic) {
+            strlcpy(diagnostic->app_id, path, sizeof(diagnostic->app_id));
+            loader_diagnostic_update_memory(diagnostic);
+        }
         size_t start = furi_get_tick();
 
         FURI_LOG_I(TAG, "Loading %s", path);
@@ -534,6 +644,26 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
         FlipperApplicationPreloadStatus preload_res =
             flipper_application_preload(loader->app.fap, path);
         if(preload_res != FlipperApplicationPreloadStatusSuccess) {
+            if(diagnostic) {
+                loader_diagnostic_set_code(
+                    diagnostic,
+                    loader_diagnostic_code_from_preload_status(preload_res),
+                    LoaderDiagnosticActionInspectLogs);
+                if((preload_res == FlipperApplicationPreloadStatusApiTooOld) ||
+                   (preload_res == FlipperApplicationPreloadStatusApiTooNew) ||
+                   (preload_res == FlipperApplicationPreloadStatusTargetMismatch)) {
+                    loader_diagnostic_set_manifest(
+                        diagnostic, flipper_application_get_manifest(loader->app.fap));
+                    diagnostic->action =
+                        (preload_res == FlipperApplicationPreloadStatusTargetMismatch) ?
+                            LoaderDiagnosticActionUpdateApp :
+                            ((preload_res == FlipperApplicationPreloadStatusApiTooNew) ?
+                                 LoaderDiagnosticActionUpdateFirmware :
+                                 LoaderDiagnosticActionUpdateApp);
+                } else if(preload_res == FlipperApplicationPreloadStatusNotEnoughMemory) {
+                    diagnostic->action = LoaderDiagnosticActionFreeMemory;
+                }
+            }
             if((preload_res == FlipperApplicationPreloadStatusApiTooOld) ||
                (preload_res == FlipperApplicationPreloadStatusApiTooNew)) {
                 if(!ignore_api_mismatch) {
@@ -586,6 +716,11 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
         FlipperApplicationLoadStatus load_status =
             flipper_application_map_to_memory(loader->app.fap);
         if(load_status != FlipperApplicationLoadStatusSuccess) {
+            loader_diagnostic_set_code(
+                diagnostic,
+                loader_diagnostic_code_from_load_status(load_status),
+                load_status == FlipperApplicationLoadStatusMissingImports ?
+                    LoaderDiagnosticActionUpdateFirmware : LoaderDiagnosticActionInspectLogs);
             const char* err_msg = flipper_application_load_status_to_string(load_status);
             result.value = loader_make_status_error(
                 LoaderStatusErrorInternal, error_message, "Load failed, %s: %s", path, err_msg);
@@ -596,6 +731,10 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
         FURI_LOG_I(TAG, "Loaded in %zums", (size_t)(furi_get_tick() - start));
 
         if(flipper_application_is_plugin(loader->app.fap)) {
+            loader_diagnostic_set_code(
+                diagnostic,
+                LoaderDiagnosticCodePluginNotRunnable,
+                LoaderDiagnosticActionLaunch);
             result.value = loader_make_status_error(
                 LoaderStatusErrorInternal, error_message, "Plugin %s is not runnable", path);
             break;
@@ -616,6 +755,7 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
         }
 
         loader_start_app_thread(loader, FlipperInternalApplicationFlagDefault);
+        loader_diagnostic_set_code(diagnostic, LoaderDiagnosticCodeSuccess, LoaderDiagnosticActionLaunch);
     } while(0);
 
     if(result.value != LoaderStatusOk) {
@@ -672,16 +812,24 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
     Loader* loader,
     const char* name,
     const char* args,
-    FuriString* error_message) {
+    FuriString* error_message,
+    LoaderDiagnostic* diagnostic) {
     LoaderMessageLoaderStatusResult status;
     status.value = loader_make_success_status(error_message);
     status.error = LoaderStatusErrorUnknown;
 
-    if(name == NULL) return status;
+    if(name == NULL) {
+        loader_diagnostic_set_code(diagnostic, LoaderDiagnosticCodeNotFound, LoaderDiagnosticActionInstallApp);
+        return status;
+    }
 
     do {
         // check lock
         if(loader_do_is_locked(loader)) {
+            loader_diagnostic_set_code(
+                diagnostic,
+                LoaderDiagnosticCodeBusy,
+                LoaderDiagnosticActionCloseRunningApp);
             if(loader->app.thread == (FuriThread*)LOADER_MAGIC_THREAD_VALUE) {
                 status.value = loader_make_status_error(
                     LoaderStatusErrorAppStarted, error_message, "Loader locked");
@@ -701,6 +849,7 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
         // check Applications
         if(strcmp(name, LOADER_APPLICATIONS_NAME) == 0) {
             loader_do_applications_show(loader, args);
+            loader_diagnostic_set_code(diagnostic, LoaderDiagnosticCodeSuccess, LoaderDiagnosticActionLaunch);
             status.value = loader_make_success_status(error_message);
             break;
         }
@@ -714,6 +863,7 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
             const FlipperInternalApplication* app = loader_find_application_by_name(name);
             if(app) {
                 loader_start_internal_app(loader, app, args);
+                loader_diagnostic_set_code(diagnostic, LoaderDiagnosticCodeSuccess, LoaderDiagnosticActionLaunch);
                 status.value = loader_make_success_status(error_message);
                 break;
             }
@@ -730,10 +880,11 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
             Storage* storage = furi_record_open(RECORD_STORAGE);
             if(storage_file_exists(storage, name)) {
                 status =
-                    loader_start_external_app(loader, storage, name, args, error_message, false);
+                    loader_start_external_app(
+                        loader, storage, name, args, error_message, false, diagnostic);
                 if(status.value == LoaderStatusErrorApiMismatch) {
                     status = loader_start_external_app(
-                        loader, storage, name, args, error_message, true);
+                        loader, storage, name, args, error_message, true, diagnostic);
                 }
                 furi_record_close(RECORD_STORAGE);
                 break;
@@ -743,6 +894,7 @@ static LoaderMessageLoaderStatusResult loader_do_start_by_name(
 
         status.value = loader_make_status_error(
             LoaderStatusErrorUnknownApp, error_message, "%s not found", name);
+        loader_diagnostic_set_code(diagnostic, LoaderDiagnosticCodeNotFound, LoaderDiagnosticActionInstallApp);
     } while(false);
 
     if(status.value == LoaderStatusOk) {
@@ -801,15 +953,16 @@ static bool loader_do_deferred_launch(Loader* loader, LoaderDeferredLaunchRecord
         const char* app_args = record->args;
         FURI_LOG_I(TAG, "Deferred launch: %s", app_name_str);
 
+        LoaderDiagnostic diagnostic;
         LoaderMessageLoaderStatusResult result =
-            loader_do_start_by_name(loader, app_name_str, app_args, error_message);
+            loader_do_start_by_name(loader, app_name_str, app_args, error_message, &diagnostic);
         if(result.value == LoaderStatusOk) {
             is_successful = true;
             break;
         }
 
         if(record->flags & LoaderDeferredLaunchFlagGui)
-            loader_show_gui_error(result, app_name_str, error_message);
+            loader_show_gui_error(result, app_name_str, error_message, &diagnostic);
 
         loader_do_next_deferred_launch_if_available(loader);
     } while(false);
@@ -900,7 +1053,7 @@ int32_t loader_srv(void* p) {
     if((furi_hal_rtc_get_boot_mode() == FuriHalRtcBootModeNormal) && FLIPPER_AUTORUN_APP_NAME &&
        strlen(FLIPPER_AUTORUN_APP_NAME)) {
         FURI_LOG_I(TAG, "Starting autorun app: %s", FLIPPER_AUTORUN_APP_NAME);
-        loader_do_start_by_name(loader, FLIPPER_AUTORUN_APP_NAME, NULL, NULL);
+        loader_do_start_by_name(loader, FLIPPER_AUTORUN_APP_NAME, NULL, NULL, NULL);
     }
 
     LoaderMessage message;
@@ -912,7 +1065,8 @@ int32_t loader_srv(void* p) {
                     loader,
                     message.start.name,
                     message.start.args,
-                    message.start.error_message); //-V595
+                    message.start.error_message,
+                    message.start.diagnostic); //-V595
                 *(message.status_value) = status;
                 if(status.value != LoaderStatusOk) loader_do_emit_queue_empty_event(loader);
                 api_lock_unlock(message.api_lock);
@@ -921,11 +1075,17 @@ int32_t loader_srv(void* p) {
             case LoaderMessageTypeStartByNameDetachedWithGuiError: {
                 FuriString* error_message = furi_string_alloc();
                 LoaderMessageLoaderStatusResult status = loader_do_start_by_name(
-                    loader, message.start.name, message.start.args, error_message); //-V595
-                loader_show_gui_error(status, message.start.name, error_message);
+                    loader,
+                    message.start.name,
+                    message.start.args,
+                    error_message,
+                    message.start.diagnostic); //-V595
+                loader_show_gui_error(
+                    status, message.start.name, error_message, message.start.diagnostic);
                 if(status.value != LoaderStatusOk) loader_do_emit_queue_empty_event(loader);
                 if(message.start.name) free((void*)message.start.name);
                 if(message.start.args) free((void*)message.start.args);
+                if(message.start.diagnostic) free(message.start.diagnostic);
                 furi_string_free(error_message);
                 break;
             }

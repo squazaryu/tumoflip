@@ -1,6 +1,6 @@
 App(
     appid="runtime_trace_viewer",
-    name="Runtime Trace",
+    name="Tumo Diagnostics",
     apptype=FlipperAppType.EXTERNAL,
     targets=["f7"],
     entry_point="runtime_trace_viewer_app",
@@ -13,5 +13,5 @@ App(
     fap_version="0.1.0",
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip",
-    fap_description="On-device viewer and SD exporter for the Tumoflip runtime trace ring.",
+    fap_description="On-device diagnostics, runtime trace viewer, and SD report exporter for Tumoflip.",
 )

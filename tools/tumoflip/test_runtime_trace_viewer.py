@@ -26,7 +26,7 @@ class RuntimeTraceViewerTest(unittest.TestCase):
 
     def test_app_is_module_one_diagnostics_fap(self) -> None:
         self.assertIn('appid="runtime_trace_viewer"', self.manifest)
-        self.assertIn('name="Runtime Trace"', self.manifest)
+        self.assertIn('name="Tumo Diagnostics"', self.manifest)
         self.assertIn('apptype=FlipperAppType.EXTERNAL', self.manifest)
         self.assertIn('requires=["gui", "storage"]', self.manifest)
         self.assertIn('fap_category="Module One/Diagnostics"', self.manifest)

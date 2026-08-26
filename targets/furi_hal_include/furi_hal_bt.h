@@ -12,6 +12,7 @@
 #include <furi_ble/profile_interface.h>
 #include <ble_glue.h>
 #include <ble_app.h>
+#include <furi_hal_bt_client.h>
 #include <stdint.h>
 
 #define FURI_HAL_BT_STACK_VERSION_MAJOR (1)

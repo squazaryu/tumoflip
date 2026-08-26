@@ -69,3 +69,5 @@
 !tumo_uart_console/**
 !esp_flasher/
 !esp_flasher/**
+!ble_scanner/
+!ble_scanner/**

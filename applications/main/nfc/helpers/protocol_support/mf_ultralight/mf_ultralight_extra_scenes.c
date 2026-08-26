@@ -11,6 +11,18 @@ enum {
     DictAttackStateSystemDictInProgress,
 };
 
+static void mf_ultralight_scene_dict_save_checkpoint(NfcApp* instance) {
+    const MfUltralightData* data = nfc_poller_get_data(instance->poller);
+    if(data && data->pages_read > 0U && data->pages_read < data->pages_total) {
+        if(!nfc_checkpoint_save(
+               instance,
+               NfcProtocolMfUltralight,
+               nfc_poller_get_data(instance->poller))) {
+            FURI_LOG_W("NfcMfUltralight", "Unable to persist MIFARE Ultralight recovery checkpoint");
+        }
+    }
+}
+
 // ---- c_dict_attack -----------------------------------------------------
 #undef TAG
 #define TAG "NfcMfUlCDictAttack"
@@ -60,7 +72,13 @@ static NfcCommand
             // Full read indicates successful authentication in dict attack mode
             instance->mf_ultralight_c_dict_context.auth_success = true;
             dict_attack_set_key_found(instance->dict_attack, true);
+            nfc_checkpoint_clear(instance, NfcProtocolMfUltralight);
         }
+        view_dispatcher_send_custom_event(
+            instance->view_dispatcher, NfcCustomEventDictAttackComplete);
+        command = NfcCommandStop;
+    } else if(poller_event->type == MfUltralightPollerEventTypeReadFailed) {
+        mf_ultralight_scene_dict_save_checkpoint(instance);
         view_dispatcher_send_custom_event(
             instance->view_dispatcher, NfcCustomEventDictAttackComplete);
         command = NfcCommandStop;
@@ -319,6 +337,13 @@ static NfcCommand
         nfc_device_set_data(
             instance->nfc_device, NfcProtocolMfUltralight, nfc_poller_get_data(instance->poller));
         const MfUltralightData* data = nfc_poller_get_data(instance->poller);
+
+        if(poller_event->type == MfUltralightPollerEventTypeReadSuccess &&
+           data->pages_read == data->pages_total) {
+            nfc_checkpoint_clear(instance, NfcProtocolMfUltralight);
+        } else {
+            mf_ultralight_scene_dict_save_checkpoint(instance);
+        }
 
         dict_attack_set_pages_read(instance->dict_attack, data->pages_read);
         dict_attack_set_pages_total(instance->dict_attack, data->pages_total);

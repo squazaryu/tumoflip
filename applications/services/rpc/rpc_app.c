@@ -93,8 +93,9 @@ static void rpc_system_app_start_process(const PB_Main* request, void* context) 
         }
 
         result = PB_CommandStatus_ERROR_APP_CANT_START;
+        LoaderDiagnostic diagnostic;
 
-        switch(loader_start(loader, app_name, app_args, NULL)) {
+        switch(loader_start_with_diagnostic(loader, app_name, app_args, NULL, &diagnostic)) {
         case LoaderStatusOk:
             result = PB_CommandStatus_OK;
             break;
@@ -110,8 +111,23 @@ static void rpc_system_app_start_process(const PB_Main* request, void* context) 
             result = PB_CommandStatus_ERROR_APP_CANT_START;
             break;
         }
+
+        if(result != PB_CommandStatus_OK) {
+            char diagnostic_text[256];
+            if(!loader_diagnostic_format(&diagnostic, diagnostic_text, sizeof(diagnostic_text))) {
+                strlcpy(
+                    diagnostic_text,
+                    "schema=1;code=internal;action=inspect_logs",
+                    sizeof(diagnostic_text));
+            }
+            rpc_system_app_set_error_code(rpc_app, (uint32_t)diagnostic.code);
+            rpc_system_app_set_error_text(rpc_app, diagnostic_text);
+        }
     } else {
         result = PB_CommandStatus_ERROR_INVALID_PARAMETERS;
+        rpc_system_app_set_error_code(rpc_app, LoaderDiagnosticCodeNotFound);
+        rpc_system_app_set_error_text(
+            rpc_app, "schema=1;code=not_found;action=install_app;app_id=missing");
     }
 
     furi_record_close(RECORD_LOADER);

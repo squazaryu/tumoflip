@@ -170,7 +170,7 @@ class MfUltralightAesTest(unittest.TestCase):
         self.assertIn("NfcDataGeneratorTypeMfUltralightC", order)
         self.assertIn("NfcDataGeneratorTypeMfUltralightAES", order)
 
-    def test_public_data_layout_is_append_only_and_api_is_88_4(self) -> None:
+    def test_public_data_layout_is_append_only_and_api_is_88_5(self) -> None:
         struct = self.header[
             self.header.index("typedef struct {\n    Iso14443_3aData*") :
             self.header.index("} MfUltralightData;")
@@ -182,7 +182,7 @@ class MfUltralightAesTest(unittest.TestCase):
         self.assertLess(aes_signature, aes_key)
         self.assertIn("static inline bool mf_ultralight_aes_get_key", self.header)
         self.assertNotIn("mf_ultralight_aes_get_key", self.api_symbols)
-        self.assertRegex(self.api_symbols, r"(?m)^Version,\+,88\.4,,$")
+        self.assertRegex(self.api_symbols, r"(?m)^Version,\+,88\.5,,$")
 
     def test_recovered_key_is_explicit_metadata_not_fabricated_pages(self) -> None:
         read_success = function_body(

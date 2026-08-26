@@ -21,6 +21,21 @@ enum {
 #undef TAG
 #define TAG "NfcMfPlusDictAttack"
 
+static void mf_plus_scene_dict_attack_save_checkpoint(NfcApp* instance) {
+    NfcMfPlusDictAttackContext* ctx = &instance->mf_plus_dict_context;
+    if(!instance->poller || ctx->sectors_read == 0U ||
+       ctx->sectors_read <= ctx->checkpoint_sectors) {
+        return;
+    }
+
+    const NfcDeviceData* data = nfc_poller_get_data(instance->poller);
+    if(data && nfc_checkpoint_save(instance, NfcProtocolMfPlus, data)) {
+        ctx->checkpoint_sectors = ctx->sectors_read;
+    } else {
+        FURI_LOG_W(TAG, "Unable to persist MIFARE Plus recovery checkpoint");
+    }
+}
+
 // The MIFARE Plus SL3 poller visits every sector once, asking for candidate keys per
 // (sector, key type). Unlike MIFARE Classic it has no resume-from-prior-data path, so both the
 // user and the built-in system dictionary are consumed within a SINGLE poller pass (user keys
@@ -123,9 +138,11 @@ static NfcCommand nfc_mf_plus_dict_attack_worker_callback(NfcGenericEvent event,
         ctx->current_sector = mfp_event->data->data_update.current_sector;
         ctx->sectors_read = mfp_event->data->data_update.sectors_read;
         ctx->keys_found = mfp_event->data->data_update.keys_found;
+        mf_plus_scene_dict_attack_save_checkpoint(instance);
         view_dispatcher_send_custom_event(
             instance->view_dispatcher, NfcCustomEventDictAttackDataUpdate);
     } else if(mfp_event->type == MfPlusPollerEventTypeReadSuccess) {
+        nfc_checkpoint_clear(instance, NfcProtocolMfPlus);
         view_dispatcher_send_custom_event(
             instance->view_dispatcher, NfcCustomEventDictAttackComplete);
         command = NfcCommandStop;
@@ -198,6 +215,7 @@ static void mf_plus_scene_dict_attack_setup_dicts(NfcApp* instance) {
     // (no cache file / different card) leaves the cache empty and the attack runs exactly as before.
     ctx->key_cache = mf_plus_key_cache_alloc();
     ctx->cache_key_fed = false;
+    ctx->checkpoint_sectors = 0;
     const MfPlusData* data = nfc_device_get_data(instance->nfc_device, NfcProtocolMfPlus);
     size_t uid_len = 0;
     const uint8_t* uid = mf_plus_get_uid(data, &uid_len);

@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,88.4,,
+Version,+,88.5,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/services/applications.h,,
 Header,+,applications/services/bt/bt_service/bt.h,,
@@ -313,6 +313,7 @@ Header,+,targets/f7/platform_specific/math_wrapper.h,,
 Header,+,targets/furi_hal_include/furi_hal.h,,
 Header,+,targets/furi_hal_include/furi_hal_adc.h,,
 Header,+,targets/furi_hal_include/furi_hal_bt.h,,
+Header,+,targets/furi_hal_include/furi_hal_bt_client.h,,
 Header,+,targets/furi_hal_include/furi_hal_cortex.h,,
 Header,+,targets/furi_hal_include/furi_hal_crypto.h,,
 Header,+,targets/furi_hal_include/furi_hal_debug.h,,
@@ -1457,6 +1458,13 @@ Function,+,furi_hal_bt_extra_beacon_set_config,_Bool,const GapExtraBeaconConfig*
 Function,+,furi_hal_bt_extra_beacon_set_data,_Bool,"const uint8_t*, uint8_t"
 Function,+,furi_hal_bt_extra_beacon_start,_Bool,
 Function,+,furi_hal_bt_extra_beacon_stop,_Bool,
+Function,+,furi_hal_bt_gatt_connect,_Bool,"const FuriHalBtPeer*, FuriHalBtGattEventCallback, void*"
+Function,+,furi_hal_bt_gatt_disconnect,_Bool,
+Function,+,furi_hal_bt_gatt_discover_characteristics,_Bool,"uint16_t, uint16_t"
+Function,+,furi_hal_bt_gatt_discover_services,_Bool,
+Function,+,furi_hal_bt_gatt_read,_Bool,uint16_t
+Function,+,furi_hal_bt_gatt_write,_Bool,"uint16_t, const uint8_t*, size_t, _Bool"
+Function,+,furi_hal_bt_gatt_set_notifications,_Bool,"uint16_t, _Bool, _Bool"
 Function,+,furi_hal_bt_get_key_storage_buff,void,"uint8_t**, uint16_t*"
 Function,+,furi_hal_bt_get_radio_stack,FuriHalBtStack,
 Function,+,furi_hal_bt_get_rssi,float,
@@ -1470,6 +1478,9 @@ Function,+,furi_hal_bt_lock_core2,void,
 Function,+,furi_hal_bt_nvm_sram_sem_acquire,void,
 Function,+,furi_hal_bt_nvm_sram_sem_release,void,
 Function,+,furi_hal_bt_reinit,void,
+Function,+,furi_hal_bt_scan_is_active,_Bool,
+Function,+,furi_hal_bt_scan_start,_Bool,"uint32_t, FuriHalBtScanResultCallback, void*"
+Function,+,furi_hal_bt_scan_stop,_Bool,
 Function,+,furi_hal_bt_set_key_storage_change_callback,void,"BleGlueKeyStorageChangedCallback, void*"
 Function,+,furi_hal_bt_start_advertising,void,
 Function,+,furi_hal_bt_start_app,FuriHalBleProfileBase*,"const FuriHalBleProfileTemplate*, FuriHalBleProfileParams, const GapRootSecurityKeys*, GapEventCallback, void*"
@@ -2510,6 +2521,10 @@ Function,-,llround,long long int,double
 Function,-,llroundf,long long int,float
 Function,-,llroundl,long long int,long double
 Function,+,loader_clear_launch_queue,void,Loader*
+Function,+,loader_diagnostic_action_to_string,const char*,LoaderDiagnosticAction
+Function,+,loader_diagnostic_code_to_string,const char*,LoaderDiagnosticCode
+Function,+,loader_diagnostic_format,_Bool,"const LoaderDiagnostic*, char*, size_t"
+Function,+,loader_diagnostic_reset,void,"LoaderDiagnostic*, const char*"
 Function,+,loader_enqueue_launch,void,"Loader*, const char*, const char*, LoaderDeferredLaunchFlag"
 Function,+,loader_get_application_launch_path,_Bool,"Loader*, FuriString*"
 Function,+,loader_get_application_name,_Bool,"Loader*, FuriString*"
@@ -2520,6 +2535,7 @@ Function,+,loader_show_menu,void,Loader*
 Function,+,loader_signal,_Bool,"Loader*, uint32_t, void*"
 Function,+,loader_start,LoaderStatus,"Loader*, const char*, const char*, FuriString*"
 Function,+,loader_start_detached_with_gui_error,void,"Loader*, const char*, const char*"
+Function,+,loader_start_with_diagnostic,LoaderStatus,"Loader*, const char*, const char*, FuriString*, LoaderDiagnostic*"
 Function,+,loader_start_with_gui_error,LoaderStatus,"Loader*, const char*, const char*"
 Function,+,loader_unlock,void,Loader*
 Function,+,loading_alloc,Loading*,
@@ -3773,11 +3789,21 @@ Function,+,subghz_protocol_somfy_telis_create_data,_Bool,"void*, FlipperFormat*,
 Function,+,subghz_radio_broker_acquire,_Bool,"SubGhzRadioBroker*, const char*, uint32_t, SubGhzRadioBrokerLease*"
 Function,+,subghz_radio_broker_external_power_off,void,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*"
 Function,+,subghz_radio_broker_external_power_on,_Bool,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*"
+Function,+,subghz_radio_broker_get_capability,_Bool,"SubGhzRadioBroker*, SubGhzRadioBrokerDevice, SubGhzRadioBrokerCapability*"
+Function,+,subghz_radio_broker_get_protocol_capability,_Bool,"SubGhzRadioBroker*, const char*, SubGhzRadioBrokerDevice, SubGhzRadioBrokerProtocolCapability*"
 Function,+,subghz_radio_broker_get_status,void,"SubGhzRadioBroker*, SubGhzRadioBrokerStatus*"
 Function,+,subghz_radio_broker_get_status_v2,void,"SubGhzRadioBroker*, SubGhzRadioBrokerStatusV2*"
+Function,+,subghz_radio_broker_policy_result_to_string,const char*,SubGhzRadioBrokerPolicyResult
 Function,+,subghz_radio_broker_release,void,"SubGhzRadioBroker*, SubGhzRadioBrokerLease*"
+Function,+,subghz_radio_broker_session_close,_Bool,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*"
+Function,+,subghz_radio_broker_session_history,size_t,"SubGhzRadioBroker*, SubGhzRadioBrokerSessionRecord*, size_t"
+Function,+,subghz_radio_broker_session_observe,_Bool,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*, uint32_t, const char*, const char*, int16_t"
+Function,+,subghz_radio_broker_session_open,_Bool,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*, SubGhzRadioBrokerDevice, const char*"
+Function,+,subghz_radio_broker_session_pause,_Bool,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*"
+Function,+,subghz_radio_broker_session_resume,_Bool,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*"
 Function,+,subghz_radio_broker_set_selected_device,_Bool,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*, SubGhzRadioBrokerDevice"
 Function,+,subghz_radio_broker_set_state,_Bool,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*, SubGhzRadioBrokerState"
+Function,+,subghz_radio_broker_validate_tx,SubGhzRadioBrokerPolicyResult,"SubGhzRadioBroker*, const SubGhzRadioBrokerLease*, SubGhzRadioBrokerDevice, uint32_t, _Bool"
 Function,+,subghz_receiver_alloc_init,SubGhzReceiver*,SubGhzEnvironment*
 Function,+,subghz_receiver_decode,void,"SubGhzReceiver*, _Bool, uint32_t"
 Function,+,subghz_receiver_free,void,SubGhzReceiver*

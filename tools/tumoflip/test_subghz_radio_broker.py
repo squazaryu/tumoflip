@@ -84,6 +84,48 @@ class SubGhzRadioBrokerTest(unittest.TestCase):
         self.assertIn("observability contract", broker_docs)
         self.assertIn("explicit lifecycle transitions", broker_docs)
 
+    def test_protocol_registry_sessions_and_policy_are_bounded(self) -> None:
+        header = (
+            REPO_ROOT
+            / "applications/services/subghz_radio_broker/subghz_radio_broker.h"
+        ).read_text(encoding="utf-8")
+        broker = (
+            REPO_ROOT
+            / "applications/services/subghz_radio_broker/subghz_radio_broker.c"
+        ).read_text(encoding="utf-8")
+        runtime = (
+            REPO_ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c"
+        ).read_text(encoding="utf-8")
+        bridge_docs = (REPO_ROOT / "docs/app-bridge-v2.md").read_text(encoding="utf-8")
+
+        for required in (
+            "SubGhzRadioBrokerProtocolCapability",
+            "SubGhzRadioBrokerSessionStatePaused",
+            "subghz_radio_broker_get_protocol_capability",
+            "subghz_radio_broker_session_pause",
+            "subghz_radio_broker_session_resume",
+            "SUBGHZ_RADIO_BROKER_SESSION_HISTORY_DEPTH",
+        ):
+            self.assertIn(required, header)
+        for required in (
+            'strcasecmp(protocol, "RAW")',
+            'strcasecmp(protocol, "ProtoPirate")',
+            'strcasecmp(protocol, "Keeloq")',
+            "subghz_radio_broker_frequency_is_tx_allowed",
+            "SubGhzRadioBrokerPolicyConfirmationRequired",
+        ):
+            self.assertIn(required, broker)
+        for required in (
+            'strcmp(command, "radio_protocols") == 0',
+            'strcmp(command, "radio_sessions_export") == 0',
+            "tumoflip_runtime_make_radio_protocols_payload",
+            "tumoflip_runtime_radio_sessions_export",
+            "state=%s",
+        ):
+            self.assertIn(required, runtime)
+        for required in ("`radio_protocols`", "diagnostics_export", "rp=1"):
+            self.assertIn(required, bridge_docs)
+
     def test_direct_radio_control_paths_are_brokered_or_allowlisted(self) -> None:
         direct_control = re.compile(
             r"furi_hal_power_(?:enable|disable)_otg\(|"

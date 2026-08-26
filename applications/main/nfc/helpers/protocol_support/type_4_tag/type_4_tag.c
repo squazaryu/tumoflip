@@ -109,9 +109,14 @@ static NfcCommand nfc_scene_read_poller_callback_type_4_tag(NfcGenericEvent even
     if(type_4_tag_event->type == Type4TagPollerEventTypeReadSuccess) {
         nfc_device_set_data(
             instance->nfc_device, NfcProtocolType4Tag, nfc_poller_get_data(instance->poller));
+        nfc_checkpoint_clear(instance, NfcProtocolType4Tag);
         view_dispatcher_send_custom_event(instance->view_dispatcher, NfcCustomEventPollerSuccess);
         command = NfcCommandStop;
     } else if(type_4_tag_event->type == Type4TagPollerEventTypeReadFailed) {
+        const Type4TagData* partial = nfc_poller_get_data(instance->poller);
+        if(partial && partial->ndef_data && simple_array_get_count(partial->ndef_data) > 0U) {
+            nfc_checkpoint_save(instance, NfcProtocolType4Tag, (const NfcDeviceData*)partial);
+        }
         command = NfcCommandReset;
     }
 

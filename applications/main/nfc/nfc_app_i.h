@@ -97,6 +97,14 @@
     (NFC_APP_FOLDER "/assets/mf_ultralight_aes_dict.nfc")
 #define NFC_APP_MF_PLUS_DICT_USER_PATH   (NFC_APP_FOLDER "/assets/mf_plus_dict_user.nfc")
 #define NFC_APP_MF_PLUS_DICT_SYSTEM_PATH (NFC_APP_FOLDER "/assets/mf_plus_dict.nfc")
+#define NFC_APP_MF_CLASSIC_CHECKPOINT_PATH \
+    EXT_PATH("nfc/.tumoflip-mfclassic-checkpoint.nfc")
+#define NFC_APP_MF_PLUS_CHECKPOINT_PATH \
+    EXT_PATH("nfc/.tumoflip-mfplus-checkpoint.nfc")
+#define NFC_APP_MF_ULTRALIGHT_CHECKPOINT_PATH \
+    EXT_PATH("nfc/.tumoflip-mfultralight-checkpoint.nfc")
+#define NFC_APP_TYPE4_CHECKPOINT_PATH \
+    EXT_PATH("nfc/.tumoflip-type4-checkpoint.nfc")
 
 #define NFC_MFKEY32_APP_PATH (EXT_PATH("apps/NFC/mfkey.fap"))
 
@@ -130,6 +138,7 @@ typedef struct {
     uint16_t msb_count;
     bool enhanced_dict;
     uint16_t current_key_idx; // Current key index for CUID dictionary mode
+    uint8_t checkpoint_sectors; // Number of sectors present in the last recovery snapshot
     uint8_t*
         cuid_key_indices_bitmap; // Bitmap of key indices present in CUID dictionary (256 bits = 32 bytes)
 } NfcMfClassicDictAttackContext;
@@ -167,6 +176,7 @@ typedef struct {
     uint8_t last_sector;
     uint8_t last_key_type;
     uint8_t last_admin_type;
+    uint8_t checkpoint_sectors;
     // Per-UID key cache (/ext/nfc/.cache), populated from a prior save. When present, its key for the
     // current target is offered before the dictionaries so a known card authenticates on the first
     // try; cache_key_fed guards it to one offer per target (a re-keyed card then falls to the dicts).
@@ -245,7 +255,25 @@ struct NfcApp {
     NfcLocationSidecarSession* location_sidecar_session;
     FuriTimer* timer;
     bool tumotag_verify_capture;
+    /* A checkpoint is an incomplete, recoverable read and is never treated as a normal dump. */
+    bool checkpoint_recovered;
+    NfcProtocol checkpoint_protocol;
 };
+
+/** Return the persistent checkpoint path for the supported recoverable-read protocols. */
+const char* nfc_checkpoint_path_for_protocol(NfcProtocol protocol);
+
+/** Return whether a recoverable checkpoint exists for @p protocol. */
+bool nfc_checkpoint_exists(NfcApp* instance, NfcProtocol protocol);
+
+/** Atomically replace a protocol checkpoint with a bounded snapshot of @p data. */
+bool nfc_checkpoint_save(
+    NfcApp* instance,
+    NfcProtocol protocol,
+    const NfcDeviceData* data);
+
+/** Remove a checkpoint and any temporary/backup siblings. */
+bool nfc_checkpoint_clear(NfcApp* instance, NfcProtocol protocol);
 
 typedef enum {
     NfcViewMenu,

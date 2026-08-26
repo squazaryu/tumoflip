@@ -711,9 +711,12 @@ static void nfc_protocol_support_scene_saved_menu_on_enter(NfcApp* instance) {
     }
 
     Submenu* submenu = instance->submenu;
+    const bool recovered_checkpoint =
+        instance->checkpoint_recovered && instance->checkpoint_protocol == protocol;
 
     // Header submenu items
-    if(nfc_protocol_support_has_feature(protocol, instance, NfcProtocolFeatureEmulateUid)) {
+    if(!recovered_checkpoint &&
+       nfc_protocol_support_has_feature(protocol, instance, NfcProtocolFeatureEmulateUid)) {
         submenu_add_item(
             submenu,
             "Emulate UID",
@@ -721,7 +724,8 @@ static void nfc_protocol_support_scene_saved_menu_on_enter(NfcApp* instance) {
             nfc_protocol_support_common_submenu_callback,
             instance);
 
-    } else if(nfc_protocol_support_has_feature(protocol, instance, NfcProtocolFeatureEmulateFull)) {
+    } else if(!recovered_checkpoint &&
+              nfc_protocol_support_has_feature(protocol, instance, NfcProtocolFeatureEmulateFull)) {
         submenu_add_item(
             submenu,
             "Emulate",
@@ -730,7 +734,8 @@ static void nfc_protocol_support_scene_saved_menu_on_enter(NfcApp* instance) {
             instance);
     }
 
-    if(nfc_protocol_support_has_feature(protocol, instance, NfcProtocolFeatureWrite)) {
+    if(!recovered_checkpoint && nfc_protocol_support_has_feature(
+                                   protocol, instance, NfcProtocolFeatureWrite)) {
         submenu_add_item(
             submenu,
             "Write",
@@ -739,7 +744,8 @@ static void nfc_protocol_support_scene_saved_menu_on_enter(NfcApp* instance) {
             instance);
     }
 
-    if(nfc_protocol_support_has_feature(protocol, instance, NfcProtocolFeatureEditUid)) {
+    if(!recovered_checkpoint && nfc_protocol_support_has_feature(
+                                   protocol, instance, NfcProtocolFeatureEditUid)) {
         submenu_add_item(
             submenu,
             "Edit UID",
@@ -752,7 +758,7 @@ static void nfc_protocol_support_scene_saved_menu_on_enter(NfcApp* instance) {
     base->scene_saved_menu.on_enter(instance);
 
     // Trailer submenu items
-    if(nfc_has_shadow_file(instance)) {
+    if(!recovered_checkpoint && nfc_has_shadow_file(instance)) {
         submenu_add_item(
             submenu,
             "Restore to Original State",
@@ -761,18 +767,27 @@ static void nfc_protocol_support_scene_saved_menu_on_enter(NfcApp* instance) {
             instance);
     }
 
-    submenu_add_item(
-        submenu,
-        "Rename",
-        SubmenuIndexCommonRename,
-        nfc_protocol_support_common_submenu_callback,
-        instance);
-    submenu_add_item(
-        submenu,
-        "Delete",
-        SubmenuIndexCommonDelete,
-        nfc_protocol_support_common_submenu_callback,
-        instance);
+    if(recovered_checkpoint) {
+        submenu_add_item(
+            submenu,
+            "Save recovered dump",
+            SubmenuIndexCommonSave,
+            nfc_protocol_support_common_submenu_callback,
+            instance);
+    } else {
+        submenu_add_item(
+            submenu,
+            "Rename",
+            SubmenuIndexCommonRename,
+            nfc_protocol_support_common_submenu_callback,
+            instance);
+        submenu_add_item(
+            submenu,
+            "Delete",
+            SubmenuIndexCommonDelete,
+            nfc_protocol_support_common_submenu_callback,
+            instance);
+    }
     submenu_add_item(
         submenu,
         "Info",
@@ -801,6 +816,9 @@ static bool
             scene_manager_next_scene(instance->scene_manager, NfcSceneSupportedCard);
             consumed = true;
         } else if(event.event == SubmenuIndexCommonRename) {
+            scene_manager_next_scene(instance->scene_manager, NfcSceneSaveName);
+            consumed = true;
+        } else if(event.event == SubmenuIndexCommonSave) {
             scene_manager_next_scene(instance->scene_manager, NfcSceneSaveName);
             consumed = true;
         } else if(event.event == SubmenuIndexCommonDelete) {
@@ -931,6 +949,14 @@ static bool
             furi_string_free(replaced_path);
 
             if(saved) {
+                if(instance->checkpoint_recovered &&
+                   instance->checkpoint_protocol == nfc_device_get_protocol(instance->nfc_device)) {
+                    if(!nfc_checkpoint_clear(instance, instance->checkpoint_protocol)) {
+                        FURI_LOG_W(TAG, "Failed to clear recovered NFC checkpoint");
+                    }
+                    instance->checkpoint_recovered = false;
+                    instance->checkpoint_protocol = NfcProtocolInvalid;
+                }
                 scene_manager_next_scene(instance->scene_manager, NfcSceneSaveSuccess);
                 dolphin_deed(
                     scene_manager_has_previous_scene(instance->scene_manager, NfcSceneSetType) ?

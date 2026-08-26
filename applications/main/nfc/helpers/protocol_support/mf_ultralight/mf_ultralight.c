@@ -118,6 +118,7 @@ static NfcCommand
     if(mf_ultralight_event->type == MfUltralightPollerEventTypeReadSuccess) {
         nfc_device_set_data(
             instance->nfc_device, NfcProtocolMfUltralight, nfc_poller_get_data(instance->poller));
+        nfc_checkpoint_clear(instance, NfcProtocolMfUltralight);
 
         const MfUltralightData* data =
             nfc_device_get_data(instance->nfc_device, NfcProtocolMfUltralight);
@@ -131,6 +132,12 @@ static NfcCommand
             instance->nfc_device, NfcProtocolMfUltralight, nfc_poller_get_data(instance->poller));
         const MfUltralightData* data =
             nfc_device_get_data(instance->nfc_device, NfcProtocolMfUltralight);
+        if(data->pages_read > 0U && data->pages_read < data->pages_total) {
+            nfc_checkpoint_save(
+                instance,
+                NfcProtocolMfUltralight,
+                nfc_poller_get_data(instance->poller));
+        }
         if(data->type == MfUltralightTypeUltralightAES) {
             // UL-AES auth is AES, not password, and it has an AUTH_LIM - a failed auth is counted
             // and can permanently lock the card. Never authenticate automatically on a plain read.
@@ -196,6 +203,14 @@ static NfcCommand
     } else if(mf_ultralight_event->type == MfUltralightPollerEventTypeAuthFailed) {
         // The default-password probe is deliberately silent; this event is user-driven auth.
         instance->mf_ul_auth->outcome = MfUltralightAuthOutcomeFailed;
+    } else if(mf_ultralight_event->type == MfUltralightPollerEventTypeReadFailed) {
+        const MfUltralightData* data = nfc_poller_get_data(instance->poller);
+        if(data && data->pages_read > 0U && data->pages_read < data->pages_total) {
+            nfc_checkpoint_save(
+                instance,
+                NfcProtocolMfUltralight,
+                nfc_poller_get_data(instance->poller));
+        }
     }
 
     return NfcCommandContinue;

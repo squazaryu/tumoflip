@@ -16,6 +16,7 @@ SETTINGS_SCENE = (
     REPO_ROOT
     / "applications/settings/desktop_settings/scenes/desktop_settings_scene_start.c"
 )
+RPC_APP = REPO_ROOT / "applications/services/rpc/rpc_app.c"
 
 
 def function_body(source: str, signature: str) -> str:
@@ -38,6 +39,7 @@ class LoaderFapLaunchTest(unittest.TestCase):
         cls.desktop_settings = DESKTOP_SETTINGS.read_text(encoding="utf-8")
         cls.desktop_settings_header = DESKTOP_SETTINGS_HEADER.read_text(encoding="utf-8")
         cls.settings_scene = SETTINGS_SCENE.read_text(encoding="utf-8")
+        cls.rpc_app = RPC_APP.read_text(encoding="utf-8")
 
     def test_removed_preference_is_migrated_without_becoming_current_state(self) -> None:
         self.assertIn("#define DESKTOP_SETTINGS_VER_20 (20)", self.desktop_settings)
@@ -58,9 +60,7 @@ class LoaderFapLaunchTest(unittest.TestCase):
             "static LoaderMessageLoaderStatusResult loader_do_start_by_name(",
         )
         exists = start.index("if(storage_file_exists(storage, name)) {")
-        first_load = start.index(
-            "loader_start_external_app(loader, storage, name, args, error_message, false)"
-        )
+        first_load = start.index("loader_start_external_app(")
         retry = start.index("loader_start_external_app(", first_load + 1)
         close = start.index("furi_record_close(RECORD_STORAGE);", retry)
 
@@ -70,6 +70,42 @@ class LoaderFapLaunchTest(unittest.TestCase):
         self.assertNotIn("loading_get_view", start)
         self.assertNotIn("loader_do_show_loading", start)
         self.assertNotIn("loading_shown", start)
+
+    def test_structured_diagnostic_contract_is_public_and_cli_visible(self) -> None:
+        loader_header = (
+            REPO_ROOT / "applications/services/loader/loader.h"
+        ).read_text(encoding="utf-8")
+        diagnostics_header = (
+            REPO_ROOT / "applications/services/loader/loader_diagnostics.h"
+        ).read_text(encoding="utf-8")
+        cli = (
+            REPO_ROOT / "applications/services/loader/loader_cli.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("loader_start_with_diagnostic(", loader_header)
+        self.assertIn("LoaderDiagnostic* diagnostic", loader_header)
+        for token in (
+            "LoaderDiagnosticCodeApiTooOld",
+            "LoaderDiagnosticCodeApiTooNew",
+            "LoaderDiagnosticCodeTargetMismatch",
+            "LoaderDiagnosticCodeInsufficientContiguousMemory",
+            "LOADER_DIAGNOSTIC_SCHEMA_VERSION",
+            "loader_diagnostic_format(",
+        ):
+            self.assertIn(token, diagnostics_header)
+        self.assertIn("loader_start_with_diagnostic(", cli)
+        self.assertIn('printf("DIAG %s\\r\\n", diagnostic_text)', cli)
+
+    def test_rpc_and_gui_launch_paths_use_the_same_diagnostic_contract(self) -> None:
+        self.assertIn("loader_start_with_diagnostic(", self.rpc_app)
+        self.assertIn("loader_diagnostic_format(", self.rpc_app)
+        self.assertIn("rpc_system_app_set_error_code(rpc_app, (uint32_t)diagnostic.code)", self.rpc_app)
+        self.assertIn("rpc_system_app_set_error_text(rpc_app, diagnostic_text)", self.rpc_app)
+        self.assertIn(".start.diagnostic = diagnostic", self.loader)
+        self.assertRegex(
+            self.loader,
+            r"loader_show_gui_error\(\s*status, message\.start\.name, error_message,\s*message\.start\.diagnostic\)",
+        )
 
     def test_loader_has_no_fap_loading_overlay_helpers_or_depth(self) -> None:
         self.assertNotIn("loading_depth", self.loader_internal)

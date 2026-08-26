@@ -148,8 +148,8 @@ class TimeLocationConsumersTest(unittest.TestCase):
     def test_runtime_and_wire_contract_advertise_time(self) -> None:
         runtime = source("applications/services/tumoflip_runtime/tumoflip_runtime.c")
         docs = source("docs/app-bridge-v2.md")
-        self.assertIn("time=1", runtime)
-        self.assertIn("fabric,time,gps,net", runtime)
+        for capability in ("fabric=1", "time=1", "gps=1", "net=1"):
+            self.assertIn(capability, runtime)
         self.assertIn("`time_once`", docs)
         self.assertIn("holding `OK` on the Time row", docs)
 

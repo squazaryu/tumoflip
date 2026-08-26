@@ -71,6 +71,10 @@ static constexpr auto nfc_app_api_table = sort(create_array_t<sym_entry>(
     API_METHOD(nfc_text_store_set, void, (NfcApp*, const char*, ...)),
     API_METHOD(nfc_text_store_clear, void, (NfcApp*)),
     API_METHOD(nfc_save_shadow_file, bool, (NfcApp*)),
+    API_METHOD(nfc_checkpoint_path_for_protocol, const char*, (NfcProtocol)),
+    API_METHOD(nfc_checkpoint_exists, bool, (NfcApp*, NfcProtocol)),
+    API_METHOD(nfc_checkpoint_save, bool, (NfcApp*, NfcProtocol, const NfcDeviceData*)),
+    API_METHOD(nfc_checkpoint_clear, bool, (NfcApp*, NfcProtocol)),
     API_METHOD(nfc_show_loading_label_popup, void, (void*, const char*, bool)),
     API_METHOD(nfc_app_run_external, void, (NfcApp*, const char*)),
     API_METHOD(

@@ -6,6 +6,7 @@
 #include <ble/ble.h>
 
 #include <furi_hal.h>
+#include <furi_hal_bt.h>
 #include <furi.h>
 #include <stdint.h>
 
@@ -13,6 +14,16 @@
 
 #define FAST_ADV_TIMEOUT    30000
 #define INITIAL_ADV_TIMEOUT 60000
+
+#define GAP_SCAN_MIN_DURATION_MS 1000U
+#define GAP_SCAN_MAX_DURATION_MS 30000U
+#define GAP_SCAN_INTERVAL        0x0060U
+#define GAP_SCAN_WINDOW          0x0030U
+#define GAP_CONNECT_INTERVAL     0x0060U
+#define GAP_CONNECT_WINDOW       0x0030U
+#define GAP_CONNECT_INTERVAL_MIN 0x0006U
+#define GAP_CONNECT_INTERVAL_MAX 0x000CU
+#define GAP_CONNECT_TIMEOUT      0x00C8U
 
 #define GAP_INTERVAL_TO_MS(x) (uint16_t)((x) * 1.25)
 
@@ -42,12 +53,46 @@ typedef struct {
     bool enable_adv;
     bool is_secure;
     uint8_t negotiation_round;
+    GapSvcEventHandler* client_event_handler;
+    FuriTimer* scan_timer;
+    bool scan_start_pending;
+    bool scan_active;
+    bool scan_restore_adv;
+    uint32_t scan_duration_ms;
+    FuriHalBtScanResultCallback scan_callback;
+    void* scan_context;
+    bool gatt_connect_pending;
+    bool gatt_client_connected;
+    bool gatt_restore_adv;
+    uint16_t gatt_connection_handle;
+    FuriHalBtPeer gatt_peer;
+    FuriHalBtGattEventCallback gatt_callback;
+    void* gatt_context;
+    uint16_t gatt_discovery_start_handle;
+    uint16_t gatt_discovery_end_handle;
+    uint8_t gatt_write_len;
+    uint16_t gatt_descriptor_handle;
+    bool gatt_notifications_enabled;
+    /* One serialized attribute operation is kept at a time.  The handle is
+       shared by read and write requests; naming it generically avoids making
+       read completions look like they refer to a write-only field. */
+    uint16_t gatt_attribute_handle;
+    uint8_t gatt_write_data[FURI_HAL_BT_GATT_DATA_MAX];
 } Gap;
 
 typedef enum {
     GapCommandAdvFast,
     GapCommandAdvLowPower,
     GapCommandAdvStop,
+    GapCommandScanStart,
+    GapCommandScanStop,
+    GapCommandGattConnect,
+    GapCommandGattDisconnect,
+    GapCommandGattDiscoverServices,
+    GapCommandGattDiscoverCharacteristics,
+    GapCommandGattRead,
+    GapCommandGattWrite,
+    GapCommandGattNotifications,
     GapCommandKillThread,
 } GapCommand;
 
@@ -55,6 +100,217 @@ static Gap* gap = NULL;
 
 static void gap_advertise_start(GapState new_state);
 static int32_t gap_app(void* context);
+static void gap_scan_stop_locked(bool restore_advertising);
+static void gap_gatt_disconnect_locked(void);
+
+static bool gap_client_stack_available(void) {
+    return furi_hal_bt_get_radio_stack() == FuriHalBtStackFull;
+}
+
+static void gap_emit_gatt_event(const FuriHalBtGattEvent* event) {
+    if(gap->gatt_callback && event) {
+        gap->gatt_callback(event, gap->gatt_context);
+    }
+}
+
+static void gap_emit_gatt_error(uint8_t status) {
+    FuriHalBtGattEvent event = {
+        .type = FuriHalBtGattEventError,
+        .connection_handle = gap->gatt_connection_handle,
+        .status = status,
+    };
+    gap_emit_gatt_event(&event);
+}
+
+static uint8_t gap_copy_advertising_name(
+    const uint8_t* data,
+    uint8_t data_len,
+    char* name,
+    size_t name_size) {
+    if(!name || name_size == 0U) return 0U;
+    name[0] = '\0';
+
+    uint8_t offset = 0U;
+    while(offset < data_len) {
+        const uint8_t field_len = data[offset];
+        if(field_len == 0U) break;
+        if((uint16_t)offset + 1U + field_len > data_len) break;
+        const uint8_t field_type = data[offset + 1U];
+        if((field_type == 0x08U || field_type == 0x09U) && field_len > 1U) {
+            size_t copy_len = field_len - 1U;
+            if(copy_len >= name_size) copy_len = name_size - 1U;
+            memcpy(name, &data[offset + 2U], copy_len);
+            name[copy_len] = '\0';
+            return (uint8_t)copy_len;
+        }
+        offset = (uint8_t)(offset + 1U + field_len);
+    }
+    return 0U;
+}
+
+static void gap_handle_advertising_reports(const hci_event_pckt* event_pckt) {
+    if(!gap->scan_active || !gap->scan_callback || event_pckt->plen < 3U) return;
+
+    const uint8_t* data = event_pckt->data;
+    size_t remaining = event_pckt->plen;
+    if(remaining < 2U || data[0] != HCI_LE_ADVERTISING_REPORT_SUBEVT_CODE) return;
+    data++;
+    remaining--;
+
+    const uint8_t report_count = data[0];
+    data++;
+    remaining--;
+
+    for(uint8_t report_index = 0U; report_index < report_count; report_index++) {
+        // Event layout: type (1), address type (1), address (6), data len (1),
+        // data (N), RSSI (1).  Do not trust any length supplied by the peer.
+        if(remaining < 10U) break;
+        const uint8_t data_len = data[8];
+        if((size_t)data_len + 10U > remaining || data_len > FURI_HAL_BT_SCAN_DATA_MAX) break;
+
+        FuriHalBtScanResult result = {0};
+        result.address_type = data[1];
+        memcpy(result.address, &data[2], sizeof(result.address));
+        result.data_len = data_len;
+        if(data_len) memcpy(result.data, &data[9], data_len);
+        result.rssi = (int8_t)data[9U + data_len];
+        gap_copy_advertising_name(
+            result.data, result.data_len, result.name, sizeof(result.name));
+        gap->scan_callback(&result, gap->scan_context);
+
+        data += 10U + data_len;
+        remaining -= 10U + data_len;
+    }
+}
+
+static void gap_handle_gatt_event(const hci_event_pckt* event_pckt) {
+    if(!gap->gatt_client_connected || event_pckt->plen < 3U) return;
+
+    const evt_blecore_aci* blue_evt = (const evt_blecore_aci*)event_pckt->data;
+    const uint8_t* data = blue_evt->data;
+    const size_t data_len = event_pckt->plen - 2U;
+
+    if(blue_evt->ecode == ACI_GATT_NOTIFICATION_VSEVT_CODE ||
+       blue_evt->ecode == ACI_GATT_INDICATION_VSEVT_CODE) {
+        if(data_len < 5U) return;
+        const aci_gatt_notification_event_rp0* notification =
+            (const aci_gatt_notification_event_rp0*)data;
+        const size_t value_len = MIN(
+            (size_t)notification->Attribute_Value_Length,
+            MIN(sizeof(notification->Attribute_Value), FURI_HAL_BT_GATT_DATA_MAX));
+        if(5U + value_len > data_len) return;
+
+        FuriHalBtGattEvent event = {
+            .type = blue_evt->ecode == ACI_GATT_NOTIFICATION_VSEVT_CODE
+                        ? FuriHalBtGattEventNotification
+                        : FuriHalBtGattEventNotification,
+            .connection_handle = notification->Connection_Handle,
+            .attribute_handle = notification->Attribute_Handle,
+            .data_len = value_len,
+        };
+        if(value_len) memcpy(event.data, notification->Attribute_Value, value_len);
+        gap_emit_gatt_event(&event);
+    } else if(
+        blue_evt->ecode == ACI_ATT_READ_RESP_VSEVT_CODE ||
+        blue_evt->ecode == ACI_ATT_READ_BLOB_RESP_VSEVT_CODE) {
+        if(data_len < 3U) return;
+        const aci_att_read_resp_event_rp0* read = (const aci_att_read_resp_event_rp0*)data;
+        const size_t value_len = MIN(
+            (size_t)read->Event_Data_Length,
+            MIN(sizeof(read->Attribute_Value), FURI_HAL_BT_GATT_DATA_MAX));
+        if(3U + value_len > data_len) return;
+
+        FuriHalBtGattEvent event = {
+            .type = FuriHalBtGattEventRead,
+            .connection_handle = read->Connection_Handle,
+            .attribute_handle = gap->gatt_attribute_handle,
+            .data_len = value_len,
+        };
+        if(value_len) memcpy(event.data, read->Attribute_Value, value_len);
+        gap_emit_gatt_event(&event);
+    } else if(blue_evt->ecode == ACI_ATT_READ_BY_GROUP_TYPE_RESP_VSEVT_CODE) {
+        if(data_len < 4U) return;
+        const aci_att_read_by_group_type_resp_event_rp0* response =
+            (const aci_att_read_by_group_type_resp_event_rp0*)data;
+        const uint8_t tuple_len = response->Attribute_Data_Length;
+        const uint8_t list_len = response->Data_Length;
+        if(tuple_len < 6U || list_len > data_len - 4U || (list_len % tuple_len) != 0U) return;
+
+        const uint8_t* cursor = response->Attribute_Data_List;
+        for(uint8_t offset = 0U; offset < list_len; offset = (uint8_t)(offset + tuple_len)) {
+            FuriHalBtGattEvent event = {
+                .type = FuriHalBtGattEventService,
+                .connection_handle = response->Connection_Handle,
+                .start_handle = cursor[0] | ((uint16_t)cursor[1] << 8),
+                .end_handle = cursor[2] | ((uint16_t)cursor[3] << 8),
+                .uuid_len = (uint8_t)MIN((size_t)(tuple_len - 4U), sizeof(event.uuid)),
+            };
+            memcpy(event.uuid, &cursor[4], event.uuid_len);
+            gap_emit_gatt_event(&event);
+            cursor += tuple_len;
+        }
+    } else if(blue_evt->ecode == ACI_ATT_READ_BY_TYPE_RESP_VSEVT_CODE) {
+        if(data_len < 4U) return;
+        const aci_att_read_by_type_resp_event_rp0* response =
+            (const aci_att_read_by_type_resp_event_rp0*)data;
+        const uint8_t tuple_len = response->Handle_Value_Pair_Length;
+        const uint8_t list_len = response->Data_Length;
+        if(tuple_len < 7U || list_len > data_len - 4U || (list_len % tuple_len) != 0U) return;
+
+        const uint8_t* cursor = response->Handle_Value_Pair_Data;
+        for(uint8_t offset = 0U; offset < list_len; offset = (uint8_t)(offset + tuple_len)) {
+            FuriHalBtGattEvent event = {
+                .type = FuriHalBtGattEventCharacteristic,
+                .connection_handle = response->Connection_Handle,
+                .attribute_handle = cursor[0] | ((uint16_t)cursor[1] << 8),
+                .properties = cursor[2],
+                .data_len = 0U,
+                .uuid_len = (uint8_t)MIN((size_t)(tuple_len - 5U), sizeof(event.uuid)),
+            };
+            event.start_handle = cursor[3] | ((uint16_t)cursor[4] << 8);
+            memcpy(event.uuid, &cursor[5], event.uuid_len);
+            gap_emit_gatt_event(&event);
+            cursor += tuple_len;
+        }
+    } else if(blue_evt->ecode == ACI_GATT_PROC_COMPLETE_VSEVT_CODE) {
+        if(data_len < 3U) return;
+        const aci_gatt_proc_complete_event_rp0* complete =
+            (const aci_gatt_proc_complete_event_rp0*)data;
+        FuriHalBtGattEvent event = {
+            .type = FuriHalBtGattEventProcedureComplete,
+            .connection_handle = complete->Connection_Handle,
+            .status = complete->Error_Code,
+        };
+        gap_emit_gatt_event(&event);
+    } else if(blue_evt->ecode == ACI_GATT_ERROR_RESP_VSEVT_CODE) {
+        if(data_len < 6U) return;
+        const aci_gatt_error_resp_event_rp0* error =
+            (const aci_gatt_error_resp_event_rp0*)data;
+        FuriHalBtGattEvent event = {
+            .type = FuriHalBtGattEventError,
+            .connection_handle = error->Connection_Handle,
+            .attribute_handle = error->Attribute_Handle,
+            .status = error->Error_Code,
+        };
+        gap_emit_gatt_event(&event);
+    }
+}
+
+static BleEventAckStatus gap_client_event_handler(void* event, void* context) {
+    UNUSED(context);
+    if(!gap || !event) return BleEventNotAck;
+
+    const hci_uart_pckt* uart_packet = (const hci_uart_pckt*)event;
+    if(!uart_packet) return BleEventNotAck;
+    const hci_event_pckt* event_pckt = (const hci_event_pckt*)uart_packet->data;
+    if(event_pckt->plen == 0U) return BleEventNotAck;
+    if(event_pckt->evt == HCI_LE_META_EVT_CODE) {
+        gap_handle_advertising_reports(event_pckt);
+    } else if(event_pckt->evt == HCI_VENDOR_SPECIFIC_DEBUG_EVT_CODE) {
+        gap_handle_gatt_event(event_pckt);
+    }
+    return BleEventNotAck;
+}
 
 static void gap_verify_connection_parameters(Gap* gap) {
     furi_check(gap);
@@ -130,6 +386,9 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
     case HCI_DISCONNECTION_COMPLETE_EVT_CODE: {
         hci_disconnection_complete_event_rp0* disconnection_complete_event =
             (hci_disconnection_complete_event_rp0*)event_pckt->data;
+        const bool was_gatt_client =
+            gap->gatt_client_connected || gap->gatt_connect_pending ||
+            (gap->gatt_connection_handle == disconnection_complete_event->Connection_Handle);
         if(disconnection_complete_event->Connection_Handle == gap->service.connection_handle) {
             gap->service.connection_handle = 0;
             gap->state = GapStateIdle;
@@ -138,12 +397,25 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
         }
         gap->is_secure = false;
         gap->negotiation_round = 0;
+        if(was_gatt_client) {
+            gap->gatt_client_connected = false;
+            gap->gatt_connect_pending = false;
+            gap->gatt_descriptor_handle = 0U;
+            gap->gatt_notifications_enabled = false;
+            FuriHalBtGattEvent gatt_event = {
+                .type = FuriHalBtGattEventDisconnected,
+                .connection_handle = disconnection_complete_event->Connection_Handle,
+                .status = disconnection_complete_event->Reason,
+            };
+            gap_emit_gatt_event(&gatt_event);
+        }
         // Enterprise sleep
         furi_delay_us(666 + 666);
-        if(gap->enable_adv) {
+        if(gap->enable_adv && gap->gatt_restore_adv && !gap->scan_active) {
             // Restart advertising
             gap_advertise_start(GapStateAdvFast);
         }
+        gap->gatt_restore_adv = false;
         GapEvent event = {.type = GapEventTypeDisconnected};
         gap->on_event_cb(event, gap->context);
     } break;
@@ -182,6 +454,18 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
         case HCI_LE_CONNECTION_COMPLETE_SUBEVT_CODE: {
             hci_le_connection_complete_event_rp0* event =
                 (hci_le_connection_complete_event_rp0*)meta_evt->data;
+            if(event->Status != BLE_STATUS_SUCCESS) {
+                if(gap->gatt_connect_pending) {
+                    gap_emit_gatt_error(event->Status);
+                    gap->gatt_connect_pending = false;
+                    gap->state = GapStateIdle;
+                    if(gap->enable_adv && gap->gatt_restore_adv) {
+                        gap_advertise_start(GapStateAdvFast);
+                    }
+                    gap->gatt_restore_adv = false;
+                }
+                break;
+            }
             gap->connection_params.conn_interval = event->Conn_Interval;
             gap->connection_params.slave_latency = event->Conn_Latency;
             gap->connection_params.supervisor_timeout = event->Supervision_Timeout;
@@ -193,9 +477,22 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
             gap->state = GapStateConnected;
             gap->service.connection_handle = event->Connection_Handle;
 
+            if(gap->gatt_connect_pending && event->Role == 0U) {
+                gap->gatt_connect_pending = false;
+                gap->gatt_client_connected = true;
+                gap->gatt_connection_handle = event->Connection_Handle;
+                gap->gatt_descriptor_handle = 0U;
+                gap->gatt_notifications_enabled = false;
+                FuriHalBtGattEvent gatt_event = {
+                    .type = FuriHalBtGattEventConnected,
+                    .connection_handle = event->Connection_Handle,
+                };
+                gap_emit_gatt_event(&gatt_event);
+            }
+
             gap_verify_connection_parameters(gap);
 
-            if(gap->config->pairing_method != GapPairingNone) {
+            if((event->Role != 0U) && (gap->config->pairing_method != GapPairingNone)) {
                 // Start pairing by sending security request
                 aci_gap_slave_security_req(event->Connection_Handle);
             }
@@ -358,8 +655,12 @@ static void gap_init_svc(Gap* gap, const GapRootSecurityKeys* root_keys) {
     // Initialize GAP interface
     // Skip first symbol AD_TYPE_COMPLETE_LOCAL_NAME
     char* name = gap->service.adv_name + 1;
+    uint8_t gap_role = GAP_PERIPHERAL_ROLE;
+    if(gap_client_stack_available()) {
+        gap_role |= GAP_CENTRAL_ROLE | GAP_OBSERVER_ROLE;
+    }
     aci_gap_init(
-        GAP_PERIPHERAL_ROLE,
+        gap_role,
         0,
         strlen(name),
         &gap->service.gap_svc_handle,
@@ -479,8 +780,14 @@ static void gap_advertise_start(GapState new_state) {
 static void gap_advertise_stop(void) {
     FURI_LOG_D(TAG, "Stop");
     tBleStatus ret;
+    if(gap->scan_active || gap->scan_start_pending) {
+        gap_scan_stop_locked(false);
+    }
     if(gap->state > GapStateIdle) {
-        if(gap->state == GapStateConnected) {
+        if((gap->state == GapStateConnected && gap->gatt_client_connected) ||
+           gap->state == GapStateConnecting || gap->gatt_connect_pending) {
+            gap_gatt_disconnect_locked();
+        } else if(gap->state == GapStateConnected) {
             // Terminate connection
             ret = aci_gap_terminate(gap->service.connection_handle, 0x13);
             if(ret != BLE_STATUS_SUCCESS) {
@@ -491,16 +798,215 @@ static void gap_advertise_stop(void) {
         }
         // Stop advertising
         furi_timer_stop(gap->advertise_timer);
-        ret = aci_gap_set_non_discoverable();
-        if(ret != BLE_STATUS_SUCCESS) {
-            FURI_LOG_E(TAG, "set_non_discoverable failed %d", ret);
-        } else {
-            FURI_LOG_D(TAG, "set_non_discoverable success");
+        if((gap->state == GapStateAdvFast) || (gap->state == GapStateAdvLowPower) ||
+           (gap->state == GapStateStartingAdv)) {
+            ret = aci_gap_set_non_discoverable();
+            if(ret != BLE_STATUS_SUCCESS) {
+                FURI_LOG_E(TAG, "set_non_discoverable failed %d", ret);
+            } else {
+                FURI_LOG_D(TAG, "set_non_discoverable success");
+            }
         }
-        gap->state = GapStateIdle;
+        if(!gap->gatt_client_connected) gap->state = GapStateIdle;
     }
     GapEvent event = {.type = GapEventTypeStopAdvertising};
     gap->on_event_cb(event, gap->context);
+}
+
+static void gap_scan_timer_callback(void* context) {
+    UNUSED(context);
+    if(!gap || !gap->command_queue) return;
+    GapCommand command = GapCommandScanStop;
+    furi_message_queue_put(gap->command_queue, &command, 0);
+}
+
+static void gap_scan_start_locked(void) {
+    furi_check(gap->scan_start_pending);
+
+    // A peripheral advertisement and an observer procedure cannot run at
+    // the same time.  Keep the user's advertising preference and restore it
+    // once the bounded scan finishes.
+    if((gap->state == GapStateAdvFast) || (gap->state == GapStateAdvLowPower) ||
+       (gap->state == GapStateStartingAdv)) {
+        furi_timer_stop(gap->advertise_timer);
+        tBleStatus advertising_status = aci_gap_set_non_discoverable();
+        if(advertising_status != BLE_STATUS_SUCCESS) {
+            FURI_LOG_W(TAG, "Failed to pause advertising for scan: %d", advertising_status);
+        }
+        gap->state = GapStateIdle;
+    }
+
+    const tBleStatus status = aci_gap_start_observation_proc(
+        GAP_SCAN_INTERVAL,
+        GAP_SCAN_WINDOW,
+        HCI_SCAN_TYPE_PASSIVE,
+        CFG_IDENTITY_ADDRESS,
+        1U,
+        0U);
+    gap->scan_start_pending = false;
+    if(status != BLE_STATUS_SUCCESS) {
+        FURI_LOG_W(TAG, "Failed to start passive scan: %d", status);
+        gap->scan_active = false;
+        gap->scan_callback = NULL;
+        gap->scan_context = NULL;
+        gap->state = GapStateIdle;
+        if(gap->scan_restore_adv && gap->enable_adv) {
+            gap_advertise_start(GapStateAdvFast);
+        }
+        gap->scan_restore_adv = false;
+        return;
+    }
+
+    gap->scan_active = true;
+    gap->state = GapStateScanning;
+    furi_timer_start(gap->scan_timer, gap->scan_duration_ms);
+    FURI_LOG_I(TAG, "Passive scan started for %lu ms", (unsigned long)gap->scan_duration_ms);
+}
+
+static void gap_scan_stop_locked(bool restore_advertising) {
+    if(!gap->scan_active && !gap->scan_start_pending) return;
+
+    if(gap->scan_active) {
+        const tBleStatus status = aci_gap_terminate_gap_proc(GAP_OBSERVATION_PROC);
+        if(status != BLE_STATUS_SUCCESS) {
+            FURI_LOG_W(TAG, "Failed to stop passive scan: %d", status);
+        }
+    }
+    furi_timer_stop(gap->scan_timer);
+    gap->scan_active = false;
+    gap->scan_start_pending = false;
+    gap->state = GapStateIdle;
+    gap->scan_callback = NULL;
+    gap->scan_context = NULL;
+
+    if(restore_advertising && gap->enable_adv) {
+        gap_advertise_start(GapStateAdvFast);
+    }
+    gap->scan_restore_adv = false;
+    FURI_LOG_I(TAG, "Passive scan stopped");
+}
+
+static void gap_gatt_connect_locked(void) {
+    furi_check(gap->gatt_connect_pending);
+
+    if(gap->state == GapStateAdvFast || gap->state == GapStateAdvLowPower ||
+       gap->state == GapStateStartingAdv) {
+        furi_timer_stop(gap->advertise_timer);
+        const tBleStatus advertising_status = aci_gap_set_non_discoverable();
+        if(advertising_status != BLE_STATUS_SUCCESS) {
+            FURI_LOG_W(TAG, "Failed to pause advertising for GATT client: %d", advertising_status);
+        }
+        gap->state = GapStateIdle;
+    }
+
+    const tBleStatus status = aci_gap_create_connection(
+        GAP_CONNECT_INTERVAL,
+        GAP_CONNECT_WINDOW,
+        gap->gatt_peer.address_type,
+        gap->gatt_peer.address,
+        CFG_IDENTITY_ADDRESS,
+        GAP_CONNECT_INTERVAL_MIN,
+        GAP_CONNECT_INTERVAL_MAX,
+        0U,
+        GAP_CONNECT_TIMEOUT,
+        0U,
+        0U);
+    if(status != BLE_STATUS_SUCCESS) {
+        FURI_LOG_W(TAG, "Failed to start GATT connection: %d", status);
+        gap_emit_gatt_error(status);
+        gap->gatt_connect_pending = false;
+        gap->state = GapStateIdle;
+        if(gap->gatt_restore_adv && gap->enable_adv) {
+            gap_advertise_start(GapStateAdvFast);
+        }
+        gap->gatt_restore_adv = false;
+        return;
+    }
+
+    gap->state = GapStateConnecting;
+    FURI_LOG_I(TAG, "GATT connection procedure started");
+}
+
+static void gap_gatt_disconnect_locked(void) {
+    if(gap->gatt_client_connected) {
+        const tBleStatus status = aci_gap_terminate(gap->gatt_connection_handle, 0x13U);
+        if(status != BLE_STATUS_SUCCESS) {
+            FURI_LOG_W(TAG, "Failed to terminate GATT connection: %d", status);
+        }
+    } else if(gap->gatt_connect_pending || gap->state == GapStateConnecting) {
+        const tBleStatus status =
+            aci_gap_terminate_gap_proc(GAP_DIRECT_CONNECTION_ESTABLISHMENT_PROC);
+        if(status != BLE_STATUS_SUCCESS) {
+            FURI_LOG_W(TAG, "Failed to cancel GATT connection: %d", status);
+        }
+        gap->gatt_connect_pending = false;
+        gap->state = GapStateIdle;
+        if(gap->gatt_restore_adv && gap->enable_adv) {
+            gap_advertise_start(GapStateAdvFast);
+        }
+        gap->gatt_restore_adv = false;
+    }
+}
+
+static void gap_gatt_discover_services_locked(void) {
+    if(!gap->gatt_client_connected) return;
+    const tBleStatus status = aci_gatt_disc_all_primary_services(gap->gatt_connection_handle);
+    if(status != BLE_STATUS_SUCCESS) {
+        gap_emit_gatt_error(status);
+    }
+}
+
+static void gap_gatt_discover_characteristics_locked(void) {
+    if(!gap->gatt_client_connected) return;
+    const tBleStatus status = aci_gatt_disc_all_char_of_service(
+        gap->gatt_connection_handle,
+        gap->gatt_discovery_start_handle,
+        gap->gatt_discovery_end_handle);
+    if(status != BLE_STATUS_SUCCESS) {
+        gap_emit_gatt_error(status);
+    }
+}
+
+static void gap_gatt_read_locked(void) {
+    if(!gap->gatt_client_connected || gap->gatt_attribute_handle == 0U) return;
+    const tBleStatus status =
+        aci_gatt_read_char_value(gap->gatt_connection_handle, gap->gatt_attribute_handle);
+    if(status != BLE_STATUS_SUCCESS) {
+        gap_emit_gatt_error(status);
+    }
+}
+
+static void gap_gatt_write_locked(void) {
+    if(!gap->gatt_client_connected || gap->gatt_attribute_handle == 0U ||
+       gap->gatt_write_len == 0U) {
+        return;
+    }
+    const tBleStatus status = aci_gatt_write_char_value(
+        gap->gatt_connection_handle,
+        gap->gatt_attribute_handle,
+        gap->gatt_write_len,
+        gap->gatt_write_data);
+    if(status != BLE_STATUS_SUCCESS) {
+        gap_emit_gatt_error(status);
+    }
+    memset(gap->gatt_write_data, 0, sizeof(gap->gatt_write_data));
+    gap->gatt_write_len = 0U;
+}
+
+static void gap_gatt_notifications_locked(void) {
+    if(!gap->gatt_client_connected || gap->gatt_descriptor_handle == 0U) return;
+    const uint8_t value[2] = {
+        gap->gatt_notifications_enabled ? 0x01U : 0x00U,
+        0x00U,
+    };
+    const tBleStatus status = aci_gatt_write_char_desc(
+        gap->gatt_connection_handle,
+        gap->gatt_descriptor_handle,
+        sizeof(value),
+        value);
+    if(status != BLE_STATUS_SUCCESS) {
+        gap_emit_gatt_error(status);
+    }
 }
 
 void gap_start_advertising(void) {
@@ -544,9 +1050,11 @@ bool gap_init(
     furi_check(gap == NULL);
 
     gap = malloc(sizeof(Gap));
+    memset(gap, 0, sizeof(Gap));
     gap->config = config;
     // Create advertising timer
     gap->advertise_timer = furi_timer_alloc(gap_advertise_timer_callback, FuriTimerTypeOnce, NULL);
+    gap->scan_timer = furi_timer_alloc(gap_scan_timer_callback, FuriTimerTypeOnce, NULL);
     // Initialization of GATT & GAP layer
     gap->service.adv_name = config->adv_name;
     gap_init_svc(gap, root_keys);
@@ -555,10 +1063,14 @@ bool gap_init(
     gap->state_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     gap->state = GapStateIdle;
     gap->service.connection_handle = 0xFFFF;
+    gap->gatt_connection_handle = 0xFFFF;
     gap->enable_adv = true;
 
     // Command queue allocation
     gap->command_queue = furi_message_queue_alloc(8, sizeof(GapCommand));
+
+    gap->client_event_handler =
+        ble_event_dispatcher_register_svc_handler(gap_client_event_handler, gap);
 
     // Thread configuration
     gap->thread = furi_thread_alloc_ex("BleGapDriver", 1024, gap_app, gap);
@@ -624,7 +1136,13 @@ void gap_thread_stop(void) {
         gap->command_queue = NULL;
         furi_timer_free(gap->advertise_timer);
         gap->advertise_timer = NULL;
+        furi_timer_free(gap->scan_timer);
+        gap->scan_timer = NULL;
 
+        if(gap->client_event_handler) {
+            ble_event_dispatcher_unregister_svc_handler(gap->client_event_handler);
+            gap->client_event_handler = NULL;
+        }
         ble_event_dispatcher_reset();
         free(gap);
         gap = NULL;
@@ -642,6 +1160,8 @@ static int32_t gap_app(void* context) {
         }
         furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
         if(command == GapCommandKillThread) {
+            gap_scan_stop_locked(false);
+            gap_gatt_disconnect_locked();
             break;
         }
         if(command == GapCommandAdvFast) {
@@ -650,6 +1170,24 @@ static int32_t gap_app(void* context) {
             gap_advertise_start(GapStateAdvLowPower);
         } else if(command == GapCommandAdvStop) {
             gap_advertise_stop();
+        } else if(command == GapCommandScanStart) {
+            gap_scan_start_locked();
+        } else if(command == GapCommandScanStop) {
+            gap_scan_stop_locked(true);
+        } else if(command == GapCommandGattConnect) {
+            gap_gatt_connect_locked();
+        } else if(command == GapCommandGattDisconnect) {
+            gap_gatt_disconnect_locked();
+        } else if(command == GapCommandGattDiscoverServices) {
+            gap_gatt_discover_services_locked();
+        } else if(command == GapCommandGattDiscoverCharacteristics) {
+            gap_gatt_discover_characteristics_locked();
+        } else if(command == GapCommandGattRead) {
+            gap_gatt_read_locked();
+        } else if(command == GapCommandGattWrite) {
+            gap_gatt_write_locked();
+        } else if(command == GapCommandGattNotifications) {
+            gap_gatt_notifications_locked();
         }
         furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
     }
@@ -661,4 +1199,212 @@ void gap_emit_ble_beacon_status_event(bool active) {
     GapEvent event = {.type = active ? GapEventTypeBeaconStart : GapEventTypeBeaconStop};
     gap->on_event_cb(event, gap->context);
     FURI_LOG_I(TAG, "Beacon status event: %d", active);
+}
+
+bool furi_hal_bt_scan_start(
+    uint32_t duration_ms,
+    FuriHalBtScanResultCallback callback,
+    void* context) {
+    if(!gap || !callback || !gap_client_stack_available()) return false;
+    if(duration_ms < GAP_SCAN_MIN_DURATION_MS) duration_ms = GAP_SCAN_MIN_DURATION_MS;
+    if(duration_ms > GAP_SCAN_MAX_DURATION_MS) duration_ms = GAP_SCAN_MAX_DURATION_MS;
+
+    furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool can_start =
+        !gap->scan_active && !gap->scan_start_pending && !gap->gatt_client_connected &&
+        !gap->gatt_connect_pending && gap->state != GapStateConnecting &&
+        gap->state != GapStateConnected;
+    bool queued = false;
+    if(can_start) {
+        gap->scan_restore_adv =
+            gap->state == GapStateAdvFast || gap->state == GapStateAdvLowPower ||
+            gap->state == GapStateStartingAdv;
+        gap->scan_duration_ms = duration_ms;
+        gap->scan_callback = callback;
+        gap->scan_context = context;
+        gap->scan_start_pending = true;
+        GapCommand command = GapCommandScanStart;
+        if(furi_message_queue_put(gap->command_queue, &command, 0) != FuriStatusOk) {
+            gap->scan_start_pending = false;
+            gap->scan_restore_adv = false;
+            gap->scan_callback = NULL;
+            gap->scan_context = NULL;
+        } else {
+            queued = true;
+        }
+    }
+    furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+    return queued;
+}
+
+bool furi_hal_bt_scan_stop(void) {
+    if(!gap) return false;
+    furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool was_active = gap->scan_active || gap->scan_start_pending;
+    if(was_active) {
+        GapCommand command = GapCommandScanStop;
+        if(furi_message_queue_put(gap->command_queue, &command, 0) != FuriStatusOk) {
+            furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+            return false;
+        }
+    }
+    furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+    return was_active;
+}
+
+bool furi_hal_bt_scan_is_active(void) {
+    if(!gap) return false;
+    furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool active = gap->scan_active || gap->scan_start_pending;
+    furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+    return active;
+}
+
+bool furi_hal_bt_gatt_connect(
+    const FuriHalBtPeer* peer,
+    FuriHalBtGattEventCallback callback,
+    void* context) {
+    if(!gap || !peer || !callback || !gap_client_stack_available()) return false;
+
+    furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool can_start =
+        !gap->scan_active && !gap->scan_start_pending && !gap->gatt_client_connected &&
+        !gap->gatt_connect_pending && gap->state != GapStateConnected &&
+        gap->state != GapStateConnecting;
+    bool queued = false;
+    if(can_start) {
+        gap->gatt_peer = *peer;
+        gap->gatt_callback = callback;
+        gap->gatt_context = context;
+        gap->gatt_connection_handle = 0xFFFFU;
+        gap->gatt_restore_adv =
+            gap->state == GapStateAdvFast || gap->state == GapStateAdvLowPower ||
+            gap->state == GapStateStartingAdv;
+        gap->gatt_connect_pending = true;
+        GapCommand command = GapCommandGattConnect;
+        if(furi_message_queue_put(gap->command_queue, &command, 0) != FuriStatusOk) {
+            gap->gatt_connect_pending = false;
+            gap->gatt_restore_adv = false;
+            gap->gatt_callback = NULL;
+            gap->gatt_context = NULL;
+        } else {
+            queued = true;
+        }
+    }
+    furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+    return queued;
+}
+
+bool furi_hal_bt_gatt_disconnect(void) {
+    if(!gap) return false;
+    furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool active = gap->gatt_client_connected || gap->gatt_connect_pending;
+    if(active) {
+        GapCommand command = GapCommandGattDisconnect;
+        if(furi_message_queue_put(gap->command_queue, &command, 0) != FuriStatusOk) {
+            furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+            return false;
+        }
+    }
+    furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+    return active;
+}
+
+bool furi_hal_bt_gatt_discover_services(void) {
+    if(!gap) return false;
+    furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool active = gap->gatt_client_connected;
+    if(active) {
+        GapCommand command = GapCommandGattDiscoverServices;
+        if(furi_message_queue_put(gap->command_queue, &command, 0) != FuriStatusOk) {
+            furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+            return false;
+        }
+    }
+    furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+    return active;
+}
+
+bool furi_hal_bt_gatt_discover_characteristics(uint16_t start_handle, uint16_t end_handle) {
+    if(!gap || start_handle == 0U || end_handle < start_handle) return false;
+    furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool active = gap->gatt_client_connected;
+    if(active) {
+        gap->gatt_discovery_start_handle = start_handle;
+        gap->gatt_discovery_end_handle = end_handle;
+        GapCommand command = GapCommandGattDiscoverCharacteristics;
+        if(furi_message_queue_put(gap->command_queue, &command, 0) != FuriStatusOk) {
+            furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+            return false;
+        }
+    }
+    furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+    return active;
+}
+
+bool furi_hal_bt_gatt_read(uint16_t attribute_handle) {
+    if(!gap || attribute_handle == 0U) return false;
+    furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool active = gap->gatt_client_connected;
+    if(active) {
+        gap->gatt_attribute_handle = attribute_handle;
+        GapCommand command = GapCommandGattRead;
+        if(furi_message_queue_put(gap->command_queue, &command, 0) != FuriStatusOk) {
+            furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+            return false;
+        }
+    }
+    furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+    return active;
+}
+
+bool furi_hal_bt_gatt_write(
+    uint16_t attribute_handle,
+    const uint8_t* data,
+    size_t data_len,
+    bool user_confirmed) {
+    if(!gap || !data || attribute_handle == 0U || data_len == 0U ||
+       data_len > FURI_HAL_BT_GATT_DATA_MAX || !user_confirmed) {
+        return false;
+    }
+
+    furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool active = gap->gatt_client_connected;
+    if(active) {
+        gap->gatt_attribute_handle = attribute_handle;
+        gap->gatt_write_len = (uint8_t)data_len;
+        memcpy(gap->gatt_write_data, data, data_len);
+        GapCommand command = GapCommandGattWrite;
+        if(furi_message_queue_put(gap->command_queue, &command, 0) != FuriStatusOk) {
+            memset(gap->gatt_write_data, 0, sizeof(gap->gatt_write_data));
+            gap->gatt_write_len = 0U;
+            furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+            return false;
+        }
+    }
+    furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+    return active;
+}
+
+bool furi_hal_bt_gatt_set_notifications(
+    uint16_t cccd_handle,
+    bool enabled,
+    bool user_confirmed) {
+    if(!gap || cccd_handle == 0U || !user_confirmed) return false;
+
+    furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
+    const bool active = gap->gatt_client_connected;
+    if(active) {
+        gap->gatt_descriptor_handle = cccd_handle;
+        gap->gatt_notifications_enabled = enabled;
+        GapCommand command = GapCommandGattNotifications;
+        if(furi_message_queue_put(gap->command_queue, &command, 0) != FuriStatusOk) {
+            gap->gatt_descriptor_handle = 0U;
+            gap->gatt_notifications_enabled = false;
+            furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+            return false;
+        }
+    }
+    furi_check(furi_mutex_release(gap->state_mutex) == FuriStatusOk);
+    return active;
 }

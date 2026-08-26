@@ -37,8 +37,16 @@ class TumoflipRuntimeTest(unittest.TestCase):
                 "fabric_state",
                 "fabric_step",
                 "fabric_cancel",
+                "diagnostics",
+                "diagnostics_export",
+                "radio_caps",
+                "radio_sessions",
+                "radio_sessions_export",
+                "radio_protocols",
+                "journal",
             },
         )
+        self.assertIn("diag=1;rc=1;rs=2;rp=1;", runtime)
         self.assertIn("feat=pkg,radio,trace,twin,transfer,fabric", runtime)
 
     def test_runtime_status_schema_is_documented_and_bounded(self) -> None:
@@ -60,6 +68,7 @@ class TumoflipRuntimeTest(unittest.TestCase):
         self.assertIn("session=3", runtime)
         self.assertIn("trace=1", runtime)
         self.assertIn("twin=1", runtime)
+        self.assertIn("diag=1;rc=1;rs=2;rp=1;", runtime)
         self.assertIn("feat=pkg,radio,trace,twin,transfer,fabric", runtime)
         self.assertNotIn('"radio_status"', runtime)
         self.assertNotIn("tumoflip_runtime_radio_state_name", runtime)
@@ -87,6 +96,9 @@ class TumoflipRuntimeTest(unittest.TestCase):
             'strcmp(command, "transfer_progress") == 0',
             'strcmp(command, "transfer_end") == 0',
             "BtMessageTypeTransferActivity",
+            "TUMOFLIP_RUNTIME_RADIO_SESSIONS_PATH",
+            "tumoflip_runtime_radio_sessions_export",
+            'strcmp(command, "radio_sessions_export") == 0',
         ):
             self.assertIn(required, runtime)
 
@@ -135,13 +147,16 @@ class TumoflipRuntimeTest(unittest.TestCase):
             "pkg=1",
             "radio=2",
             "sd=1",
+            "diag=1",
+            "rc=1",
+            "rs=2",
+            "rp=1",
             "feat=pkg",
             "pkg",
             "radio",
             "trace",
             "twin",
             "transfer",
-            "fabric=1",
             "fabric",
         ):
             self.assertIn(required, capabilities)
@@ -338,6 +353,20 @@ class TumoflipRuntimeTest(unittest.TestCase):
         self.assertIn("`tumofabric caps`", bridge_docs)
         self.assertIn("must not expose the BLE token", bridge_docs)
         self.assertIn("TumoFabric Mac Node", checklist)
+
+    def test_diagnostics_are_available_from_the_on_device_viewer(self) -> None:
+        viewer = (
+            REPO_ROOT
+            / "applications_user/runtime_trace_viewer/runtime_trace_viewer.c"
+        ).read_text(encoding="utf-8")
+        manifest = (
+            REPO_ROOT
+            / "applications_user/runtime_trace_viewer/application.fam"
+        ).read_text(encoding="utf-8")
+        self.assertIn("RuntimeTraceViewerActionDiagnostics", viewer)
+        self.assertIn("Hardware Diagnostics", viewer)
+        self.assertIn("get_diagnostics", viewer)
+        self.assertIn('name="Tumo Diagnostics"', manifest)
 
 
 if __name__ == "__main__":

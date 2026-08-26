@@ -10,6 +10,7 @@
 #include <m-array.h>
 
 #include "loader.h"
+#include "loader_diagnostics.h"
 #include "loader_menu.h"
 #include "loader_applications.h"
 #include "loader_queue.h"
@@ -58,6 +59,7 @@ typedef struct {
     const char* name;
     const char* args;
     FuriString* error_message;
+    LoaderDiagnostic* diagnostic;
 } LoaderMessageStartByName;
 
 typedef struct {

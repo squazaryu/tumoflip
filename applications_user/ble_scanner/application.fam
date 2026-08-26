@@ -1,0 +1,16 @@
+App(
+    appid="ble_scanner",
+    name="BLE Scanner",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="ble_scanner_app",
+    requires=["gui", "bt"],
+    stack_size=3 * 1024,
+    icon="A_GPIO_14",
+    fap_icon="icon.png",
+    fap_category="Module One/BLE",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip",
+    fap_description="Authorized passive BLE advertising scanner with bounded device history.",
+)

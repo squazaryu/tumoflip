@@ -21,6 +21,7 @@ typedef enum {
 } RuntimeTraceViewerView;
 
 typedef enum {
+    RuntimeTraceViewerActionDiagnostics,
     RuntimeTraceViewerActionRefresh,
     RuntimeTraceViewerActionExport,
     RuntimeTraceViewerActionAbout,
@@ -111,6 +112,62 @@ static bool runtime_trace_viewer_get_trace(RuntimeTraceViewerApp* app, char* out
     }
 
     return app->runtime->get_trace(app->runtime, output, size);
+}
+
+static const char* runtime_trace_viewer_check_name(TumoflipRuntimeDiagnosticCheckId id) {
+    static const char* const names[TUMOFLIP_RUNTIME_DIAGNOSTIC_CHECK_COUNT] = {
+        "Identity",
+        "Heap",
+        "Storage",
+        "Battery",
+        "Radio",
+        "BLE",
+        "Display",
+        "NFC",
+        "GPIO",
+        "Input",
+    };
+
+    return id < TUMOFLIP_RUNTIME_DIAGNOSTIC_CHECK_COUNT ? names[id] : "Unknown";
+}
+
+static const char* runtime_trace_viewer_check_status(TumoflipRuntimeDiagnosticStatus status) {
+    switch(status) {
+    case TumoflipRuntimeDiagnosticStatusPassed:
+        return "PASS";
+    case TumoflipRuntimeDiagnosticStatusFailed:
+        return "FAIL";
+    case TumoflipRuntimeDiagnosticStatusSkipped:
+    default:
+        return "SKIP";
+    }
+}
+
+static void runtime_trace_viewer_build_diagnostics(RuntimeTraceViewerApp* app) {
+    TumoflipRuntimeDiagnosticReport report;
+    const bool available = app->runtime && app->runtime->get_diagnostics &&
+                           app->runtime->get_diagnostics(app->runtime, &report);
+
+    furi_string_reset(app->text);
+    furi_string_cat(app->text, "Tumo Diagnostics\n\n");
+    if(!available) {
+        furi_string_cat(app->text, "Runtime diagnostics unavailable.\n");
+        return;
+    }
+
+    furi_string_cat_printf(
+        app->text, "Schema: %u\nChecks: %u\n\n", report.schema_version, report.check_count);
+    for(uint8_t index = 0U;
+        index < report.check_count && index < TUMOFLIP_RUNTIME_DIAGNOSTIC_CHECK_COUNT;
+        index++) {
+        const TumoflipRuntimeDiagnosticCheck* check = &report.checks[index];
+        furi_string_cat_printf(
+            app->text,
+            "%s  %s\n%s\n\n",
+            runtime_trace_viewer_check_status(check->status),
+            runtime_trace_viewer_check_name(check->id),
+            check->detail);
+    }
 }
 
 static void runtime_trace_viewer_append_event(FuriString* output, const char* event, uint8_t index) {
@@ -206,8 +263,8 @@ static void runtime_trace_viewer_build_about(RuntimeTraceViewerApp* app) {
     furi_string_reset(app->text);
     furi_string_cat(
         app->text,
-        "Runtime Trace\n\n"
-        "Shows the compact Tumoflip runtime ring buffer and exports a text report to SD.\n\n"
+        "Tumo Diagnostics\n\n"
+        "Runs bounded device checks, shows the compact Tumoflip runtime ring buffer, and exports a text report to SD.\n\n"
         "The trace stores command metadata only: event type, command family, and result. It does not store payloads.");
 }
 
@@ -220,6 +277,9 @@ static void runtime_trace_viewer_menu_callback(void* context, uint32_t index) {
     RuntimeTraceViewerApp* app = context;
 
     switch(index) {
+    case RuntimeTraceViewerActionDiagnostics:
+        runtime_trace_viewer_build_diagnostics(app);
+        break;
     case RuntimeTraceViewerActionRefresh:
         runtime_trace_viewer_build_report(app, app->text);
         break;
@@ -262,7 +322,13 @@ static RuntimeTraceViewerApp* runtime_trace_viewer_alloc(void) {
     view_dispatcher_set_navigation_event_callback(
         app->view_dispatcher, runtime_trace_viewer_back_callback);
 
-    submenu_set_header(app->submenu, "Runtime Trace");
+    submenu_set_header(app->submenu, "Tumo Diagnostics");
+    submenu_add_item(
+        app->submenu,
+        "Hardware Diagnostics",
+        RuntimeTraceViewerActionDiagnostics,
+        runtime_trace_viewer_menu_callback,
+        app);
     submenu_add_item(
         app->submenu,
         "Refresh",

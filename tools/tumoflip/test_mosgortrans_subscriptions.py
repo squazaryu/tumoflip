@@ -106,10 +106,10 @@ class MosgortransSubscriptionsTest(unittest.TestCase):
         )
         self.assertIsNotNone(no_ticket)
 
-    def test_unknown_transport_layout_is_reported_read_only(self) -> None:
+    def test_unknown_transport_layout_is_skipped_read_only(self) -> None:
         default_case = self.source[self.source.rindex("    default:") :]
-        self.assertIn('"Ticket data detected\\nLayout: %04X\\nValidity: not decoded"', default_case)
-        self.assertIn("return true;", default_case)
+        self.assertIn('"Layout %x is not supported"', default_case)
+        self.assertIn("return false;", default_case)
         self.assertNotIn("result = NULL;", default_case)
 
     def test_social_card_scans_complete_sector_records(self) -> None:

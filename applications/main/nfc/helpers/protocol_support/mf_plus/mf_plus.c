@@ -111,6 +111,7 @@ static NfcCommand nfc_scene_read_poller_callback_mf_plus(NfcGenericEvent event, 
     if(mf_plus_event->type == MfPlusPollerEventTypeReadSuccess) {
         nfc_device_set_data(
             instance->nfc_device, NfcProtocolMfPlus, nfc_poller_get_data(instance->poller));
+        nfc_checkpoint_clear(instance, NfcProtocolMfPlus);
         // The identity scan is done. An SL3 card can be dictionary-attacked to recover its keys
         // and blocks, so continue straight into the dictionary attack (like MIFARE Classic auto-
         // runs its dict). SL0/SL1/SL2 have nothing further to read here, so finish.
@@ -121,6 +122,16 @@ static NfcCommand nfc_scene_read_poller_callback_mf_plus(NfcGenericEvent event, 
         view_dispatcher_send_custom_event(instance->view_dispatcher, custom_event);
         command = NfcCommandStop;
     } else if(mf_plus_event->type == MfPlusPollerEventTypeReadFailed) {
+        const MfPlusData* partial = nfc_poller_get_data(instance->poller);
+        if(partial) {
+            uint8_t sectors_read = 0U;
+            uint8_t keys_found = 0U;
+            mf_plus_get_read_sectors_and_keys(partial, &sectors_read, &keys_found);
+            UNUSED(keys_found);
+            if(sectors_read > 0U) {
+                nfc_checkpoint_save(instance, NfcProtocolMfPlus, (const NfcDeviceData*)partial);
+            }
+        }
         command = NfcCommandReset;
     }
 

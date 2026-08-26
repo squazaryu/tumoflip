@@ -1,7 +1,7 @@
 #pragma once
 
 #include "subghz_txrx.h"
-#include <subghz_radio_broker/subghz_radio_broker.h>
+#include <subghz_radio_broker/subghz_radio_broker_i.h>
 #include <lib/subghz/protocols/plugin_registry_i.h>
 
 const SubGhzProtocolPackReport* subghz_txrx_get_protocol_pack_report(SubGhzTxRx* instance);
