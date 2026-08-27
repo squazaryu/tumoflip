@@ -117,6 +117,7 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
         "apps/Tools/ai_dashboard.fap",
         "apps/Tools/clock.fap",
         "apps/Tools/flipper_relay.fap",
+        "apps/Tools/morse_player.fap",
         "apps/Tools/quac.fap",
         "apps/Tools/tumoflip_packages.fap",
         "apps/Tools/totp.fap",
@@ -475,11 +476,11 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertNotIn("compatible_builds", after[esp_source])
             self.assertEqual(
                 sum("compatible_builds" in entry for entry in before.values()),
-                16,
+                17,
             )
             self.assertEqual(
                 sum("compatible_builds" in entry for entry in after.values()),
-                15,
+                16,
             )
             installed_dev004 = {
                 source: entry["compatible_builds"][0]["md5"]
@@ -1257,6 +1258,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertNotIn("apps/Scripts/js_app.fap", base_entries)
             self.assertIn("apps/Bluetooth/claude_buddy.fap", base_entries)
             self.assertIn("apps/Sub-GHz/subghz_wardriving.fap", base_entries)
+            self.assertIn("apps/Tools/morse_player.fap", base_entries)
             self.assertNotIn("apps_data/js_app/plugins/js_gui.fal", base_entries)
             self.assertNotIn("apps_data/js_app/plugins/js_subghz.fal", base_entries)
             self.assertFalse((resources / "apps/Scripts/js_app.fap").exists())
