@@ -22,6 +22,18 @@
 #define MORSE_PLAYER_DEFAULT_VOLUME 0.70f
 #define MORSE_PLAYER_WORKER_STOP_FLAG (1U << 0)
 
+/*
+ * The 128x64 display is shared with the fixed action buttons at the bottom
+ * (y = 52..63). Keep the playback rows in explicit bands so a long text or
+ * the progress/status row can never paint over another element.
+ */
+#define MORSE_PLAYER_PLAYBACK_TEXT_Y 20U
+#define MORSE_PLAYER_PLAYBACK_CODE_Y 32U
+#define MORSE_PLAYER_PLAYBACK_PROGRESS_Y 35U
+#define MORSE_PLAYER_PLAYBACK_STATUS_Y 50U
+#define MORSE_PLAYER_PLAYBACK_VALUE_X 27U
+#define MORSE_PLAYER_PLAYBACK_VALUE_WIDTH 99U
+
 typedef enum {
     MorsePlayerViewMain,
     MorsePlayerViewTextInput,
@@ -272,9 +284,12 @@ static void morse_player_draw_header(Canvas* canvas, const char* state) {
 }
 
 static void morse_player_draw_check(Canvas* canvas) {
-    canvas_draw_frame(canvas, 4, 21, 18, 18);
+    /* A two-pixel check is easier to read and keeps both strokes balanced. */
+    canvas_draw_frame(canvas, 4, 20, 18, 18);
+    canvas_draw_line(canvas, 8, 29, 12, 33);
     canvas_draw_line(canvas, 8, 30, 12, 34);
-    canvas_draw_line(canvas, 12, 34, 19, 26);
+    canvas_draw_line(canvas, 12, 33, 19, 26);
+    canvas_draw_line(canvas, 12, 34, 19, 27);
 }
 
 static void morse_player_draw_error(Canvas* canvas) {
@@ -306,30 +321,43 @@ static void morse_player_preview_draw(Canvas* canvas, void* _model) {
     case MorsePlayerPreviewPlaying: {
         morse_player_draw_header(canvas, "PLAY");
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str(canvas, 2, 21, "TEXT");
+        canvas_draw_str(canvas, 2, MORSE_PLAYER_PLAYBACK_TEXT_Y, "TEXT");
         canvas_set_font(canvas, FontPrimary);
         morse_player_draw_focus_window(
-            canvas, 27U, 21U, 99U, model->text, model->text_offset);
+            canvas,
+            MORSE_PLAYER_PLAYBACK_VALUE_X,
+            MORSE_PLAYER_PLAYBACK_TEXT_Y,
+            MORSE_PLAYER_PLAYBACK_VALUE_WIDTH,
+            model->text,
+            model->text_offset);
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str(canvas, 2, 35, "CODE");
+        canvas_draw_str(canvas, 2, MORSE_PLAYER_PLAYBACK_CODE_Y, "CODE");
         canvas_set_font(canvas, FontKeyboard);
         morse_player_draw_focus_window(
-            canvas, 27U, 35U, 99U, model->display, model->display_offset);
-        canvas_draw_frame(canvas, 2, 38, 124, 7);
+            canvas,
+            MORSE_PLAYER_PLAYBACK_VALUE_X,
+            MORSE_PLAYER_PLAYBACK_CODE_Y,
+            MORSE_PLAYER_PLAYBACK_VALUE_WIDTH,
+            model->display,
+            model->display_offset);
+        canvas_draw_frame(canvas, 2, MORSE_PLAYER_PLAYBACK_PROGRESS_Y, 124, 7);
         if(model->total_units > 0U) {
             uint32_t width = (model->progress_units * 120U) / model->total_units;
             if(width > 120U) width = 120U;
-            if(width > 0U) canvas_draw_box(canvas, 4, 40, width, 3);
+            if(width > 0U) {
+                canvas_draw_box(canvas, 4, MORSE_PLAYER_PLAYBACK_PROGRESS_Y + 2U, width, 3);
+            }
         }
         canvas_set_font(canvas, FontSecondary);
         const char* phase = "GAP";
         if(model->active_tone && model->display_offset < strlen(model->display)) {
             phase = model->display[model->display_offset] == '-' ? "DASH" : "DOT";
         }
-        canvas_draw_str(canvas, 2, 51, phase);
+        canvas_draw_str(canvas, 2, MORSE_PLAYER_PLAYBACK_STATUS_Y, phase);
         char status[32];
         snprintf(status, sizeof(status), "%luHz  %luWPM", model->tone_hz, model->wpm);
-        canvas_draw_str_aligned(canvas, 126, 51, AlignRight, AlignBottom, status);
+        canvas_draw_str_aligned(
+            canvas, 126, MORSE_PLAYER_PLAYBACK_STATUS_Y, AlignRight, AlignBottom, status);
         elements_button_center(canvas, "Stop");
         break;
     }
@@ -338,9 +366,9 @@ static void morse_player_preview_draw(Canvas* canvas, void* _model) {
         morse_player_draw_header(canvas, "DONE");
         morse_player_draw_check(canvas);
         canvas_set_font(canvas, FontPrimary);
-        canvas_draw_str(canvas, 29, 30, "Playback complete");
+        morse_player_draw_fitted(canvas, 29, 29, "Playback complete", 96U);
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str(canvas, 29, 42, "OK to replay");
+        canvas_draw_str(canvas, 29, 40, "OK to replay");
         elements_button_left(canvas, "Edit");
         elements_button_center(canvas, "Replay");
         break;
@@ -553,7 +581,7 @@ static void morse_player_menu_callback(void* context, uint32_t index) {
     case MorsePlayerMenuAbout:
         morse_player_show_message(
             app,
-            "Morse Player 0.2\n\n"
+            "Morse Player 0.3\n\n"
             "Enter text and press OK\n"
             "to hear standard Morse\n"
             "through the Flipper speaker.\n\n"
