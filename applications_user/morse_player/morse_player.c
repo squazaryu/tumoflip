@@ -553,7 +553,7 @@ static void morse_player_menu_callback(void* context, uint32_t index) {
     case MorsePlayerMenuAbout:
         morse_player_show_message(
             app,
-            "Morse Player 0.1\n\n"
+            "Morse Player 0.2\n\n"
             "Enter text and press OK\n"
             "to hear standard Morse\n"
             "through the Flipper speaker.\n\n"
