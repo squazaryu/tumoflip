@@ -15,7 +15,8 @@
 
 #include "morse_codec.h"
 
-#define MORSE_PLAYER_TICK_PERIOD_MS 100U
+/* Refresh below the shortest 15 WPM dot so the active symbol is not skipped. */
+#define MORSE_PLAYER_TICK_PERIOD_MS 50U
 #define MORSE_PLAYER_DEFAULT_WPM 15U
 #define MORSE_PLAYER_DEFAULT_TONE_HZ 700U
 #define MORSE_PLAYER_DEFAULT_VOLUME 0.70f
@@ -49,6 +50,9 @@ typedef struct {
     const char* display;
     uint32_t total_units;
     uint32_t progress_units;
+    size_t text_offset;
+    size_t display_offset;
+    bool active_tone;
     size_t unknown_count;
     uint32_t wpm;
     uint32_t tone_hz;
@@ -80,6 +84,9 @@ struct MorsePlayerApp {
     volatile bool worker_finished;
     volatile bool speaker_error;
     volatile uint32_t progress_units;
+    volatile size_t active_text_offset;
+    volatile size_t active_display_offset;
+    volatile bool active_tone;
 };
 
 static const uint32_t morse_player_wpm_values[] = {5U, 10U, 15U, 20U, 25U, 30U, 35U, 40U};
@@ -97,6 +104,9 @@ static void morse_player_sync_view(MorsePlayerApp* app, MorsePlayerPreviewState 
             model->display = app->display_buffer;
             model->total_units = app->program.total_units;
             model->progress_units = app->progress_units;
+            model->text_offset = app->active_text_offset;
+            model->display_offset = app->active_display_offset;
+            model->active_tone = app->active_tone;
             model->unknown_count = app->program.unknown_count;
             model->wpm = app->wpm;
             model->tone_hz = app->tone_hz;
@@ -104,51 +114,153 @@ static void morse_player_sync_view(MorsePlayerApp* app, MorsePlayerPreviewState 
         true);
 }
 
-static void morse_player_draw_window(
+#define MORSE_PLAYER_WINDOW_BUFFER_SIZE 96U
+
+static size_t morse_player_codepoint_bytes(const char* text) {
+    const uint8_t* bytes = (const uint8_t*)text;
+    if(bytes[0] == '\0') return 0U;
+    if(bytes[0] < 0x80U) return 1U;
+    if(
+        (bytes[0] & 0xE0U) == 0xC0U && (bytes[1] & 0xC0U) == 0x80U) {
+        return 2U;
+    }
+    if(
+        (bytes[0] & 0xF0U) == 0xE0U && (bytes[1] & 0xC0U) == 0x80U &&
+        (bytes[2] & 0xC0U) == 0x80U) {
+        return 3U;
+    }
+    if(
+        (bytes[0] & 0xF8U) == 0xF0U && (bytes[1] & 0xC0U) == 0x80U &&
+        (bytes[2] & 0xC0U) == 0x80U && (bytes[3] & 0xC0U) == 0x80U) {
+        return 4U;
+    }
+    return 1U;
+}
+
+static size_t morse_player_previous_codepoint(const char* text, size_t offset) {
+    if(offset == 0U) return 0U;
+    offset--;
+    while(offset > 0U && (((uint8_t)text[offset] & 0xC0U) == 0x80U)) offset--;
+    return offset;
+}
+
+static size_t morse_player_copy_range(
+    char* output,
+    size_t output_capacity,
+    const char* text,
+    size_t start,
+    size_t end) {
+    furi_check(output_capacity > 0U);
+    if(end < start) end = start;
+    size_t length = end - start;
+    if(length >= output_capacity) length = output_capacity - 1U;
+    memcpy(output, text + start, length);
+    output[length] = '\0';
+    return length;
+}
+
+static void morse_player_draw_fitted(
     Canvas* canvas,
     uint8_t x,
     uint8_t y,
     const char* text,
-    size_t max_bytes) {
-    char buffer[48];
-    furi_check(max_bytes < sizeof(buffer));
+    uint8_t max_width) {
+    char buffer[MORSE_PLAYER_WINDOW_BUFFER_SIZE];
+    char candidate[MORSE_PLAYER_WINDOW_BUFFER_SIZE];
     const size_t length = strlen(text);
-    size_t copy_length = length < max_bytes ? length : max_bytes;
+    size_t end = 0U;
 
-    memcpy(buffer, text, copy_length);
-    while(copy_length > 0U && ((buffer[copy_length - 1U] & 0xC0U) == 0x80U)) {
-        copy_length--;
+    while(end < length) {
+        size_t next = end + morse_player_codepoint_bytes(text + end);
+        if(next > length) next = length;
+        morse_player_copy_range(candidate, sizeof(candidate), text, 0U, next);
+        if(canvas_string_width(canvas, candidate) > max_width) break;
+        end = next;
     }
-    if(length > max_bytes && copy_length >= 3U) {
-        buffer[copy_length - 3U] = '.';
-        buffer[copy_length - 2U] = '.';
-        buffer[copy_length - 1U] = '.';
+
+    if(end < length) {
+        const size_t ellipsis_width = canvas_string_width(canvas, "...");
+        while(end > 0U) {
+            const size_t start = morse_player_previous_codepoint(text, end);
+            const size_t prefix_length = morse_player_copy_range(
+                candidate, sizeof(candidate), text, 0U, start);
+            if(prefix_length + 3U < sizeof(candidate)) {
+                memcpy(candidate + prefix_length, "...", 4U);
+            }
+            if(canvas_string_width(canvas, candidate) <= max_width) {
+                strcpy(buffer, candidate);
+                canvas_draw_str(canvas, x, y, buffer);
+                return;
+            }
+            end = start;
+        }
+        if(ellipsis_width <= max_width) {
+            canvas_draw_str(canvas, x, y, "...");
+            return;
+        }
     }
-    buffer[copy_length] = '\0';
+
+    morse_player_copy_range(buffer, sizeof(buffer), text, 0U, end);
     canvas_draw_str(canvas, x, y, buffer);
 }
 
-static void morse_player_draw_centered_window(
+static void morse_player_draw_focus_window(
     Canvas* canvas,
+    uint8_t x,
     uint8_t y,
+    uint8_t max_width,
     const char* text,
-    size_t max_bytes) {
-    char buffer[48];
-    furi_check(max_bytes < sizeof(buffer));
+    size_t focus_offset) {
+    char buffer[MORSE_PLAYER_WINDOW_BUFFER_SIZE];
+    char candidate[MORSE_PLAYER_WINDOW_BUFFER_SIZE];
     const size_t length = strlen(text);
-    size_t copy_length = length < max_bytes ? length : max_bytes;
+    if(length == 0U) return;
 
-    memcpy(buffer, text, copy_length);
-    while(copy_length > 0U && ((buffer[copy_length - 1U] & 0xC0U) == 0x80U)) {
-        copy_length--;
+    if(focus_offset >= length) focus_offset = morse_player_previous_codepoint(text, length);
+    while(focus_offset > 0U && (((uint8_t)text[focus_offset] & 0xC0U) == 0x80U)) {
+        focus_offset--;
     }
-    if(length > max_bytes && copy_length >= 3U) {
-        buffer[copy_length - 3U] = '.';
-        buffer[copy_length - 2U] = '.';
-        buffer[copy_length - 1U] = '.';
+
+    size_t focus_end = focus_offset + morse_player_codepoint_bytes(text + focus_offset);
+    if(focus_end > length) focus_end = length;
+    size_t start = focus_offset;
+    const uint8_t target_left = max_width / 2U;
+
+    while(start > 0U) {
+        const size_t previous = morse_player_previous_codepoint(text, start);
+        morse_player_copy_range(candidate, sizeof(candidate), text, previous, focus_end);
+        if(canvas_string_width(canvas, candidate) > target_left && start != focus_offset) break;
+        start = previous;
     }
-    buffer[copy_length] = '\0';
-    canvas_draw_str_aligned(canvas, 64, y, AlignCenter, AlignBottom, buffer);
+
+    size_t end = focus_end;
+    while(end < length) {
+        size_t next = end + morse_player_codepoint_bytes(text + end);
+        if(next > length) next = length;
+        morse_player_copy_range(candidate, sizeof(candidate), text, start, next);
+        if(canvas_string_width(canvas, candidate) > max_width) break;
+        end = next;
+    }
+
+    morse_player_copy_range(buffer, sizeof(buffer), text, start, end);
+    canvas_draw_str(canvas, x, y, buffer);
+}
+
+static void morse_player_draw_preview_field(
+    Canvas* canvas,
+    const char* label,
+    uint8_t top,
+    const char* value,
+    Font value_font) {
+    canvas_set_font(canvas, FontSecondary);
+    const uint8_t label_width = (uint8_t)canvas_string_width(canvas, label);
+    const uint8_t frame_x = (uint8_t)(2U + label_width + 5U);
+    const uint8_t frame_width = (uint8_t)(126U - frame_x);
+    canvas_draw_str(canvas, 2, (uint8_t)(top + 9U), label);
+    canvas_draw_frame(canvas, frame_x, top, frame_width, 14U);
+    canvas_set_font(canvas, value_font);
+    morse_player_draw_fitted(
+        canvas, (uint8_t)(frame_x + 4U), (uint8_t)(top + 10U), value, (uint8_t)(frame_width - 8U));
 }
 
 static void morse_player_draw_header(Canvas* canvas, const char* state) {
@@ -184,14 +296,8 @@ static void morse_player_preview_draw(Canvas* canvas, void* _model) {
             snprintf(state, sizeof(state), "READY");
         }
         morse_player_draw_header(canvas, state);
-        canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str(canvas, 2, 21, "TEXT");
-        canvas_draw_frame(canvas, 24, 14, 102, 14);
-        morse_player_draw_window(canvas, 27, 24, model->text, 16U);
-        canvas_draw_str(canvas, 2, 39, "CODE");
-        canvas_draw_frame(canvas, 24, 32, 102, 14);
-        canvas_set_font(canvas, FontKeyboard);
-        morse_player_draw_window(canvas, 27, 42, model->display, 16U);
+        morse_player_draw_preview_field(canvas, "TEXT", 14U, model->text, FontSecondary);
+        morse_player_draw_preview_field(canvas, "CODE", 32U, model->display, FontKeyboard);
         elements_button_left(canvas, "Edit");
         elements_button_center(canvas, "Play");
         break;
@@ -199,16 +305,28 @@ static void morse_player_preview_draw(Canvas* canvas, void* _model) {
 
     case MorsePlayerPreviewPlaying: {
         morse_player_draw_header(canvas, "PLAY");
-        canvas_set_font(canvas, FontPrimary);
-        morse_player_draw_centered_window(canvas, 27, model->text, 16U);
         canvas_set_font(canvas, FontSecondary);
-        canvas_draw_str_aligned(canvas, 64, 35, AlignCenter, AlignBottom, "Playing Morse audio");
+        canvas_draw_str(canvas, 2, 21, "TEXT");
+        canvas_set_font(canvas, FontPrimary);
+        morse_player_draw_focus_window(
+            canvas, 27U, 21U, 99U, model->text, model->text_offset);
+        canvas_set_font(canvas, FontSecondary);
+        canvas_draw_str(canvas, 2, 35, "CODE");
+        canvas_set_font(canvas, FontKeyboard);
+        morse_player_draw_focus_window(
+            canvas, 27U, 35U, 99U, model->display, model->display_offset);
         canvas_draw_frame(canvas, 2, 38, 124, 7);
         if(model->total_units > 0U) {
             uint32_t width = (model->progress_units * 120U) / model->total_units;
             if(width > 120U) width = 120U;
             if(width > 0U) canvas_draw_box(canvas, 4, 40, width, 3);
         }
+        canvas_set_font(canvas, FontSecondary);
+        const char* phase = "GAP";
+        if(model->active_tone && model->display_offset < strlen(model->display)) {
+            phase = model->display[model->display_offset] == '-' ? "DASH" : "DOT";
+        }
+        canvas_draw_str(canvas, 2, 51, phase);
         char status[32];
         snprintf(status, sizeof(status), "%luHz  %luWPM", model->tone_hz, model->wpm);
         canvas_draw_str_aligned(canvas, 126, 51, AlignRight, AlignBottom, status);
@@ -243,6 +361,16 @@ static void morse_player_worker_set_progress(MorsePlayerApp* app, uint32_t units
     app->progress_units += units;
 }
 
+static void morse_player_worker_set_segment(MorsePlayerApp* app, size_t segment_index) {
+    MorsePlayerPlaybackCursor cursor;
+    if(morse_player_cursor_for_segment(app->text_buffer, segment_index, &cursor)) {
+        app->active_text_offset = cursor.text_offset;
+        app->active_display_offset = cursor.display_offset;
+    }
+    app->active_tone =
+        (app->segments[segment_index] & MORSE_PLAYER_TONE_FLAG) != 0U;
+}
+
 static bool morse_player_worker_wait(uint32_t duration_ms) {
     const uint32_t flags = furi_thread_flags_wait(
         MORSE_PLAYER_WORKER_STOP_FLAG, FuriFlagWaitAny, duration_ms);
@@ -268,6 +396,7 @@ static int32_t morse_player_worker(void* context) {
             ((uint32_t)units * 1200U + app->wpm / 2U) / app->wpm;
         const bool tone = (segment & MORSE_PLAYER_TONE_FLAG) != 0U;
 
+        morse_player_worker_set_segment(app, i);
         if(tone) {
             furi_hal_speaker_start((float)app->tone_hz, app->volume);
         } else {
@@ -303,6 +432,9 @@ static void morse_player_stop(MorsePlayerApp* app) {
     app->worker_finished = false;
     app->speaker_error = false;
     app->progress_units = 0U;
+    app->active_text_offset = 0U;
+    app->active_display_offset = 0U;
+    app->active_tone = false;
 }
 
 static bool morse_player_start(MorsePlayerApp* app) {
@@ -314,6 +446,9 @@ static bool morse_player_start(MorsePlayerApp* app) {
     app->worker_finished = false;
     app->speaker_error = false;
     app->progress_units = 0U;
+    app->active_text_offset = 0U;
+    app->active_display_offset = 0U;
+    app->active_tone = false;
     app->worker = furi_thread_alloc_ex("MorsePlayer", 1024U, morse_player_worker, app);
     app->worker_started = true;
     furi_thread_start(app->worker);

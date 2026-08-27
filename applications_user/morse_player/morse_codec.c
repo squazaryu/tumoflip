@@ -236,6 +236,73 @@ bool morse_player_build_program(
     return info->segment_count > 0U;
 }
 
+bool morse_player_cursor_for_segment(
+    const char* text,
+    size_t target_segment,
+    MorsePlayerPlaybackCursor* cursor) {
+    if(!text || !cursor) return false;
+
+    size_t segment_index = 0U;
+    size_t display_offset = 0U;
+    bool has_character = false;
+    bool pending_word_gap = false;
+    const char* input = text;
+
+    while(*input != '\0') {
+        const char* text_start = input;
+        const uint32_t codepoint = morse_player_utf8_next(&input);
+        if(codepoint == 0U) break;
+
+        if(codepoint == ' ' || codepoint == '\t' || codepoint == '\r' || codepoint == '\n') {
+            if(has_character) pending_word_gap = true;
+            continue;
+        }
+
+        const char* pattern = morse_player_pattern_for_codepoint(codepoint);
+        if(!pattern) continue;
+
+        if(has_character) {
+            if(target_segment == segment_index) {
+                cursor->text_offset = (size_t)(text_start - text);
+                cursor->display_offset = display_offset;
+                return true;
+            }
+            segment_index++;
+            display_offset += pending_word_gap ? 3U : 1U;
+        }
+
+        for(const char* symbol = pattern; *symbol != '\0'; symbol++) {
+            if(target_segment == segment_index) {
+                cursor->text_offset = (size_t)(text_start - text);
+                cursor->display_offset = display_offset;
+                return true;
+            }
+            segment_index++;
+            display_offset++;
+
+            if(symbol[1] != '\0') {
+                if(target_segment == segment_index) {
+                    cursor->text_offset = (size_t)(text_start - text);
+                    cursor->display_offset = display_offset - 1U;
+                    return true;
+                }
+                segment_index++;
+            }
+        }
+
+        has_character = true;
+        pending_word_gap = false;
+    }
+
+    if(target_segment == segment_index) {
+        cursor->text_offset = strlen(text);
+        cursor->display_offset = display_offset;
+        return true;
+    }
+
+    return false;
+}
+
 static bool morse_player_display_append(char* output, size_t capacity, size_t* length, const char* text) {
     const size_t text_length = strlen(text);
     if(*length + text_length + 1U > capacity) return false;

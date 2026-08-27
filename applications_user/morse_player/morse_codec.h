@@ -25,6 +25,12 @@ typedef struct {
     size_t unknown_count;
 } MorsePlayerProgramInfo;
 
+/** The visible text/code position represented by one playback segment. */
+typedef struct {
+    size_t text_offset;
+    size_t display_offset;
+} MorsePlayerPlaybackCursor;
+
 /**
  * Find a Morse pattern for an ASCII/Unicode codepoint.
  *
@@ -49,6 +55,18 @@ bool morse_player_build_program(
     MorsePlayerSegment* segments,
     size_t segment_capacity,
     MorsePlayerProgramInfo* info);
+
+/**
+ * Map a timed segment back to the source text and Morse preview.
+ *
+ * Segment zero is the first tone or gap. Passing a segment index equal to the
+ * program length returns the end position, which is useful when a playback
+ * worker finishes. Unsupported codepoints are skipped just like the encoder.
+ */
+bool morse_player_cursor_for_segment(
+    const char* text,
+    size_t segment_index,
+    MorsePlayerPlaybackCursor* cursor);
 
 /** Build a compact preview such as ".... . .-.. .-.. --- / .--". */
 bool morse_player_build_display(
