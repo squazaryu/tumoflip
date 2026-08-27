@@ -10,6 +10,9 @@
 
 struct KeysDict {
     Stream* stream;
+    // Reuse one line buffer while iterating large dictionaries. Allocating a
+    // temporary FuriString for every key needlessly fragments the heap.
+    FuriString* scratch;
     size_t key_size;
     size_t key_size_symbols;
     size_t total_keys;
@@ -72,6 +75,7 @@ KeysDict* keys_dict_alloc(const char* path, KeysDictMode mode, size_t key_size) 
 
     Storage* storage = furi_record_open(RECORD_STORAGE);
     instance->stream = buffered_file_stream_alloc(storage);
+    instance->scratch = furi_string_alloc();
 
     FS_OpenMode open_mode = (mode == KeysDictModeOpenAlways) ? FSOM_OPEN_ALWAYS :
                                                                FSOM_OPEN_EXISTING;
@@ -92,14 +96,12 @@ KeysDict* keys_dict_alloc(const char* path, KeysDictMode mode, size_t key_size) 
         keys_dict_add_ending_new_line(instance);
     }
 
-    FuriString* line = furi_string_alloc();
-
     bool is_endfile = false;
 
     // In this loop we only count the entries in the file
     // We prefer not to load the whole file in memory for space reasons
     while(file_exists && !is_endfile) {
-        bool read_key = keys_dict_read_key_line(instance, line, &is_endfile);
+        bool read_key = keys_dict_read_key_line(instance, instance->scratch, &is_endfile);
         if(read_key) {
             instance->total_keys++;
         }
@@ -107,14 +109,15 @@ KeysDict* keys_dict_alloc(const char* path, KeysDictMode mode, size_t key_size) 
     stream_rewind(instance->stream);
     FURI_LOG_I(TAG, "Loaded dictionary with %zu keys", instance->total_keys);
 
-    furi_string_free(line);
-
     return instance;
 }
 
 void keys_dict_free(KeysDict* instance) {
     furi_check(instance);
     furi_check(instance->stream);
+    furi_check(instance->scratch);
+
+    furi_string_free(instance->scratch);
 
     buffered_file_stream_close(instance->stream);
     stream_free(instance->stream);
@@ -184,18 +187,16 @@ static bool keys_dict_get_next_key_str(KeysDict* instance, FuriString* key) {
 bool keys_dict_get_next_key(KeysDict* instance, uint8_t* key, size_t key_size) {
     furi_check(instance);
     furi_check(instance->stream);
+    furi_check(instance->scratch);
     furi_check(instance->key_size == key_size);
     furi_check(key);
 
-    FuriString* temp_key = furi_string_alloc();
-
-    bool key_read = keys_dict_get_next_key_str(instance, temp_key);
+    bool key_read = keys_dict_get_next_key_str(instance, instance->scratch);
 
     if(key_read) {
-        keys_dict_str_to_int(instance, temp_key, key);
+        keys_dict_str_to_int(instance, instance->scratch, key);
     }
 
-    furi_string_free(temp_key);
     return key_read;
 }
 
