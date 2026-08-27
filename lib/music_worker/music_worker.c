@@ -5,8 +5,7 @@
 
 #include <storage/storage.h>
 #include <lib/flipper_format/flipper_format.h>
-
-#include <math.h>
+#include <toolbox/note_frequency.h>
 #include <m-array.h>
 
 #define TAG "MusicWorker"
@@ -15,10 +14,6 @@
 #define MUSIC_PLAYER_VERSION  0
 
 #define SEMITONE_PAUSE 0xFF
-
-#define NOTE_C4             261.63f
-#define NOTE_C4_SEMITONE    (4.0f * 12.0f)
-#define TWO_POW_TWELTH_ROOT 1.059463094359f
 
 typedef struct {
     uint8_t semitone;
@@ -56,8 +51,7 @@ static int32_t music_worker_thread_callback(void* context) {
             } else {
                 NoteBlock* note_block = NoteBlockArray_ref(it);
 
-                float note_from_a4 = (float)note_block->semitone - NOTE_C4_SEMITONE;
-                float frequency = NOTE_C4 * powf(TWO_POW_TWELTH_ROOT, note_from_a4);
+                float frequency = note_frequency_from_semitone(note_block->semitone);
                 float duration = 60.0 * furi_kernel_get_tick_frequency() * 4 / instance->bpm /
                                  note_block->duration;
                 uint32_t dots = note_block->dots;
