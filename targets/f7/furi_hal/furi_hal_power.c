@@ -581,6 +581,60 @@ void furi_hal_power_info_get(PropertyValueCallback out, char sep, void* context)
     furi_string_free(value);
 }
 
+typedef struct {
+    const char* name;
+    uint8_t byte;
+    uint8_t mask;
+    uint8_t shift;
+} FuriHalPowerDebugBitField;
+
+/*
+ * BQ27220 status structures are two low-bit-first bytes (see bq27220.h).
+ * Keeping the field layout in data lets the debug exporter share one small
+ * emission loop instead of repeating the same property metadata 24 times.
+ */
+static const FuriHalPowerDebugBitField furi_hal_power_debug_operation_fields[] = {
+    {"calmd", 0, 0x01, 0},
+    {"sec", 0, 0x03, 1},
+    {"edv2", 0, 0x01, 3},
+    {"vdq", 0, 0x01, 4},
+    {"initcomp", 0, 0x01, 5},
+    {"smth", 0, 0x01, 6},
+    {"btpint", 0, 0x01, 7},
+    {"cfgupdate", 1, 0x01, 2},
+};
+
+static const FuriHalPowerDebugBitField furi_hal_power_debug_battery_fields[] = {
+    {"chginh", 1, 0x01, 0},
+    {"fc", 1, 0x01, 1},
+    {"otd", 1, 0x01, 2},
+    {"otc", 1, 0x01, 3},
+    {"sleep", 1, 0x01, 4},
+    {"ocvfail", 1, 0x01, 5},
+    {"ocvcomp", 1, 0x01, 6},
+    {"fd", 1, 0x01, 7},
+    {"dsg", 0, 0x01, 0},
+    {"sysdwn", 0, 0x01, 1},
+    {"tda", 0, 0x01, 2},
+    {"battpres", 0, 0x01, 3},
+    {"authgd", 0, 0x01, 4},
+    {"ocvgd", 0, 0x01, 5},
+    {"tca", 0, 0x01, 6},
+    {"rsvd", 0, 0x01, 7},
+};
+
+static void furi_hal_power_debug_emit_bit_fields(
+    PropertyValueContext* property_context,
+    const uint8_t* raw_status,
+    const FuriHalPowerDebugBitField* fields,
+    size_t fields_count) {
+    for(size_t i = 0; i < fields_count; i++) {
+        const FuriHalPowerDebugBitField* field = &fields[i];
+        const int value = (raw_status[field->byte] >> field->shift) & field->mask;
+        property_value_out(property_context, "%d", 2, "gauge", field->name, value);
+    }
+}
+
 void furi_hal_power_debug_get(PropertyValueCallback out, void* context) {
     furi_check(out);
 
@@ -640,37 +694,17 @@ void furi_hal_power_debug_get(PropertyValueCallback out, void* context) {
     if(bq27220_get_battery_status(&furi_hal_i2c_handle_power, &battery_status) &&
        bq27220_get_operation_status(&furi_hal_i2c_handle_power, &operation_status)) {
         property_value_out(&property_context, "%lu", 2, "charger", "ntc", ntc_mpct);
-        property_value_out(&property_context, "%d", 2, "gauge", "calmd", operation_status.CALMD);
-        property_value_out(&property_context, "%d", 2, "gauge", "sec", operation_status.SEC);
-        property_value_out(&property_context, "%d", 2, "gauge", "edv2", operation_status.EDV2);
-        property_value_out(&property_context, "%d", 2, "gauge", "vdq", operation_status.VDQ);
-        property_value_out(
-            &property_context, "%d", 2, "gauge", "initcomp", operation_status.INITCOMP);
-        property_value_out(&property_context, "%d", 2, "gauge", "smth", operation_status.SMTH);
-        property_value_out(&property_context, "%d", 2, "gauge", "btpint", operation_status.BTPINT);
-        property_value_out(
-            &property_context, "%d", 2, "gauge", "cfgupdate", operation_status.CFGUPDATE);
+        furi_hal_power_debug_emit_bit_fields(
+            &property_context,
+            (const uint8_t*)&operation_status,
+            furi_hal_power_debug_operation_fields,
+            COUNT_OF(furi_hal_power_debug_operation_fields));
 
-        // Battery status register, part 1
-        property_value_out(&property_context, "%d", 2, "gauge", "chginh", battery_status.CHGINH);
-        property_value_out(&property_context, "%d", 2, "gauge", "fc", battery_status.FC);
-        property_value_out(&property_context, "%d", 2, "gauge", "otd", battery_status.OTD);
-        property_value_out(&property_context, "%d", 2, "gauge", "otc", battery_status.OTC);
-        property_value_out(&property_context, "%d", 2, "gauge", "sleep", battery_status.SLEEP);
-        property_value_out(&property_context, "%d", 2, "gauge", "ocvfail", battery_status.OCVFAIL);
-        property_value_out(&property_context, "%d", 2, "gauge", "ocvcomp", battery_status.OCVCOMP);
-        property_value_out(&property_context, "%d", 2, "gauge", "fd", battery_status.FD);
-
-        // Battery status register, part 2
-        property_value_out(&property_context, "%d", 2, "gauge", "dsg", battery_status.DSG);
-        property_value_out(&property_context, "%d", 2, "gauge", "sysdwn", battery_status.SYSDWN);
-        property_value_out(&property_context, "%d", 2, "gauge", "tda", battery_status.TDA);
-        property_value_out(
-            &property_context, "%d", 2, "gauge", "battpres", battery_status.BATTPRES);
-        property_value_out(&property_context, "%d", 2, "gauge", "authgd", battery_status.AUTH_GD);
-        property_value_out(&property_context, "%d", 2, "gauge", "ocvgd", battery_status.OCVGD);
-        property_value_out(&property_context, "%d", 2, "gauge", "tca", battery_status.TCA);
-        property_value_out(&property_context, "%d", 2, "gauge", "rsvd", battery_status.RSVD);
+        furi_hal_power_debug_emit_bit_fields(
+            &property_context,
+            (const uint8_t*)&battery_status,
+            furi_hal_power_debug_battery_fields,
+            COUNT_OF(furi_hal_power_debug_battery_fields));
 
         // Voltage and current info
         property_value_out(

@@ -193,7 +193,7 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-007` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-007-013` (or newer) | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-008-002` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
@@ -215,10 +215,10 @@ settings, IR files, and Sub-GHz files should be copied somewhere safe.
 
 Download the update package from the
 [GitHub release](https://github.com/squazaryu/tumoflip/releases/latest) and use
-the normal qFlipper or Flipper SD-card update flow. The stable artifact is:
+the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-flppr-fw-007.tgz
+flipper-z-f7-update-t-dev-008-002.tgz
 ```
 
 ## Compatibility notes

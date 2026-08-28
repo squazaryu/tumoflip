@@ -151,7 +151,8 @@ static void subghz_scene_add_to_history_callback(
                 idx--;
             }
         }
-        if(subghz_history_add_to_history(history, decoder_base, &preset)) {
+        if(subghz_history_add_to_history(
+               history, decoder_base, &preset, subghz_txrx_get_air_time_ms(subghz->txrx))) {
             furi_string_reset(item_name);
             furi_string_reset(item_time);
 

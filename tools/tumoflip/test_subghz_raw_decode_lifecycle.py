@@ -110,15 +110,18 @@ class SubGhzRawDecodeLifecycleTest(unittest.TestCase):
         raw_tx = source("lib/subghz/protocols/raw.c")
         self.assertIn("furi_string_get_cstr(instance->radio_device_name)", raw_tx)
 
-    def test_zero_hash_and_resume_timeout_are_handled_in_both_histories(self) -> None:
+    def test_zero_hash_and_air_time_window_are_handled_in_both_histories(self) -> None:
         for relative in (CORE_HISTORY, ARF_HISTORY):
             with self.subTest(path=relative):
                 history = source(relative)
                 self.assertIn("bool code_last_hash_data_set;", history)
                 self.assertIn("instance->code_last_hash_data_set = false;", history)
+                self.assertIn("uint32_t last_update_air_time;", history)
                 self.assertIn(
-                    "instance->last_update_timestamp = furi_get_tick();", history
+                    "air_time_ms - instance->last_update_air_time", history
                 )
+                self.assertNotIn("last_update_timestamp", history)
+                self.assertNotIn("furi_get_tick() - instance->last_update", history)
                 self.assertIn("instance->code_last_hash_data_set &&", history)
                 self.assertIn(
                     "instance->code_last_hash_data == code_hash_data", history
@@ -137,6 +140,23 @@ class SubGhzRawDecodeLifecycleTest(unittest.TestCase):
                 resume.index("subghz_history_restart_duplicate_timeout(history)"),
                 resume.index("subghz_txrx_rx_start(subghz->txrx)"),
             )
+
+    def test_decoder_clock_is_used_by_live_and_raw_paths(self) -> None:
+        for relative in (
+            "applications/main/subghz/helpers/subghz_txrx.c",
+            "applications_user/arf_subghz_full/helpers/subghz_txrx.c",
+        ):
+            with self.subTest(path=relative):
+                txrx = source(relative)
+                self.assertIn("subghz_txrx_worker_pair_callback", txrx)
+                self.assertIn("subghz_txrx_get_air_time_ms", txrx)
+                self.assertIn("subghz_receiver_decode(", txrx)
+                self.assertIn("instance->air_time_us += duration", txrx)
+
+        for relative in (CORE_DECODE, ARF_DECODE):
+            decode = source(relative)
+            self.assertIn("subghz_txrx_decode(subghz->txrx, level, duration)", decode)
+            self.assertIn("subghz_txrx_get_air_time_ms(subghz->txrx)", decode)
 
     def test_async_rx_resets_decoders_before_start(self) -> None:
         core_txrx = source("applications/main/subghz/helpers/subghz_txrx.c")
