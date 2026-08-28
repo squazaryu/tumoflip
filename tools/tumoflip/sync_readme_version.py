@@ -96,9 +96,81 @@ def is_stable_prefix(prefix: str) -> bool:
     return prefix in (STABLE_PREFIX, LEGACY_STABLE_PREFIX)
 
 
+def sync_compact_readme_text(
+    text: str, dist_suffix: str, release_tag: str | None = None
+) -> str:
+    """Update the compact README without rewriting historical identities.
+
+    The current README intentionally keeps the stable identity visible while a
+    development build is being prepared.  The original synchronizer predates
+    that layout and replaced every version-shaped string, which turned stable
+    documentation into a development snapshot.  Compact metadata has explicit
+    Stable/Dev rows, so update only the row represented by ``dist_suffix`` and
+    the branch artifact examples.
+    """
+
+    prefix, _, _, _ = parse_dist_suffix(dist_suffix)
+    updated = text
+
+    if is_stable_prefix(prefix):
+        current_stable = re.compile(
+            r"(^> \*\*Current stable:\*\* )`[^`]+`(?: \(`[^`]+`\))?",
+            re.MULTILINE,
+        )
+        current_match = current_stable.search(updated)
+        if current_match:
+            semver = release_tag
+            if semver is None:
+                existing = re.search(r"\(`(v[^`]+)`\)", current_match.group(0))
+                semver = existing.group(1) if existing else None
+            semver_suffix = f" (`{semver}`)" if semver else ""
+            replacement = f"{current_match.group(1)}`{dist_suffix}`{semver_suffix}"
+            updated = current_stable.sub(replacement, updated, count=1)
+
+        updated = re.sub(
+            r"(^\| \*\*Stable\*\* \| )`[^`]+`",
+            rf"\1`{dist_suffix}`",
+            updated,
+            count=1,
+            flags=re.MULTILINE,
+        )
+    else:
+        updated = re.sub(
+            r"(^\| \*\*Dev\*\* \| )`[^`]+`(?: \([^)]*\))?",
+            rf"\1`{dist_suffix}`",
+            updated,
+            count=1,
+            flags=re.MULTILINE,
+        )
+
+    # The compact README labels these examples as the currently selected
+    # branch build.  They must follow either a stable or development build,
+    # while historical stable identities elsewhere remain untouched.
+    updated = re.sub(
+        r"flipper-z-f7-update-(?:t-flppr-fw-[0-9-]+|tmwhflpprarf[0-9-]+|t-dev-[0-9-]+)\.tgz",
+        f"flipper-z-f7-update-{dist_suffix}.tgz",
+        updated,
+    )
+
+    if release_tag:
+        if not release_tag.startswith("v"):
+            raise ValueError(f"release tag must start with v: {release_tag}")
+        updated = re.sub(
+            r"- Release: `v[^`]+` published release",
+            f"- Release: `{release_tag}` published release",
+            updated,
+            count=1,
+        )
+
+    return updated
+
+
 def sync_readme_text(
     text: str, dist_suffix: str, release_tag: str | None = None
 ) -> str:
+    if "## Stable and Dev channels" in text and "## Version Scheme" not in text:
+        return sync_compact_readme_text(text, dist_suffix, release_tag)
+
     prefix, base, build, iteration = parse_dist_suffix(dist_suffix)
     updated = README_VERSION_RE.sub(dist_suffix, text)
     # These lines describe the immutable first standalone stable release, not

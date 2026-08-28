@@ -15,6 +15,27 @@
 #define SUBGHZ_PROTOCOL_PLUGIN_PATH      EXT_PATH("apps_data/subghz/plugins")
 #define SUBGHZ_DIVERSITY_STREAM_CAPACITY 1024U
 
+static void subghz_txrx_add_air_time(SubGhzTxRx* instance, uint32_t duration) {
+    furi_check(furi_mutex_acquire(instance->air_time_mutex, FuriWaitForever) == FuriStatusOk);
+    instance->air_time_us += duration;
+    furi_mutex_release(instance->air_time_mutex);
+}
+
+static void subghz_txrx_worker_pair_callback(void* context, bool level, uint32_t duration) {
+    SubGhzTxRxReceiverContext* receiver_context = context;
+    furi_check(receiver_context);
+    subghz_receiver_decode(receiver_context->receiver, level, duration);
+    // Count samples after decode: a decoder callback is emitted before the
+    // terminating gap has been consumed, matching the upstream air-time model.
+    subghz_txrx_add_air_time(receiver_context->instance, duration);
+}
+
+static void subghz_txrx_worker_overrun_callback(void* context) {
+    SubGhzTxRxReceiverContext* receiver_context = context;
+    furi_check(receiver_context);
+    subghz_receiver_reset(receiver_context->receiver);
+}
+
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
     subghz_radio_broker_external_power_on(instance->radio_broker, &instance->radio_lease);
 }
@@ -65,9 +86,10 @@ static void subghz_txrx_configure_receiver(
     SubGhzTxRxReceiverContext* context) {
     subghz_receiver_set_filter(receiver, instance->receiver_filter);
     subghz_receiver_set_rx_callback(receiver, subghz_txrx_receiver_callback, context);
-    subghz_worker_set_overrun_callback(worker, (SubGhzWorkerOverrunCallback)subghz_receiver_reset);
-    subghz_worker_set_pair_callback(worker, (SubGhzWorkerPairCallback)subghz_receiver_decode);
-    subghz_worker_set_context(worker, receiver);
+    context->receiver = receiver;
+    subghz_worker_set_overrun_callback(worker, subghz_txrx_worker_overrun_callback);
+    subghz_worker_set_pair_callback(worker, subghz_txrx_worker_pair_callback);
+    subghz_worker_set_context(worker, context);
 }
 
 static void subghz_txrx_diversity_free(SubGhzTxRx* instance) {
@@ -123,6 +145,8 @@ SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group) {
 
     instance->worker = subghz_worker_alloc();
     instance->rx_callback_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
+    instance->air_time_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
+    instance->air_time_us = 0;
     instance->fff_data = flipper_format_string_alloc();
     instance->tx_from_internal_fff = false;
     instance->rx_callback = NULL;
@@ -230,6 +254,7 @@ void subghz_txrx_free(SubGhzTxRx* instance) {
     furi_string_free(instance->preset->name);
     subghz_setting_free(instance->setting);
     furi_mutex_free(instance->rx_callback_mutex);
+    furi_mutex_free(instance->air_time_mutex);
 
     free(instance->preset);
     free(instance);
@@ -1181,6 +1206,20 @@ void subghz_txrx_receiver_reset(SubGhzTxRx* instance) {
     if(instance->diversity_receiver) {
         subghz_receiver_reset(instance->diversity_receiver);
     }
+}
+
+void subghz_txrx_decode(SubGhzTxRx* instance, bool level, uint32_t duration) {
+    furi_assert(instance);
+    subghz_receiver_decode(instance->receiver, level, duration);
+    subghz_txrx_add_air_time(instance, duration);
+}
+
+uint32_t subghz_txrx_get_air_time_ms(SubGhzTxRx* instance) {
+    furi_assert(instance);
+    furi_check(furi_mutex_acquire(instance->air_time_mutex, FuriWaitForever) == FuriStatusOk);
+    uint32_t air_time_ms = (uint32_t)(instance->air_time_us / 1000U);
+    furi_mutex_release(instance->air_time_mutex);
+    return air_time_ms;
 }
 
 SubGhzReceiver* subghz_txrx_get_receiver(SubGhzTxRx* instance) {
