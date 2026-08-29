@@ -85,6 +85,12 @@ are legally allowed to test.
 - Select `Standard Sub-GHz`; confirm it starts the core firmware app.
 - Run `Read` with internal CC1101 and confirm RX starts.
 - Run `Read RAW`, start and stop capture, then exit without reboot.
+- With Standard hopping off, set Standard to 315 MHz/AM650. Open `Read RAW ->
+  Config`, set 433.92 MHz/FM238, exit, and reopen both screens. Confirm each
+  screen retains its own frequency and modulation.
+- Change Standard to 868.35 MHz/AM270 and confirm the saved Read RAW profile is
+  still 433.92 MHz/FM238. Then change Read RAW back to 315 MHz/AM650 and confirm
+  Standard remains 868.35 MHz/AM270.
 - Save a legal test signal and reopen it from Saved.
 - With hopping off, select 315 MHz/AM and open the protocol list. Confirm
   `Linear` and `Cham_Code` are selectable; change to 433 MHz and confirm both

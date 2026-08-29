@@ -435,8 +435,7 @@ int32_t subghz_app(void* p) {
 
     if(open_capture_at_frequency &&
        subghz_txrx_radio_device_is_frequency_valid(subghz->txrx, capture_frequency)) {
-        subghz->last_settings->frequency = capture_frequency;
-        subghz->last_settings->hopping_mode = SubGhzHoppingModeOff;
+        subghz->last_settings->raw_frequency = capture_frequency;
         subghz_last_settings_save(subghz->last_settings);
     }
 

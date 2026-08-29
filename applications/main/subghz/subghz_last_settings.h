@@ -27,6 +27,8 @@ typedef enum {
 typedef struct {
     uint32_t frequency;
     uint32_t preset_index; // AKA Modulation
+    uint32_t raw_frequency;
+    uint32_t raw_preset_index; // AKA Modulation for Read RAW
     uint32_t frequency_analyzer_feedback_level;
     float frequency_analyzer_trigger;
     bool protocol_file_names;

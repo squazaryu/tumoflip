@@ -29,6 +29,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("test_subghz_drift.py", workflow)
         self.assertIn("test_subghz_protocol_capabilities.py", workflow)
         self.assertIn("test_subghz_protocol_packs.py", workflow)
+        self.assertIn("test_subghz_raw_profiles.py", workflow)
         self.assertIn("test_hardware_acceptance_suite.py", workflow)
         self.assertIn("test_update_splash.py", workflow)
         self.assertIn("tumoflip-packages.json", workflow)
