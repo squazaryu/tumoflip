@@ -31,6 +31,7 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
         self.assertIn('fap_icon="icon.png"', self.manifest)
         self.assertTrue((APP_DIR / "icon.png").is_file())
         self.assertIn('icon="A_Plugins_14"', self.manifest)
+        self.assertIn('fap_version="0.2.0"', self.manifest)
 
     def test_report_covers_release_acceptance_inputs(self) -> None:
         for required in (
@@ -52,8 +53,32 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
             "furi_hal_infrared_is_busy()",
             "furi_hal_power_check_otg_fault()",
             "Hardware-only transmit/receive tests: SKIP by design",
+            "TUMO_ACCEPTANCE_REPORT_SCHEMA",
+            "TumoAcceptanceResultSkip",
+            "furi_hal_power_gauge_is_ok()",
+            "furi_hal_power_get_pct()",
+            "storage_common_fs_info",
         ):
             self.assertIn(required, self.source)
+
+    def test_safe_self_test_uses_private_create_new_probe_and_cleans_it(self) -> None:
+        for required in (
+            'EXT_PATH("apps_data/tumo_acceptance_suite/.storage_probe.tmp")',
+            "FSOM_CREATE_NEW",
+            "storage_file_write",
+            "storage_file_sync",
+            "storage_file_read",
+            "memcmp",
+            "storage_common_remove",
+            "Run Safe Test",
+            "Display/input",
+            "NFC availability",
+            "GPIO baseline",
+            "BLE/AppBridge state",
+        ):
+            self.assertIn(required, self.source)
+
+        self.assertNotIn("FSOM_CREATE_ALWAYS", self.source)
 
     def test_app_checks_key_packaged_paths_without_active_transmit(self) -> None:
         for required in (
@@ -80,7 +105,7 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
     def test_report_export_and_cockpit_package_route(self) -> None:
         self.assertIn('EXT_PATH("apps_data/tumo_acceptance_suite")', self.source)
         self.assertIn('"/acceptance_%s.txt"', self.source)
-        self.assertIn("storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS)", self.source)
+        self.assertIn("storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_NEW)", self.source)
         self.assertIn("storage_file_sync(file)", self.source)
         self.assertIn("System: Acceptance", self.cockpit)
         self.assertIn("System: Runtime Trace", self.cockpit)
