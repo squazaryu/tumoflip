@@ -19,9 +19,14 @@
 #include <string.h>
 
 #define TUMO_ACCEPTANCE_DATA_DIR EXT_PATH("apps_data/tumo_acceptance_suite")
+#define TUMO_ACCEPTANCE_STORAGE_PROBE_PATH \
+    EXT_PATH("apps_data/tumo_acceptance_suite/.storage_probe.tmp")
 #define TUMO_ACCEPTANCE_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
-#define TUMO_ACCEPTANCE_REPORT_PATH_SIZE 128U
-#define TUMO_ACCEPTANCE_MAX_THREAD_LINES 12U
+#define TUMO_ACCEPTANCE_REPORT_SCHEMA      "tumoflip.acceptance/1"
+#define TUMO_ACCEPTANCE_SUITE_VERSION      "0.2.0"
+#define TUMO_ACCEPTANCE_REPORT_PATH_SIZE   128U
+#define TUMO_ACCEPTANCE_MAX_THREAD_LINES   12U
+#define TUMO_ACCEPTANCE_DETAIL_SIZE        96U
 
 typedef enum {
     TumoAcceptanceViewMenu,
@@ -33,6 +38,12 @@ typedef enum {
     TumoAcceptanceActionExport,
     TumoAcceptanceActionAbout,
 } TumoAcceptanceAction;
+
+typedef enum {
+    TumoAcceptanceResultSkip,
+    TumoAcceptanceResultPass,
+    TumoAcceptanceResultFail,
+} TumoAcceptanceResult;
 
 typedef struct {
     const char* label;
@@ -47,6 +58,9 @@ typedef struct {
     Submenu* submenu;
     TextBox* text_box;
     FuriString* text;
+    bool self_test_ran;
+    TumoAcceptanceResult storage_result;
+    char storage_detail[TUMO_ACCEPTANCE_DETAIL_SIZE];
 } TumoAcceptanceApp;
 
 static const TumoAcceptancePathCheck tumo_acceptance_paths[] = {
@@ -119,6 +133,19 @@ static void tumo_acceptance_append_result(
     if(detail && detail[0]) {
         furi_string_cat_printf(output, " - %s", detail);
     }
+    furi_string_cat(output, "\n");
+}
+
+static void tumo_acceptance_append_status(
+    FuriString* output,
+    const char* name,
+    TumoAcceptanceResult result,
+    const char* detail) {
+    const char* status = "SKIP";
+    if(result == TumoAcceptanceResultPass) status = "PASS";
+    if(result == TumoAcceptanceResultFail) status = "FAIL";
+    furi_string_cat_printf(output, "[%s] %s", status, name);
+    if(detail && detail[0]) furi_string_cat_printf(output, " - %s", detail);
     furi_string_cat(output, "\n");
 }
 
@@ -246,16 +273,73 @@ static void tumo_acceptance_append_runtime_snapshot(
     furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
 
     tumo_acceptance_append_info(
-        output,
-        "USB CLI log drops",
-        "query with `log stats` after a USB log session");
+        output, "USB CLI log drops", "query with `log stats` after a USB log session");
     UNUSED(app);
 }
 
-static void tumo_acceptance_build_report(
-    TumoAcceptanceApp* app,
-    FuriString* output,
-    const char* stage) {
+static TumoAcceptanceResult tumo_acceptance_run_storage_test(TumoAcceptanceApp* app) {
+    static const uint8_t probe[] = "TUMO_ACCEPTANCE_STORAGE_V1";
+    uint8_t readback[sizeof(probe)] = {0};
+    strlcpy(app->storage_detail, "not run", sizeof(app->storage_detail));
+
+    if(storage_sd_status(app->storage) != FSE_OK) {
+        strlcpy(app->storage_detail, "SD card is not mounted", sizeof(app->storage_detail));
+        return TumoAcceptanceResultSkip;
+    }
+    if(!tumo_acceptance_mkdir(app->storage, TUMO_ACCEPTANCE_DATA_DIR)) {
+        strlcpy(app->storage_detail, "private directory unavailable", sizeof(app->storage_detail));
+        return TumoAcceptanceResultFail;
+    }
+
+    if(tumo_acceptance_path_exists(app->storage, TUMO_ACCEPTANCE_STORAGE_PROBE_PATH) &&
+       storage_common_remove(app->storage, TUMO_ACCEPTANCE_STORAGE_PROBE_PATH) != FSE_OK) {
+        strlcpy(
+            app->storage_detail,
+            "stale private probe cleanup failed",
+            sizeof(app->storage_detail));
+        return TumoAcceptanceResultFail;
+    }
+
+    File* file = storage_file_alloc(app->storage);
+    bool opened =
+        storage_file_open(file, TUMO_ACCEPTANCE_STORAGE_PROBE_PATH, FSAM_WRITE, FSOM_CREATE_NEW);
+    bool write_ok = false;
+    if(opened) {
+        write_ok = storage_file_write(file, probe, sizeof(probe)) == sizeof(probe) &&
+                   storage_file_sync(file);
+        storage_file_close(file);
+    }
+
+    bool read_ok = false;
+    if(write_ok && storage_file_open(
+                       file, TUMO_ACCEPTANCE_STORAGE_PROBE_PATH, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        read_ok = storage_file_read(file, readback, sizeof(readback)) == sizeof(readback) &&
+                  memcmp(probe, readback, sizeof(probe)) == 0;
+        storage_file_close(file);
+    }
+    storage_file_free(file);
+
+    const bool cleanup_ok =
+        storage_common_remove(app->storage, TUMO_ACCEPTANCE_STORAGE_PROBE_PATH) == FSE_OK &&
+        !tumo_acceptance_path_exists(app->storage, TUMO_ACCEPTANCE_STORAGE_PROBE_PATH);
+    if(!opened) {
+        strlcpy(app->storage_detail, "CREATE_NEW failed", sizeof(app->storage_detail));
+    } else if(!write_ok) {
+        strlcpy(app->storage_detail, "write or sync failed", sizeof(app->storage_detail));
+    } else if(!read_ok) {
+        strlcpy(app->storage_detail, "read-back mismatch", sizeof(app->storage_detail));
+    } else if(!cleanup_ok) {
+        strlcpy(app->storage_detail, "private probe cleanup failed", sizeof(app->storage_detail));
+    } else {
+        strlcpy(
+            app->storage_detail, "write, sync, read-back, cleanup", sizeof(app->storage_detail));
+        return TumoAcceptanceResultPass;
+    }
+    return TumoAcceptanceResultFail;
+}
+
+static void
+    tumo_acceptance_build_report(TumoAcceptanceApp* app, FuriString* output, const char* stage) {
     furi_string_reset(output);
 
     const Version* version = furi_hal_version_get_firmware_version();
@@ -263,7 +347,13 @@ static void tumo_acceptance_build_report(
     uint16_t api_minor = 0;
     furi_hal_info_get_api_version(&api_major, &api_minor);
 
-    furi_string_cat(output, "Tumoflip Hardware Acceptance Suite\n");
+    furi_string_cat_printf(
+        output,
+        "Tumoflip Hardware Acceptance Suite\n"
+        "Schema: %s\n"
+        "Suite: %s\n",
+        TUMO_ACCEPTANCE_REPORT_SCHEMA,
+        TUMO_ACCEPTANCE_SUITE_VERSION);
     furi_string_cat(output, "Generated: ");
     tumo_acceptance_append_iso_timestamp(output);
     furi_string_cat_printf(
@@ -290,7 +380,32 @@ static void tumo_acceptance_build_report(
 
     furi_string_cat(output, "\nStorage\n");
     const bool sd_ready = storage_sd_status(app->storage) == FSE_OK;
-    tumo_acceptance_append_result(output, "SD card mounted", sd_ready, sd_ready ? "ready" : "not ready");
+    tumo_acceptance_append_result(
+        output, "SD card mounted", sd_ready, sd_ready ? "ready" : "not ready");
+    uint64_t total_space = 0;
+    uint64_t free_space = 0;
+    const FS_Error fs_info =
+        storage_common_fs_info(app->storage, STORAGE_EXT_PATH_PREFIX, &total_space, &free_space);
+    char storage_detail[TUMO_ACCEPTANCE_DETAIL_SIZE];
+    if(fs_info == FSE_OK) {
+        snprintf(
+            storage_detail,
+            sizeof(storage_detail),
+            "free=%llu total=%llu",
+            (unsigned long long)free_space,
+            (unsigned long long)total_space);
+    } else {
+        strlcpy(storage_detail, "capacity unavailable", sizeof(storage_detail));
+    }
+    tumo_acceptance_append_status(
+        output,
+        "SD free space",
+        fs_info == FSE_OK ? TumoAcceptanceResultPass :
+        sd_ready          ? TumoAcceptanceResultFail :
+                            TumoAcceptanceResultSkip,
+        storage_detail);
+    tumo_acceptance_append_status(
+        output, "private storage R/W", app->storage_result, app->storage_detail);
     const bool package_state =
         sd_ready && tumo_acceptance_path_exists(app->storage, TUMO_ACCEPTANCE_PACKAGE_STATE_PATH);
     tumo_acceptance_append_result(
@@ -309,37 +424,55 @@ static void tumo_acceptance_build_report(
         (unsigned long)memmgr_get_minimum_free_heap(),
         (unsigned long)memmgr_heap_get_max_free_block());
     tumo_acceptance_append_result(
-        output,
-        "heap headroom",
-        memmgr_heap_get_max_free_block() >= 4096U,
-        heap_detail);
+        output, "heap headroom", memmgr_heap_get_max_free_block() >= 4096U, heap_detail);
     tumo_acceptance_append_runtime_snapshot(app, output, stage);
 
     furi_string_cat(output, "\nPassive hardware state\n");
-    tumo_acceptance_append_info(
+    char battery_detail[TUMO_ACCEPTANCE_DETAIL_SIZE];
+    snprintf(
+        battery_detail,
+        sizeof(battery_detail),
+        "%u%% health=%u%% %.2fV %s",
+        furi_hal_power_get_pct(),
+        furi_hal_power_get_bat_health_pct(),
+        (double)furi_hal_power_get_battery_voltage(FuriHalPowerICFuelGauge),
+        furi_hal_power_is_charging() ? "charging" : "battery");
+    tumo_acceptance_append_result(
+        output, "battery gauge", furi_hal_power_gauge_is_ok(), battery_detail);
+    tumo_acceptance_append_status(
         output,
-        "IR HAL",
-        furi_hal_infrared_is_busy() ? "busy" : "free");
+        "Display/input",
+        app->self_test_ran ? TumoAcceptanceResultPass : TumoAcceptanceResultSkip,
+        app->self_test_ran ? "safe test selected through GUI" : "run safe test first");
+    tumo_acceptance_append_status(
+        output, "NFC availability", TumoAcceptanceResultSkip, "not probed in FAP-only phase");
+    tumo_acceptance_append_status(
+        output, "GPIO baseline", TumoAcceptanceResultSkip, "no pins are driven in safe phase");
+    tumo_acceptance_append_status(
+        output, "BLE/AppBridge state", TumoAcceptanceResultSkip, "not probed in FAP-only phase");
+    tumo_acceptance_append_info(output, "IR HAL", furi_hal_infrared_is_busy() ? "busy" : "free");
     tumo_acceptance_append_info(
-        output,
-        "USART",
-        furi_hal_serial_control_is_busy(FuriHalSerialIdUsart) ? "busy" : "free");
+        output, "USART", furi_hal_serial_control_is_busy(FuriHalSerialIdUsart) ? "busy" : "free");
     tumo_acceptance_append_info(
         output,
         "LPUART",
         furi_hal_serial_control_is_busy(FuriHalSerialIdLpuart) ? "busy" : "free");
     tumo_acceptance_append_info(
-        output,
-        "Sleep",
-        furi_hal_power_sleep_available() ? "available" : "locked");
+        output, "Sleep", furi_hal_power_sleep_available() ? "available" : "locked");
     tumo_acceptance_append_info(
-        output,
-        "OTG 5V",
-        furi_hal_power_is_otg_enabled() ? "enabled" : "disabled");
+        output, "OTG 5V", furi_hal_power_is_otg_enabled() ? "enabled" : "disabled");
     tumo_acceptance_append_info(
+        output, "OTG fault", furi_hal_power_check_otg_fault() ? "yes" : "no");
+
+    SubGhzRadioBroker* radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+    SubGhzRadioBrokerStatusV2 radio_status;
+    subghz_radio_broker_get_status_v2(radio_broker, &radio_status);
+    furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
+    tumo_acceptance_append_status(
         output,
-        "OTG fault",
-        furi_hal_power_check_otg_fault() ? "yes" : "no");
+        "CC1101 broker baseline",
+        radio_status.base.busy ? TumoAcceptanceResultSkip : TumoAcceptanceResultPass,
+        radio_status.base.busy ? "owned by another app; left untouched" : "idle; no RF TX");
 
     furi_string_cat(output, "\nPackaged app paths\n");
     uint8_t missing_required = 0;
@@ -361,20 +494,19 @@ static void tumo_acceptance_build_report(
     tumo_acceptance_append_result(
         output,
         "release smoke",
-        sd_ready && !version_get_dirty_flag(version) && (missing_required == 0U),
-        "passive checks only");
+        sd_ready && !version_get_dirty_flag(version) && (missing_required == 0U) &&
+            app->self_test_ran && app->storage_result == TumoAcceptanceResultPass,
+        "safe FAP phase; optional hardware skips do not block");
 }
 
-static bool
-    tumo_acceptance_write_text_file(Storage* storage, const char* path, const char* text) {
+static bool tumo_acceptance_write_text_file(Storage* storage, const char* path, const char* text) {
     File* file = storage_file_alloc(storage);
-    bool ok = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    bool ok = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_NEW);
     if(ok) {
         const size_t size = strlen(text);
-        ok = storage_file_write(file, text, size) == size;
-        storage_file_sync(file);
+        ok = storage_file_write(file, text, size) == size && storage_file_sync(file);
+        storage_file_close(file);
     }
-    storage_file_close(file);
     storage_file_free(file);
     return ok;
 }
@@ -389,8 +521,8 @@ static void tumo_acceptance_export_report(TumoAcceptanceApp* app) {
     tumo_acceptance_build_report(app, report, "export");
 
     const bool dir_ok = tumo_acceptance_mkdir(app->storage, TUMO_ACCEPTANCE_DATA_DIR);
-    const bool write_ok =
-        dir_ok && tumo_acceptance_write_text_file(app->storage, path, furi_string_get_cstr(report));
+    const bool write_ok = dir_ok && tumo_acceptance_write_text_file(
+                                        app->storage, path, furi_string_get_cstr(report));
 
     furi_string_reset(app->text);
     furi_string_cat_printf(
@@ -414,8 +546,9 @@ static void tumo_acceptance_build_about(TumoAcceptanceApp* app) {
     furi_string_cat(
         app->text,
         "Tumo Acceptance\n\n"
-        "Passive release smoke checks for Tumoflip dev builds.\n\n"
-        "It does not transmit IR/Sub-GHz, does not enable OTG, and does not auto-launch child apps.");
+        "Safe release checks for Tumoflip dev builds.\n\n"
+        "The private SD probe is created, read back, and deleted. Existing files are never overwritten.\n\n"
+        "No IR/Sub-GHz TX, NFC writes, GPIO drive, OTG enable, or child app launch.");
 }
 
 static void tumo_acceptance_menu_callback(void* context, uint32_t index) {
@@ -423,6 +556,8 @@ static void tumo_acceptance_menu_callback(void* context, uint32_t index) {
 
     switch(index) {
     case TumoAcceptanceActionRun:
+        app->self_test_ran = true;
+        app->storage_result = tumo_acceptance_run_storage_test(app);
         tumo_acceptance_build_report(app, app->text, "run");
         break;
     case TumoAcceptanceActionExport:
@@ -459,13 +594,17 @@ static TumoAcceptanceApp* tumo_acceptance_alloc(void) {
     app->submenu = submenu_alloc();
     app->text_box = text_box_alloc();
     app->text = furi_string_alloc();
+    app->self_test_ran = false;
+    app->storage_result = TumoAcceptanceResultSkip;
+    strlcpy(app->storage_detail, "run safe test first", sizeof(app->storage_detail));
 
     view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
-    view_dispatcher_set_navigation_event_callback(app->view_dispatcher, tumo_acceptance_back_callback);
+    view_dispatcher_set_navigation_event_callback(
+        app->view_dispatcher, tumo_acceptance_back_callback);
 
     submenu_set_header(app->submenu, "Tumo Acceptance");
     submenu_add_item(
-        app->submenu, "Run Smoke", TumoAcceptanceActionRun, tumo_acceptance_menu_callback, app);
+        app->submenu, "Run Safe Test", TumoAcceptanceActionRun, tumo_acceptance_menu_callback, app);
     submenu_add_item(
         app->submenu,
         "Export Report",

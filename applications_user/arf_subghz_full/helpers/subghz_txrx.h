@@ -9,6 +9,7 @@
 #include <lib/subghz/protocols/raw.h>
 #include <lib/subghz/protocols/plugin_registry.h>
 #include <lib/subghz/devices/devices.h>
+#include <subghz_radio_broker/subghz_radio_broker.h>
 
 typedef struct SubGhzTxRx SubGhzTxRx;
 
@@ -18,6 +19,7 @@ typedef enum {
     SubGhzTxRxStartTxStateOk,
     SubGhzTxRxStartTxStateErrorOnlyRx,
     SubGhzTxRxStartTxStateErrorParserOthers,
+    SubGhzTxRxStartTxStateErrorCapability,
 } SubGhzTxRxStartTxState;
 
 /**
@@ -109,6 +111,8 @@ void subghz_txrx_get_frequency_and_modulation(
  * @return SubGhzTxRxStartTxState
  */
 SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat* flipper_format);
+
+SubGhzRadioBrokerValidation subghz_txrx_get_last_validation(SubGhzTxRx* instance);
 
 /**
  * Rebuild protocol data without starting TX.

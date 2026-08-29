@@ -4,12 +4,14 @@
 #include <gui/modules/submenu.h>
 #include <gui/modules/text_box.h>
 #include <storage/storage.h>
+#include <subghz_radio_broker/subghz_radio_broker.h>
+#include <lib/subghz/subghz_protocol_registry.h>
 #include <toolbox/path.h>
 
 #define TAG "ArfStatus"
 
-#define ARF_FULL_PATH          EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")
-#define ARF_MODULES_PATH       EXT_PATH("apps_data/arf_subghz_full/modules/")
+#define ARF_FULL_PATH    EXT_PATH("apps/ARF Tools/arf_subghz_full.fap")
+#define ARF_MODULES_PATH EXT_PATH("apps_data/arf_subghz_full/modules/")
 
 typedef enum {
     ArfToolsViewMain,
@@ -18,11 +20,13 @@ typedef enum {
 
 typedef enum {
     ArfToolsMenuAssets,
+    ArfToolsMenuCapabilities,
     ArfToolsMenuAbout,
 } ArfToolsMenu;
 
 typedef enum {
     ArfToolsEventAssets,
+    ArfToolsEventCapabilities,
     ArfToolsEventAbout,
 } ArfToolsEvent;
 
@@ -66,17 +70,76 @@ static void arf_tools_show_assets(ArfToolsApp* app) {
     arf_tools_append_exists(app, "PSA Decrypt", ARF_MODULES_PATH "arf_psa_decrypt.fap");
     furi_string_cat_str(app->text, "Analyzer: core Sub-GHz\n");
     arf_tools_append_exists(app, "RollJam", ARF_MODULES_PATH "rolljam.fap");
-    arf_tools_append_exists(
-        app, "SubBrute", ARF_MODULES_PATH "subghz_bruteforcer.fap");
+    arf_tools_append_exists(app, "SubBrute", ARF_MODULES_PATH "subghz_bruteforcer.fap");
     arf_tools_append_exists(app, "Protocol packs", EXT_PATH("apps_data/subghz/plugins"));
+    arf_tools_set_text_string(app);
+}
+
+static void arf_tools_append_protocol_capability(ArfToolsApp* app, const char* name) {
+    const SubGhzProtocol* protocol =
+        subghz_protocol_registry_get_by_name(&subghz_protocol_registry, name);
+    if(!protocol) {
+        furi_string_cat_printf(app->text, "%s: missing\n", name);
+        return;
+    }
+
+    const SubGhzRadioBrokerProtocolCapability capability =
+        subghz_radio_broker_protocol_capability(protocol);
+    furi_string_cat_printf(
+        app->text,
+        "%s: %s%s%s %s%s %s%s\n",
+        name,
+        capability.bands & SubGhzRadioBrokerBand315 ? "315 " : "",
+        capability.bands & SubGhzRadioBrokerBand433 ? "433 " : "",
+        capability.bands & SubGhzRadioBrokerBand868 ? "868 " : "",
+        capability.presets & SubGhzRadioBrokerPresetOok650 ? "AM " : "",
+        capability.presets & SubGhzRadioBrokerPresetFsk238 ? "FM " : "",
+        capability.directions & SubGhzRadioBrokerDirectionReceive ? "RX " : "",
+        capability.directions & SubGhzRadioBrokerDirectionTransmit ? "TX" : "");
+}
+
+static void arf_tools_show_capabilities(ArfToolsApp* app) {
+    size_t receive_count = 0;
+    size_t transmit_count = 0;
+    size_t am_count = 0;
+    size_t fm_count = 0;
+    const size_t protocol_count = subghz_protocol_registry_count(&subghz_protocol_registry);
+    for(size_t i = 0; i < protocol_count; i++) {
+        const SubGhzProtocol* protocol =
+            subghz_protocol_registry_get_by_index(&subghz_protocol_registry, i);
+        const SubGhzRadioBrokerProtocolCapability capability =
+            subghz_radio_broker_protocol_capability(protocol);
+        if(capability.directions & SubGhzRadioBrokerDirectionReceive) receive_count++;
+        if(capability.directions & SubGhzRadioBrokerDirectionTransmit) transmit_count++;
+        if(capability.presets & SubGhzRadioBrokerPresetOok650) am_count++;
+        if(capability.presets & SubGhzRadioBrokerPresetFsk238) fm_count++;
+    }
+
+    furi_string_printf(
+        app->text,
+        "RF Capabilities v%u\n\n"
+        "Core registry: %u\n"
+        "RX: %u  TX: %u\n"
+        "AM: %u  FM: %u\n\n",
+        SUBGHZ_RADIO_BROKER_CAPABILITY_SCHEMA_VERSION,
+        (unsigned)protocol_count,
+        (unsigned)receive_count,
+        (unsigned)transmit_count,
+        (unsigned)am_count,
+        (unsigned)fm_count);
+    arf_tools_append_protocol_capability(app, "Holtek_HT12X");
+    arf_tools_append_protocol_capability(app, "Linear");
+    arf_tools_append_protocol_capability(app, "Cham_Code");
+    furi_string_cat_str(
+        app->text, "\nUnsupported band, preset, direction, or radio is blocked before TX.");
     arf_tools_set_text_string(app);
 }
 
 static void arf_tools_show_about(ArfToolsApp* app) {
     arf_tools_set_text(
         app,
-        "ARF Status 0.2\n\n"
-        "Checks the Full launcher and isolated modules.\n\n"
+        "ARF Status 0.3\n\n"
+        "Checks modules and runtime RF capabilities.\n\n"
         "Frequency Analyzer is provided by the core Sub-GHz app.");
 }
 
@@ -91,6 +154,9 @@ static bool arf_tools_custom_event_callback(void* context, uint32_t event) {
     switch(event) {
     case ArfToolsEventAssets:
         arf_tools_show_assets(app);
+        return true;
+    case ArfToolsEventCapabilities:
+        arf_tools_show_capabilities(app);
         return true;
     case ArfToolsEventAbout:
         arf_tools_show_about(app);
@@ -127,6 +193,8 @@ static ArfToolsApp* arf_tools_app_alloc(void) {
     submenu_set_header(app->main_menu, "ARF Status");
     submenu_add_item(
         app->main_menu, "Assets Status", ArfToolsMenuAssets, arf_tools_menu_callback, app);
+    submenu_add_item(
+        app->main_menu, "RF Capabilities", ArfToolsMenuCapabilities, arf_tools_menu_callback, app);
     submenu_add_item(app->main_menu, "About", ArfToolsMenuAbout, arf_tools_menu_callback, app);
     view_set_previous_callback(submenu_get_view(app->main_menu), arf_tools_nav_exit);
     view_dispatcher_add_view(

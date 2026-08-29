@@ -62,6 +62,7 @@ struct SubGhzTxRx {
     void* need_save_context;
     // True only when the last TX used fff_data, which is bound to file_path.
     bool tx_from_internal_fff;
+    SubGhzRadioBrokerValidation last_validation;
     SubGhzReceiverCallback rx_callback;
     void* rx_context;
     SubGhzProtocolFlag receiver_filter;

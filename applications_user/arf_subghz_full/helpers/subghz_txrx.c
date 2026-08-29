@@ -40,6 +40,16 @@ static void subghz_txrx_radio_state(SubGhzTxRx* instance, SubGhzRadioBrokerState
     subghz_radio_broker_set_state(instance->radio_broker, &instance->radio_lease, state);
 }
 
+static SubGhzRadioBrokerDevice subghz_txrx_broker_device(SubGhzTxRx* instance) {
+    if(instance->radio_device_type == SubGhzRadioDeviceTypeInternal) {
+        return SubGhzRadioBrokerDeviceInternal;
+    }
+    if(instance->radio_device_type == SubGhzRadioDeviceTypeExternalCC1101) {
+        return SubGhzRadioBrokerDeviceExternalCC1101;
+    }
+    return SubGhzRadioBrokerDeviceDual;
+}
+
 SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group) {
     SubGhzTxRx* instance = malloc(sizeof(SubGhzTxRx));
     instance->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
@@ -375,6 +385,7 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
     furi_assert(flipper_format);
 
     subghz_txrx_stop(instance);
+    instance->last_validation = SubGhzRadioBrokerValidationOk;
 
     SubGhzTxRxStartTxState ret = SubGhzTxRxStartTxStateErrorParserOthers;
     FuriString* temp_str = furi_string_alloc();
@@ -394,8 +405,23 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
             subghz_transmitter_alloc_init(instance->environment, furi_string_get_cstr(temp_str));
 
         if(instance->transmitter) {
-            if(subghz_transmitter_deserialize(instance->transmitter, flipper_format) ==
-               SubGhzProtocolStatusOk) {
+            const SubGhzProtocolEncoderBase* encoder =
+                subghz_transmitter_get_protocol_instance(instance->transmitter);
+            const char* preset_short =
+                subghz_txrx_get_preset_name(instance, furi_string_get_cstr(preset->name));
+            instance->last_validation = subghz_radio_broker_validate_protocol(
+                encoder ? encoder->protocol : NULL,
+                preset->frequency,
+                subghz_radio_broker_preset_from_short_name(preset_short),
+                subghz_txrx_broker_device(instance),
+                true);
+
+            if(instance->last_validation != SubGhzRadioBrokerValidationOk) {
+                FURI_LOG_W(TAG, "Protocol capability rejected: %u", instance->last_validation);
+                ret = SubGhzTxRxStartTxStateErrorCapability;
+            } else if(
+                subghz_transmitter_deserialize(instance->transmitter, flipper_format) ==
+                SubGhzProtocolStatusOk) {
                 if(strcmp(furi_string_get_cstr(preset->name), "") != 0) {
                     subghz_txrx_begin(
                         instance,
@@ -440,6 +466,11 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
     return ret;
 }
 
+SubGhzRadioBrokerValidation subghz_txrx_get_last_validation(SubGhzTxRx* instance) {
+    furi_assert(instance);
+    return instance->last_validation;
+}
+
 bool subghz_txrx_rebuild_from_fff(SubGhzTxRx* instance, FlipperFormat* flipper_format) {
     furi_assert(instance);
     furi_assert(flipper_format);
@@ -467,8 +498,8 @@ bool subghz_txrx_rebuild_from_fff(SubGhzTxRx* instance, FlipperFormat* flipper_f
             break;
         }
 
-        rebuilt =
-            subghz_transmitter_deserialize(transmitter, flipper_format) == SubGhzProtocolStatusOk;
+        rebuilt = subghz_transmitter_deserialize(transmitter, flipper_format) ==
+                  SubGhzProtocolStatusOk;
         if(!rebuilt) {
             FURI_LOG_E(TAG, "Protocol rebuild failed");
             break;

@@ -27,7 +27,9 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("validate_stable_release.py", workflow)
         self.assertIn("test_validate_stable_release.py", workflow)
         self.assertIn("test_subghz_drift.py", workflow)
+        self.assertIn("test_subghz_protocol_capabilities.py", workflow)
         self.assertIn("test_subghz_protocol_packs.py", workflow)
+        self.assertIn("test_hardware_acceptance_suite.py", workflow)
         self.assertIn("test_update_splash.py", workflow)
         self.assertIn("tumoflip-packages.json", workflow)
         self.assertIn("tumoflip-packages.zip", workflow)
@@ -82,7 +84,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("CI must not mark hardware-only checks as passed", workflow)
         self.assertIn("docs/hardware-regression-checklist.md", workflow)
 
-        self.assertIn("Checklist version: 1", doc)
+        self.assertIn("Checklist version: 2", doc)
         self.assertIn("Do not mark a hardware-only item as passed", doc)
         self.assertIn("Install And Identity", doc)
         self.assertIn("System Sub-GHz Internal CC1101", doc)
