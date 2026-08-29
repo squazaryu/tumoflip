@@ -10,6 +10,22 @@
 
 #define TAG "SubGhz"
 
+static const char* subghz_capability_error_text(SubGhzRadioBrokerValidation validation) {
+    switch(validation) {
+    case SubGhzRadioBrokerValidationInvalidFrequency:
+    case SubGhzRadioBrokerValidationUnsupportedBand:
+        return "TX blocked:\nfrequency";
+    case SubGhzRadioBrokerValidationUnsupportedPreset:
+        return "TX blocked:\nmodulation";
+    case SubGhzRadioBrokerValidationUnsupportedDevice:
+    case SubGhzRadioBrokerValidationReceiveUnsupported:
+    case SubGhzRadioBrokerValidationTransmitUnsupported:
+        return "TX blocked:\nradio or direction";
+    default:
+        return "TX capability\nvalidation failed";
+    }
+}
+
 void subghz_blink_start(SubGhz* subghz) {
     furi_assert(subghz);
     notification_message(subghz->notifications, &sequence_blink_stop);
@@ -30,9 +46,16 @@ bool subghz_tx_start(SubGhz* subghz, FlipperFormat* flipper_format) {
     case SubGhzTxRxStartTxStateErrorOnlyRx:
         subghz_dialog_message_freq_error(subghz, true);
         break;
+    case SubGhzTxRxStartTxStateErrorCapability:
+        dialog_message_show_storage_error(
+            subghz->dialogs,
+            subghz_capability_error_text(subghz_txrx_get_last_validation(subghz->txrx)));
+        break;
 
-    default:
+    case SubGhzTxRxStartTxStateOk:
         return true;
+    default:
+        dialog_message_show_storage_error(subghz->dialogs, "Unknown TX validation error");
         break;
     }
     return false;

@@ -38,6 +38,7 @@ struct SubGhzTxRx {
 
     SubGhzTxRxNeedSaveCallback need_save_callback;
     void* need_save_context;
+    SubGhzRadioBrokerValidation last_validation;
     SubGhzReceiverCallback rx_callback;
     void* rx_context;
     SubGhzProtocolFlag receiver_filter;

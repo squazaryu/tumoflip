@@ -9,6 +9,7 @@
 #include <lib/subghz/protocols/raw.h>
 #include <lib/subghz/protocols/plugin_registry.h>
 #include <lib/subghz/devices/devices.h>
+#include <subghz_radio_broker/subghz_radio_broker.h>
 
 typedef struct SubGhzTxRx SubGhzTxRx;
 
@@ -18,6 +19,7 @@ typedef enum {
     SubGhzTxRxStartTxStateOk,
     SubGhzTxRxStartTxStateErrorOnlyRx,
     SubGhzTxRxStartTxStateErrorParserOthers,
+    SubGhzTxRxStartTxStateErrorCapability,
 } SubGhzTxRxStartTxState;
 
 /**
@@ -116,6 +118,8 @@ void subghz_txrx_get_frequency_and_modulation(
  * @return SubGhzTxRxStartTxState 
  */
 SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat* flipper_format);
+
+SubGhzRadioBrokerValidation subghz_txrx_get_last_validation(SubGhzTxRx* instance);
 
 /**
  * Rebuild protocol data without starting TX.
@@ -410,10 +414,7 @@ const char* subghz_txrx_radio_device_get_name(SubGhzTxRx* instance);
 bool subghz_txrx_radio_device_is_frequency_valid(SubGhzTxRx* instance, uint32_t frequency);
 
 /** Start a bounded receive-only analyzer probe with the selected preset. */
-bool subghz_txrx_analyzer_begin(
-    SubGhzTxRx* instance,
-    size_t preset_index,
-    uint32_t frequency);
+bool subghz_txrx_analyzer_begin(SubGhzTxRx* instance, size_t preset_index, uint32_t frequency);
 
 /** Stop a receive-only analyzer probe and leave the selected radio idle. */
 void subghz_txrx_analyzer_end(SubGhzTxRx* instance);
