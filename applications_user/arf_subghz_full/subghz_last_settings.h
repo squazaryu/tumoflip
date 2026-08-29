@@ -19,6 +19,8 @@
 typedef struct {
     uint32_t frequency;
     uint32_t preset_index;
+    uint32_t raw_frequency;
+    uint32_t raw_preset_index;
     uint32_t frequency_analyzer_feedback_level;
     float frequency_analyzer_trigger;
     bool protocol_file_names;

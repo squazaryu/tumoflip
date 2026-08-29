@@ -109,8 +109,8 @@ void subghz_scene_read_raw_on_enter(void* context) {
         if(furi_string_empty(file_name)) {
             subghz_txrx_set_preset_internal(
                 subghz->txrx,
-                subghz->last_settings->frequency,
-                subghz->last_settings->preset_index,
+                subghz->last_settings->raw_frequency,
+                subghz->last_settings->raw_preset_index,
                 subghz->last_settings->tx_power);
         }
     }

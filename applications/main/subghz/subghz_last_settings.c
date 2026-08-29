@@ -11,6 +11,8 @@
 
 #define SUBGHZ_LAST_SETTING_FIELD_FREQUENCY                         "Frequency"
 #define SUBGHZ_LAST_SETTING_FIELD_PRESET                            "Preset" // AKA Modulation
+#define SUBGHZ_LAST_SETTING_FIELD_RAW_FREQUENCY                     "RawFrequency"
+#define SUBGHZ_LAST_SETTING_FIELD_RAW_PRESET                        "RawPreset"
 #define SUBGHZ_LAST_SETTING_FIELD_FREQUENCY_ANALYZER_FEEDBACK_LEVEL "FeedbackLevel"
 #define SUBGHZ_LAST_SETTING_FIELD_FREQUENCY_ANALYZER_TRIGGER        "FATrigger"
 #define SUBGHZ_LAST_SETTING_FIELD_PROTOCOL_FILE_NAMES               "ProtocolNames"
@@ -187,6 +189,9 @@ void subghz_last_settings_load(SubGhzLastSettings* instance, size_t preset_count
     // Default values (all others set to 0, if read from file fails these are used)
     instance->frequency = SUBGHZ_LAST_SETTING_DEFAULT_FREQUENCY;
     instance->preset_index = SUBGHZ_LAST_SETTING_DEFAULT_PRESET;
+    // Zero/UINT32_MAX mark fields missing from settings written before Dev 008-005.
+    instance->raw_frequency = 0;
+    instance->raw_preset_index = UINT32_MAX;
     instance->frequency_analyzer_feedback_level =
         SUBGHZ_LAST_SETTING_FREQUENCY_ANALYZER_FEEDBACK_LEVEL;
     instance->frequency_analyzer_trigger = SUBGHZ_LAST_SETTING_FREQUENCY_ANALYZER_TRIGGER;
@@ -220,6 +225,20 @@ void subghz_last_settings_load(SubGhzLastSettings* instance, size_t preset_count
             }
             if(!flipper_format_read_uint32(
                    fff_data_file, SUBGHZ_LAST_SETTING_FIELD_PRESET, &instance->preset_index, 1)) {
+                flipper_format_rewind(fff_data_file);
+            }
+            if(!flipper_format_read_uint32(
+                   fff_data_file,
+                   SUBGHZ_LAST_SETTING_FIELD_RAW_FREQUENCY,
+                   &instance->raw_frequency,
+                   1)) {
+                flipper_format_rewind(fff_data_file);
+            }
+            if(!flipper_format_read_uint32(
+                   fff_data_file,
+                   SUBGHZ_LAST_SETTING_FIELD_RAW_PRESET,
+                   &instance->raw_preset_index,
+                   1)) {
                 flipper_format_rewind(fff_data_file);
             }
             if(!flipper_format_read_uint32(
@@ -332,6 +351,16 @@ void subghz_last_settings_load(SubGhzLastSettings* instance, size_t preset_count
     if(instance->preset_index > 4) {
         instance->preset_index = SUBGHZ_LAST_SETTING_DEFAULT_PRESET;
     }
+
+    // Existing installations inherit Standard once, then persist an independent RAW profile.
+    if(instance->raw_frequency == 0 ||
+       !furi_hal_subghz_is_frequency_valid(instance->raw_frequency)) {
+        instance->raw_frequency = instance->frequency;
+    }
+
+    if(instance->raw_preset_index > 4) {
+        instance->raw_preset_index = instance->preset_index;
+    }
 }
 
 bool subghz_last_settings_save(SubGhzLastSettings* instance) {
@@ -359,6 +388,14 @@ bool subghz_last_settings_save(SubGhzLastSettings* instance) {
         }
         if(!flipper_format_write_uint32(
                file, SUBGHZ_LAST_SETTING_FIELD_PRESET, &instance->preset_index, 1)) {
+            break;
+        }
+        if(!flipper_format_write_uint32(
+               file, SUBGHZ_LAST_SETTING_FIELD_RAW_FREQUENCY, &instance->raw_frequency, 1)) {
+            break;
+        }
+        if(!flipper_format_write_uint32(
+               file, SUBGHZ_LAST_SETTING_FIELD_RAW_PRESET, &instance->raw_preset_index, 1)) {
             break;
         }
         if(!flipper_format_write_uint32(
