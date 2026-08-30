@@ -11,6 +11,10 @@ import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 POLLER = REPO_ROOT / "lib/nfc/protocols/mf_classic/mf_classic_poller.c"
+SCENES = REPO_ROOT / (
+    "applications/main/nfc/helpers/protocol_support/mf_classic/"
+    "mf_classic_extra_scenes.c"
+)
 HOST_TEST = (
     REPO_ROOT / "tools/tumoflip/fixtures/nfc_mf_classic_cuid_iteration_host_test.c"
 )
@@ -31,6 +35,7 @@ class NfcMifareClassicCuidIterationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.poller = POLLER.read_text(encoding="utf-8")
+        cls.scenes = SCENES.read_text(encoding="utf-8")
 
     def test_cuid_transition_matrix_with_host_compiler(self) -> None:
         compiler = shutil.which("cc") or shutil.which("clang")
@@ -109,6 +114,34 @@ class NfcMifareClassicCuidIterationTest(unittest.TestCase):
         self.assertIn(
             "dict_attack_ctx->current_sector == instance->sectors_total", body
         )
+
+    def test_cuid_end_marker_is_not_stored_in_display_cursor(self) -> None:
+        body = function_body(self.scenes, "nfc_dict_attack_worker_callback(")
+        next_sector = body.index("uint8_t next_sector")
+        publish = body.index(
+            "mfc_event->data->next_sector_data.current_sector = next_sector",
+            next_sector,
+        )
+        bounds_check = body.index(
+            "if(next_sector < instance->nfc_dict_context.sectors_total)", publish
+        )
+        display_update = body.index(
+            "instance->nfc_dict_context.current_sector = next_sector", bounds_check
+        )
+
+        self.assertLess(publish, bounds_check)
+        self.assertLess(bounds_check, display_update)
+
+    def test_dictionary_phase_resets_display_cursor_before_repaint(self) -> None:
+        body = function_body(
+            self.scenes, "mf_classic_scene_dict_attack_prepare_view("
+        )
+        keys_reset = body.index("dict_keys_current = 0")
+        sector_reset = body.index("current_sector = 0", keys_reset)
+        repaint = body.index("mf_classic_scene_dict_attack_update_view", sector_reset)
+
+        self.assertLess(keys_reset, sector_reset)
+        self.assertLess(sector_reset, repaint)
 
 
 if __name__ == "__main__":

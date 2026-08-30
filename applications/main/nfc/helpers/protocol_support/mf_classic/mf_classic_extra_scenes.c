@@ -149,15 +149,16 @@ static NfcCommand nfc_dict_attack_worker_callback(NfcGenericEvent event, void* c
         keys_dict_rewind(instance->nfc_dict_context.dict);
         instance->nfc_dict_context.dict_keys_current = 0;
 
-        // In CUID mode, increment the key index and calculate sector from it
         if(is_cuid_dict) {
             instance->nfc_dict_context.current_key_idx++;
             // Calculate sector from key_idx (each sector has 2 keys: A and B)
-            instance->nfc_dict_context.current_sector =
-                instance->nfc_dict_context.current_key_idx / 2;
-            // Write back to event data so poller can read it
-            mfc_event->data->next_sector_data.current_sector =
-                instance->nfc_dict_context.current_sector;
+            uint8_t next_sector = instance->nfc_dict_context.current_key_idx / 2;
+            // The poller uses the one-past-end sector to finish the pass. Keep that marker out of
+            // the view cursor so a 1K card never displays a nonexistent sector 16.
+            mfc_event->data->next_sector_data.current_sector = next_sector;
+            if(next_sector < instance->nfc_dict_context.sectors_total) {
+                instance->nfc_dict_context.current_sector = next_sector;
+            }
         } else {
             instance->nfc_dict_context.current_sector =
                 mfc_event->data->next_sector_data.current_sector;
@@ -330,6 +331,8 @@ static void mf_classic_scene_dict_attack_prepare_view(NfcApp* instance) {
     dict_attack_set_total_dict_keys(
         instance->dict_attack, instance->nfc_dict_context.dict_keys_total);
     instance->nfc_dict_context.dict_keys_current = 0;
+    // Each dictionary phase starts with a clean display cursor.
+    instance->nfc_dict_context.current_sector = 0;
 
     dict_attack_set_callback(
         instance->dict_attack, nfc_dict_attack_dict_attack_result_callback, instance);
