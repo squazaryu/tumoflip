@@ -92,6 +92,12 @@ struct SubGhz {
     GenInfo* gen_info;
 
     SubGhzFileEncoderWorker* decode_raw_file_worker_encoder;
+    bool decode_raw_auto;
+    SubGhzProtocolPackGroup decode_raw_original_pack_group;
+    SubGhzProtocolPackGroup decode_raw_active_pack_group;
+    uint32_t decode_raw_visited_pack_mask;
+    uint8_t decode_raw_scanned_pack_count;
+    bool decode_raw_pack_error;
 
     SubGhzThresholdRssi* threshold_rssi;
     SubGhzRxKeyState rx_key_state;
@@ -105,6 +111,8 @@ struct SubGhz {
 
 void subghz_blink_start(SubGhz* subghz);
 void subghz_blink_stop(SubGhz* subghz);
+
+void subghz_scene_decode_raw_cleanup(SubGhz* subghz);
 
 bool subghz_tx_start(SubGhz* subghz, FlipperFormat* flipper_format);
 void subghz_dialog_message_freq_error(SubGhz* subghz, bool only_rx);

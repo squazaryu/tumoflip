@@ -57,6 +57,13 @@ class SubGhzDriftTest(unittest.TestCase):
         self.assertNotIn("application.fam", entries)
         self.assertNotIn("subghz.c", entries)
         self.assertNotIn("helpers/subghz_txrx.c", entries)
+        self.assertNotIn("scenes/subghz_scene_decode_raw.c", entries)
+        self.assertNotIn("scenes/subghz_scene_more_raw.c", entries)
+
+        architecture = (
+            REPO_ROOT / "docs/subghz-architecture.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("RAW Auto Decode is intentionally core-only", architecture)
 
     def test_hopper_plan_is_the_explicit_shared_api(self) -> None:
         helper = (REPO_ROOT / "lib/subghz/subghz_hopper_plan.h").read_text(

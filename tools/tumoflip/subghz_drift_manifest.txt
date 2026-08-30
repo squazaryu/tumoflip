@@ -22,11 +22,9 @@ resources/subghz/assets/nice_flor_s
 resources/subghz/assets/vag
 scenes/subghz_scene.c
 scenes/subghz_scene.h
-scenes/subghz_scene_decode_raw.c
 scenes/subghz_scene_frequency_analyzer.c
 scenes/subghz_scene_delete.c
 scenes/subghz_scene_delete_raw.c
-scenes/subghz_scene_more_raw.c
 scenes/subghz_scene_protocol_pack_info.c
 scenes/subghz_scene_saved.c
 scenes/subghz_scene_set_key.c
