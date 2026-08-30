@@ -236,6 +236,11 @@ bool subghz_txrx_reload_protocol_pack(
     return true;
 }
 
+SubGhzProtocolPackGroup subghz_txrx_get_protocol_pack_group(SubGhzTxRx* instance) {
+    furi_assert(instance);
+    return instance->protocol_pack_group;
+}
+
 const SubGhzProtocolPackReport* subghz_txrx_get_protocol_pack_report(SubGhzTxRx* instance) {
     furi_assert(instance);
     return subghz_protocol_pack_registry_get_report(instance->protocol_pack_registry);

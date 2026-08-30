@@ -195,6 +195,13 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
     subghz->last_settings = subghz_last_settings_alloc();
     subghz_last_settings_load(subghz->last_settings, 0);
     subghz->txrx = subghz_txrx_alloc(subghz->last_settings->protocol_pack_group);
+    subghz->decode_raw_file_worker_encoder = NULL;
+    subghz->decode_raw_auto = false;
+    subghz->decode_raw_original_pack_group = subghz_txrx_get_protocol_pack_group(subghz->txrx);
+    subghz->decode_raw_active_pack_group = subghz->decode_raw_original_pack_group;
+    subghz->decode_raw_visited_pack_mask = 0;
+    subghz->decode_raw_scanned_pack_count = 0;
+    subghz->decode_raw_pack_error = false;
 
     if(!alloc_for_tx_only) {
         // SubMenu
@@ -323,6 +330,11 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
 
 void subghz_free(SubGhz* subghz, bool alloc_for_tx_only) {
     furi_assert(subghz);
+
+    if(!alloc_for_tx_only &&
+       (subghz->decode_raw_file_worker_encoder != NULL || subghz->decode_raw_auto)) {
+        subghz_scene_decode_raw_cleanup(subghz);
+    }
 
     if(subghz->rpc_ctx) {
         rpc_system_app_set_callback(subghz->rpc_ctx, NULL, NULL);

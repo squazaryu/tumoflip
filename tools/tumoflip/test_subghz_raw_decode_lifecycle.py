@@ -204,30 +204,111 @@ class SubGhzRawDecodeLifecycleTest(unittest.TestCase):
         self.assertIn("subghz_receiver_reset(instance->receiver);", arf_reset)
 
     def test_decode_workers_are_freed_once_and_cleared(self) -> None:
-        pairs = (
-            (
-                CORE_DECODE,
-                "applications/main/subghz/scenes/subghz_scene_save_success.c",
-            ),
-            (
-                ARF_DECODE,
-                "applications_user/arf_subghz_full/scenes/subghz_scene_save_success.c",
-            ),
+        core_decode = source(CORE_DECODE)
+        core_save = source(
+            "applications/main/subghz/scenes/subghz_scene_save_success.c"
         )
-        for decode_path, save_path in pairs:
-            with self.subTest(path=decode_path):
-                for contents in (source(decode_path), source(save_path)):
-                    self.assertIn(
-                        "if(subghz->decode_raw_file_worker_encoder != NULL)", contents
-                    )
-                    self.assertIn(
-                        "subghz_file_encoder_worker_free("
-                        "subghz->decode_raw_file_worker_encoder)",
-                        contents,
-                    )
-                    self.assertIn(
-                        "subghz->decode_raw_file_worker_encoder = NULL;", contents
-                    )
+        self.assertIn(
+            "if(subghz->decode_raw_file_worker_encoder != NULL)", core_decode
+        )
+        self.assertIn(
+            "subghz_file_encoder_worker_free(subghz->decode_raw_file_worker_encoder)",
+            core_decode,
+        )
+        self.assertIn(
+            "subghz->decode_raw_file_worker_encoder = NULL;", core_decode
+        )
+        self.assertIn("subghz_scene_decode_raw_cleanup(subghz);", core_save)
+
+        for relative in (
+            ARF_DECODE,
+            "applications_user/arf_subghz_full/scenes/subghz_scene_save_success.c",
+        ):
+            with self.subTest(path=relative):
+                contents = source(relative)
+                self.assertIn(
+                    "if(subghz->decode_raw_file_worker_encoder != NULL)", contents
+                )
+                self.assertIn(
+                    "subghz_file_encoder_worker_free("
+                    "subghz->decode_raw_file_worker_encoder)",
+                    contents,
+                )
+                self.assertIn(
+                    "subghz->decode_raw_file_worker_encoder = NULL;", contents
+                )
+
+    def test_standard_raw_auto_decode_scans_one_pack_at_a_time(self) -> None:
+        decode = source(CORE_DECODE)
+        more_raw = source(
+            "applications/main/subghz/scenes/subghz_scene_more_raw.c"
+        )
+        subghz = source("applications/main/subghz/subghz.c")
+        save_success = source(
+            "applications/main/subghz/scenes/subghz_scene_save_success.c"
+        )
+
+        self.assertLess(more_raw.index('"Auto Decode"'), more_raw.index('"Decode Current"'))
+        self.assertIn(
+            "subghz->decode_raw_auto = event.event == SubmenuIndexAutoDecode;",
+            more_raw,
+        )
+
+        self.assertIn("subghz_scene_decode_raw_get_next_pack", decode)
+        self.assertIn("SubGhzProtocolPackGroupCount", decode)
+        self.assertIn("decode_raw_visited_pack_mask", decode)
+        self.assertIn("subghz_txrx_reload_protocol_pack(subghz->txrx, next_group)", decode)
+        self.assertIn("subghz_scene_decode_raw_stop_worker(subghz);", decode)
+        self.assertIn(
+            """} else {
+            subghz_scene_decode_raw_stop_worker(subghz);
+            if(subghz->decode_raw_auto) {
+                return subghz_scene_decode_raw_start_next_pack(subghz);
+            }""",
+            decode,
+        )
+
+        first_match = region(
+            decode,
+            "if(subghz->decode_raw_auto && subghz_history_get_item(subghz->history) > 0)",
+            "} else {",
+        )
+        self.assertIn("subghz_scene_decode_raw_stop_worker(subghz);", first_match)
+        self.assertIn("subghz_scene_decode_raw_show_match(subghz);", first_match)
+
+        self.assertIn("subghz_txrx_get_protocol_pack_group(subghz->txrx)", decode)
+        self.assertIn("subghz_scene_decode_raw_restore_pack(subghz)", decode)
+        self.assertIn("subghz_scene_decode_raw_note_pack_status(subghz)", decode)
+        self.assertIn("report->loaded_plugin_count != report->expected_plugin_count", decode)
+        self.assertIn('"No match (pack ERR)"', decode)
+        self.assertNotIn("last_settings->protocol_pack_group", decode)
+        self.assertIn("subghz_scene_decode_raw_cleanup(subghz);", save_success)
+
+        self.assertIn("subghz->decode_raw_file_worker_encoder = NULL;", subghz)
+        self.assertIn("subghz->decode_raw_auto = false;", subghz)
+        self.assertIn("subghz->decode_raw_pack_error = false;", subghz)
+        self.assertIn(
+            "subghz->decode_raw_file_worker_encoder != NULL || "
+            "subghz->decode_raw_auto",
+            subghz,
+        )
+        self.assertIn("subghz_scene_decode_raw_cleanup(subghz);", subghz)
+
+    def test_standard_raw_auto_decode_remains_radio_free(self) -> None:
+        decode = source(CORE_DECODE)
+        auto_scan = region(
+            decode,
+            "static bool subghz_scene_decode_raw_start_next_pack(",
+            "bool subghz_scene_decode_raw_next(",
+        )
+        self.assertNotIn("subghz_txrx_rx_start(", auto_scan)
+        self.assertNotIn("subghz_txrx_tx_start(", auto_scan)
+        self.assertNotIn("subghz_txrx_begin(", auto_scan)
+
+        docs = source("docs/subghz-protocol-packs.md")
+        self.assertIn("The scan is\nradio-free", docs)
+        self.assertIn("never transmits", docs)
+        self.assertIn("Only one\ngroup is mapped at a time", docs)
 
     def test_failed_raw_encoder_start_frees_unstarted_worker_for_retry(self) -> None:
         expected_cleanup = """if(instance->file_worker_encoder) {

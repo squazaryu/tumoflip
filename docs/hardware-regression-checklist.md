@@ -124,6 +124,15 @@ are legally allowed to test.
 - Open `Pack Status` and confirm loaded versus expected counts.
 - Temporarily remove or corrupt one non-critical `.fal` on SD, confirm the UI
   reports the missing or invalid pack, then restore the file.
+- Record an owned, known-decodable signal as RAW while a different Protocol
+  Pack is selected. Open `More` -> `Auto Decode`; confirm the progress advances
+  through one group at a time, stops on the expected decoded frame, and never
+  enters radio transmit mode.
+- Inspect the Auto Decode result, return to `More`, and confirm Receiver Config
+  still shows the group selected before the scan. Repeat after saving the
+  decoded result.
+- Run Auto Decode on a legal no-match RAW sample; confirm it ends with
+  `No match`, remains responsive, and restores the original group.
 - Record the minimum free heap shown during pack switching or status display
   when available.
 

@@ -48,6 +48,22 @@ bool subghz_txrx_reload_protocol_pack(
     SubGhzProtocolPackGroup protocol_pack_group);
 
 /**
+ * Get the active protocol pack group.
+ *
+ * @param instance Pointer to a SubGhzTxRx
+ * @return Currently loaded protocol pack group
+ */
+SubGhzProtocolPackGroup subghz_txrx_get_protocol_pack_group(SubGhzTxRx* instance);
+
+/**
+ * Get the load report for the active protocol pack group.
+ *
+ * @param instance Pointer to a SubGhzTxRx
+ * @return Report owned by SubGhzTxRx and valid until the next pack reload
+ */
+const SubGhzProtocolPackReport* subghz_txrx_get_protocol_pack_report(SubGhzTxRx* instance);
+
+/**
  * Check if the database is loaded
  * 
  * @param instance Pointer to a SubGhzTxRx
