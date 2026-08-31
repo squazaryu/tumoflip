@@ -79,6 +79,10 @@ jobs:
           echo "ref=$SAFE_REF"              >> "$GITHUB_OUTPUT"
           echo "dist=${SAFE_REF}-${SHORT}"  >> "$GITHUB_OUTPUT"
 
+      - name: Validate main menu layouts and navigation
+        shell: bash
+        run: python3 tools/tumoflip/test_main_menu_layouts.py
+
       - name: Build firmware (minimal / clean)
         id: build
         shell: bash

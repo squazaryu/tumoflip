@@ -34,10 +34,10 @@ typedef struct {
 static inline const char* menu_style_get_name(MenuStyle style) {
     static const char* const names[MenuStyleCount] = {
         "List",
-        "Wii",
-        "DSi",
-        "Vertical",
-        "Wii Vertical",
+        "Matrix",
+        "Rail",
+        "Side List",
+        "Side Grid",
     };
 
     return style < MenuStyleCount ? names[style] : names[MenuStyleList];

@@ -8,6 +8,7 @@
 #include <gui/icon_animation_i.h>
 #include <gui/icon_i.h>
 #include <m-array.h>
+#include <string.h>
 
 struct Menu {
     View* view;
@@ -25,23 +26,65 @@ ARRAY_DEF(MenuItemArray, MenuItem, M_POD_OPLIST); //-V658
 
 #define M_OPL_MenuItemArray_t() ARRAY_OPLIST(MenuItemArray, M_POD_OPLIST)
 
+#define MENU_SCREEN_WIDTH  128U
+#define MENU_SCREEN_HEIGHT 64U
+
+#define MENU_HEADER_BASELINE        10U
+#define MENU_HEADER_DIVIDER_Y       13U
+#define MENU_HEADER_LABEL_X         4U
+#define MENU_HEADER_LABEL_MAX_WIDTH 94U
+#define MENU_HEADER_COUNTER_X       124U
+
+#define MENU_MATRIX_PAGE_SIZE       6U
+#define MENU_MATRIX_COLUMNS         3U
+#define MENU_MATRIX_ROWS            2U
+#define MENU_MATRIX_CELL_WIDTH      42U
+#define MENU_MATRIX_CELL_HEIGHT     24U
+#define MENU_MATRIX_FIRST_CENTER_X  22U
+#define MENU_MATRIX_FIRST_CENTER_Y  26U
+#define MENU_MATRIX_SELECTED_WIDTH  36U
+#define MENU_MATRIX_SELECTED_HEIGHT 19U
+
+#define MENU_RAIL_PREVIOUS_X        20U
+#define MENU_RAIL_SELECTED_X        64U
+#define MENU_RAIL_NEXT_X            108U
+#define MENU_RAIL_ICON_CENTER_Y     36U
+#define MENU_RAIL_SIDE_WIDTH        26U
+#define MENU_RAIL_SIDE_HEIGHT       25U
+#define MENU_RAIL_SELECTED_WIDTH    38U
+#define MENU_RAIL_SELECTED_HEIGHT   34U
+#define MENU_RAIL_CONNECTOR_X       3U
+#define MENU_RAIL_CONNECTOR_Y       36U
+#define MENU_RAIL_CONNECTOR_WIDTH   122U
+#define MENU_RAIL_PROGRESS_Y        59U
+#define MENU_RAIL_PROGRESS_STEP     3U
+#define MENU_RAIL_MAX_DOTS          32U
+#define MENU_LABEL_SCRATCH_CAPACITY 64U
+
 typedef struct {
     MenuItemArray_t items;
     size_t position;
     size_t vertical_offset;
     MenuStyle style;
+    FuriString* label_scratch;
+    size_t label_scratch_capacity;
 } MenuModel;
 
-static void menu_process_up(Menu* menu);
-static void menu_process_down(Menu* menu);
-static void menu_process_left(Menu* menu);
-static void menu_process_right(Menu* menu);
+static void menu_process_direction(Menu* menu, InputKey key);
 static void menu_process_ok(Menu* menu);
-
-#define menu_short_name(label) (label)
 
 static size_t menu_wrap_position(size_t position, size_t count) {
     return count ? position % count : 0;
+}
+
+static const char* menu_compact_name(const char* label) {
+    if(strcmp(label, "125 kHz RFID") == 0) return "RFID";
+    if(strcmp(label, "Sub-GHz") == 0) return "RF";
+    if(strcmp(label, "Infrared") == 0) return "IR";
+    if(strcmp(label, "iButton") == 0) return "iBtn";
+    if(strcmp(label, "Bad USB") == 0) return "USB";
+    if(strcmp(label, "Settings") == 0) return "Setup";
+    return label;
 }
 
 static void menu_centered_icon(
@@ -60,16 +103,53 @@ static void menu_centered_icon(
 
 static void menu_draw_fit_label(
     Canvas* canvas,
+    MenuModel* model,
     const char* label,
     int32_t x,
     int32_t y,
     Align horizontal,
     Align vertical,
     size_t width) {
-    FuriString* text = furi_string_alloc_set_str(label);
-    elements_string_fit_width(canvas, text, width);
-    canvas_draw_str_aligned(canvas, x, y, horizontal, vertical, furi_string_get_cstr(text));
-    furi_string_free(text);
+    furi_string_set_str(model->label_scratch, label);
+    elements_string_fit_width(canvas, model->label_scratch, width);
+    canvas_draw_str_aligned(
+        canvas, x, y, horizontal, vertical, furi_string_get_cstr(model->label_scratch));
+}
+
+static void menu_draw_header(Canvas* canvas, MenuModel* model) {
+    const size_t count = MenuItemArray_size(model->items);
+    MenuItem* item = MenuItemArray_get(model->items, model->position);
+
+    furi_string_printf(
+        model->label_scratch, "%u/%u", (unsigned int)(model->position + 1U), (unsigned int)count);
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(
+        canvas,
+        MENU_HEADER_COUNTER_X,
+        MENU_HEADER_BASELINE - 1U,
+        AlignRight,
+        AlignBottom,
+        furi_string_get_cstr(model->label_scratch));
+
+    const size_t counter_width =
+        canvas_string_width(canvas, furi_string_get_cstr(model->label_scratch));
+    const size_t label_area_width = MENU_HEADER_COUNTER_X - MENU_HEADER_LABEL_X - 5U;
+    size_t label_width = counter_width < label_area_width ? label_area_width - counter_width : 24U;
+    if(label_width > MENU_HEADER_LABEL_MAX_WIDTH) label_width = MENU_HEADER_LABEL_MAX_WIDTH;
+    if(label_width < 24U) label_width = 24U;
+
+    canvas_set_font(canvas, FontPrimary);
+    menu_draw_fit_label(
+        canvas,
+        model,
+        item->label,
+        MENU_HEADER_LABEL_X,
+        MENU_HEADER_BASELINE,
+        AlignLeft,
+        AlignBottom,
+        label_width);
+    canvas_draw_line(
+        canvas, 2, MENU_HEADER_DIVIDER_Y, MENU_SCREEN_WIDTH - 3U, MENU_HEADER_DIVIDER_Y);
 }
 
 static void menu_draw_list(Canvas* canvas, MenuModel* model) {
@@ -81,77 +161,133 @@ static void menu_draw_list(Canvas* canvas, MenuModel* model) {
         const size_t item_i = (position + count + i - 1) % count;
         MenuItem* item = MenuItemArray_get(model->items, item_i);
         menu_centered_icon(canvas, item, 4, 3 + 22 * i, 14, 14);
-        canvas_draw_str(canvas, 22, 14 + 22 * i, item->label);
+        menu_draw_fit_label(
+            canvas, model, item->label, 22, 14 + 22 * i, AlignLeft, AlignBottom, 98);
     }
 
     elements_frame(canvas, 0, 21, 123, 21);
     elements_scrollbar(canvas, position, count);
 }
 
-static void menu_draw_wii(Canvas* canvas, MenuModel* model) {
+static size_t menu_matrix_first(size_t position, size_t count) {
+    if(!count) return 0;
+    position %= count;
+    return position - (position % MENU_MATRIX_PAGE_SIZE);
+}
+
+static void menu_draw_signal_matrix(Canvas* canvas, MenuModel* model) {
     const size_t position = model->position;
     const size_t count = MenuItemArray_size(model->items);
-    size_t first = 0;
+    const size_t first = menu_matrix_first(position, count);
 
-    if(count > 6 && position >= 4) {
-        first = (position >= count - 2 + (count % 2)) ? position - (position % 2) - 4 :
-                                                        position - (position % 2) - 2;
-    }
+    menu_draw_header(canvas, model);
 
-    canvas_set_font(canvas, FontSecondary);
-    for(uint8_t i = 0; i < 6; i++) {
+    for(uint8_t i = 0; i < MENU_MATRIX_PAGE_SIZE; i++) {
         const size_t item_i = first + i;
         if(item_i >= count) continue;
 
-        const uint8_t x = (i / 2) * 43 + 1;
-        const uint8_t y = (i % 2) * 32;
+        const uint8_t column = i / MENU_MATRIX_ROWS;
+        const uint8_t row = i % MENU_MATRIX_ROWS;
+        const uint8_t center_x = MENU_MATRIX_FIRST_CENTER_X + column * MENU_MATRIX_CELL_WIDTH;
+        const uint8_t center_y = MENU_MATRIX_FIRST_CENTER_Y + row * MENU_MATRIX_CELL_HEIGHT;
         const bool selected = item_i == position;
         MenuItem* item = MenuItemArray_get(model->items, item_i);
 
         if(selected) {
-            elements_slightly_rounded_box(canvas, x, y, 40, 30);
+            const uint8_t selected_x = center_x - MENU_MATRIX_SELECTED_WIDTH / 2U;
+            const uint8_t selected_y = center_y - MENU_MATRIX_SELECTED_HEIGHT / 2U;
+            elements_slightly_rounded_box(
+                canvas,
+                selected_x,
+                selected_y,
+                MENU_MATRIX_SELECTED_WIDTH,
+                MENU_MATRIX_SELECTED_HEIGHT);
             canvas_set_color(canvas, ColorWhite);
         } else {
-            elements_frame(canvas, x, y, 40, 30);
+            canvas_draw_line(canvas, center_x - 2U, center_y + 10U, center_x + 2U, center_y + 10U);
         }
 
-        menu_centered_icon(canvas, item, x, y, 40, 19);
-        menu_draw_fit_label(
-            canvas,
-            menu_short_name(item->label),
-            x + 20,
-            y + 27,
-            AlignCenter,
-            AlignBottom,
-            36);
+        menu_centered_icon(canvas, item, center_x - 7U, center_y - 7U, 14U, 14U);
 
         if(selected) canvas_set_color(canvas, ColorBlack);
     }
 }
 
-static void menu_draw_dsi(Canvas* canvas, MenuModel* model) {
+static void menu_draw_rail_side_item(Canvas* canvas, MenuItem* item, uint8_t center_x) {
+    const uint8_t frame_x = center_x - MENU_RAIL_SIDE_WIDTH / 2U;
+    const uint8_t frame_y = MENU_RAIL_ICON_CENTER_Y - MENU_RAIL_SIDE_HEIGHT / 2U;
+    canvas_set_color(canvas, ColorWhite);
+    canvas_draw_box(
+        canvas, frame_x + 1U, frame_y + 1U, MENU_RAIL_SIDE_WIDTH - 2U, MENU_RAIL_SIDE_HEIGHT - 2U);
+    canvas_set_color(canvas, ColorBlack);
+    canvas_draw_rframe(canvas, frame_x, frame_y, MENU_RAIL_SIDE_WIDTH, MENU_RAIL_SIDE_HEIGHT, 2);
+    menu_centered_icon(
+        canvas, item, frame_x, frame_y, MENU_RAIL_SIDE_WIDTH, MENU_RAIL_SIDE_HEIGHT);
+}
+
+static void menu_draw_signal_rail(Canvas* canvas, MenuModel* model) {
     const size_t position = model->position;
     const size_t count = MenuItemArray_size(model->items);
 
-    for(int8_t i = -2; i <= 2; i++) {
-        const size_t item_i = (position + count + i) % count;
-        MenuItem* item = MenuItemArray_get(model->items, item_i);
-        int32_t x = 64 + (30 * i);
-        int32_t y = i == 0 ? 35 : 38;
-        const size_t w = i == 0 ? 30 : 24;
-        const size_t h = i == 0 ? 31 : 26;
-
-        if(i == 0) {
-            canvas_draw_frame(canvas, x - w / 2, y - h / 2, w, h + 5);
-            canvas_set_font(canvas, FontPrimary);
-            canvas_draw_str_aligned(canvas, 64, 12, AlignCenter, AlignBottom, item->label);
-        } else {
-            elements_slightly_rounded_frame(canvas, x - w / 2, y - h / 2, w, h);
-        }
-
-        menu_centered_icon(canvas, item, x - 8, y - 8, 16, 16);
+    menu_draw_header(canvas, model);
+    if(count > 2U) {
+        canvas_draw_line(
+            canvas,
+            MENU_RAIL_CONNECTOR_X,
+            MENU_RAIL_CONNECTOR_Y,
+            MENU_RAIL_CONNECTOR_X + MENU_RAIL_CONNECTOR_WIDTH - 1U,
+            MENU_RAIL_CONNECTOR_Y);
+    } else if(count == 2U) {
+        canvas_draw_line(
+            canvas,
+            MENU_RAIL_SELECTED_X + MENU_RAIL_SELECTED_WIDTH / 2U - 1U,
+            MENU_RAIL_CONNECTOR_Y,
+            MENU_RAIL_NEXT_X - MENU_RAIL_SIDE_WIDTH / 2U,
+            MENU_RAIL_CONNECTOR_Y);
     }
 
+    if(count > 1U) {
+        const size_t side_position = count == 2U ? (position + 1U) % count :
+                                                   (position + count - 1U) % count;
+        MenuItem* side_item = MenuItemArray_get(model->items, side_position);
+        menu_draw_rail_side_item(
+            canvas, side_item, count == 2U ? MENU_RAIL_NEXT_X : MENU_RAIL_PREVIOUS_X);
+    }
+    if(count > 2U) {
+        MenuItem* next = MenuItemArray_get(model->items, (position + 1U) % count);
+        menu_draw_rail_side_item(canvas, next, MENU_RAIL_NEXT_X);
+    }
+
+    const uint8_t selected_x = MENU_RAIL_SELECTED_X - MENU_RAIL_SELECTED_WIDTH / 2U;
+    const uint8_t selected_y = MENU_RAIL_ICON_CENTER_Y - MENU_RAIL_SELECTED_HEIGHT / 2U;
+    elements_slightly_rounded_box(
+        canvas, selected_x, selected_y, MENU_RAIL_SELECTED_WIDTH, MENU_RAIL_SELECTED_HEIGHT);
+    canvas_set_color(canvas, ColorWhite);
+    menu_centered_icon(
+        canvas,
+        MenuItemArray_get(model->items, position),
+        selected_x,
+        selected_y,
+        MENU_RAIL_SELECTED_WIDTH,
+        MENU_RAIL_SELECTED_HEIGHT);
+    canvas_set_color(canvas, ColorBlack);
+
+    if(count <= MENU_RAIL_MAX_DOTS) {
+        const uint8_t dots_width = count > 1U ? (count - 1U) * MENU_RAIL_PROGRESS_STEP + 1U : 1U;
+        const uint8_t dots_x = (MENU_SCREEN_WIDTH - dots_width) / 2U;
+        for(size_t i = 0; i < count; i++) {
+            const uint8_t dot_x = dots_x + i * MENU_RAIL_PROGRESS_STEP;
+            if(i == position) {
+                canvas_draw_box(canvas, dot_x - 1U, MENU_RAIL_PROGRESS_Y - 1U, 3, 3);
+            } else {
+                canvas_draw_dot(canvas, dot_x, MENU_RAIL_PROGRESS_Y);
+            }
+        }
+    } else {
+        canvas_draw_line(canvas, 8, MENU_RAIL_PROGRESS_Y, 119, MENU_RAIL_PROGRESS_Y);
+        const uint8_t progress_x = 8U + (111U * position) / (count - 1U);
+        canvas_draw_box(canvas, progress_x - 1U, MENU_RAIL_PROGRESS_Y - 1U, 3, 3);
+    }
 }
 
 static void menu_draw_vertical(Canvas* canvas, MenuModel* model) {
@@ -182,7 +318,7 @@ static void menu_draw_vertical(Canvas* canvas, MenuModel* model) {
         }
 
         menu_centered_icon(canvas, item, 0, y, 16, 16);
-        canvas_draw_str(canvas, 17, y + 12, menu_short_name(item->label));
+        menu_draw_fit_label(canvas, model, item->label, 17, y + 12, AlignLeft, AlignBottom, 46);
         if(selected) canvas_set_color(canvas, ColorBlack);
     }
     canvas_set_orientation(canvas, CanvasOrientationHorizontal);
@@ -220,7 +356,8 @@ static void menu_draw_wii_vertical(Canvas* canvas, MenuModel* model) {
         menu_centered_icon(canvas, item, x, y, 31, 19);
         menu_draw_fit_label(
             canvas,
-            menu_short_name(item->label),
+            model,
+            menu_compact_name(item->label),
             x + 15,
             y + 27,
             AlignCenter,
@@ -243,10 +380,10 @@ static void menu_draw_callback(Canvas* canvas, void* _model) {
 
     switch(model->style) {
     case MenuStyleWii:
-        menu_draw_wii(canvas, model);
+        menu_draw_signal_matrix(canvas, model);
         break;
     case MenuStyleDsi:
-        menu_draw_dsi(canvas, model);
+        menu_draw_signal_rail(canvas, model);
         break;
     case MenuStyleVertical:
         menu_draw_vertical(canvas, model);
@@ -264,46 +401,14 @@ static void menu_draw_callback(Canvas* canvas, void* _model) {
 static bool menu_input_callback(InputEvent* event, void* context) {
     Menu* menu = context;
     bool consumed = true;
-    InputKey key = event->key;
 
     if(event->type == InputTypeShort || event->type == InputTypeRepeat) {
-        with_view_model(
-            menu->view,
-            MenuModel * model,
-            {
-                if(model->style == MenuStyleWiiVertical) {
-                    switch(key) {
-                    case InputKeyUp:
-                        key = InputKeyRight;
-                        break;
-                    case InputKeyDown:
-                        key = InputKeyLeft;
-                        break;
-                    case InputKeyRight:
-                        key = InputKeyDown;
-                        break;
-                    case InputKeyLeft:
-                        key = InputKeyUp;
-                        break;
-                    default:
-                        break;
-                    }
-                }
-            },
-            false);
-
-        switch(key) {
+        switch(event->key) {
         case InputKeyUp:
-            menu_process_up(menu);
-            break;
         case InputKeyDown:
-            menu_process_down(menu);
-            break;
         case InputKeyLeft:
-            menu_process_left(menu);
-            break;
         case InputKeyRight:
-            menu_process_right(menu);
+            menu_process_direction(menu, event->key);
             break;
         case InputKeyOk:
             if(event->type != InputTypeRepeat) menu_process_ok(menu);
@@ -367,6 +472,9 @@ Menu* menu_alloc(void) {
             model->position = 0;
             model->vertical_offset = 0;
             model->style = MenuStyleList;
+            model->label_scratch = furi_string_alloc();
+            furi_string_reserve(model->label_scratch, MENU_LABEL_SCRATCH_CAPACITY);
+            model->label_scratch_capacity = MENU_LABEL_SCRATCH_CAPACITY;
         },
         true);
 
@@ -377,7 +485,16 @@ void menu_free(Menu* menu) {
     furi_check(menu);
 
     menu_reset(menu);
-    with_view_model(menu->view, MenuModel * model, { MenuItemArray_clear(model->items); }, false);
+    with_view_model(
+        menu->view,
+        MenuModel * model,
+        {
+            MenuItemArray_clear(model->items);
+            furi_string_free(model->label_scratch);
+            model->label_scratch = NULL;
+            model->label_scratch_capacity = 0;
+        },
+        false);
     view_free(menu->view);
     free(menu);
 }
@@ -401,6 +518,14 @@ void menu_add_item(
         menu->view,
         MenuModel * model,
         {
+            size_t label_capacity = strlen(label) + 1U;
+            if(label_capacity < MENU_LABEL_SCRATCH_CAPACITY) {
+                label_capacity = MENU_LABEL_SCRATCH_CAPACITY;
+            }
+            if(label_capacity > model->label_scratch_capacity) {
+                furi_string_reserve(model->label_scratch, label_capacity);
+                model->label_scratch_capacity = label_capacity;
+            }
             MenuItem* item = MenuItemArray_push_new(model->items);
             item->label = label;
             item->icon = icon ? icon_animation_alloc(icon) : icon_animation_alloc(&A_Plugins_14);
@@ -427,6 +552,8 @@ void menu_reset(Menu* menu) {
             MenuItemArray_reset(model->items);
             model->position = 0;
             model->vertical_offset = 0;
+            furi_string_reset(model->label_scratch);
+            model->label_scratch_capacity = 0;
         },
         true);
 }
@@ -473,153 +600,92 @@ void menu_set_selected_item(Menu* menu, uint32_t index) {
         true);
 }
 
-static void menu_process_up(Menu* menu) {
-    size_t position = 0;
-    with_view_model(
-        menu->view,
-        MenuModel * model,
-        {
-            const size_t count = MenuItemArray_size(model->items);
-            if(!count) return;
+static size_t menu_next_position(MenuStyle style, InputKey key, size_t position, size_t count) {
+    if(!count) return 0;
+    position %= count;
 
-            position = model->position;
-            switch(model->style) {
-            case MenuStyleWii:
-                position = (position % 2 || (position == count - 1 && count % 2)) ?
-                               position - 1 :
-                               position + 1;
-                break;
-            case MenuStyleDsi:
-            case MenuStyleVertical:
-                position = position > 0 ? position - 1 : count - 1;
-                break;
-            case MenuStyleWiiVertical:
-                if(position >= 2) {
-                    position -= 2;
-                } else {
-                    const size_t column = position % 2;
-                    const size_t last_row = (count - 1) / 2;
-                    position = last_row * 2 + column;
-                    if(position >= count) position--;
-                }
-                break;
-            default:
-                position = position > 0 ? position - 1 : count - 1;
-                break;
-            }
-            position = menu_wrap_position(position, count);
-        },
-        false);
-    menu_set_position(menu, position);
+    if(style == MenuStyleWiiVertical) {
+        switch(key) {
+        case InputKeyUp:
+            key = InputKeyRight;
+            break;
+        case InputKeyDown:
+            key = InputKeyLeft;
+            break;
+        case InputKeyRight:
+            key = InputKeyDown;
+            break;
+        case InputKeyLeft:
+            key = InputKeyUp;
+            break;
+        default:
+            break;
+        }
+    }
+
+    if(style == MenuStyleWii) {
+        const size_t column = position / MENU_MATRIX_ROWS;
+        const size_t row = position % MENU_MATRIX_ROWS;
+
+        if(key == InputKeyUp || key == InputKeyDown) {
+            const size_t target = column * MENU_MATRIX_ROWS + (key == InputKeyDown ? 1U : 0U);
+            return target < count ? target : position;
+        }
+
+        if(key == InputKeyLeft || key == InputKeyRight) {
+            const size_t row_columns = (count + MENU_MATRIX_ROWS - 1U - row) / MENU_MATRIX_ROWS;
+            const size_t next_column = key == InputKeyRight ?
+                                           (column + 1U) % row_columns :
+                                           (column + row_columns - 1U) % row_columns;
+            return next_column * MENU_MATRIX_ROWS + row;
+        }
+
+        return position;
+    }
+
+    if(style == MenuStyleDsi || style == MenuStyleVertical) {
+        if(key == InputKeyLeft) {
+            return position > 0U ? position - 1U : count - 1U;
+        }
+        if(key == InputKeyRight) {
+            return position + 1U < count ? position + 1U : 0U;
+        }
+        return position;
+    }
+
+    if(style == MenuStyleWiiVertical) {
+        if(key == InputKeyUp) {
+            if(position >= 2U) return position - 2U;
+            const size_t column = position % 2U;
+            const size_t rows_in_column = (count + 1U - column) / 2U;
+            return (rows_in_column - 1U) * 2U + column;
+        }
+        if(key == InputKeyDown) {
+            const size_t target = position + 2U;
+            if(target < count) return target;
+            const size_t column = position % 2U;
+            return column < count ? column : 0U;
+        }
+        if(key == InputKeyLeft || key == InputKeyRight) {
+            if(position % 2U) return position - 1U;
+            if(position + 1U < count) return position + 1U;
+        }
+        return position;
+    }
+
+    if(key == InputKeyUp) return position > 0U ? position - 1U : count - 1U;
+    if(key == InputKeyDown) return position + 1U < count ? position + 1U : 0U;
+    return position;
 }
 
-static void menu_process_down(Menu* menu) {
+static void menu_process_direction(Menu* menu, InputKey key) {
     size_t position = 0;
     with_view_model(
         menu->view,
         MenuModel * model,
         {
-            const size_t count = MenuItemArray_size(model->items);
-            if(!count) return;
-
-            position = model->position;
-            switch(model->style) {
-            case MenuStyleWii:
-                position = (position % 2 || (position == count - 1 && count % 2)) ?
-                               position - 1 :
-                               position + 1;
-                break;
-            case MenuStyleDsi:
-            case MenuStyleVertical:
-                position = position < count - 1 ? position + 1 : 0;
-                break;
-            case MenuStyleWiiVertical:
-                position += 2;
-                if(position >= count) {
-                    position %= 2;
-                    if(position >= count) position = 0;
-                }
-                break;
-            default:
-                position = position < count - 1 ? position + 1 : 0;
-                break;
-            }
-            position = menu_wrap_position(position, count);
-        },
-        false);
-    menu_set_position(menu, position);
-}
-
-static void menu_process_left(Menu* menu) {
-    size_t position = 0;
-    with_view_model(
-        menu->view,
-        MenuModel * model,
-        {
-            const size_t count = MenuItemArray_size(model->items);
-            if(!count) return;
-
-            position = model->position;
-            switch(model->style) {
-            case MenuStyleWii:
-                position = position < 2 ? (count % 2 ? count - 1 : count - 2 + position % 2) :
-                                          position - 2;
-                break;
-            case MenuStyleDsi:
-            case MenuStyleVertical:
-                position = position > 0 ? position - 1 : count - 1;
-                break;
-            case MenuStyleWiiVertical:
-                if(position % 2) {
-                    position--;
-                } else if(position + 1 < count) {
-                    position++;
-                }
-                break;
-            default:
-                break;
-            }
-            position = menu_wrap_position(position, count);
-        },
-        false);
-    menu_set_position(menu, position);
-}
-
-static void menu_process_right(Menu* menu) {
-    size_t position = 0;
-    with_view_model(
-        menu->view,
-        MenuModel * model,
-        {
-            const size_t count = MenuItemArray_size(model->items);
-            if(!count) return;
-
-            position = model->position;
-            switch(model->style) {
-            case MenuStyleWii:
-                if(count % 2) {
-                    position = position == count - 1 ? 0 :
-                               position == count - 2 ? count - 1 :
-                                                       position + 2;
-                } else {
-                    position += 2;
-                }
-                break;
-            case MenuStyleDsi:
-            case MenuStyleVertical:
-                position = position < count - 1 ? position + 1 : 0;
-                break;
-            case MenuStyleWiiVertical:
-                if(position % 2) {
-                    position--;
-                } else if(position + 1 < count) {
-                    position++;
-                }
-                break;
-            default:
-                break;
-            }
-            position = menu_wrap_position(position, count);
+            position = menu_next_position(
+                model->style, key, model->position, MenuItemArray_size(model->items));
         },
         false);
     menu_set_position(menu, position);
