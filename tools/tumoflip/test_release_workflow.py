@@ -49,6 +49,13 @@ class ReleaseWorkflowTest(unittest.TestCase):
             (REPO_ROOT / ".github/workflows/protected-app-audit.yml").exists()
         )
 
+    def test_release_validation_requires_four_kibibytes_of_c2_reserve(self) -> None:
+        workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("--min-c2-gap 4096", workflow)
+
     def test_pr_build_compiles_package_only_faps(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/pr-build.yml").read_text(
             encoding="utf-8"
