@@ -34,6 +34,7 @@
 * Toolbox: Compare the complete storage of each SimpleArray element (Unleashed #1107 / Tumoflip #394)
 * F7 serial: Reject the invalid expansion serial sentinel (Unleashed #1108 / Tumoflip #394)
 * Release validation: model the updater's page-aligned C1 erase range so the final C1 page can end at the C2 boundary without weakening DfuSe address checks
+* Sub-GHz & Storage: Share duplicated protocol allocation, deserialization, serialization, and command-dispatch bodies, freeing about 4.8 KB of internal flash without changing the exported SDK API (Unleashed PR #1116)
 <br><br>
 
 ----
