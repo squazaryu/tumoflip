@@ -1,5 +1,7 @@
 #include "../subghz_i.h"
 
+#include <stdlib.h>
+
 #define TAG "SubGhzDecodeRaw"
 
 #define SAMPLES_TO_READ_PER_TICK 400
@@ -67,21 +69,24 @@ static bool subghz_scene_decode_raw_restore_pack(SubGhz* subghz) {
     return true;
 }
 
-void subghz_scene_decode_raw_cleanup(SubGhz* subghz) {
+bool subghz_scene_decode_raw_cleanup(SubGhz* subghz) {
     furi_assert(subghz);
 
     subghz_txrx_set_rx_callback(subghz->txrx, NULL, subghz);
     subghz_txrx_receiver_reset(subghz->txrx);
     subghz_scene_decode_raw_stop_worker(subghz);
-    subghz_scene_decode_raw_restore_pack(subghz);
+    const bool restored = subghz_scene_decode_raw_restore_pack(subghz);
 
-    subghz->decode_raw_auto = false;
-    subghz->decode_raw_original_pack_group = subghz_txrx_get_protocol_pack_group(subghz->txrx);
-    subghz->decode_raw_active_pack_group = subghz->decode_raw_original_pack_group;
+    if(restored) {
+        subghz->decode_raw_auto = false;
+        subghz->decode_raw_original_pack_group = subghz_txrx_get_protocol_pack_group(subghz->txrx);
+        subghz->decode_raw_active_pack_group = subghz->decode_raw_original_pack_group;
+    }
     subghz->decode_raw_visited_pack_mask = 0;
     subghz->decode_raw_scanned_pack_count = 0;
     subghz->decode_raw_pack_error = false;
     subghz->state_notifications = SubGhzNotificationStateIDLE;
+    return restored;
 }
 
 static void subghz_scene_decode_raw_set_result(SubGhz* subghz, const char* text) {
@@ -91,37 +96,33 @@ static void subghz_scene_decode_raw_set_result(SubGhz* subghz, const char* text)
     subghz_view_receiver_add_data_progress(subghz->subghz_receiver, text);
 }
 
-static void subghz_scene_decode_raw_show_auto_progress(SubGhz* subghz, const char* progress) {
-    char text[32];
-    if(progress) {
-        snprintf(
-            text,
-            sizeof(text),
-            "%s %u/%u %s",
-            subghz_protocol_pack_group_get_name(subghz->decode_raw_active_pack_group),
-            (unsigned)subghz->decode_raw_scanned_pack_count,
-            (unsigned)SubGhzProtocolPackGroupCount,
-            progress);
-    } else {
-        snprintf(
-            text,
-            sizeof(text),
-            "%s %u/%u",
-            subghz_protocol_pack_group_get_name(subghz->decode_raw_active_pack_group),
-            (unsigned)subghz->decode_raw_scanned_pack_count,
-            (unsigned)SubGhzProtocolPackGroupCount);
-    }
-    subghz_view_receiver_add_data_progress(subghz->subghz_receiver, text);
+static void subghz_scene_decode_raw_set_auto_result(
+    SubGhz* subghz,
+    SubGhzViewReceiverAutoDecodeState state) {
+    scene_manager_set_scene_state(
+        subghz->scene_manager, SubGhzSceneDecodeRAW, SubGhzDecodeRawStateLoaded);
+    subghz->state_notifications = SubGhzNotificationStateIDLE;
+    subghz_view_receiver_set_auto_decode(
+        subghz->subghz_receiver,
+        state,
+        subghz_protocol_pack_group_get_name(subghz->decode_raw_active_pack_group),
+        subghz->decode_raw_scanned_pack_count,
+        SubGhzProtocolPackGroupCount,
+        100);
+}
+
+static void subghz_scene_decode_raw_show_auto_progress(SubGhz* subghz, uint8_t progress) {
+    subghz_view_receiver_set_auto_decode(
+        subghz->subghz_receiver,
+        SubGhzViewReceiverAutoDecodeStateScanning,
+        subghz_protocol_pack_group_get_name(subghz->decode_raw_active_pack_group),
+        subghz->decode_raw_scanned_pack_count,
+        SubGhzProtocolPackGroupCount,
+        progress);
 }
 
 static void subghz_scene_decode_raw_show_match(SubGhz* subghz) {
-    char text[32];
-    snprintf(
-        text,
-        sizeof(text),
-        "Found: %s",
-        subghz_protocol_pack_group_get_name(subghz->decode_raw_active_pack_group));
-    subghz_scene_decode_raw_set_result(subghz, text);
+    subghz_scene_decode_raw_set_auto_result(subghz, SubGhzViewReceiverAutoDecodeStateFound);
 }
 
 static bool
@@ -176,7 +177,7 @@ static void subghz_scene_add_to_history_callback(
             furi_string_get_cstr(item_time),
             subghz_history_get_type_protocol(subghz->history, idx));
 
-        subghz_scene_receiver_update_statusbar(subghz);
+        if(!subghz->decode_raw_auto) subghz_scene_receiver_update_statusbar(subghz);
     }
     subghz_receiver_reset(receiver);
     furi_string_free(item_name);
@@ -239,7 +240,7 @@ static bool subghz_scene_decode_raw_start_next_pack(SubGhz* subghz) {
 
         subghz->decode_raw_active_pack_group = next_group;
         subghz_scene_decode_raw_note_pack_status(subghz);
-        subghz_scene_decode_raw_show_auto_progress(subghz, NULL);
+        subghz_scene_decode_raw_show_auto_progress(subghz, 0);
 
         if(subghz_scene_decode_raw_start(subghz)) {
             subghz->state_notifications = SubGhzNotificationStateRx;
@@ -248,16 +249,19 @@ static bool subghz_scene_decode_raw_start_next_pack(SubGhz* subghz) {
 
         FURI_LOG_E(TAG, "Failed to restart RAW decode");
         const bool restored = subghz_scene_decode_raw_restore_pack(subghz);
-        subghz_scene_decode_raw_set_result(
-            subghz, restored ? "RAW read error" : "Pack restore error");
+        subghz_scene_decode_raw_set_auto_result(
+            subghz,
+            restored ? SubGhzViewReceiverAutoDecodeStateReadError :
+                       SubGhzViewReceiverAutoDecodeStateRestoreError);
         return false;
     }
 
     const bool restored = subghz_scene_decode_raw_restore_pack(subghz);
-    subghz_scene_decode_raw_set_result(
+    subghz_scene_decode_raw_set_auto_result(
         subghz,
-        restored ? (subghz->decode_raw_pack_error ? "No match (pack ERR)" : "No match") :
-                   "Pack restore error");
+        restored ? (subghz->decode_raw_pack_error ? SubGhzViewReceiverAutoDecodeStatePackError :
+                                                    SubGhzViewReceiverAutoDecodeStateNoMatch) :
+                   SubGhzViewReceiverAutoDecodeStateRestoreError);
     return false;
 }
 
@@ -303,7 +307,8 @@ bool subghz_scene_decode_raw_next(SubGhz* subghz) {
         subghz->decode_raw_file_worker_encoder, progress_str);
 
     if(subghz->decode_raw_auto) {
-        subghz_scene_decode_raw_show_auto_progress(subghz, furi_string_get_cstr(progress_str));
+        const uint32_t progress = strtoul(furi_string_get_cstr(progress_str), NULL, 10);
+        subghz_scene_decode_raw_show_auto_progress(subghz, (uint8_t)MIN(progress, (uint32_t)100));
     } else {
         subghz_view_receiver_add_data_progress(
             subghz->subghz_receiver, furi_string_get_cstr(progress_str));
@@ -320,7 +325,10 @@ void subghz_scene_decode_raw_on_enter(void* context) {
     FuriString* item_name = furi_string_alloc();
     FuriString* item_time = furi_string_alloc();
 
-    subghz_view_receiver_set_mode(subghz->subghz_receiver, SubGhzViewReceiverModeFile);
+    subghz_view_receiver_set_mode(
+        subghz->subghz_receiver,
+        subghz->decode_raw_auto ? SubGhzViewReceiverModeAutoDecode : SubGhzViewReceiverModeFile);
+    subghz_view_receiver_set_lock(subghz->subghz_receiver, false);
     subghz_view_receiver_set_callback(
         subghz->subghz_receiver, subghz_scene_decode_raw_callback, subghz);
 
@@ -344,7 +352,7 @@ void subghz_scene_decode_raw_on_enter(void* context) {
             subghz->decode_raw_scanned_pack_count = 1;
             subghz->decode_raw_pack_error = false;
             subghz_scene_decode_raw_note_pack_status(subghz);
-            subghz_scene_decode_raw_show_auto_progress(subghz, NULL);
+            subghz_scene_decode_raw_show_auto_progress(subghz, 0);
         }
 
         if(subghz_scene_decode_raw_start(subghz)) {
@@ -353,8 +361,15 @@ void subghz_scene_decode_raw_on_enter(void* context) {
             subghz->state_notifications = SubGhzNotificationStateRx;
         } else {
             const bool restored = subghz_scene_decode_raw_restore_pack(subghz);
-            subghz_scene_decode_raw_set_result(
-                subghz, restored ? "RAW read error" : "Pack restore error");
+            if(subghz->decode_raw_auto) {
+                subghz_scene_decode_raw_set_auto_result(
+                    subghz,
+                    restored ? SubGhzViewReceiverAutoDecodeStateReadError :
+                               SubGhzViewReceiverAutoDecodeStateRestoreError);
+            } else {
+                subghz_scene_decode_raw_set_result(
+                    subghz, restored ? "RAW read error" : "Pack restore error");
+            }
         }
     } else {
         //decoding was frozen while another scene was on screen, that time must not
@@ -376,12 +391,15 @@ void subghz_scene_decode_raw_on_enter(void* context) {
                 subghz_history_get_type_protocol(subghz->history, i));
         }
         subghz_view_receiver_set_idx_menu(subghz->subghz_receiver, subghz->idx_menu_chosen);
+        if(subghz->decode_raw_auto && subghz_history_get_item(subghz->history) > 0) {
+            subghz_scene_decode_raw_show_match(subghz);
+        }
     }
 
     furi_string_free(item_name);
     furi_string_free(item_time);
 
-    subghz_scene_receiver_update_statusbar(subghz);
+    if(!subghz->decode_raw_auto) subghz_scene_receiver_update_statusbar(subghz);
 
     view_dispatcher_switch_to_view(subghz->view_dispatcher, SubGhzViewIdReceiver);
 }
@@ -397,7 +415,13 @@ bool subghz_scene_decode_raw_on_event(void* context, SceneManagerEvent event) {
             subghz->idx_menu_chosen = 0;
 
             //do not leave a half decoded frame or temporary protocol pack behind
-            subghz_scene_decode_raw_cleanup(subghz);
+            if(!subghz_scene_decode_raw_cleanup(subghz)) {
+                FURI_LOG_E(TAG, "Protocol pack restore failed; closing Sub-GHz");
+                scene_manager_stop(subghz->scene_manager);
+                view_dispatcher_stop(subghz->view_dispatcher);
+                consumed = true;
+                break;
+            }
             scene_manager_set_scene_state(
                 subghz->scene_manager, SubGhzSceneReadRAW, SubGhzCustomEventManagerNoSet);
             scene_manager_search_and_switch_to_previous_scene(

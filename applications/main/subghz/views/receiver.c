@@ -62,6 +62,7 @@ typedef struct {
     FuriString* preset_str;
     FuriString* history_stat_str;
     FuriString* progress_str;
+    FuriString* auto_decode_pack_str;
     bool hopping_enabled;
     bool bin_raw_enabled;
     SubGhzReceiverHistory* history;
@@ -70,6 +71,10 @@ typedef struct {
     uint16_t history_item;
     SubGhzViewReceiverBarShow bar_show;
     SubGhzViewReceiverMode mode;
+    SubGhzViewReceiverAutoDecodeState auto_decode_state;
+    uint8_t auto_decode_pack_index;
+    uint8_t auto_decode_pack_count;
+    uint8_t auto_decode_raw_progress;
     uint8_t u_rssi;
 
     SubGhzRadioDeviceType device_type;
@@ -104,8 +109,8 @@ void subghz_receiver_rssi(SubGhzViewReceiver* instance, float rssi) {
 void subghz_view_receiver_set_lock(SubGhzViewReceiver* subghz_receiver, bool lock) {
     furi_assert(subghz_receiver);
     subghz_receiver->lock_count = 0;
+    subghz_receiver->lock = lock;
     if(lock == true) {
-        subghz_receiver->lock = lock;
         with_view_model(
             subghz_receiver->view,
             SubGhzViewReceiverModel * model,
@@ -113,6 +118,7 @@ void subghz_view_receiver_set_lock(SubGhzViewReceiver* subghz_receiver, bool loc
             true);
         furi_timer_start(subghz_receiver->timer, 1000);
     } else {
+        furi_timer_stop(subghz_receiver->timer);
         with_view_model(
             subghz_receiver->view,
             SubGhzViewReceiverModel * model,
@@ -250,6 +256,27 @@ void subghz_view_receiver_add_data_progress(
         true);
 }
 
+void subghz_view_receiver_set_auto_decode(
+    SubGhzViewReceiver* subghz_receiver,
+    SubGhzViewReceiverAutoDecodeState state,
+    const char* pack_name,
+    uint8_t pack_index,
+    uint8_t pack_count,
+    uint8_t raw_progress) {
+    furi_assert(subghz_receiver);
+    with_view_model(
+        subghz_receiver->view,
+        SubGhzViewReceiverModel * model,
+        {
+            model->auto_decode_state = state;
+            furi_string_set(model->auto_decode_pack_str, pack_name ? pack_name : "");
+            model->auto_decode_pack_count = pack_count;
+            model->auto_decode_pack_index = MIN(pack_index, pack_count);
+            model->auto_decode_raw_progress = MIN(raw_progress, 100);
+        },
+        true);
+}
+
 void subghz_view_receiver_set_radio_device_type(
     SubGhzViewReceiver* subghz_receiver,
     SubGhzRadioDeviceType device_type) {
@@ -285,10 +312,114 @@ static void subghz_view_rssi_draw(Canvas* canvas, SubGhzViewReceiverModel* model
     }
 }
 
+static void subghz_view_receiver_draw_auto_decode_pack_steps(
+    Canvas* canvas,
+    const SubGhzViewReceiverModel* model) {
+    const uint8_t count = model->auto_decode_pack_count;
+    if(count == 0 || count > 8) return;
+
+    const uint8_t start_x = 5;
+    const uint8_t segment_width = 12;
+    const uint8_t gap = 3;
+
+    for(uint8_t index = 0; index < count; index++) {
+        const uint8_t x = start_x + index * (segment_width + gap);
+        if(index + 1 < model->auto_decode_pack_index) {
+            canvas_draw_rbox(canvas, x, 45, segment_width, 5, 1);
+        } else if(index + 1 == model->auto_decode_pack_index) {
+            canvas_draw_rframe(canvas, x, 45, segment_width, 5, 1);
+            canvas_draw_dot(canvas, x + segment_width / 2, 47);
+        } else {
+            canvas_draw_dot(canvas, x + segment_width / 2, 47);
+        }
+    }
+}
+
+static void subghz_view_receiver_draw_auto_decode(Canvas* canvas, SubGhzViewReceiverModel* model) {
+    char counter[8];
+    snprintf(
+        counter,
+        sizeof(counter),
+        "%u/%u",
+        (unsigned)model->auto_decode_pack_index,
+        (unsigned)model->auto_decode_pack_count);
+
+    canvas_draw_icon(canvas, 3, 2, &I_Raw_9x7);
+    canvas_set_font(canvas, FontPrimary);
+    canvas_draw_str(
+        canvas,
+        16,
+        10,
+        model->auto_decode_state == SubGhzViewReceiverAutoDecodeStateFound ? "Decoded" :
+                                                                             "Auto Decode");
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(canvas, 124, 10, AlignRight, AlignBottom, counter);
+    canvas_draw_line(canvas, 2, 13, 125, 13);
+
+    FuriString* fitted = model->progress_str;
+    if(model->auto_decode_state == SubGhzViewReceiverAutoDecodeStateScanning ||
+       model->auto_decode_state == SubGhzViewReceiverAutoDecodeStateFound) {
+        canvas_draw_str(canvas, 4, 25, "PACK");
+        canvas_set_font(canvas, FontPrimary);
+        furi_string_set(fitted, model->auto_decode_pack_str);
+        elements_string_fit_width(canvas, fitted, 88);
+        canvas_draw_str(canvas, 35, 25, furi_string_get_cstr(fitted));
+    }
+
+    if(model->auto_decode_state == SubGhzViewReceiverAutoDecodeStateScanning) {
+        char progress[12];
+        snprintf(
+            progress, sizeof(progress), "RAW %03u%%", (unsigned)model->auto_decode_raw_progress);
+        elements_progress_bar_with_text(
+            canvas, 4, 30, 120, model->auto_decode_raw_progress / 100.0f, progress);
+        subghz_view_receiver_draw_auto_decode_pack_steps(canvas, model);
+        elements_button_left(canvas, "Cancel");
+    } else if(model->auto_decode_state == SubGhzViewReceiverAutoDecodeStateFound) {
+        canvas_set_font(canvas, FontSecondary);
+        canvas_draw_str(canvas, 4, 38, "PROTOCOL");
+        canvas_set_font(canvas, FontPrimary);
+        furi_string_reset(fitted);
+        if(model->history_item > 0) {
+            const SubGhzReceiverMenuItem* item =
+                SubGhzReceiverMenuItemArray_get(model->history->data, model->idx);
+            if(item) furi_string_set(fitted, item->item_str);
+        }
+        if(furi_string_empty(fitted)) furi_string_set_str(fitted, "Decoded signal");
+        elements_string_fit_width(canvas, fitted, 120);
+        canvas_draw_str(canvas, 4, 49, furi_string_get_cstr(fitted));
+        canvas_set_font(canvas, FontSecondary);
+        elements_button_center(canvas, "Details");
+    } else {
+        const char* title = "No match";
+        const char* detail = "All packs checked";
+        if(model->auto_decode_state == SubGhzViewReceiverAutoDecodeStatePackError) {
+            title = "Pack issue";
+            detail = "Some packs skipped";
+        } else if(model->auto_decode_state == SubGhzViewReceiverAutoDecodeStateReadError) {
+            title = "RAW read error";
+            detail = "Try another capture";
+        } else if(model->auto_decode_state == SubGhzViewReceiverAutoDecodeStateRestoreError) {
+            title = "Restore failed";
+            detail = "Restart Sub-GHz";
+        }
+
+        canvas_set_font(canvas, FontPrimary);
+        canvas_draw_str_aligned(canvas, 64, 31, AlignCenter, AlignBottom, title);
+        canvas_set_font(canvas, FontSecondary);
+        canvas_draw_str_aligned(canvas, 64, 44, AlignCenter, AlignBottom, detail);
+        elements_button_left(canvas, "Back");
+    }
+}
+
 void subghz_view_receiver_draw(Canvas* canvas, SubGhzViewReceiverModel* model) {
     canvas_clear(canvas);
     canvas_set_color(canvas, ColorBlack);
     canvas_set_font(canvas, FontSecondary);
+
+    if(model->mode == SubGhzViewReceiverModeAutoDecode) {
+        subghz_view_receiver_draw_auto_decode(canvas, model);
+        return;
+    }
 
     const bool show_diversity_toggle = model->device_type != SubGhzRadioDeviceTypeInternal &&
                                        model->mode == SubGhzViewReceiverModeLive &&
@@ -379,6 +510,8 @@ void subghz_view_receiver_draw(Canvas* canvas, SubGhzViewReceiverModel* model) {
     if(model->mode == SubGhzViewReceiverModeLive) {
         subghz_view_rssi_draw(canvas, model);
     }
+    if(model->mode != SubGhzViewReceiverModeLive) return;
+
     switch(model->bar_show) {
     case SubGhzViewReceiverBarShowLock:
         canvas_draw_icon(canvas, 64, 55, &I_Lock_7x8);
@@ -504,6 +637,27 @@ bool subghz_view_receiver_input(InputEvent* event, void* context) {
         return true;
     }
 
+    bool auto_decode = false;
+    bool auto_decode_has_result = false;
+    with_view_model(
+        subghz_receiver->view,
+        SubGhzViewReceiverModel * model,
+        {
+            auto_decode = model->mode == SubGhzViewReceiverModeAutoDecode;
+            auto_decode_has_result = model->auto_decode_state ==
+                                         SubGhzViewReceiverAutoDecodeStateFound &&
+                                     model->history_item > 0;
+        },
+        false);
+    if(auto_decode) {
+        if(event->key == InputKeyBack && event->type == InputTypeShort) {
+            subghz_receiver->callback(SubGhzCustomEventViewReceiverBack, subghz_receiver->context);
+        } else if(auto_decode_has_result && event->key == InputKeyOk && event->type == InputTypeShort) {
+            subghz_receiver->callback(SubGhzCustomEventViewReceiverOK, subghz_receiver->context);
+        }
+        return true;
+    }
+
     bool consumed = false;
     if(event->key == InputKeyBack && event->type == InputTypeShort) {
         subghz_receiver->callback(SubGhzCustomEventViewReceiverBack, subghz_receiver->context);
@@ -601,6 +755,12 @@ void subghz_view_receiver_exit(void* context) {
             furi_string_reset(model->frequency_str);
             furi_string_reset(model->preset_str);
             furi_string_reset(model->history_stat_str);
+            furi_string_reset(model->progress_str);
+            furi_string_reset(model->auto_decode_pack_str);
+            model->auto_decode_state = SubGhzViewReceiverAutoDecodeStateScanning;
+            model->auto_decode_pack_index = 0;
+            model->auto_decode_pack_count = 0;
+            model->auto_decode_raw_progress = 0;
 
                 for
                     M_EACH(item_menu, model->history->data, SubGhzReceiverMenuItemArray_t) {
@@ -648,6 +808,7 @@ SubGhzViewReceiver* subghz_view_receiver_alloc(void) {
             model->preset_str = furi_string_alloc();
             model->history_stat_str = furi_string_alloc();
             model->progress_str = furi_string_alloc();
+            model->auto_decode_pack_str = furi_string_alloc();
             model->bar_show = SubGhzViewReceiverBarShowDefault;
             model->nodraw = false;
             model->history = malloc(sizeof(SubGhzReceiverHistory));
@@ -674,6 +835,7 @@ void subghz_view_receiver_free(SubGhzViewReceiver* subghz_receiver) {
             furi_string_free(model->preset_str);
             furi_string_free(model->history_stat_str);
             furi_string_free(model->progress_str);
+            furi_string_free(model->auto_decode_pack_str);
                 for
                     M_EACH(item_menu, model->history->data, SubGhzReceiverMenuItemArray_t) {
                         furi_string_free(item_menu->item_str);

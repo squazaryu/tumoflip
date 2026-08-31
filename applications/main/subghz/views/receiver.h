@@ -8,6 +8,15 @@ typedef struct SubGhzViewReceiver SubGhzViewReceiver;
 
 typedef void (*SubGhzViewReceiverCallback)(SubGhzCustomEvent event, void* context);
 
+typedef enum {
+    SubGhzViewReceiverAutoDecodeStateScanning,
+    SubGhzViewReceiverAutoDecodeStateFound,
+    SubGhzViewReceiverAutoDecodeStateNoMatch,
+    SubGhzViewReceiverAutoDecodeStatePackError,
+    SubGhzViewReceiverAutoDecodeStateReadError,
+    SubGhzViewReceiverAutoDecodeStateRestoreError,
+} SubGhzViewReceiverAutoDecodeState;
+
 void subghz_view_receiver_set_mode(
     SubGhzViewReceiver* subghz_receiver,
     SubGhzViewReceiverMode mode);
@@ -42,6 +51,14 @@ void subghz_view_receiver_set_radio_device_type(
 void subghz_view_receiver_add_data_progress(
     SubGhzViewReceiver* subghz_receiver,
     const char* progress_str);
+
+void subghz_view_receiver_set_auto_decode(
+    SubGhzViewReceiver* subghz_receiver,
+    SubGhzViewReceiverAutoDecodeState state,
+    const char* pack_name,
+    uint8_t pack_index,
+    uint8_t pack_count,
+    uint8_t raw_progress);
 
 void subghz_view_receiver_add_item_to_menu(
     SubGhzViewReceiver* subghz_receiver,

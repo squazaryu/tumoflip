@@ -218,7 +218,7 @@ class SubGhzRawDecodeLifecycleTest(unittest.TestCase):
         self.assertIn(
             "subghz->decode_raw_file_worker_encoder = NULL;", core_decode
         )
-        self.assertIn("subghz_scene_decode_raw_cleanup(subghz);", core_save)
+        self.assertIn("subghz_scene_decode_raw_cleanup(subghz)", core_save)
 
         for relative in (
             ARF_DECODE,
@@ -280,9 +280,10 @@ class SubGhzRawDecodeLifecycleTest(unittest.TestCase):
         self.assertIn("subghz_scene_decode_raw_restore_pack(subghz)", decode)
         self.assertIn("subghz_scene_decode_raw_note_pack_status(subghz)", decode)
         self.assertIn("report->loaded_plugin_count != report->expected_plugin_count", decode)
-        self.assertIn('"No match (pack ERR)"', decode)
+        self.assertIn("SubGhzViewReceiverAutoDecodeStateNoMatch", decode)
+        self.assertIn("SubGhzViewReceiverAutoDecodeStatePackError", decode)
         self.assertNotIn("last_settings->protocol_pack_group", decode)
-        self.assertIn("subghz_scene_decode_raw_cleanup(subghz);", save_success)
+        self.assertIn("subghz_scene_decode_raw_cleanup(subghz)", save_success)
 
         self.assertIn("subghz->decode_raw_file_worker_encoder = NULL;", subghz)
         self.assertIn("subghz->decode_raw_auto = false;", subghz)

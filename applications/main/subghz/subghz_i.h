@@ -112,7 +112,7 @@ struct SubGhz {
 void subghz_blink_start(SubGhz* subghz);
 void subghz_blink_stop(SubGhz* subghz);
 
-void subghz_scene_decode_raw_cleanup(SubGhz* subghz);
+bool subghz_scene_decode_raw_cleanup(SubGhz* subghz);
 
 bool subghz_tx_start(SubGhz* subghz, FlipperFormat* flipper_format);
 void subghz_dialog_message_freq_error(SubGhz* subghz, bool only_rx);
