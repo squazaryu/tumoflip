@@ -19,6 +19,7 @@ const char* menu_style_get_name(MenuStyle style) {
         "Rail",
         "Side List",
         "Side Grid",
+        "Wii",
     };
 
     return style < MenuStyleCount ? names[style] : names[MenuStyleList];

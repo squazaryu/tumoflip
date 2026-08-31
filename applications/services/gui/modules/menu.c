@@ -45,6 +45,19 @@ ARRAY_DEF(MenuItemArray, MenuItem, M_POD_OPLIST); //-V658
 #define MENU_MATRIX_SELECTED_WIDTH  36U
 #define MENU_MATRIX_SELECTED_HEIGHT 19U
 
+#define MENU_WII_PAGE_SIZE       6U
+#define MENU_WII_COLUMNS         3U
+#define MENU_WII_ROWS            2U
+#define MENU_WII_COLUMN_STEP     43U
+#define MENU_WII_ROW_STEP        32U
+#define MENU_WII_FIRST_X         1U
+#define MENU_WII_FIRST_Y         0U
+#define MENU_WII_CELL_WIDTH      40U
+#define MENU_WII_CELL_HEIGHT     30U
+#define MENU_WII_ICON_HEIGHT     19U
+#define MENU_WII_LABEL_BASELINE  27U
+#define MENU_WII_LABEL_MAX_WIDTH 36U
+
 #define MENU_RAIL_PREVIOUS_X        20U
 #define MENU_RAIL_SELECTED_X        64U
 #define MENU_RAIL_NEXT_X            108U
@@ -208,6 +221,59 @@ static void menu_draw_signal_matrix(Canvas* canvas, MenuModel* model) {
         }
 
         menu_centered_icon(canvas, item, center_x - 7U, center_y - 7U, 14U, 14U);
+
+        if(selected) canvas_set_color(canvas, ColorBlack);
+    }
+}
+
+static size_t menu_wii_first(size_t position, size_t count) {
+    if(!count) return 0;
+    position %= count;
+
+    size_t first = 0;
+    if(count > MENU_WII_PAGE_SIZE && position >= MENU_WII_PAGE_SIZE - MENU_WII_ROWS) {
+        const size_t last_window_threshold = count - MENU_WII_ROWS + (count % MENU_WII_ROWS);
+        first = position >= last_window_threshold ?
+                    position - (position % MENU_WII_ROWS) - (MENU_WII_PAGE_SIZE - MENU_WII_ROWS) :
+                    position - (position % MENU_WII_ROWS) - MENU_WII_ROWS;
+    }
+    return first;
+}
+
+static void menu_draw_wii_classic(Canvas* canvas, MenuModel* model) {
+    const size_t position = model->position;
+    const size_t count = MenuItemArray_size(model->items);
+    const size_t first = menu_wii_first(position, count);
+
+    canvas_set_font(canvas, FontSecondary);
+    for(uint8_t i = 0; i < MENU_WII_PAGE_SIZE; i++) {
+        const size_t item_i = first + i;
+        if(item_i >= count) continue;
+
+        const uint8_t column = i / MENU_WII_ROWS;
+        const uint8_t row = i % MENU_WII_ROWS;
+        const uint8_t x = MENU_WII_FIRST_X + column * MENU_WII_COLUMN_STEP;
+        const uint8_t y = MENU_WII_FIRST_Y + row * MENU_WII_ROW_STEP;
+        const bool selected = item_i == position;
+        MenuItem* item = MenuItemArray_get(model->items, item_i);
+
+        if(selected) {
+            elements_slightly_rounded_box(canvas, x, y, MENU_WII_CELL_WIDTH, MENU_WII_CELL_HEIGHT);
+            canvas_set_color(canvas, ColorWhite);
+        } else {
+            elements_frame(canvas, x, y, MENU_WII_CELL_WIDTH, MENU_WII_CELL_HEIGHT);
+        }
+
+        menu_centered_icon(canvas, item, x, y, MENU_WII_CELL_WIDTH, MENU_WII_ICON_HEIGHT);
+        menu_draw_fit_label(
+            canvas,
+            model,
+            item->label,
+            x + MENU_WII_CELL_WIDTH / 2U,
+            y + MENU_WII_LABEL_BASELINE,
+            AlignCenter,
+            AlignBottom,
+            MENU_WII_LABEL_MAX_WIDTH);
 
         if(selected) canvas_set_color(canvas, ColorBlack);
     }
@@ -391,6 +457,9 @@ static void menu_draw_callback(Canvas* canvas, void* _model) {
     case MenuStyleWiiVertical:
         menu_draw_wii_vertical(canvas, model);
         break;
+    case MenuStyleWiiClassic:
+        menu_draw_wii_classic(canvas, model);
+        break;
     case MenuStyleList:
     default:
         menu_draw_list(canvas, model);
@@ -559,24 +628,26 @@ void menu_reset(Menu* menu) {
 }
 
 static void menu_set_position(Menu* menu, size_t position) {
+    bool changed = false;
     with_view_model(
         menu->view,
         MenuModel * model,
         {
             const size_t count = MenuItemArray_size(model->items);
-            if(!count) return;
+            if(count) {
+                position = menu_wrap_position(position, count);
+                if(position != model->position) {
+                    MenuItem* item = MenuItemArray_get(model->items, model->position);
+                    icon_animation_stop(item->icon);
 
-            position = menu_wrap_position(position, count);
-            if(position == model->position) return;
-
-            MenuItem* item = MenuItemArray_get(model->items, model->position);
-            icon_animation_stop(item->icon);
-
-            item = MenuItemArray_get(model->items, position);
-            icon_animation_start(item->icon);
-            model->position = position;
+                    item = MenuItemArray_get(model->items, position);
+                    icon_animation_start(item->icon);
+                    model->position = position;
+                    changed = true;
+                }
+            }
         },
-        true);
+        changed);
 }
 
 void menu_set_selected_item(Menu* menu, uint32_t index) {
@@ -623,7 +694,7 @@ static size_t menu_next_position(MenuStyle style, InputKey key, size_t position,
         }
     }
 
-    if(style == MenuStyleWii) {
+    if(style == MenuStyleWii || style == MenuStyleWiiClassic) {
         const size_t column = position / MENU_MATRIX_ROWS;
         const size_t row = position % MENU_MATRIX_ROWS;
 

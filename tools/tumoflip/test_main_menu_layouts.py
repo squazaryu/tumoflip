@@ -44,6 +44,7 @@ VISIBLE_STYLE_NAMES = (
     "Rail",
     "Side List",
     "Side Grid",
+    "Wii",
 )
 
 EXPECTED_DRAW_FUNCTIONS = (
@@ -52,6 +53,7 @@ EXPECTED_DRAW_FUNCTIONS = (
     "menu_draw_signal_rail",
     "menu_draw_vertical",
     "menu_draw_wii_vertical",
+    "menu_draw_wii_classic",
 )
 
 
@@ -204,7 +206,8 @@ class MainMenuLayoutTest(unittest.TestCase):
         enum_values = parse_enum_values(self.style_header)
         for name, expected_id in LEGACY_STYLE_IDS.items():
             self.assertEqual(enum_values.get(name), expected_id)
-        self.assertGreaterEqual(enum_values.get("MenuStyleCount", -1), len(LEGACY_STYLE_IDS))
+        self.assertEqual(enum_values.get("MenuStyleWiiClassic"), 5)
+        self.assertEqual(enum_values.get("MenuStyleCount"), 6)
         for contents in (self.style_header, self.style_source):
             self.assertIn("uint8_t style;", contents)
             self.assertIn("settings.style < MenuStyleCount", contents)
@@ -346,6 +349,31 @@ class MainMenuLayoutTest(unittest.TestCase):
         self.assertLessEqual(selected_width, cell_width)
         self.assertLessEqual(selected_height, cell_height)
 
+        wii_page_size = value("MENU_WII_PAGE_SIZE")
+        wii_columns = value("MENU_WII_COLUMNS")
+        wii_rows = value("MENU_WII_ROWS")
+        wii_column_step = value("MENU_WII_COLUMN_STEP")
+        wii_row_step = value("MENU_WII_ROW_STEP")
+        wii_first_x = value("MENU_WII_FIRST_X")
+        wii_first_y = value("MENU_WII_FIRST_Y")
+        wii_cell_width = value("MENU_WII_CELL_WIDTH")
+        wii_cell_height = value("MENU_WII_CELL_HEIGHT")
+        wii_icon_height = value("MENU_WII_ICON_HEIGHT")
+        wii_label_baseline = value("MENU_WII_LABEL_BASELINE")
+        wii_label_width = value("MENU_WII_LABEL_MAX_WIDTH")
+        self.assertEqual(wii_page_size, wii_columns * wii_rows)
+        self.assertLessEqual(
+            wii_first_x + (wii_columns - 1) * wii_column_step + wii_cell_width,
+            screen_width,
+        )
+        self.assertLessEqual(
+            wii_first_y + (wii_rows - 1) * wii_row_step + wii_cell_height,
+            screen_height,
+        )
+        self.assertLessEqual(wii_icon_height, wii_cell_height)
+        self.assertLess(wii_label_baseline, wii_cell_height)
+        self.assertLessEqual(wii_label_width, wii_cell_width)
+
         previous_x = value("MENU_RAIL_PREVIOUS_X")
         selected_x = value("MENU_RAIL_SELECTED_X")
         next_x = value("MENU_RAIL_NEXT_X")
@@ -378,6 +406,7 @@ class MainMenuLayoutTest(unittest.TestCase):
 
         matrix = function_definition(self.menu, "menu_draw_signal_matrix")
         rail = function_definition(self.menu, "menu_draw_signal_rail")
+        wii = function_definition(self.menu, "menu_draw_wii_classic")
         for constant in (
             "MENU_MATRIX_PAGE_SIZE",
             "MENU_MATRIX_ROWS",
@@ -397,6 +426,20 @@ class MainMenuLayoutTest(unittest.TestCase):
             "MENU_RAIL_MAX_DOTS",
         ):
             self.assertIn(constant, rail)
+        for constant in (
+            "MENU_WII_PAGE_SIZE",
+            "MENU_WII_ROWS",
+            "MENU_WII_COLUMN_STEP",
+            "MENU_WII_ROW_STEP",
+            "MENU_WII_FIRST_X",
+            "MENU_WII_FIRST_Y",
+            "MENU_WII_CELL_WIDTH",
+            "MENU_WII_CELL_HEIGHT",
+            "MENU_WII_ICON_HEIGHT",
+            "MENU_WII_LABEL_BASELINE",
+            "MENU_WII_LABEL_MAX_WIDTH",
+        ):
+            self.assertIn(constant, wii)
 
     def test_empty_and_small_counts_guard_all_item_accesses(self) -> None:
         callback = function_definition(self.menu, "menu_draw_callback")
@@ -437,7 +480,8 @@ class MainMenuLayoutTest(unittest.TestCase):
                 MenuStyleDsi = 2,
                 MenuStyleVertical = 3,
                 MenuStyleWiiVertical = 4,
-                MenuStyleCount = 5,
+                MenuStyleWiiClassic = 5,
+                MenuStyleCount = 6,
             }} MenuStyle;
 
             typedef enum {{
@@ -456,6 +500,7 @@ class MainMenuLayoutTest(unittest.TestCase):
             static int key_is_relevant(MenuStyle style, InputKey key) {{
                 switch(style) {{
                 case MenuStyleWii:
+                case MenuStyleWiiClassic:
                 case MenuStyleWiiVertical:
                     return key == InputKeyUp || key == InputKeyDown ||
                            key == InputKeyLeft || key == InputKeyRight;
@@ -478,6 +523,7 @@ class MainMenuLayoutTest(unittest.TestCase):
 
                 switch(style) {{
                 case MenuStyleWii:
+                case MenuStyleWiiClassic:
                     {{
                     const size_t column = position / 2U;
                     const size_t row = position % 2U;
@@ -586,7 +632,8 @@ class MainMenuLayoutTest(unittest.TestCase):
                                     return 2;
                                 }}
 
-                                if(count > 0U && style == MenuStyleWii) {{
+                                if(count > 0U &&
+                                   (style == MenuStyleWii || style == MenuStyleWiiClassic)) {{
                                     const size_t normalized = position % count;
                                     if((keys[k] == InputKeyLeft || keys[k] == InputKeyRight) &&
                                        actual % 2U != normalized % 2U) {{
@@ -675,6 +722,270 @@ class MainMenuLayoutTest(unittest.TestCase):
         ):
             self.assertNotIn(legacy_handler, self.menu)
 
+    def test_noop_direction_always_releases_the_locking_view_model(self) -> None:
+        """A no-op direction must still reach view_commit_model() and unlock."""
+
+        setter = function_definition(self.menu, "menu_set_position")
+        self.assertNotIn(
+            "return;",
+            setter,
+            "return inside with_view_model bypasses view_commit_model and leaks its mutex",
+        )
+        self.assertRegex(setter, r"bool\s+(?:changed|update)\s*=\s*false\s*;")
+        self.assertRegex(setter, r"if\s*\(count\)\s*{")
+        self.assertRegex(setter, r"if\s*\(position\s*!=\s*model->position\)\s*{")
+        self.assertIsNotNone(
+            re.search(
+                r"with_view_model\s*\(.*?\}\s*,\s*(?:changed|update)\s*\)\s*;",
+                setter,
+                re.DOTALL,
+            ),
+            "redraw flag must be false for a no-op while the model is still committed",
+        )
+
+    def test_runtime_noop_directions_release_model_without_side_effects(self) -> None:
+        """Execute the real input path against a locking ViewModel fake."""
+
+        compiler = shutil.which("cc") or shutil.which("clang")
+        self.assertIsNotNone(compiler, "a host C compiler is required")
+        functions = "\n\n".join(
+            function_definition(self.menu, name)
+            for name in (
+                "menu_wrap_position",
+                "menu_next_position",
+                "menu_set_position",
+                "menu_process_direction",
+                "menu_input_callback",
+            )
+        )
+        helper = function_definition(self.menu, "menu_next_position")
+        helper_defines = "\n".join(
+            f"#define {name} {numeric_define(self.menu, name)}U"
+            for name in sorted(set(re.findall(r"\bMENU_[A-Z0-9_]+\b", helper)))
+        )
+        harness = textwrap.dedent(
+            f"""
+            #include <assert.h>
+            #include <stdbool.h>
+            #include <stddef.h>
+            #include <stdint.h>
+            #include <string.h>
+
+            typedef enum {{
+                MenuStyleList = 0,
+                MenuStyleWii = 1,
+                MenuStyleDsi = 2,
+                MenuStyleVertical = 3,
+                MenuStyleWiiVertical = 4,
+                MenuStyleWiiClassic = 5,
+                MenuStyleCount = 6,
+            }} MenuStyle;
+
+            typedef enum {{
+                InputKeyUp,
+                InputKeyDown,
+                InputKeyRight,
+                InputKeyLeft,
+                InputKeyOk,
+                InputKeyBack,
+            }} InputKey;
+
+            typedef enum {{
+                InputTypePress,
+                InputTypeRelease,
+                InputTypeShort,
+                InputTypeLong,
+                InputTypeRepeat,
+            }} InputType;
+
+            typedef struct {{ InputKey key; InputType type; }} InputEvent;
+            typedef struct {{ unsigned int id; }} IconAnimation;
+            typedef struct {{ IconAnimation* icon; }} MenuItem;
+            typedef struct {{ MenuItem* data; size_t size; }} MenuItemArray_t;
+            typedef struct {{
+                MenuItemArray_t items;
+                size_t position;
+                size_t vertical_offset;
+                MenuStyle style;
+                void* label_scratch;
+                size_t label_scratch_capacity;
+            }} MenuModel;
+            typedef struct {{
+                MenuModel model;
+                bool locked;
+                size_t get_count;
+                size_t commit_count;
+                size_t update_count;
+            }} View;
+            typedef struct Menu {{ View* view; }} Menu;
+
+            static size_t icon_start_count;
+            static size_t icon_stop_count;
+            static size_t ok_count;
+
+            static size_t MenuItemArray_size(MenuItemArray_t items) {{ return items.size; }}
+            static MenuItem* MenuItemArray_get(MenuItemArray_t items, size_t position) {{
+                assert(position < items.size);
+                return &items.data[position];
+            }}
+            static void icon_animation_start(IconAnimation* icon) {{
+                assert(icon);
+                icon_start_count++;
+            }}
+            static void icon_animation_stop(IconAnimation* icon) {{
+                assert(icon);
+                icon_stop_count++;
+            }}
+            static void* view_get_model(View* view) {{
+                assert(!view->locked);
+                view->locked = true;
+                view->get_count++;
+                return &view->model;
+            }}
+            static void view_commit_model(View* view, bool update) {{
+                assert(view->locked);
+                view->locked = false;
+                view->commit_count++;
+                if(update) view->update_count++;
+            }}
+
+            #define with_view_model(view, type, code, update) \
+                {{                                                \
+                    type = view_get_model(view);                  \
+                    {{code}};                                     \
+                    view_commit_model(view, update);              \
+                }}
+
+            {helper_defines}
+            static void menu_process_direction(Menu* menu, InputKey key);
+            static void menu_process_ok(Menu* menu) {{
+                (void)menu;
+                ok_count++;
+            }}
+
+            {functions}
+
+            static void reset_fixture(
+                View* view,
+                Menu* menu,
+                MenuItem* items,
+                IconAnimation* icons,
+                MenuStyle style,
+                size_t count,
+                size_t position) {{
+                memset(view, 0, sizeof(*view));
+                memset(items, 0, 9U * sizeof(*items));
+                memset(icons, 0, 9U * sizeof(*icons));
+                for(size_t i = 0U; i < count; i++) items[i].icon = &icons[i];
+                view->model.items.data = items;
+                view->model.items.size = count;
+                view->model.position = count ? position % count : 0U;
+                view->model.style = style;
+                menu->view = view;
+                icon_start_count = 0U;
+                icon_stop_count = 0U;
+                ok_count = 0U;
+            }}
+
+            int main(void) {{
+                const InputKey keys[] = {{
+                    InputKeyUp, InputKeyDown, InputKeyLeft, InputKeyRight
+                }};
+                const InputType types[] = {{InputTypeShort, InputTypeRepeat}};
+
+                for(size_t style = 0U; style < MenuStyleCount; style++) {{
+                    for(size_t count = 0U; count <= 9U; count++) {{
+                        const size_t positions = count ? count : 1U;
+                        for(size_t position = 0U; position < positions; position++) {{
+                            for(size_t key_i = 0U; key_i < 4U; key_i++) {{
+                                const size_t expected = menu_next_position(
+                                    (MenuStyle)style, keys[key_i], position, count);
+                                for(size_t type_i = 0U; type_i < 2U; type_i++) {{
+                                    View view;
+                                    Menu menu;
+                                    MenuItem items[9];
+                                    IconAnimation icons[9];
+                                    reset_fixture(
+                                        &view,
+                                        &menu,
+                                        items,
+                                        icons,
+                                        (MenuStyle)style,
+                                        count,
+                                        position);
+                                    InputEvent event = {{.key = keys[key_i], .type = types[type_i]}};
+                                    assert(menu_input_callback(&event, &menu));
+                                    assert(!view.locked);
+                                    assert(view.get_count == 2U);
+                                    assert(view.commit_count == 2U);
+                                    assert(view.model.position == expected);
+                                    const bool moved = count && expected != position;
+                                    assert(view.update_count == (moved ? 1U : 0U));
+                                    assert(icon_start_count == (moved ? 1U : 0U));
+                                    assert(icon_stop_count == (moved ? 1U : 0U));
+                                    assert(ok_count == 0U);
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+
+                View view;
+                Menu menu;
+                MenuItem items[9];
+                IconAnimation icons[9];
+                reset_fixture(
+                    &view, &menu, items, icons, MenuStyleDsi, 3U, 1U);
+                InputEvent no_op = {{.key = InputKeyUp, .type = InputTypeRepeat}};
+                for(size_t i = 0U; i < 10000U; i++) {{
+                    assert(menu_input_callback(&no_op, &menu));
+                }}
+                assert(!view.locked);
+                assert(view.update_count == 0U);
+                assert(icon_start_count == 0U && icon_stop_count == 0U);
+                return 0;
+            }}
+            """
+        )
+
+        with tempfile.TemporaryDirectory(prefix="tumoflip-menu-runtime-lock-") as directory:
+            harness_path = Path(directory) / "menu_runtime_lock_test.c"
+            binary = Path(directory) / "menu_runtime_lock_test"
+            harness_path.write_text(harness, encoding="utf-8")
+            compile_result = subprocess.run(
+                [
+                    str(compiler),
+                    "-std=c11",
+                    "-O0",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    str(harness_path),
+                    "-o",
+                    str(binary),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(
+                compile_result.returncode,
+                0,
+                compile_result.stdout + compile_result.stderr,
+            )
+            run_result = subprocess.run(
+                [str(binary)],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=3.0,
+            )
+            self.assertEqual(
+                run_result.returncode,
+                0,
+                run_result.stdout + run_result.stderr,
+            )
+
     def test_side_grid_rotates_each_physical_direction_exactly_once(self) -> None:
         """Side Grid draws on a rotated canvas, so its physical D-pad is rotated too."""
 
@@ -682,7 +993,9 @@ class MainMenuLayoutTest(unittest.TestCase):
         input_callback = function_definition(self.menu, "menu_input_callback")
         self.assertNotIn("MenuStyleWiiVertical", input_callback)
         remap_start = navigation.index("if(style == MenuStyleWiiVertical)")
-        remap_end = navigation.index("if(style == MenuStyleWii)", remap_start)
+        remap_end = navigation.index(
+            "if(style == MenuStyleWii || style == MenuStyleWiiClassic)", remap_start
+        )
         remap_region = navigation[remap_start:remap_end]
         remaps = dict(
             re.findall(
@@ -778,6 +1091,128 @@ class MainMenuLayoutTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
                 check=False,
+            )
+            self.assertEqual(
+                run_result.returncode,
+                0,
+                run_result.stdout + run_result.stderr,
+            )
+
+    def test_wii_renderer_uses_its_own_sliding_window(self) -> None:
+        callback = function_definition(self.menu, "menu_draw_callback")
+        renderer = function_definition(self.menu, "menu_draw_wii_classic")
+
+        self.assertRegex(
+            callback,
+            r"case\s+MenuStyleWiiClassic\s*:\s*menu_draw_wii_classic\s*\(",
+        )
+        self.assertIn("menu_wii_first(position, count)", renderer)
+        self.assertIn("MENU_WII_PAGE_SIZE", renderer)
+        self.assertIn("MENU_WII_ROWS", renderer)
+
+    def test_wii_window_is_bounded_and_keeps_the_selected_item_visible(self) -> None:
+        """The restored Wii 3x2 grid scrolls by whole two-item columns."""
+
+        compiler = shutil.which("cc") or shutil.which("clang")
+        self.assertIsNotNone(compiler, "a host C compiler is required")
+
+        helper = function_definition(self.menu, "menu_wii_first")
+        page_size = numeric_define(self.menu, "MENU_WII_PAGE_SIZE")
+        rows = numeric_define(self.menu, "MENU_WII_ROWS")
+        self.assertEqual((page_size, rows), (6, 2))
+        harness = textwrap.dedent(
+            f"""
+            #include <assert.h>
+            #include <stddef.h>
+
+            #define MENU_WII_PAGE_SIZE {page_size}U
+            #define MENU_WII_ROWS {rows}U
+            {helper}
+
+            static size_t expected_first(size_t position, size_t count) {{
+                if(count == 0U || count <= MENU_WII_PAGE_SIZE) return 0U;
+                position %= count;
+                if(position < MENU_WII_PAGE_SIZE - MENU_WII_ROWS) return 0U;
+
+                const size_t column_first = position - (position % MENU_WII_ROWS);
+                const size_t tail_threshold =
+                    count - MENU_WII_ROWS + (count % MENU_WII_ROWS);
+                return position >= tail_threshold ?
+                           column_first - (MENU_WII_PAGE_SIZE - MENU_WII_ROWS) :
+                           column_first - MENU_WII_ROWS;
+            }}
+
+            int main(void) {{
+                assert(MENU_WII_PAGE_SIZE == 6U);
+                assert(MENU_WII_ROWS == 2U);
+
+                for(size_t count = 0U; count <= 40U; count++) {{
+                    for(size_t position = 0U; position <= count + 4U; position++) {{
+                        const size_t first = menu_wii_first(position, count);
+                        assert(first == expected_first(position, count));
+
+                        if(count == 0U) {{
+                            assert(first == 0U);
+                            continue;
+                        }}
+
+                        const size_t normalized = position % count;
+                        assert(first <= normalized);
+                        assert(normalized < first + MENU_WII_PAGE_SIZE);
+                        assert(first < count);
+                        assert(first % MENU_WII_ROWS == 0U);
+                        if(count <= MENU_WII_PAGE_SIZE) assert(first == 0U);
+                    }}
+
+                    if(count > 0U) {{
+                        size_t previous_first = menu_wii_first(0U, count);
+                        for(size_t position = 1U; position < count; position++) {{
+                            const size_t first = menu_wii_first(position, count);
+                            assert(first >= previous_first);
+                            assert(first - previous_first <= MENU_WII_ROWS);
+                            if(position % MENU_WII_ROWS != 0U) {{
+                                assert(first == previous_first);
+                            }}
+                            previous_first = first;
+                        }}
+                    }}
+
+                    if(count > MENU_WII_PAGE_SIZE) {{
+                        const size_t first = menu_wii_first(count - 1U, count);
+                        assert(first + MENU_WII_PAGE_SIZE >= count);
+                    }}
+                }}
+                return 0;
+            }}
+            """
+        )
+
+        with tempfile.TemporaryDirectory(prefix="tumoflip-menu-wii-window-") as directory:
+            harness_path = Path(directory) / "menu_wii_window_test.c"
+            binary = Path(directory) / "menu_wii_window_test"
+            harness_path.write_text(harness, encoding="utf-8")
+            compile_result = subprocess.run(
+                [
+                    str(compiler),
+                    "-std=c11",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    str(harness_path),
+                    "-o",
+                    str(binary),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(
+                compile_result.returncode,
+                0,
+                compile_result.stdout + compile_result.stderr,
+            )
+            run_result = subprocess.run(
+                [str(binary)], capture_output=True, text=True, check=False
             )
             self.assertEqual(
                 run_result.returncode,
