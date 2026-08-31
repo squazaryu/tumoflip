@@ -49,7 +49,11 @@ bool subghz_scene_save_success_on_event(void* context, SceneManagerEvent event) 
                     subghz->scene_manager, SubGhzSceneDecodeRAW, SubGhzDecodeRawStateStart);
 
                 subghz->idx_menu_chosen = 0;
-                subghz_scene_decode_raw_cleanup(subghz);
+                if(!subghz_scene_decode_raw_cleanup(subghz)) {
+                    scene_manager_stop(subghz->scene_manager);
+                    view_dispatcher_stop(subghz->view_dispatcher);
+                    return true;
+                }
                 subghz_rx_key_state_set(subghz, SubGhzRxKeyStateIDLE);
 
                 scene_manager_set_scene_state(
