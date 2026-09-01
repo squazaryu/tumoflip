@@ -68,6 +68,12 @@ class CiWorkflowSecurityTests(unittest.TestCase):
         self.assertIn("--tag-ref", workflow)
         self.assertIn("--provenance", workflow)
         self.assertIn("--checksums", workflow)
+        self.assertIn(
+            '--ledger "$RUNNER_TEMP/protected-app-audit-ledger.json"', workflow
+        )
+        self.assertNotIn(
+            '--ledger "$RUNNER_TEMP/protected-audit-ledger.json"', workflow
+        )
         self.assertIn(".title == $title and .state == \"open\"", workflow)
 
 if __name__ == "__main__":

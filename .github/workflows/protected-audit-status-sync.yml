@@ -85,7 +85,7 @@ jobs:
           python3 tools/tumoflip/sync_protected_audit_status.py build-plan \
             --release "$RUNNER_TEMP/protected-audit-release.json" \
             --tag-ref "$RUNNER_TEMP/protected-audit-tag-ref.json" \
-            --ledger "$RUNNER_TEMP/protected-audit-ledger.json" \
+            --ledger "$RUNNER_TEMP/protected-app-audit-ledger.json" \
             --provenance "$RUNNER_TEMP/audit-provenance.json" \
             --checksums "$RUNNER_TEMP/protected-app-audit-ledger-SHA256SUMS" \
             --issues "$RUNNER_TEMP/tumoflip-issues.json" \
