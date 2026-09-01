@@ -211,9 +211,16 @@ def verify_immutable_bundle(
 
 
 def _family_tag(source_tag: str) -> str:
-    """Treat a corrected ``22aug2026p2`` release as one audit family."""
+    """Treat corrected ``pN`` releases as revisions of one audit family."""
 
-    return source_tag[:-2] if source_tag.endswith("p2") else source_tag
+    return _family_identity(source_tag)[0]
+
+
+def _family_identity(source_tag: str) -> tuple[str, int]:
+    match = re.fullmatch(r"([0-9]{1,2}[a-z]{3}[0-9]{4})(?:p([1-9][0-9]*))?", source_tag)
+    if match is None:
+        return source_tag, 0
+    return match.group(1), int(match.group(2) or 0)
 
 
 def _latest_audits(audits: Iterable[Mapping[str, Any]]) -> Dict[str, Mapping[str, Any]]:
@@ -241,11 +248,11 @@ def _entry_counts(audits: Iterable[Mapping[str, Any]]) -> Dict[str, int]:
     return dict(sorted(counts.items()))
 
 
-def _family_status(audits: List[Mapping[str, Any]]) -> str:
-    statuses = {str(audit.get("overallStatus", "pending")) for audit in audits}
-    if statuses == {"verified"}:
+def _audit_status(audit: Mapping[str, Any]) -> str:
+    status = str(audit.get("overallStatus", "pending"))
+    if status == "verified":
         return "verified"
-    if "failed" in statuses or "needsReview" in statuses:
+    if status in {"failed", "needsReview"}:
         return "needs-review"
     return "pending"
 
@@ -298,22 +305,33 @@ def build_plan(
         # later ledger is corrected or backfilled.
         if str(issue.get("state", "")).lower() != "open":
             continue
-        family_audits = sorted(families.get(family, []), key=lambda item: int(item.get("sequence", 0)))
+        family_audits = sorted(
+            families.get(family, []),
+            key=lambda item: (
+                _family_identity(str(item.get("sourceTag", "")))[1],
+                int(item.get("sequence", 0)),
+            ),
+        )
         if not family_audits:
             continue
-        status = _family_status(family_audits)
-        sequence = max(int(audit.get("sequence", 0)) for audit in family_audits)
+        # A corrected pN release supersedes prior revisions of the same family.
+        # Historical pending evidence stays in the immutable ledger, but must not
+        # keep the corrected, fully verified release open forever.
+        effective_audit = family_audits[-1]
+        status = _audit_status(effective_audit)
+        sequence = int(effective_audit.get("sequence", 0))
         source_tags = [str(audit.get("sourceTag")) for audit in family_audits]
+        effective_source_tag = str(effective_audit.get("sourceTag"))
         issue_number = int(issue["number"])
         marker = f"<!-- tumoflip-audit-sync:{family}:{sequence}:{status} -->"
-        counts = _entry_counts(family_audits)
+        counts = _entry_counts([effective_audit])
         count_lines = "\n".join(
             f"- `{name}`: {count}" for name, count in counts.items()
         ) or "- none"
         audit_links = sorted(
             {
                 str(audit.get("auditIssue"))
-                for audit in family_audits
+                for audit in [effective_audit]
                 if audit.get("auditIssue")
             }
         )
@@ -328,6 +346,7 @@ def build_plan(
             "## Protected-app audit synchronized\n\n"
             f"- Release family: `{family}`\n"
             f"- Source tags: {', '.join(f'`{tag}`' for tag in source_tags)}\n"
+            f"- Effective source tag: `{effective_source_tag}`\n"
             f"- Ledger generated: `{generated_at}`\n"
             f"- Status: **{status}**\n\n"
             "### Ledger dispositions\n"
@@ -343,6 +362,7 @@ def build_plan(
                 "issueState": str(issue.get("state", "")).lower(),
                 "family": family,
                 "sourceTags": source_tags,
+                "effectiveSourceTag": effective_source_tag,
                 "overallStatus": status,
                 "sequence": sequence,
                 "marker": marker,

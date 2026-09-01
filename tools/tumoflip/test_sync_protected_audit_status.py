@@ -152,7 +152,7 @@ class ProtectedAuditStatusTest(unittest.TestCase):
                 checksums,
             )
 
-    def test_p2_is_grouped_with_the_base_release_and_stays_open_if_pending(self):
+    def test_verified_p2_supersedes_pending_base_release(self):
         ledger = {
             "schema": 2,
             "generatedAt": "2026-08-25T10:25:52+00:00",
@@ -172,9 +172,38 @@ class ProtectedAuditStatusTest(unittest.TestCase):
             update["issueTitle"],
             "[all-the-plugins] Review 22aug2026 release inventory",
         )
+        self.assertEqual(update["overallStatus"], "verified")
+        self.assertTrue(update["shouldClose"])
+        self.assertEqual(update["sourceTags"], ["22aug2026", "22aug2026p2"])
+        self.assertEqual(update["effectiveSourceTag"], "22aug2026p2")
+        self.assertIn("Effective source tag: `22aug2026p2`", update["comment"])
+        self.assertIn("- `auditedDifference`: 1", update["comment"])
+        self.assertIn("- `intentionallyReplaced`: 1", update["comment"])
+
+    def test_pending_p3_supersedes_verified_earlier_revisions(self):
+        plan = build_plan(
+            {
+                "schema": 2,
+                "generatedAt": "now",
+                "audits": [
+                    audit("2sep2026", 1, "verified"),
+                    audit("2sep2026p2", 2, "verified"),
+                    audit("2sep2026p3", 3, "pending"),
+                ],
+            },
+            [
+                {
+                    "number": 401,
+                    "title": "[all-the-plugins] Review 2sep2026 release inventory",
+                    "state": "OPEN",
+                }
+            ],
+        )
+
+        update = plan["updates"][0]
+        self.assertEqual(update["effectiveSourceTag"], "2sep2026p3")
         self.assertEqual(update["overallStatus"], "pending")
         self.assertFalse(update["shouldClose"])
-        self.assertEqual(update["sourceTags"], ["22aug2026", "22aug2026p2"])
 
     def test_verified_release_family_closes_open_issue(self):
         plan = build_plan(
