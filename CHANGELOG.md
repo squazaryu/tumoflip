@@ -16,6 +16,7 @@
 * Apps: **NFC Magic** - Gen2 CUID/static-nonce detection, Gen1 4b/7b UID, length-aware wipe & write guard (by @mishamyte)
 * Apps: Build tag (**10jun2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
 ## Other changes
+* Desktop: Add a second page to the Up-button menu for screen brightness, volume, and vibration; Left/Right switches pages without changing the selected Desktop layout.
 * NFC: **Remove unreachable EMV render helpers and stale NFC/backdoor exports**, eliminating an undefined plugin symbol and reducing link-time surface (Unleashed PR #1085)
 * NFC: **Parser declines and unknown ticket layouts are now logged at debug level**, while MIFARE Classic parser guidance explicitly requires checking block data (Unleashed PR #1097)
 * NFC: **Ultralight read results now distinguish failed authentication from an intentionally skipped attempt**, and never display masked zero bytes as a captured password (Unleashed PR #1090)

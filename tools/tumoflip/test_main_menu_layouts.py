@@ -29,6 +29,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 MENU_SOURCE = REPO_ROOT / "applications/services/gui/modules/menu.c"
 MENU_STYLE_HEADER = REPO_ROOT / "applications/services/gui/modules/menu_style.h"
 MENU_STYLE_SOURCE = REPO_ROOT / "applications/services/gui/modules/menu_style.c"
+DESKTOP_LOCK_MENU_SOURCE = (
+    REPO_ROOT / "applications/services/desktop/views/desktop_view_lock_menu.c"
+)
+DESKTOP_QUICK_SETTINGS_VIEW_SOURCE = (
+    REPO_ROOT / "applications/services/desktop/views/desktop_view_quick_settings.c"
+)
+DESKTOP_QUICK_SETTINGS_SCENE_SOURCE = (
+    REPO_ROOT / "applications/services/desktop/scenes/desktop_scene_quick_settings.c"
+)
 
 LEGACY_STYLE_IDS = {
     "MenuStyleList": 0,
@@ -705,6 +714,310 @@ class MainMenuLayoutTest(unittest.TestCase):
                 0,
                 run_result.stdout + run_result.stderr,
             )
+
+
+class RuntimeNavigationAndQuickSettingsTest(unittest.TestCase):
+    """Execute layout navigation and the second Up-menu page against lock fakes."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.menu = source(MENU_SOURCE)
+        cls.lock_menu = source(DESKTOP_LOCK_MENU_SOURCE)
+        cls.quick_view = source(DESKTOP_QUICK_SETTINGS_VIEW_SOURCE)
+        cls.quick_scene = source(DESKTOP_QUICK_SETTINGS_SCENE_SOURCE)
+
+    def test_lock_menu_opens_quick_settings_only_on_short_sideways_press(self) -> None:
+        input_callback = function_definition(
+            self.lock_menu, "desktop_lock_menu_input_callback"
+        )
+        self.assertRegex(
+            input_callback,
+            r"\(event->key\s*==\s*InputKeyLeft\)\s*\|\|\s*"
+            r"\(event->key\s*==\s*InputKeyRight\)",
+        )
+        self.assertRegex(
+            input_callback,
+            r"if\s*\(event->type\s*==\s*InputTypeShort\)\s*{"
+            r"[^}]*DesktopLockMenuEventOpenQuickSettings",
+        )
+        self.assertRegex(
+            input_callback,
+            r"DesktopLockMenuEventOpenQuickSettings[^}]*}\s*consumed\s*=\s*true\s*;",
+        )
+
+    def test_runtime_quick_settings_navigation_releases_the_model_lock(self) -> None:
+        """Execute the actual input callback with a locking ViewModel fake."""
+
+        compiler = shutil.which("cc") or shutil.which("clang")
+        self.assertIsNotNone(compiler, "a host C compiler is required")
+        index_enum = re.search(
+            r"typedef\s+enum\s*{.*?}\s*DesktopQuickSettingsIndex\s*;",
+            self.quick_view,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(index_enum, "quick-settings index enum not found")
+        callback = function_definition(
+            self.quick_view, "desktop_quick_settings_input_callback"
+        )
+
+        harness = textwrap.dedent(
+            f"""
+            #include <assert.h>
+            #include <stdbool.h>
+            #include <stddef.h>
+            #include <stdint.h>
+            #include <string.h>
+
+            typedef enum {{
+                InputKeyUp,
+                InputKeyDown,
+                InputKeyRight,
+                InputKeyLeft,
+                InputKeyOk,
+                InputKeyBack,
+            }} InputKey;
+
+            typedef enum {{
+                InputTypePress,
+                InputTypeRelease,
+                InputTypeShort,
+                InputTypeLong,
+                InputTypeRepeat,
+            }} InputType;
+
+            typedef struct {{ InputKey key; InputType type; }} InputEvent;
+
+            typedef enum {{
+                DesktopQuickSettingsEventBrightnessChanged,
+                DesktopQuickSettingsEventVolumeChanged,
+                DesktopQuickSettingsEventVibroChanged,
+                DesktopQuickSettingsEventSave,
+                DesktopQuickSettingsEventClose,
+            }} DesktopEvent;
+
+            {index_enum.group(0)}
+
+            #define DESKTOP_QUICK_SETTINGS_LEVELS 21
+            #define CLAMP(value, upper, lower) \\
+                ((value) > (upper) ? (upper) : ((value) < (lower) ? (lower) : (value)))
+            #define furi_assert(value) assert(value)
+
+            typedef struct {{
+                uint8_t idx;
+                bool editing;
+                uint8_t brightness;
+                uint8_t volume;
+                bool vibro;
+            }} DesktopQuickSettingsViewModel;
+
+            typedef struct {{
+                DesktopQuickSettingsViewModel model;
+                bool locked;
+                size_t get_count;
+                size_t commit_count;
+                size_t update_count;
+            }} View;
+
+            typedef void (*DesktopQuickSettingsViewCallback)(DesktopEvent event, void* context);
+            typedef struct {{
+                View* view;
+                DesktopQuickSettingsViewCallback callback;
+                void* context;
+            }} DesktopQuickSettingsView;
+
+            typedef struct {{
+                View view;
+                DesktopQuickSettingsView quick_settings;
+                size_t callback_count;
+                DesktopEvent last_event;
+            }} Fixture;
+
+            static void* view_get_model(View* view) {{
+                assert(!view->locked);
+                view->locked = true;
+                view->get_count++;
+                return &view->model;
+            }}
+
+            static void view_commit_model(View* view, bool update) {{
+                assert(view->locked);
+                view->locked = false;
+                view->commit_count++;
+                if(update) view->update_count++;
+            }}
+
+            #define with_view_model(view, type, code, update) \\
+                {{                                                \\
+                    type = view_get_model(view);                  \\
+                    {{code}};                                     \\
+                    view_commit_model(view, update);              \\
+                }}
+
+            static void record_event(DesktopEvent event, void* context) {{
+                Fixture* fixture = context;
+                /* Callbacks must never re-enter the view while its model is locked. */
+                assert(!fixture->view.locked);
+                fixture->callback_count++;
+                fixture->last_event = event;
+            }}
+
+            {callback}
+
+            static void reset_fixture(Fixture* fixture) {{
+                memset(fixture, 0, sizeof(*fixture));
+                fixture->view.model.brightness = 10U;
+                fixture->view.model.volume = 10U;
+                fixture->quick_settings.view = &fixture->view;
+                fixture->quick_settings.callback = record_event;
+                fixture->quick_settings.context = fixture;
+            }}
+
+            static bool send(Fixture* fixture, InputKey key, InputType type) {{
+                InputEvent event = {{.key = key, .type = type}};
+                const size_t commits = fixture->view.commit_count;
+                const bool consumed = desktop_quick_settings_input_callback(
+                    &event, &fixture->quick_settings);
+                assert(!fixture->view.locked);
+                assert(fixture->view.get_count == commits + 1U);
+                assert(fixture->view.commit_count == commits + 1U);
+                return consumed;
+            }}
+
+            int main(void) {{
+                Fixture fixture;
+                reset_fixture(&fixture);
+
+                /* Selection wraps and repeat navigation follows the same path. */
+                assert(send(&fixture, InputKeyUp, InputTypeShort));
+                assert(fixture.view.model.idx == DesktopQuickSettingsIndexVibro);
+                assert(send(&fixture, InputKeyDown, InputTypeRepeat));
+                assert(fixture.view.model.idx == DesktopQuickSettingsIndexBrightness);
+                assert(!send(&fixture, InputKeyDown, InputTypePress));
+
+                /* Sideways swaps pages only on a short press when not editing. */
+                assert(send(&fixture, InputKeyLeft, InputTypeShort));
+                assert(fixture.callback_count == 1U);
+                assert(fixture.last_event == DesktopQuickSettingsEventClose);
+                assert(send(&fixture, InputKeyRight, InputTypeRepeat));
+                assert(fixture.callback_count == 1U);
+
+                /* OK enters edit; Up/Down are consumed without moving the row. */
+                assert(send(&fixture, InputKeyOk, InputTypeShort));
+                assert(fixture.view.model.editing);
+                const size_t updates_before_noop = fixture.view.update_count;
+                assert(send(&fixture, InputKeyDown, InputTypeRepeat));
+                assert(fixture.view.model.idx == DesktopQuickSettingsIndexBrightness);
+                assert(fixture.view.update_count == updates_before_noop);
+
+                /* Slider repeats update live, but the save event happens on exit. */
+                assert(send(&fixture, InputKeyRight, InputTypeRepeat));
+                assert(fixture.view.model.brightness == 11U);
+                assert(fixture.last_event == DesktopQuickSettingsEventBrightnessChanged);
+                assert(send(&fixture, InputKeyOk, InputTypeShort));
+                assert(!fixture.view.model.editing);
+                assert(fixture.last_event == DesktopQuickSettingsEventSave);
+
+                /* Back exits edit first; unedited Back is delegated to the scene. */
+                assert(send(&fixture, InputKeyOk, InputTypeShort));
+                assert(send(&fixture, InputKeyBack, InputTypeShort));
+                assert(!fixture.view.model.editing);
+                assert(fixture.last_event == DesktopQuickSettingsEventSave);
+                assert(!send(&fixture, InputKeyBack, InputTypeShort));
+
+                /* Vibro is an immediate checkbox action and never enters edit mode. */
+                assert(send(&fixture, InputKeyUp, InputTypeShort));
+                assert(fixture.view.model.idx == DesktopQuickSettingsIndexVibro);
+                assert(send(&fixture, InputKeyOk, InputTypeShort));
+                assert(fixture.view.model.vibro);
+                assert(!fixture.view.model.editing);
+                assert(fixture.last_event == DesktopQuickSettingsEventVibroChanged);
+
+                /* A bounded slider is a true no-op but still commits/unlocks the model. */
+                fixture.view.model.idx = DesktopQuickSettingsIndexVolume;
+                fixture.view.model.editing = true;
+                fixture.view.model.volume = DESKTOP_QUICK_SETTINGS_LEVELS - 1U;
+                const size_t updates_at_limit = fixture.view.update_count;
+                const size_t callbacks_at_limit = fixture.callback_count;
+                assert(send(&fixture, InputKeyRight, InputTypeRepeat));
+                assert(fixture.view.model.volume == DESKTOP_QUICK_SETTINGS_LEVELS - 1U);
+                assert(fixture.view.update_count == updates_at_limit);
+                assert(fixture.callback_count == callbacks_at_limit);
+
+                return 0;
+            }}
+            """
+        )
+
+        with tempfile.TemporaryDirectory(prefix="tumoflip-quick-settings-") as directory:
+            harness_path = Path(directory) / "quick_settings_navigation_test.c"
+            binary = Path(directory) / "quick_settings_navigation_test"
+            harness_path.write_text(harness, encoding="utf-8")
+            compile_result = subprocess.run(
+                [
+                    str(compiler),
+                    "-std=c11",
+                    "-O0",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    str(harness_path),
+                    "-o",
+                    str(binary),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(
+                compile_result.returncode,
+                0,
+                compile_result.stdout + compile_result.stderr,
+            )
+            run_result = subprocess.run(
+                [str(binary)],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=3.0,
+            )
+            self.assertEqual(
+                run_result.returncode,
+                0,
+                run_result.stdout + run_result.stderr,
+            )
+
+    def test_scene_batches_slider_storage_writes_and_has_explicit_exit_paths(self) -> None:
+        save = function_definition(self.quick_scene, "desktop_scene_quick_settings_save")
+        on_event = function_definition(
+            self.quick_scene, "desktop_scene_quick_settings_on_event"
+        )
+        on_exit = function_definition(
+            self.quick_scene, "desktop_scene_quick_settings_on_exit"
+        )
+
+        self.assertIn("DESKTOP_QUICK_SETTINGS_CLEAN", save)
+        self.assertIn("notification_message_save_settings", save)
+        self.assertEqual(
+            self.quick_scene.count("notification_message_save_settings"),
+            1,
+            "storage writes must stay centralized in the dirty-state save helper",
+        )
+        self.assertIn("DesktopQuickSettingsEventSave", on_event)
+        self.assertIn("DesktopQuickSettingsEventClose", on_event)
+        self.assertIn("scene_manager_previous_scene", on_event)
+        self.assertIn("DesktopSceneMain", on_event)
+        self.assertIn("desktop_scene_quick_settings_save(desktop);", on_exit)
+
+    def test_quick_settings_does_not_read_or_mutate_desktop_layout_state(self) -> None:
+        combined = self.quick_view + self.quick_scene
+        for forbidden in (
+            "MenuStyle",
+            "menu_style",
+            "menu_set_style",
+            "DesktopSettings",
+            "favorite",
+        ):
+            self.assertNotIn(forbidden, combined)
 
     def test_runtime_direction_path_uses_the_validated_navigation_helper(self) -> None:
         input_callback = function_definition(self.menu, "menu_input_callback")
