@@ -83,6 +83,10 @@ jobs:
         shell: bash
         run: python3 tools/tumoflip/test_main_menu_layouts.py
 
+      - name: Validate Infrared Universal save flow
+        shell: bash
+        run: python3 tools/tumoflip/test_infrared_universal_save.py
+
       - name: Build firmware (minimal / clean)
         id: build
         shell: bash

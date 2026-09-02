@@ -100,7 +100,7 @@ static void infrared_rpc_command_callback(const RpcAppSystemEvent* event, void* 
     }
 }
 
-static void infrared_find_vacant_remote_name(FuriString* name, const char* path) {
+void infrared_find_vacant_remote_name(FuriString* name, const char* path) {
     Storage* storage = furi_record_open(RECORD_STORAGE);
 
     FuriString* base_path;
@@ -302,13 +302,14 @@ static void infrared_free(InfraredApp* infrared) {
     free(infrared);
 }
 
-InfraredErrorCode infrared_add_remote_with_button(
+InfraredErrorCode infrared_add_named_remote_with_button(
     const InfraredApp* infrared,
+    const char* remote_name,
     const char* button_name,
     const InfraredSignal* signal) {
     InfraredRemote* remote = infrared->remote;
 
-    FuriString* new_name = furi_string_alloc_set(INFRARED_DEFAULT_REMOTE_NAME);
+    FuriString* new_name = furi_string_alloc_set(remote_name);
     FuriString* new_path = furi_string_alloc_set(INFRARED_APP_FOLDER);
 
     infrared_find_vacant_remote_name(new_name, furi_string_get_cstr(new_path));
@@ -322,12 +323,25 @@ InfraredErrorCode infrared_add_remote_with_button(
         if(INFRARED_ERROR_PRESENT(error)) break;
 
         error = infrared_remote_append_signal(remote, signal, button_name);
+        if(INFRARED_ERROR_PRESENT(error)) {
+            // This path was selected as vacant above, so removing it cannot touch
+            // a pre-existing user remote. Do not leave a partial new file behind.
+            infrared_remote_remove(remote);
+        }
     } while(false);
 
     furi_string_free(new_name);
     furi_string_free(new_path);
 
     return error;
+}
+
+InfraredErrorCode infrared_add_remote_with_button(
+    const InfraredApp* infrared,
+    const char* button_name,
+    const InfraredSignal* signal) {
+    return infrared_add_named_remote_with_button(
+        infrared, INFRARED_DEFAULT_REMOTE_NAME, button_name, signal);
 }
 
 InfraredErrorCode

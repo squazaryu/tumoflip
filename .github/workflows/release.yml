@@ -128,6 +128,7 @@ jobs:
             tools/tumoflip/test_hardware_acceptance_suite.py \
             tools/tumoflip/test_clock_nightstand.py \
             tools/tumoflip/test_desktop_animation_resume.py \
+            tools/tumoflip/test_infrared_universal_save.py \
             tools/tumoflip/test_main_menu_layouts.py \
             tools/tumoflip/test_mf_desfire_zero_key_count.py \
             tools/tumoflip/test_release_workflow.py \

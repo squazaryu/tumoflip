@@ -1,5 +1,7 @@
 #include "../../infrared_app_i.h"
 
+#include "infrared_scene_universal_common.h"
+
 #include <dolphin/dolphin.h>
 
 #pragma pack(push, 1)
@@ -34,6 +36,8 @@ static void
     ViewStack* view_stack = infrared->view_stack;
     InfraredProgressView* progress = infrared->progress;
     infrared_progress_view_set_progress_total(progress, record_count);
+    // The same progress view is reused between runs; always start in sending mode.
+    infrared_progress_view_set_paused(progress, false);
     infrared_progress_view_set_input_callback(
         progress, infrared_scene_universal_common_progress_input_callback, infrared);
     view_stack_add_view(view_stack, infrared_progress_view_get_view(progress));
@@ -107,6 +111,25 @@ static void infrared_scene_universal_common_handle_popup_input(
         scene_state.signal_index++;
         if(infrared_progress_view_set_progress(infrared->progress, scene_state.signal_index + 1))
             scene_manager_set_scene_state(scene_manager, scene_id, scene_state.packed_value);
+        break;
+    }
+
+    case InfraredProgressViewInputSave: {
+        InfraredSceneState scene_state = {
+            .packed_value = scene_manager_get_scene_state(scene_manager, scene_id)};
+
+        // Copy both values while the brute-force database is still open. Saving
+        // happens only after the transmitter is stopped and the database is closed.
+        if(infrared_brute_force_load_signal(
+               brute_force, scene_state.signal_index, infrared->current_signal)) {
+            infrared_text_store_set(
+                infrared, 1, "%s", infrared_brute_force_get_current_record_name(brute_force));
+            infrared_brute_force_stop(brute_force);
+            infrared_scene_universal_common_hide_popup(infrared);
+            scene_manager_next_scene(scene_manager, InfraredSceneUniversalSave);
+        } else {
+            infrared_show_error_message(infrared, "Failed to read\nthe signal");
+        }
         break;
     }
 
@@ -204,6 +227,24 @@ bool infrared_scene_universal_common_on_event(void* context, SceneManagerEvent e
     }
 
     return consumed;
+}
+
+void infrared_scene_universal_common_return(void* context) {
+    InfraredApp* infrared = context;
+    static const uint32_t universal_scenes[] = {
+        InfraredSceneUniversalTV,
+        InfraredSceneUniversalAudio,
+        InfraredSceneUniversalProjector,
+        InfraredSceneUniversalLEDs,
+        InfraredSceneUniversalFan,
+        InfraredSceneUniversalAC,
+    };
+
+    if(!scene_manager_search_and_switch_to_previous_scene_one_of(
+           infrared->scene_manager, universal_scenes, COUNT_OF(universal_scenes))) {
+        scene_manager_search_and_switch_to_previous_scene(
+            infrared->scene_manager, InfraredSceneUniversal);
+    }
 }
 
 void infrared_scene_universal_common_on_exit(void* context) {
