@@ -14,6 +14,10 @@ static void infrared_scene_remote_list_select_and_load(InfraredApp* infrared) {
     dialog_file_browser_set_basic_options(&browser_options, INFRARED_APP_EXTENSION, &I_ir_10px);
     browser_options.base_path = INFRARED_APP_FOLDER;
 
+    if(furi_string_empty(infrared->file_path)) {
+        furi_string_set(infrared->file_path, INFRARED_APP_FOLDER);
+    }
+
     const bool file_selected = dialog_file_browser_show(
         infrared->dialogs, infrared->file_path, infrared->file_path, &browser_options);
 
