@@ -52,5 +52,29 @@ class CiWorkflowSecurityTests(unittest.TestCase):
             workflow,
         )
 
+    def test_protected_audit_sync_verifies_immutable_release_before_writes(self) -> None:
+        workflow = (
+            REPO_ROOT / ".github/workflows/protected-audit-status-sync.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("raw.githubusercontent.com", workflow)
+        self.assertIn(
+            "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            workflow,
+        )
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("resolve-release", workflow)
+        self.assertIn("releases/assets/$asset_id", workflow)
+        self.assertIn("--tag-ref", workflow)
+        self.assertIn("--provenance", workflow)
+        self.assertIn("--checksums", workflow)
+        self.assertIn(
+            '--ledger "$RUNNER_TEMP/protected-app-audit-ledger.json"', workflow
+        )
+        self.assertNotIn(
+            '--ledger "$RUNNER_TEMP/protected-audit-ledger.json"', workflow
+        )
+        self.assertIn(".title == $title and .state == \"open\"", workflow)
+
 if __name__ == "__main__":
     unittest.main()

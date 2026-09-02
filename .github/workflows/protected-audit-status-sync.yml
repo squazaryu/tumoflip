@@ -15,37 +15,79 @@ permissions:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
-      LEDGER_URL: https://raw.githubusercontent.com/squazaryu/tumoflip-fw-packages/protected-app-audit-ledger/latest.json
+      AUDIT_REPOSITORY: squazaryu/tumoflip-fw-packages
     steps:
       - name: Checkout trusted sync code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
-      - name: Download immutable audit ledger
+      - name: Prove exact sync code
         shell: bash
         run: |
-          curl --fail --location --retry 3 --retry-all-errors \
-            --output "$RUNNER_TEMP/protected-audit-ledger.json" \
-            "$LEDGER_URL"
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Resolve latest immutable audit release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$AUDIT_REPOSITORY/releases?per_page=100" \
+            --paginate --slurp > "$RUNNER_TEMP/audit-releases.json"
+          python3 tools/tumoflip/sync_protected_audit_status.py resolve-release \
+            --releases "$RUNNER_TEMP/audit-releases.json" \
+            --output "$RUNNER_TEMP/protected-audit-release.json"
+          audit_tag="$(jq -r '.tag' "$RUNNER_TEMP/protected-audit-release.json")"
+          gh api "repos/$AUDIT_REPOSITORY/git/ref/tags/$audit_tag" \
+            > "$RUNNER_TEMP/protected-audit-tag-ref.json"
+
+      - name: Download exact release assets by numeric ID
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="$RUNNER_TEMP/protected-audit-release.json"
+          download_asset() {
+            local name="$1"
+            local output="$2"
+            local asset_id
+            asset_id="$(jq -r --arg name "$name" '.assets[$name].id' "$release")"
+            [[ "$asset_id" =~ ^[1-9][0-9]*$ ]]
+            gh api -H "Accept: application/octet-stream" \
+              "repos/$AUDIT_REPOSITORY/releases/assets/$asset_id" > "$output"
+          }
+          download_asset \
+            "protected-app-audit-ledger.json" \
+            "$RUNNER_TEMP/protected-app-audit-ledger.json"
+          download_asset \
+            "audit-provenance.json" \
+            "$RUNNER_TEMP/audit-provenance.json"
+          download_asset \
+            "protected-app-audit-ledger-SHA256SUMS" \
+            "$RUNNER_TEMP/protected-app-audit-ledger-SHA256SUMS"
 
       - name: Collect release-inventory issues
         shell: bash
         run: |
-          gh issue list \
-            --repo "$GITHUB_REPOSITORY" \
-            --state all \
-            --limit 200 \
-            --json number,title,state,labels \
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/issues?state=all&per_page=100" \
+            --paginate --slurp \
+            | jq '[.[][] | select(.pull_request == null) | {number,title,state,labels}]' \
             > "$RUNNER_TEMP/tumoflip-issues.json"
 
       - name: Build deterministic sync plan
         shell: bash
         run: |
-          python3 tools/tumoflip/sync_protected_audit_status.py \
-            --ledger "$RUNNER_TEMP/protected-audit-ledger.json" \
+          set -euo pipefail
+          python3 tools/tumoflip/sync_protected_audit_status.py build-plan \
+            --release "$RUNNER_TEMP/protected-audit-release.json" \
+            --tag-ref "$RUNNER_TEMP/protected-audit-tag-ref.json" \
+            --ledger "$RUNNER_TEMP/protected-app-audit-ledger.json" \
+            --provenance "$RUNNER_TEMP/audit-provenance.json" \
+            --checksums "$RUNNER_TEMP/protected-app-audit-ledger-SHA256SUMS" \
             --issues "$RUNNER_TEMP/tumoflip-issues.json" \
             --output "$RUNNER_TEMP/protected-audit-plan.json"
           cat "$RUNNER_TEMP/protected-audit-plan.json" >> "$GITHUB_STEP_SUMMARY"
@@ -55,7 +97,12 @@ jobs:
         run: |
           jq -c '.updates[]' "$RUNNER_TEMP/protected-audit-plan.json" | while read -r update; do
             number="$(jq -r '.issueNumber' <<<"$update")"
+            title="$(jq -r '.issueTitle' <<<"$update")"
             marker="$(jq -r '.marker' <<<"$update")"
+            issue="$(gh api "repos/$GITHUB_REPOSITORY/issues/$number")"
+            jq -e --arg title "$title" \
+              '.pull_request == null and .title == $title and .state == "open"' \
+              <<<"$issue" >/dev/null
             comments="$(gh api \
               "repos/$GITHUB_REPOSITORY/issues/$number/comments?per_page=100" \
               --paginate --slurp)"
@@ -79,4 +126,3 @@ jobs:
                 --reason completed
             fi
           done
-
