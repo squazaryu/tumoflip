@@ -29,6 +29,7 @@ class NfcKeyDictionaryImportTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.header = source("applications/main/nfc/helpers/nfc_key_dict.h")
         cls.helper = source("applications/main/nfc/helpers/nfc_key_dict.c")
+        cls.importer = source("applications/main/nfc/helpers/nfc_key_dict_import.c")
         cls.classic = source(
             "applications/main/nfc/helpers/protocol_support/mf_classic/mf_classic.c"
         )
@@ -58,21 +59,13 @@ class NfcKeyDictionaryImportTest(unittest.TestCase):
         self.assertEqual(collector.count("nfc_key_dict_push_unique("), 2)
 
     def test_dictionary_scans_are_explicitly_read_only(self) -> None:
-        self.assertIn("KeysDictModeOpenExistingReadOnly", self.keys_header)
-        allocation = function_body(self.keys_source, "KeysDict* keys_dict_alloc(")
-        self.assertIn("FSAM_READ", allocation)
-        self.assertIn("KeysDictModeOpenExistingReadOnly", allocation)
-        self.assertRegex(
-            allocation,
-            r"mode\s*!=\s*KeysDictModeOpenExistingReadOnly.*?"
-            r"keys_dict_add_ending_new_line",
-        )
-
-        importer = function_body(self.helper, "void nfc_key_dict_import(")
-        self.assertGreaterEqual(importer.count("KeysDictModeOpenExistingReadOnly"), 2)
+        scan = function_body(self.importer, "nfc_key_dict_mark_path_present(")
+        self.assertIn("file_stream_open(stream, path, FSAM_READ, FSOM_OPEN_EXISTING)", scan)
+        self.assertIn("file_stream_get_error(stream) == FSE_OK", scan)
+        self.assertNotIn("keys_dict_alloc(", self.importer)
 
     def test_missing_system_dictionary_fails_before_user_file_access(self) -> None:
-        importer = function_body(self.helper, "void nfc_key_dict_import(")
+        importer = function_body(self.importer, "void nfc_key_dict_import(")
         missing = importer.index("NfcKeyDictImportStatusSystemDictionaryMissing")
         user_scan = importer.index("dict->user_path")
         transaction = importer.index("nfc_key_dict_append_transaction(")
@@ -82,7 +75,7 @@ class NfcKeyDictionaryImportTest(unittest.TestCase):
 
     def test_transaction_backs_up_before_the_first_write(self) -> None:
         transaction = function_body(
-            self.helper, "nfc_key_dict_append_transaction("
+            self.importer, "nfc_key_dict_append_transaction("
         )
         backup = transaction.index("nfc_key_dict_create_backup(")
         write = transaction.index("storage_file_write(")
@@ -90,7 +83,7 @@ class NfcKeyDictionaryImportTest(unittest.TestCase):
 
     def test_success_is_reported_only_after_write_and_sync(self) -> None:
         transaction = function_body(
-            self.helper, "nfc_key_dict_append_transaction("
+            self.importer, "nfc_key_dict_append_transaction("
         )
         write = transaction.index("storage_file_write(")
         sync = transaction.index("storage_file_sync(", write)
@@ -101,7 +94,7 @@ class NfcKeyDictionaryImportTest(unittest.TestCase):
 
     def test_failed_write_restores_original_or_preserves_backup(self) -> None:
         transaction = function_body(
-            self.helper, "nfc_key_dict_append_transaction("
+            self.importer, "nfc_key_dict_append_transaction("
         )
         write = transaction.index("storage_file_write(")
         rollback = transaction.index("nfc_key_dict_restore_original(", write)
