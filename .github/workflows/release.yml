@@ -131,6 +131,7 @@ jobs:
             tools/tumoflip/test_infrared_universal_save.py \
             tools/tumoflip/test_main_menu_layouts.py \
             tools/tumoflip/test_mf_desfire_zero_key_count.py \
+            tools/tumoflip/test_nfc_key_dictionary_import.py \
             tools/tumoflip/test_release_workflow.py \
             tools/tumoflip/test_readme_version_sync.py \
             tools/tumoflip/test_validate_stable_release.py \
