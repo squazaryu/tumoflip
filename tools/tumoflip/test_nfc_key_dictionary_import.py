@@ -3,6 +3,9 @@
 
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import tempfile
 import unittest
 
 
@@ -38,6 +41,29 @@ class NfcKeyDictionaryImportTest(unittest.TestCase):
         )
         cls.keys_header = source("lib/toolbox/keys_dict.h")
         cls.keys_source = source("lib/toolbox/keys_dict.c")
+
+    def test_import_behavior_with_injected_storage_failures(self) -> None:
+        compiler = shutil.which("cc") or shutil.which("clang")
+        self.assertIsNotNone(compiler, "a host C compiler is required")
+        helpers = REPO_ROOT / "applications/main/nfc/helpers"
+        fixtures = REPO_ROOT / "tools/tumoflip/fixtures"
+        with tempfile.TemporaryDirectory(prefix="tumoflip-key-import-host-") as directory:
+            executable = Path(directory) / "key_import_test"
+            subprocess.run(
+                [
+                    str(compiler), "-std=c11", "-Wall", "-Wextra", "-Werror",
+                    "-I", str(fixtures / "nfc_key_import_stubs"),
+                    "-I", str(helpers),
+                    str(fixtures / "nfc_key_dictionary_import_host_test.c"),
+                    str(helpers / "nfc_key_dict_import.c"),
+                    "-o", str(executable),
+                ],
+                check=True,
+                cwd=REPO_ROOT,
+            )
+            data_directory = Path(directory) / "data"
+            data_directory.mkdir()
+            subprocess.run([str(executable), str(data_directory)], check=True, cwd=REPO_ROOT)
 
     def test_mifare_menus_offer_import_only_when_a_key_was_recovered(self) -> None:
         self.assertIn("SubmenuIndexSaveKeys", self.classic)
@@ -109,6 +135,12 @@ class NfcKeyDictionaryImportTest(unittest.TestCase):
         add_key = function_body(self.keys_source, "static bool keys_dict_add_key_str(")
         self.assertIn("stream_insert_string(instance->stream, key)", add_key)
         self.assertNotIn("stream_write_string(instance->stream, key)", add_key)
+
+    def test_import_is_gated_by_pr_and_release_ci(self) -> None:
+        for workflow in ("pr-build.yml", "release.yml"):
+            with self.subTest(workflow=workflow):
+                content = source(f".github/workflows/{workflow}")
+                self.assertIn("test_nfc_key_dictionary_import.py", content)
 
     def test_scene_reports_fail_closed_outcomes(self) -> None:
         scene = source("applications/main/nfc/scenes/nfc_scene_key_dict_import.c")

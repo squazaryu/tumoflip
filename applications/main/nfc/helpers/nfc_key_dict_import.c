@@ -61,8 +61,7 @@ static bool nfc_key_dict_mark_path_present(
     return success;
 }
 
-static bool
-    nfc_key_dict_sync_size(Storage* storage, const char* path, uint64_t expected_size) {
+static bool nfc_key_dict_sync_size(Storage* storage, const char* path, uint64_t expected_size) {
     File* file = storage_file_alloc(storage);
     bool success = false;
     if(storage_file_open(file, path, FSAM_READ_WRITE, FSOM_OPEN_EXISTING)) {
@@ -84,12 +83,7 @@ static bool nfc_key_dict_create_backup(
 
     path_extract_dirname(user_path, directory);
     storage_get_next_filename(
-        storage,
-        furi_string_get_cstr(directory),
-        ".nfc_key_import",
-        ".bak",
-        backup_name,
-        255);
+        storage, furi_string_get_cstr(directory), ".nfc_key_import", ".bak", backup_name, 255);
     furi_string_printf(
         backup_path,
         "%s/%s.bak",
@@ -172,8 +166,8 @@ static NfcKeyDictImportStatus nfc_key_dict_append_transaction(
     }
 
     FuriString* backup_path = furi_string_alloc();
-    if(user_existed && !nfc_key_dict_create_backup(
-                           storage, dict->user_path, original_info.size, backup_path)) {
+    if(user_existed &&
+       !nfc_key_dict_create_backup(storage, dict->user_path, original_info.size, backup_path)) {
         furi_string_free(backup_path);
         return NfcKeyDictImportStatusBackupFailed;
     }
@@ -210,7 +204,8 @@ static NfcKeyDictImportStatus nfc_key_dict_append_transaction(
         if(!storage_file_seek(file, (uint32_t)original_info.size, true)) break;
         const size_t append_size = furi_string_size(append_data);
         needs_rollback = true;
-        if(storage_file_write(file, furi_string_get_cstr(append_data), append_size) != append_size) {
+        if(storage_file_write(file, furi_string_get_cstr(append_data), append_size) !=
+           append_size) {
             break;
         }
         if(!storage_file_sync(file)) break;
@@ -229,18 +224,15 @@ static NfcKeyDictImportStatus nfc_key_dict_append_transaction(
     NfcKeyDictImportStatus status = NfcKeyDictImportStatusSuccess;
     if(!committed) {
         stats->added = 0;
-        if(!needs_rollback || nfc_key_dict_restore_original(
-                                  storage,
-                                  dict->user_path,
-                                  user_existed,
-                                  original_info.size,
-                                  backup_path)) {
+        if(!needs_rollback ||
+           nfc_key_dict_restore_original(
+               storage, dict->user_path, user_existed, original_info.size, backup_path)) {
             status = NfcKeyDictImportStatusWriteFailed;
         } else {
             status = NfcKeyDictImportStatusRollbackFailed;
-            stats->backup_preserved = !furi_string_empty(backup_path) &&
-                                      storage_file_exists(
-                                          storage, furi_string_get_cstr(backup_path));
+            stats->backup_preserved =
+                !furi_string_empty(backup_path) &&
+                storage_file_exists(storage, furi_string_get_cstr(backup_path));
             FURI_LOG_E(
                 TAG,
                 "Import rollback failed; backup %s",
@@ -319,7 +311,6 @@ void nfc_key_dict_import(
         return;
     }
 
-    stats->status =
-        nfc_key_dict_append_transaction(storage, dict, keys, key_count, known, stats);
+    stats->status = nfc_key_dict_append_transaction(storage, dict, keys, key_count, known, stats);
     furi_record_close(RECORD_STORAGE);
 }
