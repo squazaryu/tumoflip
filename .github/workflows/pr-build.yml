@@ -87,6 +87,10 @@ jobs:
         shell: bash
         run: python3 tools/tumoflip/test_infrared_universal_save.py
 
+      - name: Validate transactional NFC key import
+        shell: bash
+        run: python3 tools/tumoflip/test_nfc_key_dictionary_import.py
+
       - name: Build firmware (minimal / clean)
         id: build
         shell: bash
