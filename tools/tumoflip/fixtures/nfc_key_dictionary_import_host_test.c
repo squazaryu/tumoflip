@@ -24,7 +24,7 @@ struct File {
 };
 
 static Storage storage;
-static char root[1024], system_path[1024], user_path[1024];
+static char root[512], system_path[1024], user_path[1024];
 static NfcKeyDict dictionary;
 static int partial_write = -1;
 static int sync_failures;
@@ -358,6 +358,7 @@ static NfcKeyDictImportStats run_import(void) {
 
 int main(int argc, char** argv) {
     assert(argc == 2);
+    assert(strlen(argv[1]) < sizeof(root));
     snprintf(root, sizeof(root), "%s", argv[1]);
     snprintf(system_path, sizeof(system_path), "%s/system.nfc", root);
     snprintf(user_path, sizeof(user_path), "%s/user.nfc", root);
