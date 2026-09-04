@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <time.h>
 
 #include <flipper_format/flipper_format.h>
@@ -21,8 +22,12 @@ struct FuriEventFlag {
 };
 
 struct FuriStreamBuffer {
+    pthread_mutex_t mutex;
+    int32_t* values;
     size_t capacity;
-    size_t available;
+    size_t head;
+    size_t tail;
+    size_t count;
 };
 
 struct FuriString {
@@ -51,6 +56,8 @@ static SubGhzDevice radio;
 static unsigned open_count;
 static unsigned fail_open_number;
 static unsigned async_tx_checks;
+static bool async_tx_complete;
+static atomic_uint callback_count;
 
 static void* host_thread_entry(void* context) {
     FuriThread* thread = context;
@@ -162,16 +169,26 @@ FuriStreamBuffer* furi_stream_buffer_alloc(size_t size, size_t trigger_level) {
     UNUSED(trigger_level);
     FuriStreamBuffer* stream = calloc(1, sizeof(FuriStreamBuffer));
     assert(stream);
-    stream->capacity = size;
+    assert(size % sizeof(int32_t) == 0U);
+    stream->capacity = size / sizeof(int32_t);
+    stream->values = calloc(stream->capacity, sizeof(int32_t));
+    assert(stream->values);
+    assert(pthread_mutex_init(&stream->mutex, NULL) == 0);
     return stream;
 }
 
 void furi_stream_buffer_free(FuriStreamBuffer* stream) {
+    assert(pthread_mutex_destroy(&stream->mutex) == 0);
+    free(stream->values);
     free(stream);
 }
 
 void furi_stream_buffer_reset(FuriStreamBuffer* stream) {
-    stream->available = 0;
+    assert(pthread_mutex_lock(&stream->mutex) == 0);
+    stream->head = 0;
+    stream->tail = 0;
+    stream->count = 0;
+    assert(pthread_mutex_unlock(&stream->mutex) == 0);
 }
 
 size_t furi_stream_buffer_send(
@@ -179,10 +196,17 @@ size_t furi_stream_buffer_send(
     const void* data,
     size_t size,
     uint32_t timeout_ms) {
-    UNUSED(data);
     UNUSED(timeout_ms);
-    if(stream->available + size > stream->capacity) return 0;
-    stream->available += size;
+    assert(size == sizeof(int32_t));
+    assert(pthread_mutex_lock(&stream->mutex) == 0);
+    if(stream->count == stream->capacity) {
+        assert(pthread_mutex_unlock(&stream->mutex) == 0);
+        return 0;
+    }
+    stream->values[stream->tail] = *(const int32_t*)data;
+    stream->tail = (stream->tail + 1U) % stream->capacity;
+    stream->count++;
+    assert(pthread_mutex_unlock(&stream->mutex) == 0);
     return size;
 }
 
@@ -191,19 +215,32 @@ size_t furi_stream_buffer_receive(
     void* data,
     size_t size,
     uint32_t timeout_ms) {
-    UNUSED(data);
     UNUSED(timeout_ms);
-    if(stream->available < size) return 0;
-    stream->available -= size;
+    assert(size == sizeof(int32_t));
+    assert(pthread_mutex_lock(&stream->mutex) == 0);
+    if(stream->count == 0U) {
+        assert(pthread_mutex_unlock(&stream->mutex) == 0);
+        return 0;
+    }
+    *(int32_t*)data = stream->values[stream->head];
+    stream->head = (stream->head + 1U) % stream->capacity;
+    stream->count--;
+    assert(pthread_mutex_unlock(&stream->mutex) == 0);
     return size;
 }
 
 size_t furi_stream_buffer_bytes_available(FuriStreamBuffer* stream) {
-    return stream->available;
+    assert(pthread_mutex_lock(&stream->mutex) == 0);
+    const size_t available = stream->count * sizeof(int32_t);
+    assert(pthread_mutex_unlock(&stream->mutex) == 0);
+    return available;
 }
 
 size_t furi_stream_buffer_spaces_available(FuriStreamBuffer* stream) {
-    return stream->capacity - stream->available;
+    assert(pthread_mutex_lock(&stream->mutex) == 0);
+    const size_t available = (stream->capacity - stream->count) * sizeof(int32_t);
+    assert(pthread_mutex_unlock(&stream->mutex) == 0);
+    return available;
 }
 
 FuriString* furi_string_alloc(void) {
@@ -276,10 +313,7 @@ bool flipper_format_file_open_existing(FlipperFormat* format, const char* path) 
     return open_count != fail_open_number;
 }
 
-bool flipper_format_read_string(
-    FlipperFormat* format,
-    const char* key,
-    FuriString* value) {
+bool flipper_format_read_string(FlipperFormat* format, const char* key, FuriString* value) {
     UNUSED(format);
     UNUSED(key);
     furi_string_set(value, "RAW");
@@ -333,7 +367,7 @@ const SubGhzDevice* subghz_devices_get_by_name(const char* name) {
 bool subghz_devices_is_async_complete_tx(const SubGhzDevice* device) {
     assert(device == &radio);
     async_tx_checks++;
-    return false;
+    return async_tx_complete;
 }
 
 static uint64_t monotonic_milliseconds(void) {
@@ -354,19 +388,26 @@ static void simulate_initial_metadata_parse(const char* path) {
     furi_record_close(RECORD_STORAGE);
 }
 
-int main(void) {
+static void worker_end_callback(void* context) {
+    assert(context == &callback_count);
+    atomic_fetch_add(&callback_count, 1U);
+}
+
+static int test_failed_worker_reopen(void) {
     const char* path = "/ext/subghz/test.sub";
     open_count = 0;
     fail_open_number = 2;
     async_tx_checks = 0;
+    async_tx_complete = false;
 
     simulate_initial_metadata_parse(path);
     SubGhzFileEncoderWorker* worker = subghz_file_encoder_worker_alloc();
     const uint64_t start_ms = monotonic_milliseconds();
     const bool started = subghz_file_encoder_worker_start(worker, path, "internal");
     const uint64_t elapsed_ms = monotonic_milliseconds() - start_ms;
+    const bool running_after_start = subghz_file_encoder_worker_is_running(worker);
 
-    if(started && subghz_file_encoder_worker_is_running(worker)) {
+    if(started && running_after_start) {
         subghz_file_encoder_worker_stop(worker);
     }
     subghz_file_encoder_worker_free(worker);
@@ -379,6 +420,10 @@ int main(void) {
         fprintf(stderr, "worker reported success after injected reopen failure\n");
         return 1;
     }
+    if(running_after_start) {
+        fprintf(stderr, "worker remained running after rejected startup\n");
+        return 1;
+    }
     if(elapsed_ms > 500U) {
         fprintf(stderr, "startup failure took %llu ms\n", (unsigned long long)elapsed_ms);
         return 1;
@@ -388,5 +433,66 @@ int main(void) {
         return 1;
     }
 
+    return 0;
+}
+
+static int test_normal_eof(void) {
+    const char* path = "/ext/subghz/test.sub";
+    open_count = 0;
+    fail_open_number = 0;
+    async_tx_checks = 0;
+    async_tx_complete = true;
+    atomic_store(&callback_count, 0U);
+
+    simulate_initial_metadata_parse(path);
+    SubGhzFileEncoderWorker* worker = subghz_file_encoder_worker_alloc();
+    subghz_file_encoder_worker_callback_end(worker, worker_end_callback, &callback_count);
+    if(!subghz_file_encoder_worker_start(worker, path, "internal")) {
+        fprintf(stderr, "normal worker start was rejected\n");
+        subghz_file_encoder_worker_free(worker);
+        return 1;
+    }
+
+    LevelDuration output[3] = {0};
+    size_t output_count = 0;
+    const uint64_t deadline_ms = monotonic_milliseconds() + 500U;
+    while(output_count < 3U && monotonic_milliseconds() < deadline_ms) {
+        const LevelDuration duration = subghz_file_encoder_worker_get_level_duration(worker);
+        if(!duration.wait) output[output_count++] = duration;
+        if(duration.wait) furi_delay_ms(1);
+    }
+
+    while(atomic_load(&callback_count) == 0U && monotonic_milliseconds() < deadline_ms) {
+        furi_delay_ms(1);
+    }
+    if(subghz_file_encoder_worker_is_running(worker)) {
+        subghz_file_encoder_worker_stop(worker);
+    }
+    subghz_file_encoder_worker_free(worker);
+
+    if(open_count != 2U) {
+        fprintf(stderr, "normal path expected two opens, got %u\n", open_count);
+        return 1;
+    }
+    if(output_count != 3U || output[0].level != 1 || output[0].duration != 100U ||
+       output[1].level != 0 || output[1].duration != 100U || !output[2].reset) {
+        fprintf(stderr, "normal path did not preserve pulse, pulse, EOF reset\n");
+        return 1;
+    }
+    if(async_tx_checks == 0U) {
+        fprintf(stderr, "normal path skipped TX completion check\n");
+        return 1;
+    }
+    if(atomic_load(&callback_count) == 0U) {
+        fprintf(stderr, "normal path skipped EOF callback\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+int main(void) {
+    if(test_failed_worker_reopen() != 0) return 1;
+    if(test_normal_eof() != 0) return 1;
     return 0;
 }

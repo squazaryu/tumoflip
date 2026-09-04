@@ -60,7 +60,9 @@ LevelDuration subghz_file_encoder_worker_get_level_duration(void* context);
  * @param instance Pointer to a SubGhzFileEncoderWorker instance
  * @param file_path File path
  * @param radio_device_name Radio device name, NULL when decoding
- * @return true if started; false if a non-NULL radio name cannot be resolved
+ * @return true after the worker opens and validates the RAW file; false if the
+ *         file cannot be opened, its protocol cannot be read, startup times out,
+ *         or a non-NULL radio name cannot be resolved
  */
 bool subghz_file_encoder_worker_start(
     SubGhzFileEncoderWorker* instance,

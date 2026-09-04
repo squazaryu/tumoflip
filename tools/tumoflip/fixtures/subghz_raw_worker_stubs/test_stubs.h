@@ -22,6 +22,7 @@ typedef int32_t (*FuriThreadCallback)(void* context);
 
 enum {
     FuriFlagWaitAny = 0U,
+    FuriFlagError = 0x80000000U,
     FuriFlagErrorTimeout = 0xFFFFFFFEU,
 };
 

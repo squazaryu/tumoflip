@@ -13,7 +13,7 @@ STUBS = REPO_ROOT / "tools/tumoflip/fixtures/subghz_raw_worker_stubs"
 
 
 class SubGhzRawWorkerStartupTest(unittest.TestCase):
-    def test_second_open_failure_is_reported_before_transmit(self) -> None:
+    def test_reopen_failure_and_normal_eof_lifecycle(self) -> None:
         compiler = os.environ.get("CC", "cc")
         with tempfile.TemporaryDirectory() as temp_dir:
             binary = Path(temp_dir) / "subghz_raw_worker_startup_host_test"
