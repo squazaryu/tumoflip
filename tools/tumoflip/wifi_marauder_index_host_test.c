@@ -20,13 +20,14 @@ static void expect_invalid(const char* command, const char* prefix) {
 int main(void) {
     expect_valid("spoofat -t 0", "spoofat -t", 0U);
     expect_valid("findmy -t 42", "findmy -t", 42U);
-    expect_valid("findmy -t   17", "findmy -t", 17U);
     expect_valid("findmy -t 2147483647", "findmy -t", WIFI_MARAUDER_DEVICE_INDEX_MAX);
 
     expect_invalid(NULL, "findmy -t");
     expect_invalid("findmy -t 1", NULL);
     expect_invalid("findmy -t", "findmy -t");
     expect_invalid("findmy -t   ", "findmy -t");
+    expect_invalid("findmy -t   17", "findmy -t");
+    expect_invalid("spoofat -t  1", "spoofat -t");
     expect_invalid("findmy -t -1", "findmy -t");
     expect_invalid("findmy -t +1", "findmy -t");
     expect_invalid("findmy -t 1.0", "findmy -t");
