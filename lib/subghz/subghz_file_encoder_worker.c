@@ -10,19 +10,12 @@
 
 #define SUBGHZ_FILE_ENCODER_LOAD 512
 
-#define SUBGHZ_FILE_ENCODER_START_TIMEOUT_MS 1000
-#define SUBGHZ_FILE_ENCODER_START_READY      (1U << 0)
-#define SUBGHZ_FILE_ENCODER_START_FAILED     (1U << 1)
-#define SUBGHZ_FILE_ENCODER_START_MASK \
-    (SUBGHZ_FILE_ENCODER_START_READY | SUBGHZ_FILE_ENCODER_START_FAILED)
-
 /* Longest duration the radio can hold a level for in a single step */
 #define SUBGHZ_FILE_ENCODER_DURATION_MAX 1000000
 
 struct SubGhzFileEncoderWorker {
     FuriThread* thread;
     FuriStreamBuffer* stream;
-    FuriEventFlag* startup_event;
 
     Storage* storage;
     FlipperFormat* flipper_format;
@@ -158,9 +151,13 @@ static int32_t subghz_file_encoder_worker_thread(void* context) {
         FURI_LOG_I(TAG, "Start transmission");
     } while(0);
 
-    furi_event_flag_set(
-        instance->startup_event,
-        res ? SUBGHZ_FILE_ENCODER_START_READY : SUBGHZ_FILE_ENCODER_START_FAILED);
+    if(!res) {
+        // A RAW file can be parsed by the caller while this worker is being launched, then
+        // disappear or fail its second open. Publish one terminal item so an already-started
+        // async TX cannot wait forever for its first duration.
+        subghz_file_encoder_worker_add_level_duration(instance, LEVEL_DURATION_RESET);
+        instance->worker_stopping = true;
+    }
 
     while(res && instance->worker_running) {
         size_t stream_free_byte = furi_stream_buffer_spaces_available(instance->stream);
@@ -185,22 +182,22 @@ static int32_t subghz_file_encoder_worker_thread(void* context) {
         FURI_LOG_E(TAG, "Storage is slow");
     }
 
+    FURI_LOG_I(TAG, "End read file");
     if(res) {
-        FURI_LOG_I(TAG, "End read file");
         //nothing was put on the air when decoding, and is_async_complete_tx() never turns
         //true outside of a transmission, so this would spin until the worker is stopped
         while(!instance->is_decoding && instance->device &&
               !subghz_devices_is_async_complete_tx(instance->device) && instance->worker_running) {
             furi_delay_ms(5);
         }
+    }
 
-        FURI_LOG_I(TAG, "End transmission");
-        while(instance->worker_running) {
-            if(instance->worker_stopping) {
-                if(instance->callback_end) instance->callback_end(instance->context_end);
-            }
-            furi_delay_ms(50);
+    FURI_LOG_I(TAG, "End transmission");
+    while(instance->worker_running) {
+        if(instance->worker_stopping) {
+            if(instance->callback_end) instance->callback_end(instance->context_end);
         }
+        furi_delay_ms(50);
     }
     flipper_format_file_close(instance->flipper_format);
 
@@ -214,7 +211,6 @@ SubGhzFileEncoderWorker* subghz_file_encoder_worker_alloc(void) {
     instance->thread =
         furi_thread_alloc_ex("SubGhzFEWorker", 2048, subghz_file_encoder_worker_thread, instance);
     instance->stream = furi_stream_buffer_alloc(sizeof(int32_t) * 2048, sizeof(int32_t));
-    instance->startup_event = furi_event_flag_alloc();
 
     instance->storage = furi_record_open(RECORD_STORAGE);
     instance->flipper_format = flipper_format_file_alloc(instance->storage);
@@ -232,7 +228,6 @@ void subghz_file_encoder_worker_free(SubGhzFileEncoderWorker* instance) {
 
     furi_stream_buffer_free(instance->stream);
     furi_thread_free(instance->thread);
-    furi_event_flag_free(instance->startup_event);
 
     furi_string_free(instance->str_data);
     furi_string_free(instance->file_path);
@@ -251,7 +246,6 @@ bool subghz_file_encoder_worker_start(
     furi_assert(!instance->worker_running);
 
     furi_stream_buffer_reset(instance->stream);
-    furi_event_flag_clear(instance->startup_event, SUBGHZ_FILE_ENCODER_START_MASK);
     furi_string_set(instance->file_path, file_path);
     //without a radio the samples go to a decoder, not on the air
     instance->is_decoding = (radio_device_name == NULL);
@@ -264,18 +258,6 @@ bool subghz_file_encoder_worker_start(
 
     instance->worker_running = true;
     furi_thread_start(instance->thread);
-
-    const uint32_t startup_result = furi_event_flag_wait(
-        instance->startup_event,
-        SUBGHZ_FILE_ENCODER_START_MASK,
-        FuriFlagWaitAny,
-        SUBGHZ_FILE_ENCODER_START_TIMEOUT_MS);
-    if((startup_result & FuriFlagError) || !(startup_result & SUBGHZ_FILE_ENCODER_START_READY)) {
-        FURI_LOG_E(TAG, "RAW file worker startup failed");
-        instance->worker_running = false;
-        furi_thread_join(instance->thread);
-        return false;
-    }
 
     return true;
 }

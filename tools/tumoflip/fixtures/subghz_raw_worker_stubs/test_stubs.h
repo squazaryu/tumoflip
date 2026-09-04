@@ -11,7 +11,6 @@
 
 typedef struct FuriThread FuriThread;
 typedef struct FuriStreamBuffer FuriStreamBuffer;
-typedef struct FuriEventFlag FuriEventFlag;
 typedef struct FuriString FuriString;
 typedef struct Storage Storage;
 typedef struct Stream Stream;
@@ -19,12 +18,6 @@ typedef struct FlipperFormat FlipperFormat;
 typedef struct SubGhzDevice SubGhzDevice;
 
 typedef int32_t (*FuriThreadCallback)(void* context);
-
-enum {
-    FuriFlagWaitAny = 0U,
-    FuriFlagError = 0x80000000U,
-    FuriFlagErrorTimeout = 0xFFFFFFFEU,
-};
 
 typedef struct {
     int level;
@@ -53,16 +46,6 @@ void furi_thread_start(FuriThread* thread);
 void furi_thread_join(FuriThread* thread);
 void furi_thread_free(FuriThread* thread);
 void furi_delay_ms(uint32_t duration_ms);
-
-FuriEventFlag* furi_event_flag_alloc(void);
-void furi_event_flag_free(FuriEventFlag* event);
-uint32_t furi_event_flag_set(FuriEventFlag* event, uint32_t flags);
-uint32_t furi_event_flag_clear(FuriEventFlag* event, uint32_t flags);
-uint32_t furi_event_flag_wait(
-    FuriEventFlag* event,
-    uint32_t flags,
-    uint32_t options,
-    uint32_t timeout_ms);
 
 FuriStreamBuffer* furi_stream_buffer_alloc(size_t size, size_t trigger_level);
 void furi_stream_buffer_free(FuriStreamBuffer* stream);

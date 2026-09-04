@@ -1,6 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
 
-#include <errno.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <time.h>
@@ -13,12 +12,6 @@ struct FuriThread {
     FuriThreadCallback callback;
     void* context;
     bool started;
-};
-
-struct FuriEventFlag {
-    pthread_mutex_t mutex;
-    pthread_cond_t condition;
-    uint32_t flags;
 };
 
 struct FuriStreamBuffer {
@@ -106,67 +99,6 @@ void furi_delay_ms(uint32_t duration_ms) {
         .tv_nsec = (long)(duration_ms % 1000U) * 1000000L,
     };
     nanosleep(&duration, NULL);
-}
-
-FuriEventFlag* furi_event_flag_alloc(void) {
-    FuriEventFlag* event = calloc(1, sizeof(FuriEventFlag));
-    assert(event);
-    assert(pthread_mutex_init(&event->mutex, NULL) == 0);
-    assert(pthread_cond_init(&event->condition, NULL) == 0);
-    return event;
-}
-
-void furi_event_flag_free(FuriEventFlag* event) {
-    assert(pthread_cond_destroy(&event->condition) == 0);
-    assert(pthread_mutex_destroy(&event->mutex) == 0);
-    free(event);
-}
-
-uint32_t furi_event_flag_set(FuriEventFlag* event, uint32_t flags) {
-    assert(pthread_mutex_lock(&event->mutex) == 0);
-    event->flags |= flags;
-    const uint32_t result = event->flags;
-    assert(pthread_cond_broadcast(&event->condition) == 0);
-    assert(pthread_mutex_unlock(&event->mutex) == 0);
-    return result;
-}
-
-uint32_t furi_event_flag_clear(FuriEventFlag* event, uint32_t flags) {
-    assert(pthread_mutex_lock(&event->mutex) == 0);
-    event->flags &= ~flags;
-    const uint32_t result = event->flags;
-    assert(pthread_mutex_unlock(&event->mutex) == 0);
-    return result;
-}
-
-uint32_t furi_event_flag_wait(
-    FuriEventFlag* event,
-    uint32_t flags,
-    uint32_t options,
-    uint32_t timeout_ms) {
-    UNUSED(options);
-    struct timespec deadline;
-    assert(clock_gettime(CLOCK_REALTIME, &deadline) == 0);
-    deadline.tv_sec += timeout_ms / 1000U;
-    deadline.tv_nsec += (long)(timeout_ms % 1000U) * 1000000L;
-    if(deadline.tv_nsec >= 1000000000L) {
-        deadline.tv_sec++;
-        deadline.tv_nsec -= 1000000000L;
-    }
-
-    assert(pthread_mutex_lock(&event->mutex) == 0);
-    while((event->flags & flags) == 0U) {
-        const int result = pthread_cond_timedwait(&event->condition, &event->mutex, &deadline);
-        if(result == ETIMEDOUT) {
-            assert(pthread_mutex_unlock(&event->mutex) == 0);
-            return FuriFlagErrorTimeout;
-        }
-        assert(result == 0);
-    }
-    const uint32_t result = event->flags & flags;
-    event->flags &= ~result;
-    assert(pthread_mutex_unlock(&event->mutex) == 0);
-    return result;
 }
 
 FuriStreamBuffer* furi_stream_buffer_alloc(size_t size, size_t trigger_level) {
