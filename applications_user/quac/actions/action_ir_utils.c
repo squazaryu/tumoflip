@@ -102,13 +102,11 @@ bool infrared_utils_read_signal_at_index(
         } else if(furi_string_equal(temp_str, "raw")) {
             InfraredRawSignal raw = {0};
 
-            if(!flipper_format_read_uint32(
-                   fff_data_file, "frequency", &raw.frequency, 1)) {
+            if(!flipper_format_read_uint32(fff_data_file, "frequency", &raw.frequency, 1)) {
                 // ACTION_SET_ERROR("IR: Failed to read frequency");
                 break;
             }
-            if(!flipper_format_read_float(
-                   fff_data_file, "duty_cycle", &raw.duty_cycle, 1)) {
+            if(!flipper_format_read_float(fff_data_file, "duty_cycle", &raw.duty_cycle, 1)) {
                 // ACTION_SET_ERROR("IR: Failed to read duty cycle");
                 break;
             }
@@ -116,15 +114,14 @@ bool infrared_utils_read_signal_at_index(
                 // ACTION_SET_ERROR("IR: Failed to get size of data");
                 break;
             }
-            if(temp_data32 > MAX_TIMINGS_AMOUNT) {
+            if(temp_data32 == 0 || temp_data32 > MAX_TIMINGS_AMOUNT) {
                 // ACTION_SET_ERROR("IR: Data size exceeds limit");
                 break;
             }
             raw.timings_size = temp_data32;
 
             raw.timings = malloc(sizeof(uint32_t) * raw.timings_size);
-            if(!flipper_format_read_uint32(
-                   fff_data_file, "data", raw.timings, temp_data32)) {
+            if(!flipper_format_read_uint32(fff_data_file, "data", raw.timings, temp_data32)) {
                 // ACTION_SET_ERROR("IR: Failed to read data");
                 free(raw.timings);
                 break;
