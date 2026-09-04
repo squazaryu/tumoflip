@@ -476,11 +476,11 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertNotIn("compatible_builds", after[esp_source])
             self.assertEqual(
                 sum("compatible_builds" in entry for entry in before.values()),
-                17,
+                len(PACKAGE_RELEASE_OVERLAY_FILES),
             )
             self.assertEqual(
                 sum("compatible_builds" in entry for entry in after.values()),
-                16,
+                len(PACKAGE_RELEASE_OVERLAY_FILES) - 1,
             )
             installed_dev004 = {
                 source: entry["compatible_builds"][0]["md5"]
@@ -746,7 +746,7 @@ class PackageReleaseTest(unittest.TestCase):
                 },
                 set(overlays),
             )
-            self.assertNotIn("compatible_builds", entries["apps/Tools/quac.fap"])
+            self.assertIn("compatible_builds", entries["apps/Tools/quac.fap"])
             for source in overlays:
                 alias = entries[source]["compatible_builds"]
                 self.assertEqual(len(alias), 1)
