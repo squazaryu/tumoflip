@@ -67,6 +67,7 @@ void action_subghz_tx(void* context, const FuriString* action_path, FuriString* 
     FuriString* preset_name = furi_string_alloc();
     FuriString* protocol_name = furi_string_alloc();
     bool is_raw = false;
+    bool loaded = false;
 
     FuriString* temp_str;
     temp_str = furi_string_alloc();
@@ -154,36 +155,46 @@ void action_subghz_tx(void* context, const FuriString* action_path, FuriString* 
                 fff_data, file_name, subghz_txrx_radio_device_get_name(txrx));
             is_raw = true;
         } else {
-            stream_copy_full(
-                flipper_format_get_raw_stream(fff_data_file),
-                flipper_format_get_raw_stream(fff_data));
+            Stream* source = flipper_format_get_raw_stream(fff_data_file);
+            if(stream_copy_full(source, flipper_format_get_raw_stream(fff_data)) !=
+               stream_size(source)) {
+                ACTION_SET_ERROR("SUBGHZ: Failed to read signal");
+                break;
+            }
         }
 
         if(subghz_txrx_load_decoder_by_name_protocol(txrx, furi_string_get_cstr(protocol_name))) {
             SubGhzProtocolStatus status =
                 subghz_protocol_decoder_base_deserialize(subghz_txrx_get_decoder(txrx), fff_data);
             if(status != SubGhzProtocolStatusOk) {
+                ACTION_SET_ERROR("SUBGHZ: Invalid signal data");
                 break;
             }
         } else {
             FURI_LOG_E(TAG, "Protocol not found: %s", furi_string_get_cstr(protocol_name));
+            ACTION_SET_ERROR("SUBGHZ: Protocol not found");
             break;
         }
+        loaded = true;
     } while(false);
 
     flipper_format_file_close(fff_data_file);
     flipper_format_free(fff_data_file);
 
-    if(subghz_txrx_tx_start(txrx, subghz_txrx_get_fff_data(txrx)) != SubGhzTxRxStartTxStateOk) {
-        FURI_LOG_E(TAG, "Failed to start TX");
-    }
-
-    if(is_raw) {
-        subghz_txrx_set_raw_file_encoder_worker_callback_end(
-            txrx, action_subghz_raw_end_callback, furi_thread_get_current());
-        furi_thread_flags_wait(0, FuriFlagWaitAll, FuriWaitForever);
-    } else {
-        furi_delay_ms(app->settings.subghz_duration);
+    if(loaded) {
+        if(subghz_txrx_tx_start(txrx, subghz_txrx_get_fff_data(txrx)) ==
+           SubGhzTxRxStartTxStateOk) {
+            if(is_raw) {
+                subghz_txrx_set_raw_file_encoder_worker_callback_end(
+                    txrx, action_subghz_raw_end_callback, furi_thread_get_current());
+                furi_thread_flags_wait(0, FuriFlagWaitAll, FuriWaitForever);
+            } else {
+                furi_delay_ms(app->settings.subghz_duration);
+            }
+        } else {
+            FURI_LOG_E(TAG, "Failed to start TX");
+            ACTION_SET_ERROR("SUBGHZ: Failed to start TX");
+        }
     }
 
     FURI_LOG_I(TAG, "SUBGHZ: Action complete.");
