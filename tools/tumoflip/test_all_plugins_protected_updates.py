@@ -18,7 +18,7 @@ class ProtectedAppUpdateTests(unittest.TestCase):
         self.assertIn("variable_item_list_free(ctx->item_list);\n    free(ctx);", edit)
         self.assertIn("variable_item_list_free(ctx->item_list);\n    free(ctx);", settings)
 
-    def test_marauder_matches_module_one_1_13_cli(self):
+    def test_marauder_0_7_10_exposes_only_the_selected_cli_delta(self):
         manifest = (
             REPO_ROOT / "applications_user/esp32_wifi_marauder/application.fam"
         ).read_text()
@@ -32,13 +32,39 @@ class ProtectedAppUpdateTests(unittest.TestCase):
             REPO_ROOT
             / "applications_user/esp32_wifi_marauder/scenes/wifi_marauder_scene_start.c"
         ).read_text()
+        text_input = (
+            REPO_ROOT
+            / "applications_user/esp32_wifi_marauder/scenes/wifi_marauder_scene_text_input.c"
+        ).read_text()
+        console = (
+            REPO_ROOT
+            / "applications_user/esp32_wifi_marauder/scenes/wifi_marauder_scene_console_output.c"
+        ).read_text()
 
-        self.assertIn("fap_version=(7, 9)", manifest)
-        self.assertIn('WIFI_MARAUDER_APP_VERSION "v0.7.9"', header)
+        self.assertIn("fap_version=(7, 10)", manifest)
+        self.assertIn('WIFI_MARAUDER_APP_VERSION "v0.7.10"', header)
         self.assertIn("#define NUM_MENU_ITEMS (34)", internal)
+        self.assertIn('"Airtag"', menu)
+        self.assertIn('{"spoof", "sound"}', menu)
+        self.assertIn('{"spoofat -t", "findmy -t"}', menu)
+        self.assertIn('"gps -g accuracy"', menu)
+        self.assertIn('"gps -g text"', menu)
+        self.assertIn('"gps -g nmea"', menu)
+
+        gps_start = menu.index('{"GPS Data"')
+        gps_end = menu.index('{"GPS Tracker"', gps_start)
+        self.assertIn("SHOW_STOPSCAN_TIP", menu[gps_start:gps_end])
+        self.assertIn('"Press BACK to send stopscan\\n"', console)
+        self.assertIn('"stopscan\\n"', console)
+
+        self.assertIn('"Enter Airtag device index"', text_input)
+        self.assertIn('"Enter FindMy device index"', text_input)
+        self.assertIn("validator_is_device_index_callback", text_input)
+
         self.assertIn('"gpstracker -c start"', menu)
         self.assertIn('"gpstracker -c stop"', menu)
         self.assertIn('{"NMEA Stream", {""}, 1, {"nmea"}', menu)
+        self.assertIn('{"Signal Monitor", {""}, 1, {"sigmon"}', menu)
         self.assertNotIn('"wardrive -s"', menu)
         self.assertNotIn('"wardrive -f"', menu)
         self.assertNotIn('"list -b"', menu)
