@@ -22,9 +22,9 @@ static bool is(const char* name) { return !strcmp(mode, name); }
 static FuriString* furi_string_alloc(void) { strings++; return calloc(1, sizeof(FuriString)); }
 static void furi_string_free(FuriString* s) { strings--; free(s); }
 static const char* furi_string_get_cstr(FuriString* s) { return s->text; }
-static bool flipper_format_rewind(FlipperFormat* f) { return true; }
-static bool flipper_format_read_string(FlipperFormat* f, const char* k, FuriString* s) { s->text = "Princeton"; return true; }
-static bool flipper_format_insert_or_update_uint32(FlipperFormat* f, const char* k, uint32_t* v, size_t n) { return true; }
+static bool flipper_format_rewind(FlipperFormat* f) { return !is("rewind"); }
+static bool flipper_format_read_string(FlipperFormat* f, const char* k, FuriString* s) { s->text = "Princeton"; return !is("protocol"); }
+static bool flipper_format_insert_or_update_uint32(FlipperFormat* f, const char* k, uint32_t* v, size_t n) { return !is("repeat"); }
 static void subghz_txrx_stop(SubGhzTxRx* t) { if(t->txrx_state == SubGhzTxRxStateTx) saves++; }
 static void* subghz_transmitter_alloc_init(void* env, const char* protocol) { return is("no-encoder") ? NULL : malloc(1); }
 static SubGhzProtocolStatus subghz_transmitter_deserialize(void* t, FlipperFormat* f) { return is("deserialize") ? SubGhzProtocolStatusError : SubGhzProtocolStatusOk; }
@@ -42,8 +42,8 @@ static void subghz_txrx_speaker_off(SubGhzTxRx* t) {}
 
 int main(int argc, char** argv) {
     assert(argc == 2); mode = argv[1];
-    FuriString name = {.text = "AM650"};
-    SubGhzRadioPreset preset = {.name = &name, .frequency = 433920000};
+    FuriString name = {.text = is("preset") ? "" : "AM650"};
+    SubGhzRadioPreset preset = {.name = &name, .frequency = is("frequency") ? 0 : 433920000};
     SubGhzTxRx txrx = {.preset = &preset, .txrx_state = SubGhzTxRxStateSleep};
     FlipperFormat data = 0;
     SubGhzTxRxStartTxState result = subghz_txrx_tx_start(&txrx, &data);
@@ -54,6 +54,6 @@ int main(int argc, char** argv) {
     REQUIRE(valid || txrx.txrx_state != SubGhzTxRxStateTx);
     REQUIRE(saves == 0 && strings == 0);
     if(valid) subghz_transmitter_free(txrx.transmitter);
-    REQUIRE(frees == (is("no-encoder") ? 0U : 1U));
+    REQUIRE(frees == (is("no-encoder") || is("rewind") || is("protocol") || is("repeat") ? 0U : 1U));
     return 0;
 }

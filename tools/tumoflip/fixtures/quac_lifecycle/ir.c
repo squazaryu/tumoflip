@@ -47,16 +47,17 @@ static bool furi_string_equal(FuriString* s, const char* v) { return !strcmp(s->
 static void furi_string_reset(FuriString* s) { s->text[0] = 0; }
 static bool fails(FlipperFormat* f, const char* key) { return f->fail && !strcmp(f->fail, key); }
 static bool flipper_format_read_header(FlipperFormat* f, FuriString* s, uint32_t* v) {
-    f->names = 0; set(s, INFRARED_FILE_TYPE); *v = 1; return !fails(f, "header");
+    f->names = 0; set(s, fails(f, "bad-type") ? "Other" : INFRARED_FILE_TYPE);
+    *v = fails(f, "bad-version") ? 99 : 1; return !fails(f, "header");
 }
 static bool flipper_format_read_string(FlipperFormat* f, const char* key, FuriString* s) {
     if(fails(f, key)) return false;
     if(!strcmp(key, "name")) { if(f->names++) return false; set(s, "Power"); }
-    else if(!strcmp(key, "type")) set(s, f->raw ? "raw" : "parsed");
-    else set(s, "NEC");
+    else if(!strcmp(key, "type")) set(s, fails(f, "unknown-type") ? "unknown" : (f->raw ? "raw" : "parsed"));
+    else set(s, fails(f, "invalid-protocol") ? "INVALID" : "NEC");
     return true;
 }
-static InfraredProtocol infrared_get_protocol_by_name(const char* name) { return InfraredProtocolNEC; }
+static InfraredProtocol infrared_get_protocol_by_name(const char* name) { return !strcmp(name, "NEC") ? InfraredProtocolNEC : InfraredProtocolUnknown; }
 static bool infrared_is_protocol_valid(InfraredProtocol p) { return p == InfraredProtocolNEC; }
 static const char* infrared_get_protocol_name(InfraredProtocol p) { return "NEC"; }
 static bool flipper_format_read_uint32(FlipperFormat* f, const char* key, uint32_t* v, uint32_t n) {
@@ -73,13 +74,13 @@ static bool flipper_format_get_value_count(FlipperFormat* f, const char* key, ui
 static bool flipper_format_read_hex(FlipperFormat* f, const char* key, uint8_t* v, uint32_t n) {
     memset(v, 0x12, n); return !fails(f, key);
 }
-static bool flipper_format_write_header_cstr(FlipperFormat* f, const char* t, uint32_t v) { f->writes++; return true; }
-static bool flipper_format_write_comment_cstr(FlipperFormat* f, const char* t) { return true; }
-static bool flipper_format_write_string(FlipperFormat* f, const char* k, FuriString* v) { return true; }
-static bool flipper_format_write_string_cstr(FlipperFormat* f, const char* k, const char* v) { return true; }
-static bool flipper_format_write_uint32(FlipperFormat* f, const char* k, uint32_t* v, uint32_t n) { assert(v && n); return true; }
-static bool flipper_format_write_float(FlipperFormat* f, const char* k, float* v, uint32_t n) { return true; }
-static bool flipper_format_write_hex(FlipperFormat* f, const char* k, uint8_t* v, uint32_t n) { return true; }
+static bool flipper_format_write_header_cstr(FlipperFormat* f, const char* t, uint32_t v) { f->writes++; return !fails(f, "header"); }
+static bool flipper_format_write_comment_cstr(FlipperFormat* f, const char* t) { return !fails(f, "comment"); }
+static bool flipper_format_write_string(FlipperFormat* f, const char* k, FuriString* v) { return !fails(f, k); }
+static bool flipper_format_write_string_cstr(FlipperFormat* f, const char* k, const char* v) { return !fails(f, k); }
+static bool flipper_format_write_uint32(FlipperFormat* f, const char* k, uint32_t* v, uint32_t n) { assert(v && n); return !fails(f, k); }
+static bool flipper_format_write_float(FlipperFormat* f, const char* k, float* v, uint32_t n) { return !fails(f, k); }
+static bool flipper_format_write_hex(FlipperFormat* f, const char* k, uint8_t* v, uint32_t n) { return !fails(f, k); }
 
 @PRODUCTION@
 
@@ -97,7 +98,13 @@ int main(int argc, char** argv) {
     else if(!strcmp(mode, "missing-command")) { file.fail = "name"; expected = false; }
     else if(!strcmp(mode, "parsed-failure")) { file.raw = false; file.fail = "command"; expected = false; }
     else if(!strcmp(mode, "parsed")) file.raw = false;
-    bool first = infrared_utils_read_signal_at_index(&file, 0, signal, name);
+    if(!strncmp(mode, "read-", 5)) { file.fail = mode + 5; expected = false; }
+    if(!strcmp(mode, "invalid-protocol") || !strcmp(mode, "unknown-type") ||
+       !strcmp(mode, "bad-version") || !strcmp(mode, "bad-type")) { file.fail = mode; expected = false; }
+    if(strstr(mode, "protocol") || strstr(mode, "address") || strstr(mode, "command")) file.raw = false;
+    uint32_t index = !strcmp(mode, "missing-index") ? 1 : 0;
+    if(index) expected = false;
+    bool first = infrared_utils_read_signal_at_index(&file, index, signal, name);
     REQUIRE(first == expected);
     if(!strcmp(mode, "raw-raw") || !strcmp(mode, "raw-parsed") || !strcmp(mode, "raw-failure")) {
         file.raw = strcmp(mode, "raw-parsed") != 0;
@@ -114,7 +121,10 @@ int main(int argc, char** argv) {
             REQUIRE(signal->payload.raw.timings_size == 3);
             REQUIRE(signal->payload.raw.timings[2] == 102);
         } else REQUIRE(signal->payload.message.address == 0x12121212);
-        REQUIRE(infrared_utils_write_signal(&file, signal, name));
+        if(!strncmp(mode, "write-", 6)) {
+            file.fail = mode + 6;
+            REQUIRE(!infrared_utils_write_signal(&file, signal, name));
+        } else REQUIRE(infrared_utils_write_signal(&file, signal, name));
         REQUIRE(file.writes == 1);
     }
     infrared_utils_signal_free(signal);
