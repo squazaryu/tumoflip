@@ -45,6 +45,7 @@ struct Stream {
 
 struct FlipperFormat {
     Stream stream;
+    bool is_open;
 };
 
 struct SubGhzDevice {
@@ -53,6 +54,9 @@ struct SubGhzDevice {
 
 static Storage storage;
 static SubGhzDevice radio;
+static pthread_mutex_t storage_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t storage_condition = PTHREAD_COND_INITIALIZER;
+static unsigned open_handles;
 static unsigned open_count;
 static unsigned fail_open_number;
 static unsigned async_tx_checks;
@@ -303,14 +307,25 @@ FlipperFormat* flipper_format_file_alloc(Storage* storage_instance) {
 }
 
 void flipper_format_free(FlipperFormat* format) {
+    assert(!format->is_open);
     free(format);
 }
 
 bool flipper_format_file_open_existing(FlipperFormat* format, const char* path) {
-    UNUSED(format);
     UNUSED(path);
+    assert(pthread_mutex_lock(&storage_mutex) == 0);
     open_count++;
-    return open_count != fail_open_number;
+    if(open_count == fail_open_number) {
+        assert(pthread_mutex_unlock(&storage_mutex) == 0);
+        return false;
+    }
+    while(open_handles != 0U) {
+        assert(pthread_cond_wait(&storage_condition, &storage_mutex) == 0);
+    }
+    format->is_open = true;
+    open_handles++;
+    assert(pthread_mutex_unlock(&storage_mutex) == 0);
+    return true;
 }
 
 bool flipper_format_read_string(FlipperFormat* format, const char* key, FuriString* value) {
@@ -321,7 +336,14 @@ bool flipper_format_read_string(FlipperFormat* format, const char* key, FuriStri
 }
 
 void flipper_format_file_close(FlipperFormat* format) {
-    UNUSED(format);
+    assert(pthread_mutex_lock(&storage_mutex) == 0);
+    if(format->is_open) {
+        assert(open_handles == 1U);
+        format->is_open = false;
+        open_handles--;
+        assert(pthread_cond_broadcast(&storage_condition) == 0);
+    }
+    assert(pthread_mutex_unlock(&storage_mutex) == 0);
 }
 
 Stream* flipper_format_get_raw_stream(FlipperFormat* format) {
@@ -376,16 +398,20 @@ static uint64_t monotonic_milliseconds(void) {
     return (uint64_t)timestamp.tv_sec * 1000U + (uint64_t)timestamp.tv_nsec / 1000000U;
 }
 
-static void simulate_initial_metadata_parse(const char* path) {
+static FlipperFormat* open_initial_metadata(const char* path) {
     Storage* metadata_storage = furi_record_open(RECORD_STORAGE);
     FlipperFormat* metadata = flipper_format_file_alloc(metadata_storage);
     FuriString* protocol = furi_string_alloc();
     assert(flipper_format_file_open_existing(metadata, path));
     assert(flipper_format_read_string(metadata, "Protocol", protocol));
-    flipper_format_file_close(metadata);
     furi_string_free(protocol);
-    flipper_format_free(metadata);
     furi_record_close(RECORD_STORAGE);
+    return metadata;
+}
+
+static void close_initial_metadata(FlipperFormat* metadata) {
+    flipper_format_file_close(metadata);
+    flipper_format_free(metadata);
 }
 
 static void worker_end_callback(void* context) {
@@ -393,65 +419,35 @@ static void worker_end_callback(void* context) {
     atomic_fetch_add(&callback_count, 1U);
 }
 
-static int test_failed_worker_reopen(void) {
-    const char* path = "/ext/subghz/test.sub";
-    open_count = 0;
-    fail_open_number = 2;
-    async_tx_checks = 0;
-    async_tx_complete = false;
-
-    simulate_initial_metadata_parse(path);
-    SubGhzFileEncoderWorker* worker = subghz_file_encoder_worker_alloc();
-    const uint64_t start_ms = monotonic_milliseconds();
-    const bool started = subghz_file_encoder_worker_start(worker, path, "internal");
-    const uint64_t elapsed_ms = monotonic_milliseconds() - start_ms;
-    const bool running_after_start = subghz_file_encoder_worker_is_running(worker);
-
-    if(started && running_after_start) {
-        subghz_file_encoder_worker_stop(worker);
-    }
-    subghz_file_encoder_worker_free(worker);
-
-    if(open_count != 2U) {
-        fprintf(stderr, "expected metadata open plus worker reopen, got %u opens\n", open_count);
-        return 1;
-    }
-    if(started) {
-        fprintf(stderr, "worker reported success after injected reopen failure\n");
-        return 1;
-    }
-    if(running_after_start) {
-        fprintf(stderr, "worker remained running after rejected startup\n");
-        return 1;
-    }
-    if(elapsed_ms > 500U) {
-        fprintf(stderr, "startup failure took %llu ms\n", (unsigned long long)elapsed_ms);
-        return 1;
-    }
-    if(async_tx_checks != 0U) {
-        fprintf(stderr, "failed startup entered TX completion wait %u times\n", async_tx_checks);
-        return 1;
-    }
-
-    return 0;
-}
-
-static int test_normal_eof(void) {
-    const char* path = "/ext/subghz/test.sub";
+static void reset_fake_storage(void) {
+    assert(open_handles == 0U);
     open_count = 0;
     fail_open_number = 0;
     async_tx_checks = 0;
-    async_tx_complete = true;
+    async_tx_complete = false;
     atomic_store(&callback_count, 0U);
+}
 
-    simulate_initial_metadata_parse(path);
+static int test_open_handle_is_released_after_async_start(void) {
+    const char* path = "/ext/subghz/test.sub";
+    reset_fake_storage();
+    async_tx_complete = true;
+
+    FlipperFormat* metadata = open_initial_metadata(path);
     SubGhzFileEncoderWorker* worker = subghz_file_encoder_worker_alloc();
     subghz_file_encoder_worker_callback_end(worker, worker_end_callback, &callback_count);
-    if(!subghz_file_encoder_worker_start(worker, path, "internal")) {
-        fprintf(stderr, "normal worker start was rejected\n");
-        subghz_file_encoder_worker_free(worker);
+    const uint64_t start_ms = monotonic_milliseconds();
+    const bool started = subghz_file_encoder_worker_start(worker, path, "internal");
+    const uint64_t elapsed_ms = monotonic_milliseconds() - start_ms;
+    if(!started || elapsed_ms > 100U) {
+        fprintf(
+            stderr,
+            "start must return while metadata handle is open: started=%u elapsed=%llu ms\n",
+            started,
+            (unsigned long long)elapsed_ms);
         return 1;
     }
+    close_initial_metadata(metadata);
 
     LevelDuration output[3] = {0};
     size_t output_count = 0;
@@ -461,7 +457,6 @@ static int test_normal_eof(void) {
         if(!duration.wait) output[output_count++] = duration;
         if(duration.wait) furi_delay_ms(1);
     }
-
     while(atomic_load(&callback_count) == 0U && monotonic_milliseconds() < deadline_ms) {
         furi_delay_ms(1);
     }
@@ -487,12 +482,102 @@ static int test_normal_eof(void) {
         fprintf(stderr, "normal path skipped EOF callback\n");
         return 1;
     }
+    if(open_handles != 0U) {
+        fprintf(stderr, "normal path leaked an open handle\n");
+        return 1;
+    }
 
     return 0;
 }
 
+static int test_hard_reopen_failure_is_terminal(void) {
+    const char* path = "/ext/subghz/test.sub";
+    reset_fake_storage();
+
+    FlipperFormat* metadata = open_initial_metadata(path);
+    close_initial_metadata(metadata);
+    fail_open_number = 2;
+    SubGhzFileEncoderWorker* worker = subghz_file_encoder_worker_alloc();
+    if(!subghz_file_encoder_worker_start(worker, path, "internal")) {
+        fprintf(stderr, "async start synchronously rejected a worker reopen failure\n");
+        subghz_file_encoder_worker_free(worker);
+        return 1;
+    }
+
+    LevelDuration terminal = {.wait = true};
+    unsigned non_wait_values = 0;
+    const uint64_t deadline_ms = monotonic_milliseconds() + 500U;
+    while(monotonic_milliseconds() < deadline_ms) {
+        const LevelDuration duration = subghz_file_encoder_worker_get_level_duration(worker);
+        if(!duration.wait) {
+            terminal = duration;
+            non_wait_values++;
+            break;
+        }
+        if(duration.wait) furi_delay_ms(1);
+    }
+
+    subghz_file_encoder_worker_callback_end(worker, worker_end_callback, &callback_count);
+    while(atomic_load(&callback_count) == 0U && monotonic_milliseconds() < deadline_ms) {
+        furi_delay_ms(1);
+    }
+    for(unsigned i = 0; i < 20U; i++) {
+        const LevelDuration duration = subghz_file_encoder_worker_get_level_duration(worker);
+        if(!duration.wait) non_wait_values++;
+        furi_delay_ms(1);
+    }
+    if(subghz_file_encoder_worker_is_running(worker)) {
+        subghz_file_encoder_worker_stop(worker);
+    }
+    subghz_file_encoder_worker_free(worker);
+
+    if(open_count != 2U) {
+        fprintf(stderr, "failure path expected two opens, got %u\n", open_count);
+        return 1;
+    }
+    if(non_wait_values != 1U || !terminal.reset) {
+        fprintf(stderr, "failure path must emit exactly one EOF reset and no pulses\n");
+        return 1;
+    }
+    if(async_tx_checks != 0U) {
+        fprintf(stderr, "failure path entered TX completion wait %u times\n", async_tx_checks);
+        return 1;
+    }
+    if(atomic_load(&callback_count) == 0U) {
+        fprintf(stderr, "failure path ignored a late callback registration\n");
+        return 1;
+    }
+    if(open_handles != 0U) {
+        fprintf(stderr, "failure path leaked an open handle\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int test_unknown_radio_is_rejected_immediately(void) {
+    const char* path = "/ext/subghz/test.sub";
+    reset_fake_storage();
+    SubGhzFileEncoderWorker* worker = subghz_file_encoder_worker_alloc();
+    if(subghz_file_encoder_worker_start(worker, path, "missing")) {
+        fprintf(stderr, "unknown radio was accepted\n");
+        return 1;
+    }
+    if(subghz_file_encoder_worker_is_running(worker)) {
+        fprintf(stderr, "unknown radio started a worker thread\n");
+        return 1;
+    }
+    subghz_file_encoder_worker_free(worker);
+    if(open_count != 0U || open_handles != 0U) {
+        fprintf(stderr, "unknown radio touched storage\n");
+        return 1;
+    }
+    return 0;
+}
+
 int main(void) {
-    if(test_failed_worker_reopen() != 0) return 1;
-    if(test_normal_eof() != 0) return 1;
+    if(test_open_handle_is_released_after_async_start() != 0) return 1;
+    if(test_hard_reopen_failure_is_terminal() != 0) return 1;
+    if(test_unknown_radio_is_rejected_immediately() != 0) return 1;
     return 0;
 }
