@@ -97,6 +97,10 @@ jobs:
         shell: bash
         run: python3 tools/tumoflip/test_nfc_key_dictionary_import.py
 
+      - name: Validate Quac action ownership and transmit failures
+        shell: bash
+        run: python3 tools/tumoflip/test_quac_lifecycle.py
+
       - name: Build firmware (minimal / clean)
         id: build
         shell: bash
@@ -105,7 +109,7 @@ jobs:
         run: |
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
-            updater_package fap_esp_flasher
+            updater_package fap_esp_flasher fap_quac
 
       - name: Upload firmware artifact
         if: success()

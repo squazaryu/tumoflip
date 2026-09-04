@@ -1,3 +1,12 @@
+## 0.9.2 (Tumoflip)
+
+- Reject failed or incomplete Sub-GHz loads before starting transmission.
+- Do not access a RAW encoder or wait for completion after a rejected TX start.
+- Propagate asynchronous TX-start failures and release failed-start resources.
+- Safely reuse IR signal storage during Import All and free read temporaries.
+- Reject empty RAW IR timing arrays before allocation/transmission.
+- No Picopass/Loclass feature import; existing radio broker and launch routes remain unchanged.
+
 ## 0.9.1
 
 - Fixed About screen
