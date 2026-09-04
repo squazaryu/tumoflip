@@ -103,6 +103,10 @@ jobs:
           python3 tools/tumoflip/test_quac_lifecycle.py
           python3 tools/tumoflip/test_quac_package_migration.py
 
+      - name: Validate Sub-GHz RAW worker startup lifecycle
+        shell: bash
+        run: python3 tools/tumoflip/test_subghz_raw_worker_startup.py
+
       - name: Build firmware (minimal / clean)
         id: build
         shell: bash

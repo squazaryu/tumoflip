@@ -142,6 +142,7 @@ jobs:
             tools/tumoflip/test_subghz_drift.py \
             tools/tumoflip/test_subghz_protocol_capabilities.py \
             tools/tumoflip/test_subghz_protocol_packs.py \
+            tools/tumoflip/test_subghz_raw_worker_startup.py \
             tools/tumoflip/test_subghz_raw_profiles.py \
             tools/tumoflip/test_update_splash.py \
             tools/tumoflip/test_validate_release.py \
