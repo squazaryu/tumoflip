@@ -4,16 +4,20 @@
 from pathlib import Path
 import unittest
 
-from tools.tumoflip.validate_release import (
-    ARF_LEGACY_PATHS,
-    BASE_LEGACY_PATHS,
-    MODULE_ONE_LEGACY_PATHS,
-    PACKAGE_ONLY_PACKAGE_FILES,
-    PACKAGE_ONLY_PACKAGE_GROUPS,
-    PACKAGE_RELEASE_OVERLAY_FILES,
-    PACKAGE_RELEASE_OVERLAY_GROUPS,
-    package_extapp_exports,
-)
+try:
+    from . import validate_release
+except ImportError:
+    import validate_release
+
+
+ARF_LEGACY_PATHS = validate_release.ARF_LEGACY_PATHS
+BASE_LEGACY_PATHS = validate_release.BASE_LEGACY_PATHS
+MODULE_ONE_LEGACY_PATHS = validate_release.MODULE_ONE_LEGACY_PATHS
+PACKAGE_ONLY_PACKAGE_FILES = validate_release.PACKAGE_ONLY_PACKAGE_FILES
+PACKAGE_ONLY_PACKAGE_GROUPS = validate_release.PACKAGE_ONLY_PACKAGE_GROUPS
+PACKAGE_RELEASE_OVERLAY_FILES = validate_release.PACKAGE_RELEASE_OVERLAY_FILES
+PACKAGE_RELEASE_OVERLAY_GROUPS = validate_release.PACKAGE_RELEASE_OVERLAY_GROUPS
+package_extapp_exports = validate_release.package_extapp_exports
 
 
 ROOT = Path(__file__).resolve().parents[2]
