@@ -16,7 +16,9 @@ bool wifi_marauder_parse_device_index_command(
     }
 
     const char* cursor = command + prefix_length;
-    while(*cursor == ' ') cursor++;
+    while(*cursor == ' ') {
+        cursor++;
+    }
     if(*cursor == '\0') return false;
 
     uint32_t value = 0;
