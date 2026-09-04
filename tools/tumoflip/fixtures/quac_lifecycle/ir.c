@@ -93,6 +93,7 @@ int main(int argc, char** argv) {
     if(!strcmp(mode, "data-failure")) { file.fail = "data"; expected = false; }
     else if(!strcmp(mode, "early-raw-failure")) { file.fail = "frequency"; expected = false; }
     else if(!strcmp(mode, "invalid-count")) { file.count = MAX_TIMINGS_AMOUNT + 1; expected = false; }
+    else if(!strcmp(mode, "empty-raw")) { file.count = 0; expected = false; }
     else if(!strcmp(mode, "missing-command")) { file.fail = "name"; expected = false; }
     else if(!strcmp(mode, "parsed-failure")) { file.raw = false; file.fail = "command"; expected = false; }
     else if(!strcmp(mode, "parsed")) file.raw = false;

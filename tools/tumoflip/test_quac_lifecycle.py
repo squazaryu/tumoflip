@@ -79,7 +79,7 @@ class QuacLifecycleTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_ir_failure_cleanup(self):
-        self.run_cases("ir", ("data-failure", "early-raw-failure", "invalid-count"))
+        self.run_cases("ir", ("data-failure", "early-raw-failure", "invalid-count", "empty-raw"))
 
     def test_ir_reused_import_signal(self):
         self.run_cases("ir", ("raw-raw", "raw-parsed", "parsed-raw-failure", "raw-failure"))
