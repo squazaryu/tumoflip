@@ -117,13 +117,21 @@ static void desktop_settings_migrate_from_v20(
     memcpy(settings->favorite_apps, settings_v20->favorite_apps, sizeof(settings->favorite_apps));
 }
 
+/* saved_struct validates the file header and checksum, not C string termination. */
+static void desktop_settings_terminate_strings(DesktopSettings* settings) {
+    for(size_t i = 0; i < FavoriteAppNumber; i++) {
+        FavoriteApp* app = &settings->favorite_apps[i];
+        app->name_or_path[sizeof(app->name_or_path) - 1] = '\0';
+    }
+}
+
 void desktop_settings_load(DesktopSettings* settings) {
     furi_assert(settings);
 
     bool success = false;
+    uint8_t version = 0;
 
     do {
-        uint8_t version;
         if(!saved_struct_get_metadata(DESKTOP_SETTINGS_PATH, NULL, &version, NULL)) break;
 
         if(version == DESKTOP_SETTINGS_VER) {
@@ -146,7 +154,6 @@ void desktop_settings_load(DesktopSettings* settings) {
 
             if(success) {
                 desktop_settings_migrate_from_v20(settings, settings_v20);
-                desktop_settings_save(settings);
             }
 
             free(settings_v20);
@@ -163,7 +170,6 @@ void desktop_settings_load(DesktopSettings* settings) {
 
             if(success) {
                 desktop_settings_migrate_from_v19(settings, settings_v19);
-                desktop_settings_save(settings);
             }
 
             free(settings_v19);
@@ -180,7 +186,6 @@ void desktop_settings_load(DesktopSettings* settings) {
 
             if(success) {
                 desktop_settings_migrate_from_v18(settings, settings_v18);
-                desktop_settings_save(settings);
             }
 
             free(settings_v18);
@@ -197,7 +202,6 @@ void desktop_settings_load(DesktopSettings* settings) {
 
             if(success) {
                 desktop_settings_migrate_from_v17(settings, settings_v17);
-                desktop_settings_save(settings);
             }
 
             free(settings_v17);
@@ -214,7 +218,6 @@ void desktop_settings_load(DesktopSettings* settings) {
 
             if(success) {
                 desktop_settings_migrate_from_v14(settings, settings_v14);
-                desktop_settings_save(settings);
             }
 
             free(settings_v14);
@@ -226,6 +229,11 @@ void desktop_settings_load(DesktopSettings* settings) {
         FURI_LOG_W(TAG, "Failed to load file, using defaults");
         memset(settings, 0, sizeof(DesktopSettings));
         desktop_settings_save(settings);
+    } else {
+        desktop_settings_terminate_strings(settings);
+        if(version != DESKTOP_SETTINGS_VER) {
+            desktop_settings_save(settings);
+        }
     }
 }
 
