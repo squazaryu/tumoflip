@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Host-execute the menu draw and canvas commit path, including RPC frame metadata.
+"""Host-execute the menu draw -> canvas framebuffer-callback metadata contract.
 
 Rendering primitives are fakes: this checks orientation/lifecycle, not LCD pixels.
 The production draw callback, both rotated renderers and canvas_commit are used
-unchanged. GUI resets the orientation before each fullscreen viewport draw.
+unchanged. Source guards check that GUI resets before each new viewport; real
+GUI scheduling, LCD pixels and RPC protobuf transport need a device pass.
 """
 
 from pathlib import Path
@@ -22,6 +23,25 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class MenuStreamOrientationTest(unittest.TestCase):
+    def test_gui_resets_orientation_before_frame_geometry_and_draw(self) -> None:
+        gui = (ROOT / "applications/services/gui/gui.c").read_text()
+        for name in ("gui_redraw_fs", "gui_redraw_window", "gui_redraw_desktop"):
+            with self.subTest(path=name):
+                body = function_definition(gui, name)
+                reset = body.index("canvas_set_orientation(")
+                frame = body.index("canvas_frame_set(")
+                draw = body.index("view_port_draw(")
+                self.assertLess(reset, frame)
+                self.assertLess(frame, draw)
+
+    def test_fullscreen_draw_is_not_reoriented_before_commit(self) -> None:
+        gui = (ROOT / "applications/services/gui/gui.c").read_text()
+        redraw = function_definition(gui, "gui_redraw")
+        self.assertNotIn("canvas_set_orientation(", redraw)
+        self.assertLess(redraw.index("gui_redraw_fs("), redraw.index("canvas_commit("))
+        loader = (ROOT / "applications/services/loader/loader_menu.c").read_text()
+        self.assertIn("app->gui, ViewDispatcherTypeFullscreen", loader)
+
     def test_fullscreen_frames_keep_draw_orientation_until_commit(self) -> None:
         menu = (ROOT / "applications/services/gui/modules/menu.c").read_text()
         canvas = (ROOT / "applications/services/gui/canvas.c").read_text()
