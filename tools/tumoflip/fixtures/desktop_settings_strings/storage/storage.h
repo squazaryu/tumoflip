@@ -7,8 +7,14 @@
 
 typedef struct Storage Storage;
 typedef struct File File;
-typedef enum { FSAM_READ, FSAM_WRITE } FS_AccessMode;
-typedef enum { FSOM_OPEN_EXISTING, FSOM_CREATE_ALWAYS } FS_OpenMode;
+typedef enum {
+    FSAM_READ,
+    FSAM_WRITE
+} FS_AccessMode;
+typedef enum {
+    FSOM_OPEN_EXISTING,
+    FSOM_CREATE_ALWAYS
+} FS_OpenMode;
 
 File* storage_file_alloc(Storage* storage);
 bool storage_file_open(File* file, const char* path, FS_AccessMode access, FS_OpenMode mode);

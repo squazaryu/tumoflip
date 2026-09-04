@@ -19,12 +19,12 @@ static bool fail_save;
 static bool short_write;
 static unsigned save_attempts;
 
-#define REQUIRE(condition, message)                     \
-    do {                                                \
-        if(!(condition)) {                              \
-            fprintf(stderr, "FAIL: %s\n", (message));  \
-            exit(1);                                    \
-        }                                               \
+#define REQUIRE(condition, message)                   \
+    do {                                              \
+        if(!(condition)) {                            \
+            fprintf(stderr, "FAIL: %s\n", (message)); \
+            exit(1);                                  \
+        }                                             \
     } while(false)
 
 void* furi_record_open(const char* name) {
@@ -193,8 +193,9 @@ static void check_settings(const DesktopSettings* actual, const DesktopSettings*
     for(size_t i = 0; i < FavoriteAppNumber; i++) {
         const char* name = actual->favorite_apps[i].name_or_path;
         REQUIRE(name[127] == '\0', "loaded shortcut is not NUL-terminated at its boundary");
-        REQUIRE(memcmp(name, expected->favorite_apps[i].name_or_path, 127) == 0,
-                "shortcut prefix or shortcut order changed");
+        REQUIRE(
+            memcmp(name, expected->favorite_apps[i].name_or_path, 127) == 0,
+            "shortcut prefix or shortcut order changed");
     }
 }
 
@@ -202,16 +203,19 @@ static void check_saved(const DesktopSettings* expected) {
     uint8_t magic;
     uint8_t version;
     size_t payload_size;
-    REQUIRE(saved_struct_get_metadata(DESKTOP_SETTINGS_PATH, &magic, &version, &payload_size),
-            "saved metadata missing");
+    REQUIRE(
+        saved_struct_get_metadata(DESKTOP_SETTINGS_PATH, &magic, &version, &payload_size),
+        "saved metadata missing");
     REQUIRE(magic == 0x17 && version == 21, "saved schema identity changed");
     REQUIRE(payload_size == 648, "saved payload size changed");
     DesktopSettings saved;
-    REQUIRE(saved_struct_load(DESKTOP_SETTINGS_PATH, &saved, sizeof(saved), magic, version),
-            "saved migration fails checksum/header validation");
+    REQUIRE(
+        saved_struct_load(DESKTOP_SETTINGS_PATH, &saved, sizeof(saved), magic, version),
+        "saved migration fails checksum/header validation");
     for(size_t i = 0; i < FavoriteAppNumber; i++) {
-        REQUIRE(saved.favorite_apps[i].name_or_path[127] == '\0',
-                "migration saved a shortcut before NUL sanitation");
+        REQUIRE(
+            saved.favorite_apps[i].name_or_path[127] == '\0',
+            "migration saved a shortcut before NUL sanitation");
     }
     check_settings(&saved, expected);
 }
@@ -266,14 +270,16 @@ int main(int argc, char** argv) {
         fail_save = true;
         defaults = true;
     } else {
-        REQUIRE(valid || strcmp(mode, "malformed") == 0 || strcmp(mode, "migration-saved") == 0,
-                "unknown test case");
+        REQUIRE(
+            valid || strcmp(mode, "malformed") == 0 || strcmp(mode, "migration-saved") == 0,
+            "unknown test case");
     }
 
     desktop_settings_load(&loaded);
     if(defaults) {
         memset(&expected, 0, sizeof(expected));
-        REQUIRE(memcmp(&loaded, &expected, sizeof(loaded)) == 0, "failed load did not reset defaults");
+        REQUIRE(
+            memcmp(&loaded, &expected, sizeof(loaded)) == 0, "failed load did not reset defaults");
         REQUIRE(save_attempts == 1, "defaults should be saved once");
         if(!fail_save) check_saved(&expected);
     } else {
@@ -281,7 +287,8 @@ int main(int argc, char** argv) {
         /* Check disk first to catch a fix applied only after migration saving. */
         if(strcmp(mode, "migration-saved") == 0) check_saved(&expected);
         check_settings(&loaded, &expected);
-        if(valid) REQUIRE(memcmp(&loaded, &expected, sizeof(loaded)) == 0, "valid settings changed");
+        if(valid)
+            REQUIRE(memcmp(&loaded, &expected, sizeof(loaded)) == 0, "valid settings changed");
         if(version != 21 && !fail_save && !short_write) check_saved(&expected);
     }
     printf("PASS: %s v%u\n", mode, version);
