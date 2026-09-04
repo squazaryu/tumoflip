@@ -1,3 +1,12 @@
+## v0.7.10 (Tumoflip adaptation)
+
+- Adds Airtag `spoof` and FindMy `sound` actions with validated decimal device indexes.
+- Adds the GPS `accuracy`, `text`, and `nmea` views.
+- GPS streaming views now make the Back/`stopscan` behavior explicit.
+- Keeps Tumoflip's Signal Monitor command and intentionally excludes unsupported
+  `list -b`, upload, and FoxHunt commands.
+
+
 ## v0.7.6
 
 New command support for firmware v1.8.5 and v1.8.6!
