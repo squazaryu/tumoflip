@@ -99,7 +99,9 @@ jobs:
 
       - name: Validate Quac action ownership and transmit failures
         shell: bash
-        run: python3 tools/tumoflip/test_quac_lifecycle.py
+        run: |
+          python3 tools/tumoflip/test_quac_lifecycle.py
+          python3 tools/tumoflip/test_quac_package_migration.py
 
       - name: Build firmware (minimal / clean)
         id: build

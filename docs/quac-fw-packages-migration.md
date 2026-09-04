@@ -13,9 +13,9 @@
 
 ## Product intent
 
-Dev 008-015 is the last immutable firmware release that bundles Quac. Future
+Dev 008-015 is the last immutable firmware release that bundles Quac 0.9.2. Future
 firmware builds keep the source and build target, but delivery and updates move
-to FW Packages. Quac updates must not force a firmware release.
+to FW Packages, beginning with Quac 0.9.3. Quac updates must not force a firmware release.
 
 ## Constraints
 
