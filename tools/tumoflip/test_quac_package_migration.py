@@ -59,6 +59,7 @@ class QuacPackageMigrationTest(unittest.TestCase):
         for workflow in ("pr-build.yml", "release.yml"):
             contents = (ROOT / ".github/workflows" / workflow).read_text()
             self.assertIn("tools/tumoflip/test_quac_package_migration.py", contents)
+            self.assertIn("fap_quac", contents)
 
 
 if __name__ == "__main__":
