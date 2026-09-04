@@ -117,7 +117,7 @@ jobs:
           set -euo pipefail
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
-            updater_package fap_esp_flasher
+            updater_package fap_esp_flasher fap_quac
 
       - name: Run release tests
         shell: bash
@@ -135,6 +135,7 @@ jobs:
             tools/tumoflip/test_mf_desfire_zero_key_count.py \
             tools/tumoflip/test_nfc_key_dictionary_import.py \
             tools/tumoflip/test_quac_lifecycle.py \
+            tools/tumoflip/test_quac_package_migration.py \
             tools/tumoflip/test_release_workflow.py \
             tools/tumoflip/test_readme_version_sync.py \
             tools/tumoflip/test_validate_stable_release.py \

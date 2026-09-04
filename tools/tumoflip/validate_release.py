@@ -134,10 +134,12 @@ MODULE_ONE_PACKAGE_FILES = (
 )
 # These files are built from the same source/API as the firmware, but are
 # intentionally absent from resources.ths. They are delivered only through
-# tumoflip-packages.zip so an optional large FAP cannot inflate every updater.
+# tumoflip-packages.zip because their lifecycle is owned by FW Packages.
+QUAC_PACKAGE_FILE = "apps/Tools/quac.fap"
 PACKAGE_ONLY_PACKAGE_FILES = frozenset(
     {
         "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+        QUAC_PACKAGE_FILE,
     }
 )
 TOTP_CLI_PLUGIN_APP_IDS = (
@@ -174,6 +176,7 @@ PACKAGE_RELEASE_OVERLAY_FILES = frozenset(
 )
 PACKAGE_ONLY_PACKAGE_GROUPS = {
     "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap": "module_one",
+    QUAC_PACKAGE_FILE: "base",
 }
 PACKAGE_RELEASE_OVERLAY_GROUPS = {
     **PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -332,6 +335,7 @@ def release_cleanup_entries() -> list[dict[str, str]]:
 def package_extapp_exports() -> dict[str, str]:
     exports = {Path(relative).name: relative for relative in MODULE_ONE_PACKAGE_FILES}
     exports["morse_player.fap"] = MORSE_PLAYER_PACKAGE_FILE
+    exports["quac.fap"] = QUAC_PACKAGE_FILE
     exports["module_one_cockpit.fap"] = "apps/Module One/Diagnostics/cockpit.fap"
     exports.update(
         {

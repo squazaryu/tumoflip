@@ -259,7 +259,7 @@ class QuacLifecycleTest(unittest.TestCase):
         self.run_cases("start", ("rewind", "protocol", "repeat", "preset", "frequency"))
 
     def test_safety_patch_identity_and_ci_gates(self):
-        self.assertIn('fap_version="0.9.2"', (QUAC / "application.fam").read_text())
+        self.assertIn('fap_version="0.9.3"', (QUAC / "application.fam").read_text())
         for workflow in ("pr-build.yml", "release.yml"):
             text = (ROOT / ".github/workflows" / workflow).read_text()
             self.assertTrue(

@@ -1,3 +1,9 @@
+## 0.9.3 (Tumoflip)
+
+- Move delivery and future updates from firmware resources to FW Packages.
+- Preserve the Quac app id, device path and all user-owned `apps_data/quac` files.
+- No application behavior change from Tumoflip Quac 0.9.2.
+
 ## 0.9.2 (Tumoflip)
 
 - Reject failed or incomplete Sub-GHz loads before starting transmission.
