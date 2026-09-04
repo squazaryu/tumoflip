@@ -8,6 +8,21 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class CiWorkflowSecurityTests(unittest.TestCase):
+    def test_desktop_hardening_is_gated_on_pr_and_release(self) -> None:
+        for name in ("pr-build.yml", "release.yml"):
+            workflow = (REPO_ROOT / ".github/workflows" / name).read_text(
+                encoding="utf-8"
+            )
+            for test in (
+                "test_menu_stream_orientation.py",
+                "test_desktop_settings_strings.py",
+            ):
+                with self.subTest(workflow=name, test=test):
+                    self.assertTrue(
+                        f"tools/tumoflip/{test}" in workflow,
+                        f"{name} must run {test}",
+                    )
+
     def test_pr_build_keeps_untrusted_code_read_only(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/pr-build.yml").read_text(
             encoding="utf-8"

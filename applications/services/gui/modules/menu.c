@@ -387,7 +387,8 @@ static void menu_draw_vertical(Canvas* canvas, MenuModel* model) {
         menu_draw_fit_label(canvas, model, item->label, 17, y + 12, AlignLeft, AlignBottom, 46);
         if(selected) canvas_set_color(canvas, ColorBlack);
     }
-    canvas_set_orientation(canvas, CanvasOrientationHorizontal);
+    // canvas_commit() forwards this orientation to RPC screen streaming. The GUI
+    // resets it before the next viewport; restoring it here would mistag this frame.
 }
 
 static void menu_draw_wii_vertical(Canvas* canvas, MenuModel* model) {
@@ -432,7 +433,7 @@ static void menu_draw_wii_vertical(Canvas* canvas, MenuModel* model) {
 
         if(selected) canvas_set_color(canvas, ColorBlack);
     }
-    canvas_set_orientation(canvas, CanvasOrientationHorizontal);
+    // Keep the rotated orientation until canvas_commit(), as for Side List above.
 }
 
 static void menu_draw_callback(Canvas* canvas, void* _model) {

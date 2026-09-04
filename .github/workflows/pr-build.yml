@@ -83,6 +83,12 @@ jobs:
         shell: bash
         run: python3 tools/tumoflip/test_main_menu_layouts.py
 
+      - name: Validate Desktop stream orientation and settings recovery
+        shell: bash
+        run: |
+          python3 tools/tumoflip/test_menu_stream_orientation.py
+          python3 tools/tumoflip/test_desktop_settings_strings.py
+
       - name: Validate Infrared Universal save flow
         shell: bash
         run: python3 tools/tumoflip/test_infrared_universal_save.py
