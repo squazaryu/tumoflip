@@ -291,9 +291,15 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
 
                 if(ret == SubGhzTxRxStartTxStateOk) {
                     //Start TX
-                    subghz_devices_start_async_tx(
-                        instance->radio_device, subghz_transmitter_yield, instance->transmitter);
-                    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateAsyncTx);
+                    if(subghz_devices_start_async_tx(
+                           instance->radio_device,
+                           subghz_transmitter_yield,
+                           instance->transmitter)) {
+                        subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateAsyncTx);
+                    } else {
+                        FURI_LOG_E(TAG, "Unable to start async TX");
+                        ret = SubGhzTxRxStartTxStateErrorParserOthers;
+                    }
                 }
             } else {
                 ret = SubGhzTxRxStartTxStateErrorParserOthers;
@@ -303,9 +309,11 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
         }
         if(ret != SubGhzTxRxStartTxStateOk) {
             subghz_transmitter_free(instance->transmitter);
+            instance->transmitter = NULL;
             if(instance->txrx_state != SubGhzTxRxStateIDLE) {
                 subghz_txrx_idle(instance);
             }
+            subghz_txrx_speaker_off(instance);
         }
 
     } while(false);
