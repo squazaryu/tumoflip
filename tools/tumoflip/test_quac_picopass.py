@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import json
 import shlex
 import shutil
 import subprocess
@@ -20,6 +21,16 @@ FIXTURE = ROOT / "tools/tumoflip/fixtures/quac_picopass/runner.c"
 SANITIZE = "--sanitize" in sys.argv
 if SANITIZE:
     sys.argv.remove("--sanitize")
+COVERAGE = "--coverage" in sys.argv
+if COVERAGE:
+    sys.argv.remove("--coverage")
+
+
+def llvm_tool(name: str) -> str:
+    found = shutil.which(name)
+    if found:
+        return found
+    return subprocess.check_output(["xcrun", "--find", name], text=True).strip()
 
 
 class QuacPicopassHostTest(unittest.TestCase):
@@ -41,7 +52,6 @@ class QuacPicopassHostTest(unittest.TestCase):
             f"-I{PICOPASS}",
             str(FIXTURE),
             str(PICOPASS / "quac_picopass.c"),
-            str(PICOPASS / "quac_picopass_mac.c"),
             "-o",
             str(cls.binary),
         ]
@@ -53,15 +63,69 @@ class QuacPicopassHostTest(unittest.TestCase):
                     "-fno-sanitize-recover=all",
                 )
             )
+        if COVERAGE:
+            command.extend(("-fprofile-instr-generate", "-fcoverage-mapping"))
         result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode:
             raise AssertionError(result.stdout + result.stderr)
 
+    @classmethod
+    def tearDownClass(cls) -> None:
+        if not COVERAGE:
+            return
+        profile = Path(cls.temp.name) / "coverage.profdata"
+        raw_profiles = sorted(Path(cls.temp.name).glob("coverage-*.profraw"))
+        if not raw_profiles:
+            raise AssertionError("coverage run produced no profiles")
+        subprocess.run(
+            [
+                llvm_tool("llvm-profdata"),
+                "merge",
+                "-sparse",
+                *map(str, raw_profiles),
+                "-o",
+                str(profile),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        sources = [PICOPASS / "quac_picopass.c"]
+        report = json.loads(
+            subprocess.check_output(
+                [
+                    llvm_tool("llvm-cov"),
+                    "export",
+                    str(cls.binary),
+                    f"-instr-profile={profile}",
+                    *map(str, sources),
+                ],
+                text=True,
+            )
+        )
+        summaries = {
+            Path(item["filename"]).resolve(): item["summary"]
+            for item in report["data"][0]["files"]
+        }
+        for source in sources:
+            summary = summaries[source.resolve()]
+            percentages = {
+                kind: round(summary[kind]["percent"], 2)
+                for kind in ("lines", "regions")
+            }
+            print(source.name, "production coverage:", percentages)
+            if any(percentages[kind] < 80 for kind in percentages):
+                raise AssertionError(f"{source.name} production coverage is below 80%")
+
     def run_case(self, case: str) -> None:
         environment = os.environ.copy()
         if SANITIZE:
-            environment["ASAN_OPTIONS"] = "detect_leaks=1:halt_on_error=1"
+            leak_check = "0" if sys.platform == "darwin" else "1"
+            environment["ASAN_OPTIONS"] = f"detect_leaks={leak_check}:halt_on_error=1"
             environment["UBSAN_OPTIONS"] = "halt_on_error=1"
+        if COVERAGE:
+            environment["LLVM_PROFILE_FILE"] = str(
+                Path(self.temp.name) / "coverage-%p.profraw"
+            )
         result = subprocess.run(
             [str(self.binary), case],
             capture_output=True,
@@ -96,17 +160,20 @@ class QuacPicopassHostTest(unittest.TestCase):
     def test_duration_parser_is_strict_and_bounded(self) -> None:
         self.run_case("duration")
 
-    def test_mac_known_answer_vectors(self) -> None:
-        self.run_case("mac-kat")
-
     def test_activation_selection_and_public_reads(self) -> None:
         self.run_case("activation")
 
-    def test_authentication_accepts_good_and_rejects_bad_mac(self) -> None:
-        self.run_case("auth-good")
-        self.run_case("auth-bad")
+    def test_secure_credentials_are_rejected_before_listener_start(self) -> None:
+        for case in (
+            "secure-fuses",
+            "encrypted-blocks",
+            "key-material",
+            "lifecycle-secure",
+        ):
+            with self.subTest(case=case):
+                self.run_case(case)
 
-    def test_protected_reads_are_authenticated_and_bounded(self) -> None:
+    def test_nonsecure_reads_are_bounded(self) -> None:
         self.run_case("read-policy")
         self.run_case("read4")
 
@@ -132,6 +199,7 @@ class QuacPicopassHostTest(unittest.TestCase):
 class QuacPicopassIntegrationGuardTest(unittest.TestCase):
     def test_direct_playlist_and_existing_routes_remain_wired(self) -> None:
         action = (QUAC / "actions/action.c").read_text()
+        adapter = (QUAC / "actions/action_picopass.c").read_text()
         playlist = (QUAC / "actions/action_qpl.c").read_text()
         declarations = (QUAC / "actions/action_i.h").read_text()
         self.assertIn('!strcmp(item->ext, ".picopass")', action)
@@ -141,6 +209,8 @@ class QuacPicopassIntegrationGuardTest(unittest.TestCase):
         self.assertIn("picopass_duration", playlist)
         self.assertIn('!strcmp(item->ext, ".qab")', action)
         self.assertIn("action_appbridge_tx(context, path, error)", action)
+        self.assertRegex(adapter, r"#define\s+QUAC_PICOPASS_FDT_FC\s+4475U")
+        self.assertIn("Picopass: Unsupported secure card", adapter)
 
     def test_item_and_import_use_the_existing_quac_nfc_icon(self) -> None:
         item_h = (QUAC / "item.h").read_text()
@@ -161,8 +231,8 @@ class QuacPicopassIntegrationGuardTest(unittest.TestCase):
         settings = (QUAC / "quac_settings.c").read_text()
         header = (QUAC / "quac.h").read_text()
         scene = (QUAC / "scenes/scene_settings.c").read_text()
-        self.assertIn("QUAC_SETTINGS_FILE_VERSION 2", settings)
-        self.assertIn("QUAC_SETTINGS_FILE_VERSION_LEGACY 1", settings)
+        self.assertRegex(settings, r"#define\s+QUAC_SETTINGS_FILE_VERSION\s+2")
+        self.assertRegex(settings, r"#define\s+QUAC_SETTINGS_FILE_VERSION_LEGACY\s+1")
         self.assertIn('"Picopass Duration"', settings)
         self.assertIn("picopass_duration", header)
         self.assertIn('"Picopass Duration"', scene)
@@ -200,7 +270,14 @@ class QuacPicopassIntegrationGuardTest(unittest.TestCase):
         self.assertNotIn("hash1(", source)
         self.assertNotIn("hash2(", source)
         self.assertNotIn("diversify", source)
-        self.assertNotIn("elite", source)
+        self.assertNotIn("loclass_elite", source)
+        self.assertNotIn("elite_kdf", source)
+        self.assertNotIn("bool elite", source)
+        self.assertNotIn("reader_mac", source)
+        self.assertNotIn("tag_mac", source)
+        self.assertNotIn("authenticated", source)
+        self.assertFalse((PICOPASS / "quac_picopass_mac.c").exists())
+        self.assertFalse((PICOPASS / "quac_picopass_mac.h").exists())
 
 
 if __name__ == "__main__":
