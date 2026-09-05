@@ -166,7 +166,10 @@ class QuacPicopassHostTest(unittest.TestCase):
     def test_secure_credentials_are_rejected_before_listener_start(self) -> None:
         for case in (
             "secure-fuses",
-            "encrypted-blocks",
+            "encryption-unknown",
+            "encryption-unrecognized",
+            "encryption-des",
+            "encryption-3des",
             "key-material",
             "lifecycle-secure",
         ):

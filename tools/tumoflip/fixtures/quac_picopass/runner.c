@@ -26,7 +26,7 @@ static const char valid_file[] = "Filetype: Flipper Picopass device\n"
                                  "Block 3: FF FF FF FF FF FF FF FF\n"
                                  "Block 4: FF FF FF FF FF FF FF FF\n"
                                  "Block 5: FF FF FF FF FF FF FF FF\n"
-                                 "Block 6: 06 10 20 30 40 50 60 70\n"
+                                 "Block 6: 06 10 20 30 40 50 60 14\n"
                                  "Block 7: 07 11 21 31 41 51 61 71\n"
                                  "Block 8: 08 12 22 32 42 52 62 72\n"
                                  "Block 9: 09 13 23 33 43 53 63 73\n"
@@ -101,10 +101,10 @@ static int malformed_case(const char* mode) {
         from = "Block 6: 06";
         to = "Block 6: GG";
     } else if(!strcmp(mode, "extra-hex")) {
-        from = "Block 6: 06 10 20 30 40 50 60 70";
-        to = "Block 6: 06 10 20 30 40 50 60 70 80";
+        from = "Block 6: 06 10 20 30 40 50 60 14";
+        to = "Block 6: 06 10 20 30 40 50 60 14 80";
     } else if(!strcmp(mode, "missing-block")) {
-        from = "Block 6: 06 10 20 30 40 50 60 70\n";
+        from = "Block 6: 06 10 20 30 40 50 60 14\n";
         to = "";
     } else if(!strcmp(mode, "small-limit")) {
         from = "Block 1: 0C";
@@ -149,9 +149,18 @@ static int secure_case(const char* mode) {
     if(!strcmp(mode, "secure-fuses")) {
         from = "Block 1: 0C FF FF FF 7F 1F FF 2C";
         to = "Block 1: 0C FF FF FF 7F 1F FF 3C";
-    } else if(!strcmp(mode, "encrypted-blocks")) {
-        from = "Block 6: 06 10 20 30 40 50 60 70";
-        to = "Block 6: 06 10 20 30 40 50 60 71";
+    } else if(!strcmp(mode, "encryption-unknown")) {
+        from = "Block 6: 06 10 20 30 40 50 60 14";
+        to = "Block 6: 06 10 20 30 40 50 60 00";
+    } else if(!strcmp(mode, "encryption-unrecognized")) {
+        from = "Block 6: 06 10 20 30 40 50 60 14";
+        to = "Block 6: 06 10 20 30 40 50 60 70";
+    } else if(!strcmp(mode, "encryption-des")) {
+        from = "Block 6: 06 10 20 30 40 50 60 14";
+        to = "Block 6: 06 10 20 30 40 50 60 15";
+    } else if(!strcmp(mode, "encryption-3des")) {
+        from = "Block 6: 06 10 20 30 40 50 60 14";
+        to = "Block 6: 06 10 20 30 40 50 60 17";
     } else if(!strcmp(mode, "key-material")) {
         from = "Block 3: FF FF FF FF FF FF FF FF";
         to = "Block 3: E0 33 CA 41 9A EE 43 F9";
@@ -466,7 +475,7 @@ int main(int argc, char** argv) {
     if(!strcmp(mode, "embedded-nul")) return embedded_nul_case();
     if(!strcmp(mode, "duration")) return duration_case();
     if(!strcmp(mode, "activation")) return activation_case();
-    if(!strcmp(mode, "secure-fuses") || !strcmp(mode, "encrypted-blocks") ||
+    if(!strcmp(mode, "secure-fuses") || !strncmp(mode, "encryption-", 11) ||
        !strcmp(mode, "key-material"))
         return secure_case(mode);
     if(!strcmp(mode, "read-policy")) return read_policy_case();

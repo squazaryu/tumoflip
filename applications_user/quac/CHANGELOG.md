@@ -1,3 +1,16 @@
+## 0.10.0 (Tumoflip)
+
+- Add bounded playback of existing non-secure, unencrypted `.picopass`
+  credentials, directly or from playlists.
+- Reject secure/encrypted credentials and key-bearing blocks before starting
+  the NFC listener; no authentication or cryptographic code is shipped.
+- Validate files strictly and keep all source files read-only.
+- Add Back cancellation, finite READ/READ4 bounds and exact NFC/resource cleanup.
+- Migrate settings schema v1 to v2 with a bounded Picopass duration.
+- Preserve package-only ownership, AppBridge routes, the Sub-GHz broker and
+  user-owned `apps_data/quac` files.
+- No card reading/writing, authentication, key handling or recovery operations.
+
 ## 0.9.3 (Tumoflip)
 
 - Move delivery and future updates from firmware resources to FW Packages.

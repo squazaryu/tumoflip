@@ -101,6 +101,7 @@ jobs:
         shell: bash
         run: |
           python3 tools/tumoflip/test_quac_lifecycle.py
+          python3 tools/tumoflip/test_quac_picopass.py
           python3 tools/tumoflip/test_quac_package_migration.py
 
       - name: Validate Sub-GHz RAW worker startup lifecycle

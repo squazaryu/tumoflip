@@ -14,11 +14,17 @@ This app allows you to organize previously recorded signals, of any type*, so th
 
 The app does not provide any recording functionality - you must use the existing Flipperzero apps to create the saved files for your action/device. Quac! provides some basic functionality to manage your files. Or, you can manage the folder structure manually on your SD card.
 
-> Supported files include: Sub-Ghz (.sub), RFID (.rfid), Infrared (.ir), NFC (.nfc), and iButton (.ibtn)
+> Supported files include: Sub-Ghz (.sub), RFID (.rfid), Infrared (.ir), NFC
+> (.nfc), Picopass (.picopass), and iButton (.ibtn).
+
+Picopass support is playback-only and limited to saved non-secure, unencrypted
+credentials. Secure/encrypted files and files containing key material are
+rejected before NFC starts. Quac ships no Picopass authentication or crypto
+code. Press Back to cancel bounded playback.
 
 ## Features
 
-* [Playback of rfid, sub-ghz, IR, NFC, iButton signals](README.md#signal-playback)
+* [Playback of RFID, Sub-GHz, IR, NFC, non-secure Picopass, and iButton signals](README.md#signal-playback)
 * [Easy navigation](README.md#navigation--controls)
 * [Flexible signal organization](README.md#signal-organization) - utilizing the SDcard filesystem
 * [In-app file management](README.md#action-settings) - rename, delete, import, import link
@@ -91,7 +97,9 @@ You can chain multiple signal playback actions together by creating a playlist. 
 * Comments: lines that start with a `#` are ignored
 * `pause <ms>` on a line will pause the playback by the specified millisecond duration
 * Signal file names can be absolute (full path) or relative to the current directory
-* SubGhz, RFID, and NFC files can have an optional duration specified. Simply add a space after the signal's file name, followed by a millisecond duration. This duration will override the Quac! Settings value, just for this one signal.
+* SubGhz, RFID, NFC, and Picopass files can have an optional duration specified.
+  For Picopass the value must be a strict integer from 100 through 10000
+  milliseconds. It overrides the Settings value for that line only.
 
 Errors found in the playlist will halt playback and vibrate the Flipper. Blank lines are ignored.
 
@@ -130,6 +138,9 @@ The settings menu will appear as the last item when you are viewing the "root" (
 * SubGhz Duration: Changes the length of time a non-RAW SubGhz signal is trasmitted. This allows for repeated transmissions during the interval. Within playlists, this can be overridden per `.sub` file.
 * RFID Duration: Changes the length of time a RFID signal is transmitted. Within playlists, this can be overridden per `.rfid` file.
 * NFC Duration: Changes the length of time a NFC signal is transmitted. Within playlists, this can be overridden per `.nfc` file.
+* Picopass Duration: Changes the bounded emulation time for an existing saved
+  non-secure `.picopass` credential. Within playlists, this can be overridden
+  per file.
 * iButton Duration: Changes the length of time a iButton signal is transmitted. Within playlists, this can be overridden per `.ibtn` file.
 * IR Ext Ant: Whether to use the external device for IR signals. If enabled, but no external IR device is attached to TX, then the internal IR device will be used.
 * Show Hidden: Will display files and folders that start with a period (`.`)
