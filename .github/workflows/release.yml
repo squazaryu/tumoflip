@@ -136,6 +136,7 @@ jobs:
             tools/tumoflip/test_nfc_key_dictionary_import.py \
             tools/tumoflip/test_tumokey.py \
             tools/tumoflip/test_dependency_pins.py \
+            tools/tumoflip/test_file_browser_momentum.py \
             tools/tumoflip/test_quac_lifecycle.py \
             tools/tumoflip/test_quac_picopass.py \
             tools/tumoflip/test_quac_package_migration.py \

@@ -42,6 +42,23 @@ class FileBrowserMomentumPortTests(unittest.TestCase):
         self.assertGreaterEqual(self.file_browser.count("path_concat("), 1)
         self.assertIn("furi_string_get_cstr(selected_item->name)", self.file_browser)
 
+    def test_folder_selection_does_not_overwrite_result_path(self):
+        folder = re.search(
+            r"else if\(selected_item->type == BrowserItemTypeFolder\) \{(?P<body>.*?)\n\s*\} else if\(selected_item->type == BrowserItemTypeFile\)",
+            self.file_browser,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(folder)
+        folder_body = folder.group("body")
+        self.assertIn("FuriString* item_path = furi_string_alloc();", folder_body)
+        self.assertIn("file_browser_worker_folder_enter(browser->worker, item_path, select_index);", folder_body)
+        self.assertNotIn("browser->result_path", folder_body)
+
+        file_body = self.file_browser[
+            self.file_browser.index("else if(selected_item->type == BrowserItemTypeFile)"):
+        ]
+        self.assertIn("browser->result_path", file_body)
+
     def test_current_path_is_internal_only(self):
         self.assertIn("file_browser_worker_get_path_current(BrowserWorker* browser)", self.worker)
         self.assertIn("file_browser_worker_get_path_current", self.worker_internal)
