@@ -103,6 +103,10 @@ jobs:
           python3 tools/tumoflip/test_tumokey.py
           python3 tools/tumoflip/test_dependency_pins.py
 
+      - name: Validate File Browser path ownership
+        shell: bash
+        run: python3 tools/tumoflip/test_file_browser_momentum.py
+
       - name: Validate Quac action ownership and transmit failures
         shell: bash
         run: |
