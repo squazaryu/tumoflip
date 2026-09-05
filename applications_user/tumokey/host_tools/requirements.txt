@@ -1,3 +1,4 @@
 cbor2>=5.6,<6
-cryptography>=43,<47
+# GHSA-jwv3-5hgf-82ww: patched in 49.0.0; keep the host tool reproducible.
+cryptography==50.0.1
 hidapi>=0.14,<1
