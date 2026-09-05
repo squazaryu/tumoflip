@@ -135,6 +135,7 @@ jobs:
             tools/tumoflip/test_mf_desfire_zero_key_count.py \
             tools/tumoflip/test_nfc_key_dictionary_import.py \
             tools/tumoflip/test_quac_lifecycle.py \
+            tools/tumoflip/test_quac_picopass.py \
             tools/tumoflip/test_quac_package_migration.py \
             tools/tumoflip/test_release_workflow.py \
             tools/tumoflip/test_readme_version_sync.py \
@@ -142,6 +143,7 @@ jobs:
             tools/tumoflip/test_subghz_drift.py \
             tools/tumoflip/test_subghz_protocol_capabilities.py \
             tools/tumoflip/test_subghz_protocol_packs.py \
+            tools/tumoflip/test_subghz_raw_worker_startup.py \
             tools/tumoflip/test_subghz_raw_profiles.py \
             tools/tumoflip/test_update_splash.py \
             tools/tumoflip/test_validate_release.py \

@@ -31,7 +31,7 @@ class QuacPackageMigrationTest(unittest.TestCase):
         manifest = (ROOT / "applications_user/quac/application.fam").read_text()
         self.assertIn('appid="quac"', manifest)
         self.assertIn('fap_category="Tools"', manifest)
-        self.assertIn('fap_version="0.9.3"', manifest)
+        self.assertIn('fap_version="0.10.0"', manifest)
         self.assertIn("fap_package_only=True", manifest)
         self.assertIn(QUAC_SOURCE, PACKAGE_ONLY_PACKAGE_FILES)
         self.assertEqual(PACKAGE_ONLY_PACKAGE_GROUPS[QUAC_SOURCE], "base")

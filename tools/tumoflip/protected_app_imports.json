@@ -8,10 +8,10 @@
     {
       "appId": "esp32_wifi_marauder",
       "localSourcePath": "applications_user/esp32_wifi_marauder",
-      "implementationCommit": "5e2383bbf4d8ad8bae93560c69b38662c701991b",
+      "implementationCommit": "38f117ad1f0312617e26bb9d32255aad96814c0e",
       "upstreamRepository": "https://github.com/0xchocolate/flipperzero-wifi-marauder.git",
       "upstreamRef": "refs/heads/feature_wifi_marauder_app",
-      "upstreamCommit": "8f8b79e4a97b283faac41dda4e4da8d260ddc459"
+      "upstreamCommit": "ed6d2b814768e811cacd24c928813248fcaf95a4"
     },
     {
       "appId": "esp_flasher",

@@ -84,6 +84,8 @@ static bool scene_action_settings_import_file_browser_callback(
         memcpy(*icon, icon_get_frame_data(&I_IR_10px, 0), 32);
     } else if(!strcmp(ext, ".nfc")) {
         memcpy(*icon, icon_get_frame_data(&I_NFC_10px, 0), 32);
+    } else if(!strcmp(ext, ".picopass")) {
+        memcpy(*icon, icon_get_frame_data(&I_NFC_10px, 0), 32);
     } else if(!strcmp(ext, ".ibtn")) {
         memcpy(*icon, icon_get_frame_data(&I_iButton_10px, 0), 32);
     } else if(!strcmp(ext, ".qpl")) {

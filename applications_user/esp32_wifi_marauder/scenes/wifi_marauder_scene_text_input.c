@@ -21,6 +21,7 @@ void wifi_marauder_scene_text_input_callback(void* context) {
 
 void wifi_marauder_scene_text_input_on_enter(void* context) {
     WifiMarauderApp* app = context;
+    const char* device_index_command = NULL;
 
     if(0 ==
        strncmp("attack -t deauth -s", app->selected_tx_string, strlen("attack -t deauth -s"))) {
@@ -58,8 +59,18 @@ void wifi_marauder_scene_text_input_on_enter(void* context) {
         wifi_text_input_set_header_text(text_input, "Add target from AP list");
     } else if(0 == strncmp("select -s", app->selected_tx_string, strlen("select -s"))) {
         wifi_text_input_set_header_text(text_input, "Add target from SSID list");
+    } else if(0 == strncmp("spoofat -t", app->selected_tx_string, strlen("spoofat -t"))) {
+        wifi_text_input_set_header_text(text_input, "Enter Airtag device index");
+        device_index_command = "spoofat -t";
+    } else if(0 == strncmp("findmy -t", app->selected_tx_string, strlen("findmy -t"))) {
+        wifi_text_input_set_header_text(text_input, "Enter FindMy device index");
+        device_index_command = "findmy -t";
     } else {
         wifi_text_input_set_header_text(text_input, "Add command arguments");
+    }
+    if(device_index_command) {
+        wifi_text_input_set_validator(
+            text_input, validator_is_device_index_callback, (void*)device_index_command);
     }
     wifi_text_input_set_result_callback(
         text_input,

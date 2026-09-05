@@ -1,5 +1,6 @@
 #include <furi.h>
 #include "wifi_marauder_validators.h"
+#include "wifi_marauder_index.h"
 #include <storage/storage.h>
 
 struct ValidatorIsFile {
@@ -54,4 +55,16 @@ void validator_is_file_free(ValidatorIsFile* instance) {
     free(instance->app_path_folder);
     free(instance->current_name);
     free(instance);
+}
+
+bool validator_is_device_index_callback(const char* text, FuriString* error, void* context) {
+    const char* command_prefix = context;
+    uint32_t index;
+
+    if(!wifi_marauder_parse_device_index_command(text, command_prefix, &index)) {
+        furi_string_set_str(error, "Use a decimal\nindex from 0 to\n2147483647.");
+        return false;
+    }
+
+    return true;
 }
