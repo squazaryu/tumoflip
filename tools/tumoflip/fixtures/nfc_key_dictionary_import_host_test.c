@@ -34,6 +34,15 @@ static const char* open_failure_path;
 static bool user_write_open_failure, user_write_close_failure, backup_sync_failure;
 static bool user_remove_failure, backup_remove_failure;
 
+static bool path_with_suffix(char* output, size_t capacity, const char* base, const char* suffix) {
+    const size_t base_length = strlen(base);
+    const size_t suffix_length = strlen(suffix);
+    if(base_length >= capacity || suffix_length > capacity - base_length - 1) return false;
+    memcpy(output, base, base_length);
+    memcpy(output + base_length, suffix, suffix_length + 1);
+    return true;
+}
+
 static void reserve(FuriString* string, size_t length) {
     if(length + 1 > string->capacity) {
         string->capacity = length + 64;
@@ -360,8 +369,8 @@ int main(int argc, char** argv) {
     assert(argc == 2);
     assert(strlen(argv[1]) < sizeof(root));
     snprintf(root, sizeof(root), "%s", argv[1]);
-    snprintf(system_path, sizeof(system_path), "%s/system.nfc", root);
-    snprintf(user_path, sizeof(user_path), "%s/user.nfc", root);
+    assert(path_with_suffix(system_path, sizeof(system_path), root, "/system.nfc"));
+    assert(path_with_suffix(user_path, sizeof(user_path), root, "/user.nfc"));
     dictionary = (NfcKeyDict){"Classic", system_path, user_path, 6};
     NfcKeyDictImportStats result;
 

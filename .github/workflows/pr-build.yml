@@ -97,12 +97,18 @@ jobs:
         shell: bash
         run: python3 tools/tumoflip/test_nfc_key_dictionary_import.py
 
+      - name: Validate TumoKey host dependency pins
+        shell: bash
+        run: |
+          python3 tools/tumoflip/test_tumokey.py
+          python3 tools/tumoflip/test_dependency_pins.py
+
       - name: Validate Quac action ownership and transmit failures
         shell: bash
         run: |
           python3 tools/tumoflip/test_quac_lifecycle.py
           python3 tools/tumoflip/test_quac_picopass.py
-          python3 tools/tumoflip/test_quac_package_migration.py
+          python3 -m tools.tumoflip.test_quac_package_migration
 
       - name: Validate Sub-GHz RAW worker startup lifecycle
         shell: bash

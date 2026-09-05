@@ -58,8 +58,22 @@ class QuacPackageMigrationTest(unittest.TestCase):
     def test_migration_contract_runs_in_pr_and_release_ci(self) -> None:
         for workflow in ("pr-build.yml", "release.yml"):
             contents = (ROOT / ".github/workflows" / workflow).read_text()
-            self.assertIn("tools/tumoflip/test_quac_package_migration.py", contents)
+            self.assertTrue(
+                "tools/tumoflip/test_quac_package_migration.py" in contents
+                or "tools.tumoflip.test_quac_package_migration" in contents
+            )
             self.assertIn("fap_quac", contents)
+
+    def test_pr_ci_runs_migration_as_a_module(self) -> None:
+        contents = (ROOT / ".github/workflows/pr-build.yml").read_text()
+        self.assertIn(
+            "python3 -m tools.tumoflip.test_quac_package_migration",
+            contents,
+        )
+        self.assertNotIn(
+            "python3 tools/tumoflip/test_quac_package_migration.py",
+            contents,
+        )
 
 
 if __name__ == "__main__":

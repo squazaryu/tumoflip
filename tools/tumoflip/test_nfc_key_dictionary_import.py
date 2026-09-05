@@ -41,6 +41,9 @@ class NfcKeyDictionaryImportTest(unittest.TestCase):
         )
         cls.keys_header = source("lib/toolbox/keys_dict.h")
         cls.keys_source = source("lib/toolbox/keys_dict.c")
+        cls.host_fixture = source(
+            "tools/tumoflip/fixtures/nfc_key_dictionary_import_host_test.c"
+        )
 
     def test_import_behavior_with_injected_storage_failures(self) -> None:
         compiler = shutil.which("cc") or shutil.which("clang")
@@ -64,6 +67,19 @@ class NfcKeyDictionaryImportTest(unittest.TestCase):
             data_directory = Path(directory) / "data"
             data_directory.mkdir()
             subprocess.run([str(executable), str(data_directory)], check=True, cwd=REPO_ROOT)
+
+    def test_host_fixture_builds_paths_with_checked_copy(self) -> None:
+        self.assertIn("static bool path_with_suffix(", self.host_fixture)
+        self.assertIn("path_with_suffix(system_path", self.host_fixture)
+        self.assertIn("path_with_suffix(user_path", self.host_fixture)
+        self.assertNotIn(
+            'snprintf(system_path, sizeof(system_path), "%s/system.nfc", root)',
+            self.host_fixture,
+        )
+        self.assertNotIn(
+            'snprintf(user_path, sizeof(user_path), "%s/user.nfc", root)',
+            self.host_fixture,
+        )
 
     def test_mifare_menus_offer_import_only_when_a_key_was_recovered(self) -> None:
         self.assertIn("SubmenuIndexSaveKeys", self.classic)
