@@ -109,7 +109,9 @@ jobs:
 
       - name: Validate app-owned startup loading lifecycle
         shell: bash
-        run: python3 tools/tumoflip/test_gui_startup_loading.py
+        run: |
+          python3 tools/tumoflip/test_gui_startup_loading.py
+          python3 tools/tumoflip/test_loader_fap_loading.py
 
       - name: Validate Quac action ownership and transmit failures
         shell: bash
