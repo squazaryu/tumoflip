@@ -16,8 +16,8 @@ class Api88CcidMigrationTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-    def test_f7_uses_experimental_api_88_4_and_f18_stays_88_0(self) -> None:
-        self.assertIn("Version,+,88.4,,", self.f7_api)
+    def test_f7_uses_experimental_api_88_5_and_f18_stays_88_0(self) -> None:
+        self.assertIn("Version,+,88.5,,", self.f7_api)
         self.assertIn("Version,+,88.0,,", self.f18_api)
 
     def test_legacy_ccid_hal_is_not_exported(self) -> None:

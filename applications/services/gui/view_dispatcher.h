@@ -179,6 +179,17 @@ void view_dispatcher_remove_view(ViewDispatcher* view_dispatcher, uint32_t view_
  */
 void view_dispatcher_switch_to_view(ViewDispatcher* view_dispatcher, uint32_t view_id);
 
+/** Show the built-in loading animation until the next application view switch.
+ *
+ * Intended for blocking work before an application can display its first view. The view is
+ * allocated lazily, owns no public view id, and is freed with the dispatcher. Repeated calls while
+ * it is already current are safe and do not stack or restart the animation. Input queued while it
+ * is current is discarded when switching to another view.
+ *
+ * @param      view_dispatcher  ViewDispatcher instance
+ */
+void view_dispatcher_show_loading(ViewDispatcher* view_dispatcher);
+
 /** Send ViewPort of this ViewDispatcher instance to front
  *
  * @param      view_dispatcher  ViewDispatcher instance

@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DISPATCHER = REPO_ROOT / "applications/services/gui/view_dispatcher.c"
 DISPATCHER_HEADER = REPO_ROOT / "applications/services/gui/view_dispatcher.h"
 DISPATCHER_INTERNAL = REPO_ROOT / "applications/services/gui/view_dispatcher_i.h"
+API_SYMBOLS = REPO_ROOT / "targets/f7/api_symbols.csv"
 LOADING = REPO_ROOT / "applications/services/gui/modules/loading.c"
 ICON_ANIMATION = REPO_ROOT / "applications/services/gui/icon_animation.c"
 ARCHIVE = REPO_ROOT / "applications/main/archive/archive.c"
@@ -40,6 +41,7 @@ class GuiStartupLoadingTest(unittest.TestCase):
         cls.dispatcher = DISPATCHER.read_text(encoding="utf-8")
         cls.dispatcher_header = DISPATCHER_HEADER.read_text(encoding="utf-8")
         cls.dispatcher_internal = DISPATCHER_INTERNAL.read_text(encoding="utf-8")
+        cls.api_symbols = API_SYMBOLS.read_text(encoding="utf-8")
         cls.loading = LOADING.read_text(encoding="utf-8")
         cls.icon_animation = ICON_ANIMATION.read_text(encoding="utf-8")
         cls.archive = ARCHIVE.read_text(encoding="utf-8")
@@ -49,6 +51,8 @@ class GuiStartupLoadingTest(unittest.TestCase):
     def test_public_loading_api_and_private_state_exist(self) -> None:
         self.assertIn("void view_dispatcher_show_loading(ViewDispatcher* view_dispatcher);", self.dispatcher_header)
         self.assertIn("struct Loading* loading;", self.dispatcher_internal)
+        self.assertIn("Version,+,88.5,,", self.api_symbols)
+        self.assertIn("Function,+,view_dispatcher_show_loading,void,ViewDispatcher*", self.api_symbols)
 
     def test_dispatcher_initializes_loading_state(self) -> None:
         alloc = function_body(self.dispatcher, "ViewDispatcher* view_dispatcher_alloc_ex(FuriEventLoop* loop)")
