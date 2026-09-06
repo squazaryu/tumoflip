@@ -43,6 +43,10 @@ DesktopSettingsApp* desktop_settings_app_alloc(void) {
 
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
 
+    // Claim the viewport before the first settings scene builds its list. This prevents the
+    // settings menu that launched us from showing through the startup work.
+    view_dispatcher_show_loading(app->view_dispatcher);
+
     app->popup = popup_alloc();
     app->submenu = submenu_alloc();
     app->variable_item_list = variable_item_list_alloc();

@@ -1,5 +1,7 @@
 #include "view_dispatcher_i.h"
 
+#include <gui/modules/loading.h>
+
 #define TAG "ViewDispatcher"
 
 #define VIEW_DISPATCHER_QUEUE_LEN (16U)
@@ -12,6 +14,8 @@ ViewDispatcher* view_dispatcher_alloc(void) {
 
 ViewDispatcher* view_dispatcher_alloc_ex(FuriEventLoop* loop) {
     ViewDispatcher* view_dispatcher = malloc(sizeof(ViewDispatcher));
+
+    view_dispatcher->loading = NULL;
 
     view_dispatcher->view_port = view_port_alloc();
     view_port_draw_callback_set(
@@ -49,6 +53,15 @@ void view_dispatcher_free(ViewDispatcher* view_dispatcher) {
     // Detach from gui
     if(view_dispatcher->gui) {
         gui_remove_view_port(view_dispatcher->gui, view_dispatcher->view_port);
+    }
+    // Detached above, so nothing can be drawing the built-in loading view now.
+    if(view_dispatcher->loading) {
+        View* loading_view = loading_get_view(view_dispatcher->loading);
+        if(view_dispatcher->current_view == loading_view) view_dispatcher->current_view = NULL;
+        if(view_dispatcher->ongoing_input_view == loading_view) {
+            view_dispatcher->ongoing_input_view = NULL;
+        }
+        loading_free(view_dispatcher->loading);
     }
     // Crash if not all views were freed
     furi_check(!ViewDict_size(view_dispatcher->views));
@@ -188,6 +201,26 @@ void view_dispatcher_remove_view(ViewDispatcher* view_dispatcher, uint32_t view_
     // Unlock gui
     if(view_dispatcher->gui) {
         gui_unlock(view_dispatcher->gui);
+    }
+}
+
+void view_dispatcher_show_loading(ViewDispatcher* view_dispatcher) {
+    furi_check(view_dispatcher);
+
+    if(!view_dispatcher->loading) {
+        view_dispatcher->loading = loading_alloc();
+        // Keep this view outside the application view dictionary: it has no public view id and is
+        // owned/freed by the dispatcher. The callback wiring is the same as add_view().
+        View* view = loading_get_view(view_dispatcher->loading);
+        view_set_update_callback(view, view_dispatcher_update);
+        view_set_update_callback_context(view, view_dispatcher);
+    }
+
+    View* loading_view = loading_get_view(view_dispatcher->loading);
+    // Repeated calls are idempotent. In particular, a retry must not add a second view or restart
+    // the timer while the loading screen is already current.
+    if(view_dispatcher->current_view != loading_view) {
+        view_dispatcher_set_current_view(view_dispatcher, loading_view);
     }
 }
 
@@ -341,6 +374,15 @@ static const ViewPortOrientation view_dispatcher_view_port_orientation_table[] =
 
 void view_dispatcher_set_current_view(ViewDispatcher* view_dispatcher, View* view) {
     furi_check(view_dispatcher);
+    // Input queued while the loading view was current belongs to that view, not to the screen
+    // that replaces it. Only drain when no key sequence is in flight: the release for an ongoing
+    // sequence is consumed by the loading view and must remain in the queue for run() to finish.
+    if(view_dispatcher->loading && !view_dispatcher->ongoing_input) {
+        View* loading_view = loading_get_view(view_dispatcher->loading);
+        if(view != loading_view && view_dispatcher->current_view == loading_view) {
+            furi_message_queue_reset(view_dispatcher->input_queue);
+        }
+    }
     // Dispatch view exit event
     if(view_dispatcher->current_view) {
         view_exit(view_dispatcher->current_view);

@@ -16,6 +16,7 @@
 * Apps: **NFC Magic** - Gen2 CUID/static-nonce detection, Gen1 4b/7b UID, length-aware wipe & write guard (by @mishamyte)
 * Apps: Build tag (**10jun2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
 ## Other changes
+* GUI: Add an app-owned startup loading view for Archive and Desktop settings; the looping indicator is stopped and reset on the first real view, and queued startup input is discarded. The direct FAP loader overlay remains disabled.
 * NFC: Save recovered MIFARE Classic keys into the user dictionary with duplicate filtering, read-only scans, a verified backup, synchronized append, and rollback on write failure (adapted from Unleashed 95c35fb).
 * Infrared: Save the currently selected Universal Remote candidate as a new uniquely named remote or append it to an existing remote; existing files are backed up before append and restored on write failure (adapted from Unleashed b9f5789)
 * Desktop: Add a second page to the Up-button menu for screen brightness, volume, and vibration; Left/Right switches pages without changing the selected Desktop layout.
