@@ -16,6 +16,7 @@ class CiWorkflowSecurityTests(unittest.TestCase):
             for test in (
                 "test_menu_stream_orientation.py",
                 "test_desktop_settings_strings.py",
+                "test_gui_startup_loading.py",
                 "test_subghz_raw_worker_startup.py",
             ):
                 with self.subTest(workflow=name, test=test):

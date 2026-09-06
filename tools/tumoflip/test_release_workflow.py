@@ -24,6 +24,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("validate_release.py", workflow)
         self.assertIn("--write-manifest", workflow)
         self.assertIn("test_readme_version_sync.py", workflow)
+        self.assertIn("test_gui_startup_loading.py", workflow)
         self.assertIn("validate_stable_release.py", workflow)
         self.assertIn("test_validate_stable_release.py", workflow)
         self.assertIn("test_subghz_drift.py", workflow)
