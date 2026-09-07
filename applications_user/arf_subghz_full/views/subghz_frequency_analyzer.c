@@ -847,8 +847,7 @@ void subghz_frequency_analyzer_exit(void* context) {
         subghz_frequency_analyzer_worker_stop(instance->worker);
     }
     subghz_frequency_analyzer_worker_free(instance->worker);
-
-    furi_record_close(RECORD_NOTIFICATION);
+    // The parent Sub-GHz app owns the notification record for its entire lifetime.
 }
 
 SubGhzFrequencyAnalyzer* subghz_frequency_analyzer_alloc(SubGhzTxRx* txrx) {
