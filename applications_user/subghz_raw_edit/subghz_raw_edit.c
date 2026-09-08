@@ -612,6 +612,7 @@ static bool synthesize_via_transmitter(
     if (strstr(protocol, "KeeLoq"))
     {
         subghz_environment_load_keystore(env, "/ext/subghz/assets/keeloq_mfcodes");
+        subghz_environment_load_keystore(env, "/ext/subghz/assets/keeloq_mfcodes_extended");
         subghz_environment_load_keystore(env, "/ext/subghz/assets/keeloq_mfcodes_user");
     }
 

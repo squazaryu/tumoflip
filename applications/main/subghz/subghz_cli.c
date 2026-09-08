@@ -80,6 +80,7 @@ static SubGhzEnvironment* subghz_cli_environment_init(void) {
     } else {
         printf("Load_keystore keeloq_mfcodes \033[0;31mERROR\033[0m\r\n");
     }
+    subghz_environment_load_keystore(environment, SUBGHZ_KEYSTORE_DIR_EXTENDED);
     if(subghz_environment_load_keystore(environment, SUBGHZ_KEYSTORE_DIR_USER_NAME)) {
         printf("Load_keystore keeloq_mfcodes_user \033[0;32mOK\033[0m\r\n");
     } else {

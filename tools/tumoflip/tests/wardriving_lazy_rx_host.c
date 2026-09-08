@@ -4,6 +4,7 @@
 
 #define furi_assert assert
 #define SUBGHZ_KEYSTORE_DIR_NAME "system"
+#define SUBGHZ_KEYSTORE_DIR_EXTENDED "system-extended"
 #define SUBGHZ_KEYSTORE_DIR_USER_NAME "user"
 #define SUBGHZ_ALUTECH_AT_4N_DIR_NAME "alutech"
 #define SUBGHZ_NICE_FLOR_S_DIR_NAME "nice"
