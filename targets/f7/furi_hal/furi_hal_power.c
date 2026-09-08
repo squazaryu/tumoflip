@@ -100,7 +100,15 @@ void furi_hal_power_init(void) {
     }
     furi_hal_i2c_release(&furi_hal_i2c_handle_power);
 
-    FURI_LOG_I(TAG, "Init OK");
+    if(furi_hal_power.gauge_ok && furi_hal_power.charger_ok) {
+        FURI_LOG_I(TAG, "Init OK");
+    } else {
+        FURI_LOG_E(
+            TAG,
+            "Init failed: gauge %u, charger %u",
+            furi_hal_power.gauge_ok,
+            furi_hal_power.charger_ok);
+    }
 }
 
 bool furi_hal_power_gauge_is_ok(void) {

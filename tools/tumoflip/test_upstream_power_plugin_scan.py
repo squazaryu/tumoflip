@@ -53,6 +53,18 @@ class UpstreamPowerAndPluginScanTest(unittest.TestCase):
         self.assertIn("return result;", scan)
         self.assertNotIn("break;\n        }\n    } while(false);", scan)
 
+    def test_subghz_registry_reports_partial_device_scans(self) -> None:
+        source = (
+            REPO_ROOT / "lib/subghz/devices/registry.c"
+        ).read_text(encoding="utf-8")
+        types = (REPO_ROOT / "lib/subghz/devices/types.h").read_text(encoding="utf-8")
+
+        self.assertIn('#define SUBGHZ_RADIO_DEVICE_PLUGIN_FAL_PREFIX  "radio_device_"', types)
+        self.assertIn("PluginManagerError error = plugin_manager_load_all_with_prefix(", source)
+        self.assertIn("plugin_manager_get_count(subghz_device->manager)", source)
+        self.assertIn('"Failed to load radio device plugin(s), error %d"', source)
+        self.assertIn('"No " SUBGHZ_RADIO_DEVICE_PLUGIN_FAL_PREFIX "*.fal plugins found"', source)
+
     def test_plugin_examples_do_not_abort_before_freeing_the_manager(self) -> None:
         for relative in (
             "applications/examples/example_plugins/example_plugins_multi.c",
@@ -60,11 +72,11 @@ class UpstreamPowerAndPluginScanTest(unittest.TestCase):
         ):
             source = (REPO_ROOT / relative).read_text(encoding="utf-8")
             load_start = source.index("plugin_manager_load_all(")
-            failure_start = source.index("if(", load_start)
+            failure_start = source.rfind("if(", 0, load_start)
             failure_end = source.index("uint32_t plugin_count", failure_start)
             failure_path = source[failure_start:failure_end]
-            self.assertIn("plugin_manager_free(manager);", failure_path)
             self.assertNotIn("return 0;", failure_path)
+            self.assertIn("plugin_manager_free(manager);", source[failure_end:])
 
 
 if __name__ == "__main__":

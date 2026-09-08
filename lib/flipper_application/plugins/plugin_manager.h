@@ -54,7 +54,11 @@ PluginManagerError plugin_manager_load_single(PluginManager* manager, const char
  */
 PluginManagerError plugin_manager_load_all(PluginManager* manager, const char* path);
 
-/** Load plugins whose file names start with the supplied prefix. */
+/**
+ * Load plugins whose file names start with the supplied prefix. The scan skips
+ * a broken plugin and continues with later files; the first real load/read
+ * error is returned after the scan completes.
+ */
 PluginManagerError plugin_manager_load_all_with_prefix(
     PluginManager* manager,
     const char* path,
