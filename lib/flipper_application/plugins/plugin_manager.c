@@ -195,8 +195,8 @@ static PluginManagerError
 
         // storage_dir_read() uses FSE_NOT_EXIST for a normal end-of-directory;
         // any other error means that the scan may have been truncated.
-        if(storage_file_get_error(directory) != FSE_OK &&
-           storage_file_get_error(directory) != FSE_NOT_EXIST) {
+        const FS_Error read_error = storage_file_get_error(directory);
+        if(read_error != FSE_OK && read_error != FSE_NOT_EXIST) {
             FURI_LOG_E(
                 TAG,
                 "Failed to read directory %s: %s",
