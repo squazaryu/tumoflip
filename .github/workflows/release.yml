@@ -117,7 +117,7 @@ jobs:
           set -euo pipefail
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
-            updater_package fap_esp_flasher fap_quac
+            updater_package fap_esp_flasher fap_quac fap_subghz_wardriving
 
       - name: Run release tests
         shell: bash
@@ -150,6 +150,8 @@ jobs:
             tools/tumoflip/test_subghz_protocol_packs.py \
             tools/tumoflip/test_subghz_raw_worker_startup.py \
             tools/tumoflip/test_analyzer_notification_ownership.py \
+            tools/tumoflip/test_subghz_wardriving.py \
+            tools/tumoflip/test_wardriving_lazy_rx.py \
             tools/tumoflip/test_subghz_raw_profiles.py \
             tools/tumoflip/test_update_splash.py \
             tools/tumoflip/test_validate_release.py \

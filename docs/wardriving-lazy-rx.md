@@ -41,6 +41,12 @@ shutdown before worker join. Optional macOS LLVM coverage:
 Source guards preserve the original GPS and worker bytes, and check scene wiring.
 These tests do not simulate RF traffic, the SD card or full Furi scheduling.
 
+PR and release CI run both focused test files and explicitly build the FAP.
+Broad local regression run on Python 3.11: 847 tests, 844 passed, three failures
+also reproduced on the unchanged baseline tree (Mosgortrans unknown-layout text,
+TumoSpectrum hopping symbol assertion, MF Ultralight stale API 88.4 assertion).
+These unrelated pre-existing assertions were not changed to make this PR green.
+
 ## Hardware acceptance (pending)
 
 1. Open Wardriving and record free heap in Start. Open Read, then return to Start
