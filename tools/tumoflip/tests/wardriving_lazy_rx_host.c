@@ -105,9 +105,20 @@ int main(void) {
         assert(loads == previous_loads && environments == 1 && receivers == 1 && workers == 1);
         assert(rx->filter == i + 1 && rx->callback == receive && rx->context == &app);
         assert(app.worker->context == rx && app.worker->pair && app.worker->overrun);
+        subghz_wardriving_txrx_receiver_set_filter(&app, i + 2);
+        assert(rx->filter == i + 2);
         app.worker->overrun(app.worker->context);
         app.worker->pair(app.worker->context, true, 100);
         app.decoder_result = rx;
+        app.txrx_state = SubGhzTxRxStateIDLE;
+        app.transmitter = &app;
+        subghz_wardriving_txrx_rx_pipeline_release(&app);
+        assert(app.receiver == rx);
+        app.transmitter = NULL;
+        app.worker->running = true;
+        subghz_wardriving_txrx_rx_pipeline_release(&app);
+        assert(app.receiver == rx);
+        app.worker->running = false;
         app.txrx_state = SubGhzTxRxStateTx;
         subghz_wardriving_txrx_rx_pipeline_release(&app);
         assert(app.receiver == rx);
@@ -125,5 +136,10 @@ int main(void) {
         assert(!app.decoder_result && !app.environment && !app.receiver && !app.worker);
         assert(!environments && !receivers && !workers);
     }
+    // Stop the hardware producer even if the worker did not start.
+    app.txrx_state = SubGhzTxRxStateRx;
+    producer_running = true;
+    subghz_wardriving_txrx_rx_end(&app);
+    assert(!producer_running);
     return 0;
 }

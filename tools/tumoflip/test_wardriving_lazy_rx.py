@@ -1,5 +1,7 @@
 """Host-executed lifecycle regression tests using actual Wardriving functions."""
 
+import hashlib
+import os
 import re
 import subprocess
 import tempfile
@@ -47,10 +49,23 @@ class WardrivingLazyRxTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="wardriving-rx-") as temporary:
             path = Path(temporary)
             (path / "test.c").write_text(fixture.replace("/* ACTUAL_FUNCTIONS */", actual))
-            subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
-                            "-fsanitize=address,undefined", str(path / "test.c"),
-                            "-o", str(path / "test")], check=True, capture_output=True)
-            subprocess.run([str(path / "test")], check=True, capture_output=True)
+            coverage = os.environ.get("WARDRIVING_HOST_COVERAGE") == "1"
+            flags = ["-fprofile-instr-generate", "-fcoverage-mapping"] if coverage else []
+            result = subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
+                                     "-fsanitize=address,undefined", *flags,
+                                     str(path / "test.c"), "-o", str(path / "test")],
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            result = subprocess.run([str(path / "test")], capture_output=True, text=True,
+                                    env={**os.environ, "LLVM_PROFILE_FILE": str(path / "test.profraw")})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            if coverage:
+                subprocess.run(["xcrun", "llvm-profdata", "merge", "-sparse",
+                                str(path / "test.profraw"), "-o", str(path / "test.profdata")], check=True)
+                subprocess.run(["xcrun", "llvm-cov", "report", str(path / "test"),
+                                "-instr-profile=" + str(path / "test.profdata"),
+                                "-show-functions", "-name-regex=subghz_wardriving_txrx_",
+                                str(path / "test.c")], check=True)
 
     def test_release_points_and_stop_order(self):
         source = (APP / "helpers/subghz_wardriving_txrx.c").read_text()
@@ -73,13 +88,17 @@ class WardrivingLazyRxTest(unittest.TestCase):
                           function(source, "subghz_wardriving_txrx_" + name))
 
     def test_gps_and_worker_unchanged(self):
-        for relative in [
-            "applications_user/subghz_wardriving/helpers/subghz_wardriving_gps_plugin.c",
-            "applications_user/subghz_wardriving/helpers/subghz_wardriving_gps.c",
-            "lib/subghz/subghz_worker.c",
-        ]:
-            baseline = subprocess.check_output(["git", "show", "b7ee21eb:" + relative], cwd=ROOT)
-            self.assertEqual((ROOT / relative).read_bytes(), baseline)
+        # Scope guard from b7ee21eb; no git history required in shallow CI clones.
+        expected = {
+            "applications_user/subghz_wardriving/helpers/subghz_wardriving_gps_plugin.c":
+                "da2f9063107ab12547844b1bc4ab9d32f70ac6332d2a3565affe738a81f5f065",
+            "applications_user/subghz_wardriving/helpers/subghz_wardriving_gps.c":
+                "7ae068874a5e0841ca8685c8f1aa21fe578456cd26c3dccca61a30d93e3bcf89",
+            "lib/subghz/subghz_worker.c":
+                "8e2700e262d32de4df948ed447bd1fef8b056135e5020ec0ae3ecd79c76610ed",
+        }
+        for relative, digest in expected.items():
+            self.assertEqual(hashlib.sha256((ROOT / relative).read_bytes()).hexdigest(), digest)
 
 
 if __name__ == "__main__":
