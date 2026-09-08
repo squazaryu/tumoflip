@@ -41,6 +41,9 @@
 * F7 serial: Reject the invalid expansion serial sentinel (Unleashed #1108 / Tumoflip #394)
 * Release validation: model the updater's page-aligned C1 erase range so the final C1 page can end at the C2 boundary without weakening DfuSe address checks
 * Sub-GHz & Storage: Share duplicated protocol allocation, deserialization, serialization, and command-dispatch bodies, freeing about 4.8 KB of internal flash without changing the exported SDK API (Unleashed PR #1116)
+* Sub-GHz: Adapt upstream `e6ded9b` (plus follow-up `3431d19`) without replacing Tumoflip's custom protocol set: Nice O-Code installer-code tooling, Security+ 2.0 86-bit keypad/PIN support, standalone 42-bit Prastel rolling code, and KeeLoq JCM Gen2/Stagnoli/Telcoma learning variants.
+* Sub-GHz: Add `nice_o_code` and `secplus_pin` system FAPs, register Prastel in the shared Standard/ARF protocol registry, and expose the new helpers through API 88.6.
+* Sub-GHz: Keep the existing Tumoflip KeeLoq keystore intact and load the upstream encrypted additions as a separate read-only resource; user keys and custom manufacturer entries remain writable and unchanged.
 <br><br>
 
 ----

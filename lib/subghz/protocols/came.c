@@ -18,7 +18,6 @@
 #define CAME_12_COUNT_BIT    12
 #define CAME_24_COUNT_BIT    24
 #define PRASTEL_25_COUNT_BIT 25
-#define PRASTEL_42_COUNT_BIT 42
 #define PRASTEL_NAME         "Prastel"
 #define AIRFORCE_COUNT_BIT   18
 #define AIRFORCE_NAME        "Airforce"
@@ -112,7 +111,6 @@ static bool subghz_protocol_encoder_came_get_upload(SubGhzProtocolEncoderCame* i
 
     switch(instance->generic.data_count_bit) {
     case CAME_24_COUNT_BIT:
-    case PRASTEL_42_COUNT_BIT:
         // CAME 24 Bit = 24320 us
         header_te = 76;
         break;
@@ -164,7 +162,7 @@ SubGhzProtocolStatus
         if(ret != SubGhzProtocolStatusOk) {
             break;
         }
-        if(instance->generic.data_count_bit > PRASTEL_42_COUNT_BIT) {
+        if(instance->generic.data_count_bit > PRASTEL_25_COUNT_BIT) {
             FURI_LOG_E(TAG, "Wrong number of bits in key");
             ret = SubGhzProtocolStatusErrorValueBitCount;
             break;
@@ -225,7 +223,7 @@ void subghz_protocol_decoder_came_feed(void* context, bool level, uint32_t durat
                     subghz_protocol_came_const.min_count_bit_for_found) ||
                    (instance->decoder.decode_count_bit == AIRFORCE_COUNT_BIT) ||
                    (instance->decoder.decode_count_bit == PRASTEL_25_COUNT_BIT) ||
-                   (instance->decoder.decode_count_bit == PRASTEL_42_COUNT_BIT) ||
+                   /* 42 bit Prastel is a rolling code and lives in prastel.c */
                    (instance->decoder.decode_count_bit == CAME_24_COUNT_BIT)) {
                     instance->generic.serial = 0x0;
                     instance->generic.btn = 0x0;
@@ -278,7 +276,7 @@ SubGhzProtocolStatus
         if(ret != SubGhzProtocolStatusOk) {
             break;
         }
-        if(instance->generic.data_count_bit > PRASTEL_42_COUNT_BIT) {
+        if(instance->generic.data_count_bit > PRASTEL_25_COUNT_BIT) {
             FURI_LOG_E(TAG, "Wrong number of bits in key");
             ret = SubGhzProtocolStatusErrorValueBitCount;
             break;
@@ -301,7 +299,6 @@ void subghz_protocol_decoder_came_get_string(void* context, FuriString* output) 
     const char* name = instance->generic.protocol_name;
     switch(instance->generic.data_count_bit) {
     case PRASTEL_25_COUNT_BIT:
-    case PRASTEL_42_COUNT_BIT:
         name = PRASTEL_NAME;
         break;
     case AIRFORCE_COUNT_BIT:

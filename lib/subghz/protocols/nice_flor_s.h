@@ -11,6 +11,8 @@ extern const SubGhzProtocolDecoder subghz_protocol_nice_flor_s_decoder;
 extern const SubGhzProtocolEncoder subghz_protocol_nice_flor_s_encoder;
 extern const SubGhzProtocol subghz_protocol_nice_flor_s;
 
+void subghz_protocol_decoder_nice_flor_s_reset(void* context);
+
 /**
  * Allocate SubGhzProtocolEncoderNiceFlorS.
  * @param environment Pointer to a SubGhzEnvironment instance

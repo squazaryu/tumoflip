@@ -42,6 +42,7 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
     instance->environment = subghz_environment_alloc();
     instance->is_database_loaded =
         subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_NAME);
+    subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_EXTENDED);
     subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_USER_NAME);
     subghz_environment_set_came_atomo_rainbow_table_file_name(
         instance->environment, SUBGHZ_CAME_ATOMO_DIR_NAME);

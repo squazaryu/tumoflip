@@ -136,6 +136,10 @@ jobs:
         shell: bash
         run: python3 tools/tumoflip/test_upstream_power_plugin_scan.py
 
+      - name: Validate upstream e6 Sub-GHz feature contracts
+        shell: bash
+        run: python3 tools/tumoflip/test_upstream_e6_protocols.py
+
       - name: Build firmware (minimal / clean)
         id: build
         shell: bash
@@ -144,7 +148,8 @@ jobs:
         run: |
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
-            updater_package fap_esp_flasher fap_quac fap_subghz_wardriving
+            updater_package fap_esp_flasher fap_quac fap_subghz_wardriving \
+            fap_nice_o_code fap_secplus_pin
 
       - name: Upload firmware artifact
         if: success()
