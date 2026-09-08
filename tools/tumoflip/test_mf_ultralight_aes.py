@@ -170,7 +170,7 @@ class MfUltralightAesTest(unittest.TestCase):
         self.assertIn("NfcDataGeneratorTypeMfUltralightC", order)
         self.assertIn("NfcDataGeneratorTypeMfUltralightAES", order)
 
-    def test_public_data_layout_is_append_only_and_api_is_88_4(self) -> None:
+    def test_public_data_layout_is_append_only_and_api_supports_88_4(self) -> None:
         struct = self.header[
             self.header.index("typedef struct {\n    Iso14443_3aData*") :
             self.header.index("} MfUltralightData;")
@@ -182,7 +182,12 @@ class MfUltralightAesTest(unittest.TestCase):
         self.assertLess(aes_signature, aes_key)
         self.assertIn("static inline bool mf_ultralight_aes_get_key", self.header)
         self.assertNotIn("mf_ultralight_aes_get_key", self.api_symbols)
-        self.assertRegex(self.api_symbols, r"(?m)^Version,\+,88\.4,,$")
+        version = re.search(r"(?m)^Version,\+,(\d+)\.(\d+),,$", self.api_symbols)
+        self.assertIsNotNone(version)
+        # AES fields require 88.4 or later in the same API-major family. Later
+        # additive exports (e.g. GUI startup in 88.5) do not remove AES support.
+        self.assertEqual(int(version.group(1)), 88)
+        self.assertGreaterEqual(int(version.group(2)), 4)
 
     def test_recovered_key_is_explicit_metadata_not_fabricated_pages(self) -> None:
         read_success = function_body(
