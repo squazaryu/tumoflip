@@ -28,7 +28,6 @@ int32_t example_advanced_plugins_app(void* p) {
         if(plugin_manager_load_all(manager, APP_ASSETS_PATH("plugins")) !=
            PluginManagerErrorNone) {
             FURI_LOG_E(TAG, "Failed to load all libs");
-            break;
         }
 
         uint32_t plugin_count = plugin_manager_get_count(manager);

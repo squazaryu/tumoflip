@@ -25,13 +25,20 @@ void subghz_device_registry_init(void) {
     //TODO FL-3556: fix path to plugins
     //if(plugin_manager_load_all(subghz_device->manager, APP_DATA_PATH("plugins")) !=
     //
-    if(plugin_manager_load_all_with_prefix(
-           subghz_device->manager, EXT_PATH("apps_data/subghz/plugins"), "radio_device_") !=
-       PluginManagerErrorNone) {
-        FURI_LOG_E(TAG, "Failed to load all libs");
+    PluginManagerError error = plugin_manager_load_all_with_prefix(
+        subghz_device->manager,
+        EXT_PATH("apps_data/subghz/plugins"),
+        SUBGHZ_RADIO_DEVICE_PLUGIN_FAL_PREFIX);
+    uint32_t plugin_count = plugin_manager_get_count(subghz_device->manager);
+    if(error != PluginManagerErrorNone) {
+        FURI_LOG_E(TAG, "Failed to load radio device plugin(s), error %d", error);
+    } else if(plugin_count == 0) {
+        FURI_LOG_W(
+            TAG,
+            "No " SUBGHZ_RADIO_DEVICE_PLUGIN_FAL_PREFIX "*.fal plugins found");
     }
 
-    subghz_device->size = plugin_manager_get_count(subghz_device->manager) + 1;
+    subghz_device->size = plugin_count + 1;
     subghz_device->items =
         (const SubGhzDevice**)malloc(sizeof(SubGhzDevice*) * subghz_device->size);
     subghz_device->items[0] = &subghz_device_cc1101_int;

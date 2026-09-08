@@ -69,8 +69,10 @@ static PluginManagerLoadStatus
     }
 }
 
-PluginManagerLoadStatus
-    plugin_manager_load_single_detailed(PluginManager* manager, const char* path) {
+static PluginManagerLoadStatus plugin_manager_load_single_detailed_internal(
+    PluginManager* manager,
+    const char* path,
+    bool scanning) {
     furi_check(manager);
     FlipperApplication* lib = flipper_application_alloc(manager->storage, manager->api_interface);
 
@@ -109,7 +111,11 @@ PluginManagerLoadStatus
         }
 
         if(strcmp(app_descriptor->appid, manager->application_id) != 0) {
-            FURI_LOG_E(TAG, "Application id mismatch %s", path);
+            if(scanning) {
+                FURI_LOG_D(TAG, "Not ours, skipping %s", path);
+            } else {
+                FURI_LOG_E(TAG, "Application id mismatch %s", path);
+            }
             status = PluginManagerLoadStatusApplicationIdMismatch;
             break;
         }
@@ -130,9 +136,13 @@ PluginManagerLoadStatus
     return status;
 }
 
-PluginManagerError plugin_manager_load_single(PluginManager* manager, const char* path) {
-    const PluginManagerLoadStatus status = plugin_manager_load_single_detailed(manager, path);
+PluginManagerLoadStatus
+    plugin_manager_load_single_detailed(PluginManager* manager, const char* path) {
+    return plugin_manager_load_single_detailed_internal(manager, path, false);
+}
 
+static PluginManagerError
+    plugin_manager_load_status_to_error(PluginManagerLoadStatus status) {
     if(status == PluginManagerLoadStatusSuccess) {
         return PluginManagerErrorNone;
     } else if(status == PluginManagerLoadStatusApplicationIdMismatch) {
@@ -144,22 +154,24 @@ PluginManagerError plugin_manager_load_single(PluginManager* manager, const char
     return PluginManagerErrorLoaderError;
 }
 
+PluginManagerError plugin_manager_load_single(PluginManager* manager, const char* path) {
+    return plugin_manager_load_status_to_error(
+        plugin_manager_load_single_detailed_internal(manager, path, false));
+}
+
 static PluginManagerError
     plugin_manager_load_all_internal(PluginManager* manager, const char* path, const char* prefix) {
     furi_check(manager);
     File* directory = storage_file_alloc(manager->storage);
     char file_name_buffer[256];
     FuriString* file_name = furi_string_alloc();
+    PluginManagerError result = PluginManagerErrorNone;
     do {
         if(!storage_dir_open(directory, path)) {
             FURI_LOG_E(TAG, "Failed to open directory %s", path);
             break;
         }
-        while(true) {
-            if(!storage_dir_read(directory, NULL, file_name_buffer, sizeof(file_name_buffer))) {
-                break;
-            }
-
+        while(storage_dir_read(directory, NULL, file_name_buffer, sizeof(file_name_buffer))) {
             furi_string_set(file_name, file_name_buffer);
             if(!furi_string_end_with_str(file_name, ".fal")) {
                 continue;
@@ -170,19 +182,33 @@ static PluginManagerError
 
             path_concat(path, file_name_buffer, file_name);
             FURI_LOG_D(TAG, "Loading %s", furi_string_get_cstr(file_name));
-            PluginManagerError error =
-                plugin_manager_load_single(manager, furi_string_get_cstr(file_name));
-
-            if(error != PluginManagerErrorNone) {
+            const PluginManagerLoadStatus status = plugin_manager_load_single_detailed_internal(
+                manager, furi_string_get_cstr(file_name), true);
+            if(status != PluginManagerLoadStatusSuccess &&
+               status != PluginManagerLoadStatusApplicationIdMismatch &&
+               result == PluginManagerErrorNone) {
+                const PluginManagerError error = plugin_manager_load_status_to_error(status);
                 FURI_LOG_E(TAG, "Failed to load %s", furi_string_get_cstr(file_name));
-                break;
+                result = error;
             }
+        }
+
+        // storage_dir_read() uses FSE_NOT_EXIST for a normal end-of-directory;
+        // any other error means that the scan may have been truncated.
+        const FS_Error read_error = storage_file_get_error(directory);
+        if(read_error != FSE_OK && read_error != FSE_NOT_EXIST) {
+            FURI_LOG_E(
+                TAG,
+                "Failed to read directory %s: %s",
+                path,
+                storage_file_get_error_desc(directory));
+            if(result == PluginManagerErrorNone) result = PluginManagerErrorLoaderError;
         }
     } while(false);
     storage_dir_close(directory);
     storage_file_free(directory);
     furi_string_free(file_name);
-    return PluginManagerErrorNone;
+    return result;
 }
 
 PluginManagerError plugin_manager_load_all(PluginManager* manager, const char* path) {
