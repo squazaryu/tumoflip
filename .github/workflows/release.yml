@@ -152,6 +152,7 @@ jobs:
             tools/tumoflip/test_analyzer_notification_ownership.py \
             tools/tumoflip/test_subghz_wardriving.py \
             tools/tumoflip/test_wardriving_lazy_rx.py \
+            tools/tumoflip/test_upstream_power_plugin_scan.py \
             tools/tumoflip/test_subghz_raw_profiles.py \
             tools/tumoflip/test_update_splash.py \
             tools/tumoflip/test_validate_release.py \

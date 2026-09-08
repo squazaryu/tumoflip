@@ -132,6 +132,10 @@ jobs:
           python3 tools/tumoflip/test_subghz_wardriving.py
           python3 tools/tumoflip/test_wardriving_lazy_rx.py
 
+      - name: Validate power and plugin scan error handling
+        shell: bash
+        run: python3 tools/tumoflip/test_upstream_power_plugin_scan.py
+
       - name: Build firmware (minimal / clean)
         id: build
         shell: bash
