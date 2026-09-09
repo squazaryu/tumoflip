@@ -21,6 +21,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("heatshrink2==0.13.0", workflow)
         self.assertIn("./fbt COMPACT=1 DEBUG=0", workflow)
         self.assertIn("updater_package fap_esp_flasher", workflow)
+        self.assertIn("fap_nearby_files", workflow)
         self.assertIn("validate_release.py", workflow)
         self.assertIn("--write-manifest", workflow)
         self.assertIn("test_readme_version_sync.py", workflow)
@@ -66,6 +67,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         )
 
         self.assertIn("updater_package fap_esp_flasher", workflow)
+        self.assertIn("fap_nearby_files", workflow)
 
     def test_subghz_architecture_is_documented_as_core_first(self) -> None:
         doc = (REPO_ROOT / "docs/subghz-architecture.md").read_text(

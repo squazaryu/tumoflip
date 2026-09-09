@@ -8,7 +8,7 @@
 
 [![Stable release](https://img.shields.io/github/v/release/squazaryu/tumoflip?label=stable&color=brightgreen)](https://github.com/squazaryu/tumoflip/releases/latest)
 [![Release workflow](https://img.shields.io/github/actions/workflow/status/squazaryu/tumoflip/release.yml?branch=main&label=build)](https://github.com/squazaryu/tumoflip/actions/workflows/release.yml)
-![Firmware API](https://img.shields.io/badge/Dev%20API-88.5-8b5cf6)
+![Firmware API](https://img.shields.io/badge/Dev%20API-88.6-8b5cf6)
 ![Target](https://img.shields.io/badge/Target-Flipper%20Zero%20F7-f97316)
 [![License](https://img.shields.io/badge/License-GPLv3-2563eb)](LICENSE)
 
@@ -65,8 +65,8 @@ control. This table is a practical orientation, not a benchmark.
 | 📡 | **Radio** | Core Sub-GHz, ARF, ProtoPirate, adaptive hopping, Protocol Packs, Radio Broker, and internal/external CC1101 selection. |
 | 🧭 | **Desktop** | Custom Wii, Wii Vertical, DSi, and Vertical layouts; Module One and ARF Tools folders; favorites for apps, scripts, and folders. |
 | 📱 | **Companion** | BLE App Bridge, RTC sync, package and firmware transfer activity, device verification, and iOS-first workflows. |
-| 🧩 | **Packages** | Separate Base, ARF, Module One, and Protocol Packs catalogs with content-addressed manifests and independent releases. |
-| 🛠️ | **Developer** | Dev API 88.5, JS Runner as an FAP, SDK archives, release validation, acceptance telemetry, and reproducible build metadata. |
+| 🧩 | **Packages** | Separate Base, ARF, Module One, and Protocol Packs catalogs with content-addressed manifests and independent releases. Nearby Files is delivered as a Base package. |
+| 🛠️ | **Developer** | Dev API 88.6, JS Runner as an FAP, SDK archives, release validation, acceptance telemetry, and reproducible build metadata. |
 
 ## Architecture at a glance
 
@@ -193,7 +193,7 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-007` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-008-021` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-008-022` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
@@ -218,13 +218,13 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-008-021.tgz
+flipper-z-f7-update-t-dev-008-022.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: Dev `88.5`; immutable stable `v1.0.7` remains `88.4`.
+- Firmware API: Dev `88.6`; immutable stable `v1.0.7` remains `88.4`.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or
   rebuilt from the matching FW Packages catalog.
 - The JS Runner is an application (`js_app.fap`); it is not required by the

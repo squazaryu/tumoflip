@@ -69,3 +69,5 @@
 !tumo_uart_console/**
 !esp_flasher/
 !esp_flasher/**
+!nearby_files/
+!nearby_files/**
