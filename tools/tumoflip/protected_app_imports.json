@@ -2,7 +2,7 @@
   "schema": 1,
   "implementation": {
     "repository": "squazaryu/tumoflip",
-    "commit": "0c4274f3561eb064d9edc17350ffe4a78cacdfb0"
+    "commit": "e2d03acda01a8f71f9b80719fc788f2cf6a42f6a"
   },
   "imports": [
     {
@@ -100,6 +100,14 @@
       "upstreamRepository": "https://github.com/Lechnio/SubGHz-RAW-Edit.git",
       "upstreamRef": "refs/heads/main",
       "upstreamCommit": "d60ee2a34fa87b89c99f1ba9056737765f9f921f"
+    },
+    {
+      "appId": "nearby_files",
+      "localSourcePath": "applications_user/nearby_files",
+      "implementationCommit": "e2d03acda01a8f71f9b80719fc788f2cf6a42f6a",
+      "upstreamRepository": "https://github.com/Stichoza/flipper-nearby-files.git",
+      "upstreamRef": "refs/heads/master",
+      "upstreamCommit": "669a8c7f919a43a77c8aa47ce8655b3070d9cc6f"
     }
   ]
 }
