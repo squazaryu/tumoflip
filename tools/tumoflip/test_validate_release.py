@@ -273,10 +273,11 @@ class ValidateReleaseTest(unittest.TestCase):
     def test_package_only_fap_is_excluded_from_updater_archive(self) -> None:
         package_only = "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
         quac = "apps/Tools/quac.fap"
-        self.assertEqual(PACKAGE_ONLY_PACKAGE_FILES, {package_only, quac})
+        nearby = "apps/GPIO/nearby_files.fap"
+        self.assertEqual(PACKAGE_ONLY_PACKAGE_FILES, {package_only, quac, nearby})
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_GROUPS,
-            {package_only: "module_one", quac: "base"},
+            {package_only: "module_one", quac: "base", nearby: "base"},
         )
         regular = "apps/Tools/clock.fap"
         regular_payload = b"clock"

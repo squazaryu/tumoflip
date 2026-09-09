@@ -44,6 +44,7 @@
 * Sub-GHz: Adapt upstream `e6ded9b` (plus follow-up `3431d19`) without replacing Tumoflip's custom protocol set: Nice O-Code installer-code tooling, Security+ 2.0 86-bit keypad/PIN support, standalone 42-bit Prastel rolling code, and KeeLoq JCM Gen2/Stagnoli/Telcoma learning variants.
 * Sub-GHz: Add `nice_o_code` and `secplus_pin` system FAPs, register Prastel in the shared Standard/ARF protocol registry, and expose the new helpers through API 88.6.
 * Sub-GHz: Keep the existing Tumoflip KeeLoq keystore intact and load the upstream encrypted additions as a separate read-only resource; user keys and custom manufacturer entries remain writable and unchanged.
+* Apps: Add Nearby Files as a Base FW Package. It sorts `.sub`, `.nfc`, `.rfid`, and `.ibtn` captures by distance using a one-shot TumoCompanion GPS location over BLE, with the existing Flipper GPS/NMEA source retained as a fallback. The Community Pack copy is excluded to prevent duplicate ownership.
 <br><br>
 
 ----

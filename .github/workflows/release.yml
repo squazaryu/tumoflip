@@ -118,7 +118,7 @@ jobs:
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
             updater_package fap_esp_flasher fap_quac fap_subghz_wardriving \
-            fap_nice_o_code fap_secplus_pin
+            fap_nearby_files fap_nice_o_code fap_secplus_pin
 
       - name: Run release tests
         shell: bash
@@ -155,6 +155,7 @@ jobs:
             tools/tumoflip/test_wardriving_lazy_rx.py \
             tools/tumoflip/test_upstream_power_plugin_scan.py \
             tools/tumoflip/test_upstream_e6_protocols.py \
+            tools/tumoflip/test_nearby_files.py \
             tools/tumoflip/test_subghz_raw_profiles.py \
             tools/tumoflip/test_update_splash.py \
             tools/tumoflip/test_validate_release.py \

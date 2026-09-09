@@ -119,6 +119,7 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
         "apps/Tools/flipper_relay.fap",
         "apps/Tools/morse_player.fap",
         "apps/Tools/quac.fap",
+        "apps/GPIO/nearby_files.fap",
         "apps/Tools/tumoflip_packages.fap",
         "apps/Tools/totp.fap",
         "apps_data/js_app/plugins/js_gui.fal",
