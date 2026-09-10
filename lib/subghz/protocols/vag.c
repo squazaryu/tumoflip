@@ -136,6 +136,7 @@ typedef struct SubGhzProtocolDecoderVAG {
     uint32_t serial;
     uint32_t cnt;
     uint8_t btn;
+    uint8_t btn_flags; // Low nibble observed on RX; diagnostic only.
     uint8_t check_byte;
     uint8_t key_idx;
     bool decrypted;
@@ -225,7 +226,8 @@ static void vag_fill_from_decrypted(
     else if(btn_nibble == 2) instance->btn = 0x20;
     else if(btn_nibble == 4) instance->btn = 0x40;
     else if(btn_nibble == 8) instance->btn = 0x80;
-    else instance->btn = dec[7];  
+    else instance->btn = dec[7];
+    instance->btn_flags = dec[7] & 0x0F;
     
     instance->check_byte = dispatch_byte;
     instance->decrypted = true;
@@ -244,6 +246,7 @@ static void vag_parse_data(SubGhzProtocolDecoderVAG* instance) {
     furi_assert(instance);
 
     instance->decrypted = false;
+    instance->btn_flags = 0;
     instance->serial = 0;
     instance->cnt = 0;
     instance->btn = 0;
@@ -302,6 +305,7 @@ static void vag_parse_data(SubGhzProtocolDecoderVAG* instance) {
                     else if(btn_nibble == 4) instance->btn = 0x40;
                     else if(btn_nibble == 8) instance->btn = 0x80;
                     else instance->btn = block_copy[7];
+                    instance->btn_flags = block_copy[7] & 0x0F;
                     
                     instance->check_byte = dispatch_byte;
                     instance->key_idx = key_idx;
@@ -401,6 +405,7 @@ static void vag_parse_data(SubGhzProtocolDecoderVAG* instance) {
     }
 
     instance->decrypted = false;
+    instance->btn_flags = 0;
     instance->serial = 0;
     instance->cnt = 0;
     instance->btn = 0;
@@ -441,6 +446,7 @@ void* subghz_protocol_decoder_vag_alloc(SubGhzEnvironment* environment) {
     instance->base.protocol = &subghz_protocol_vag;
     instance->generic.protocol_name = instance->base.protocol->name;
     instance->decrypted = false;
+    instance->btn_flags = 0;
     instance->serial = 0;
     instance->cnt = 0;
     instance->btn = 0;
@@ -465,6 +471,7 @@ void subghz_protocol_decoder_vag_reset(void* context) {
     SubGhzProtocolDecoderVAG* instance = context;
     instance->decoder.parser_step = VAGDecoderStepReset;
     instance->decrypted = false;
+    instance->btn_flags = 0;
     instance->serial = 0;
     instance->cnt = 0;
     instance->btn = 0;
@@ -766,6 +773,12 @@ SubGhzProtocolStatus subghz_protocol_decoder_vag_serialize(
         subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
 
     if(ret == SubGhzProtocolStatusOk) {
+        if(instance->decrypted) {
+            uint32_t flags = instance->btn_flags;
+            if(!flipper_format_write_uint32(flipper_format, "BtnFlags", &flags, 1)) {
+                return SubGhzProtocolStatusErrorParserOthers;
+            }
+        }
         
         uint8_t key2_bytes[8] = {0, 0, 0, 0, 0, 0, 0, 0};
         key2_bytes[6] = (uint8_t)((key2_16bit >> 8) & 0xFF);
@@ -823,6 +836,7 @@ SubGhzProtocolStatus
         instance->data_count_bit = instance->generic.data_count_bit;
 
         instance->decrypted = false;
+        instance->btn_flags = 0;
         vag_parse_data(instance);
         
         if(subghz_custom_btn_get_original() == 0) {
@@ -1294,6 +1308,10 @@ void subghz_protocol_decoder_vag_get_string(void* context, FuriString* output) {
             (unsigned long)(key1 & 0xFFFFFFFF),
             key2);
     }
+    if(instance->decrypted) {
+        furi_string_cat_printf(output, "\r\nFlags:0x%X", (unsigned int)instance->btn_flags);
+    }
+
 }
 
 #define VAG_ENCODER_UPLOAD_MAX_SIZE 2560

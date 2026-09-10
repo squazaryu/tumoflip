@@ -53,7 +53,7 @@ static const SubGhzBlockConst toyota_const_a = {
     .te_short                = 400,
     .te_long                 = 800,
     .te_delta                = 175,
-    .min_count_bit_for_found = 60,
+    .min_count_bit_for_found = 68,
 };
 
 /* ----------------------------------------------------------------
@@ -65,7 +65,7 @@ static const SubGhzBlockConst toyota_const_b = {
     .te_short                = 200,
     .te_long                 = 390,
     .te_delta                = 120,
-    .min_count_bit_for_found = 60,
+    .min_count_bit_for_found = 67,
 };
 
 /*
@@ -246,7 +246,7 @@ static void toyota_decode_and_fire(SubGhzProtocolDecoderToyota* inst) {
     const SubGhzBlockConst* c =
         (inst->variant == 1) ? &toyota_const_b : &toyota_const_a;
 
-    if(inst->bit_count < (uint8_t)c->min_count_bit_for_found) return;
+    if(inst->bit_count != (uint8_t)c->min_count_bit_for_found) return;
 
     inst->hop    = toyota_extract(inst,  0, 32);
     inst->serial = toyota_extract(inst, 32, 28);
@@ -348,7 +348,9 @@ static void toyota_feed_variant_a(
             return;
         }
 
-        if(inst->preamble_count < TOYOTA_A_PREAMBLE_MIN) {
+        // A foreign sync gap must not turn into an empty first data bit.
+        if(inst->preamble_count < TOYOTA_A_PREAMBLE_MIN ||
+           !((hl && ls) || (hs && ll))) {
             subghz_protocol_decoder_toyota_reset(inst);
             return;
         }
@@ -371,8 +373,7 @@ static void toyota_feed_variant_a(
                 inst->te_last   = duration;
                 inst->have_high = true;
             } else {
-                if(inst->bit_count >= (uint8_t)c->min_count_bit_for_found)
-                    toyota_decode_and_fire(inst);
+                toyota_decode_and_fire(inst);
                 subghz_protocol_decoder_toyota_reset(inst);
             }
             return;
@@ -391,8 +392,7 @@ static void toyota_feed_variant_a(
         } else if(hs && ll) {
             toyota_push_bit(inst, 1);
         } else {
-            if(inst->bit_count >= (uint8_t)c->min_count_bit_for_found)
-                toyota_decode_and_fire(inst);
+            toyota_decode_and_fire(inst);
             subghz_protocol_decoder_toyota_reset(inst);
             return;
         }
@@ -486,9 +486,7 @@ static void toyota_feed_variant_b(
          */
         if(duration >= TOYOTA_B_SYNC_GAP_MIN) {
             /* Frame ended by gap */
-            if(inst->bit_count >= (uint8_t)c->min_count_bit_for_found) {
-                toyota_decode_and_fire(inst);
-            }
+            toyota_decode_and_fire(inst);
             subghz_protocol_decoder_toyota_reset(inst);
             return;
         }
@@ -498,6 +496,12 @@ static void toyota_feed_variant_b(
          * <= 287us -> bit 0
          * >  287us -> bit 1
          */
+        // Keep the existing timing tolerances, but do not turn arbitrary noise
+        // below the sync-gap threshold into valid NRZ data.
+        if(!te_is_short(duration, c) && !te_is_long(duration, c)) {
+            subghz_protocol_decoder_toyota_reset(inst);
+            return;
+        }
         uint8_t bit = (duration > TOYOTA_B_NRZ_MIDPOINT) ? 1 : 0;
         toyota_push_bit(inst, bit);
 
