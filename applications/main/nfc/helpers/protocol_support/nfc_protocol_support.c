@@ -697,6 +697,8 @@ static bool
 
 static void nfc_protocol_support_scene_read_success_on_exit(NfcApp* instance) {
     notification_message_block(instance->notifications, &sequence_reset_green);
+    // Parsing borrowed the shared popup; later scenes may not set their own icon.
+    popup_reset(instance->popup);
     widget_reset(instance->widget);
 }
 
