@@ -181,6 +181,7 @@ bool subghz_scene_receiver_info_on_event(void* context, SceneManagerEvent event)
             return true;
         }
     } else if(event.type == SceneManagerEventTypeTick) {
+        subghz_txrx_radio_device_poll_active(subghz->txrx);
         if(subghz->last_settings->enable_combined_hopping) {
             subghz_txrx_combined_hopper_update(
                 subghz->txrx, subghz->last_settings->combined_hopping_threshold);
@@ -188,8 +189,7 @@ bool subghz_scene_receiver_info_on_event(void* context, SceneManagerEvent event)
             subghz_txrx_hopper_update(subghz->txrx, subghz->last_settings->hopping_threshold);
         }
         if(!subghz->last_settings->enable_combined_hopping &&
-           subghz_txrx_preset_hopper_get_state(subghz->txrx) !=
-               SubGhzPresetHopperStateOFF) {
+           subghz_txrx_preset_hopper_get_state(subghz->txrx) != SubGhzPresetHopperStateOFF) {
             subghz_txrx_preset_hopper_update(
                 subghz->txrx, subghz->last_settings->preset_hopping_threshold);
         }

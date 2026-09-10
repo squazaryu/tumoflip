@@ -447,15 +447,18 @@ static bool subghz_device_cc1101_ext_try_idle(void) {
 }
 
 void subghz_device_cc1101_ext_idle(void) {
-    furi_check(subghz_device_cc1101_ext_try_idle());
+    if(!subghz_device_cc1101_ext_try_idle()) {
+        FURI_LOG_W(TAG, "External radio did not enter IDLE");
+    }
 }
 
 void subghz_device_cc1101_ext_rx(void) {
     furi_hal_spi_acquire(subghz_device_cc1101_ext->spi_bus_handle);
     cc1101_switch_to_rx(subghz_device_cc1101_ext->spi_bus_handle);
     //waiting for the chip to switch to Rx mode
-    furi_check(
-        cc1101_wait_status_state(subghz_device_cc1101_ext->spi_bus_handle, CC1101StateRX, 10000));
+    if(!cc1101_wait_status_state(subghz_device_cc1101_ext->spi_bus_handle, CC1101StateRX, 10000)) {
+        FURI_LOG_W(TAG, "External radio did not enter RX");
+    }
 
     if(subghz_device_cc1101_ext->amp_and_leds) {
         furi_hal_gpio_write(SUBGHZ_DEVICE_CC1101_EXT_E07_AMP_GPIO, 0);
@@ -474,17 +477,20 @@ bool subghz_device_cc1101_ext_tx(void) {
     furi_hal_spi_acquire(subghz_device_cc1101_ext->spi_bus_handle);
     cc1101_switch_to_tx(subghz_device_cc1101_ext->spi_bus_handle);
     //waiting for the chip to switch to Tx mode
-    furi_check(
-        cc1101_wait_status_state(subghz_device_cc1101_ext->spi_bus_handle, CC1101StateTX, 10000));
+    const bool in_tx =
+        cc1101_wait_status_state(subghz_device_cc1101_ext->spi_bus_handle, CC1101StateTX, 10000);
 
     if(subghz_device_cc1101_ext->amp_and_leds) {
-        furi_hal_gpio_write(SUBGHZ_DEVICE_CC1101_EXT_E07_AMP_GPIO, 1);
-        // Go GDO2 (!TX/RX) to low (TX state)
-        cc1101_write_reg(subghz_device_cc1101_ext->spi_bus_handle, CC1101_IOCFG2, CC1101IocfgHW);
+        furi_hal_gpio_write(SUBGHZ_DEVICE_CC1101_EXT_E07_AMP_GPIO, in_tx);
+        if(in_tx) {
+            // Go GDO2 (!TX/RX) to low only after TX is confirmed.
+            cc1101_write_reg(
+                subghz_device_cc1101_ext->spi_bus_handle, CC1101_IOCFG2, CC1101IocfgHW);
+        }
     }
 
     furi_hal_spi_release(subghz_device_cc1101_ext->spi_bus_handle);
-    return true;
+    return in_tx;
 }
 
 float subghz_device_cc1101_ext_get_rssi(void) {

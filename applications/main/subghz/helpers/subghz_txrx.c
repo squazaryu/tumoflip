@@ -406,6 +406,7 @@ void subghz_txrx_get_frequency_and_modulation(
 
 static void subghz_txrx_begin(SubGhzTxRx* instance, uint8_t* preset_data) {
     furi_assert(instance);
+    subghz_txrx_radio_device_poll_active(instance);
     subghz_devices_reset(instance->radio_device);
     subghz_devices_idle(instance->radio_device);
     subghz_devices_load_preset(instance->radio_device, FuriHalSubGhzPresetCustom, preset_data);
@@ -1037,16 +1038,17 @@ static SubGhzRadioDeviceType
                                 radio_device_type == SubGhzRadioDeviceTypeAuto;
     const bool external_was_active = instance->radio_device &&
                                      instance->radio_device_type != SubGhzRadioDeviceTypeInternal;
-    const bool external_connected =
-        wants_external &&
-        (external_was_active ||
-         subghz_txrx_radio_device_is_external_connected(instance, SUBGHZ_DEVICE_CC1101_EXT_NAME));
+    // Workers are stopped before driver teardown. Re-run the hardware self-test
+    // even when the previous selection was External or Auto.
+    if(external_was_active) subghz_devices_end(instance->radio_device);
+    instance->radio_device_probe_tick = furi_get_tick();
     bool external_ready = false;
 
-    if(external_connected) {
+    if(wants_external) {
         subghz_txrx_radio_device_power_on(instance);
         const SubGhzDevice* external = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_EXT_NAME);
-        external_ready = external && (external_was_active || subghz_devices_begin(external));
+        external_ready = external && subghz_devices_begin(external);
+        if(external && !external_ready) subghz_devices_end(external);
         if(external_ready) {
             instance->radio_device = external;
             instance->primary_receiver_context.source = SubGhzRadioDeviceTypeExternalCC1101;
@@ -1069,9 +1071,6 @@ static SubGhzRadioDeviceType
     if(!external_ready) {
         subghz_txrx_diversity_free(instance);
         subghz_txrx_radio_device_power_off(instance);
-        if(external_was_active) {
-            subghz_devices_end(instance->radio_device);
-        }
         instance->radio_device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
         instance->radio_device_type = SubGhzRadioDeviceTypeInternal;
         instance->primary_receiver_context.source = SubGhzRadioDeviceTypeInternal;
@@ -1105,23 +1104,55 @@ SubGhzRadioDeviceType subghz_txrx_radio_device_reprobe_preferred(SubGhzTxRx* ins
                    subghz_txrx_radio_device_apply(instance, SubGhzRadioDeviceTypeInternal);
     }
 
-    if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
-        const bool external_connected = subghz_txrx_radio_device_is_external_connected(
-            instance, SUBGHZ_DEVICE_CC1101_EXT_NAME);
-        if(external_connected) {
-            return instance->radio_device_type;
-        }
-
-        FURI_LOG_W(TAG, "External live probe failed, retrying cold");
-        subghz_txrx_radio_device_apply(instance, SubGhzRadioDeviceTypeInternal);
+    if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal &&
+       subghz_devices_is_connect(instance->radio_device)) {
+        return instance->radio_device_type;
     }
 
+    // apply() owns teardown and the cold self-test, including failed begin().
     return subghz_txrx_radio_device_apply(instance, preferred);
 }
 
 SubGhzRadioDeviceType subghz_txrx_radio_device_fallback_internal(SubGhzTxRx* instance) {
     furi_assert(instance);
     return subghz_txrx_radio_device_apply(instance, SubGhzRadioDeviceTypeInternal);
+}
+
+bool subghz_txrx_radio_device_poll_active(SubGhzTxRx* instance) {
+    if(instance->radio_device_type == SubGhzRadioDeviceTypeInternal ||
+       instance->txrx_state == SubGhzTxRxStateTx)
+        return false;
+    const bool was_rx = instance->txrx_state == SubGhzTxRxStateRx;
+    // Analyzers own synchronous RX and must perform their own shutdown.
+    if(was_rx && !subghz_worker_is_running(instance->worker)) return false;
+    if(subghz_devices_is_connect(instance->radio_device)) return false;
+    subghz_txrx_stop(instance);
+    subghz_txrx_radio_device_fallback_internal(instance);
+    if(was_rx) {
+        // RAW reset discards its pending SD write buffer. Keep it intact across
+        // the radio change; decoded frames must restart on the new receiver.
+        if(instance->receiver_filter != SubGhzProtocolFlag_RAW) {
+            subghz_txrx_receiver_reset(instance);
+        }
+        subghz_txrx_begin(
+            instance,
+            subghz_setting_get_preset_data_by_name(
+                instance->setting, furi_string_get_cstr(instance->preset->name)));
+        subghz_txrx_rx(instance, instance->preset->frequency);
+    }
+    return true;
+}
+
+void subghz_txrx_radio_device_poll_reacquire(SubGhzTxRx* instance) {
+    if(instance->preferred_radio_device_type == SubGhzRadioDeviceTypeInternal ||
+       (instance->txrx_state != SubGhzTxRxStateIDLE &&
+        instance->txrx_state != SubGhzTxRxStateSleep))
+        return;
+    if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
+        subghz_txrx_radio_device_poll_active(instance);
+    } else if(furi_get_tick() - instance->radio_device_probe_tick >= furi_ms_to_ticks(5000)) {
+        subghz_txrx_radio_device_reprobe_preferred(instance);
+    }
 }
 
 SubGhzRadioDeviceType subghz_txrx_radio_device_get(SubGhzTxRx* instance) {

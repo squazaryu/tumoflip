@@ -51,7 +51,7 @@ static SubGhzRadioBrokerDevice subghz_txrx_broker_device(SubGhzTxRx* instance) {
 }
 
 SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group) {
-    SubGhzTxRx* instance = malloc(sizeof(SubGhzTxRx));
+    SubGhzTxRx* instance = calloc(1, sizeof(SubGhzTxRx));
     instance->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
     furi_check(subghz_radio_broker_acquire(
         instance->radio_broker, "arf_subghz", FuriWaitForever, &instance->radio_lease));
@@ -306,6 +306,7 @@ void subghz_txrx_get_frequency_and_modulation(
 
 static void subghz_txrx_begin(SubGhzTxRx* instance, uint8_t* preset_data) {
     furi_assert(instance);
+    subghz_txrx_radio_device_poll_active(instance);
     subghz_devices_reset(instance->radio_device);
     subghz_devices_idle(instance->radio_device);
     subghz_devices_load_preset(instance->radio_device, FuriHalSubGhzPresetCustom, preset_data);
@@ -1018,24 +1019,31 @@ bool subghz_txrx_radio_device_is_external_connected(SubGhzTxRx* instance, const 
     return is_connect;
 }
 
-SubGhzRadioDeviceType
-    subghz_txrx_radio_device_set(SubGhzTxRx* instance, SubGhzRadioDeviceType radio_device_type) {
+static SubGhzRadioDeviceType
+    subghz_txrx_radio_device_apply(SubGhzTxRx* instance, SubGhzRadioDeviceType radio_device_type) {
     furi_assert(instance);
 
+    subghz_txrx_stop(instance);
     subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateProbing);
-    if(radio_device_type == SubGhzRadioDeviceTypeExternalCC1101 &&
-       subghz_txrx_radio_device_is_external_connected(instance, SUBGHZ_DEVICE_CC1101_EXT_NAME)) {
+    if(instance->radio_device && instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
+        subghz_devices_end(instance->radio_device);
+    }
+    instance->radio_device_probe_tick = furi_get_tick();
+    const SubGhzDevice* external = NULL;
+    bool external_ready = false;
+    if(radio_device_type == SubGhzRadioDeviceTypeExternalCC1101) {
         subghz_txrx_radio_device_power_on(instance);
-        instance->radio_device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_EXT_NAME);
-        subghz_devices_begin(instance->radio_device);
+        external = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_EXT_NAME);
+        external_ready = external && subghz_devices_begin(external);
+        if(external && !external_ready) subghz_devices_end(external);
+    }
+    if(external_ready) {
+        instance->radio_device = external;
         instance->radio_device_type = SubGhzRadioDeviceTypeExternalCC1101;
         subghz_radio_broker_set_selected_device(
             instance->radio_broker, &instance->radio_lease, SubGhzRadioBrokerDeviceExternalCC1101);
     } else {
         subghz_txrx_radio_device_power_off(instance);
-        if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
-            subghz_devices_end(instance->radio_device);
-        }
         instance->radio_device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
         instance->radio_device_type = SubGhzRadioDeviceTypeInternal;
         subghz_radio_broker_set_selected_device(
@@ -1044,6 +1052,57 @@ SubGhzRadioDeviceType
 
     subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateInitialized);
     return instance->radio_device_type;
+}
+
+SubGhzRadioDeviceType
+    subghz_txrx_radio_device_set(SubGhzTxRx* instance, SubGhzRadioDeviceType radio_device_type) {
+    instance->preferred_radio_device_type = radio_device_type;
+    return subghz_txrx_radio_device_apply(instance, radio_device_type);
+}
+
+SubGhzRadioDeviceType subghz_txrx_radio_device_fallback_internal(SubGhzTxRx* instance) {
+    return subghz_txrx_radio_device_apply(instance, SubGhzRadioDeviceTypeInternal);
+}
+
+SubGhzRadioDeviceType subghz_txrx_radio_device_reprobe_preferred(SubGhzTxRx* instance) {
+    return subghz_txrx_radio_device_apply(instance, instance->preferred_radio_device_type);
+}
+
+bool subghz_txrx_radio_device_poll_active(SubGhzTxRx* instance) {
+    if(instance->radio_device_type == SubGhzRadioDeviceTypeInternal ||
+       instance->txrx_state == SubGhzTxRxStateTx)
+        return false;
+    const bool was_rx = instance->txrx_state == SubGhzTxRxStateRx;
+    // Analyzers own synchronous RX and must perform their own shutdown.
+    if(was_rx && !subghz_worker_is_running(instance->worker)) return false;
+    if(subghz_devices_is_connect(instance->radio_device)) return false;
+    subghz_txrx_stop(instance);
+    subghz_txrx_radio_device_fallback_internal(instance);
+    if(was_rx) {
+        // RAW reset discards its pending SD write buffer. Keep it intact across
+        // the radio change; decoded frames must restart on the new receiver.
+        if(instance->receiver_filter != SubGhzProtocolFlag_RAW) {
+            subghz_txrx_receiver_reset(instance);
+        }
+        subghz_txrx_begin(
+            instance,
+            subghz_setting_get_preset_data_by_name(
+                instance->setting, furi_string_get_cstr(instance->preset->name)));
+        subghz_txrx_rx(instance, instance->preset->frequency);
+    }
+    return true;
+}
+
+void subghz_txrx_radio_device_poll_reacquire(SubGhzTxRx* instance) {
+    if(instance->preferred_radio_device_type == SubGhzRadioDeviceTypeInternal ||
+       (instance->txrx_state != SubGhzTxRxStateIDLE &&
+        instance->txrx_state != SubGhzTxRxStateSleep))
+        return;
+    if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
+        subghz_txrx_radio_device_poll_active(instance);
+    } else if(furi_get_tick() - instance->radio_device_probe_tick >= furi_ms_to_ticks(5000)) {
+        subghz_txrx_radio_device_reprobe_preferred(instance);
+    }
 }
 
 SubGhzRadioDeviceType subghz_txrx_radio_device_get(SubGhzTxRx* instance) {

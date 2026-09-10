@@ -34,6 +34,7 @@ struct Loader {
     Gui* gui;
     ViewHolder* view_holder;
     Loading* loading;
+    bool assets_loading_visible;
 };
 
 typedef enum {
