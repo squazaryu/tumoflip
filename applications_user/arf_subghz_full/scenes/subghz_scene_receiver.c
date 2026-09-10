@@ -232,8 +232,7 @@ void subghz_scene_receiver_on_enter(void* context) {
     }
 
     // Check if hopping was enabled
-    if(subghz->last_settings->enable_hopping ||
-       subghz->last_settings->enable_combined_hopping) {
+    if(subghz->last_settings->enable_hopping || subghz->last_settings->enable_combined_hopping) {
         subghz_txrx_hopper_set_state(subghz->txrx, SubGhzHopperStateRunning);
     } else {
         subghz_txrx_hopper_set_state(subghz->txrx, SubGhzHopperStateOFF);
@@ -331,6 +330,9 @@ bool subghz_scene_receiver_on_event(void* context, SceneManagerEvent event) {
             break;
         }
     } else if(event.type == SceneManagerEventTypeTick) {
+        if(subghz_txrx_radio_device_poll_active(subghz->txrx)) {
+            subghz_scene_receiver_update_statusbar(subghz);
+        }
         if(subghz->last_settings->enable_combined_hopping) {
             subghz_txrx_combined_hopper_update(
                 subghz->txrx, subghz->last_settings->combined_hopping_threshold);
@@ -340,9 +342,9 @@ bool subghz_scene_receiver_on_event(void* context, SceneManagerEvent event) {
             subghz_scene_receiver_update_statusbar(subghz);
         }
         if(!subghz->last_settings->enable_combined_hopping &&
-           subghz_txrx_preset_hopper_get_state(subghz->txrx) !=
-               SubGhzPresetHopperStateOFF) {
-            subghz_txrx_preset_hopper_update(subghz->txrx, subghz->last_settings->preset_hopping_threshold);
+           subghz_txrx_preset_hopper_get_state(subghz->txrx) != SubGhzPresetHopperStateOFF) {
+            subghz_txrx_preset_hopper_update(
+                subghz->txrx, subghz->last_settings->preset_hopping_threshold);
             subghz_scene_receiver_update_statusbar(subghz);
         }
 

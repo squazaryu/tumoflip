@@ -13,6 +13,12 @@
 
 typedef struct SubGhzTxRx SubGhzTxRx;
 
+/** Detect a lost external radio. Stop async RX before switching and resume it
+ * on internal; do not probe during TX or synchronous analyzer ownership. */
+bool subghz_txrx_radio_device_poll_active(SubGhzTxRx* instance);
+/** Rate-limited recovery, called only from the idle Sub-GHz menu. */
+void subghz_txrx_radio_device_poll_reacquire(SubGhzTxRx* instance);
+
 typedef void (*SubGhzTxRxNeedSaveCallback)(void* context);
 
 typedef enum {

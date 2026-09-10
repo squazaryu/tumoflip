@@ -210,6 +210,7 @@ bool subghz_scene_receiver_info_on_event(void* context, SceneManagerEvent event)
             return true;
         }
     } else if(event.type == SceneManagerEventTypeTick) {
+        subghz_txrx_radio_device_poll_active(subghz->txrx);
         SubGhzHoppingMode mode = subghz->last_settings->hopping_mode;
         if(mode != SubGhzHoppingModeOff) {
             subghz_txrx_hopper_update(
