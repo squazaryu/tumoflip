@@ -1286,7 +1286,7 @@ void subghz_protocol_decoder_vag_get_string(void* context, FuriString* output) {
             "Key1:%08lX%08lX\r\n"
             "Key2:%04X KeyIdx:%d\r\n"
             "Ser:%08lX Cnt:%06lX\r\n"
-            "Btn:[%s]",
+            "Btn:[%s] Flags:%X",
             vehicle_name,
             instance->data_count_bit,
             (unsigned long)(key1 >> 32),
@@ -1295,7 +1295,8 @@ void subghz_protocol_decoder_vag_get_string(void* context, FuriString* output) {
             instance->key_idx,
             (unsigned long)instance->serial,
             (unsigned long)instance->cnt,
-            vag_button_name(instance->btn));
+            vag_button_name(instance->btn),
+            (unsigned int)instance->btn_flags);
     } else {
         furi_string_cat_printf(
             output,
@@ -1308,10 +1309,6 @@ void subghz_protocol_decoder_vag_get_string(void* context, FuriString* output) {
             (unsigned long)(key1 & 0xFFFFFFFF),
             key2);
     }
-    if(instance->decrypted) {
-        furi_string_cat_printf(output, "\r\nFlags:0x%X", (unsigned int)instance->btn_flags);
-    }
-
 }
 
 #define VAG_ENCODER_UPLOAD_MAX_SIZE 2560

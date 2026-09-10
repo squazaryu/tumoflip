@@ -1542,7 +1542,7 @@ void subghz_protocol_decoder_vag_get_string(void* context, FuriString* output) {
             key2);
     }
     if(instance->decrypted) {
-        furi_string_cat_printf(output, "\r\nFlags:0x%X", (unsigned int)instance->btn_flags);
+        furi_string_cat_printf(output, "Flags:0x%X", (unsigned int)instance->btn_flags);
     }
 
 }

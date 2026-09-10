@@ -14,7 +14,9 @@ Standard, RAW Auto Decode and ARF consume the shared Toyota decoder.
 The separate ProtoPirate registry does not contain this Toyota decoder.
 
 Both VAG decoder implementations retain the low nibble of the decrypted
-button byte as diagnostic BtnFlags and display it on a separate short line.
+button byte as diagnostic BtnFlags. Standard displays it beside the button
+label (Flags:0..F), keeping the bottom action area clear; ProtoPirate includes a
+short Flags line in its existing detail area.
 Raw keys remain authoritative on reopening: flags are recomputed from the
 decoded payload, not trusted from edited metadata. Reset clears prior flags.
 ProtoPirate capture copying retains the optional BtnFlags field.

@@ -37,7 +37,7 @@ class ToyotaVagTests(unittest.TestCase):
 #define furi_assert assert
 #define FURI_LOG_D(...) ((void)0)
 #define DURATION_DIFF(a,b) ((a)>(b)?(a)-(b):(b)-(a))
-typedef struct { uint32_t te_short,te_long,te_delta;uint16_t min_count_bit_for_found; } SubGhzBlockConst;
+typedef struct { const uint16_t te_long,te_short,te_delta;const uint8_t min_count_bit_for_found; } SubGhzBlockConst;
 typedef struct Base { void (*callback)(struct Base*,void*);void* context; } SubGhzProtocolDecoderBase;
 typedef struct { int parser_step;uint32_t te_last;uint64_t decode_data;uint16_t decode_count_bit; } SubGhzBlockDecoder;
 typedef struct { uint64_t data;uint16_t data_count_bit;uint32_t serial,btn,cnt; } SubGhzBlockGeneric;

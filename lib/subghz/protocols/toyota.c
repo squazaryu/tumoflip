@@ -373,7 +373,6 @@ static void toyota_feed_variant_a(
                 inst->te_last   = duration;
                 inst->have_high = true;
             } else {
-                toyota_decode_and_fire(inst);
                 subghz_protocol_decoder_toyota_reset(inst);
             }
             return;
@@ -392,7 +391,6 @@ static void toyota_feed_variant_a(
         } else if(hs && ll) {
             toyota_push_bit(inst, 1);
         } else {
-            toyota_decode_and_fire(inst);
             subghz_protocol_decoder_toyota_reset(inst);
             return;
         }
@@ -485,8 +483,7 @@ static void toyota_feed_variant_b(
          * A pulse >= inter-frame gap also ends frame.
          */
         if(duration >= TOYOTA_B_SYNC_GAP_MIN) {
-            /* Frame ended by gap */
-            toyota_decode_and_fire(inst);
+            /* Complete frames are emitted at their exact length below. */
             subghz_protocol_decoder_toyota_reset(inst);
             return;
         }
@@ -498,7 +495,8 @@ static void toyota_feed_variant_b(
          */
         // Keep the existing timing tolerances, but do not turn arbitrary noise
         // below the sync-gap threshold into valid NRZ data.
-        if(!te_is_short(duration, c) && !te_is_long(duration, c)) {
+        if(duration <= (uint32_t)c->te_short - c->te_delta ||
+           duration >= (uint32_t)c->te_long + c->te_delta) {
             subghz_protocol_decoder_toyota_reset(inst);
             return;
         }
