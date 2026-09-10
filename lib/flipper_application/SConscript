@@ -20,6 +20,18 @@ libenv.ApplyLibFlags()
 sources = libenv.GlobRecursive("*.c")
 sources.append(File("api_hashtable/api_hashtable.cpp"))
 
+# The extraction/lifecycle units are cold code and use normal size optimization
+# in compact release builds. Keep the ELF relocation engine's existing flags.
+if env["COMPACT"] and not env["DEBUG"] and not env["LIB_DEBUG"]:
+    compactenv = libenv.Clone()
+    compactenv.Append(CCFLAGS=["-Os"])
+    sources = [
+        compactenv.Object(source)
+        if source.name in ("application_assets.c", "flipper_application.c")
+        else source
+        for source in sources
+    ]
+
 lib = libenv.StaticLibrary("${FW_LIB_NAME}", sources)
 libenv.Install("${LIB_DIST_DIR}", lib)
 Return("lib")

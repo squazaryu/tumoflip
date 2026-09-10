@@ -112,6 +112,7 @@ jobs:
         run: |
           python3 tools/tumoflip/test_gui_startup_loading.py
           python3 tools/tumoflip/test_loader_fap_loading.py
+          python3 tools/tumoflip/test_hotplug_assets.py
 
       - name: Validate Quac action ownership and transmit failures
         shell: bash
