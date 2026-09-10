@@ -243,10 +243,8 @@ static const char* toyota_model_name(uint8_t variant) {
  * ---------------------------------------------------------------- */
 
 static void toyota_decode_and_fire(SubGhzProtocolDecoderToyota* inst) {
-    const SubGhzBlockConst* c =
-        (inst->variant == 1) ? &toyota_const_b : &toyota_const_a;
-
-    if(inst->bit_count != (uint8_t)c->min_count_bit_for_found) return;
+    const uint8_t expected_bits = inst->variant == 1 ? TOYOTA_B_BITS : TOYOTA_A_BITS;
+    if(inst->bit_count != expected_bits) return;
 
     inst->hop    = toyota_extract(inst,  0, 32);
     inst->serial = toyota_extract(inst, 32, 28);
@@ -359,8 +357,8 @@ static void toyota_feed_variant_a(
         inst->bits_hi   = 0;
         inst->bit_count = 0;
 
-        if     (hl && ls) toyota_push_bit(inst, 0);
-        else if(hs && ll) toyota_push_bit(inst, 1);
+        // Both legal pairs were checked above.
+        toyota_push_bit(inst, hs && ll);
 
         inst->decoder.parser_step = ToyotaStepDataA;
         return;
