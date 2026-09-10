@@ -26,6 +26,55 @@ def run_c(body):
 
 
 class HotplugAssetsTests(unittest.TestCase):
+    def test_nfc_parse_popup_does_not_draw_on_later_screens(self):
+        support = (ROOT / "applications/main/nfc/helpers/protocol_support/nfc_protocol_support.c").read_text()
+        popup = (ROOT / "applications/services/gui/modules/popup.c").read_text()
+        production = function(popup, "void popup_reset(")
+        production += "\n" + function(popup, "static void popup_view_draw_callback(")
+        production += "\n" + function(support, "static void nfc_protocol_support_scene_read_success_on_exit(")
+        run_c(r"""
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+#include <assert.h>
+#define furi_check assert
+#define with_view_model(view,decl,body,update) do { decl=(view); body; } while(0)
+enum { ColorBlack,FontPrimary,FontSecondary };
+typedef struct { const char* text;int x,y,horizontal,vertical; } TextElement;
+typedef struct { int x,y;void* icon; } IconElement;
+typedef struct { TextElement header,text;IconElement icon; } PopupModel;
+typedef struct { void* view;void* callback;void* context;bool timer_enabled;int timer_period_in_ms; } Popup;
+typedef struct { Popup* popup;void* widget;void* notifications; } NfcApp;
+typedef int Canvas;
+static int icons,texts,widget_resets,sequence_reset_green;
+static void canvas_clear(Canvas* c) { (void)c; }
+static void canvas_set_color(Canvas* c,int v) { (void)c;(void)v; }
+static void canvas_set_font(Canvas* c,int v) { (void)c;(void)v; }
+static void canvas_draw_icon(Canvas* c,int x,int y,void* i) { (void)c;(void)x;(void)y;(void)i;icons++; }
+static void elements_multiline_text_aligned(Canvas* c,int x,int y,int h,int v,const char* t) {
+ (void)c;(void)x;(void)y;(void)h;(void)v;assert(t);texts++;
+}
+static void widget_reset(void* w) { (void)w;widget_resets++; }
+static void notification_message_block(void* n,void* s) { (void)n;(void)s; }
+""" + production + r"""
+int main(void) {
+ PopupModel m={.header={.text="Parsing"},.icon={12,23,(void*)1}};
+ Popup p={.view=&m,.callback=(void*)1,.context=(void*)1,.timer_enabled=true,.timer_period_in_ms=100};
+ NfcApp app={.popup=&p};Canvas c=0;
+ popup_view_draw_callback(&c,&m);assert(icons==1);
+ nfc_protocol_support_scene_read_success_on_exit(&app);
+ assert(widget_resets==1 && !p.callback && !p.context && !p.timer_enabled);
+ m.header.text="Keys Saved";m.text.text="New keys: 2\nAlready known: 3";
+ icons=texts=0;popup_view_draw_callback(&c,&m);assert(icons==0 && texts==2);
+ m.header.text="Field is on";icons=0;popup_view_draw_callback(&c,&m);assert(icons==0);
+ // Reusing the parser popup and leaving it again remains idempotent.
+ m.icon.icon=(void*)1;nfc_protocol_support_scene_read_success_on_exit(&app);
+ icons=0;popup_view_draw_callback(&c,&m);assert(icons==0);
+ return 0;
+}
+""")
+
     def test_external_tx_timeout_releases_bus_and_disables_amplifier(self):
         source = (ROOT / "applications/drivers/subghz/cc1101_ext/cc1101_ext.c").read_text()
         production = function(source, "bool subghz_device_cc1101_ext_tx(")
