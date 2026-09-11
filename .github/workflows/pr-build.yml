@@ -111,6 +111,8 @@ jobs:
         shell: bash
         run: |
           python3 tools/tumoflip/test_gui_startup_loading.py
+          python3 tools/tumoflip/test_view_dispatcher_id.py
+          python3 tools/tumoflip/test_api88_ccid.py
           python3 tools/tumoflip/test_loader_fap_loading.py
           python3 tools/tumoflip/test_hotplug_assets.py
           python3 -m tools.tumoflip.test_toyota_vag_diagnostics

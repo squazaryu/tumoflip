@@ -18,4 +18,4 @@ this directory. The `minmea` private library keeps its upstream license files.
 
 The FAP is package-only and is delivered through Tumoflip FW Packages at
 `/ext/apps/GPIO/nearby_files.fap`; the upstream Community Apps copy is intentionally
-excluded from the TumoCompanion install list so only the API-88.6 adaptation is used.
+excluded from the TumoCompanion install list so only the API-88.7 adaptation is used.

@@ -1,3 +1,9 @@
+## Tumoflip Dev 008-027
+- GUI: **Expose `view_dispatcher_check_id()`** so FAPs can test view-ID availability without mutating the dispatcher or tripping the duplicate-ID guard. Adapted from official Flipper firmware PR #4422.
+- API: F7 advances from `88.6` to `88.7`; the maintained F18 compatibility target advances from `88.0` to `88.1`. Existing FAPs are rebuilt from the same release tree.
+- Upstream audit: official Flipper `1.5.0-rc` parity was reviewed; Elplast, Cardin S449, date/time input, canvas buffer, storage boot handling, and the relevant NFC/GUI safeguards are already present in Tumoflip. The incomplete hotel parser was not imported.
+- ARF audit: `51d4700d`, `892092a1`, and `51efff55` remain excluded because of Toyota/PSA2 regressions, broad unvalidated protocol rewrites, a committed object file, and an absent phone-side BLE offload implementation.
+
 ## Tumoflip v1.0.7 / t-flppr-fw-007
 - Current API: 88.4 (F7 stable API for t-flppr-fw-007)
 * JS Runner and NFC FAPs can resolve shared soft-float helpers from the F7 firmware, reducing duplicated libgcc code while keeping the shared-library path explicit for compatible FAPs.
