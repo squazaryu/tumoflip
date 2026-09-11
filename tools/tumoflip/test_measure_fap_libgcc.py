@@ -40,7 +40,7 @@ class MeasureFapLibgccTest(unittest.TestCase):
             )
 
         self.assertEqual(report["schema"], 1)
-        self.assertEqual(report["api_version"], "88.6")
+        self.assertEqual(report["api_version"], "88.7")
         self.assertEqual(report["artifacts"][0]["bytes"], 7)
 
 
