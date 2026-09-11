@@ -139,6 +139,8 @@ jobs:
             tools/tumoflip/test_dependency_pins.py \
             tools/tumoflip/test_file_browser_momentum.py \
             tools/tumoflip/test_gui_startup_loading.py \
+            tools/tumoflip/test_view_dispatcher_id.py \
+            tools/tumoflip/test_api88_ccid.py \
             tools/tumoflip/test_loader_fap_loading.py \
             tools/tumoflip/test_hotplug_assets.py \
             tools/tumoflip/test_toyota_vag_diagnostics.py \

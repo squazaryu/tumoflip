@@ -101,7 +101,7 @@ class UpstreamE6ProtocolsTest(unittest.TestCase):
         self.assertIn('entry_point="nice_o_code_app"', nice_manifest)
         self.assertIn("Nice O-Code", self.read("applications/system/nice_o_code/nice_o_code.c"))
         self.assertIn("Security+ PIN", self.read("applications/system/secplus_pin/secplus_pin.c"))
-        self.assertRegex(api, r"(?m)^Version,\+,88\.6,,$")
+        self.assertRegex(api, r"(?m)^Version,\+,88\.7,,$")
         for symbol in (
             "subghz_protocol_nice_o_mask",
             "subghz_protocol_nice_o_get_parcel",
