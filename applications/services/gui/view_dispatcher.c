@@ -154,7 +154,7 @@ void view_dispatcher_stop(ViewDispatcher* view_dispatcher) {
 }
 
 bool view_dispatcher_check_id(ViewDispatcher* view_dispatcher, uint32_t view_id) {
-    furi_check(view_dispatcher);
+    if(!view_dispatcher) return false;
     return ViewDict_get(view_dispatcher->views, view_id) == NULL;
 }
 

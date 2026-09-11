@@ -45,7 +45,7 @@ class ViewDispatcherIdContractTest(unittest.TestCase):
         )
         self.assertIsNotNone(match)
         body = match.group("body")
-        self.assertIn("furi_check(view_dispatcher);", body)
+        self.assertIn("if(!view_dispatcher) return false;", body)
         self.assertIn("ViewDict_get(view_dispatcher->views, view_id) == NULL", body)
         self.assertNotIn("ViewDict_set_at", body)
         self.assertNotIn("ViewDict_erase", body)
