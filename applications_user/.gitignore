@@ -71,3 +71,5 @@
 !esp_flasher/**
 !nearby_files/
 !nearby_files/**
+!weather_editor/
+!weather_editor/**
