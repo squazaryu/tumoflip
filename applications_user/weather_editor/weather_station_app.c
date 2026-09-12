@@ -448,8 +448,8 @@ WeatherStationApp* weather_station_app_alloc() {
 }
 
 void weather_station_app_free(WeatherStationApp* app) {
-    weather_lab_release(app, true);
     if(!app) return;
+    weather_lab_release(app, false);
 
     app->editor_settings.display_fahrenheit =
         app->temperature_unit == WeatherEditorTemperatureUnitFahrenheit;

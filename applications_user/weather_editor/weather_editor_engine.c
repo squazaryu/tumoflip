@@ -1,6 +1,7 @@
 #include "weather_editor_engine.h"
 #include "weather_editor_encoders_ext.h"
 #include "weather_editor_tx_variant.h"
+#include "weather_editor_validation.h"
 
 #include <storage/storage.h>
 #include <lib/subghz/blocks/math.h>
@@ -9,6 +10,7 @@
 #include <lib/toolbox/stream/stream.h>
 #include <toolbox/stream/file_stream.h>
 #include <stdint.h>
+#include <math.h>
 #include <string.h>
 
 #define TAG "WeatherEditorEngine"
@@ -195,7 +197,11 @@ bool weather_editor_state_load(WeatherEditorState* state, FlipperFormat* format)
     flipper_format_rewind(format);
     if(!flipper_format_read_string(format, "Protocol", state->protocol_name)) return false;
 
-    if(read_u32_optional(format, "Bit", &tmp)) state->bit_count = (uint8_t)tmp;
+    if(read_u32_optional(format, "Bit", &tmp)) {
+        if(!weather_editor_bits_valid(furi_string_get_cstr(state->protocol_name), tmp, 0, 0))
+            return false;
+        state->bit_count = (uint8_t)tmp;
+    }
     if(read_u32_optional(format, "Id", &tmp)) state->id = tmp;
     if(read_u32_optional(format, "Ch", &tmp)) state->channel = (uint8_t)tmp;
     if(read_u32_optional(format, "Btn", &tmp) && tmp != 0xFFU) {
@@ -207,6 +213,7 @@ bool weather_editor_state_load(WeatherEditorState* state, FlipperFormat* format)
 
     flipper_format_rewind(format);
     if(flipper_format_read_float(format, "Temp", &temp, 1)) {
+        if(!isfinite(temp) || temp < -10000.0f || temp > 10000.0f) return false;
         state->temperature_tenths = (int32_t)(temp * 10.0f + (temp >= 0 ? 0.5f : -0.5f));
     }
 
@@ -219,6 +226,7 @@ bool weather_editor_state_load(WeatherEditorState* state, FlipperFormat* format)
     state->edited_data = state->original_data;
 
     if(read_u32_optional(format, "VarBits", &tmp)) {
+        if(tmp > 64U) return false;
         state->var_bits = (uint8_t)tmp;
         flipper_format_rewind(format);
         if(protocol_is(state, "Oregon2")) {
@@ -235,6 +243,7 @@ bool weather_editor_state_load(WeatherEditorState* state, FlipperFormat* format)
     }
 
     if(read_u32_optional(format, "FrameBits", &tmp)) {
+        if(tmp > 128U) return false;
         state->frame_bits = (uint8_t)tmp;
         flipper_format_rewind(format);
         flipper_format_read_hex(
@@ -1118,6 +1127,10 @@ bool weather_editor_load_profile(
                 }
                 flipper_format_rewind(fff);
                 if(!flipper_format_read_hex(fff, "Custom_preset_data", new_preset_data, preset_count)) break;
+                if(!weather_editor_preset_valid(new_preset_data, preset_count)) {
+                    if(status) furi_string_set(status, "Invalid custom preset");
+                    break;
+                }
                 preset->data_size = preset_count;
             } else {
                 preset->data_size = 0;
@@ -1175,6 +1188,15 @@ bool weather_editor_load_profile(
         flipper_format_rewind(fff);
         if(!flipper_format_read_hex(fff, "FrameLower", lower_bytes, sizeof(lower_bytes))) break;
 
+        if(!weather_editor_bits_valid(
+               furi_string_get_cstr(protocol), bit_count, var_bits, frame_bits) ||
+           channel > UINT8_MAX || battery_kind > WeatherEditorBatteryPercent || button > 1U ||
+           temperature_tenths < -100000 || temperature_tenths > 100000 ||
+           humidity > UINT8_MAX || battery < 0 || battery > UINT8_MAX) {
+            if(status) furi_string_set(status, "Invalid profile fields");
+            break;
+        }
+
         uint32_t preset_count = 0;
         flipper_format_rewind(fff);
         if(flipper_format_get_value_count(fff, "CustomPresetData", &preset_count) && preset_count) {
@@ -1189,6 +1211,10 @@ bool weather_editor_load_profile(
             }
             flipper_format_rewind(fff);
             if(!flipper_format_read_hex(fff, "CustomPresetData", new_preset_data, preset_count)) break;
+            if(!weather_editor_preset_valid(new_preset_data, preset_count)) {
+                if(status) furi_string_set(status, "Invalid custom preset");
+                break;
+            }
             preset->data_size = preset_count;
         } else {
             preset->data_size = 0;
