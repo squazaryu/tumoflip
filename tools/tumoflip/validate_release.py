@@ -137,11 +137,13 @@ MODULE_ONE_PACKAGE_FILES = (
 # tumoflip-packages.zip because their lifecycle is owned by FW Packages.
 QUAC_PACKAGE_FILE = "apps/Tools/quac.fap"
 NEARBY_FILES_PACKAGE_FILE = "apps/GPIO/nearby_files.fap"
+WEATHER_EDITOR_PACKAGE_FILE = "apps/Sub-GHz/weather_editor.fap"
 PACKAGE_ONLY_PACKAGE_FILES = frozenset(
     {
         "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
         QUAC_PACKAGE_FILE,
         NEARBY_FILES_PACKAGE_FILE,
+        WEATHER_EDITOR_PACKAGE_FILE,
     }
 )
 TOTP_CLI_PLUGIN_APP_IDS = (
@@ -180,6 +182,7 @@ PACKAGE_ONLY_PACKAGE_GROUPS = {
     "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap": "module_one",
     QUAC_PACKAGE_FILE: "base",
     NEARBY_FILES_PACKAGE_FILE: "base",
+    WEATHER_EDITOR_PACKAGE_FILE: "base",
 }
 PACKAGE_RELEASE_OVERLAY_GROUPS = {
     **PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -340,6 +343,7 @@ def package_extapp_exports() -> dict[str, str]:
     exports["morse_player.fap"] = MORSE_PLAYER_PACKAGE_FILE
     exports["quac.fap"] = QUAC_PACKAGE_FILE
     exports["nearby_files.fap"] = NEARBY_FILES_PACKAGE_FILE
+    exports["weather_editor.fap"] = WEATHER_EDITOR_PACKAGE_FILE
     exports["module_one_cockpit.fap"] = "apps/Module One/Diagnostics/cockpit.fap"
     exports.update(
         {
@@ -883,6 +887,7 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             resources / MORSE_PLAYER_PACKAGE_FILE,
             resources / "apps/Tools/quac.fap",
             resources / "apps/GPIO/nearby_files.fap",
+            resources / WEATHER_EDITOR_PACKAGE_FILE,
             resources / "apps/Tools/tumoflip_packages.fap",
             resources / "apps/Tools/totp.fap",
         ]
