@@ -15,7 +15,9 @@ void weather_station_scene_simulation_on_enter(void* context) {
 
     weather_station_release_rx_core(app);
     submenu_reset(app->submenu);
-    submenu_set_header(app->submenu, "Simulation - protocol");
+    // The standard submenu header uses FontPrimary without fitting; keep it
+    // short enough for the 128px display and let the list provide context.
+    submenu_set_header(app->submenu, "Simulation");
     for(uint8_t i = 0U; i < WEATHER_EDITOR_PROTOCOL_TEST_COUNT; i++) {
         submenu_add_item(
             app->submenu,

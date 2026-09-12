@@ -168,7 +168,8 @@ static void weather_editor_saved_profiles_build_list(WeatherStationApp* app) {
     if(total_count == 0U) {
         app->saved_profile_page = 0U;
         char empty_header[32];
-        snprintf(empty_header, sizeof(empty_header), "%s - no saved files", source_label);
+        // Submenu headers are not ellipsized on-device.
+        snprintf(empty_header, sizeof(empty_header), "%s empty", source_label);
         submenu_set_header(app->submenu, empty_header);
     } else {
         const uint32_t page_count =
