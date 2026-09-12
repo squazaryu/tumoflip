@@ -7,7 +7,7 @@
 #include <gui/view_dispatcher.h>
 #include <gui/scene_manager.h>
 #include <gui/modules/submenu.h>
-#include <gui/modules/variable_item_list.h>
+#include "views/weather_variable_item_list.h"
 #include <gui/modules/widget.h>
 #include <gui/modules/number_input.h>
 #include <gui/modules/text_input.h>
@@ -69,7 +69,7 @@ struct WeatherStationApp {
     WeatherStationTxRx* txrx;
     SceneManager* scene_manager;
     NotificationApp* notifications;
-    VariableItemList* variable_item_list;
+    WeatherVariableItemList* variable_item_list;
     Submenu* submenu;
     Widget* widget;
     NumberInput* number_input;

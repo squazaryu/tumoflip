@@ -28,7 +28,7 @@ static void weather_station_app_tick_event_callback(void* context) {
     WeatherStationApp* app = context;
     if(!app) return;
 
-    /* A VariableItemList changes scene from inside a locked model callback.
+    /* A WeatherVariableItemList changes scene from inside a locked model callback.
        Also, ViewDispatcher may still deliver the key-release event to the
        previous view. Keep that previous GUI object alive for one second and
        release it only from a later dispatcher tick. This avoids both freeing
@@ -72,19 +72,19 @@ void weather_station_release_submenu(WeatherStationApp* app) {
 bool weather_station_ensure_variable_item_list(WeatherStationApp* app) {
     if(!app) return false;
     if(app->variable_item_list) return true;
-    app->variable_item_list = variable_item_list_alloc();
+    app->variable_item_list = weather_variable_item_list_alloc();
     if(!app->variable_item_list) return false;
     view_dispatcher_add_view(
         app->view_dispatcher,
         WeatherStationViewVariableItemList,
-        variable_item_list_get_view(app->variable_item_list));
+        weather_variable_item_list_get_view(app->variable_item_list));
     return true;
 }
 
 void weather_station_release_variable_item_list(WeatherStationApp* app) {
     if(!app || !app->variable_item_list) return;
     view_dispatcher_remove_view(app->view_dispatcher, WeatherStationViewVariableItemList);
-    variable_item_list_free(app->variable_item_list);
+    weather_variable_item_list_free(app->variable_item_list);
     app->variable_item_list = NULL;
 }
 

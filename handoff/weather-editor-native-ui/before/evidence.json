@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "reference": "379655d24fb76ea139b405a24236416565eeff81",
+  "renderer": "production C callbacks + repository U8g2 and PNG icons",
+  "models": "controlled display fixtures; no radio or physical LCD timing",
+  "generated_c_sha256": "87b56dba2d9db5a88da33d6c766a7483cf1b46964e1d21428f391aeae65fb850",
+  "address_sanitizer": false,
+  "navigation": "1000 up and down steps, bounded left/right and change callbacks",
+  "text_input": "skipped: known baseline stack overflow",
+  "frames": {
+    "01-menu.pgm": "d303df4fd97bb41f640b925d31c06f7bfb97a5bd932b723fb0bbb5e43e408f1a",
+    "02-menu-bottom.pgm": "0644e67b2ca5427881c6a23cf539e1ca1b5a9d81ae7f9dd23006bedf5539a037",
+    "03-editor-head.pgm": "473568981e72d660b5ad8169859b7f29139e865365fee87089f7f68265ca1389",
+    "04-editor-values.pgm": "5e174c0c483c8da23ef6ca51873f3872c01ccb6e09f19f5d5547d95bd9498126",
+    "05-editor-tail.pgm": "feec912de0c4ef94871d1cefc1af152333d0cee18d232bbcdf50f4b03d6d1930",
+    "06-config.pgm": "dc78e6b9a7540f79717d86962759c670ee6007be224df383c81fa34630e4c075",
+    "07-settings.pgm": "fe44a75e88a5a070edf5a02e371a7d4bdff7c391a4bb8149f6d9045200251083",
+    "08-load.pgm": "43db367cb4f708ebe609c82e360ac7ab9c76d74870d76bc25a5719bf49ff3cc5",
+    "09-files.pgm": "728f27cb22b9ec638963671f0dd4bc9ecd353658f493f4d44120cd65e60bba82",
+    "10-files-next.pgm": "18542d41459b465d8ba9c30e4f4d4209344fa22ce1660f46c90120867eb2e782",
+    "11-empty.pgm": "4bbb79ae3dc901050c5703b28290c16b8a9d5956d9e7803c9505e795ab2798fe",
+    "12-simulation.pgm": "a2c2acd4d11a488191ae5c4a1f6ce7d08531704cd93380c4df107925e1b2ff0b",
+    "13-scan.pgm": "98e0a2fcba80b4d3a86b27d80c77095942cc1340a4a1cd653735d9ee2664d093",
+    "14-stations.pgm": "f51941834b744175fef928907d4422ba967af132b176e0ed4db9c1cd6ea22b6a",
+    "15-details.pgm": "3f3261181a411f5d8148be8e2f22db2769af511c36ce1e09f9e60ebc7e1689ce",
+    "16-details-long.pgm": "069f888ce19903d2d4ba0abad5a3d3aa6b3f3f43b2a9d75ac2fa6b9f2f907644",
+    "17-number-input.pgm": "eed97a296de42d956d337a6c61c9359d0f5306cf6c9594914e1eddc6245d9eb2",
+    "18-result.pgm": "3c055933d03bf26c01f0ffeef9d3feeb5158f1dab9f2f7c0662fbcb380713a30",
+    "19-error.pgm": "2b01ef973408da186b89d4e55d0dca16f9fdfa0cb814b3681f2e51685c015713",
+    "20-about.pgm": "ca50b479cf76e3be5c4b7a6015b5c3a986f7e622781f5677591635b60241b3a9"
+  }
+}

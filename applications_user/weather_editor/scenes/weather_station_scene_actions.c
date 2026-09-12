@@ -39,8 +39,8 @@ typedef enum {
 #define WEATHER_EDITOR_CUSTOM_EVENT_REFRESH_ACTIONS (0x57455246UL)
 
 static void weather_editor_request_actions_refresh(WeatherStationApp* app) {
-    /* Do not reset/rebuild the active VariableItemList from inside
-       a VariableItem callback. On ARF this can trip furi_check because the
+    /* Do not reset/rebuild the active WeatherVariableItemList from inside
+       a WeatherVariableItem callback. On ARF this can trip furi_check because the
        list model is still locked by the GUI callback. The edited values are
        already stored in app->editor; the screen is rebuilt only after a
        normal scene transition. */
@@ -56,13 +56,13 @@ static int32_t weather_editor_display_temperature_tenths(const WeatherStationApp
     return value;
 }
 
-/* VariableItemList przechowuje elementy w dynamicznej tablicy. Wskaznik
-   zwrocony przez variable_item_list_add() moze zostac uniewazniony przez
+/* WeatherVariableItemList przechowuje elementy w dynamicznej tablicy. Wskaznik
+   zwrocony przez weather_variable_item_list_add() moze zostac uniewazniony przez
    kazde kolejne dodanie elementu. Dlatego wskazniki sa uzywane tylko lokalnie,
    zanim do listy zostanie dodany nastepny element. */
 static void weather_editor_set_temperature_text(
     WeatherStationApp* app,
-    VariableItem* item) {
+    WeatherVariableItem* item) {
     if(!app || !app->editor || !item) return;
     const int32_t value = weather_editor_display_temperature_tenths(app);
     const int32_t magnitude = weather_editor_abs_saturated(value);
@@ -75,21 +75,21 @@ static void weather_editor_set_temperature_text(
         (long)(magnitude / 10),
         (long)(magnitude % 10),
         app->temperature_unit == WeatherEditorTemperatureUnitFahrenheit ? "F" : "C");
-    variable_item_set_current_value_text(item, text);
+    weather_variable_item_set_current_value_text(item, text);
 }
 
 static void weather_editor_set_humidity_text(
     const WeatherStationApp* app,
-    VariableItem* item) {
+    WeatherVariableItem* item) {
     if(!app || !app->editor || !item) return;
     char text[24];
     snprintf(text, sizeof(text), "%ld %%", (long)app->editor->humidity);
-    variable_item_set_current_value_text(item, text);
+    weather_variable_item_set_current_value_text(item, text);
 }
 
 static void weather_editor_set_channel_text(
     const WeatherStationApp* app,
-    VariableItem* item) {
+    WeatherVariableItem* item) {
     if(!app || !app->editor || !item) return;
     char text[16];
     if(app->editor_channel_auto && app->editor_received_channel != WS_NO_CHANNEL) {
@@ -97,12 +97,12 @@ static void weather_editor_set_channel_text(
     } else {
         snprintf(text, sizeof(text), "%u", app->editor->channel);
     }
-    variable_item_set_current_value_text(item, text);
+    weather_variable_item_set_current_value_text(item, text);
 }
 
 static void weather_editor_set_frequency_text(
     const WeatherStationApp* app,
-    VariableItem* item) {
+    WeatherVariableItem* item) {
     if(!app || !item) return;
     char text[24];
     const uint32_t hz = app->editor_frequency_hz;
@@ -112,7 +112,7 @@ static void weather_editor_set_frequency_text(
         "%lu.%03lu MHz",
         (unsigned long)(hz / 1000000UL),
         (unsigned long)((hz % 1000000UL) / 1000UL));
-    variable_item_set_current_value_text(item, text);
+    weather_variable_item_set_current_value_text(item, text);
 }
 
 static const SubGhzRadioPreset* weather_editor_get_active_preset(WeatherStationApp* app) {
@@ -127,18 +127,18 @@ static const SubGhzRadioPreset* weather_editor_get_active_preset(WeatherStationA
 
 static void weather_editor_set_auto_tx_interval_text(
     const WeatherStationApp* app,
-    VariableItem* item) {
+    WeatherVariableItem* item) {
     if(!app || !item) return;
     char text[20];
     snprintf(text, sizeof(text), "%u s", app->editor_auto_tx_interval_s);
-    variable_item_set_current_value_text(item, text);
+    weather_variable_item_set_current_value_text(item, text);
 }
 
-static void weather_editor_set_toggle_text(VariableItem* item, bool enabled) {
+static void weather_editor_set_toggle_text(WeatherVariableItem* item, bool enabled) {
     if(!item) return;
     const uint8_t index = enabled ? 1U : 0U;
-    variable_item_set_current_value_index(item, index);
-    variable_item_set_current_value_text(item, weather_editor_off_on[index]);
+    weather_variable_item_set_current_value_index(item, index);
+    weather_variable_item_set_current_value_text(item, weather_editor_off_on[index]);
 }
 
 static void weather_editor_stop_auto_tx(WeatherStationApp* app) {
@@ -333,53 +333,53 @@ static void weather_editor_set_temperature_from_display(
     }
 }
 
-static void weather_editor_minus_changed(VariableItem* item) {
+static void weather_editor_minus_changed(WeatherVariableItem* item) {
     if(!item) return;
-    WeatherStationApp* app = variable_item_get_context(item);
+    WeatherStationApp* app = weather_variable_item_get_context(item);
     if(!app || !app->editor || !app->editor->has_temperature) return;
-    uint8_t index = variable_item_get_current_value_index(item);
+    uint8_t index = weather_variable_item_get_current_value_index(item);
     if(index > 1U) index = 0U;
     const int32_t current = weather_editor_display_temperature_tenths(app);
     const int32_t magnitude = weather_editor_abs_saturated(current);
     app->temperature_negative = index == 1U;
     weather_editor_set_temperature_from_display(
         app, app->temperature_negative ? -magnitude : magnitude);
-    variable_item_set_current_value_index(item, index);
-    variable_item_set_current_value_text(item, weather_editor_off_on[index]);
-    /* Odswiez Temperature dopiero po wyjsciu z callbacku VariableItemList.
+    weather_variable_item_set_current_value_index(item, index);
+    weather_variable_item_set_current_value_text(item, weather_editor_off_on[index]);
+    /* Odswiez Temperature dopiero po wyjsciu z callbacku WeatherVariableItemList.
        Resetowanie lub dotykanie innych elementow w tym callbacku jest
        niebezpieczne, bo lista trzyma elementy w relokowanej tablicy. */
     weather_editor_request_actions_refresh(app);
 }
 
-static void weather_editor_battery_changed(VariableItem* item) {
+static void weather_editor_battery_changed(WeatherVariableItem* item) {
     if(!item) return;
-    WeatherStationApp* app = variable_item_get_context(item);
+    WeatherStationApp* app = weather_variable_item_get_context(item);
     if(!app || !app->editor || app->editor->battery_kind != WeatherEditorBatteryFlag) return;
-    uint8_t index = variable_item_get_current_value_index(item);
+    uint8_t index = weather_variable_item_get_current_value_index(item);
     if(index > 1U) index = 0U;
     app->editor->battery = index ? 1 : 0;
-    variable_item_set_current_value_index(item, index);
-    variable_item_set_current_value_text(item, weather_editor_battery_flag[index]);
+    weather_variable_item_set_current_value_index(item, index);
+    weather_variable_item_set_current_value_text(item, weather_editor_battery_flag[index]);
 }
 
-static void weather_editor_button_changed(VariableItem* item) {
+static void weather_editor_button_changed(WeatherVariableItem* item) {
     if(!item) return;
-    WeatherStationApp* app = variable_item_get_context(item);
+    WeatherStationApp* app = weather_variable_item_get_context(item);
     if(!app || !app->editor || !app->editor->has_button) return;
-    uint8_t index = variable_item_get_current_value_index(item);
+    uint8_t index = weather_variable_item_get_current_value_index(item);
     if(index > 1U) index = 0U;
     app->editor->button = index ? 1U : 0U;
-    variable_item_set_current_value_index(item, index);
-    variable_item_set_current_value_text(item, weather_editor_off_on[index]);
+    weather_variable_item_set_current_value_index(item, index);
+    weather_variable_item_set_current_value_text(item, weather_editor_off_on[index]);
 }
 
-static void weather_editor_channel_mode_changed(VariableItem* item) {
+static void weather_editor_channel_mode_changed(WeatherVariableItem* item) {
     if(!item) return;
-    WeatherStationApp* app = variable_item_get_context(item);
+    WeatherStationApp* app = weather_variable_item_get_context(item);
     if(!app || !app->editor || !app->editor->has_channel) return;
 
-    uint8_t index = variable_item_get_current_value_index(item);
+    uint8_t index = weather_variable_item_get_current_value_index(item);
     if(index > 1U) index = 0U;
     app->editor_channel_auto = index == 0U;
 
@@ -400,16 +400,16 @@ static void weather_editor_channel_mode_changed(VariableItem* item) {
         app->editor->channel = weather_editor_sanitize_channel(app->editor, candidate);
     }
 
-    variable_item_set_current_value_index(item, index);
-    variable_item_set_current_value_text(item, weather_editor_channel_modes[index]);
+    weather_variable_item_set_current_value_index(item, index);
+    weather_variable_item_set_current_value_text(item, weather_editor_channel_modes[index]);
     weather_editor_request_actions_refresh(app);
 }
 
-static void weather_editor_auto_tx_changed(VariableItem* item) {
+static void weather_editor_auto_tx_changed(WeatherVariableItem* item) {
     if(!item) return;
-    WeatherStationApp* app = variable_item_get_context(item);
+    WeatherStationApp* app = weather_variable_item_get_context(item);
     if(!app || !app->editor || !app->editor->encoder_available) return;
-    uint8_t index = variable_item_get_current_value_index(item);
+    uint8_t index = weather_variable_item_get_current_value_index(item);
     if(index > 1U) index = 0U;
 
     app->editor_auto_tx_enabled = index == 1U;
@@ -612,13 +612,13 @@ static void weather_editor_map_action(WeatherStationApp* app, uint32_t action) {
     }
 }
 
-static VariableItem* weather_editor_add_readonly_item(
-    VariableItemList* list,
+static WeatherVariableItem* weather_editor_add_readonly_item(
+    WeatherVariableItemList* list,
     const char* label,
     uint32_t action,
     WeatherStationApp* app) {
     if(!list || !label || !app) return NULL;
-    VariableItem* item = variable_item_list_add(list, label, 1, NULL, app);
+    WeatherVariableItem* item = weather_variable_item_list_add(list, label, 1, NULL, app);
     if(item) weather_editor_map_action(app, action);
     return item;
 }
@@ -634,8 +634,8 @@ void weather_station_scene_actions_on_enter(void* context) {
        przy zmianie temperatury/minusa, powrocie z NumberInput i Auto TX. */
     weather_editor_suspend_rx_core(app);
 
-    VariableItemList* list = app->variable_item_list;
-    variable_item_list_reset(list);
+    WeatherVariableItemList* list = app->variable_item_list;
+    weather_variable_item_list_reset(list);
     app->editor_action_count = 0;
 
     if(app->editor && app->editor->has_channel) {
@@ -647,10 +647,10 @@ void weather_station_scene_actions_on_enter(void* context) {
         }
     }
 
-    VariableItem* protocol_item = weather_editor_add_readonly_item(
+    WeatherVariableItem* protocol_item = weather_editor_add_readonly_item(
         list, "Protocol", WeatherEditorActionNone, app);
     if(protocol_item) {
-        variable_item_set_current_value_text(
+        weather_variable_item_set_current_value_text(
             protocol_item, furi_string_get_cstr(app->editor->protocol_name));
     }
 
@@ -658,20 +658,20 @@ void weather_station_scene_actions_on_enter(void* context) {
         app->editor_simulation_mode &&
                 weather_editor_simulation_id_editable(app->editor_simulation_protocol_index) ?
             WeatherEditorActionSensorId : WeatherEditorActionNone;
-    VariableItem* id_item = weather_editor_add_readonly_item(
+    WeatherVariableItem* id_item = weather_editor_add_readonly_item(
         list, "Sensor ID", id_action, app);
     char id_text[20];
     snprintf(id_text, sizeof(id_text), "0x%08lX", (unsigned long)app->editor->id);
-    if(id_item) variable_item_set_current_value_text(id_item, id_text);
+    if(id_item) weather_variable_item_set_current_value_text(id_item, id_text);
 
-    VariableItem* bit_item = weather_editor_add_readonly_item(
+    WeatherVariableItem* bit_item = weather_editor_add_readonly_item(
         list, "Frame bits", WeatherEditorActionNone, app);
     char bit_text[8];
     snprintf(bit_text, sizeof(bit_text), "%u", app->editor->bit_count);
-    if(bit_item) variable_item_set_current_value_text(bit_item, bit_text);
+    if(bit_item) weather_variable_item_set_current_value_text(bit_item, bit_text);
 
-    VariableItem* frequency_item = weather_editor_add_readonly_item(
-        list, "TX frequency", WeatherEditorActionFrequency, app);
+    WeatherVariableItem* frequency_item = weather_editor_add_readonly_item(
+        list, "TX freq.", WeatherEditorActionFrequency, app);
     weather_editor_set_frequency_text(app, frequency_item);
 
     if(!app->editor_loaded_from_profile && !app->editor_simulation_mode) {
@@ -687,11 +687,11 @@ void weather_station_scene_actions_on_enter(void* context) {
         const int32_t display = weather_editor_display_temperature_tenths(app);
         app->temperature_negative = display < 0;
 
-        VariableItem* temperature_item = weather_editor_add_readonly_item(
+        WeatherVariableItem* temperature_item = weather_editor_add_readonly_item(
             list, "Temperature", WeatherEditorActionTemperature, app);
         weather_editor_set_temperature_text(app, temperature_item);
 
-        VariableItem* minus_item = variable_item_list_add(
+        WeatherVariableItem* minus_item = weather_variable_item_list_add(
             list, "Minus", 2, weather_editor_minus_changed, app);
         if(minus_item) {
             weather_editor_map_action(app, WeatherEditorActionMinus);
@@ -700,52 +700,52 @@ void weather_station_scene_actions_on_enter(void* context) {
     }
 
     if(app->editor->has_humidity) {
-        VariableItem* humidity_item = weather_editor_add_readonly_item(
+        WeatherVariableItem* humidity_item = weather_editor_add_readonly_item(
             list, "Humidity", WeatherEditorActionHumidity, app);
         weather_editor_set_humidity_text(app, humidity_item);
     }
 
     if(app->editor->battery_kind == WeatherEditorBatteryFlag) {
-        VariableItem* battery_item = variable_item_list_add(
+        WeatherVariableItem* battery_item = weather_variable_item_list_add(
             list, "Battery", 2, weather_editor_battery_changed, app);
         if(battery_item) {
             weather_editor_map_action(app, WeatherEditorActionBattery);
             const uint8_t index = app->editor->battery ? 1U : 0U;
-            variable_item_set_current_value_index(battery_item, index);
-            variable_item_set_current_value_text(
+            weather_variable_item_set_current_value_index(battery_item, index);
+            weather_variable_item_set_current_value_text(
                 battery_item, weather_editor_battery_flag[index]);
         }
     } else if(app->editor->battery_kind == WeatherEditorBatteryPercent) {
-        VariableItem* battery_item = weather_editor_add_readonly_item(
+        WeatherVariableItem* battery_item = weather_editor_add_readonly_item(
             list, "Battery", WeatherEditorActionBattery, app);
         char text[16];
         snprintf(text, sizeof(text), "%ld %%", (long)app->editor->battery);
-        if(battery_item) variable_item_set_current_value_text(battery_item, text);
+        if(battery_item) weather_variable_item_set_current_value_text(battery_item, text);
     }
 
     if(app->editor->has_button) {
-        VariableItem* button_item = variable_item_list_add(
+        WeatherVariableItem* button_item = weather_variable_item_list_add(
             list, "Button", 2, weather_editor_button_changed, app);
         if(button_item) {
             weather_editor_map_action(app, WeatherEditorActionButton);
             const uint8_t index = app->editor->button ? 1U : 0U;
-            variable_item_set_current_value_index(button_item, index);
-            variable_item_set_current_value_text(button_item, weather_editor_off_on[index]);
+            weather_variable_item_set_current_value_index(button_item, index);
+            weather_variable_item_set_current_value_text(button_item, weather_editor_off_on[index]);
         }
     }
 
     if(app->editor->has_channel) {
-        VariableItem* channel_mode_item = variable_item_list_add(
+        WeatherVariableItem* channel_mode_item = weather_variable_item_list_add(
             list, "Channel mode", 2, weather_editor_channel_mode_changed, app);
         if(channel_mode_item) {
             weather_editor_map_action(app, WeatherEditorActionChannelMode);
             const uint8_t mode_index = app->editor_channel_auto ? 0U : 1U;
-            variable_item_set_current_value_index(channel_mode_item, mode_index);
-            variable_item_set_current_value_text(
+            weather_variable_item_set_current_value_index(channel_mode_item, mode_index);
+            weather_variable_item_set_current_value_text(
                 channel_mode_item, weather_editor_channel_modes[mode_index]);
         }
 
-        VariableItem* channel_item = weather_editor_add_readonly_item(
+        WeatherVariableItem* channel_item = weather_editor_add_readonly_item(
             list, "Channel", WeatherEditorActionChannel, app);
         weather_editor_set_channel_text(app, channel_item);
     }
@@ -763,11 +763,11 @@ void weather_station_scene_actions_on_enter(void* context) {
             list, app->editor_simulation_mode ? "Send" : "Send edit",
             WeatherEditorActionSendEdited, app);
 
-        VariableItem* interval_item = weather_editor_add_readonly_item(
-            list, "Auto TX interval", WeatherEditorActionTxInterval, app);
+        WeatherVariableItem* interval_item = weather_editor_add_readonly_item(
+            list, "TX interval", WeatherEditorActionTxInterval, app);
         weather_editor_set_auto_tx_interval_text(app, interval_item);
 
-        VariableItem* auto_tx_item = variable_item_list_add(
+        WeatherVariableItem* auto_tx_item = weather_variable_item_list_add(
             list, "Auto TX", 2, weather_editor_auto_tx_changed, app);
         if(auto_tx_item) {
             weather_editor_map_action(app, WeatherEditorActionAutoTxToggle);
@@ -776,11 +776,11 @@ void weather_station_scene_actions_on_enter(void* context) {
 
     }
 
-    variable_item_list_set_enter_callback(list, weather_editor_enter_callback, app);
+    weather_variable_item_list_set_enter_callback(list, weather_editor_enter_callback, app);
     const uint32_t selected =
         scene_manager_get_scene_state(app->scene_manager, WeatherStationSceneActions);
     if(selected < app->editor_action_count) {
-        variable_item_list_set_selected_item(list, (uint8_t)selected);
+        weather_variable_item_list_set_selected_item(list, (uint8_t)selected);
     }
     view_dispatcher_switch_to_view(app->view_dispatcher, WeatherStationViewVariableItemList);
     weather_station_release_inactive_gui_views(app, WeatherStationViewVariableItemList);
@@ -789,7 +789,7 @@ void weather_station_scene_actions_on_enter(void* context) {
 static void weather_editor_refresh_actions_scene(WeatherStationApp* app) {
     if(!app || !app->scene_manager || !app->variable_item_list) return;
     const uint8_t selected =
-        variable_item_list_get_selected_item_index(app->variable_item_list);
+        weather_variable_item_list_get_selected_item_index(app->variable_item_list);
     scene_manager_set_scene_state(
         app->scene_manager, WeatherStationSceneActions, selected);
     weather_station_scene_actions_on_enter(app);
@@ -851,7 +851,7 @@ bool weather_station_scene_actions_on_event(void* context, SceneManagerEvent eve
 void weather_station_scene_actions_on_exit(void* context) {
     WeatherStationApp* app = context;
     if(!app) return;
-    /* Do not free the active VariableItemList here. The destination scene
+    /* Do not free the active WeatherVariableItemList here. The destination scene
        switches to its own view first and then releases this inactive module. */
     app->editor_auto_tx_enabled = false;
     app->editor_auto_tx_elapsed_ds = 0;

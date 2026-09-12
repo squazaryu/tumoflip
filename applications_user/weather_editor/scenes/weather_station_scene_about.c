@@ -48,9 +48,7 @@ void weather_station_scene_about_on_enter(void* context) {
         AlignBottom,
         "\e#\e!         Weather Editor       \e!\n",
         false);
-    widget_add_text_scroll_element(app->widget, 0, 16, 128, 50, furi_string_get_cstr(temp_str));
-    widget_add_button_element(
-        app->widget, GuiButtonTypeCenter, "", weather_station_scene_about_widget_callback, app);
+    widget_add_text_scroll_element(app->widget, 0, 16, 128, 44, furi_string_get_cstr(temp_str));
     app->lab_about_taps = 0U;
     app->lab_about_last_tick = 0U;
     furi_string_free(temp_str);
