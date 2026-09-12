@@ -932,9 +932,11 @@ bool weather_editor_save_profile(
         return false;
     }
     bool ok = false;
+    bool created = false;
     do {
         // Existing profiles remain intact when a save is retried.
-        if(!flipper_format_file_open_new(fff, path)) break;
+        created = flipper_format_file_open_new(fff, path);
+        if(!created) break;
         if(!flipper_format_write_header_cstr(fff, "Weather Lab Profile", 1)) break;
         if(!flipper_format_write_string_cstr(
                fff, "Protocol", furi_string_get_cstr(state->protocol_name)))
@@ -996,7 +998,11 @@ bool weather_editor_save_profile(
         ok = true;
     } while(false);
 
-    flipper_format_file_close(fff);
+    if(created) {
+        const bool closed = flipper_format_file_close(fff);
+        ok = ok && closed;
+        if(!ok) storage_common_remove(storage, path);
+    }
     flipper_format_free(fff);
     furi_record_close(RECORD_STORAGE);
 
