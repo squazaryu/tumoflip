@@ -84,6 +84,7 @@ static void widget_element_text_scroll_fill_lines(Canvas* canvas, WidgetElement*
 
         uint8_t line_width = 0;
         uint16_t char_i = 0;
+        uint16_t last_space = 0;
         while(true) {
             char next_char = furi_string_get_char(model->text, char_i++);
             if(next_char == '\0') {
@@ -102,14 +103,23 @@ static void widget_element_text_scroll_fill_lines(Canvas* canvas, WidgetElement*
             } else {
                 line_width += canvas_glyph_width(canvas, next_char);
                 if(line_width > model->width) {
+                    // Prefer a word boundary. Long indivisible tokens such as
+                    // file paths still use character wrapping to remain readable.
+                    uint16_t consumed = char_i - 1;
+                    if(last_space > 0) {
+                        furi_string_left(line_tmp.text, last_space);
+                        consumed = last_space + 1;
+                        while(furi_string_get_char(model->text, consumed) == ' ') consumed++;
+                    }
                     furi_string_push_back(line_tmp.text, '\0');
                     widget_element_text_scroll_add_line(element, &line_tmp);
-                    furi_string_right(model->text, char_i - 1);
+                    furi_string_right(model->text, consumed);
                     furi_string_reset(line_tmp.text);
                     total_height += params->leading_default - params->height;
                     reached_new_line = false;
                     break;
                 } else {
+                    if(next_char == ' ') last_space = char_i - 1;
                     furi_string_push_back(line_tmp.text, next_char);
                 }
             }
@@ -141,7 +151,7 @@ static void widget_element_text_scroll_draw(Canvas* canvas, WidgetElement* eleme
             if(curr_line < model->scroll_pos_current) continue;
             TextScrollLineArray* line = TextScrollLineArray_ref(it);
             const CanvasFontParameters* params = canvas_get_font_params(canvas, line->font);
-            if(y + params->descender > model->y + model->height) break;
+            if(y + params->height + params->descender > model->y + model->height) break;
             canvas_set_font(canvas, line->font);
             if(line->horizontal == AlignLeft) {
                 x = model->x;
@@ -231,6 +241,7 @@ WidgetElement* widget_element_text_scroll_create(
     model->height = height;
     model->scroll_pos_current = 0;
     model->scroll_pos_total = 1;
+    model->text_formatted = false;
     TextScrollLineArray_init(model->line_array);
     model->text = furi_string_alloc_set(text);
 

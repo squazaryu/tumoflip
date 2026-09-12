@@ -11,6 +11,7 @@ import tempfile
 import os
 import json
 import hashlib
+import sys
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,6 +42,10 @@ SUPPORT = r'''
 #include <stdarg.h>
 #include <math.h>
 #include <errno.h>
+#ifndef __APPLE__
+static size_t host_strlcpy(char* dst,const char* src,size_t size) {size_t n=strlen(src);if(size){size_t copied=n<size?n:size-1;memcpy(dst,src,copied);dst[copied]=0;}return n;}
+#define strlcpy host_strlcpy
+#endif
 #define furi_check assert
 #define furi_assert assert
 #define furi_crash() abort()
@@ -185,12 +190,26 @@ static void text_scroll(Canvas* c,int x,int y,int width,int height,const char* t
     for(size_t i=0;i<TextScrollLineArray_size(model.line_array);i++)furi_string_free(TextScrollLineArray_get(model.line_array,i)->text);
     TextScrollLineArray_clear(model.line_array);furi_string_free(model.text);
 }
+static void check_word_wrap(Canvas* c) {
+    const char* text="Invalid custom preset. The selected file was not loaded. The current capture remains unchanged.";
+    WidgetElementTextScrollModel model={.x=2,.y=18,.width=120,.height=44,.text=furi_string_alloc_set(text),.scroll_pos_total=1};
+    TextScrollLineArray_init(model.line_array);WidgetElement element={.model=&model};
+    widget_element_text_scroll_fill_lines(c,&element);
+    char restored[256]={0};
+    for(size_t i=0;i<TextScrollLineArray_size(model.line_array);i++) {
+        FuriString* line=TextScrollLineArray_get(model.line_array,i)->text;
+        if(i)strcat(restored," ");strcat(restored,line->data);furi_string_free(line);
+    }
+    assert(!strcmp(restored,text));
+    TextScrollLineArray_clear(model.line_array);furi_string_free(model.text);
+}
 int main(int argc,char** argv) {
     assert(argc==2);check_navigation();Canvas c={0};static uint8_t buf[1024];
     static const u8x8_display_info_t info={.tile_width=16,.tile_height=8,.pixel_width=128,.pixel_height=64};
     c.fb.u8x8.display_info=&info;
     u8g2_SetupBuffer(&c.fb,buf,8,u8g2_ll_hvline_vertical_top_lsb,U8G2_R0);
     canvas_set_font(&c,FontSecondary);canvas_set_color(&c,ColorBlack);
+    CHECK_WORD_WRAP
     const char* menu_labels[]={"Receiver","Load saved","Settings","Simulation","Info"};
     menu(&c,argv[1],"01-menu","Weather Editor",menu_labels,5,0,0);
     menu(&c,argv[1],"02-menu-bottom","Weather Editor",menu_labels,5,4,2);
@@ -328,6 +347,7 @@ def build_source(ref, skip_text_input=False):
         assets.append(f"static const Icon {symbol}={{{w},{h},{symbol}_data}};")
     chunks.insert(1,"\n".join(assets))
     driver=DRIVER
+    driver=driver.replace("CHECK_WORD_WRAP","" if ref else "check_word_wrap(&c);")
     actions=read("applications_user/weather_editor/scenes/weather_station_scene_actions.c",ref)
     if 'list, "TX freq."' in actions:
         driver=driver.replace('"TX frequency"','"TX freq."')
@@ -354,7 +374,8 @@ def main():
         temp=Path(temp);src=temp/"render.c";src.write_text(generated_source)
         sources=[p for p in (ROOT/"lib/u8g2").glob("*.c") if p.name!="u8g2_glue.c"]
         flags=["-fsanitize=address"] if args.sanitize else []
-        subprocess.run(["cc","-std=c11","-O1","-g","-w",*flags,"-ffunction-sections","-Wl,-dead_strip","-I",str(ROOT/"lib/u8g2"),"-I",str(ROOT/"lib/mlib"),str(src),*[str(p) for p in sources],"-o",str(temp/"render")],check=True)
+        link_gc="-Wl,-dead_strip" if sys.platform=="darwin" else "-Wl,--gc-sections"
+        subprocess.run(["cc","-std=c11","-O1","-g","-w",*flags,"-ffunction-sections",link_gc,"-I",str(ROOT/"lib/u8g2"),"-I",str(ROOT/"lib/mlib"),str(src),*[str(p) for p in sources],"-lm","-o",str(temp/"render")],check=True)
         subprocess.run([str(temp/"render"),str(args.output.resolve())],check=True,env={**os.environ,"ASAN_OPTIONS":"detect_leaks=0"})
     for path in sorted(args.output.glob("*.pgm")):
         Image.open(path).resize((768,384),Image.Resampling.NEAREST).save(path.with_suffix(".png"))

@@ -30,6 +30,9 @@ room for the cursor, ellipsis and terminator. AddressSanitizer reproduced the
 baseline failure and passed after the fix, including every cursor position for
 input lengths 0..79. The host adapter does not model firmware task scheduling.
 Navigation checks execute the list's actual up/down/left/right functions.
+Read error text is checked by reconstructing its words from the actual widget
+line array; wrapping must not insert spaces inside words. The scroller now
+wraps at spaces and leaves complete text lines inside its viewport.
 
 Reproduce on macOS using the repository toolchain Python:
 

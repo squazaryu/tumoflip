@@ -164,6 +164,9 @@ jobs:
             updater_package fap_esp_flasher fap_quac fap_subghz_wardriving \
             fap_nearby_files fap_nice_o_code fap_secplus_pin fap_weather_editor
 
+      - name: Render and validate native Weather Editor UI
+        run: toolchain/x86_64-linux/bin/python3 tools/tumoflip/render_weather_native.py /tmp/weather-editor-native-ui --sanitize
+
       - name: Upload firmware artifact
         if: success()
         uses: actions/upload-artifact@v7

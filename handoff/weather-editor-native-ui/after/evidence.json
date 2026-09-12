@@ -3,7 +3,7 @@
   "reference": "working-tree",
   "renderer": "production C callbacks + repository U8g2 and PNG icons",
   "models": "controlled display fixtures; no radio or physical LCD timing",
-  "generated_c_sha256": "38ed9711d7e68029780e16a5f0c14e85882096efb4a8ba1b722c8a640411f523",
+  "generated_c_sha256": "2d8d7924de2c00ed61f2a96363fd42e940c7119169ce7510e1c83629c6282b99",
   "address_sanitizer": true,
   "navigation": "1000 up and down steps, bounded left/right and change callbacks",
   "text_input": "all cursor positions for lengths 0..79",
@@ -26,11 +26,11 @@
     "16-details-long.pgm": "acfc88e2deb20fcebc978e1fb2545814c59e104f44420c0603e058e845fdf011",
     "17-number-input.pgm": "eed97a296de42d956d337a6c61c9359d0f5306cf6c9594914e1eddc6245d9eb2",
     "18-result.pgm": "3c055933d03bf26c01f0ffeef9d3feeb5158f1dab9f2f7c0662fbcb380713a30",
-    "19-error.pgm": "2b01ef973408da186b89d4e55d0dca16f9fdfa0cb814b3681f2e51685c015713",
-    "20-about.pgm": "bd313e09a23cf5460f1360e3421d553c9f404ef06063e87f2fa9791dd3b1a51e",
+    "19-error.pgm": "666b5707b4e431f9cd4ae1046eaeec61dcc6ef854f0024312d1ac35950057028",
+    "20-about.pgm": "460884dc2a690be1dcf5e58023b38d3ef15be28a87d8bb31d4b36fc483664cc3",
     "21-hex-input.pgm": "0fc586511961f986e0c9126911bbe18ccceb6ecc02c6c213feed766864e4915f",
     "22-details-extreme.pgm": "d82551eac1d010c3e42ca523f90f533d0ef290f654fc05961f700cec9b029741",
-    "23-error-scrolled.pgm": "db9142f9d841ba395c470005f2a2e7c160507b0dac95a1d20e9e0fec1c4e9bfa",
+    "23-error-scrolled.pgm": "3b211679a5f2c43c56dcd74964a5311412948c214f37eb0b1f843a9956044a0b",
     "24-scan-external.pgm": "4fb3ce8c3f5c0bb961914a35a95dafdba0360e5613d918f4fa7147bf4a24cef5"
   }
 }
