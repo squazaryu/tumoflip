@@ -325,8 +325,10 @@ def build_source(ref, skip_text_input=False):
     if 'list, "TX interval"' in actions:
         driver=driver.replace('"Auto TX interval"','"TX interval"')
     about=read("applications_user/weather_editor/scenes/weather_station_scene_about.c",ref)
-    scroll_height=re.search(r'widget_add_text_scroll_element\(app->widget, 0, 16, 128, (\d+)',about).group(1)
-    driver=driver.replace('text_scroll(&c,0,16,128,50,','text_scroll(&c,0,16,128,'+scroll_height+',')
+    scroll_geometry=re.search(r'widget_add_text_scroll_element\(app->widget, (\d+), (\d+), (\d+), (\d+)',about).groups()
+    driver=driver.replace('text_scroll(&c,0,16,128,50,','text_scroll(&c,'+','.join(scroll_geometry)+',')
+    if r'\e#Information' not in about:
+        driver=driver.replace(r'\e#Information\nVersion:', 'Version:')
     if 'widget_add_button_element(' not in about:
         driver=driver.replace('elements_button_center(&c,"");save(&c,argv[1],"20-about");','save(&c,argv[1],"20-about");')
     if skip_text_input:

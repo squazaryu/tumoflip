@@ -56,53 +56,56 @@ void ws_view_receiver_info_draw(Canvas* canvas, WSReceiverInfoModel* model) {
 
     // The protocol and channel own separate areas, even with a long protocol name.
     FuriString* title = furi_string_alloc_set(model->protocol_name);
-    elements_string_fit_width(canvas, title, 101);
+    elements_string_fit_width(canvas, title, 95);
     canvas_draw_str(canvas, 2, 8, furi_string_get_cstr(title));
     furi_string_free(title);
     if(model->generic->channel != WS_NO_CHANNEL) {
-        snprintf(buffer, sizeof(buffer), "C%u", model->generic->channel);
+        snprintf(buffer, sizeof(buffer), "Ch:%u", model->generic->channel);
         canvas_draw_str_aligned(canvas, 126, 8, AlignRight, AlignBottom, buffer);
     }
 
     if(model->generic->id != WS_NO_ID) {
-        snprintf(buffer, sizeof(buffer), "ID %lX", (unsigned long)model->generic->id);
-        canvas_draw_str(canvas, 2, 19, buffer);
+        canvas_draw_str(canvas, 2, 18, "ID:");
+        snprintf(buffer, sizeof(buffer), "%lX", (unsigned long)model->generic->id);
+        canvas_draw_str(canvas, 21, 18, buffer);
     }
     snprintf(buffer, sizeof(buffer), "%ub", model->generic->data_count_bit);
-    canvas_draw_str(canvas, 72, 19, buffer);
+    canvas_draw_str_aligned(canvas, 126, 18, AlignRight, AlignBottom, buffer);
+
+    snprintf(buffer, sizeof(buffer), "0x%llX", (unsigned long long)model->generic->data);
+    canvas_draw_str(canvas, 2, 28, buffer);
+    if(model->generic->btn != WS_NO_BTN) {
+        snprintf(buffer, sizeof(buffer), "Button: %u", model->generic->btn);
+        canvas_draw_str(canvas, 2, 38, buffer);
+    }
     if(model->generic->battery_low != WS_NO_BATT) {
         canvas_draw_str_aligned(
-            canvas, 126, 19, AlignRight, AlignBottom,
-            model->generic->battery_low ? "B:LOW" : "B:OK");
+            canvas, 126, 38, AlignRight, AlignBottom,
+            model->generic->battery_low ? "Battery: LOW" : "Battery: OK");
     }
 
-    snprintf(buffer, sizeof(buffer), "%llX", (unsigned long long)model->generic->data);
-    canvas_draw_str(canvas, 2, 30, buffer);
-    if(model->generic->btn != WS_NO_BTN) {
-        snprintf(buffer, sizeof(buffer), "Btn%u", model->generic->btn);
-        canvas_draw_str_aligned(canvas, 126, 30, AlignRight, AlignBottom, buffer);
-    }
-
-    elements_bold_rounded_frame(canvas, 0, 37, 127, 26);
+    canvas_draw_rframe(canvas, 0, 43, 128, 21, 3);
     if(!float_is_equal(model->generic->temp, WS_NO_TEMPERATURE)) {
         const double temperature = model->display_fahrenheit ?
             locale_celsius_to_fahrenheit(model->generic->temp) : model->generic->temp;
-        canvas_draw_icon(canvas, 4, 42, &I_Therm_7x16);
-        snprintf(buffer, sizeof(buffer), "%.1f%s", temperature,
-                 model->display_fahrenheit ? "F" : "C");
-        canvas_draw_str(canvas, 15, 53, buffer);
+        canvas_draw_icon(canvas, 4, 45, &I_Therm_7x16);
+        snprintf(buffer, sizeof(buffer), "%.1f", temperature);
+        canvas_draw_str(canvas, 15, 57, buffer);
+        const int32_t unit_x = 15 + canvas_string_width(canvas, buffer) + 5;
+        canvas_draw_circle(canvas, unit_x - 2, 51, 1);
+        canvas_draw_str(canvas, unit_x + 1, 57, model->display_fahrenheit ? "F" : "C");
     }
     if(model->generic->humidity != WS_NO_HUMIDITY) {
-        canvas_draw_icon(canvas, 65, 43, &I_Humid_8x13);
+        canvas_draw_icon(canvas, 65, 45, &I_Humid_8x13);
         snprintf(buffer, sizeof(buffer), "%u%%", model->generic->humidity);
-        canvas_draw_str(canvas, 77, 53, buffer);
+        canvas_draw_str(canvas, 77, 57, buffer);
     }
     if(model->generic->timestamp > 0 && model->curr_ts >= model->generic->timestamp) {
         const uint32_t seconds = model->curr_ts - model->generic->timestamp;
         if(seconds < 60) snprintf(buffer, sizeof(buffer), "%lus", (unsigned long)seconds);
         else if(seconds < 3600) snprintf(buffer, sizeof(buffer), "%lum", (unsigned long)(seconds / 60));
         else snprintf(buffer, sizeof(buffer), "Old");
-        canvas_draw_str_aligned(canvas, 123, 53, AlignRight, AlignBottom, buffer);
+        canvas_draw_str_aligned(canvas, 123, 57, AlignRight, AlignBottom, buffer);
     }
 }
 

@@ -17,8 +17,7 @@ void weather_station_scene_about_on_enter(void* context) {
     if(!app || !weather_station_ensure_widget(app)) return;
 
     FuriString* temp_str = furi_string_alloc();
-    furi_string_printf(temp_str, "\e#Information\n");
-    furi_string_cat_printf(temp_str, "Version: %s\n", FAP_VERSION);
+    furi_string_printf(temp_str, "Version: %s\n", FAP_VERSION);
     furi_string_cat_printf(temp_str, "Author: %s\n\n", WS_DEVELOPED);
 
 
@@ -48,7 +47,7 @@ void weather_station_scene_about_on_enter(void* context) {
         AlignBottom,
         "\e#\e!         Weather Editor       \e!\n",
         false);
-    widget_add_text_scroll_element(app->widget, 0, 16, 128, 44, furi_string_get_cstr(temp_str));
+    widget_add_text_scroll_element(app->widget, 4, 19, 120, 42, furi_string_get_cstr(temp_str));
     app->lab_about_taps = 0U;
     app->lab_about_last_tick = 0U;
     furi_string_free(temp_str);
