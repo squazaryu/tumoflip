@@ -1046,7 +1046,7 @@ static uint8_t weather_editor_button_from_original(
     return 0U;
 }
 
-bool weather_editor_load_profile(
+static bool weather_editor_read_profile(
     const char* path,
     SubGhzRadioPreset* preset,
     WeatherEditorState* state,
@@ -1282,6 +1282,48 @@ bool weather_editor_load_profile(
         if(ok) furi_string_set(status, "Profile loaded");
         else if(furi_string_size(status) == 0) furi_string_set(status, "Profile read error");
     }
+    return ok;
+}
+
+bool weather_editor_load_profile(
+    const char* path,
+    SubGhzRadioPreset* preset,
+    WeatherEditorState* state,
+    uint8_t** custom_preset_data,
+    FuriString* status) {
+    if(status) furi_string_reset(status);
+    if(!path || !path[0] || !preset || !preset->name || !state ||
+       !state->protocol_name || !custom_preset_data) {
+        if(status) furi_string_set(status, "No profile data");
+        return false;
+    }
+
+    // Parse into private strings and scalar state. Failed reads must not change
+    // the active capture, preset, or the caller's ownership of preset data.
+    WeatherEditorState next_state = *state;
+    next_state.protocol_name = furi_string_alloc();
+    SubGhzRadioPreset next_preset = {
+        .name = furi_string_alloc(), .frequency = 0, .data = NULL, .data_size = 0};
+    uint8_t* next_data = NULL;
+    bool ok = false;
+    if(next_state.protocol_name && next_preset.name) {
+        ok = weather_editor_read_profile(
+            path, &next_preset, &next_state, &next_data, status);
+        if(ok) {
+            weather_editor_state_copy(state, &next_state);
+            furi_string_set(preset->name, next_preset.name);
+            preset->frequency = next_preset.frequency;
+            preset->data = next_data;
+            preset->data_size = next_preset.data_size;
+            *custom_preset_data = next_data;
+            next_data = NULL;
+        }
+    } else if(status) {
+        furi_string_set(status, "No memory for profile");
+    }
+    if(next_state.protocol_name) furi_string_free(next_state.protocol_name);
+    if(next_preset.name) furi_string_free(next_preset.name);
+    free(next_data);
     return ok;
 }
 
