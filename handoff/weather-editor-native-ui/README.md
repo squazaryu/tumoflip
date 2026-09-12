@@ -6,7 +6,8 @@ They are host renders, not photographs or recordings from a Flipper.
 The earlier `/tmp/weather-editor-preview.png` hand-painted mockup is obsolete.
 
 - `after/comparison.png`: four identical scenarios before and after the patch.
-- `after/all-screens.png`: 21 views/states using the current source.
+- `after/all-screens.png`: 24 views/states, including extreme values, scrolled
+  errors and the external-radio scanning screen.
 - `before/all-screens.png`: baseline at `379655d24fb76ea139b405a24236416565eeff81`.
 - Each directory contains native-size PGM frames, enlarged PNG frames and evidence.
 

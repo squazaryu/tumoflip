@@ -240,6 +240,15 @@ int main(int argc,char** argv) {
     char hex[9]="1234";
     TextInputModel hex_input={.header="Sensor ID HEX (0-9 A-F)",.text_buffer=hex,.text_buffer_size=sizeof(hex),.minimum_length=1,.cursor_pos=4};
     text_input_view_draw_callback(&c,&hex_input);save(&c,argv[1],"21-hex-input");
+    details.display_fahrenheit=true;data.temp=-99.9f;data.id=UINT32_MAX;data.channel=12;
+    data.btn=254;data.data=UINT64_MAX;data.humidity=100;data.battery_low=1;
+    ws_view_receiver_info_draw(&c,&details);save(&c,argv[1],"22-details-extreme");
+    canvas_clear(&c);canvas_set_color(&c,ColorBlack);
+    elements_text_box(&c,0,2,128,14,AlignCenter,AlignCenter,"Read error",false);
+    text_scroll(&c,2,18,124,44,"Invalid custom preset. The selected file was not loaded. The current capture remains unchanged.",2);
+    save(&c,argv[1],"23-error-scrolled");
+    rx.history_item=0;rx.external_radio=true;furi_string_set(rx.history_stat_str,"0/50");
+    ws_view_receiver_draw(&c,&rx);save(&c,argv[1],"24-scan-external");
     // Exercise cursor positions, empty values, full IDs and clipped long text.
     for(int n=0;n<80;n++) {
         char input_text[81];memset(input_text,'A',n);input_text[n]=0;

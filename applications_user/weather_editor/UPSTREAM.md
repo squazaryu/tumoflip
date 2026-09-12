@@ -24,7 +24,9 @@ They do not establish full parser coverage or hardware acceptance.
 Profile loading parses into private state and commits only after success;
 a parser failure does not replace the active capture or preset.
 
-Pending before catalog inclusion: radio hot-unplug and lease contention tests,
-visual review, Community Apps duplicate/provenance audit,
-and physical sensor acceptance. The disabled Lab sources remain in this
-candidate and must not be presented as a supported feature.
+Native visual review executes the production callbacks with repository fonts
+and icons. Navigation and text input are checked with AddressSanitizer. The
+Dev release is for functional testing: physical sensor RX/TX, external-radio
+disconnect/reconnect and installation on a device remain hardware acceptance
+items. The disabled Lab sources remain in this candidate and are not a
+supported feature. Weather Editor is delivered only through FW Packages.

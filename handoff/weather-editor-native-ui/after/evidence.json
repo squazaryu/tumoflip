@@ -3,7 +3,7 @@
   "reference": "working-tree",
   "renderer": "production C callbacks + repository U8g2 and PNG icons",
   "models": "controlled display fixtures; no radio or physical LCD timing",
-  "generated_c_sha256": "05a03ad86414b97484c96437e4a7c0a6b010b53a39b6aa5d4f9b9755f9a0faf6",
+  "generated_c_sha256": "38ed9711d7e68029780e16a5f0c14e85882096efb4a8ba1b722c8a640411f523",
   "address_sanitizer": true,
   "navigation": "1000 up and down steps, bounded left/right and change callbacks",
   "text_input": "all cursor positions for lengths 0..79",
@@ -28,6 +28,9 @@
     "18-result.pgm": "3c055933d03bf26c01f0ffeef9d3feeb5158f1dab9f2f7c0662fbcb380713a30",
     "19-error.pgm": "2b01ef973408da186b89d4e55d0dca16f9fdfa0cb814b3681f2e51685c015713",
     "20-about.pgm": "bd313e09a23cf5460f1360e3421d553c9f404ef06063e87f2fa9791dd3b1a51e",
-    "21-hex-input.pgm": "0fc586511961f986e0c9126911bbe18ccceb6ecc02c6c213feed766864e4915f"
+    "21-hex-input.pgm": "0fc586511961f986e0c9126911bbe18ccceb6ecc02c6c213feed766864e4915f",
+    "22-details-extreme.pgm": "d82551eac1d010c3e42ca523f90f533d0ef290f654fc05961f700cec9b029741",
+    "23-error-scrolled.pgm": "db9142f9d841ba395c470005f2a2e7c160507b0dac95a1d20e9e0fec1c4e9bfa",
+    "24-scan-external.pgm": "4fb3ce8c3f5c0bb961914a35a95dafdba0360e5613d918f4fa7147bf4a24cef5"
   }
 }

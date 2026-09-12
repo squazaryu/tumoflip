@@ -144,6 +144,15 @@ jobs:
         shell: bash
         run: python3 tools/tumoflip/test_upstream_e6_protocols.py
 
+      - name: Validate Weather Editor and Kia file compatibility
+        run: |
+          python3 -m unittest \
+            tools.tumoflip.test_weather_save \
+            tools.tumoflip.test_weather_validation \
+            tools.tumoflip.test_weather_load_transaction \
+            tools.tumoflip.test_weather_package_export \
+            tools.tumoflip.test_kia_v5_file_lengths
+
       - name: Build firmware (minimal / clean)
         id: build
         shell: bash
@@ -153,7 +162,7 @@ jobs:
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
             updater_package fap_esp_flasher fap_quac fap_subghz_wardriving \
-            fap_nearby_files fap_nice_o_code fap_secplus_pin
+            fap_nearby_files fap_nice_o_code fap_secplus_pin fap_weather_editor
 
       - name: Upload firmware artifact
         if: success()
