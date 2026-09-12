@@ -8,6 +8,48 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class WeatherSaveTests(unittest.TestCase):
+    def test_ws_writer_reports_short_write_and_close_failure(self):
+        source = (ROOT / "applications_user/weather_editor/weather_editor_engine.c").read_text()
+        start = source.index("bool weather_editor_save_key_sub(")
+        start = source.index("    bool ok = false;", start)
+        end = source.index("\nbool weather_editor_save_profile(", start)
+        run_c(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#define FSAM_WRITE 1
+#define FSOM_CREATE_NEW 2
+#define RECORD_STORAGE 1
+static bool exists,close_ok,short_write;
+static int removed,closed;
+static bool file_stream_open(int s,const char* p,int a,int m) {(void)s;(void)p;(void)a;assert(m==2);return !exists;}
+static size_t furi_string_size(int s) {(void)s;return 10;}
+static const char* furi_string_get_cstr(int s) {(void)s;return "1234567890";}
+static size_t stream_write(int s,const uint8_t* b,size_t n) {(void)s;(void)b;return short_write?n-1:n;}
+static bool file_stream_close(int s) {(void)s;closed++;return close_ok;}
+static void stream_free(int s) {(void)s;}
+static void furi_string_free(int s) {(void)s;}
+static void furi_string_set(int s,const char* v) {(void)s;(void)v;}
+static void furi_record_close(int s) {(void)s;}
+static __attribute__((unused)) int storage_common_remove(int s,const char* p) {(void)s;(void)p;removed++;return 0;}
+static bool save(void) {
+    int stream=1,text=2,status=0;
+    int storage __attribute__((unused))=3;
+    const char* path="file.ws";
+''' + source[start:end] + r'''
+int main(void) {
+    for(int mode=0;mode<4;mode++) {
+        exists=mode==1; close_ok=mode!=2; short_write=mode==3;
+        removed=closed=0;
+        assert(save()==(mode==0));
+        assert(removed==(mode>=2?1:0));
+        assert(closed==(exists?0:1));
+    }
+    return 0;
+}
+''')
+
     def test_export_preserves_existing_files_and_reports_close_failure(self):
         self.check_save("weather_editor_save_raw_sub", "\nstatic const char*", 9)
 
