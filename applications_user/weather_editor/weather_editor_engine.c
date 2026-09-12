@@ -890,8 +890,9 @@ bool weather_editor_save_key_sub(
             stream,
             (const uint8_t*)furi_string_get_cstr(text),
             expected);
-        ok = written == expected;
-        file_stream_close(stream);
+        const bool closed = file_stream_close(stream);
+        ok = written == expected && closed;
+        if(!ok) storage_common_remove(storage, path);
     }
 
     stream_free(stream);
