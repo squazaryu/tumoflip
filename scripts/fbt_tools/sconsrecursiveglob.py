@@ -31,7 +31,9 @@ def GlobRecursive(env, pattern, node=".", exclude=[]):
 
 
 def GatherSources(env, sources_list, node="."):
-    sources_list = list(set(Flatten(sources_list)))
+    # Glob order becomes link order. Keep the caller's first occurrence rather
+    # than allowing PYTHONHASHSEED to reorder the include patterns.
+    sources_list = list(dict.fromkeys(Flatten(sources_list)))
     include_sources = list(filter(lambda x: not x.startswith("!"), sources_list))
     exclude_sources = list(x[1:] for x in sources_list if x.startswith("!"))
     gathered_sources = list(
