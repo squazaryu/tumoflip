@@ -29,7 +29,7 @@ The project is independent. We selectively integrate upstream improvements and
 keep Tumoflip-specific changes, release identities, and package contracts in
 this repository.
 
-> **Current stable:** `t-flppr-fw-007` (`v1.0.7`) · API `88.4` · Flipper Zero F7
+> **Current stable:** `t-flppr-fw-008` (`v1.0.8`) · API `88.4` · Flipper Zero F7
 >
 > Dev builds are for testing. Stable releases are immutable and are promoted
 > only after the agreed software checks and physical-device validation.
@@ -192,7 +192,7 @@ rollback rules, checksums, and catalog baseline policy.
 
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
-| **Stable** | `t-flppr-fw-007` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
+| **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
 | **Dev** | `t-dev-008-028` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
@@ -218,7 +218,7 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-008-028.tgz
+flipper-z-f7-update-t-flppr-fw-008.tgz
 ```
 
 ## Compatibility notes

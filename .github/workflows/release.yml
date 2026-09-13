@@ -116,7 +116,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf applications/main/clock_app/resources/apps/ || true
-          ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
+          ./fbt -j2 COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
             updater_package fap_esp_flasher fap_quac fap_subghz_wardriving \
             fap_nearby_files fap_nice_o_code fap_secplus_pin fap_weather_editor
 
@@ -271,6 +271,9 @@ jobs:
 
           Before flashing, back up `/int` and important SD files. `tumoflip-packages.zip` is for TumoCompanion FW Packages installation; firmware is installed separately through the standard updater package.
           """
+          curated_notes = Path(f"docs/releases/{version}.md")
+          if curated_notes.is_file():
+              notes = curated_notes.read_text() + "\n\n" + notes
           Path("release-notes.md").write_text(
               "\n".join(line.strip() for line in notes.splitlines()) + "\n",
               encoding="utf-8",
