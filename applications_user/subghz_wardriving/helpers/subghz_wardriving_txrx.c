@@ -21,6 +21,59 @@ static void subghz_wardriving_txrx_radio_state(
     subghz_radio_broker_set_state(instance->radio_broker, &instance->radio_lease, state);
 }
 
+static void subghz_wardriving_txrx_environment_ensure(SubGhzWarDrivingTxRx* instance) {
+    if(instance->environment) return;
+
+    instance->environment = subghz_environment_alloc();
+    instance->is_database_loaded =
+        subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_NAME);
+    subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_EXTENDED);
+    subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_USER_NAME);
+    subghz_environment_set_alutech_at_4n_rainbow_table_file_name(
+        instance->environment, SUBGHZ_ALUTECH_AT_4N_DIR_NAME);
+    subghz_environment_set_nice_flor_s_rainbow_table_file_name(
+        instance->environment, SUBGHZ_NICE_FLOR_S_DIR_NAME);
+    subghz_environment_set_protocol_registry(
+        instance->environment, (void*)&subghz_protocol_registry);
+}
+
+// Keep decoder/worker memory out of menus. Rebuild only on the GUI thread,
+// before starting radio callbacks, and restore the caller's RX configuration.
+static void subghz_wardriving_txrx_rx_pipeline_alloc(SubGhzWarDrivingTxRx* instance) {
+    furi_assert(instance);
+    if(instance->receiver) return;
+
+    subghz_wardriving_txrx_environment_ensure(instance);
+    instance->receiver = subghz_receiver_alloc_init(instance->environment);
+    subghz_receiver_set_filter(instance->receiver, instance->filter);
+    subghz_receiver_set_rx_callback(
+        instance->receiver, instance->rx_callback, instance->rx_callback_context);
+    instance->worker = subghz_worker_alloc();
+    subghz_worker_set_overrun_callback(
+        instance->worker, (SubGhzWorkerOverrunCallback)subghz_receiver_reset);
+    subghz_worker_set_pair_callback(
+        instance->worker, (SubGhzWorkerPairCallback)subghz_receiver_decode);
+    subghz_worker_set_context(instance->worker, instance->receiver);
+}
+
+void subghz_wardriving_txrx_rx_pipeline_release(SubGhzWarDrivingTxRx* instance) {
+    furi_assert(instance);
+    if(instance->txrx_state == SubGhzTxRxStateRx ||
+       instance->txrx_state == SubGhzTxRxStateTx || instance->transmitter)
+        return;
+    if(instance->worker && subghz_worker_is_running(instance->worker)) return;
+
+    // Producers are stopped and the worker joined before decoder pointers die.
+    if(instance->worker) subghz_worker_free(instance->worker);
+    instance->worker = NULL;
+    instance->decoder_result = NULL;
+    if(instance->receiver) subghz_receiver_free(instance->receiver);
+    instance->receiver = NULL;
+    if(instance->environment) subghz_environment_free(instance->environment);
+    instance->environment = NULL;
+    instance->is_database_loaded = false;
+}
+
 SubGhzWarDrivingTxRx* subghz_wardriving_txrx_alloc(void) {
     SubGhzWarDrivingTxRx* instance = calloc(1, sizeof(SubGhzWarDrivingTxRx));
     instance->radio_broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
@@ -39,26 +92,8 @@ SubGhzWarDrivingTxRx* subghz_wardriving_txrx_alloc(void) {
     subghz_wardriving_txrx_speaker_set_state(instance, SubGhzSpeakerStateDisable);
     subghz_wardriving_txrx_set_debug_pin_state(instance, false);
 
-    instance->worker = subghz_worker_alloc();
     instance->fff_data = flipper_format_string_alloc();
-
-    instance->environment = subghz_environment_alloc();
-    instance->is_database_loaded =
-        subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_NAME);
-    subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_USER_NAME);
-    subghz_environment_set_alutech_at_4n_rainbow_table_file_name(
-        instance->environment, SUBGHZ_ALUTECH_AT_4N_DIR_NAME);
-    subghz_environment_set_nice_flor_s_rainbow_table_file_name(
-        instance->environment, SUBGHZ_NICE_FLOR_S_DIR_NAME);
-    subghz_environment_set_protocol_registry(
-        instance->environment, (void*)&subghz_protocol_registry);
-    instance->receiver = subghz_receiver_alloc_init(instance->environment);
-
-    subghz_worker_set_overrun_callback(
-        instance->worker, (SubGhzWorkerOverrunCallback)subghz_receiver_reset);
-    subghz_worker_set_pair_callback(
-        instance->worker, (SubGhzWorkerPairCallback)subghz_receiver_decode);
-    subghz_worker_set_context(instance->worker, instance->receiver);
+    instance->filter = SubGhzProtocolFlag_Decodable;
 
     //set default device External
     subghz_wardriving_txrx_radio_state(instance, SubGhzRadioBrokerStateProbing);
@@ -74,6 +109,8 @@ SubGhzWarDrivingTxRx* subghz_wardriving_txrx_alloc(void) {
 void subghz_wardriving_txrx_free(SubGhzWarDrivingTxRx* instance) {
     furi_assert(instance);
 
+    subghz_wardriving_txrx_stop(instance);
+    subghz_wardriving_txrx_rx_pipeline_release(instance);
     subghz_wardriving_txrx_radio_state(instance, SubGhzRadioBrokerStateCleaningUp);
     if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
         subghz_wardriving_txrx_radio_device_power_off(instance);
@@ -84,9 +121,6 @@ void subghz_wardriving_txrx_free(SubGhzWarDrivingTxRx* instance) {
     subghz_radio_broker_release(instance->radio_broker, &instance->radio_lease);
     furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
 
-    subghz_worker_free(instance->worker);
-    subghz_receiver_free(instance->receiver);
-    subghz_environment_free(instance->environment);
     flipper_format_free(instance->fff_data);
     furi_string_free(instance->preset->name);
     subghz_setting_free(instance->setting);
@@ -97,6 +131,9 @@ void subghz_wardriving_txrx_free(SubGhzWarDrivingTxRx* instance) {
 
 bool subghz_wardriving_txrx_is_database_loaded(SubGhzWarDrivingTxRx* instance) {
     furi_assert(instance);
+    // Preserve the real keystore parse result, including missing/corrupt SD data.
+    // This startup check does not allocate decoders or a worker.
+    subghz_wardriving_txrx_environment_ensure(instance);
     return instance->is_database_loaded;
 }
 
@@ -287,9 +324,9 @@ static void subghz_wardriving_txrx_rx_end(SubGhzWarDrivingTxRx* instance) {
     furi_assert(instance->txrx_state == SubGhzTxRxStateRx);
 
     subghz_wardriving_txrx_radio_state(instance, SubGhzRadioBrokerStateCleaningUp);
-    if(subghz_worker_is_running(instance->worker)) {
+    subghz_devices_stop_async_rx(instance->radio_device);
+    if(instance->worker && subghz_worker_is_running(instance->worker)) {
         subghz_worker_stop(instance->worker);
-        subghz_devices_stop_async_rx(instance->radio_device);
     }
     subghz_devices_idle(instance->radio_device);
     subghz_wardriving_txrx_speaker_off(instance);
@@ -299,6 +336,7 @@ static void subghz_wardriving_txrx_rx_end(SubGhzWarDrivingTxRx* instance) {
 
 void subghz_wardriving_txrx_sleep(SubGhzWarDrivingTxRx* instance) {
     furi_assert(instance);
+    subghz_wardriving_txrx_stop(instance);
     subghz_devices_sleep(instance->radio_device);
     instance->txrx_state = SubGhzTxRxStateSleep;
 }
@@ -327,6 +365,7 @@ SubGhzTxRxStartTxState
 
     subghz_wardriving_txrx_stop(instance);
 
+    subghz_wardriving_txrx_rx_pipeline_alloc(instance);
     SubGhzTxRxStartTxState ret = SubGhzTxRxStartTxStateErrorParserOthers;
     FuriString* temp_str = furi_string_alloc();
     do {
@@ -381,6 +420,7 @@ SubGhzTxRxStartTxState
         }
         if(ret != SubGhzTxRxStartTxStateOk) {
             if(instance->transmitter) subghz_transmitter_free(instance->transmitter);
+            instance->transmitter = NULL;
             if(instance->txrx_state != SubGhzTxRxStateIDLE) {
                 subghz_wardriving_txrx_idle(instance);
             }
@@ -394,6 +434,7 @@ SubGhzTxRxStartTxState
 void subghz_wardriving_txrx_rx_start(SubGhzWarDrivingTxRx* instance) {
     furi_assert(instance);
     subghz_wardriving_txrx_stop(instance);
+    subghz_wardriving_txrx_rx_pipeline_alloc(instance);
     subghz_wardriving_txrx_begin(
         instance,
         subghz_setting_get_preset_data_by_name(
@@ -419,9 +460,11 @@ static void subghz_wardriving_txrx_tx_stop(SubGhzWarDrivingTxRx* instance) {
     subghz_devices_stop_async_tx(instance->radio_device);
     subghz_transmitter_stop(instance->transmitter);
     subghz_transmitter_free(instance->transmitter);
+    instance->transmitter = NULL;
 
     //if protocol dynamic then we save the last upload
-    if(instance->decoder_result->protocol->type == SubGhzProtocolTypeDynamic) {
+    if(instance->decoder_result &&
+       instance->decoder_result->protocol->type == SubGhzProtocolTypeDynamic) {
         if(instance->need_save_callback) {
             instance->need_save_callback(instance->need_save_context);
         }
@@ -460,6 +503,7 @@ void subghz_wardriving_txrx_stop(SubGhzWarDrivingTxRx* instance) {
 
 void subghz_wardriving_txrx_hopper_update(SubGhzWarDrivingTxRx* instance, float stay_threshold) {
     furi_assert(instance);
+    if(!instance->receiver) return;
 
     switch(instance->hopper_state) {
     case SubGhzHopperStateOFF:
@@ -614,6 +658,7 @@ bool subghz_wardriving_txrx_load_decoder_by_name_protocol(
     furi_assert(instance);
     furi_assert(name_protocol);
     bool res = false;
+    subghz_wardriving_txrx_rx_pipeline_alloc(instance);
     instance->decoder_result =
         subghz_receiver_search_decoder_base_by_name(instance->receiver, name_protocol);
     if(instance->decoder_result) {
@@ -629,6 +674,7 @@ SubGhzProtocolDecoderBase* subghz_wardriving_txrx_get_decoder(SubGhzWarDrivingTx
 
 bool subghz_wardriving_txrx_protocol_is_serializable(SubGhzWarDrivingTxRx* instance) {
     furi_assert(instance);
+    if(!instance->decoder_result) return false;
     return (instance->decoder_result->protocol->flag & SubGhzProtocolFlag_Save) ==
            SubGhzProtocolFlag_Save;
 }
@@ -637,6 +683,7 @@ bool subghz_wardriving_txrx_protocol_is_transmittable(
     SubGhzWarDrivingTxRx* instance,
     bool check_type) {
     furi_assert(instance);
+    if(!instance->decoder_result) return false;
     const SubGhzProtocol* protocol = instance->decoder_result->protocol;
     if(check_type) {
         return ((protocol->flag & SubGhzProtocolFlag_Send) == SubGhzProtocolFlag_Send) &&
@@ -650,14 +697,18 @@ void subghz_wardriving_txrx_receiver_set_filter(
     SubGhzWarDrivingTxRx* instance,
     SubGhzProtocolFlag filter) {
     furi_assert(instance);
-    subghz_receiver_set_filter(instance->receiver, filter);
+    instance->filter = filter;
+    if(instance->receiver) subghz_receiver_set_filter(instance->receiver, filter);
 }
 
 void subghz_wardriving_txrx_set_rx_callback(
     SubGhzWarDrivingTxRx* instance,
     SubGhzReceiverCallback callback,
     void* context) {
-    subghz_receiver_set_rx_callback(instance->receiver, callback, context);
+    furi_assert(instance);
+    instance->rx_callback = callback;
+    instance->rx_callback_context = context;
+    if(instance->receiver) subghz_receiver_set_rx_callback(instance->receiver, callback, context);
 }
 
 void subghz_wardriving_txrx_set_raw_file_encoder_worker_callback_end(
@@ -777,7 +828,7 @@ bool subghz_wardriving_txrx_get_debug_pin_state(SubGhzWarDrivingTxRx* instance) 
 
 void subghz_wardriving_txrx_reset_dynamic_and_custom_btns(SubGhzWarDrivingTxRx* instance) {
     furi_assert(instance);
-    subghz_environment_reset_keeloq(instance->environment);
+    if(instance->environment) subghz_environment_reset_keeloq(instance->environment);
 
     //faac_slh_reset_prog_mode();
 
@@ -786,6 +837,7 @@ void subghz_wardriving_txrx_reset_dynamic_and_custom_btns(SubGhzWarDrivingTxRx* 
 
 SubGhzReceiver* subghz_wardriving_txrx_get_receiver(SubGhzWarDrivingTxRx* instance) {
     furi_assert(instance);
+    subghz_wardriving_txrx_rx_pipeline_alloc(instance);
     return instance->receiver;
 }
 

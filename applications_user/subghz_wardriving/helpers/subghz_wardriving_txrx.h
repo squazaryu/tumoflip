@@ -33,6 +33,12 @@ SubGhzWarDrivingTxRx* subghz_wardriving_txrx_alloc(void);
  */
 void subghz_wardriving_txrx_free(SubGhzWarDrivingTxRx* instance);
 
+/** Release idle decoder/worker/environment memory on the GUI thread.
+ * No-op during TX/RX. Invalidates borrowed decoder/receiver pointers, so call
+ * only after leaving the signal screen. Settings and callbacks are retained.
+ */
+void subghz_wardriving_txrx_rx_pipeline_release(SubGhzWarDrivingTxRx* instance);
+
 /**
  * Check if the database is loaded
  *

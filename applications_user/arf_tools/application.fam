@@ -3,11 +3,11 @@ App(
     name="ARF Status",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="arf_tools_main",
-    requires=["gui"],
+    requires=["gui", "storage", "subghz_radio_broker"],
     stack_size=4 * 1024,
     fap_icon="icon.png",
     fap_category="ARF Tools",
     fap_dist_path="apps_data/arf_subghz_full/modules/{filename}",
-    fap_version="0.2.0",
+    fap_version="0.3.0",
     fap_description="Deployment status for ARF Sub-GHz Full and its internal modules.",
 )

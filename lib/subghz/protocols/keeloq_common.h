@@ -4,6 +4,8 @@
 
 #include <furi.h>
 
+typedef struct SubGhzKeystore SubGhzKeystore;
+
 /*
  * Keeloq
  * https://ru.wikipedia.org/wiki/KeeLoq
@@ -32,6 +34,14 @@
 #define KEELOQ_LEARNING_PUJOL               13u
 #define KEELOQ_LEARNING_AERF                14u
 #define KEELOQ_LEARNING_SIMPLE_JCM          15u
+#define KEELOQ_LEARNING_JCM_GEN2            16u
+#define KEELOQ_LEARNING_STAGNOLI            17u
+#define KEELOQ_LEARNING_TELCOMA_TABLE_HI    18u
+#define KEELOQ_LEARNING_TELCOMA_TABLE_LO    19u
+
+#define KEELOQ_ROUNDS_FULL              528u
+#define KEELOQ_NL_EXTEND_LIMIT_AERF_DEC 0x40u
+#define KEELOQ_NL_EXTEND_LIMIT_AERF_ENC 0x240u
 
 /**
  * Simple Learning Encrypt
@@ -108,6 +118,16 @@ uint64_t subghz_protocol_keeloq_common_magic_serial_type2_learning(uint32_t data
 
 uint64_t subghz_protocol_keeloq_common_magic_serial_type3_learning(uint32_t data, uint64_t man);
 
+uint64_t
+    subghz_protocol_keeloq_common_learning_jcm_gen2(uint32_t data, uint8_t btn, const uint64_t key);
+
+uint64_t subghz_protocol_keeloq_common_learning_stagnoli(uint32_t data, const uint64_t key);
+
+uint64_t
+    subghz_protocol_keeloq_common_learning_telcoma_table(uint32_t data, const uint32_t table[4]);
+
+bool subghz_protocol_keeloq_common_get_telcoma_table(SubGhzKeystore* keystore, uint32_t table[4]);
+
 // Protocol (Manufacturer) specific learning
 // TODO: Better documentation for these functions
 
@@ -123,3 +143,13 @@ uint32_t subghz_protocol_keeloq_common_decrypt_derived(
     uint32_t hop_encrypted,
     uint64_t derived_manufacturing_key,
     uint32_t outer_limit);
+
+uint32_t subghz_protocol_keeloq_common_encrypt_derived(
+    uint32_t data,
+    uint64_t derived_manufacturing_key,
+    uint32_t outer_limit);
+
+uint32_t subghz_protocol_keeloq_common_encrypt_rounds(
+    const uint32_t data,
+    const uint64_t key,
+    uint32_t rounds);

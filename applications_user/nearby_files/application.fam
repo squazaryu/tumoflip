@@ -1,0 +1,26 @@
+App(
+    appid="nearby_files",
+    name="Nearby Files",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="nearby_files_app",
+    requires=["gui", "storage", "dialogs", "loader", "notification", "bt"],
+    stack_size=4 * 1024,
+    fap_icon="nearby_files_10px.png",
+    fap_category="GPIO",
+    fap_dist_path="apps/GPIO/nearby_files.fap",
+    fap_icon_assets="icons",
+    fap_libs=["tumoflip_device_services"],
+    fap_private_libs=[
+        Lib(
+            name="minmea",
+            sources=["minmea.c"],
+            cdefines=["timegm=mktime"],
+        ),
+    ],
+    fap_version="1.8",
+    fap_author="Stichoza; Tumoflip adaptation",
+    fap_weburl="https://github.com/Stichoza/flipper-nearby-files",
+    fap_description="A GPS-enabled file browser that sorts captures by distance and can use a one-shot TumoCompanion location.",
+    fap_package_only=True,
+)

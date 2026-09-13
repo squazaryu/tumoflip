@@ -564,6 +564,7 @@ static bool protopirate_storage_write_capture_data(
             break;
         if(!protopirate_storage_copy_key2(save_file, flipper_format)) break;
         if(!protopirate_storage_copy_u32_optional(save_file, flipper_format, "KeyIdx")) break;
+        if(!protopirate_storage_copy_u32_optional(save_file, flipper_format, "BtnFlags")) break;
         if(!protopirate_storage_copy_u32_optional(save_file, flipper_format, "Seed")) break;
         if(!protopirate_storage_copy_hex_or_u32(save_file, flipper_format, "ValidationField", 2))
             break;

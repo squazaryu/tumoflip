@@ -15,6 +15,9 @@ void subghz_scene_start_on_enter(void* context) {
         subghz->state_notifications = SubGhzNotificationStateIDLE;
     }
 
+    subghz_wardriving_txrx_stop(subghz->txrx);
+    subghz_wardriving_txrx_rx_pipeline_release(subghz->txrx);
+
     submenu_add_item(
         subghz->submenu, "Read", SubmenuIndexRead, subghz_scene_start_submenu_callback, subghz);
     submenu_add_item(

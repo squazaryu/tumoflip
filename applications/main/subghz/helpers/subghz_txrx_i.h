@@ -4,11 +4,10 @@
 #include <subghz_radio_broker/subghz_radio_broker.h>
 #include <lib/subghz/protocols/plugin_registry_i.h>
 
-const SubGhzProtocolPackReport* subghz_txrx_get_protocol_pack_report(SubGhzTxRx* instance);
-
 typedef struct {
     SubGhzTxRx* instance;
     SubGhzRadioDeviceType source;
+    SubGhzReceiver* receiver;
 } SubGhzTxRxReceiverContext;
 
 struct SubGhzTxRx {
@@ -44,6 +43,7 @@ struct SubGhzTxRx {
     const SubGhzDevice* radio_device;
     const SubGhzDevice* diversity_radio_device;
     SubGhzRadioDeviceType radio_device_type;
+    uint32_t radio_device_probe_tick;
     SubGhzRadioDeviceType preferred_radio_device_type;
     SubGhzRadioDeviceType last_rx_device_type;
     float last_rx_rssi;
@@ -52,6 +52,8 @@ struct SubGhzTxRx {
     bool diversity_rx_active;
 
     FuriMutex* rx_callback_mutex;
+    FuriMutex* air_time_mutex;
+    uint64_t air_time_us;
     SubGhzTxRxReceiverContext primary_receiver_context;
     SubGhzTxRxReceiverContext diversity_receiver_context;
 
@@ -59,6 +61,7 @@ struct SubGhzTxRx {
     void* need_save_context;
     // True only when the last TX used fff_data, which is bound to file_path.
     bool tx_from_internal_fff;
+    SubGhzRadioBrokerValidation last_validation;
     SubGhzReceiverCallback rx_callback;
     void* rx_context;
     SubGhzProtocolFlag receiver_filter;

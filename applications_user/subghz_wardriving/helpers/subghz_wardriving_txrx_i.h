@@ -30,6 +30,11 @@ struct SubGhzWarDrivingTxRx {
     SubGhzTxRxNeedSaveCallback need_save_callback;
     void* need_save_context;
 
+    // Configuration survives release/recreation of the RX pipeline.
+    SubGhzProtocolFlag filter;
+    SubGhzReceiverCallback rx_callback;
+    void* rx_callback_context;
+
     bool debug_pin_state;
 
     float latitude;

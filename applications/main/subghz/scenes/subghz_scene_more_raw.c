@@ -1,6 +1,7 @@
 #include "../subghz_i.h"
 
 enum SubmenuIndex {
+    SubmenuIndexAutoDecode,
     SubmenuIndexDecode,
     SubmenuIndexEdit,
     SubmenuIndexDelete,
@@ -16,7 +17,14 @@ void subghz_scene_more_raw_on_enter(void* context) {
 
     submenu_add_item(
         subghz->submenu,
-        "Decode",
+        "Auto Decode",
+        SubmenuIndexAutoDecode,
+        subghz_scene_more_raw_submenu_callback,
+        subghz);
+
+    submenu_add_item(
+        subghz->submenu,
+        "Decode Current",
         SubmenuIndexDecode,
         subghz_scene_more_raw_submenu_callback,
         subghz);
@@ -74,10 +82,11 @@ bool subghz_scene_more_raw_on_event(void* context, SceneManagerEvent event) {
                     view_dispatcher_stop(subghz->view_dispatcher);
                 }
             }
-        } else if(event.event == SubmenuIndexDecode) {
+        } else if(event.event == SubmenuIndexAutoDecode || event.event == SubmenuIndexDecode) {
             if(subghz_file_available(subghz)) {
+                subghz->decode_raw_auto = event.event == SubmenuIndexAutoDecode;
                 scene_manager_set_scene_state(
-                    subghz->scene_manager, SubGhzSceneMoreRAW, SubmenuIndexDecode);
+                    subghz->scene_manager, SubGhzSceneMoreRAW, event.event);
                 scene_manager_next_scene(subghz->scene_manager, SubGhzSceneDecodeRAW);
                 return true;
             } else {

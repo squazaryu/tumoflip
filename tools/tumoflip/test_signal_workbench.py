@@ -274,9 +274,15 @@ class TumoSpectrumTest(unittest.TestCase):
         for required in (
             '"tumospectrum_raw:"',
             "subghz_parse_tumospectrum_capture_frequency",
-            "SubGhzHoppingModeOff",
         ):
             self.assertIn(required, self.subghz)
+        capture_start = self.subghz.index("if(open_capture_at_frequency")
+        capture = self.subghz[capture_start:self.subghz.index("if(alloc_for_tx)", capture_start)]
+        self.assertIn("subghz_txrx_radio_device_is_frequency_valid", capture)
+        self.assertIn("subghz->last_settings->raw_frequency = capture_frequency;", capture)
+        self.assertIn("subghz_last_settings_save", capture)
+        self.assertNotIn("last_settings->frequency =", capture)
+        self.assertNotIn("last_settings->hopping_mode =", capture)
 
     def test_stock_capture_apps_resume_tumospectrum_without_changing_normal_back(self) -> None:
         self.assertIn("bool return_to_launcher;", self.subghz_internal)

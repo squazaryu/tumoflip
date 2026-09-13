@@ -25,6 +25,8 @@ struct ViewDispatcher {
 
     View* current_view;
 
+    struct Loading* loading; //<! Built-in startup loading view, allocated on first use
+
     View* ongoing_input_view;
     uint8_t ongoing_input;
 

@@ -203,6 +203,30 @@ The first standalone stable line is
             updated,
         )
 
+    def test_sync_compact_readme_keeps_stable_identity_for_dev(self) -> None:
+        original = """> **Current stable:** `t-flppr-fw-007` (`v1.0.7`) · API `88.4`
+
+## Stable and Dev channels
+
+| Channel | Identity |
+| --- | --- |
+| **Stable** | `t-flppr-fw-007` |
+| **Dev** | `t-dev-007-013` |
+
+```text
+flipper-z-f7-update-t-flppr-fw-007.tgz
+```
+"""
+        updated = sync_readme_text(original, "t-dev-008-001")
+
+        self.assertIn(
+            "> **Current stable:** `t-flppr-fw-007` (`v1.0.7`)",
+            updated,
+        )
+        self.assertIn("| **Stable** | `t-flppr-fw-007` |", updated)
+        self.assertIn("| **Dev** | `t-dev-008-001` |", updated)
+        self.assertIn("flipper-z-f7-update-t-dev-008-001.tgz", updated)
+
     def test_readme_is_synced_with_dist_suffix(self) -> None:
         readme = (REPO_ROOT / "ReadMe.md").read_text(encoding="utf-8")
         self.assertEqual(sync_readme_text(readme, fbt_options.DIST_SUFFIX), readme)

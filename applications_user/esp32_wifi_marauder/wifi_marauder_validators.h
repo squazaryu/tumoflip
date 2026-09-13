@@ -16,6 +16,8 @@ void validator_is_file_free(ValidatorIsFile* instance);
 
 bool validator_is_file_callback(const char* text, FuriString* error, void* context);
 
+bool validator_is_device_index_callback(const char* text, FuriString* error, void* context);
+
 #ifdef __cplusplus
 }
 #endif

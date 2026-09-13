@@ -9,8 +9,15 @@
 #include <lib/subghz/protocols/raw.h>
 #include <lib/subghz/protocols/plugin_registry.h>
 #include <lib/subghz/devices/devices.h>
+#include <subghz_radio_broker/subghz_radio_broker.h>
 
 typedef struct SubGhzTxRx SubGhzTxRx;
+
+/** Detect a lost external radio. Stop async RX before switching and resume it
+ * on internal; do not probe during TX or synchronous analyzer ownership. */
+bool subghz_txrx_radio_device_poll_active(SubGhzTxRx* instance);
+/** Rate-limited recovery, called only from the idle Sub-GHz menu. */
+void subghz_txrx_radio_device_poll_reacquire(SubGhzTxRx* instance);
 
 typedef void (*SubGhzTxRxNeedSaveCallback)(void* context);
 
@@ -18,6 +25,7 @@ typedef enum {
     SubGhzTxRxStartTxStateOk,
     SubGhzTxRxStartTxStateErrorOnlyRx,
     SubGhzTxRxStartTxStateErrorParserOthers,
+    SubGhzTxRxStartTxStateErrorCapability,
 } SubGhzTxRxStartTxState;
 
 /**
@@ -44,6 +52,22 @@ void subghz_txrx_free(SubGhzTxRx* instance);
 bool subghz_txrx_reload_protocol_pack(
     SubGhzTxRx* instance,
     SubGhzProtocolPackGroup protocol_pack_group);
+
+/**
+ * Get the active protocol pack group.
+ *
+ * @param instance Pointer to a SubGhzTxRx
+ * @return Currently loaded protocol pack group
+ */
+SubGhzProtocolPackGroup subghz_txrx_get_protocol_pack_group(SubGhzTxRx* instance);
+
+/**
+ * Get the load report for the active protocol pack group.
+ *
+ * @param instance Pointer to a SubGhzTxRx
+ * @return Report owned by SubGhzTxRx and valid until the next pack reload
+ */
+const SubGhzProtocolPackReport* subghz_txrx_get_protocol_pack_report(SubGhzTxRx* instance);
 
 /**
  * Check if the database is loaded
@@ -116,6 +140,8 @@ void subghz_txrx_get_frequency_and_modulation(
  * @return SubGhzTxRxStartTxState 
  */
 SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat* flipper_format);
+
+SubGhzRadioBrokerValidation subghz_txrx_get_last_validation(SubGhzTxRx* instance);
 
 /**
  * Rebuild protocol data without starting TX.
@@ -410,10 +436,7 @@ const char* subghz_txrx_radio_device_get_name(SubGhzTxRx* instance);
 bool subghz_txrx_radio_device_is_frequency_valid(SubGhzTxRx* instance, uint32_t frequency);
 
 /** Start a bounded receive-only analyzer probe with the selected preset. */
-bool subghz_txrx_analyzer_begin(
-    SubGhzTxRx* instance,
-    size_t preset_index,
-    uint32_t frequency);
+bool subghz_txrx_analyzer_begin(SubGhzTxRx* instance, size_t preset_index, uint32_t frequency);
 
 /** Stop a receive-only analyzer probe and leave the selected radio idle. */
 void subghz_txrx_analyzer_end(SubGhzTxRx* instance);
@@ -433,6 +456,12 @@ void subghz_txrx_reset_dynamic_and_custom_btns(SubGhzTxRx* instance);
 void subghz_txrx_receiver_reset(SubGhzTxRx* instance);
 
 SubGhzReceiver* subghz_txrx_get_receiver(SubGhzTxRx* instance); // TODO use only in DecodeRaw
+
+/** Feed one sample to the decoders and count it against the decoded air-time clock. */
+void subghz_txrx_decode(SubGhzTxRx* instance, bool level, uint32_t duration);
+
+/** Return decoded air time in milliseconds; wall-clock pauses are excluded. */
+uint32_t subghz_txrx_get_air_time_ms(SubGhzTxRx* instance);
 
 /**
  * @brief Set current preset AM650 without additional params

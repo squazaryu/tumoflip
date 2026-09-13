@@ -369,6 +369,7 @@ static Loader* loader_alloc(void) {
     loader->gui = furi_record_open(RECORD_GUI);
     loader->view_holder = view_holder_alloc();
     loader->loading = loading_alloc();
+    loader->assets_loading_visible = false;
     view_holder_attach_to_gui(loader->view_holder, loader->gui);
     return loader;
 }
@@ -514,6 +515,27 @@ static LoaderStatusError
     }
 }
 
+// The loader thread owns this short-lived overlay. It exists only during asset
+// extraction, never behind an application that can reveal it again on Back.
+static void loader_assets_progress(void* context, size_t done, size_t total) {
+    Loader* loader = context;
+    if(total == 0) return;
+    loading_set_progress(loader->loading, (float)done / (float)total);
+    if(!loader->assets_loading_visible) {
+        view_holder_set_view(loader->view_holder, loading_get_view(loader->loading));
+        view_holder_send_to_front(loader->view_holder);
+        loader->assets_loading_visible = true;
+    }
+}
+
+static void loader_assets_progress_finish(Loader* loader) {
+    if(loader->assets_loading_visible) {
+        view_holder_set_view(loader->view_holder, NULL);
+        loader->assets_loading_visible = false;
+    }
+    loading_reset_progress(loader->loading);
+}
+
 static LoaderMessageLoaderStatusResult loader_start_external_app(
     Loader* loader,
     Storage* storage,
@@ -531,8 +553,12 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
 
         FURI_LOG_I(TAG, "Loading %s", path);
 
+        flipper_application_set_assets_progress_callback(
+            loader->app.fap, loader_assets_progress, loader);
         FlipperApplicationPreloadStatus preload_res =
             flipper_application_preload(loader->app.fap, path);
+        flipper_application_set_assets_progress_callback(loader->app.fap, NULL, NULL);
+        loader_assets_progress_finish(loader);
         if(preload_res != FlipperApplicationPreloadStatusSuccess) {
             if((preload_res == FlipperApplicationPreloadStatusApiTooOld) ||
                (preload_res == FlipperApplicationPreloadStatusApiTooNew)) {

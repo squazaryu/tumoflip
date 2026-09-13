@@ -8,7 +8,7 @@
 
 [![Stable release](https://img.shields.io/github/v/release/squazaryu/tumoflip?label=stable&color=brightgreen)](https://github.com/squazaryu/tumoflip/releases/latest)
 [![Release workflow](https://img.shields.io/github/actions/workflow/status/squazaryu/tumoflip/release.yml?branch=main&label=build)](https://github.com/squazaryu/tumoflip/actions/workflows/release.yml)
-![Firmware API](https://img.shields.io/badge/Firmware%20API-88.4-8b5cf6)
+![Firmware API](https://img.shields.io/badge/Dev%20API-88.7-8b5cf6)
 ![Target](https://img.shields.io/badge/Target-Flipper%20Zero%20F7-f97316)
 [![License](https://img.shields.io/badge/License-GPLv3-2563eb)](LICENSE)
 
@@ -29,7 +29,7 @@ The project is independent. We selectively integrate upstream improvements and
 keep Tumoflip-specific changes, release identities, and package contracts in
 this repository.
 
-> **Current stable:** `t-flppr-fw-007` (`v1.0.7`) · API `88.4` · Flipper Zero F7
+> **Current stable:** `t-flppr-fw-008` (`v1.0.8`) · API `88.4` · Flipper Zero F7
 >
 > Dev builds are for testing. Stable releases are immutable and are promoted
 > only after the agreed software checks and physical-device validation.
@@ -65,8 +65,8 @@ control. This table is a practical orientation, not a benchmark.
 | 📡 | **Radio** | Core Sub-GHz, ARF, ProtoPirate, adaptive hopping, Protocol Packs, Radio Broker, and internal/external CC1101 selection. |
 | 🧭 | **Desktop** | Custom Wii, Wii Vertical, DSi, and Vertical layouts; Module One and ARF Tools folders; favorites for apps, scripts, and folders. |
 | 📱 | **Companion** | BLE App Bridge, RTC sync, package and firmware transfer activity, device verification, and iOS-first workflows. |
-| 🧩 | **Packages** | Separate Base, ARF, Module One, and Protocol Packs catalogs with content-addressed manifests and independent releases. |
-| 🛠️ | **Developer** | API 88.4, JS Runner as an FAP, SDK archives, release validation, acceptance telemetry, and reproducible build metadata. |
+| 🧩 | **Packages** | Separate Base, ARF, Module One, and Protocol Packs catalogs with content-addressed manifests and independent releases. Nearby Files is delivered as a Base package. |
+| 🛠️ | **Developer** | Dev API 88.7, JS Runner as an FAP, SDK archives, release validation, acceptance telemetry, and reproducible build metadata. |
 
 ## Architecture at a glance
 
@@ -192,8 +192,8 @@ rollback rules, checksums, and catalog baseline policy.
 
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
-| **Stable** | `t-flppr-fw-007` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-007-013` (or newer) | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
+| **Dev** | `t-dev-008-028` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
@@ -215,16 +215,16 @@ settings, IR files, and Sub-GHz files should be copied somewhere safe.
 
 Download the update package from the
 [GitHub release](https://github.com/squazaryu/tumoflip/releases/latest) and use
-the normal qFlipper or Flipper SD-card update flow. The stable artifact is:
+the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-flppr-fw-007.tgz
+flipper-z-f7-update-t-flppr-fw-008.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: `88.4`.
+- Firmware API: Dev `88.7`; immutable stable `v1.0.7` remains `88.4`.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or
   rebuilt from the matching FW Packages catalog.
 - The JS Runner is an application (`js_app.fap`); it is not required by the

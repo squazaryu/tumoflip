@@ -15,4 +15,5 @@ SubGhzHistoryAddResult subghz_history_add_to_history_with_source(
     void* context,
     SubGhzRadioPreset* preset,
     SubGhzRadioDeviceType source,
-    float rssi);
+    float rssi,
+    uint32_t air_time_ms);

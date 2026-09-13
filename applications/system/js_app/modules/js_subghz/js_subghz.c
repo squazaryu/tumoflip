@@ -267,6 +267,7 @@ static void js_subghz_transmit_file(struct mjs* mjs) {
     if(!subghz_environment_load_keystore(environment, SUBGHZ_KEYSTORE_DIR_NAME)) {
         FURI_LOG_W(TAG, "Load_keystore keeloq_mfcodes - failed to load");
     }
+    subghz_environment_load_keystore(environment, SUBGHZ_KEYSTORE_DIR_EXTENDED);
     if(!subghz_environment_load_keystore(environment, SUBGHZ_KEYSTORE_DIR_USER_NAME)) {
         FURI_LOG_W(TAG, "Load_keystore keeloq_mfcodes_user - failed to load");
     }

@@ -359,6 +359,11 @@ void subghz_save_to_file(void* context) {
 bool subghz_load_protocol_from_file(SubGhz* subghz) {
     furi_assert(subghz);
 
+    // The previous signal is no longer displayed. Leave room for the browser;
+    // subghz_key_load recreates the decoder after selecting a file.
+    subghz_wardriving_txrx_stop(subghz->txrx);
+    subghz_wardriving_txrx_rx_pipeline_release(subghz->txrx);
+
     FuriString* file_path = furi_string_alloc();
 
     DialogsFileBrowserOptions browser_options;

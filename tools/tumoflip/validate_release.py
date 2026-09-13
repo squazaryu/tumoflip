@@ -134,10 +134,16 @@ MODULE_ONE_PACKAGE_FILES = (
 )
 # These files are built from the same source/API as the firmware, but are
 # intentionally absent from resources.ths. They are delivered only through
-# tumoflip-packages.zip so an optional large FAP cannot inflate every updater.
+# tumoflip-packages.zip because their lifecycle is owned by FW Packages.
+QUAC_PACKAGE_FILE = "apps/Tools/quac.fap"
+NEARBY_FILES_PACKAGE_FILE = "apps/GPIO/nearby_files.fap"
+WEATHER_EDITOR_PACKAGE_FILE = "apps/Sub-GHz/weather_editor.fap"
 PACKAGE_ONLY_PACKAGE_FILES = frozenset(
     {
         "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+        QUAC_PACKAGE_FILE,
+        NEARBY_FILES_PACKAGE_FILE,
+        WEATHER_EDITOR_PACKAGE_FILE,
     }
 )
 TOTP_CLI_PLUGIN_APP_IDS = (
@@ -159,6 +165,7 @@ TOTP_CLI_PLUGIN_APP_IDS = (
 TOTP_CLI_PLUGIN_PACKAGE_FILES = tuple(
     f"apps_data/totp/plugins/{appid}.fal" for appid in TOTP_CLI_PLUGIN_APP_IDS
 )
+MORSE_PLAYER_PACKAGE_FILE = "apps/Tools/morse_player.fap"
 
 # Independent FW Packages revisions may replace files that are also bundled in
 # updater resources. This is intentionally broader than PACKAGE_ONLY_PACKAGE_FILES:
@@ -167,15 +174,20 @@ PACKAGE_RELEASE_OVERLAY_FILES = frozenset(
     {
         *PACKAGE_ONLY_PACKAGE_FILES,
         "apps/ARF Tools/subghz_raw_edit.fap",
+        MORSE_PLAYER_PACKAGE_FILE,
         *TOTP_CLI_PLUGIN_PACKAGE_FILES,
     }
 )
 PACKAGE_ONLY_PACKAGE_GROUPS = {
     "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap": "module_one",
+    QUAC_PACKAGE_FILE: "base",
+    NEARBY_FILES_PACKAGE_FILE: "base",
+    WEATHER_EDITOR_PACKAGE_FILE: "base",
 }
 PACKAGE_RELEASE_OVERLAY_GROUPS = {
     **PACKAGE_ONLY_PACKAGE_GROUPS,
     "apps/ARF Tools/subghz_raw_edit.fap": "arf",
+    MORSE_PLAYER_PACKAGE_FILE: "base",
     **{relative: "base" for relative in TOTP_CLI_PLUGIN_PACKAGE_FILES},
 }
 MODULE_ONE_PACKAGE_DATA_FILES = (
@@ -328,6 +340,10 @@ def release_cleanup_entries() -> list[dict[str, str]]:
 
 def package_extapp_exports() -> dict[str, str]:
     exports = {Path(relative).name: relative for relative in MODULE_ONE_PACKAGE_FILES}
+    exports["morse_player.fap"] = MORSE_PLAYER_PACKAGE_FILE
+    exports["quac.fap"] = QUAC_PACKAGE_FILE
+    exports["nearby_files.fap"] = NEARBY_FILES_PACKAGE_FILE
+    exports["weather_editor.fap"] = WEATHER_EDITOR_PACKAGE_FILE
     exports["module_one_cockpit.fap"] = "apps/Module One/Diagnostics/cockpit.fap"
     exports.update(
         {
@@ -868,7 +884,10 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             resources / "apps/Tools/ai_dashboard.fap",
             resources / "apps/Tools/clock.fap",
             resources / "apps/Tools/flipper_relay.fap",
+            resources / MORSE_PLAYER_PACKAGE_FILE,
             resources / "apps/Tools/quac.fap",
+            resources / "apps/GPIO/nearby_files.fap",
+            resources / WEATHER_EDITOR_PACKAGE_FILE,
             resources / "apps/Tools/tumoflip_packages.fap",
             resources / "apps/Tools/totp.fap",
         ]

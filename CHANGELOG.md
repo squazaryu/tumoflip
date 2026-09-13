@@ -1,3 +1,9 @@
+## Tumoflip Dev 008-027
+- GUI: **Expose `view_dispatcher_check_id()`** so FAPs can test view-ID availability without mutating the dispatcher or tripping the duplicate-ID guard. Adapted from official Flipper firmware PR #4422.
+- API: F7 advances from `88.6` to `88.7`; the maintained F18 compatibility target advances from `88.0` to `88.1`. Existing FAPs are rebuilt from the same release tree.
+- Upstream audit: official Flipper `1.5.0-rc` parity was reviewed; Elplast, Cardin S449, date/time input, canvas buffer, storage boot handling, and the relevant NFC/GUI safeguards are already present in Tumoflip. The incomplete hotel parser was not imported.
+- ARF audit: `51d4700d`, `892092a1`, and `51efff55` remain excluded because of Toyota/PSA2 regressions, broad unvalidated protocol rewrites, a committed object file, and an absent phone-side BLE offload implementation.
+
 ## Tumoflip v1.0.7 / t-flppr-fw-007
 - Current API: 88.4 (F7 stable API for t-flppr-fw-007)
 * JS Runner and NFC FAPs can resolve shared soft-float helpers from the F7 firmware, reducing duplicated libgcc code while keeping the shared-library path explicit for compatible FAPs.
@@ -16,6 +22,12 @@
 * Apps: **NFC Magic** - Gen2 CUID/static-nonce detection, Gen1 4b/7b UID, length-aware wipe & write guard (by @mishamyte)
 * Apps: Build tag (**10jun2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
 ## Other changes
+* Power: report the actual fuel-gauge and charger initialization result instead of logging `Init OK` after a failed boot attempt (adapted from Unleashed #1132).
+* Plugin loader: continue scanning after an invalid or incompatible `.fal`, return the first real load/read error, and keep the Sub-GHz radio driver visible when another plugin fails (adapted from Unleashed #1133; existing filename-prefix filtering is preserved).
+* GUI: Add an app-owned startup loading view for Archive and Desktop settings; the looping indicator is stopped and reset on the first real view, and queued startup input is discarded. The direct FAP loader overlay remains disabled.
+* NFC: Save recovered MIFARE Classic keys into the user dictionary with duplicate filtering, read-only scans, a verified backup, synchronized append, and rollback on write failure (adapted from Unleashed 95c35fb).
+* Infrared: Save the currently selected Universal Remote candidate as a new uniquely named remote or append it to an existing remote; existing files are backed up before append and restored on write failure (adapted from Unleashed b9f5789)
+* Desktop: Add a second page to the Up-button menu for screen brightness, volume, and vibration; Left/Right switches pages without changing the selected Desktop layout.
 * NFC: **Remove unreachable EMV render helpers and stale NFC/backdoor exports**, eliminating an undefined plugin symbol and reducing link-time surface (Unleashed PR #1085)
 * NFC: **Parser declines and unknown ticket layouts are now logged at debug level**, while MIFARE Classic parser guidance explicitly requires checking block data (Unleashed PR #1097)
 * NFC: **Ultralight read results now distinguish failed authentication from an intentionally skipped attempt**, and never display masked zero bytes as a captured password (Unleashed PR #1090)
@@ -34,6 +46,11 @@
 * Toolbox: Compare the complete storage of each SimpleArray element (Unleashed #1107 / Tumoflip #394)
 * F7 serial: Reject the invalid expansion serial sentinel (Unleashed #1108 / Tumoflip #394)
 * Release validation: model the updater's page-aligned C1 erase range so the final C1 page can end at the C2 boundary without weakening DfuSe address checks
+* Sub-GHz & Storage: Share duplicated protocol allocation, deserialization, serialization, and command-dispatch bodies, freeing about 4.8 KB of internal flash without changing the exported SDK API (Unleashed PR #1116)
+* Sub-GHz: Adapt upstream `e6ded9b` (plus follow-up `3431d19`) without replacing Tumoflip's custom protocol set: Nice O-Code installer-code tooling, Security+ 2.0 86-bit keypad/PIN support, standalone 42-bit Prastel rolling code, and KeeLoq JCM Gen2/Stagnoli/Telcoma learning variants.
+* Sub-GHz: Add `nice_o_code` and `secplus_pin` system FAPs, register Prastel in the shared Standard/ARF protocol registry, and expose the new helpers through API 88.6.
+* Sub-GHz: Keep the existing Tumoflip KeeLoq keystore intact and load the upstream encrypted additions as a separate read-only resource; user keys and custom manufacturer entries remain writable and unchanged.
+* Apps: Add Nearby Files as a Base FW Package. It sorts `.sub`, `.nfc`, `.rfid`, and `.ibtn` captures by distance using a one-shot TumoCompanion GPS location over BLE, with the existing Flipper GPS/NMEA source retained as a fallback. The Community Pack copy is excluded to prevent duplicate ownership.
 <br><br>
 
 ----

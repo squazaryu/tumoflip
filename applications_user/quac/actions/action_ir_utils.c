@@ -6,18 +6,23 @@
 
 #include "action_ir_utils.h"
 
-InfraredSignal* infrared_utils_signal_alloc() {
-    InfraredSignal* signal = malloc(sizeof(InfraredSignal));
+static void infrared_utils_signal_reset(InfraredSignal* signal) {
+    if(signal->is_raw) {
+        free(signal->payload.raw.timings);
+    }
+    memset(&signal->payload, 0, sizeof(signal->payload));
     signal->is_raw = false;
     signal->payload.message.protocol = InfraredProtocolUnknown;
+}
+
+InfraredSignal* infrared_utils_signal_alloc() {
+    InfraredSignal* signal = malloc(sizeof(InfraredSignal));
+    *signal = (InfraredSignal){.payload.message.protocol = InfraredProtocolUnknown};
     return signal;
 }
 
 void infrared_utils_signal_free(InfraredSignal* signal) {
-    if(signal->is_raw) {
-        free(signal->payload.raw.timings);
-        signal->payload.raw.timings = NULL;
-    }
+    infrared_utils_signal_reset(signal);
     free(signal);
 }
 
@@ -26,7 +31,8 @@ bool infrared_utils_read_signal_at_index(
     uint32_t index,
     InfraredSignal* signal,
     FuriString* name) {
-    //
+    // Import All reuses this object for both raw and parsed commands.
+    infrared_utils_signal_reset(signal);
     FuriString* temp_str;
     temp_str = furi_string_alloc();
     uint32_t temp_data32;
@@ -94,15 +100,13 @@ bool infrared_utils_read_signal_at_index(
             }
             success = true;
         } else if(furi_string_equal(temp_str, "raw")) {
-            signal->is_raw = true;
+            InfraredRawSignal raw = {0};
 
-            if(!flipper_format_read_uint32(
-                   fff_data_file, "frequency", &signal->payload.raw.frequency, 1)) {
+            if(!flipper_format_read_uint32(fff_data_file, "frequency", &raw.frequency, 1)) {
                 // ACTION_SET_ERROR("IR: Failed to read frequency");
                 break;
             }
-            if(!flipper_format_read_float(
-                   fff_data_file, "duty_cycle", &signal->payload.raw.duty_cycle, 1)) {
+            if(!flipper_format_read_float(fff_data_file, "duty_cycle", &raw.duty_cycle, 1)) {
                 // ACTION_SET_ERROR("IR: Failed to read duty cycle");
                 break;
             }
@@ -110,24 +114,26 @@ bool infrared_utils_read_signal_at_index(
                 // ACTION_SET_ERROR("IR: Failed to get size of data");
                 break;
             }
-            if(temp_data32 > MAX_TIMINGS_AMOUNT) {
+            if(temp_data32 == 0 || temp_data32 > MAX_TIMINGS_AMOUNT) {
                 // ACTION_SET_ERROR("IR: Data size exceeds limit");
                 break;
             }
-            signal->payload.raw.timings_size = temp_data32;
+            raw.timings_size = temp_data32;
 
-            signal->payload.raw.timings =
-                malloc(sizeof(uint32_t) * signal->payload.raw.timings_size);
-            if(!flipper_format_read_uint32(
-                   fff_data_file, "data", signal->payload.raw.timings, temp_data32)) {
+            raw.timings = malloc(sizeof(uint32_t) * raw.timings_size);
+            if(!flipper_format_read_uint32(fff_data_file, "data", raw.timings, temp_data32)) {
                 // ACTION_SET_ERROR("IR: Failed to read data");
-                free(signal->payload.raw.timings);
+                free(raw.timings);
                 break;
             }
+            // Publish ownership only after the complete raw payload was read.
+            signal->payload.raw = raw;
+            signal->is_raw = true;
             success = true;
         }
     } while(false);
 
+    furi_string_free(temp_str);
     return success;
 }
 

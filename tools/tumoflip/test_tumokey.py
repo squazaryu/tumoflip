@@ -90,6 +90,12 @@ class TumoKeyTest(unittest.TestCase):
         self.assertTrue((APP_ROOT / "tests/native/protocol/runner.c").is_file())
         self.assertTrue((APP_ROOT / "tests/native/transport_u2f/runner.c").is_file())
 
+    def test_host_crypto_dependency_is_security_pinned(self) -> None:
+        requirements = (APP_ROOT / "host_tools/requirements.txt").read_text(
+            encoding="utf-8"
+        )
+        self.assertRegex(requirements, r"(?m)^cryptography==50\.0\.1$")
+
 
 if __name__ == "__main__":
     unittest.main()

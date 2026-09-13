@@ -97,6 +97,7 @@ typedef enum {
 typedef enum {
     SubGhzViewReceiverModeLive,
     SubGhzViewReceiverModeFile,
+    SubGhzViewReceiverModeAutoDecode,
 } SubGhzViewReceiverMode;
 
 typedef enum {

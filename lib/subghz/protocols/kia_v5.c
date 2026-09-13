@@ -724,8 +724,7 @@ SubGhzProtocolStatus
     SubGhzProtocolStatus ret = subghz_block_generic_deserialize(&instance->generic, flipper_format);
 
     if((ret == SubGhzProtocolStatusOk) &&
-       (instance->generic.data_count_bit <
-        subghz_protocol_kia_v5_const.min_count_bit_for_found)) {
+       (instance->generic.data_count_bit != 64U && instance->generic.data_count_bit != 67U)) {
         ret = SubGhzProtocolStatusErrorParserBitCount;
     }
 

@@ -19,6 +19,7 @@ static const ActionMenuItemType ItemToMenuItem[] = {
     [Item_RFID] = ActionMenuItemTypeRFID,
     [Item_IR] = ActionMenuItemTypeIR,
     [Item_NFC] = ActionMenuItemTypeNFC,
+    [Item_Picopass] = ActionMenuItemTypePicopass,
     [Item_iButton] = ActionMenuItemTypeiButton,
     [Item_Playlist] = ActionMenuItemTypePlaylist,
     [Item_AppBridge] = ActionMenuItemTypeRelay,
@@ -155,6 +156,11 @@ bool scene_items_on_event(void* context, SceneManagerEvent event) {
         }
         break;
     case SceneManagerEventTypeBack:
+        if(app->suppress_next_back) {
+            app->suppress_next_back = false;
+            consumed = true;
+            break;
+        }
         // FURI_LOG_I(TAG, "Back button pressed!");
         consumed = false; // Ensure Back event continues to propagate
         if(app->depth > 0) {

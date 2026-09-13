@@ -42,6 +42,7 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
     instance->environment = subghz_environment_alloc();
     instance->is_database_loaded =
         subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_NAME);
+    subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_EXTENDED);
     subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_USER_NAME);
     subghz_environment_set_came_atomo_rainbow_table_file_name(
         instance->environment, SUBGHZ_CAME_ATOMO_DIR_NAME);
@@ -291,9 +292,15 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
 
                 if(ret == SubGhzTxRxStartTxStateOk) {
                     //Start TX
-                    subghz_devices_start_async_tx(
-                        instance->radio_device, subghz_transmitter_yield, instance->transmitter);
-                    subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateAsyncTx);
+                    if(subghz_devices_start_async_tx(
+                           instance->radio_device,
+                           subghz_transmitter_yield,
+                           instance->transmitter)) {
+                        subghz_txrx_radio_state(instance, SubGhzRadioBrokerStateAsyncTx);
+                    } else {
+                        FURI_LOG_E(TAG, "Unable to start async TX");
+                        ret = SubGhzTxRxStartTxStateErrorParserOthers;
+                    }
                 }
             } else {
                 ret = SubGhzTxRxStartTxStateErrorParserOthers;
@@ -303,9 +310,11 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
         }
         if(ret != SubGhzTxRxStartTxStateOk) {
             subghz_transmitter_free(instance->transmitter);
+            instance->transmitter = NULL;
             if(instance->txrx_state != SubGhzTxRxStateIDLE) {
                 subghz_txrx_idle(instance);
             }
+            subghz_txrx_speaker_off(instance);
         }
 
     } while(false);

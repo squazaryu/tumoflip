@@ -23,8 +23,8 @@ class FapExcludeLibsTest(unittest.TestCase):
             BUILDER,
         )
 
-    def test_f7_api_88_4_exports_shared_libgcc_experiment(self) -> None:
-        self.assertIn("Version,+,88.4,,", API)
+    def test_f7_api_88_6_exports_shared_libgcc_experiment(self) -> None:
+        self.assertIn("Version,+,88.7,,", API)
         for symbol in (
             "__adddf3",
             "__aeabi_d2f",

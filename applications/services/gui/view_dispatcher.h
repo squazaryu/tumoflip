@@ -155,6 +155,18 @@ void view_dispatcher_run(ViewDispatcher* view_dispatcher);
  */
 void view_dispatcher_stop(ViewDispatcher* view_dispatcher);
 
+/** Check if a view id is available.
+ *
+ * This helper is non-mutating and may be used before registering a view to avoid
+ * tripping the duplicate-id assertion in view_dispatcher_add_view().
+ *
+ * @param      view_dispatcher  ViewDispatcher instance
+ * @param      view_id          View id to check
+ *
+ * @return     true if no view is registered with view_id, false otherwise.
+ */
+bool view_dispatcher_check_id(ViewDispatcher* view_dispatcher, uint32_t view_id);
+
 /** Add view to ViewDispatcher
  *
  * @param      view_dispatcher  ViewDispatcher instance
@@ -178,6 +190,17 @@ void view_dispatcher_remove_view(ViewDispatcher* view_dispatcher, uint32_t view_
  *             reached
  */
 void view_dispatcher_switch_to_view(ViewDispatcher* view_dispatcher, uint32_t view_id);
+
+/** Show the built-in loading animation until the next application view switch.
+ *
+ * Intended for blocking work before an application can display its first view. The view is
+ * allocated lazily, owns no public view id, and is freed with the dispatcher. Repeated calls while
+ * it is already current are safe and do not stack or restart the animation. Input queued while it
+ * is current is discarded when switching to another view.
+ *
+ * @param      view_dispatcher  ViewDispatcher instance
+ */
+void view_dispatcher_show_loading(ViewDispatcher* view_dispatcher);
 
 /** Send ViewPort of this ViewDispatcher instance to front
  *

@@ -124,13 +124,7 @@ class SubGhzDiversityTest(unittest.TestCase):
             txrx.index("SubGhzRadioDeviceType subghz_txrx_radio_device_fallback_internal")
         ]
 
-        live_failure = reprobe.index(
-            'FURI_LOG_W(TAG, "External live probe failed, retrying cold")'
-        )
-        teardown = reprobe.index(
-            "subghz_txrx_radio_device_apply(instance, SubGhzRadioDeviceTypeInternal);",
-            live_failure,
-        )
+        live_probe = reprobe.index("subghz_devices_is_connect(instance->radio_device)")
         cold_restore = reprobe.index(
             "return subghz_txrx_radio_device_apply(instance, preferred);"
         )
@@ -138,8 +132,7 @@ class SubGhzDiversityTest(unittest.TestCase):
         self.assertIn(
             "instance->radio_device_type != SubGhzRadioDeviceTypeInternal", reprobe
         )
-        self.assertLess(live_failure, teardown)
-        self.assertLess(teardown, cold_restore)
+        self.assertLess(live_probe, cold_restore)
 
     def test_external_hopping_timeout_falls_back_without_blocking(self) -> None:
         txrx = (SUBGHZ / "helpers/subghz_txrx.c").read_text(encoding="utf-8")
@@ -212,12 +205,12 @@ class SubGhzDiversityTest(unittest.TestCase):
             self.assertIn(required, source)
 
         self.assertIn("if(!external_ready)", source)
-        self.assertIn("const bool external_connected", source)
-        self.assertRegex(
-            source,
-            r"external_was_active\s*\|\|\s*subghz_txrx_radio_device_is_external_connected",
+        apply = source[source.index("    subghz_txrx_radio_device_apply("):]
+        self.assertLess(
+            apply.index("subghz_devices_end(instance->radio_device)"),
+            apply.index("external_ready = external && subghz_devices_begin(external)"),
         )
-        self.assertIn("if(external_connected)", source)
+        self.assertIn("if(external && !external_ready) subghz_devices_end(external);", apply)
         self.assertIn("SubGhzRadioDeviceTypeInternal", source)
         self.assertIn("subghz_txrx_radio_device_power_off(instance)", source)
 
@@ -233,6 +226,8 @@ class SubGhzDiversityTest(unittest.TestCase):
         self.assertIn("rssi > item->rssi", history)
         self.assertIn("item->source = source", history)
         self.assertIn("SubGhzHistoryAddResultUpdated", history)
+        self.assertIn("air_time_ms - instance->last_update_air_time", history)
+        self.assertIn("subghz_txrx_get_air_time_ms(subghz->txrx)", receiver_scene)
         self.assertIn('"%.2d:%.2d %s%.0f"', history)
         self.assertIn('"D:%s"', receiver_scene)
         self.assertIn("subghz_view_receiver_update_item_time", receiver_scene)

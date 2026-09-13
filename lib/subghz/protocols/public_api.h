@@ -297,6 +297,16 @@ void subghz_protocol_decoder_bin_raw_data_input_rssi(
  */
 bool subghz_protocol_secplus_v1_check_fixed(uint32_t fixed);
 
+/** Nice O-Code helpers used by the installer-code recovery app. */
+void subghz_protocol_nice_o_mask(uint8_t n, uint32_t* mask_32, uint16_t* mask_16);
+uint8_t subghz_protocol_nice_o_get_parcel(uint64_t data);
+void subghz_protocol_decoder_nice_flor_s_set_skip_o_code(void* context, bool skip);
+#define SUBGHZ_NO_NICE_FLOR_S_RAINBOW_TABLE 0
+uint64_t subghz_protocol_nice_flor_s_decrypt_ic(
+    uint64_t data,
+    uint16_t ic,
+    const char* file_name);
+
 #ifdef __cplusplus
 }
 #endif

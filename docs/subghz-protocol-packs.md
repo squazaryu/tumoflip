@@ -66,6 +66,22 @@ restores callbacks and filters, then resumes RX. The selection is also stored
 in the existing Sub-GHz settings. Every pack remains on SD; the selection only
 controls which files are mapped into RAM for the current session.
 
+## RAW Auto Decode
+
+After recording or opening a RAW capture, select `More` -> `Auto Decode` to
+try the active group first and then each remaining Protocol Pack. The scan is
+radio-free: it rereads the saved RAW file and never transmits it. Only one
+group is mapped at a time, and the scan stops at the first decoded frame.
+
+The matching group remains active while the decoded result is inspected or
+saved so its decoder is still available. Leaving Auto Decode restores the
+group that was active before the scan; the saved Receiver configuration is not
+changed. `Decode Current` remains available when only the selected group should
+be used. `No match (pack ERR)` means the scan finished without a decode but at
+least one expected `.fal` could not be loaded; use Protocol Pack Inspector to
+see the exact missing, incompatible, or invalid file before treating the result
+as a true no-match.
+
 ## Protocol Pack Inspector
 
 Open `Sub-GHz` -> `Read` -> receiver configuration -> `Pack Status`, then

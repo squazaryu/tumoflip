@@ -27,7 +27,7 @@ typedef struct {
 } SubGhzHistoryStruct;
 
 struct SubGhzHistory {
-    uint32_t last_update_timestamp;
+    uint32_t last_update_air_time;
     uint16_t last_index_write;
     uint8_t code_last_hash_data;
     bool code_last_hash_data_set;
@@ -92,12 +92,14 @@ void subghz_history_reset(SubGhzHistory* instance) {
     instance->last_index_write = 0;
     instance->code_last_hash_data = 0;
     instance->code_last_hash_data_set = false;
-    instance->last_update_timestamp = furi_get_tick();
+    instance->last_update_air_time = 0;
 }
 
 void subghz_history_restart_duplicate_timeout(SubGhzHistory* instance) {
     furi_assert(instance);
-    instance->last_update_timestamp = furi_get_tick();
+    // A scene transition pauses decoding. Forget the previous frame instead of
+    // letting the wall-clock pause decide whether the next frame is a duplicate.
+    instance->code_last_hash_data_set = false;
 }
 
 void subghz_history_delete_item(SubGhzHistory* instance, uint16_t idx) {
@@ -200,7 +202,8 @@ SubGhzHistoryAddResult subghz_history_add_to_history_with_source(
     void* context,
     SubGhzRadioPreset* preset,
     SubGhzRadioDeviceType source,
-    float rssi) {
+    float rssi,
+    uint32_t air_time_ms) {
     furi_assert(instance);
     furi_assert(context);
 
@@ -212,7 +215,7 @@ SubGhzHistoryAddResult subghz_history_add_to_history_with_source(
     //the "have we seen anything at all" flag matters: without it a signal whose hash is
     //zero would match the value the filter starts out with and never reach the history
     if(instance->code_last_hash_data_set && (instance->code_last_hash_data == code_hash_data) &&
-       ((furi_get_tick() - instance->last_update_timestamp) < 500)) {
+       ((air_time_ms - instance->last_update_air_time) < 500)) {
         SubGhzHistoryAddResult result = SubGhzHistoryAddResultDuplicate;
         if(instance->last_index_write > 0) {
             SubGhzHistoryItem* item = SubGhzHistoryItemArray_get(
@@ -223,13 +226,13 @@ SubGhzHistoryAddResult subghz_history_add_to_history_with_source(
                 result = SubGhzHistoryAddResultUpdated;
             }
         }
-        instance->last_update_timestamp = furi_get_tick();
+        instance->last_update_air_time = air_time_ms;
         return result;
     }
 
     instance->code_last_hash_data = code_hash_data;
     instance->code_last_hash_data_set = true;
-    instance->last_update_timestamp = furi_get_tick();
+    instance->last_update_air_time = air_time_ms;
 
     FuriString* text = furi_string_alloc();
     SubGhzHistoryItem* item = SubGhzHistoryItemArray_push_raw(instance->history->data);
@@ -306,8 +309,9 @@ SubGhzHistoryAddResult subghz_history_add_to_history_with_source(
 bool subghz_history_add_to_history(
     SubGhzHistory* instance,
     void* context,
-    SubGhzRadioPreset* preset) {
+    SubGhzRadioPreset* preset,
+    uint32_t air_time_ms) {
     return subghz_history_add_to_history_with_source(
-               instance, context, preset, SubGhzRadioDeviceTypeAuto, -127.0f) ==
+               instance, context, preset, SubGhzRadioDeviceTypeAuto, -127.0f, air_time_ms) ==
            SubGhzHistoryAddResultAdded;
 }

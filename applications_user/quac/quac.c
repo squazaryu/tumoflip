@@ -50,6 +50,8 @@ App* app_alloc() {
     // data member initialize
     app->depth = 0;
     app->selected_item = -1;
+    app->action_cancelled = false;
+    app->suppress_next_back = false;
 
     app->temp_str = furi_string_alloc();
 

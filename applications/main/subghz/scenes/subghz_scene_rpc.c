@@ -78,11 +78,24 @@ bool subghz_scene_rpc_on_event(void* context, SceneManagerEvent event) {
                         subghz->rpc_ctx, "Error in protocol parameters description");
                     break;
 
-                default: //if(SubGhzTxRxStartTxStateOk)
+                case SubGhzTxRxStartTxStateErrorCapability:
+                    subghz_block_generic_global.endless_tx = false;
+                    rpc_system_app_set_error_code(
+                        subghz->rpc_ctx, RpcAppSystemErrorCodeInternalParse);
+                    rpc_system_app_set_error_text(subghz->rpc_ctx, "Protocol capability mismatch");
+                    break;
+
+                case SubGhzTxRxStartTxStateOk:
                     result = true;
                     subghz_blink_start(subghz);
                     scene_manager_set_scene_state(
                         subghz->scene_manager, SubGhzSceneRpc, SubGhzRpcStateTx);
+                    break;
+                default:
+                    subghz_block_generic_global.endless_tx = false;
+                    rpc_system_app_set_error_code(
+                        subghz->rpc_ctx, RpcAppSystemErrorCodeInternalParse);
+                    rpc_system_app_set_error_text(subghz->rpc_ctx, "Unknown TX validation error");
                     break;
                 }
             }

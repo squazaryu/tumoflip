@@ -11,6 +11,7 @@ void subghz_scene_start_submenu_callback(void* context, uint32_t index) {
 
 void subghz_scene_start_on_enter(void* context) {
     SubGhz* subghz = context;
+    subghz_txrx_radio_device_poll_reacquire(subghz->txrx);
     if(subghz->state_notifications == SubGhzNotificationStateStarting) {
         subghz->state_notifications = SubGhzNotificationStateIDLE;
     }

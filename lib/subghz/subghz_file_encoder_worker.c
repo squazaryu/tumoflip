@@ -151,6 +151,14 @@ static int32_t subghz_file_encoder_worker_thread(void* context) {
         FURI_LOG_I(TAG, "Start transmission");
     } while(0);
 
+    if(!res) {
+        // A RAW file can be parsed by the caller while this worker is being launched, then
+        // disappear or fail its second open. Publish one terminal item so an already-started
+        // async TX cannot wait forever for its first duration.
+        subghz_file_encoder_worker_add_level_duration(instance, LEVEL_DURATION_RESET);
+        instance->worker_stopping = true;
+    }
+
     while(res && instance->worker_running) {
         size_t stream_free_byte = furi_stream_buffer_spaces_available(instance->stream);
         if((stream_free_byte / sizeof(int32_t)) >= SUBGHZ_FILE_ENCODER_LOAD) {
@@ -175,11 +183,13 @@ static int32_t subghz_file_encoder_worker_thread(void* context) {
     }
 
     FURI_LOG_I(TAG, "End read file");
-    //nothing was put on the air when decoding, and is_async_complete_tx() never turns
-    //true outside of a transmission, so this would spin until the worker is stopped
-    while(!instance->is_decoding && instance->device &&
-          !subghz_devices_is_async_complete_tx(instance->device) && instance->worker_running) {
-        furi_delay_ms(5);
+    if(res) {
+        //nothing was put on the air when decoding, and is_async_complete_tx() never turns
+        //true outside of a transmission, so this would spin until the worker is stopped
+        while(!instance->is_decoding && instance->device &&
+              !subghz_devices_is_async_complete_tx(instance->device) && instance->worker_running) {
+            furi_delay_ms(5);
+        }
     }
 
     FURI_LOG_I(TAG, "End transmission");

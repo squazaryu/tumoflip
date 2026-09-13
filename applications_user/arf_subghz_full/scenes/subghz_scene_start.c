@@ -33,6 +33,7 @@ static bool __attribute__((unused)) subghz_scene_start_load_signal(SubGhz* subgh
 
 void subghz_scene_start_on_enter(void* context) {
     SubGhz* subghz = context;
+    subghz_txrx_radio_device_poll_reacquire(subghz->txrx);
     if(subghz->state_notifications == SubGhzNotificationStateStarting) {
         subghz->state_notifications = SubGhzNotificationStateIDLE;
     }

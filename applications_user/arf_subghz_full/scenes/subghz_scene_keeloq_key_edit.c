@@ -4,7 +4,7 @@
 // Internal step events used only within this scene
 #define KL_EDIT_EV_KEY_DONE  200u
 #define KL_EDIT_EV_NAME_DONE 201u
-#define KL_EDIT_EV_TYPE_BASE 210u // type 1..8 mapped to events 211..218
+#define KL_EDIT_EV_TYPE_BASE 210u // supported learning types mapped to events 211..
 
 static void kl_edit_byte_input_cb(void* context) {
     SubGhz* subghz = context;
@@ -22,15 +22,30 @@ static void kl_edit_type_submenu_cb(void* context, uint32_t index) {
         subghz->view_dispatcher, (uint32_t)(KL_EDIT_EV_TYPE_BASE + 1 + index));
 }
 
-static const char* const kl_type_names[8] = {
-    "1-Simple",
-    "2-Normal",
-    "3-Secure",
-    "4-Magic XOR",
-    "5-FAAC SLH",
-    "6-Magic Ser1",
-    "7-Magic Ser2",
-    "8-Magic Ser3",
+typedef struct {
+    uint16_t type;
+    const char* name;
+} KlTypeOption;
+
+static const KlTypeOption kl_type_options[] = {
+    {1u, "1-Simple"},
+    {2u, "2-Normal"},
+    {3u, "3-Secure"},
+    {4u, "4-Magic XOR"},
+    {5u, "5-FAAC SLH"},
+    {6u, "6-Magic Ser1"},
+    {7u, "7-Magic Ser2"},
+    {8u, "8-Magic Ser3"},
+    {10u, "10-KingGates"},
+    {11u, "11-Jarolift"},
+    {12u, "12-Erreka"},
+    {13u, "13-Pujol"},
+    {14u, "14-AERF"},
+    {15u, "15-JCM"},
+    {16u, "16-JCM Gen2"},
+    {17u, "17-Stagnoli"},
+    {18u, "18-Telcoma hi"},
+    {19u, "19-Telcoma lo"},
 };
 
 static void kl_edit_show_step(SubGhz* subghz) {
@@ -60,16 +75,19 @@ static void kl_edit_show_step(SubGhz* subghz) {
     case 2:
         submenu_reset(subghz->submenu);
         submenu_set_header(subghz->submenu, "Learning type");
-        for(size_t i = 0; i < 8; i++) {
+        for(size_t i = 0; i < COUNT_OF(kl_type_options); i++) {
             submenu_add_item(
                 subghz->submenu,
-                kl_type_names[i],
+                kl_type_options[i].name,
                 (uint32_t)i,
                 kl_edit_type_submenu_cb,
                 subghz);
         }
-        if(subghz->keeloq_edit.type >= 1 && subghz->keeloq_edit.type <= 8) {
-            submenu_set_selected_item(subghz->submenu, (uint32_t)(subghz->keeloq_edit.type - 1));
+        for(size_t i = 0; i < COUNT_OF(kl_type_options); i++) {
+            if(subghz->keeloq_edit.type == kl_type_options[i].type) {
+                submenu_set_selected_item(subghz->submenu, (uint32_t)i);
+                break;
+            }
         }
         view_dispatcher_switch_to_view(subghz->view_dispatcher, SubGhzViewIdMenu);
         break;
@@ -103,8 +121,10 @@ bool subghz_scene_keeloq_key_edit_on_event(void* context, SceneManagerEvent even
         return true;
     }
 
-    if(event.event > KL_EDIT_EV_TYPE_BASE && event.event <= KL_EDIT_EV_TYPE_BASE + 8) {
-        subghz->keeloq_edit.type = (uint16_t)(event.event - KL_EDIT_EV_TYPE_BASE);
+    if(event.event > KL_EDIT_EV_TYPE_BASE &&
+       event.event <= KL_EDIT_EV_TYPE_BASE + COUNT_OF(kl_type_options)) {
+        const size_t option_index = (size_t)(event.event - KL_EDIT_EV_TYPE_BASE - 1u);
+        subghz->keeloq_edit.type = kl_type_options[option_index].type;
 
         // Reconstruct 64-bit key from byte array (big-endian, same as ByteInput display order)
         uint64_t kval = 0;

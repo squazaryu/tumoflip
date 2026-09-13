@@ -17,6 +17,7 @@ typedef enum {
     MenuStyleDsi,
     MenuStyleVertical,
     MenuStyleWiiVertical,
+    MenuStyleWiiClassic,
     MenuStyleCount,
 } MenuStyle;
 
@@ -34,10 +35,11 @@ typedef struct {
 static inline const char* menu_style_get_name(MenuStyle style) {
     static const char* const names[MenuStyleCount] = {
         "List",
+        "Matrix",
+        "Rail",
+        "Side List",
+        "Side Grid",
         "Wii",
-        "DSi",
-        "Vertical",
-        "Wii Vertical",
     };
 
     return style < MenuStyleCount ? names[style] : names[MenuStyleList];

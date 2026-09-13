@@ -1,10 +1,12 @@
 #include "quac_settings.h"
 
 #include <flipper_format/flipper_format.h>
+#include "actions/picopass/quac_picopass.h"
 
 // Quac Settings File Info
-#define QUAC_SETTINGS_FILE_TYPE    "Quac Settings File"
-#define QUAC_SETTINGS_FILE_VERSION 1
+#define QUAC_SETTINGS_FILE_TYPE           "Quac Settings File"
+#define QUAC_SETTINGS_FILE_VERSION_LEGACY 1
+#define QUAC_SETTINGS_FILE_VERSION        2
 
 void quac_set_default_settings(App* app) {
     app->settings.layout = QUAC_APP_LANDSCAPE;
@@ -13,6 +15,7 @@ void quac_set_default_settings(App* app) {
     app->settings.subghz_duration = 1500;
     app->settings.rfid_duration = 2500;
     app->settings.nfc_duration = 1000;
+    app->settings.picopass_duration = 1000;
     app->settings.ibutton_duration = 1000;
     app->settings.ir_use_ext_module = false;
     app->settings.show_hidden = false;
@@ -23,6 +26,8 @@ void quac_load_settings(App* app) {
     FuriString* temp_str;
     temp_str = furi_string_alloc();
     uint32_t temp_data32 = 0;
+    uint32_t settings_version = 0;
+    bool migration_required = false;
 
     // Initialize settings to the defaults
     quac_set_default_settings(app);
@@ -34,17 +39,18 @@ void quac_load_settings(App* app) {
             break;
         }
 
-        if(!flipper_format_read_header(fff_settings, temp_str, &temp_data32)) {
+        if(!flipper_format_read_header(fff_settings, temp_str, &settings_version)) {
             FURI_LOG_E(TAG, "SETTINGS: Missing or incorrect header");
             break;
         }
 
-        if((!strcmp(furi_string_get_cstr(temp_str), QUAC_SETTINGS_FILE_TYPE)) &&
-           (temp_data32 == QUAC_SETTINGS_FILE_VERSION)) {
-        } else {
+        if(strcmp(furi_string_get_cstr(temp_str), QUAC_SETTINGS_FILE_TYPE) ||
+           (settings_version != QUAC_SETTINGS_FILE_VERSION &&
+            settings_version != QUAC_SETTINGS_FILE_VERSION_LEGACY)) {
             FURI_LOG_E(TAG, "SETTINGS: Type or version mismatch");
             break;
         }
+        migration_required = settings_version == QUAC_SETTINGS_FILE_VERSION_LEGACY;
 
         // Now read actual values we care about
         if(!flipper_format_read_string(fff_settings, "Layout", temp_str)) {
@@ -89,6 +95,18 @@ void quac_load_settings(App* app) {
             app->settings.nfc_duration = temp_data32;
         }
 
+        if(settings_version == QUAC_SETTINGS_FILE_VERSION) {
+            if(!flipper_format_read_uint32(fff_settings, "Picopass Duration", &temp_data32, 1)) {
+                FURI_LOG_W(TAG, "SETTINGS: Missing 'Picopass Duration'");
+            } else if(
+                temp_data32 >= QUAC_PICOPASS_MIN_DURATION_MS &&
+                temp_data32 <= QUAC_PICOPASS_MAX_DURATION_MS) {
+                app->settings.picopass_duration = temp_data32;
+            } else {
+                FURI_LOG_W(TAG, "SETTINGS: Invalid 'Picopass Duration', using default");
+            }
+        }
+
         if(!flipper_format_read_uint32(fff_settings, "iButton Duration", &temp_data32, 1)) {
             FURI_LOG_W(TAG, "SETTINGS: Missing 'iButton Duration'");
         } else {
@@ -108,8 +126,10 @@ void quac_load_settings(App* app) {
         }
     } while(false);
 
+    flipper_format_file_close(fff_settings);
     furi_string_free(temp_str);
     flipper_format_free(fff_settings);
+    if(migration_required) quac_save_settings(app);
 }
 
 void quac_save_settings(App* app) {
@@ -161,6 +181,11 @@ void quac_save_settings(App* app) {
         if(!flipper_format_write_uint32(
                fff_settings, "NFC Duration", &app->settings.nfc_duration, 1)) {
             FURI_LOG_E(TAG, "SETTINGS: Failed to write 'NFC Duration'");
+            break;
+        }
+        if(!flipper_format_write_uint32(
+               fff_settings, "Picopass Duration", &app->settings.picopass_duration, 1)) {
+            FURI_LOG_E(TAG, "SETTINGS: Failed to write 'Picopass Duration'");
             break;
         }
         if(!flipper_format_write_uint32(

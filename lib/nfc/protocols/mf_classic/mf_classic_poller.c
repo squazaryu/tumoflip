@@ -829,9 +829,9 @@ NfcCommand mf_classic_poller_handler_auth_a(MfClassicPoller* instance) {
 
     if(mf_classic_is_key_found(
            instance->data, dict_attack_ctx->current_sector, MfClassicKeyTypeA)) {
-        // In CUID mode, skip directly to RequestKey since we test keys by specific type
+        // A CUID key index identifies one sector and key type; advance the app-owned cursor.
         if(dict_attack_ctx->mode == MfClassicPollerModeDictAttackCUID) {
-            instance->state = MfClassicPollerStateRequestKey;
+            instance->state = MfClassicPollerStateNextSector;
         } else {
             instance->state = MfClassicPollerStateAuthKeyB;
         }
@@ -855,7 +855,6 @@ NfcCommand mf_classic_poller_handler_auth_a(MfClassicPoller* instance) {
             instance->state = MfClassicPollerStateReadSector;
         } else {
             mf_classic_poller_halt(instance);
-            // In CUID mode, skip directly to RequestKey since we test keys by specific type
             if(dict_attack_ctx->mode == MfClassicPollerModeDictAttackCUID) {
                 instance->state = MfClassicPollerStateRequestKey;
             } else {
@@ -873,9 +872,9 @@ NfcCommand mf_classic_poller_handler_auth_b(MfClassicPoller* instance) {
 
     if(mf_classic_is_key_found(
            instance->data, dict_attack_ctx->current_sector, MfClassicKeyTypeB)) {
-        // In CUID mode, just request next key since we iterate by key_idx
+        // Key B uses the same app-owned CUID cursor as key A.
         if(dict_attack_ctx->mode == MfClassicPollerModeDictAttackCUID) {
-            instance->state = MfClassicPollerStateRequestKey;
+            instance->state = MfClassicPollerStateNextSector;
         } else if(mf_classic_is_key_found(
                       instance->data, dict_attack_ctx->current_sector, MfClassicKeyTypeA)) {
             instance->state = MfClassicPollerStateNextSector;
@@ -914,6 +913,20 @@ NfcCommand mf_classic_poller_handler_next_sector(MfClassicPoller* instance) {
     NfcCommand command = NfcCommandContinue;
     MfClassicPollerDictAttackContext* dict_attack_ctx = &instance->mode_ctx.dict_attack_ctx;
 
+    // In CUID mode the app advances key_idx and derives current_sector from that index.
+    if(dict_attack_ctx->mode == MfClassicPollerModeDictAttackCUID) {
+        instance->mfc_event.type = MfClassicPollerEventTypeNextSector;
+        instance->mfc_event_data.next_sector_data.current_sector = dict_attack_ctx->current_sector;
+        command = instance->callback(instance->general_event, instance->context);
+
+        dict_attack_ctx->current_sector = instance->mfc_event_data.next_sector_data.current_sector;
+        instance->state = (dict_attack_ctx->current_sector >= instance->sectors_total) ?
+                              MfClassicPollerStateSuccess :
+                              MfClassicPollerStateRequestKey;
+
+        return command;
+    }
+
     dict_attack_ctx->current_sector++;
 
     if(dict_attack_ctx->current_sector == instance->sectors_total) {
@@ -922,12 +935,6 @@ NfcCommand mf_classic_poller_handler_next_sector(MfClassicPoller* instance) {
         instance->mfc_event.type = MfClassicPollerEventTypeNextSector;
         instance->mfc_event_data.next_sector_data.current_sector = dict_attack_ctx->current_sector;
         command = instance->callback(instance->general_event, instance->context);
-
-        // In CUID mode, NFC app manages sector based on key_idx - read it back
-        if(dict_attack_ctx->mode == MfClassicPollerModeDictAttackCUID) {
-            dict_attack_ctx->current_sector =
-                instance->mfc_event_data.next_sector_data.current_sector;
-        }
 
         instance->state = MfClassicPollerStateRequestKey;
     }

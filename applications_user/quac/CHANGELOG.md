@@ -1,3 +1,31 @@
+## 0.10.0 (Tumoflip)
+
+- Add bounded playback of existing non-secure, unencrypted `.picopass`
+  credentials, directly or from playlists.
+- Reject secure/encrypted credentials and key-bearing blocks before starting
+  the NFC listener; no authentication or cryptographic code is shipped.
+- Validate files strictly and keep all source files read-only.
+- Add Back cancellation, finite READ/READ4 bounds and exact NFC/resource cleanup.
+- Migrate settings schema v1 to v2 with a bounded Picopass duration.
+- Preserve package-only ownership, AppBridge routes, the Sub-GHz broker and
+  user-owned `apps_data/quac` files.
+- No card reading/writing, authentication, key handling or recovery operations.
+
+## 0.9.3 (Tumoflip)
+
+- Move delivery and future updates from firmware resources to FW Packages.
+- Preserve the Quac app id, device path and all user-owned `apps_data/quac` files.
+- No application behavior change from Tumoflip Quac 0.9.2.
+
+## 0.9.2 (Tumoflip)
+
+- Reject failed or incomplete Sub-GHz loads before starting transmission.
+- Do not access a RAW encoder or wait for completion after a rejected TX start.
+- Propagate asynchronous TX-start failures and release failed-start resources.
+- Safely reuse IR signal storage during Import All and free read temporaries.
+- Reject empty RAW IR timing arrays before allocation/transmission.
+- No Picopass/Loclass feature import; existing radio broker and launch routes remain unchanged.
+
 ## 0.9.1
 
 - Fixed About screen

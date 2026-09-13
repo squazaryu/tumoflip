@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,88.4,,
+Version,+,88.7,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/services/applications.h,,
 Header,+,applications/services/bt/bt_service/bt.h,,
@@ -1294,6 +1294,7 @@ Function,+,flipper_application_plugin_get_descriptor,const FlipperAppPluginDescr
 Function,+,flipper_application_preload,FlipperApplicationPreloadStatus,"FlipperApplication*, const char*"
 Function,+,flipper_application_preload_manifest,FlipperApplicationPreloadStatus,"FlipperApplication*, const char*"
 Function,+,flipper_application_preload_status_to_string,const char*,FlipperApplicationPreloadStatus
+Function,-,flipper_application_set_assets_progress_callback,void,"FlipperApplication*, FlipperApplicationAssetsProgress, void*"
 Function,+,flipper_format_buffered_file_alloc,FlipperFormat*,Storage*
 Function,+,flipper_format_buffered_file_close,_Bool,FlipperFormat*
 Function,+,flipper_format_buffered_file_open_always,_Bool,"FlipperFormat*, const char*"
@@ -2230,7 +2231,9 @@ Function,-,infrared_brute_force_add_record,void,"InfraredBruteForce*, uint32_t, 
 Function,-,infrared_brute_force_alloc,InfraredBruteForce*,
 Function,-,infrared_brute_force_calculate_messages,InfraredErrorCode,InfraredBruteForce*
 Function,-,infrared_brute_force_free,void,InfraredBruteForce*
+Function,-,infrared_brute_force_get_current_record_name,const char*,const InfraredBruteForce*
 Function,-,infrared_brute_force_is_started,_Bool,const InfraredBruteForce*
+Function,-,infrared_brute_force_load_signal,_Bool,"InfraredBruteForce*, uint32_t, InfraredSignal*"
 Function,-,infrared_brute_force_reset,void,InfraredBruteForce*
 Function,-,infrared_brute_force_send,_Bool,"InfraredBruteForce*, uint32_t"
 Function,-,infrared_brute_force_set_db_filename,void,"InfraredBruteForce*, const char*"
@@ -2525,6 +2528,8 @@ Function,+,loader_unlock,void,Loader*
 Function,+,loading_alloc,Loading*,
 Function,+,loading_free,void,Loading*
 Function,+,loading_get_view,View*,Loading*
+Function,-,loading_reset_progress,void,Loading*
+Function,-,loading_set_progress,void,"Loading*, float"
 Function,+,locale_celsius_to_fahrenheit,float,float
 Function,+,locale_fahrenheit_to_celsius,float,float
 Function,+,locale_format_date,void,"FuriString*, const DateTime*, const LocaleDateFormat, const char*"
@@ -3750,6 +3755,10 @@ Function,+,subghz_protocol_keeloq_seed_create_data,_Bool,"void*, FlipperFormat*,
 Function,+,subghz_protocol_kinggates_stylo_4k_create_data,_Bool,"void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, SubGhzRadioPreset*"
 Function,+,subghz_protocol_marantec_crc8,uint8_t,"uint8_t*, size_t"
 Function,+,subghz_protocol_nice_flor_s_create_data,_Bool,"void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, SubGhzRadioPreset*, _Bool"
+Function,+,subghz_protocol_decoder_nice_flor_s_set_skip_o_code,void,"void*, _Bool"
+Function,+,subghz_protocol_nice_flor_s_decrypt_ic,uint64_t,"uint64_t, uint16_t, const char*"
+Function,+,subghz_protocol_nice_o_get_parcel,uint8_t,uint64_t
+Function,+,subghz_protocol_nice_o_mask,void,"uint8_t, uint32_t*, uint16_t*"
 Function,+,subghz_protocol_pack_group_get_name,const char*,SubGhzProtocolPackGroup
 Function,+,subghz_protocol_pack_registry_alloc,SubGhzProtocolPackRegistry*,"const SubGhzProtocolRegistry*, const char*, SubGhzProtocolPackGroup"
 Function,+,subghz_protocol_pack_registry_free,void,SubGhzProtocolPackRegistry*
@@ -5043,6 +5052,7 @@ Function,+,view_dispatcher_add_view,void,"ViewDispatcher*, uint32_t, View*"
 Function,+,view_dispatcher_alloc,ViewDispatcher*,
 Function,+,view_dispatcher_alloc_ex,ViewDispatcher*,FuriEventLoop*
 Function,+,view_dispatcher_attach_to_gui,void,"ViewDispatcher*, Gui*, ViewDispatcherType"
+Function,+,view_dispatcher_check_id,_Bool,"ViewDispatcher*, uint32_t"
 Function,+,view_dispatcher_enable_queue,void,ViewDispatcher*
 Function,+,view_dispatcher_free,void,ViewDispatcher*
 Function,+,view_dispatcher_get_event_loop,FuriEventLoop*,ViewDispatcher*
@@ -5055,6 +5065,7 @@ Function,+,view_dispatcher_set_custom_event_callback,void,"ViewDispatcher*, View
 Function,+,view_dispatcher_set_event_callback_context,void,"ViewDispatcher*, void*"
 Function,+,view_dispatcher_set_navigation_event_callback,void,"ViewDispatcher*, ViewDispatcherNavigationEventCallback"
 Function,+,view_dispatcher_set_tick_event_callback,void,"ViewDispatcher*, ViewDispatcherTickEventCallback, uint32_t"
+Function,+,view_dispatcher_show_loading,void,ViewDispatcher*
 Function,+,view_dispatcher_stop,void,ViewDispatcher*
 Function,+,view_dispatcher_switch_to_view,void,"ViewDispatcher*, uint32_t"
 Function,+,view_free,void,View*

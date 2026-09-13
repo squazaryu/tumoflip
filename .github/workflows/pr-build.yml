@@ -79,6 +79,83 @@ jobs:
           echo "ref=$SAFE_REF"              >> "$GITHUB_OUTPUT"
           echo "dist=${SAFE_REF}-${SHORT}"  >> "$GITHUB_OUTPUT"
 
+      - name: Validate main menu layouts and navigation
+        shell: bash
+        run: python3 tools/tumoflip/test_main_menu_layouts.py
+
+      - name: Validate Desktop stream orientation and settings recovery
+        shell: bash
+        run: |
+          python3 tools/tumoflip/test_menu_stream_orientation.py
+          python3 tools/tumoflip/test_desktop_settings_strings.py
+
+      - name: Validate Infrared Universal save flow
+        shell: bash
+        run: python3 tools/tumoflip/test_infrared_universal_save.py
+
+      - name: Validate transactional NFC key import
+        shell: bash
+        run: python3 tools/tumoflip/test_nfc_key_dictionary_import.py
+
+      - name: Validate TumoKey host dependency pins
+        shell: bash
+        run: |
+          python3 tools/tumoflip/test_tumokey.py
+          python3 tools/tumoflip/test_dependency_pins.py
+
+      - name: Validate File Browser path ownership
+        shell: bash
+        run: python3 tools/tumoflip/test_file_browser_momentum.py
+
+      - name: Validate app-owned startup loading lifecycle
+        shell: bash
+        run: |
+          python3 tools/tumoflip/test_gui_startup_loading.py
+          python3 tools/tumoflip/test_view_dispatcher_id.py
+          python3 tools/tumoflip/test_api88_ccid.py
+          python3 tools/tumoflip/test_loader_fap_loading.py
+          python3 tools/tumoflip/test_hotplug_assets.py
+          python3 -m tools.tumoflip.test_toyota_vag_diagnostics
+
+      - name: Validate Quac action ownership and transmit failures
+        shell: bash
+        run: |
+          python3 tools/tumoflip/test_quac_lifecycle.py
+          python3 tools/tumoflip/test_quac_picopass.py
+          python3 -m tools.tumoflip.test_quac_package_migration
+
+      - name: Validate Sub-GHz RAW worker startup lifecycle
+        shell: bash
+        run: |
+          python3 tools/tumoflip/test_subghz_raw_worker_startup.py
+          python3 tools/tumoflip/test_analyzer_notification_ownership.py
+
+      - name: Validate Wardriving lazy RX lifecycle
+        shell: bash
+        run: |
+          python3 tools/tumoflip/test_subghz_wardriving.py
+          python3 tools/tumoflip/test_wardriving_lazy_rx.py
+
+      - name: Validate power and plugin scan error handling
+        shell: bash
+        run: python3 tools/tumoflip/test_upstream_power_plugin_scan.py
+
+      - name: Validate upstream e6 Sub-GHz feature contracts
+        shell: bash
+        run: python3 tools/tumoflip/test_upstream_e6_protocols.py
+
+      - name: Validate Weather Editor and Kia file compatibility
+        run: |
+          python3 -m unittest \
+            tools.tumoflip.test_weather_save \
+            tools.tumoflip.test_weather_validation \
+            tools.tumoflip.test_weather_load_transaction \
+            tools.tumoflip.test_weather_package_export \
+            tools.tumoflip.test_kia_v5_file_lengths
+
+      - name: Validate deterministic source gathering and Wisniowski variants
+        run: python3 -m unittest tools.tumoflip.test_build_source_order tools.tumoflip.test_wisniowski_variants
+
       - name: Build firmware (minimal / clean)
         id: build
         shell: bash
@@ -87,7 +164,11 @@ jobs:
         run: |
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
-            updater_package fap_esp_flasher
+            updater_package fap_esp_flasher fap_quac fap_subghz_wardriving \
+            fap_nearby_files fap_nice_o_code fap_secplus_pin fap_weather_editor
+
+      - name: Render and validate native Weather Editor UI
+        run: toolchain/x86_64-linux/bin/python3 tools/tumoflip/render_weather_native.py /tmp/weather-editor-native-ui --sanitize
 
       - name: Upload firmware artifact
         if: success()

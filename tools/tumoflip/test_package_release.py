@@ -117,7 +117,10 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
         "apps/Tools/ai_dashboard.fap",
         "apps/Tools/clock.fap",
         "apps/Tools/flipper_relay.fap",
+        "apps/Tools/morse_player.fap",
         "apps/Tools/quac.fap",
+        "apps/GPIO/nearby_files.fap",
+        "apps/Sub-GHz/weather_editor.fap",
         "apps/Tools/tumoflip_packages.fap",
         "apps/Tools/totp.fap",
         "apps_data/js_app/plugins/js_gui.fal",
@@ -475,11 +478,11 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertNotIn("compatible_builds", after[esp_source])
             self.assertEqual(
                 sum("compatible_builds" in entry for entry in before.values()),
-                16,
+                len(PACKAGE_RELEASE_OVERLAY_FILES),
             )
             self.assertEqual(
                 sum("compatible_builds" in entry for entry in after.values()),
-                15,
+                len(PACKAGE_RELEASE_OVERLAY_FILES) - 1,
             )
             installed_dev004 = {
                 source: entry["compatible_builds"][0]["md5"]
@@ -745,7 +748,7 @@ class PackageReleaseTest(unittest.TestCase):
                 },
                 set(overlays),
             )
-            self.assertNotIn("compatible_builds", entries["apps/Tools/quac.fap"])
+            self.assertIn("compatible_builds", entries["apps/Tools/quac.fap"])
             for source in overlays:
                 alias = entries[source]["compatible_builds"]
                 self.assertEqual(len(alias), 1)
@@ -1257,6 +1260,7 @@ class PackageReleaseTest(unittest.TestCase):
             self.assertNotIn("apps/Scripts/js_app.fap", base_entries)
             self.assertIn("apps/Bluetooth/claude_buddy.fap", base_entries)
             self.assertIn("apps/Sub-GHz/subghz_wardriving.fap", base_entries)
+            self.assertIn("apps/Tools/morse_player.fap", base_entries)
             self.assertNotIn("apps_data/js_app/plugins/js_gui.fal", base_entries)
             self.assertNotIn("apps_data/js_app/plugins/js_subghz.fal", base_entries)
             self.assertFalse((resources / "apps/Scripts/js_app.fap").exists())

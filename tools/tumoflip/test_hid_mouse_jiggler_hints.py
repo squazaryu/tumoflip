@@ -34,6 +34,14 @@ class MouseJigglerStealthHintsTest(unittest.TestCase):
         ):
             self.assertIn(icon, view)
 
+    def test_mouse_delta_stays_within_the_signed_hid_report_range(self) -> None:
+        view = view_source()
+        self.assertIn("#include <stdint.h>", view)
+        self.assertIn("int8_t move_x", view)
+        self.assertIn("int8_t move_y", view)
+        self.assertIn("2 * INT8_MAX + 1", view)
+        self.assertNotIn("rand() % 2001", view)
+
 
 if __name__ == "__main__":
     unittest.main()

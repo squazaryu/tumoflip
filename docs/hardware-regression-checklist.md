@@ -1,6 +1,6 @@
 # Hardware Regression Checklist
 
-Checklist version: 1
+Checklist version: 2
 
 Use this checklist for tumoflip release candidates before marking a release as
 hardware-validated. CI can build firmware, validate packages, run unit tests,
@@ -20,7 +20,7 @@ hardware cases as unverified.
 ```text
 Hardware validation
 - status: not run | partial | passed | failed
-- checklist version: 1
+- checklist version: 2
 - firmware version:
 - release tag:
 - firmware commit:
@@ -46,6 +46,10 @@ These checks are allowed to be marked by CI:
 - generated `tumoflip-packages.json`
 - generated `tumoflip-packages.zip`
 - release asset SHA-256 sums
+- Sub-GHz capability descriptor and preflight tests in
+  `tools/tumoflip/test_subghz_protocol_capabilities.py`
+- safe acceptance-suite contract tests in
+  `tools/tumoflip/test_hardware_acceptance_suite.py`
 
 ## Hardware Matrix
 
@@ -66,6 +70,14 @@ are legally allowed to test.
   mismatched package files on a clean install.
 - Confirm no unexpected `FW packages` update warning remains after package
   installation.
+- Open `Apps -> Module One -> Diagnostics -> Tumo Acceptance`, run `Run Safe
+  Test`, and confirm private storage R/W is `PASS` while NFC and GPIO remain
+  explicitly `SKIP` in this FAP-only phase.
+- Confirm `.storage_probe.tmp` is absent after the safe test, then export a
+  report and verify it contains schema `tumoflip.acceptance/1`, firmware/API
+  identity, SD capacity, battery state, and the CC1101 broker baseline.
+- Run export twice without deleting the first report; confirm an existing report
+  is never overwritten and no unrelated SD file changes.
 
 ### System Sub-GHz Internal CC1101
 
@@ -73,7 +85,21 @@ are legally allowed to test.
 - Select `Standard Sub-GHz`; confirm it starts the core firmware app.
 - Run `Read` with internal CC1101 and confirm RX starts.
 - Run `Read RAW`, start and stop capture, then exit without reboot.
+- With Standard hopping off, set Standard to 315 MHz/AM650. Open `Read RAW ->
+  Config`, set 433.92 MHz/FM238, exit, and reopen both screens. Confirm each
+  screen retains its own frequency and modulation.
+- Change Standard to 868.35 MHz/AM270 and confirm the saved Read RAW profile is
+  still 433.92 MHz/FM238. Then change Read RAW back to 315 MHz/AM650 and confirm
+  Standard remains 868.35 MHz/AM270.
 - Save a legal test signal and reopen it from Saved.
+- With hopping off, select 315 MHz/AM and open the protocol list. Confirm
+  `Linear` and `Cham_Code` are selectable; change to 433 MHz and confirm both
+  are shown as incompatible instead of being silently accepted.
+- Confirm `Holtek_HT12X` remains selectable on its declared 315/433/868 MHz
+  bands with a matching AM/FM preset.
+- Attempt to transmit a saved test file with a deliberately mismatched
+  frequency or preset. Confirm TX is rejected with a concrete reason before
+  the CC1101 enters transmit mode.
 - Exit Sub-GHz and reopen it three times without a radio lock or crash.
 
 ### External CC1101 And Module One
@@ -81,6 +107,9 @@ are legally allowed to test.
 - Connect Module One or another supported external CC1101 module.
 - Set Infrared/Sub-GHz GPIO settings to the intended automatic mode.
 - Confirm external CC1101 is detected when present.
+- Repeat one compatible and one incompatible TX preflight with the external
+  CC1101 selected; confirm the same fail-closed result as with the internal
+  radio.
 - Confirm fallback to internal CC1101 when the external module is absent or not
   acquired.
 - Exit every radio app and confirm OTG/external power ownership is cleaned up.
@@ -95,6 +124,15 @@ are legally allowed to test.
 - Open `Pack Status` and confirm loaded versus expected counts.
 - Temporarily remove or corrupt one non-critical `.fal` on SD, confirm the UI
   reports the missing or invalid pack, then restore the file.
+- Record an owned, known-decodable signal as RAW while a different Protocol
+  Pack is selected. Open `More` -> `Auto Decode`; confirm the progress advances
+  through one group at a time, stops on the expected decoded frame, and never
+  enters radio transmit mode.
+- Inspect the Auto Decode result, return to `More`, and confirm Receiver Config
+  still shows the group selected before the scan. Repeat after saving the
+  decoded result.
+- Run Auto Decode on a legal no-match RAW sample; confirm it ends with
+  `No match`, remains responsive, and restores the original group.
 - Record the minimum free heap shown during pack switching or status display
   when available.
 
@@ -133,6 +171,11 @@ are legally allowed to test.
   `arf_keeloq`, `arf_counter_bf`, `arf_car_emulate`, `arf_psa_decrypt`,
   `proto_pirate`, `rolljam`, `subghz_bruteforcer`, and `arf_status`.
 - Confirm a child FAP crash or exit does not leave the Radio Broker locked.
+- Open `ARF Status -> RF Capabilities`; confirm schema version, RX/TX and AM/FM
+  totals are present and the `Holtek_HT12X`, `Linear`, and `Cham_Code` rows
+  match the Standard Sub-GHz compatibility view.
+- In one ARF transmitter module, repeat the mismatched frequency/preset case
+  and confirm it is blocked before TX.
 - Reopen core `Sub-GHz` after ARF testing and confirm RX starts.
 - With Module One connected, open `Apps -> Module One -> Sub-GHz -> TumoNet
   Bench` or `Desktop -> Cockpit -> CC1101: TumoNet`. Pair the RAM-only bench

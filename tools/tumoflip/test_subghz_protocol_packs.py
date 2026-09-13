@@ -47,6 +47,10 @@ class SubGhzProtocolPackTest(unittest.TestCase):
         self.assertIn("subghz_protocol_pack_registry_free(instance->protocol_pack_registry)", txrx)
         self.assertIn("subghz_receiver_set_rx_callback(", txrx)
         self.assertIn("if(resume_rx) subghz_txrx_rx_start(instance);", txrx)
+        self.assertIn(
+            "SubGhzProtocolPackGroup subghz_txrx_get_protocol_pack_group(", txrx
+        )
+        self.assertIn("return instance->protocol_pack_group;", txrx)
 
     def test_core_is_default_pack_for_core_and_arf_subghz(self) -> None:
         files = [

@@ -47,10 +47,10 @@ The first cleanup pass keeps behavior unchanged and removes false divergence:
 files that differed only by comment whitespace were synchronized and added to
 the drift manifest. The current checked surface is:
 
-- 75 common paths between core Sub-GHz and ARF FAP sources;
-- 33 byte-identical shared files tracked by
+- 80 common paths between core Sub-GHz and ARF FAP sources;
+- 34 byte-identical shared files tracked by
   `tools/tumoflip/subghz_drift_manifest.txt`;
-- 42 intentionally diverged files.
+- 44 intentionally diverged files.
 
 The remaining diverged files include ARF profile adapters, app entry points,
 radio lifecycle/state code, and ARF-only UI scenes. The ARF Frequency Analyzer
@@ -68,6 +68,15 @@ app, so diversity remains available from the supported user path without
 duplicating the core receiver inside a FAP. The core receiver view header also
 diverges to update a deduplicated history row when the second radio reports a
 stronger copy of the same frame.
+
+RAW Auto Decode is intentionally core-only. The core `More RAW` and `Decode RAW`
+scenes can temporarily switch the firmware-owned Protocol Pack registry,
+scan one group at a time without using the radio, and restore the user's active
+group on exit. The ARF profile has its own registry and advanced tool lifecycle,
+so mechanically copying these scenes would blur the supported boundary and
+duplicate the same primary workflow. These two scene files are therefore
+excluded from the byte-identical drift manifest; their radio-free RAW worker
+contract remains covered by the shared lifecycle tests.
 
 ## Shared APIs
 

@@ -1,4 +1,5 @@
 #include "notification.h"
+#include <toolbox/note_frequency.h>
 #include <toolbox/strint.h>
 
 /*
@@ -574,8 +575,6 @@ const NotificationMessage message_note_b8 = {
 };
 
 float notification_messages_notes_frequency_from_name(const char* note_name) {
-    const float base_note = 16.3515979f; // C0
-
     const char* note_names[] = {"c", "cs", "d", "ds", "e", "f", "fs", "g", "gs", "a", "as", "b"};
     const size_t notes_count = COUNT_OF(note_names);
 
@@ -600,7 +599,7 @@ float notification_messages_notes_frequency_from_name(const char* note_name) {
     if(octave > 8) return 0.0;
 
     int semitone_index = octave * notes_count + note_index;
-    float frequency = base_note * powf(2.0f, semitone_index / 12.0f);
+    float frequency = note_frequency_from_semitone((uint8_t)semitone_index);
 
     return roundf(frequency * 100) / 100.0f;
 }

@@ -9,6 +9,7 @@
 
 #include "action_i.h"
 #include "quac.h"
+#include "picopass/quac_picopass.h"
 
 /** Open the Playlist file and then transmit each action
  * 
@@ -34,6 +35,7 @@ void action_qpl_tx(void* context, const FuriString* action_path, FuriString* err
     uint32_t orig_subghz_duration = app->settings.subghz_duration;
     uint32_t orig_rfid_duration = app->settings.rfid_duration;
     uint32_t orig_nfc_duration = app->settings.nfc_duration;
+    uint32_t orig_picopass_duration = app->settings.picopass_duration;
     uint32_t orig_ibutton_duration = app->settings.ibutton_duration;
 
     FuriString* buffer;
@@ -118,6 +120,14 @@ void action_qpl_tx(void* context, const FuriString* action_path, FuriString* err
                         FURI_LOG_I(TAG, "NFC duration = %lu", nfc_duration);
                         app->settings.nfc_duration = nfc_duration;
                     }
+                } else if(!strcmp(ext, ".picopass")) {
+                    uint32_t picopass_duration = 0;
+                    if(quac_picopass_duration_parse(
+                           furi_string_get_cstr(buffer), &picopass_duration)) {
+                        app->settings.picopass_duration = picopass_duration;
+                    } else {
+                        ACTION_SET_ERROR("Playlist: Invalid Picopass duration");
+                    }
                 } else if(!strcmp(ext, ".ibtn")) {
                     uint32_t ibutton_duration = 0;
                     if(sscanf(furi_string_get_cstr(buffer), "%lu", &ibutton_duration) == 1) {
@@ -130,6 +140,8 @@ void action_qpl_tx(void* context, const FuriString* action_path, FuriString* err
 
             furi_string_swap(buffer, args_tmp);
             furi_string_free(args_tmp);
+
+            if(furi_string_size(error)) break;
 
             if(processed_special_command) {
                 continue;
@@ -162,6 +174,10 @@ void action_qpl_tx(void* context, const FuriString* action_path, FuriString* err
                 action_nfc_tx(context, buffer, error);
                 // Reset our default duration back - in case it was changed during playback
                 app->settings.nfc_duration = orig_nfc_duration;
+            } else if(!strcmp(ext, ".picopass")) {
+                action_picopass_tx(context, buffer, error);
+                // Reset the bounded default after any per-line override.
+                app->settings.picopass_duration = orig_picopass_duration;
             } else if(!strcmp(ext, ".ibtn")) {
                 action_ibutton_tx(context, buffer, error);
                 // Reset our default duration back - in case it was changed during playback
@@ -177,6 +193,7 @@ void action_qpl_tx(void* context, const FuriString* action_path, FuriString* err
                 // Abort playing the playlist - one of our actions failed
                 break;
             }
+            if(app->action_cancelled) break;
 
             // Playlist action complete!
             // TODO: Do we need a small delay (say 25ms) between actions?

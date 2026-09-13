@@ -1,0 +1,4 @@
+This directory is licensed under the GNU General Public License, version 3 or,
+at your option, any later version (GPL-3.0-or-later). The complete GPLv3 text is
+the repository root `LICENSE` file and applies to this component. Source files
+retain their copyright, warranty and modification notices.

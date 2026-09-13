@@ -28,6 +28,8 @@ SubGhzKeeloqKeysManager* subghz_keeloq_keys_alloc(void) {
 
     m->system_ks = subghz_keystore_alloc();
     subghz_keystore_load(m->system_ks, SUBGHZ_KEYSTORE_DIR_NAME);
+    /* Keep the ARF key browser in sync with the shared decoder environment. */
+    subghz_keystore_load(m->system_ks, SUBGHZ_KEYSTORE_DIR_EXTENDED);
 
     return m;
 }

@@ -61,12 +61,14 @@ class SubGhzUnleashed090Test(unittest.TestCase):
         generator = source("applications/main/subghz/helpers/subghz_gen_info.c")
         keeloq = source("lib/subghz/protocols/keeloq.c")
 
-        cardin_case = generator[
-            generator.index("case SetTypeCardinS449_433FM") :
-            generator.index("case SetTypePujol433")
-        ]
-        self.assertIn('.mod = "FM12K"', cardin_case)
-        self.assertIn('.keeloq.manuf = "Cardin_S449"', cardin_case)
+        # Keeloq generation metadata is table-driven in the compact build.
+        # Keep the test tied to the semantic preset, not its old switch case.
+        self.assertRegex(
+            generator,
+            r"\[33\]\s*=\s*SUBGHZ_KEELOQ_PRESET\(.*"
+            r"KEELOQ_MODULATION_FM12K.*\"Cardin_S449\"\),",
+        )
+        self.assertIn("[SetTypeCardinS449_433FM] = 34", generator)
         self.assertIn('"Cardin_S449"', keeloq)
 
 

@@ -224,12 +224,18 @@ uint8_t subghz_scene_receiver_config_hopper_value_index(void* context) {
     }
 }
 
+static bool subghz_scene_receiver_config_is_raw(const SubGhz* subghz) {
+    return scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneReadRAW) ==
+           SubGhzCustomEventManagerSet;
+}
+
 static void subghz_scene_receiver_config_set_frequency(VariableItem* item) {
     SubGhz* subghz = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
     SubGhzSetting* setting = subghz_txrx_get_setting(subghz->txrx);
+    const bool is_raw = subghz_scene_receiver_config_is_raw(subghz);
 
-    if(subghz_txrx_hopper_get_state(subghz->txrx) == SubGhzHopperStateOFF) {
+    if(is_raw || subghz_txrx_hopper_get_state(subghz->txrx) == SubGhzHopperStateOFF) {
         char text_buf[10] = {0};
         uint32_t frequency = subghz_setting_get_frequency(setting, index);
         SubGhzRadioPreset preset = subghz_txrx_get_preset(subghz->txrx);
@@ -255,7 +261,11 @@ static void subghz_scene_receiver_config_set_frequency(VariableItem* item) {
 
 
 
-        subghz->last_settings->frequency = frequency;
+        if(is_raw) {
+            subghz->last_settings->raw_frequency = frequency;
+        } else {
+            subghz->last_settings->frequency = frequency;
+        }
         subghz_setting_set_default_frequency(setting, frequency);
     } else {
         variable_item_set_current_value_index(
@@ -267,8 +277,10 @@ static void subghz_scene_receiver_config_set_preset(VariableItem* item) {
     SubGhz* subghz = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
     SubGhzSetting* setting = subghz_txrx_get_setting(subghz->txrx);
+    const bool is_raw = subghz_scene_receiver_config_is_raw(subghz);
 
-    if(subghz_txrx_preset_hopper_get_state(subghz->txrx) == SubGhzPresetHopperStateOFF) {
+    if(is_raw ||
+       subghz_txrx_preset_hopper_get_state(subghz->txrx) == SubGhzPresetHopperStateOFF) {
         const char* preset_name = subghz_setting_get_preset_name(setting, index);
         variable_item_set_current_value_text(item, preset_name);
         SubGhzRadioPreset preset = subghz_txrx_get_preset(subghz->txrx);
@@ -279,7 +291,11 @@ static void subghz_scene_receiver_config_set_preset(VariableItem* item) {
 
         subghz_txrx_set_preset(
             subghz->txrx, preset_name, preset.frequency, preset_data, preset_data_size);
-        subghz->last_settings->preset_index = index;
+        if(is_raw) {
+            subghz->last_settings->raw_preset_index = index;
+        } else {
+            subghz->last_settings->preset_index = index;
+        }
     } else {
         variable_item_set_current_value_index(item, subghz->last_settings->preset_index);
     }
@@ -573,6 +589,8 @@ static void subghz_scene_receiver_config_var_list_enter_callback(void* context, 
 
         subghz->last_settings->frequency = SUBGHZ_LAST_SETTING_DEFAULT_FREQUENCY;
         subghz->last_settings->preset_index = preset_index;
+        subghz->last_settings->raw_frequency = SUBGHZ_LAST_SETTING_DEFAULT_FREQUENCY;
+        subghz->last_settings->raw_preset_index = SUBGHZ_LAST_SETTING_DEFAULT_PRESET;
 
         subghz_threshold_rssi_set(subghz->threshold_rssi, raw_threshold_rssi_value[default_index]);
         subghz->filter = bin_raw_value[0];

@@ -50,6 +50,8 @@ void action_ql_resolve(
 void action_tx(void* context, Item* item, FuriString* error) {
     // FURI_LOG_I(TAG, "action_run: %s : %s", furi_string_get_cstr(item->name), item->ext);
 
+    App* app = context;
+    app->action_cancelled = false;
     FuriString* path = furi_string_alloc_set(item->path);
     if(item->is_link) {
         // This is a Quac link, open the file and pull the real filename
@@ -69,6 +71,8 @@ void action_tx(void* context, Item* item, FuriString* error) {
         action_rfid_tx(context, path, error);
     } else if(!strcmp(item->ext, ".nfc")) {
         action_nfc_tx(context, path, error);
+    } else if(!strcmp(item->ext, ".picopass")) {
+        action_picopass_tx(context, path, error);
     } else if(!strcmp(item->ext, ".ibtn")) {
         action_ibutton_tx(context, path, error);
     } else if(!strcmp(item->ext, ".qpl")) {

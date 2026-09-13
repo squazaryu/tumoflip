@@ -27,14 +27,10 @@ void subghz_history_free(SubGhzHistory* instance);
  */
 void subghz_history_reset(SubGhzHistory* instance);
 
-/** Restart the timeout of the duplicate filter
+/** Reset the duplicate filter after a scene transition.
  *
- * Repeats of the same signal are dropped while they keep arriving within a short
- * timeout, which is measured with the system tick. That only holds while the
- * decoders are fed in real time - as soon as decoding is suspended (a scene is
- * pushed on top of it, RX is restarted, ...) the time spent outside of the
- * decoder counts too, and the next repeat of the last signal is added to the
- * history as if it were a new one. Call this whenever decoding is resumed.
+ * The next decoded frame starts a fresh duplicate window. The window itself is
+ * measured using decoded air time, so time spent outside the decoder is ignored.
  *
  * @param instance - SubGhzHistory instance
  */
@@ -132,7 +128,8 @@ uint16_t subghz_history_get_last_index(SubGhzHistory* instance);
 bool subghz_history_add_to_history(
     SubGhzHistory* instance,
     void* context,
-    SubGhzRadioPreset* preset);
+    SubGhzRadioPreset* preset,
+    uint32_t air_time_ms);
 
 /** Get SubGhzProtocolCommonLoad to load into the protocol decoder bin data
  *
