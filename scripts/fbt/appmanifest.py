@@ -1,5 +1,6 @@
 import os
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, ClassVar, List, Optional, Tuple, Union
@@ -66,9 +67,10 @@ class FlipperApplication:
     sdk_headers: List[str] = field(default_factory=list)
     targets: List[str] = field(default_factory=lambda: ["all"])
     resources: Optional[str] = None
+    # Common to built-in applications and external applications.
+    sources: List[str] = field(default_factory=lambda: ["*.c*"])
 
     # .fap-specific
-    sources: List[str] = field(default_factory=lambda: ["*.c*"])
     fap_version: Union[str, Tuple[int]] = "0.1"
     fap_icon: Optional[str] = None
     fap_libs: List[str] = field(default_factory=list)
@@ -485,10 +487,12 @@ class AppBuildset:
         )
 
     def get_builtin_app_folders(self):
+        # APP and STARTUP may share a folder. Merge their patterns before
+        # gathering, otherwise a startup hook can reintroduce excluded sources.
+        folder_sources = defaultdict(set)
+        for app in self.get_builtin_apps():
+            folder_sources[app._appdir].update(app.sources)
         return sorted(
-            set(
-                (app._appdir, source_type)
-                for app in self.get_builtin_apps()
-                for source_type in app.sources
-            )
+            (appdir, tuple(sorted(patterns)))
+            for appdir, patterns in folder_sources.items()
         )
