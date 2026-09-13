@@ -136,6 +136,33 @@ void subghz_protocol_encoder_keeloq_free(void* context) {
  * @param btn Button number, 4 bit
  * @param counter_up increasing the counter if the value is true
  */
+static bool subghz_protocol_keeloq_uses_12bit_serial(const char* name) {
+    static const char* const names[] = {
+        "DTM_Neo",
+        "FAAC_RC,XT",
+        "Clemsa_Mutancode",
+        "Came_Space",
+        "Genius_Bravo",
+        "GSN",
+        "Rosh",
+        "Rossi",
+        "Pecinin",
+        "Steelmate",
+        "Cardin_S449",
+        "Stilmatic",
+        "Wisniowski",
+        "Wisniowski2",
+        "Wisniowski1Rv",
+        "ATA_PTX4",
+        "Fadini",
+        "Seav",
+    };
+    for(size_t i = 0; i < COUNT_OF(names); i++) {
+        if(strcmp(name, names[i]) == 0) return true;
+    }
+    return false;
+}
+
 static bool subghz_protocol_keeloq_gen_data(
     SubGhzProtocolEncoderKeeloq* instance,
     uint8_t btn,
@@ -367,25 +394,7 @@ static bool subghz_protocol_keeloq_gen_data(
                     apri_serial |= 0b110000000000;
                 }
                 decrypt = btn << 28 | (apri_serial & 0xFFF) << 16 | instance->generic.cnt;
-            } else if(
-                (strcmp(instance->manufacture_name, "DTM_Neo") == 0) ||
-                (strcmp(instance->manufacture_name, "FAAC_RC,XT") == 0) ||
-                (strcmp(instance->manufacture_name, "Clemsa_Mutancode") == 0) ||
-                (strcmp(instance->manufacture_name, "Came_Space") == 0) ||
-                (strcmp(instance->manufacture_name, "Genius_Bravo") == 0) ||
-                (strcmp(instance->manufacture_name, "GSN") == 0) ||
-                (strcmp(instance->manufacture_name, "Rosh") == 0) ||
-                (strcmp(instance->manufacture_name, "Rossi") == 0) ||
-                (strcmp(instance->manufacture_name, "Pecinin") == 0) ||
-                (strcmp(instance->manufacture_name, "Steelmate") == 0) ||
-                (strcmp(instance->manufacture_name, "Cardin_S449") == 0) ||
-                (strcmp(instance->manufacture_name, "Stilmatic") == 0) ||
-                (strcmp(instance->manufacture_name, "Wisniowski") == 0) ||
-                (strcmp(instance->manufacture_name, "Wisniowski2") == 0) ||
-                (strcmp(instance->manufacture_name, "Wisniowski1Rv") == 0) ||
-                (strcmp(instance->manufacture_name, "ATA_PTX4") == 0) ||
-                (strcmp(instance->manufacture_name, "Fadini") == 0) ||
-                (strcmp(instance->manufacture_name, "Seav") == 0)) {
+            } else if(subghz_protocol_keeloq_uses_12bit_serial(instance->manufacture_name)) {
                 // DTM Neo, Came_Space uses 12bit serial -> simple learning
                 // FAAC_RC,XT , Clemsa_Mutancode, Genius_Bravo, GSN 12bit serial -> normal learning
                 // Rosh, Rossi, Pecinin -> 12bit serial - simple learning

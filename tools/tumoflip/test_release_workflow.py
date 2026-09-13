@@ -19,7 +19,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("release_tag:", workflow)
         self.assertIn("sync_readme_version.py", workflow)
         self.assertIn("heatshrink2==0.13.0", workflow)
-        self.assertIn("./fbt COMPACT=1 DEBUG=0", workflow)
+        self.assertIn("./fbt -j2 COMPACT=1 DEBUG=0", workflow)
         self.assertIn("updater_package fap_esp_flasher", workflow)
         self.assertIn("fap_nearby_files", workflow)
         self.assertIn("validate_release.py", workflow)
