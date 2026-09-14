@@ -1,6 +1,7 @@
 #include <furi.h>
 #include <toolbox/protocols/protocol.h>
 #include <bit_lib/bit_lib.h>
+#include <string.h>
 #include "lfrfid_protocols.h"
 
 #define KERI_PREAMBLE_BIT_SIZE (33)
@@ -74,8 +75,7 @@ static bool protocol_keri_can_be_decoded(const uint8_t* data, bool inverted) {
     // Both frames must carry the same ID. Keri has no parity and no checksum, so
     // frame to frame agreement is the only integrity check available, and a
     // marginal capture is mis-sliced differently in each frame.
-    if(bit_lib_get_bits_32(data, 32, 32) !=
-       bit_lib_get_bits_32(data, KERI_ENCODED_BIT_SIZE + 32, 32))
+    if(memcmp(data + 4, data + 12, KERI_DECODED_DATA_SIZE) != 0)
         return false;
     return true;
 }
@@ -124,12 +124,10 @@ static void protocol_keri_decoder_save(
     uint8_t* data_to,
     const uint8_t* data_from,
     bool inverted) {
-    uint32_t id = bit_lib_get_bits_32(data_from, 32, 32);
-    if(inverted) id = ~id;
-    data_to[3] = (uint8_t)id;
-    data_to[2] = (uint8_t)(id >>= 8);
-    data_to[1] = (uint8_t)(id >>= 8);
-    data_to[0] = (uint8_t)(id >>= 8);
+    memcpy(data_to, data_from + 4, KERI_DECODED_DATA_SIZE);
+    if(inverted) {
+        for(size_t i = 0; i < KERI_DECODED_DATA_SIZE; i++) data_to[i] = (uint8_t)~data_to[i];
+    }
 }
 
 bool protocol_keri_decoder_feed(ProtocolKeri* protocol, bool level, uint32_t duration) {
