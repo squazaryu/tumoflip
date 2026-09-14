@@ -1,3 +1,8 @@
+## Tumoflip Dev 008-029
+- LFRFID: harden Keri PSK decoding against slicer skew by checking two complete frames for matching IDs before accepting a read; include regression vectors for clean and mismatched frames.
+- NFC: award the existing Dolphin deed when launching directly into card emulation, matching the saved-card path.
+- LFRFID: upcoming write-target settings are adapted separately below; the release will keep all existing targets enabled by default.
+
 ## Tumoflip Dev 008-027
 - GUI: **Expose `view_dispatcher_check_id()`** so FAPs can test view-ID availability without mutating the dispatcher or tripping the duplicate-ID guard. Adapted from official Flipper firmware PR #4422.
 - API: F7 advances from `88.6` to `88.7`; the maintained F18 compatibility target advances from `88.0` to `88.1`. Existing FAPs are rebuilt from the same release tree.
