@@ -16,6 +16,7 @@
 #include <gui/modules/text_input.h>
 #include <gui/modules/byte_input.h>
 #include <gui/modules/widget.h>
+#include <gui/modules/variable_item_list.h>
 
 #include <lfrfid/views/lfrfid_view_read.h>
 
@@ -30,6 +31,8 @@
 #include <toolbox/protocols/protocol_dict.h>
 #include <toolbox/path.h>
 #include <lfrfid/lfrfid_dict_file.h>
+#include <lfrfid/lfrfid_settings.h>
+#include <lfrfid/lfrfid_write_targets.h>
 #include <lfrfid/protocols/lfrfid_protocols.h>
 #include <lfrfid/lfrfid_worker.h>
 
@@ -63,6 +66,7 @@ enum LfRfidCustomEvent {
     LfRfidEventWipeProgress,
     LfRfidEventWriteOK,
     LfRfidEventWriteProtocolCannotBeWritten,
+    LfRfidEventWriteNoEnabledTarget,
     LfRfidEventWriteFobCannotBeWritten,
     LfRfidEventWriteTooLongToWrite,
     LfRfidEventWriteProgress,
@@ -113,6 +117,7 @@ struct LfRfid {
     Popup* popup;
     TextInput* text_input;
     ByteInput* byte_input;
+    VariableItemList* variable_item_list; // allocated on first use, see the settings scene
 
     // Custom views
     LfRfidReadView* read_view;
@@ -125,6 +130,7 @@ typedef enum {
     LfRfidViewWidget,
     LfRfidViewTextInput,
     LfRfidViewByteInput,
+    LfRfidViewVariableItemList,
     LfRfidViewRead,
 } LfRfidView;
 
@@ -133,6 +139,7 @@ typedef enum {
     LfRfidMenuIndexSaved,
     LfRfidMenuIndexAddManually,
     LfRfidMenuIndexExtraActions,
+    LfRfidMenuIndexSettings,
 } LfRfidMenuIndex;
 
 bool lfrfid_save_key(LfRfid* app);
