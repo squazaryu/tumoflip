@@ -98,7 +98,7 @@ class LfRfidWriteTargetTests(unittest.TestCase):
 
     def test_write_failure_diagnostic_does_not_format_a_target_name(self) -> None:
         worker = source("lib/lfrfid/lfrfid_worker_modes.c")
-        self.assertIn('FURI_LOG_E(TAG, "Encoding target %u failed"', worker)
+        self.assertIn('FURI_LOG_E(TAG, "Encode %u"', worker)
 
 
 if __name__ == "__main__":

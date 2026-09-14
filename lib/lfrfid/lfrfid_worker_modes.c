@@ -663,7 +663,7 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
             // half-filled request, and if that leaves nothing, report it instead of spinning
             // until the timer blames the card.
             if(!protocol_dict_get_write_data(worker->protocols, protocol, request)) {
-                FURI_LOG_E(TAG, "Encoding target %u failed", (unsigned)target);
+                FURI_LOG_E(TAG, "Encode %u", (unsigned)target);
                 targets &= ~LFRFID_WRITE_TARGET_BIT(target);
                 if(targets == 0) {
                     if(worker->write_cb) {
