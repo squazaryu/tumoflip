@@ -13,6 +13,18 @@ def source(path: str) -> str:
 
 
 class LfRfidWriteTargetTests(unittest.TestCase):
+    def test_settings_persistence_is_not_linked_into_the_core_library(self) -> None:
+        api = source("targets/f7/api_symbols.csv")
+        app = source("applications/main/lfrfid/application.fam")
+        cli = source("applications/main/lfrfid/application.fam")
+
+        self.assertFalse((ROOT / "lib/lfrfid/lfrfid_settings.c").exists())
+        self.assertTrue((ROOT / "applications/main/lfrfid/lfrfid_settings.c").exists())
+        self.assertIn('sources=["plugins/settings/*.c", "lfrfid_settings.c"]', app)
+        self.assertIn('sources=["lfrfid_cli.c", "lfrfid_settings.c"]', cli)
+        self.assertNotIn("Function,+,lfrfid_settings_get_write_targets", api)
+        self.assertNotIn("Function,+,lfrfid_settings_set_write_targets", api)
+
     def test_target_table_covers_every_default_chip_variant(self) -> None:
         header = source("lib/lfrfid/lfrfid_write_targets.h")
         implementation = source("lib/lfrfid/lfrfid_write_targets.c")
