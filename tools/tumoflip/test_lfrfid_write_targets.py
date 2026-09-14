@@ -59,6 +59,7 @@ class LfRfidWriteTargetTests(unittest.TestCase):
         self.assertIn("protocol->clock_per_bit == 64", protocol)
         self.assertIn("hitags_read_uid", worker)
         self.assertIn("if(attempted) hitags_write", worker)
+        self.assertIn("#ifndef FURI_NDEBUG", source("lib/lfrfid/tools/hitags.c"))
 
         settings = source("applications/main/lfrfid/lfrfid_settings.c")
         worker_alloc = source("lib/lfrfid/lfrfid_worker.c")

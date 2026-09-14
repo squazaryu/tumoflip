@@ -794,6 +794,8 @@ void hitags_write(const LFRFIDHitagS* data, const uint8_t* uid) {
     hitags_write_one_page(HITAGS_EM_PAGE1, data->page5, uid);
 }
 
+#ifndef FURI_NDEBUG
+
 // Each vector names itself, so a failure says which one rather than only that something did. A
 // crash would take the whole unit-test run with it, and the harness reads output that never comes.
 #define HITAGS_SELFTEST_CHECK(what, condition) \
@@ -958,3 +960,4 @@ const char* hitags_selftest(void) {
     return failure;
 }
 
+#endif
