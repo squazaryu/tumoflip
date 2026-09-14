@@ -1,4 +1,4 @@
-## Tumoflip Dev 008-029
+## Tumoflip Dev 009-001
 - LFRFID: harden Keri PSK decoding against slicer skew by checking two complete frames for matching IDs before accepting a read; include regression vectors for clean and mismatched frames.
 - NFC: award the existing Dolphin deed when launching directly into card emulation, matching the saved-card path.
 - LFRFID: choose which writable chips the app and CLI may try (T5577, EM4305, and each Hitag micro variant); all targets remain enabled by default and writes still verify the result.
