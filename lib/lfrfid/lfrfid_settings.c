@@ -34,7 +34,7 @@ LFRFIDWriteTargetMask lfrfid_settings_get_write_targets(void) {
                      sizeof(LFRFIDSettings),
                      LFRFID_SETTINGS_MAGIC,
                      LFRFID_SETTINGS_VERSION)) {
-        return settings.write_target_mask;
+        return settings.write_target_mask & LFRFID_WRITE_TARGET_MASK_ALL;
     }
 
     // saved_struct logs the cause; this is the consequence - a choice the user made is gone.

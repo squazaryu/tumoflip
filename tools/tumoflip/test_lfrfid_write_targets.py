@@ -43,6 +43,7 @@ class LfRfidWriteTargetTests(unittest.TestCase):
         settings = source("lib/lfrfid/lfrfid_settings.c")
         self.assertIn("return LFRFID_WRITE_TARGET_MASK_ALL", settings)
         self.assertIn("mask & LFRFID_WRITE_TARGET_MASK_ALL", settings)
+        self.assertIn("settings.write_target_mask & LFRFID_WRITE_TARGET_MASK_ALL", settings)
         self.assertIn("saved_struct_load", settings)
         self.assertIn("saved_struct_save", settings)
 
