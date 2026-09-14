@@ -38,9 +38,35 @@ class LfRfidWriteTargetTests(unittest.TestCase):
             "LFRFIDWriteTargetHitagMicroH55",
         ):
             self.assertIn(name, header)
+        self.assertIn("LFRFIDWriteTargetHitagS8268", header)
         self.assertIn("LFRFIDWriteTargetMax", plugin)
         self.assertIn("LFRFID_WRITE_TARGET_MASK_ALL", header)
         self.assertIn("LFRFIDWriteTargetMax < 32", header)
+        self.assertIn('if(target == LFRFIDWriteTargetHitagS8268) return "8268"', worker)
+        self.assertIn('if(target == LFRFIDWriteTargetHitagS8268) return "8268"', plugin)
+
+    def test_hitags_writer_is_opt_in_and_clock_limited(self) -> None:
+        header = source("lib/lfrfid/protocols/lfrfid_protocols.h")
+        protocol = source("lib/lfrfid/protocols/protocol_em4100.c")
+        worker = source("lib/lfrfid/lfrfid_worker_modes.c")
+        module = ROOT / "lib/lfrfid/tools/hitags.c"
+        module_header = ROOT / "lib/lfrfid/tools/hitags.h"
+
+        self.assertTrue(module.exists())
+        self.assertTrue(module_header.exists())
+        self.assertIn("LFRFIDWriteTypeHitagS", header)
+        self.assertIn("LFRFIDHitagS hitags", header)
+        self.assertIn("protocol->clock_per_bit == 64", protocol)
+        self.assertIn("hitags_read_uid", worker)
+        self.assertIn("if(attempted) hitags_write", worker)
+
+        settings = source("applications/main/lfrfid/lfrfid_settings.c")
+        worker_alloc = source("lib/lfrfid/lfrfid_worker.c")
+        self.assertIn("lfrfid_write_targets_default()", settings)
+        self.assertIn("lfrfid_write_targets_default()", worker_alloc)
+        targets = source("lib/lfrfid/lfrfid_write_targets.c")
+        self.assertIn("LFRFIDWriteTargetHitagS8268", targets)
+        self.assertIn("return LFRFID_WRITE_TARGET_MASK_ALL & ~", targets)
 
     def test_write_loop_uses_settings_mask_as_support_probe(self) -> None:
         worker = source("lib/lfrfid/lfrfid_worker_modes.c")
@@ -53,7 +79,7 @@ class LfRfidWriteTargetTests(unittest.TestCase):
 
     def test_settings_default_is_all_enabled_and_persists_only_known_bits(self) -> None:
         settings = source("applications/main/lfrfid/lfrfid_settings.c")
-        self.assertIn("return LFRFID_WRITE_TARGET_MASK_ALL", settings)
+        self.assertIn("return lfrfid_write_targets_default()", settings)
         self.assertIn("mask & LFRFID_WRITE_TARGET_MASK_ALL", settings)
         self.assertIn("settings.write_target_mask & LFRFID_WRITE_TARGET_MASK_ALL", settings)
         self.assertIn("saved_struct_load", settings)
@@ -69,9 +95,10 @@ class LfRfidWriteTargetTests(unittest.TestCase):
 
     def test_api_minor_bump_exports_only_the_new_scalar_surface(self) -> None:
         api = source("targets/f7/api_symbols.csv")
-        self.assertIn("Version,+,88.8,,", api)
+        self.assertIn("Version,+,88.9,,", api)
         for symbol in (
             "lfrfid_worker_set_write_targets",
+            "lfrfid_write_targets_default",
         ):
             self.assertIn(symbol, api)
         self.assertNotIn("lfrfid_write_targets_supported", api)
