@@ -1,4 +1,4 @@
-#include "lfrfid_settings.h"
+#include <lfrfid/lfrfid_settings.h>
 
 #include <furi.h>
 #include <storage/storage.h>
@@ -6,10 +6,9 @@
 
 #define TAG "LfRfidSettings"
 
-// Private to this file: the app, the CLI and third-party apps go through the accessors, so the
-// stored layout is free to change. Bump the version whenever it does - including when a write
-// target is appended - but note that a bump makes an existing file be rejected whole, so every
-// other choice the user made goes back to default with it.
+// Private to this file: the app, the CLI and the settings plugin are built with this same
+// implementation, while the core library only owns the worker and protocol code. The stored
+// layout can change without widening the firmware API surface.
 #define LFRFID_SETTINGS_FOLDER  EXT_PATH("lfrfid")
 #define LFRFID_SETTINGS_PATH    LFRFID_SETTINGS_FOLDER "/.lfrfid.settings"
 #define LFRFID_SETTINGS_VERSION (1)

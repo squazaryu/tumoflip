@@ -52,7 +52,7 @@ class LfRfidWriteTargetTests(unittest.TestCase):
         self.assertIn("LFRFIDWorkerWriteNoEnabledTarget", worker)
 
     def test_settings_default_is_all_enabled_and_persists_only_known_bits(self) -> None:
-        settings = source("lib/lfrfid/lfrfid_settings.c")
+        settings = source("applications/main/lfrfid/lfrfid_settings.c")
         self.assertIn("return LFRFID_WRITE_TARGET_MASK_ALL", settings)
         self.assertIn("mask & LFRFID_WRITE_TARGET_MASK_ALL", settings)
         self.assertIn("settings.write_target_mask & LFRFID_WRITE_TARGET_MASK_ALL", settings)
@@ -71,14 +71,11 @@ class LfRfidWriteTargetTests(unittest.TestCase):
         api = source("targets/f7/api_symbols.csv")
         self.assertIn("Version,+,88.8,,", api)
         for symbol in (
-            "lfrfid_settings_get_write_targets",
-            "lfrfid_settings_set_write_targets",
             "lfrfid_worker_set_write_targets",
             "lfrfid_write_target_name",
             "lfrfid_write_targets_supported",
         ):
             self.assertIn(symbol, api)
-        self.assertIn("Header,+,lib/lfrfid/lfrfid_settings.h,,", api)
         self.assertIn("Header,+,lib/lfrfid/lfrfid_write_targets.h,,", api)
 
 

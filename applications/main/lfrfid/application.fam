@@ -21,7 +21,7 @@ App(
     apptype=FlipperAppType.PLUGIN,
     entry_point="lfrfid_settings_plugin_ep",
     requires=["lfrfid"],
-    sources=["plugins/settings/*.c"],
+    sources=["plugins/settings/*.c", "lfrfid_settings.c"],
     fal_embedded=True,
 )
 
@@ -31,5 +31,5 @@ App(
     apptype=FlipperAppType.PLUGIN,
     entry_point="cli_rfid_ep",
     requires=["cli"],
-    sources=["lfrfid_cli.c"],
+    sources=["lfrfid_cli.c", "lfrfid_settings.c"],
 )
