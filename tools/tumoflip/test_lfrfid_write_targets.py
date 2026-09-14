@@ -82,6 +82,8 @@ class LfRfidWriteTargetTests(unittest.TestCase):
         keri = source("lib/lfrfid/protocols/protocol_keri.c")
         self.assertNotIn("negative_encoded_data", keri)
         self.assertIn("inverted", keri)
+        self.assertIn("memcmp(data + 4, data + 12, KERI_DECODED_DATA_SIZE)", keri)
+        self.assertIn("memcpy(data_to, data_from + 4, KERI_DECODED_DATA_SIZE)", keri)
 
 
 if __name__ == "__main__":
