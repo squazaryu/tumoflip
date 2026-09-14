@@ -41,13 +41,12 @@ class LfRfidWriteTargetTests(unittest.TestCase):
         self.assertIn("LFRFID_WRITE_TARGET_MASK_ALL", header)
         self.assertIn("LFRFIDWriteTargetMax < 32", implementation)
 
-    def test_write_loop_snapshots_before_probe_and_intersects_settings(self) -> None:
+    def test_write_loop_uses_settings_mask_as_support_probe(self) -> None:
         worker = source("lib/lfrfid/lfrfid_worker_modes.c")
         snapshot = worker.index("protocol_dict_get_data(worker->protocols, protocol, verify_data")
-        probe = worker.index("lfrfid_write_targets_supported(worker->protocols, protocol)")
-        intersection = worker.index("worker->write_target_mask & supported", probe)
-        self.assertLess(snapshot, probe)
-        self.assertLess(probe, intersection)
+        mask = worker.index("LFRFIDWriteTargetMask targets = worker->write_target_mask")
+        self.assertLess(snapshot, mask)
+        self.assertIn("This is also the support probe", worker)
         self.assertIn("while(targets != 0 && !done", worker)
         self.assertIn("LFRFIDWorkerWriteNoEnabledTarget", worker)
 
@@ -73,10 +72,16 @@ class LfRfidWriteTargetTests(unittest.TestCase):
         for symbol in (
             "lfrfid_worker_set_write_targets",
             "lfrfid_write_target_name",
-            "lfrfid_write_targets_supported",
         ):
             self.assertIn(symbol, api)
+        self.assertNotIn("lfrfid_write_targets_supported", api)
+        self.assertNotIn("lfrfid_write_target_variant", api)
         self.assertIn("Header,+,lib/lfrfid/lfrfid_write_targets.h,,", api)
+
+    def test_keri_keeps_one_buffer_per_timing_candidate(self) -> None:
+        keri = source("lib/lfrfid/protocols/protocol_keri.c")
+        self.assertNotIn("negative_encoded_data", keri)
+        self.assertIn("inverted", keri)
 
 
 if __name__ == "__main__":
