@@ -31,7 +31,7 @@ LFRFIDWorker* lfrfid_worker_alloc(ProtocolDict* dict) {
     worker->raw_filename = NULL;
     worker->mode_storage = NULL;
     worker->write_chip_name[0] = '\0';
-    worker->write_target_mask = LFRFID_WRITE_TARGET_MASK_ALL;
+    worker->write_target_mask = lfrfid_write_targets_default();
 
     worker->thread = furi_thread_alloc_ex("LfrfidWorker", 2048, lfrfid_worker_thread, worker);
 

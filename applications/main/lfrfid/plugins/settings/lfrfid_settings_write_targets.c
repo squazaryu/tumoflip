@@ -13,6 +13,7 @@ static const char* lfrfid_settings_write_target_name(LFRFIDWriteTarget target) {
     furi_check(target < LFRFIDWriteTargetMax);
     if(target == LFRFIDWriteTargetT5577) return "T5577";
     if(target == LFRFIDWriteTargetEM4305) return "EM4305";
+    if(target == LFRFIDWriteTargetHitagS8268) return "8268";
 
     return hitagmicro_variant_name(
         (HitagMicroVariant)(target - LFRFIDWriteTargetHitagMicro8265));

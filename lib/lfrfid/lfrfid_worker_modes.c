@@ -4,6 +4,7 @@
 #include "lfrfid_worker_i.h"
 #include "tools/t5577.h"
 #include "tools/hitagmicro.h"
+#include "tools/hitags.h"
 #include <stdio.h>
 #include <toolbox/pulse_protocols/pulse_glue.h>
 #include <toolbox/buffer_stream.h>
@@ -573,7 +574,8 @@ static bool lfrfid_worker_write_verify_and_finish(
     const uint8_t* verify_data,
     uint8_t* read_data,
     size_t data_size,
-    size_t* unsuccessful_reads) {
+    size_t* unsuccessful_reads,
+    size_t max_unsuccessful_reads) {
     LFRFIDWorkerWriteVerifyResult result =
         lfrfid_worker_write_verify(worker, protocol, verify_data, read_data, data_size);
 
@@ -586,7 +588,7 @@ static bool lfrfid_worker_write_verify_and_finish(
     }
 
     (*unsuccessful_reads)++;
-    if(*unsuccessful_reads == LFRFID_WORKER_WRITE_MAX_UNSUCCESSFUL_READS && worker->write_cb) {
+    if(*unsuccessful_reads == max_unsuccessful_reads && worker->write_cb) {
         worker->write_cb(LFRFIDWorkerWriteFobCannotBeWritten, worker->cb_ctx);
     }
     return false;
@@ -598,9 +600,16 @@ static const char* lfrfid_worker_write_target_name(LFRFIDWriteTarget target) {
     furi_check(target < LFRFIDWriteTargetMax);
     if(target == LFRFIDWriteTargetT5577) return "T5577";
     if(target == LFRFIDWriteTargetEM4305) return "EM4305";
+    if(target == LFRFIDWriteTargetHitagS8268) return "8268";
 
     return hitagmicro_variant_name(
         (HitagMicroVariant)(target - LFRFIDWriteTargetHitagMicro8265));
+}
+
+// Signature adapter for the Hitag S UID interrogation. The worker stop flag is the only state
+// needed, so the callback remains cheap and lets Back interrupt the RF exchange promptly.
+static bool lfrfid_worker_write_aborted(void* context) {
+    return lfrfid_worker_check_for_stop(context);
 }
 
 static void lfrfid_worker_write_set_target(LFRFIDWorker* worker, const char* target) {
@@ -630,6 +639,14 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
     // different protocol state and no duplicate request allocation is needed.
     LFRFIDWriteTargetMask targets = worker->write_target_mask;
 
+    size_t max_unsuccessful_reads = 0;
+    for(LFRFIDWriteTarget target = 0; target < LFRFIDWriteTargetMax; target++) {
+        if(targets & LFRFID_WRITE_TARGET_BIT(target)) max_unsuccessful_reads++;
+    }
+    if(max_unsuccessful_reads < LFRFID_WORKER_WRITE_MAX_UNSUCCESSFUL_READS) {
+        max_unsuccessful_reads = LFRFID_WORKER_WRITE_MAX_UNSUCCESSFUL_READS;
+    }
+
     if(targets == 0 && worker->write_cb) {
         worker->write_cb(LFRFIDWorkerWriteNoEnabledTarget, worker->cb_ctx);
     }
@@ -637,7 +654,7 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
     bool done = false;
 
     // Each enabled target is written and then immediately read back, so a success can
-    // report exactly which chip accepted the data (T5577 / EM4305 / Hitag micro variant).
+    // report exactly which chip accepted the data (T5577 / EM4305 / Hitag micro / Hitag S).
     // Trade-off: when the present chip is not the first one tried, this is slower than a
     // single verify per pass - every non-matching target costs one verify read of up to
     // LFRFID_WORKER_WRITE_VERIFY_TIME_MS.
@@ -649,11 +666,15 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
             if(!(targets & LFRFID_WRITE_TARGET_BIT(target))) continue;
 
             memset(request, 0, sizeof(LFRFIDWriteRequest));
-            // The first two target values intentionally match their write types; Hitag micro
-            // variants share the third encoding and differ only by password.
-            request->write_type = (target >= LFRFIDWriteTargetHitagMicro8265) ?
-                                      LFRFIDWriteTypeHitagMicro :
-                                      (LFRFIDWriteType)target;
+            // The first two target values intentionally match their write types. Hitag micro
+            // variants share one encoding, while Hitag S has its own UID-gated writer.
+            if(target == LFRFIDWriteTargetHitagS8268) {
+                request->write_type = LFRFIDWriteTypeHitagS;
+            } else if(target >= LFRFIDWriteTargetHitagMicro8265) {
+                request->write_type = LFRFIDWriteTypeHitagMicro;
+            } else {
+                request->write_type = (LFRFIDWriteType)target;
+            }
 
             // A preceding verify read overwrites the protocol's data, so restore the
             // intended ID before (re)encoding each write.
@@ -676,6 +697,8 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
 
             lfrfid_worker_write_set_target(worker, lfrfid_worker_write_target_name(target));
 
+            bool attempted = true;
+
             switch(request->write_type) {
             case LFRFIDWriteTypeT5577:
                 t5577_write(&request->t5577);
@@ -692,13 +715,29 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
                     hitagmicro_variant_password((HitagMicroVariant)(
                         target - LFRFIDWriteTargetHitagMicro8265)));
                 break;
+            case LFRFIDWriteTypeHitagS: {
+                // SELECT needs the tag's UID. The read is also a presence check, so a missing
+                // ID8268 is skipped without spending a second verify pass on a blind write.
+                uint8_t uid[LFRFID_HITAGS_UID_SIZE];
+                attempted = hitags_read_uid(uid, lfrfid_worker_write_aborted, worker);
+                if(attempted) hitags_write(&request->hitags, uid);
+                break;
+            }
             case LFRFIDWriteTypeMax:
                 // No default, so -Wswitch catches a new write type here too.
                 furi_crash("Unknown write type");
             }
 
+            if(!attempted) continue;
+
             done = lfrfid_worker_write_verify_and_finish(
-                worker, protocol, verify_data, read_data, data_size, &unsuccessful_reads);
+                worker,
+                protocol,
+                verify_data,
+                read_data,
+                data_size,
+                &unsuccessful_reads,
+                max_unsuccessful_reads);
         }
 
         if(done) break;

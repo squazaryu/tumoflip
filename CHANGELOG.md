@@ -2,7 +2,8 @@
 - LFRFID: harden Keri PSK decoding against slicer skew by checking two complete frames for matching IDs before accepting a read; include regression vectors for clean and mismatched frames.
 - NFC: award the existing Dolphin deed when launching directly into card emulation, matching the saved-card path.
 - LFRFID: choose which writable chips the app and CLI may try (T5577, EM4305, and each Hitag micro variant); all targets remain enabled by default and writes still verify the result.
-- API: F7 advances from `88.7` to `88.8` for the new scalar write-target accessors; existing API 88 FAPs remain major-compatible.
+- LFRFID: add an opt-in `8268` target for writing EM4100 RF/64 frames to ID8268 / Hitag S clone chips; UID confirmation is required before the two data pages are written, and the target stays disabled by default to protect genuine Hitag S application data.
+- API: F7 advances from `88.8` to `88.9` for the default write-target accessor; existing API 88 FAPs remain major-compatible.
 
 ## Tumoflip Dev 008-027
 - GUI: **Expose `view_dispatcher_check_id()`** so FAPs can test view-ID availability without mutating the dispatcher or tripping the duplicate-ID guard. Adapted from official Flipper firmware PR #4422.

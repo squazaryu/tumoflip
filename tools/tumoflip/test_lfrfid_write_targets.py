@@ -112,16 +112,18 @@ class LfRfidWriteTargetTests(unittest.TestCase):
         self.assertIn("memcmp(data + 4, data + 12, KERI_DECODED_DATA_SIZE)", keri)
         self.assertIn("memcpy(data_to, data_from + 4, KERI_DECODED_DATA_SIZE)", keri)
 
-    def test_target_mapping_stays_local_to_the_writer_and_settings_plugin(self) -> None:
+    def test_target_mapping_stays_local_except_for_the_default_mask(self) -> None:
         api = source("targets/f7/api_symbols.csv")
         worker = source("lib/lfrfid/lfrfid_worker_modes.c")
         plugin = source("applications/main/lfrfid/plugins/settings/lfrfid_settings_write_targets.c")
+        target_defaults = source("lib/lfrfid/lfrfid_write_targets.c")
 
-        self.assertFalse((ROOT / "lib/lfrfid/lfrfid_write_targets.c").exists())
+        self.assertTrue((ROOT / "lib/lfrfid/lfrfid_write_targets.c").exists())
         self.assertNotIn("lfrfid_write_target_type", api)
         self.assertNotIn("lfrfid_write_target_name", api)
         self.assertIn("lfrfid_worker_write_target_name", worker)
         self.assertIn('"T5577"', plugin)
+        self.assertIn("lfrfid_write_targets_default", target_defaults)
 
     def test_write_failure_diagnostic_does_not_format_a_target_name(self) -> None:
         worker = source("lib/lfrfid/lfrfid_worker_modes.c")

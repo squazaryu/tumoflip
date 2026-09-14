@@ -25,6 +25,7 @@ typedef enum {
     LFRFIDWriteTargetHitagMicro8265,
     LFRFIDWriteTargetHitagMicro8210,
     LFRFIDWriteTargetHitagMicroH55,
+    LFRFIDWriteTargetHitagS8268,
 
     LFRFIDWriteTargetMax,
 } LFRFIDWriteTarget;
@@ -36,11 +37,18 @@ _Static_assert(
     LFRFIDWriteTargetMax < 32,
     "A write target mask is a uint32_t, so there is room for 31 targets");
 
-/** The default mask. */
+/** Every target. Use it to validate a mask, not to build one - see lfrfid_write_targets_default(). */
 #define LFRFID_WRITE_TARGET_MASK_ALL ((LFRFIDWriteTargetMask)((1UL << LFRFIDWriteTargetMax) - 1))
 
 /** Bit this target occupies in a mask. */
 #define LFRFID_WRITE_TARGET_BIT(target) ((LFRFIDWriteTargetMask)(1UL << (target)))
+
+/** Targets enabled when the user has expressed no preference.
+ *
+ * Hitag S / ID8268 is deliberately opt-in because pages 4 and 5 can contain application data on
+ * a genuine Hitag S, which the Flipper cannot distinguish from a clone at write time.
+ */
+LFRFIDWriteTargetMask lfrfid_write_targets_default(void);
 
 #ifdef __cplusplus
 }

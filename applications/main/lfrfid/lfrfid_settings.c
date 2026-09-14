@@ -38,10 +38,10 @@ LFRFIDWriteTargetMask lfrfid_settings_get_write_targets(void) {
 
     // saved_struct logs the cause; this is the consequence - a choice the user made is gone.
     if(exists) {
-        FURI_LOG_W(TAG, "%s unreadable, re-enabling every write target", LFRFID_SETTINGS_PATH);
+        FURI_LOG_W(TAG, "%s unreadable, restoring default write targets", LFRFID_SETTINGS_PATH);
     }
 
-    return LFRFID_WRITE_TARGET_MASK_ALL;
+    return lfrfid_write_targets_default();
 }
 
 bool lfrfid_settings_set_write_targets(LFRFIDWriteTargetMask mask) {

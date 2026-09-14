@@ -2,6 +2,7 @@
 #include "../test.h" // IWYU pragma: keep
 #include <toolbox/protocols/protocol_dict.h>
 #include <lfrfid/protocols/lfrfid_protocols.h>
+#include <lfrfid/lfrfid_write_targets.h>
 #include <toolbox/pulse_protocols/pulse_glue.h>
 
 #define LF_RFID_READ_TIMING_MULTIPLIER 8
@@ -740,9 +741,58 @@ MU_TEST(test_lfrfid_protocol_indala224_alternating_phase) {
     protocol_dict_free(dict);
 }
 
+// Pin the Hitag S frame builders and anticollision decoder to datasheet/Proxmark vectors. The
+// reader/writer is intentionally kept behind the worker, so this reports a named failure rather
+// than exposing protocol state to applications.
+MU_TEST(test_lfrfid_hitags_frames_and_decoder) {
+    const char* failure = hitags_selftest();
+    mu_assert(failure == NULL, failure ? failure : "");
+}
+
+MU_TEST(test_lfrfid_hitags_write_target) {
+    // ID8268 / Hitag S can overwrite application pages on a genuine tag, so it is never enabled
+    // by the default mask. The user must explicitly turn on 8268 in Write Chips settings.
+    mu_assert_int_eq(
+        LFRFID_WRITE_TARGET_MASK_ALL & ~LFRFID_WRITE_TARGET_BIT(LFRFIDWriteTargetHitagS8268),
+        lfrfid_write_targets_default());
+}
+
+MU_TEST(test_lfrfid_protocol_em_write_hitags) {
+    ProtocolDict* dict = protocol_dict_alloc(lfrfid_protocols, LFRFIDProtocolMax);
+    const uint8_t data[] = EM_TEST_DATA;
+
+    LFRFIDWriteRequest via_t5577 = {.write_type = LFRFIDWriteTypeT5577};
+    protocol_dict_set_data(dict, LFRFIDProtocolEM4100, data, EM_TEST_DATA_SIZE);
+    mu_check(protocol_dict_get_write_data(dict, LFRFIDProtocolEM4100, &via_t5577));
+
+    // Encoding mutates the protocol's encoded state, so restore the source before the second
+    // target asks for the same frame.
+    LFRFIDWriteRequest via_hitags = {.write_type = LFRFIDWriteTypeHitagS};
+    protocol_dict_set_data(dict, LFRFIDProtocolEM4100, data, EM_TEST_DATA_SIZE);
+    mu_check(protocol_dict_get_write_data(dict, LFRFIDProtocolEM4100, &via_hitags));
+
+    const uint8_t expected_page4[] = {0xFF, 0xAA, 0x20, 0x04};
+    const uint8_t expected_page5[] = {0x54, 0xC4, 0x80, 0xA0};
+    mu_assert_mem_eq(expected_page4, via_hitags.hitags.page4, LFRFID_HITAGS_PAGE_SIZE);
+    mu_assert_mem_eq(expected_page5, via_hitags.hitags.page5, LFRFID_HITAGS_PAGE_SIZE);
+
+    // The Hitag S factory TTF stream is EM4100 RF/64 only. Faster EM4100 variants are refused;
+    // they would require rewriting the tag's configuration page as well.
+    LFRFIDWriteRequest wrong_clock = {.write_type = LFRFIDWriteTypeHitagS};
+    protocol_dict_set_data(dict, LFRFIDProtocolEM4100_32, data, EM_TEST_DATA_SIZE);
+    mu_check(!protocol_dict_get_write_data(dict, LFRFIDProtocolEM4100_32, &wrong_clock));
+    protocol_dict_set_data(dict, LFRFIDProtocolEM4100_16, data, EM_TEST_DATA_SIZE);
+    mu_check(!protocol_dict_get_write_data(dict, LFRFIDProtocolEM4100_16, &wrong_clock));
+
+    protocol_dict_free(dict);
+}
+
 MU_TEST_SUITE(test_lfrfid_protocols_suite) {
     MU_RUN_TEST(test_lfrfid_protocol_em_read_simple);
     MU_RUN_TEST(test_lfrfid_protocol_em_emulate_simple);
+    MU_RUN_TEST(test_lfrfid_protocol_em_write_hitags);
+    MU_RUN_TEST(test_lfrfid_hitags_frames_and_decoder);
+    MU_RUN_TEST(test_lfrfid_hitags_write_target);
 
     MU_RUN_TEST(test_lfrfid_protocol_h10301_read_simple);
     MU_RUN_TEST(test_lfrfid_protocol_h10301_emulate_simple);
