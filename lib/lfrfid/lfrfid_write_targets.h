@@ -12,9 +12,8 @@
  */
 
 #pragma once
-#include <toolbox/protocols/protocol_dict.h>
-#include "protocols/lfrfid_protocols.h"
-#include "tools/hitagmicro.h"
+#include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,25 +32,15 @@ typedef enum {
 /** A set of write targets, one bit per LFRFIDWriteTarget. */
 typedef uint32_t LFRFIDWriteTargetMask;
 
+_Static_assert(
+    LFRFIDWriteTargetMax < 32,
+    "A write target mask is a uint32_t, so there is room for 31 targets");
+
 /** The default mask. */
 #define LFRFID_WRITE_TARGET_MASK_ALL ((LFRFIDWriteTargetMask)((1UL << LFRFIDWriteTargetMax) - 1))
 
 /** Bit this target occupies in a mask. */
 #define LFRFID_WRITE_TARGET_BIT(target) ((LFRFIDWriteTargetMask)(1UL << (target)))
-
-/** How data for this target is encoded. Firmware internal, not exported to apps.
- *
- * @param      target  The write target
- * @return     the write type to fill a LFRFIDWriteRequest with
- */
-LFRFIDWriteType lfrfid_write_target_type(LFRFIDWriteTarget target);
-
-/** Chip name, as shown on the write screen and in settings, e.g. "T5577" or "8210".
- *
- * @param      target  The write target
- * @return     pointer to a static string
- */
-const char* lfrfid_write_target_name(LFRFIDWriteTarget target);
 
 #ifdef __cplusplus
 }

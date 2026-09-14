@@ -2,11 +2,21 @@
 
 #include <flipper_application/flipper_application.h>
 #include <lfrfid/lfrfid_settings.h>
+#include <lfrfid/tools/hitagmicro.h>
 
 static struct {
     LFRFIDWriteTargetMask mask;
     LFRFIDWriteTargetMask saved_mask;
 } page;
+
+static const char* lfrfid_settings_write_target_name(LFRFIDWriteTarget target) {
+    furi_check(target < LFRFIDWriteTargetMax);
+    if(target == LFRFIDWriteTargetT5577) return "T5577";
+    if(target == LFRFIDWriteTargetEM4305) return "EM4305";
+
+    return hitagmicro_variant_name(
+        (HitagMicroVariant)(target - LFRFIDWriteTargetHitagMicro8265));
+}
 
 static void lfrfid_settings_write_targets_changed(VariableItem* item) {
     LFRFIDWriteTarget target = (LFRFIDWriteTarget)(uintptr_t)variable_item_get_context(item);
@@ -40,7 +50,7 @@ static void lfrfid_settings_write_targets_on_enter(VariableItemList* list) {
 
         VariableItem* item = variable_item_list_add(
             list,
-            lfrfid_write_target_name(target),
+            lfrfid_settings_write_target_name(target),
             2,
             lfrfid_settings_write_targets_changed,
             (void*)(uintptr_t)target);

@@ -594,6 +594,15 @@ static bool lfrfid_worker_write_verify_and_finish(
 
 // Record the target now being attempted and notify the UI (so the write screen can show
 // it). On success this same string is what the success screen reports as the written chip.
+static const char* lfrfid_worker_write_target_name(LFRFIDWriteTarget target) {
+    furi_check(target < LFRFIDWriteTargetMax);
+    if(target == LFRFIDWriteTargetT5577) return "T5577";
+    if(target == LFRFIDWriteTargetEM4305) return "EM4305";
+
+    return hitagmicro_variant_name(
+        (HitagMicroVariant)(target - LFRFIDWriteTargetHitagMicro8265));
+}
+
 static void lfrfid_worker_write_set_target(LFRFIDWorker* worker, const char* target) {
     FURI_LOG_D(TAG, "write target: %s", target);
     snprintf(worker->write_chip_name, sizeof(worker->write_chip_name), "%s", target);
@@ -640,7 +649,11 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
             if(!(targets & LFRFID_WRITE_TARGET_BIT(target))) continue;
 
             memset(request, 0, sizeof(LFRFIDWriteRequest));
-            request->write_type = lfrfid_write_target_type(target);
+            // The first two target values intentionally match their write types; Hitag micro
+            // variants share the third encoding and differ only by password.
+            request->write_type = (target >= LFRFIDWriteTargetHitagMicro8265) ?
+                                      LFRFIDWriteTypeHitagMicro :
+                                      (LFRFIDWriteType)target;
 
             // A preceding verify read overwrites the protocol's data, so restore the
             // intended ID before (re)encoding each write.
@@ -650,7 +663,7 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
             // half-filled request, and if that leaves nothing, report it instead of spinning
             // until the timer blames the card.
             if(!protocol_dict_get_write_data(worker->protocols, protocol, request)) {
-                FURI_LOG_E(TAG, "Encoding for %s failed", lfrfid_write_target_name(target));
+                FURI_LOG_E(TAG, "Encoding target %u failed", (unsigned)target);
                 targets &= ~LFRFID_WRITE_TARGET_BIT(target);
                 if(targets == 0) {
                     if(worker->write_cb) {
@@ -661,7 +674,7 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
                 continue;
             }
 
-            lfrfid_worker_write_set_target(worker, lfrfid_write_target_name(target));
+            lfrfid_worker_write_set_target(worker, lfrfid_worker_write_target_name(target));
 
             switch(request->write_type) {
             case LFRFIDWriteTypeT5577:

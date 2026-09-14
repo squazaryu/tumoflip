@@ -27,7 +27,8 @@ class LfRfidWriteTargetTests(unittest.TestCase):
 
     def test_target_table_covers_every_default_chip_variant(self) -> None:
         header = source("lib/lfrfid/lfrfid_write_targets.h")
-        implementation = source("lib/lfrfid/lfrfid_write_targets.c")
+        worker = source("lib/lfrfid/lfrfid_worker_modes.c")
+        plugin = source("applications/main/lfrfid/plugins/settings/lfrfid_settings_write_targets.c")
 
         for name in (
             "LFRFIDWriteTargetT5577",
@@ -37,9 +38,9 @@ class LfRfidWriteTargetTests(unittest.TestCase):
             "LFRFIDWriteTargetHitagMicroH55",
         ):
             self.assertIn(name, header)
-            self.assertIn(name, implementation)
+        self.assertIn("LFRFIDWriteTargetMax", plugin)
         self.assertIn("LFRFID_WRITE_TARGET_MASK_ALL", header)
-        self.assertIn("LFRFIDWriteTargetMax < 32", implementation)
+        self.assertIn("LFRFIDWriteTargetMax < 32", header)
 
     def test_write_loop_uses_settings_mask_as_support_probe(self) -> None:
         worker = source("lib/lfrfid/lfrfid_worker_modes.c")
@@ -71,7 +72,6 @@ class LfRfidWriteTargetTests(unittest.TestCase):
         self.assertIn("Version,+,88.8,,", api)
         for symbol in (
             "lfrfid_worker_set_write_targets",
-            "lfrfid_write_target_name",
         ):
             self.assertIn(symbol, api)
         self.assertNotIn("lfrfid_write_targets_supported", api)
@@ -95,6 +95,10 @@ class LfRfidWriteTargetTests(unittest.TestCase):
         self.assertNotIn("lfrfid_write_target_name", api)
         self.assertIn("lfrfid_worker_write_target_name", worker)
         self.assertIn('"T5577"', plugin)
+
+    def test_write_failure_diagnostic_does_not_format_a_target_name(self) -> None:
+        worker = source("lib/lfrfid/lfrfid_worker_modes.c")
+        self.assertIn('FURI_LOG_E(TAG, "Encoding target %u failed"', worker)
 
 
 if __name__ == "__main__":
