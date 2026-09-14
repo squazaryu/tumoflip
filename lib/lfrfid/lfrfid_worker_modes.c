@@ -616,16 +616,13 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
 
     protocol_dict_get_data(worker->protocols, protocol, verify_data, data_size);
 
-    // Probing modifies the protocol's data, so it has to follow the snapshot above.
-    LFRFIDWriteTargetMask supported = lfrfid_write_targets_supported(worker->protocols, protocol);
-    LFRFIDWriteTargetMask targets = worker->write_target_mask & supported;
+    // Keep the user's mask as the single source of truth. Encoding each target immediately
+    // before its write also performs the support probe, so a second pass cannot observe a
+    // different protocol state and no duplicate request allocation is needed.
+    LFRFIDWriteTargetMask targets = worker->write_target_mask;
 
     if(targets == 0 && worker->write_cb) {
-        // Which of the two it is decides what the caller can tell the user to do about it.
-        worker->write_cb(
-            supported == 0 ? LFRFIDWorkerWriteProtocolCannotBeWritten :
-                             LFRFIDWorkerWriteNoEnabledTarget,
-            worker->cb_ctx);
+        worker->write_cb(LFRFIDWorkerWriteNoEnabledTarget, worker->cb_ctx);
     }
 
     bool done = false;
@@ -649,10 +646,9 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
             // intended ID before (re)encoding each write.
             protocol_dict_set_data(worker->protocols, protocol, verify_data, data_size);
 
-            // Always true today - support depends only on write_type, which is what the probe
-            // sampled (securakey already branches on data; both its arms happen to support the
-            // same types). Drop the target rather than write a half-filled request, and if that
-            // leaves nothing, say so instead of spinning until the timer blames the card.
+            // This is also the support probe. Drop an unsupported target rather than writing a
+            // half-filled request, and if that leaves nothing, report it instead of spinning
+            // until the timer blames the card.
             if(!protocol_dict_get_write_data(worker->protocols, protocol, request)) {
                 FURI_LOG_E(TAG, "Encoding for %s failed", lfrfid_write_target_name(target));
                 targets &= ~LFRFID_WRITE_TARGET_BIT(target);
@@ -680,7 +676,8 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
                 // tag untouched, and the variant that reads back correctly is the one present.
                 hitagmicro_write(
                     &request->hitagmicro,
-                    hitagmicro_variant_password(lfrfid_write_target_variant(target)));
+                    hitagmicro_variant_password((HitagMicroVariant)(
+                        target - LFRFIDWriteTargetHitagMicro8265)));
                 break;
             case LFRFIDWriteTypeMax:
                 // No default, so -Wswitch catches a new write type here too.

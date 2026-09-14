@@ -33,11 +33,8 @@ typedef struct {
 
 typedef struct {
     uint8_t encoded_data[KERI_ENCODED_DATA_SIZE];
-    uint8_t negative_encoded_data[KERI_ENCODED_DATA_SIZE];
     uint8_t high_long_encoded_data[KERI_ENCODED_DATA_SIZE];
-    uint8_t high_long_negative_encoded_data[KERI_ENCODED_DATA_SIZE];
     uint8_t high_short_encoded_data[KERI_ENCODED_DATA_SIZE];
-    uint8_t high_short_negative_encoded_data[KERI_ENCODED_DATA_SIZE];
 
     uint8_t data[KERI_DECODED_DATA_SIZE];
     ProtocolKeriEncoder encoder;
@@ -58,23 +55,22 @@ uint8_t* protocol_keri_get_data(ProtocolKeri* protocol) {
 
 void protocol_keri_decoder_start(ProtocolKeri* protocol) {
     memset(protocol->encoded_data, 0, KERI_ENCODED_DATA_SIZE);
-    memset(protocol->negative_encoded_data, 0, KERI_ENCODED_DATA_SIZE);
     memset(protocol->high_long_encoded_data, 0, KERI_ENCODED_DATA_SIZE);
-    memset(protocol->high_long_negative_encoded_data, 0, KERI_ENCODED_DATA_SIZE);
     memset(protocol->high_short_encoded_data, 0, KERI_ENCODED_DATA_SIZE);
-    memset(protocol->high_short_negative_encoded_data, 0, KERI_ENCODED_DATA_SIZE);
 }
 
-static bool protocol_keri_check_preamble(uint8_t* data, size_t bit_index) {
+static bool protocol_keri_check_preamble(const uint8_t* data, size_t bit_index, bool inverted) {
     // Preamble 11100000 00000000 00000000 00000000 1
-    if(*(uint32_t*)&data[bit_index / 8] != 0b00000000000000000000000011100000) return false;
-    if(bit_lib_get_bit(data, bit_index + 32) != 1) return false;
+    uint32_t preamble = *(const uint32_t*)&data[bit_index / 8];
+    if(inverted) preamble = ~preamble;
+    if(preamble != 0b00000000000000000000000011100000) return false;
+    if(bit_lib_get_bit(data, bit_index + 32) != (inverted ? 0 : 1)) return false;
     return true;
 }
 
-static bool protocol_keri_can_be_decoded(uint8_t* data) {
-    if(!protocol_keri_check_preamble(data, 0)) return false;
-    if(!protocol_keri_check_preamble(data, KERI_ENCODED_BIT_SIZE)) return false;
+static bool protocol_keri_can_be_decoded(const uint8_t* data, bool inverted) {
+    if(!protocol_keri_check_preamble(data, 0, inverted)) return false;
+    if(!protocol_keri_check_preamble(data, KERI_ENCODED_BIT_SIZE, inverted)) return false;
     // Both frames must carry the same ID. Keri has no parity and no checksum, so
     // frame to frame agreement is the only integrity check available, and a
     // marginal capture is mis-sliced differently in each frame.
@@ -84,23 +80,20 @@ static bool protocol_keri_can_be_decoded(uint8_t* data) {
     return true;
 }
 
-static bool protocol_keri_decoder_feed_internal(bool polarity, uint32_t time, uint8_t* data) {
+static int8_t protocol_keri_decoder_feed_internal(bool polarity, uint32_t time, uint8_t* data) {
     time += (KERI_US_PER_BIT / 2);
 
     size_t bit_count = (time / KERI_US_PER_BIT);
-    bool result = false;
 
     if(bit_count < KERI_ENCODED_BIT_SIZE) {
         for(size_t i = 0; i < bit_count; i++) {
             bit_lib_push_bit(data, KERI_ENCODED_DATA_SIZE, polarity);
-            if(protocol_keri_can_be_decoded(data)) {
-                result = true;
-                break;
-            }
+            if(protocol_keri_can_be_decoded(data, false)) return 1;
+            if(protocol_keri_can_be_decoded(data, true)) return -1;
         }
     }
 
-    return result;
+    return 0;
 }
 
 static void protocol_keri_descramble(uint32_t* fc, uint32_t* cn, uint32_t* internal_id) {
@@ -127,40 +120,24 @@ static void protocol_keri_descramble(uint32_t* fc, uint32_t* cn, uint32_t* inter
     }
 }
 
-static void protocol_keri_decoder_save(uint8_t* data_to, const uint8_t* data_from) {
+static void protocol_keri_decoder_save(
+    uint8_t* data_to,
+    const uint8_t* data_from,
+    bool inverted) {
     uint32_t id = bit_lib_get_bits_32(data_from, 32, 32);
+    if(inverted) id = ~id;
     data_to[3] = (uint8_t)id;
     data_to[2] = (uint8_t)(id >>= 8);
     data_to[1] = (uint8_t)(id >>= 8);
     data_to[0] = (uint8_t)(id >>= 8);
 }
 
-// Feed one level/duration into a pair of buffers: one that takes the level as
-// the bit value, one that takes its complement. On success the decoded ID is
-// written to protocol->data.
-static bool protocol_keri_decoder_feed_pair(
-    ProtocolKeri* protocol,
-    bool level,
-    uint32_t duration,
-    uint8_t* positive,
-    uint8_t* negative) {
-    if(protocol_keri_decoder_feed_internal(level, duration, positive)) {
-        protocol_keri_decoder_save(protocol->data, positive);
-        return true;
-    }
-
-    if(protocol_keri_decoder_feed_internal(!level, duration, negative)) {
-        protocol_keri_decoder_save(protocol->data, negative);
-        return true;
-    }
-
-    return false;
-}
-
 bool protocol_keri_decoder_feed(ProtocolKeri* protocol, bool level, uint32_t duration) {
+    int8_t polarity;
     if(duration > (KERI_US_PER_BIT / 2)) {
-        if(protocol_keri_decoder_feed_pair(
-               protocol, level, duration, protocol->encoded_data, protocol->negative_encoded_data)) {
+        polarity = protocol_keri_decoder_feed_internal(level, duration, protocol->encoded_data);
+        if(polarity) {
+            protocol_keri_decoder_save(protocol->data, protocol->encoded_data, polarity < 0);
             return true;
         }
     }
@@ -173,21 +150,19 @@ bool protocol_keri_decoder_feed(ProtocolKeri* protocol, bool level, uint32_t dur
             (duration > KERI_EDGE_SKEW_US) ? (duration - KERI_EDGE_SKEW_US) : duration;
         const uint32_t lengthened = duration + KERI_EDGE_SKEW_US;
 
-        if(protocol_keri_decoder_feed_pair(
-               protocol,
-               level,
-               level ? shortened : lengthened,
-               protocol->high_long_encoded_data,
-               protocol->high_long_negative_encoded_data)) {
+        polarity = protocol_keri_decoder_feed_internal(
+            level, level ? shortened : lengthened, protocol->high_long_encoded_data);
+        if(polarity) {
+            protocol_keri_decoder_save(
+                protocol->data, protocol->high_long_encoded_data, polarity < 0);
             return true;
         }
 
-        if(protocol_keri_decoder_feed_pair(
-               protocol,
-               level,
-               level ? lengthened : shortened,
-               protocol->high_short_encoded_data,
-               protocol->high_short_negative_encoded_data)) {
+        polarity = protocol_keri_decoder_feed_internal(
+            level, level ? lengthened : shortened, protocol->high_short_encoded_data);
+        if(polarity) {
+            protocol_keri_decoder_save(
+                protocol->data, protocol->high_short_encoded_data, polarity < 0);
             return true;
         }
     }

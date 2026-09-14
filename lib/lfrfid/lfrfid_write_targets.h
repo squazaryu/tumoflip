@@ -46,31 +46,12 @@ typedef uint32_t LFRFIDWriteTargetMask;
  */
 LFRFIDWriteType lfrfid_write_target_type(LFRFIDWriteTarget target);
 
-/** Chip variant this target addresses, for LFRFIDWriteTypeHitagMicro targets only.
- * Firmware internal, not exported to apps.
- *
- * @param      target  The write target, which must be a Hitag micro one
- * @return     the variant whose password unlocks this chip
- */
-HitagMicroVariant lfrfid_write_target_variant(LFRFIDWriteTarget target);
-
 /** Chip name, as shown on the write screen and in settings, e.g. "T5577" or "8210".
  *
  * @param      target  The write target
  * @return     pointer to a static string
  */
 const char* lfrfid_write_target_name(LFRFIDWriteTarget target);
-
-/** Mask of the targets a protocol can be written to.
- *
- * Probes the protocol exactly as the write loop does, so it leaves the protocol's data
- * modified: snapshot it with protocol_dict_get_data() first if the caller still needs it.
- *
- * @param      dict      The protocol dictionary
- * @param      protocol  The protocol to probe
- * @return     mask of LFRFIDWriteTarget bits, 0 if the protocol cannot be written at all
- */
-LFRFIDWriteTargetMask lfrfid_write_targets_supported(ProtocolDict* dict, ProtocolId protocol);
 
 #ifdef __cplusplus
 }

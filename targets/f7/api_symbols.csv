@@ -2503,8 +2503,6 @@ Function,+,lfrfid_worker_write_and_set_pass_start,void,"LFRFIDWorker*, LFRFIDPro
 Function,+,lfrfid_worker_write_start,void,"LFRFIDWorker*, LFRFIDProtocol, LFRFIDWorkerWriteCallback, void*"
 Function,+,lfrfid_write_target_name,const char*,LFRFIDWriteTarget
 Function,-,lfrfid_write_target_type,LFRFIDWriteType,LFRFIDWriteTarget
-Function,-,lfrfid_write_target_variant,HitagMicroVariant,LFRFIDWriteTarget
-Function,-,lfrfid_write_targets_supported,LFRFIDWriteTargetMask,"ProtocolDict*, ProtocolId"
 Function,-,lgamma,double,double
 Function,-,lgamma_r,double,"double, int*"
 Function,-,lgammaf,float,float
