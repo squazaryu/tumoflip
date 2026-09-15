@@ -118,7 +118,8 @@ jobs:
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
             updater_package fap_esp_flasher fap_quac fap_subghz_wardriving \
-            fap_nearby_files fap_nice_o_code fap_secplus_pin fap_weather_editor
+            fap_nearby_files fap_nice_o_code fap_secplus_pin fap_weather_editor \
+            fap_lfrfid_hitags
 
       - name: Run release tests
         shell: bash
@@ -165,7 +166,8 @@ jobs:
             tools/tumoflip/test_validate_release.py \
             tools/tumoflip/test_esp_flash_package.py \
             tools/tumoflip/test_apply_packages.py \
-            tools/tumoflip/test_make_packages_zip.py
+            tools/tumoflip/test_make_packages_zip.py \
+            tools/tumoflip/test_lfrfid_hitags_package.py
 
           python3 -m unittest \
             tools.tumoflip.test_weather_save \
@@ -174,7 +176,7 @@ jobs:
             tools.tumoflip.test_weather_package_export \
             tools.tumoflip.test_kia_v5_file_lengths
 
-          python3 -m unittest tools.tumoflip.test_build_source_order tools.tumoflip.test_wisniowski_variants
+          python3 -m unittest tools.tumoflip.test_build_source_order tools.tumoflip.test_wisniowski_variants tools.tumoflip.test_lfrfid_write_targets tools.tumoflip.test_lfrfid_hitags_package tools.tumoflip.test_lfrfid_bplm tools.tumoflip.test_lto_build
 
       - name: Render and validate native Weather Editor UI
         run: toolchain/x86_64-linux/bin/python3 tools/tumoflip/render_weather_native.py /tmp/weather-editor-native-ui --sanitize

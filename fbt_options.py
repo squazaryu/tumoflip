@@ -11,12 +11,16 @@ TARGET_HW = 7
 # Optimization flags
 ## Optimize for size
 COMPACT = 1
+# Link-time optimization applies only to the resident image; extapps.scons
+# deliberately strips it from FAP builds so their symbol-table validation stays
+# intact. Override with LTO=0 for a diagnostic non-LTO build.
+LTO = 1
 ## Optimize for debugging experience
 DEBUG = 0
 
 # Suffix to add to files when building distribution
 # If OS environment has DIST_SUFFIX set, it will be used instead
-DIST_SUFFIX = "t-dev-008-028"
+DIST_SUFFIX = "t-dev-009-001"
 
 # Post-update slideshow shown by the updater package
 UPDATE_SPLASH = "tumoflip_update"

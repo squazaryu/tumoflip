@@ -1,3 +1,14 @@
+## Tumoflip Dev 009-001
+- LFRFID: harden Keri PSK decoding against slicer skew by checking two complete frames for matching IDs before accepting a read; include regression vectors for clean and mismatched frames.
+- NFC: award the existing Dolphin deed when launching directly into card emulation, matching the saved-card path.
+- LFRFID: choose which writable chips the app and CLI may try (T5577, EM4305, and each Hitag micro variant); all targets remain enabled by default and writes still verify the result.
+- LFRFID: add an opt-in `8268` target for writing EM4100 RF/64 frames to ID8268 / Hitag S clone chips; UID confirmation is required before the two data pages are written, and the target stays disabled by default to protect genuine Hitag S application data. The Hitag S implementation is delivered as a lazy `lfrfid_hitags.fal` package, so its reader/writer is loaded only when that target is selected.
+- Build: enable resident-image LTO while keeping FAPs on the normal symbol-table pipeline; the F7 C1 image shrinks by about 8.3 KiB and now leaves an 8 KiB physical C2 gap. `LTO=0` remains available for A/B diagnostics.
+- LFRFID: keep Hitag Micro and Hitag S BPLM cell timings in one shared header; this is a source-drift guard with no behavioral or binary change.
+- Core correctness: align startup-hook signatures with `FlipperInternalOnStartHook` and make Storage Settings copy a concrete descriptor with its full option array, removing LTO diagnostics without changing behavior.
+- Core audit: review the resident LFRFID/Sub-GHz symbols and public API exports; no safe dead-code removal was found without cutting Standard/ARF or third-party FAP functionality.
+- API: F7 advances from `88.8` to `88.9` for the default write-target accessor; existing API 88 FAPs remain major-compatible.
+
 ## Tumoflip Dev 008-027
 - GUI: **Expose `view_dispatcher_check_id()`** so FAPs can test view-ID availability without mutating the dispatcher or tripping the duplicate-ID guard. Adapted from official Flipper firmware PR #4422.
 - API: F7 advances from `88.6` to `88.7`; the maintained F18 compatibility target advances from `88.0` to `88.1`. Existing FAPs are rebuilt from the same release tree.

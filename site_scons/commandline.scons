@@ -81,6 +81,11 @@ vars.AddVariables(
         help="Optimize for size",
         default=True,
     ),
+    BoolVariable(
+        "LTO",
+        help="Enable link-time optimization for the resident firmware image",
+        default=False,
+    ),
     EnumVariable(
         "TARGET_HW",
         help="Hardware target",

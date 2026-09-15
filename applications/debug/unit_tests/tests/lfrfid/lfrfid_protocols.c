@@ -2,6 +2,7 @@
 #include "../test.h" // IWYU pragma: keep
 #include <toolbox/protocols/protocol_dict.h>
 #include <lfrfid/protocols/lfrfid_protocols.h>
+#include <lfrfid/lfrfid_write_targets.h>
 #include <toolbox/pulse_protocols/pulse_glue.h>
 
 #define LF_RFID_READ_TIMING_MULTIPLIER 8
@@ -222,6 +223,92 @@ const int8_t fdxb_test_timings[FDXB_TEST_EMULATION_TIMINGS_COUNT] = {
     -16, 32,  -16, 16,  -16, 16,  -16, 16,  -16, 16,  -16, 16,  -16, 16,  -16, 16,  -16, 16,  -32,
     16,  -16, 16,  -16, 16,  -16, 16,  -16, 16,  -16, 16,  -16, 16,  -16, 16,  -16,
 };
+
+#define KERI_TEST_DATA        {0x80, 0x00, 0x30, 0x39}
+#define KERI_TEST_DATA_SIZE   4
+#define KERI_TEST_RUNS_COUNT  4
+#define KERI_TEST_FRAME_COUNT 40
+
+// One frame of a real RF/32 PSK1 Keri tag (internal ID 12345, T5577 blocks
+// 00000004 / 000181CF) captured with `rfid raw_read psk`: the high and low
+// length of each run, in microseconds. 64 bits in runs of 4H/29L, 1H/17L, 2H/6L,
+// 3H/2L totalling 16373 us, so ~255.8 us per bit, with every high run ~135 us
+// long and every low run ~135 us short. Uncorrected these total 66 bits, the
+// preamble never aligns, and the frame does not decode at all. Fed straight to
+// the decoder rather than through PulseGlue, as the PSK read path does.
+static const uint16_t keri_test_timings[KERI_TEST_RUNS_COUNT][2] = {
+    {1158, 7288},
+    {392, 4214},
+    {647, 1396},
+    {902, 376},
+};
+
+// The same frame with the 2H/6L run pair read as 3H/5L, setting encoded bit 52
+// so it carries 0x80003839 rather than 0x80003039. Each decodes on its own, so
+// alternating them is a tag whose two frames disagree.
+static const uint16_t keri_test_timings_alt[KERI_TEST_RUNS_COUNT][2] = {
+    {1158, 7288},
+    {392, 4214},
+    {902, 1141},
+    {902, 376},
+};
+
+MU_TEST(test_lfrfid_protocol_keri_read_simple) {
+    ProtocolDict* dict = protocol_dict_alloc(lfrfid_protocols, LFRFIDProtocolMax);
+    mu_assert_int_eq(KERI_TEST_DATA_SIZE, protocol_dict_get_data_size(dict, LFRFIDProtocolKeri));
+    mu_assert_string_eq("Keri", protocol_dict_get_name(dict, LFRFIDProtocolKeri));
+    mu_assert_string_eq("Keri", protocol_dict_get_manufacturer(dict, LFRFIDProtocolKeri));
+
+    const uint8_t data[KERI_TEST_DATA_SIZE] = KERI_TEST_DATA;
+
+    protocol_dict_decoders_start(dict);
+
+    ProtocolId protocol = PROTOCOL_NO;
+
+    for(size_t i = 0; i < KERI_TEST_RUNS_COUNT * KERI_TEST_FRAME_COUNT; i++) {
+        const uint16_t* run = keri_test_timings[i % KERI_TEST_RUNS_COUNT];
+
+        protocol = protocol_dict_decoders_feed(dict, true, run[0]);
+        if(protocol != PROTOCOL_NO) break;
+
+        protocol = protocol_dict_decoders_feed(dict, false, run[1]);
+        if(protocol != PROTOCOL_NO) break;
+    }
+
+    mu_assert_int_eq(LFRFIDProtocolKeri, protocol);
+    uint8_t received_data[KERI_TEST_DATA_SIZE] = {0};
+    protocol_dict_get_data(dict, protocol, received_data, KERI_TEST_DATA_SIZE);
+
+    mu_assert_mem_eq(data, received_data, KERI_TEST_DATA_SIZE);
+
+    protocol_dict_free(dict);
+}
+
+// Frames that disagree must not decode. Without the ID check the stream reads
+// out as whichever frame lands first, a credential the tag never presented.
+MU_TEST(test_lfrfid_protocol_keri_read_mismatched_frames) {
+    ProtocolDict* dict = protocol_dict_alloc(lfrfid_protocols, LFRFIDProtocolMax);
+
+    protocol_dict_decoders_start(dict);
+
+    ProtocolId protocol = PROTOCOL_NO;
+
+    for(size_t i = 0; i < KERI_TEST_RUNS_COUNT * KERI_TEST_FRAME_COUNT; i++) {
+        const uint16_t* run = ((i / KERI_TEST_RUNS_COUNT) % 2 == 0) ?
+                                  keri_test_timings[i % KERI_TEST_RUNS_COUNT] :
+                                  keri_test_timings_alt[i % KERI_TEST_RUNS_COUNT];
+
+        protocol = protocol_dict_decoders_feed(dict, true, run[0]);
+        if(protocol != PROTOCOL_NO) break;
+
+        protocol = protocol_dict_decoders_feed(dict, false, run[1]);
+        if(protocol != PROTOCOL_NO) break;
+    }
+
+    mu_assert_int_eq(PROTOCOL_NO, protocol);
+
+    protocol_dict_free(dict);
+}
 
 MU_TEST(test_lfrfid_protocol_em_read_simple) {
     ProtocolDict* dict = protocol_dict_alloc(lfrfid_protocols, LFRFIDProtocolMax);
@@ -654,9 +741,49 @@ MU_TEST(test_lfrfid_protocol_indala224_alternating_phase) {
     protocol_dict_free(dict);
 }
 
+MU_TEST(test_lfrfid_hitags_write_target) {
+    // ID8268 / Hitag S can overwrite application pages on a genuine tag, so it is never enabled
+    // by the default mask. The user must explicitly turn on 8268 in Write Chips settings.
+    mu_assert_int_eq(
+        LFRFID_WRITE_TARGET_MASK_ALL & ~LFRFID_WRITE_TARGET_BIT(LFRFIDWriteTargetHitagS8268),
+        lfrfid_write_targets_default());
+}
+
+MU_TEST(test_lfrfid_protocol_em_write_hitags) {
+    ProtocolDict* dict = protocol_dict_alloc(lfrfid_protocols, LFRFIDProtocolMax);
+    const uint8_t data[] = EM_TEST_DATA;
+
+    LFRFIDWriteRequest via_t5577 = {.write_type = LFRFIDWriteTypeT5577};
+    protocol_dict_set_data(dict, LFRFIDProtocolEM4100, data, EM_TEST_DATA_SIZE);
+    mu_check(protocol_dict_get_write_data(dict, LFRFIDProtocolEM4100, &via_t5577));
+
+    // Encoding mutates the protocol's encoded state, so restore the source before the second
+    // target asks for the same frame.
+    LFRFIDWriteRequest via_hitags = {.write_type = LFRFIDWriteTypeHitagS};
+    protocol_dict_set_data(dict, LFRFIDProtocolEM4100, data, EM_TEST_DATA_SIZE);
+    mu_check(protocol_dict_get_write_data(dict, LFRFIDProtocolEM4100, &via_hitags));
+
+    const uint8_t expected_page4[] = {0xFF, 0xAA, 0x20, 0x04};
+    const uint8_t expected_page5[] = {0x54, 0xC4, 0x80, 0xA0};
+    mu_assert_mem_eq(expected_page4, via_hitags.hitags.page4, LFRFID_HITAGS_PAGE_SIZE);
+    mu_assert_mem_eq(expected_page5, via_hitags.hitags.page5, LFRFID_HITAGS_PAGE_SIZE);
+
+    // The Hitag S factory TTF stream is EM4100 RF/64 only. Faster EM4100 variants are refused;
+    // they would require rewriting the tag's configuration page as well.
+    LFRFIDWriteRequest wrong_clock = {.write_type = LFRFIDWriteTypeHitagS};
+    protocol_dict_set_data(dict, LFRFIDProtocolEM4100_32, data, EM_TEST_DATA_SIZE);
+    mu_check(!protocol_dict_get_write_data(dict, LFRFIDProtocolEM4100_32, &wrong_clock));
+    protocol_dict_set_data(dict, LFRFIDProtocolEM4100_16, data, EM_TEST_DATA_SIZE);
+    mu_check(!protocol_dict_get_write_data(dict, LFRFIDProtocolEM4100_16, &wrong_clock));
+
+    protocol_dict_free(dict);
+}
+
 MU_TEST_SUITE(test_lfrfid_protocols_suite) {
     MU_RUN_TEST(test_lfrfid_protocol_em_read_simple);
     MU_RUN_TEST(test_lfrfid_protocol_em_emulate_simple);
+    MU_RUN_TEST(test_lfrfid_protocol_em_write_hitags);
+    MU_RUN_TEST(test_lfrfid_hitags_write_target);
 
     MU_RUN_TEST(test_lfrfid_protocol_h10301_read_simple);
     MU_RUN_TEST(test_lfrfid_protocol_h10301_emulate_simple);
@@ -668,6 +795,9 @@ MU_TEST_SUITE(test_lfrfid_protocols_suite) {
 
     MU_RUN_TEST(test_lfrfid_protocol_indala224_roundtrip);
     MU_RUN_TEST(test_lfrfid_protocol_indala224_alternating_phase);
+
+    MU_RUN_TEST(test_lfrfid_protocol_keri_read_simple);
+    MU_RUN_TEST(test_lfrfid_protocol_keri_read_mismatched_frames);
 
     MU_RUN_TEST(test_lfrfid_protocol_fdxb_read_simple);
     MU_RUN_TEST(test_lfrfid_protocol_fdxb_emulate_simple);

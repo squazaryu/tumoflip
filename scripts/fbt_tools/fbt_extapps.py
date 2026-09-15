@@ -208,7 +208,7 @@ class AppBuilder:
                     )
                 else:
                     fal_path = f"apps_data/{parent_app_id}/plugins/{app_artifacts.compact.name}"
-                    deployable = True
+                    deployable = self.app.is_default_deployable
                     # If it's a plugin for a non-deployable app, don't include it in the resources
                     if parent_app := self.app._appmanager.get(parent_app_id):
                         if not parent_app.is_default_deployable:

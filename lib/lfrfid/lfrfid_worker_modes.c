@@ -4,6 +4,10 @@
 #include "lfrfid_worker_i.h"
 #include "tools/t5577.h"
 #include "tools/hitagmicro.h"
+#include "tools/hitags.h"
+#include <flipper_application/plugins/plugin_manager.h>
+#include <loader/firmware_api/firmware_api.h>
+#include <storage/storage.h>
 #include <stdio.h>
 #include <toolbox/pulse_protocols/pulse_glue.h>
 #include <toolbox/buffer_stream.h>
@@ -11,6 +15,8 @@
 #include <lib/bit_lib/bit_lib.h>
 
 #define TAG "LfRfidWorker"
+
+#define LFRFID_HITAGS_PLUGIN_PATH APP_ASSETS_PATH("plugins/lfrfid_hitags.fal")
 
 /**
  * if READ_DEBUG_GPIO is defined:
@@ -573,7 +579,8 @@ static bool lfrfid_worker_write_verify_and_finish(
     const uint8_t* verify_data,
     uint8_t* read_data,
     size_t data_size,
-    size_t* unsuccessful_reads) {
+    size_t* unsuccessful_reads,
+    size_t max_unsuccessful_reads) {
     LFRFIDWorkerWriteVerifyResult result =
         lfrfid_worker_write_verify(worker, protocol, verify_data, read_data, data_size);
 
@@ -586,7 +593,7 @@ static bool lfrfid_worker_write_verify_and_finish(
     }
 
     (*unsuccessful_reads)++;
-    if(*unsuccessful_reads == LFRFID_WORKER_WRITE_MAX_UNSUCCESSFUL_READS && worker->write_cb) {
+    if(*unsuccessful_reads == max_unsuccessful_reads && worker->write_cb) {
         worker->write_cb(LFRFIDWorkerWriteFobCannotBeWritten, worker->cb_ctx);
     }
     return false;
@@ -594,6 +601,53 @@ static bool lfrfid_worker_write_verify_and_finish(
 
 // Record the target now being attempted and notify the UI (so the write screen can show
 // it). On success this same string is what the success screen reports as the written chip.
+static const char* lfrfid_worker_write_target_name(LFRFIDWriteTarget target) {
+    furi_check(target < LFRFIDWriteTargetMax);
+    if(target == LFRFIDWriteTargetT5577) return "T5577";
+    if(target == LFRFIDWriteTargetEM4305) return "EM4305";
+    if(target == LFRFIDWriteTargetHitagS8268) return "8268";
+
+    return hitagmicro_variant_name(
+        (HitagMicroVariant)(target - LFRFIDWriteTargetHitagMicro8265));
+}
+
+// Signature adapter for the Hitag S UID interrogation. The worker stop flag is the only state
+// needed, so the callback remains cheap and lets Back interrupt the RF exchange promptly.
+static bool lfrfid_worker_write_aborted(void* context) {
+    return lfrfid_worker_check_for_stop(context);
+}
+
+// Hitag S is a package-owned plugin. Keep it mapped for the whole write operation so the worker
+// never calls code after the loader has unmapped it, and fail closed when the optional package is
+// absent or has an incompatible ABI.
+static const LFRFIDHitagSPlugin* lfrfid_worker_load_hitags_plugin(
+    PluginManager** manager_out) {
+    furi_check(manager_out);
+
+    PluginManager* manager = plugin_manager_alloc(
+        LFRFID_HITAGS_PLUGIN_APP_ID, LFRFID_HITAGS_PLUGIN_API_VERSION, firmware_api_interface);
+    const PluginManagerError error =
+        plugin_manager_load_single(manager, LFRFID_HITAGS_PLUGIN_PATH);
+    if(error != PluginManagerErrorNone || plugin_manager_get_count(manager) != 1) {
+        FURI_LOG_W(
+            TAG,
+            "Hitag S plugin unavailable (%d), keeping 8268 disabled",
+            error);
+        plugin_manager_free(manager);
+        return NULL;
+    }
+
+    const LFRFIDHitagSPlugin* plugin = plugin_manager_get_ep(manager, 0);
+    if(!plugin || !plugin->read_uid || !plugin->write) {
+        FURI_LOG_E(TAG, "Hitag S plugin has an invalid descriptor");
+        plugin_manager_free(manager);
+        return NULL;
+    }
+
+    *manager_out = manager;
+    return plugin;
+}
+
 static void lfrfid_worker_write_set_target(LFRFIDWorker* worker, const char* target) {
     FURI_LOG_D(TAG, "write target: %s", target);
     snprintf(worker->write_chip_name, sizeof(worker->write_chip_name), "%s", target);
@@ -616,61 +670,124 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
 
     protocol_dict_get_data(worker->protocols, protocol, verify_data, data_size);
 
-    // Each writable target is written and then immediately read back, so a success can
-    // report exactly which chip accepted the data (T5577 / EM4305 / Hitag micro variant).
+    // Keep the user's mask as the single source of truth. Encoding each target immediately
+    // before its write also performs the support probe, so a second pass cannot observe a
+    // different protocol state and no duplicate request allocation is needed.
+    LFRFIDWriteTargetMask targets = worker->write_target_mask;
+
+    if(targets == 0 && worker->write_cb) {
+        worker->write_cb(LFRFIDWorkerWriteNoEnabledTarget, worker->cb_ctx);
+    }
+
+    bool done = false;
+    PluginManager* hitags_plugin_manager = NULL;
+    const LFRFIDHitagSPlugin* hitags_plugin = NULL;
+    if(targets & LFRFID_WRITE_TARGET_BIT(LFRFIDWriteTargetHitagS8268)) {
+        hitags_plugin = lfrfid_worker_load_hitags_plugin(&hitags_plugin_manager);
+        if(!hitags_plugin) {
+            targets &= ~LFRFID_WRITE_TARGET_BIT(LFRFIDWriteTargetHitagS8268);
+            if(targets == 0) {
+                if(worker->write_cb) {
+                    worker->write_cb(LFRFIDWorkerWriteProtocolCannotBeWritten, worker->cb_ctx);
+                }
+                done = true;
+            }
+        }
+    }
+
+    size_t max_unsuccessful_reads = 0;
+    for(LFRFIDWriteTarget target = 0; target < LFRFIDWriteTargetMax; target++) {
+        if(targets & LFRFID_WRITE_TARGET_BIT(target)) max_unsuccessful_reads++;
+    }
+    if(max_unsuccessful_reads < LFRFID_WORKER_WRITE_MAX_UNSUCCESSFUL_READS) {
+        max_unsuccessful_reads = LFRFID_WORKER_WRITE_MAX_UNSUCCESSFUL_READS;
+    }
+
+    // Each enabled target is written and then immediately read back, so a success can
+    // report exactly which chip accepted the data (T5577 / EM4305 / Hitag micro / Hitag S).
     // Trade-off: when the present chip is not the first one tried, this is slower than a
     // single verify per pass - every non-matching target costs one verify read of up to
     // LFRFID_WORKER_WRITE_VERIFY_TIME_MS.
-    bool done = false;
-    while(!done && !lfrfid_worker_check_for_stop(worker)) {
+    while(targets != 0 && !done && !lfrfid_worker_check_for_stop(worker)) {
         FURI_LOG_D(TAG, "Data write");
         furi_delay_ms(5); // halt
-        uint16_t skips = 0;
 
-        for(size_t i = 0; i < LFRFIDWriteTypeMax && !done; i++) {
+        for(LFRFIDWriteTarget target = 0; target < LFRFIDWriteTargetMax && !done; target++) {
+            if(!(targets & LFRFID_WRITE_TARGET_BIT(target))) continue;
+
             memset(request, 0, sizeof(LFRFIDWriteRequest));
-            request->write_type = (LFRFIDWriteType)i;
+            // The first two target values intentionally match their write types. Hitag micro
+            // variants share one encoding, while Hitag S has its own UID-gated writer.
+            if(target == LFRFIDWriteTargetHitagS8268) {
+                request->write_type = LFRFIDWriteTypeHitagS;
+            } else if(target >= LFRFIDWriteTargetHitagMicro8265) {
+                request->write_type = LFRFIDWriteTypeHitagMicro;
+            } else {
+                request->write_type = (LFRFIDWriteType)target;
+            }
 
             // A preceding verify read overwrites the protocol's data, so restore the
             // intended ID before (re)encoding each write.
             protocol_dict_set_data(worker->protocols, protocol, verify_data, data_size);
 
+            // This is also the support probe. Drop an unsupported target rather than writing a
+            // half-filled request, and if that leaves nothing, report it instead of spinning
+            // until the timer blames the card.
             if(!protocol_dict_get_write_data(worker->protocols, protocol, request)) {
-                skips++;
-                if(skips == LFRFIDWriteTypeMax) {
+                FURI_LOG_E(TAG, "Encoding target %u failed", (unsigned)target);
+                targets &= ~LFRFID_WRITE_TARGET_BIT(target);
+                if(targets == 0) {
                     if(worker->write_cb) {
                         worker->write_cb(LFRFIDWorkerWriteProtocolCannotBeWritten, worker->cb_ctx);
                     }
-                    break;
+                    done = true;
                 }
                 continue;
             }
 
-            if(request->write_type == LFRFIDWriteTypeT5577) {
-                lfrfid_worker_write_set_target(worker, "T5577");
+            lfrfid_worker_write_set_target(worker, lfrfid_worker_write_target_name(target));
+
+            bool attempted = true;
+
+            switch(request->write_type) {
+            case LFRFIDWriteTypeT5577:
                 t5577_write(&request->t5577);
-                done = lfrfid_worker_write_verify_and_finish(
-                    worker, protocol, verify_data, read_data, data_size, &unsuccessful_reads);
-            } else if(request->write_type == LFRFIDWriteTypeEM4305) {
-                lfrfid_worker_write_set_target(worker, "EM4305");
+                break;
+            case LFRFIDWriteTypeEM4305:
                 em4305_write(&request->em4305);
-                done = lfrfid_worker_write_verify_and_finish(
-                    worker, protocol, verify_data, read_data, data_size, &unsuccessful_reads);
-            } else if(request->write_type == LFRFIDWriteTypeHitagMicro) {
-                // ID82xx / Hitag micro magic chips differ only by their LOGIN password. Try
-                // each known variant and verify after each: a wrong password is rejected and
-                // leaves the tag untouched, so the variant that reads back correctly is the
-                // one actually present. The password is the per-variant credential, passed
-                // alongside the shared block/config data.
-                for(uint8_t variant = 0; variant < HitagMicroVariantCount && !done; variant++) {
-                    lfrfid_worker_write_set_target(worker, hitagmicro_variant_name(variant));
-                    hitagmicro_write(&request->hitagmicro, hitagmicro_variant_password(variant));
-                    done = lfrfid_worker_write_verify_and_finish(
-                        worker, protocol, verify_data, read_data, data_size, &unsuccessful_reads);
-                }
-            } else {
+                break;
+            case LFRFIDWriteTypeHitagMicro:
+                // ID82xx / Hitag micro magic chips differ only by their LOGIN password, so
+                // each variant is its own target: a wrong password is rejected and leaves the
+                // tag untouched, and the variant that reads back correctly is the one present.
+                hitagmicro_write(
+                    &request->hitagmicro,
+                    hitagmicro_variant_password((HitagMicroVariant)(
+                        target - LFRFIDWriteTargetHitagMicro8265)));
+                break;
+            case LFRFIDWriteTypeHitagS: {
+                // SELECT needs the tag's UID. The read is also a presence check, so a missing
+                // ID8268 is skipped without spending a second verify pass on a blind write.
+                uint8_t uid[LFRFID_HITAGS_UID_SIZE];
+                attempted = hitags_plugin->read_uid(uid, lfrfid_worker_write_aborted, worker);
+                if(attempted) hitags_plugin->write(&request->hitags, uid);
+                break;
+            }
+            case LFRFIDWriteTypeMax:
+                // No default, so -Wswitch catches a new write type here too.
                 furi_crash("Unknown write type");
             }
+
+            if(!attempted) continue;
+
+            done = lfrfid_worker_write_verify_and_finish(
+                worker,
+                protocol,
+                verify_data,
+                read_data,
+                data_size,
+                &unsuccessful_reads,
+                max_unsuccessful_reads);
         }
 
         if(done) break;
@@ -686,6 +803,7 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
         lfrfid_worker_delay(worker, LFRFID_WORKER_WRITE_DROP_TIME_MS);
     }
 
+    if(hitags_plugin_manager) plugin_manager_free(hitags_plugin_manager);
     free(request);
     free(verify_data);
     free(read_data);

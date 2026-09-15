@@ -51,6 +51,15 @@ ENV.AppendUnique(
     ],
 )
 
+# Keep LTO opt-in and scoped to the resident firmware image. External FAPs use a
+# separate symbol-table based validation/linking pipeline and must retain their
+# normal object format; extapps.scons strips these flags from that cloned env.
+if ENV["LTO"]:
+    ENV.AppendUnique(
+        CCFLAGS=["-flto"],
+        LINKFLAGS=["-flto"],
+    )
+
 
 if ENV["FIRMWARE_BUILD_CFG"] == "updater":
     ENV.Append(
