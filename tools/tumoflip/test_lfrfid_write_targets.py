@@ -69,6 +69,23 @@ class LfRfidWriteTargetTests(unittest.TestCase):
         self.assertIn("LFRFIDWriteTargetHitagS8268", targets)
         self.assertIn("return LFRFID_WRITE_TARGET_MASK_ALL & ~", targets)
 
+    def test_hitags_runtime_is_a_lazy_package_plugin(self) -> None:
+        library = source("lib/lfrfid/SConscript")
+        worker = source("lib/lfrfid/lfrfid_worker_modes.c")
+        manifest_path = ROOT / "applications_user/lfrfid_hitags/application.fam"
+
+        self.assertTrue(manifest_path.exists())
+        manifest = manifest_path.read_text(encoding="utf-8")
+        self.assertIn('appid="lfrfid_hitags"', manifest)
+        self.assertIn('requires=["lfrfid"]', manifest)
+        self.assertIn("fal_embedded=False", manifest)
+        self.assertIn("fap_package_only=True", manifest)
+        self.assertIn("../../lib/lfrfid/tools/hitags.c", manifest)
+        self.assertIn('exclude=["tools/hitags.c"]', library)
+        self.assertIn("plugin_manager_load_single", worker)
+        self.assertIn('APP_ASSETS_PATH("plugins/lfrfid_hitags.fal")', worker)
+        self.assertIn("LFRFID_HITAGS_PLUGIN_API_VERSION", worker)
+
     def test_write_loop_uses_settings_mask_as_support_probe(self) -> None:
         worker = source("lib/lfrfid/lfrfid_worker_modes.c")
         snapshot = worker.index("protocol_dict_get_data(worker->protocols, protocol, verify_data")
