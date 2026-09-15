@@ -201,27 +201,13 @@ static size_t hitags_build_write_data(uint8_t* tx, const uint8_t* data) {
 // Field and modulation.
 // =================================================================================================
 
-// Stopping the PWM leaves the tank ringing down at its own Q, so a gap may only dent the field
-// where the datasheet wants a modulation index of 0.95..1. Damping the antenna through the gap was
-// tried and measured worse at every gap length (41 edges -> 11), so the gap is left undamped.
-static void hitags_gap(void) {
-    furi_hal_rfid_tim_read_pause();
-    furi_delay_us(LFRFID_HITAG_BPLM_GAP_US);
-    furi_hal_rfid_tim_read_continue();
-}
-
-static void hitags_send_bit(bool one) {
-    hitags_gap();
-    furi_delay_us(one ? LFRFID_HITAG_BPLM_BIT1_ON_US : LFRFID_HITAG_BPLM_BIT0_ON_US);
-}
-
 // Sends `nbits` MSB-first then the EOF gap, after which the field stays on far longer than TEOF.
 // Callers hold the critical section: a bit cell stretched by a preemption is a malformed command.
 static void hitags_send_frame(const uint8_t* tx, size_t nbits) {
     for(size_t i = 0; i < nbits; i++) {
-        hitags_send_bit(bit_lib_get_bit(tx, i));
+        lfrfid_hitag_bplm_send_bit(bit_lib_get_bit(tx, i));
     }
-    hitags_gap();
+    lfrfid_hitag_bplm_gap();
 }
 
 // =================================================================================================

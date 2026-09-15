@@ -21,16 +21,18 @@ class LfrfidBplmTest(unittest.TestCase):
 
         for value in ("64u", "96u", "160u"):
             self.assertIn(value, header)
+        self.assertIn("lfrfid_hitag_bplm_gap", header)
+        self.assertIn("lfrfid_hitag_bplm_send_bit", header)
         for source in (micro, hitags):
             self.assertIn('#include "hitag_bplm.h"', source)
-            self.assertIn("LFRFID_HITAG_BPLM_GAP_US", source)
-            self.assertIn("LFRFID_HITAG_BPLM_BIT0_ON_US", source)
-            self.assertIn("LFRFID_HITAG_BPLM_BIT1_ON_US", source)
+            self.assertIn("lfrfid_hitag_bplm_gap", source)
+            self.assertIn("lfrfid_hitag_bplm_send_bit", source)
 
         # Protocol-specific constants must not silently fork the shared cell
         # timing values again in either implementation.
         for source in (micro, hitags):
             self.assertNotRegex(source, r"#define HITAGS?(MICRO)?_(?:GAP|BIT[01]_ON)_US")
+            self.assertNotRegex(source, r"static void hitags?_(?:gap|send_bit)")
 
 
 if __name__ == "__main__":

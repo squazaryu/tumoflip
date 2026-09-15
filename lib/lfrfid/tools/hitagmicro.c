@@ -163,31 +163,20 @@ static size_t hitagmicro_build_read(uint8_t* tx, uint8_t page, uint8_t count) {
 }
 
 // --- Modulation ------------------------------------------------------------------
-static void hitagmicro_gap(void) {
-    furi_hal_rfid_tim_read_pause();
-    furi_delay_us(LFRFID_HITAG_BPLM_GAP_US);
-    furi_hal_rfid_tim_read_continue();
-}
-
-static void hitagmicro_send_bit(bool bit) {
-    hitagmicro_gap();
-    furi_delay_us(bit ? LFRFID_HITAG_BPLM_BIT1_ON_US : LFRFID_HITAG_BPLM_BIT0_ON_US);
-}
-
 static void hitagmicro_send_sof(void) {
     // SOF = a '0' bit followed by a code violation (gap + extended field-on).
-    hitagmicro_send_bit(false);
-    hitagmicro_gap();
+    lfrfid_hitag_bplm_send_bit(false);
+    lfrfid_hitag_bplm_gap();
     furi_delay_us(HITAGMICRO_SOF_VIOLATION_US);
 }
 
 static void hitagmicro_send_frame(const uint8_t* tx, size_t nbits) {
     hitagmicro_send_sof();
     for(size_t i = 0; i < nbits; i++) {
-        hitagmicro_send_bit((tx[i / 8] >> (7 - (i % 8))) & 1);
+        lfrfid_hitag_bplm_send_bit((tx[i / 8] >> (7 - (i % 8))) & 1);
     }
     // EOF = a trailing gap; the field stays energized for the next frame.
-    hitagmicro_gap();
+    lfrfid_hitag_bplm_gap();
 }
 
 // Log a built frame as hex (debug level). Open-loop has no RX, so the transmitted frames
