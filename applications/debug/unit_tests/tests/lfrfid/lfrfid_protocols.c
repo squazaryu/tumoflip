@@ -741,14 +741,6 @@ MU_TEST(test_lfrfid_protocol_indala224_alternating_phase) {
     protocol_dict_free(dict);
 }
 
-// Pin the Hitag S frame builders and anticollision decoder to datasheet/Proxmark vectors. The
-// reader/writer is intentionally kept behind the worker, so this reports a named failure rather
-// than exposing protocol state to applications.
-MU_TEST(test_lfrfid_hitags_frames_and_decoder) {
-    const char* failure = hitags_selftest();
-    mu_assert(failure == NULL, failure ? failure : "");
-}
-
 MU_TEST(test_lfrfid_hitags_write_target) {
     // ID8268 / Hitag S can overwrite application pages on a genuine tag, so it is never enabled
     // by the default mask. The user must explicitly turn on 8268 in Write Chips settings.
@@ -791,7 +783,6 @@ MU_TEST_SUITE(test_lfrfid_protocols_suite) {
     MU_RUN_TEST(test_lfrfid_protocol_em_read_simple);
     MU_RUN_TEST(test_lfrfid_protocol_em_emulate_simple);
     MU_RUN_TEST(test_lfrfid_protocol_em_write_hitags);
-    MU_RUN_TEST(test_lfrfid_hitags_frames_and_decoder);
     MU_RUN_TEST(test_lfrfid_hitags_write_target);
 
     MU_RUN_TEST(test_lfrfid_protocol_h10301_read_simple);

@@ -5,6 +5,9 @@
 #include "tools/t5577.h"
 #include "tools/hitagmicro.h"
 #include "tools/hitags.h"
+#include <flipper_application/plugins/plugin_manager.h>
+#include <loader/firmware_api/firmware_api.h>
+#include <storage/storage.h>
 #include <stdio.h>
 #include <toolbox/pulse_protocols/pulse_glue.h>
 #include <toolbox/buffer_stream.h>
@@ -12,6 +15,8 @@
 #include <lib/bit_lib/bit_lib.h>
 
 #define TAG "LfRfidWorker"
+
+#define LFRFID_HITAGS_PLUGIN_PATH APP_ASSETS_PATH("plugins/lfrfid_hitags.fal")
 
 /**
  * if READ_DEBUG_GPIO is defined:
@@ -612,6 +617,37 @@ static bool lfrfid_worker_write_aborted(void* context) {
     return lfrfid_worker_check_for_stop(context);
 }
 
+// Hitag S is a package-owned plugin. Keep it mapped for the whole write operation so the worker
+// never calls code after the loader has unmapped it, and fail closed when the optional package is
+// absent or has an incompatible ABI.
+static const LFRFIDHitagSPlugin* lfrfid_worker_load_hitags_plugin(
+    PluginManager** manager_out) {
+    furi_check(manager_out);
+
+    PluginManager* manager = plugin_manager_alloc(
+        LFRFID_HITAGS_PLUGIN_APP_ID, LFRFID_HITAGS_PLUGIN_API_VERSION, firmware_api_interface);
+    const PluginManagerError error =
+        plugin_manager_load_single(manager, LFRFID_HITAGS_PLUGIN_PATH);
+    if(error != PluginManagerErrorNone || plugin_manager_get_count(manager) != 1) {
+        FURI_LOG_W(
+            TAG,
+            "Hitag S plugin unavailable (%d), keeping 8268 disabled",
+            error);
+        plugin_manager_free(manager);
+        return NULL;
+    }
+
+    const LFRFIDHitagSPlugin* plugin = plugin_manager_get_ep(manager, 0);
+    if(!plugin || !plugin->read_uid || !plugin->write) {
+        FURI_LOG_E(TAG, "Hitag S plugin has an invalid descriptor");
+        plugin_manager_free(manager);
+        return NULL;
+    }
+
+    *manager_out = manager;
+    return plugin;
+}
+
 static void lfrfid_worker_write_set_target(LFRFIDWorker* worker, const char* target) {
     FURI_LOG_D(TAG, "write target: %s", target);
     snprintf(worker->write_chip_name, sizeof(worker->write_chip_name), "%s", target);
@@ -639,6 +675,26 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
     // different protocol state and no duplicate request allocation is needed.
     LFRFIDWriteTargetMask targets = worker->write_target_mask;
 
+    if(targets == 0 && worker->write_cb) {
+        worker->write_cb(LFRFIDWorkerWriteNoEnabledTarget, worker->cb_ctx);
+    }
+
+    bool done = false;
+    PluginManager* hitags_plugin_manager = NULL;
+    const LFRFIDHitagSPlugin* hitags_plugin = NULL;
+    if(targets & LFRFID_WRITE_TARGET_BIT(LFRFIDWriteTargetHitagS8268)) {
+        hitags_plugin = lfrfid_worker_load_hitags_plugin(&hitags_plugin_manager);
+        if(!hitags_plugin) {
+            targets &= ~LFRFID_WRITE_TARGET_BIT(LFRFIDWriteTargetHitagS8268);
+            if(targets == 0) {
+                if(worker->write_cb) {
+                    worker->write_cb(LFRFIDWorkerWriteProtocolCannotBeWritten, worker->cb_ctx);
+                }
+                done = true;
+            }
+        }
+    }
+
     size_t max_unsuccessful_reads = 0;
     for(LFRFIDWriteTarget target = 0; target < LFRFIDWriteTargetMax; target++) {
         if(targets & LFRFID_WRITE_TARGET_BIT(target)) max_unsuccessful_reads++;
@@ -646,12 +702,6 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
     if(max_unsuccessful_reads < LFRFID_WORKER_WRITE_MAX_UNSUCCESSFUL_READS) {
         max_unsuccessful_reads = LFRFID_WORKER_WRITE_MAX_UNSUCCESSFUL_READS;
     }
-
-    if(targets == 0 && worker->write_cb) {
-        worker->write_cb(LFRFIDWorkerWriteNoEnabledTarget, worker->cb_ctx);
-    }
-
-    bool done = false;
 
     // Each enabled target is written and then immediately read back, so a success can
     // report exactly which chip accepted the data (T5577 / EM4305 / Hitag micro / Hitag S).
@@ -719,8 +769,8 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
                 // SELECT needs the tag's UID. The read is also a presence check, so a missing
                 // ID8268 is skipped without spending a second verify pass on a blind write.
                 uint8_t uid[LFRFID_HITAGS_UID_SIZE];
-                attempted = hitags_read_uid(uid, lfrfid_worker_write_aborted, worker);
-                if(attempted) hitags_write(&request->hitags, uid);
+                attempted = hitags_plugin->read_uid(uid, lfrfid_worker_write_aborted, worker);
+                if(attempted) hitags_plugin->write(&request->hitags, uid);
                 break;
             }
             case LFRFIDWriteTypeMax:
@@ -753,6 +803,7 @@ static void lfrfid_worker_mode_write_process(LFRFIDWorker* worker) {
         lfrfid_worker_delay(worker, LFRFID_WORKER_WRITE_DROP_TIME_MS);
     }
 
+    if(hitags_plugin_manager) plugin_manager_free(hitags_plugin_manager);
     free(request);
     free(verify_data);
     free(read_data);

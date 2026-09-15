@@ -17,6 +17,7 @@ try:
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         MODULE_ONE_LEGACY_PATHS,
+        LFRFID_HITAGS_PACKAGE_FILE,
         PACKAGE_ONLY_PACKAGE_FILES,
         PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
@@ -46,6 +47,7 @@ except ImportError:
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         MODULE_ONE_LEGACY_PATHS,
+        LFRFID_HITAGS_PACKAGE_FILE,
         PACKAGE_ONLY_PACKAGE_FILES,
         PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
@@ -275,8 +277,9 @@ class ValidateReleaseTest(unittest.TestCase):
         quac = "apps/Tools/quac.fap"
         nearby = "apps/GPIO/nearby_files.fap"
         weather = "apps/Sub-GHz/weather_editor.fap"
+        hitags = LFRFID_HITAGS_PACKAGE_FILE
         self.assertEqual(
-            PACKAGE_ONLY_PACKAGE_FILES, {package_only, quac, nearby, weather}
+            PACKAGE_ONLY_PACKAGE_FILES, {package_only, quac, nearby, weather, hitags}
         )
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -285,6 +288,7 @@ class ValidateReleaseTest(unittest.TestCase):
                 quac: "base",
                 nearby: "base",
                 weather: "base",
+                hitags: "base",
             },
         )
         regular = "apps/Tools/clock.fap"

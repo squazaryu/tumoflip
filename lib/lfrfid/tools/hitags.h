@@ -9,6 +9,9 @@ extern "C" {
 #define LFRFID_HITAGS_PAGE_SIZE 4
 #define LFRFID_HITAGS_UID_SIZE  4
 
+#define LFRFID_HITAGS_PLUGIN_APP_ID      "lfrfid_hitags"
+#define LFRFID_HITAGS_PLUGIN_API_VERSION 1
+
 // Data to clone an EM4100 ID onto an ID8268 / Hitag S magic chip, at RF/64 - the only rate the
 // chip's factory TTF config emits. The tag streams pages 4 and 5 as the EM4100 frame, so the two
 // halves go there; which page is which is hitags_write()'s business, not a caller's. All fields
@@ -20,6 +23,12 @@ typedef struct {
 
 /** Polled while a read runs; return true to give up. */
 typedef bool (*HitagSAbortCallback)(void* context);
+
+/** Operations exposed by the lazy Hitag S plugin to the resident RFID worker. */
+typedef struct {
+    bool (*read_uid)(uint8_t* uid, HitagSAbortCallback abort, void* context);
+    void (*write)(const LFRFIDHitagS* data, const uint8_t* uid);
+} LFRFIDHitagSPlugin;
 
 /** Read the UID of a Hitag S family tag, which SELECT needs before anything can be written.
  * Firmware internal, not exported to apps.
@@ -75,4 +84,3 @@ const char* hitags_selftest(void);
 #ifdef __cplusplus
 }
 #endif
-
