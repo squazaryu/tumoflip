@@ -1,0 +1,10 @@
+App(
+    appid="lfrfid_hitags",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="lfrfid_hitags_plugin_ep",
+    requires=["lfrfid"],
+    sources=["../../lib/lfrfid/tools/hitags.c", "hitags_plugin.c"],
+    fap_version="1.0",
+    fap_package_only=True,
+    fal_embedded=False,
+)
