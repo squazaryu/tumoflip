@@ -19,6 +19,16 @@ appenv.Replace(
     LINKER_SCRIPT_PATH=appenv["APP_LINKER_SCRIPT_PATH"],
 )
 
+# FAPs are validated through their own ELF symbol table. Do not inherit the
+# resident-image LTO flags: GCC's LTO sections make that table unavailable to
+# the FAP validator. The firmware itself remains free to use LTO when opted in.
+if appenv["LTO"]:
+    appenv.Replace(
+        CCFLAGS=[flag for flag in appenv["CCFLAGS"] if flag != "-flto"],
+        CXXFLAGS=[flag for flag in appenv["CXXFLAGS"] if flag != "-flto"],
+        LINKFLAGS=[flag for flag in appenv["LINKFLAGS"] if flag != "-flto"],
+    )
+
 appenv.AppendUnique(
     CCFLAGS=[
         "-mword-relocations",

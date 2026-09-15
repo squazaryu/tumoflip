@@ -1,4 +1,5 @@
 #include "hitags.h"
+#include "hitag_bplm.h"
 
 #include <furi.h>
 #include <furi_hal_rfid.h>
@@ -14,11 +15,8 @@
 // Reader->tag BPLM (datasheet 7.4.1), T0 = one 125 kHz cycle = 8 us. Every bit cell opens with an
 // 8 T0 gap and holds the field on for the rest: 20 T0 in total for a '0', 28 T0 for a '1'. This is
 // on/off keying of the field, not Manchester - Manchester is only the tag->reader direction.
-// Same T_LOW / T_0 / T_1 as tools/hitagmicro.c - one BPLM family, and neither set is
-// re-derivable without a Proxmark, so keep the two in step.
-#define HITAGS_GAP_US     64
-#define HITAGS_BIT0_ON_US 96
-#define HITAGS_BIT1_ON_US 160
+// The shared T_LOW / T_0 / T_1 timings are defined in hitag_bplm.h so the
+// resident Hitag Micro writer and this lazy package stay in step.
 
 #define HITAGS_CMD_UID_REQ_ADV 0xC8 // 11001, 5 bits: UID REQUEST advanced (Table 17)
 #define HITAGS_CMD_SELECT      0x00 // 00000, 5 bits
@@ -208,13 +206,13 @@ static size_t hitags_build_write_data(uint8_t* tx, const uint8_t* data) {
 // tried and measured worse at every gap length (41 edges -> 11), so the gap is left undamped.
 static void hitags_gap(void) {
     furi_hal_rfid_tim_read_pause();
-    furi_delay_us(HITAGS_GAP_US);
+    furi_delay_us(LFRFID_HITAG_BPLM_GAP_US);
     furi_hal_rfid_tim_read_continue();
 }
 
 static void hitags_send_bit(bool one) {
     hitags_gap();
-    furi_delay_us(one ? HITAGS_BIT1_ON_US : HITAGS_BIT0_ON_US);
+    furi_delay_us(one ? LFRFID_HITAG_BPLM_BIT1_ON_US : LFRFID_HITAG_BPLM_BIT0_ON_US);
 }
 
 // Sends `nbits` MSB-first then the EOF gap, after which the field stays on far longer than TEOF.

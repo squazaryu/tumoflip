@@ -1,4 +1,5 @@
 #include "hitagmicro.h"
+#include "hitag_bplm.h"
 #include <furi.h>
 #include <furi_hal_rfid.h>
 #include <lib/bit_lib/bit_lib.h>
@@ -19,17 +20,8 @@
 #define HITAGMICRO_PAGE_BLOCK1 0x01 // second EM4100 data block
 #define HITAGMICRO_PAGE_CONFIG 0xFF // HITAGU_CONFIG_PADR
 
-// --- Reader->tag BPLM/OOK modulation timings, microseconds -----------------------
-// The reader->tag link is plain on/off-keyed field-gap modulation (NOT Manchester;
-// Manchester is only the tag->reader direction, unused here). Each bit cell begins
-// with a fixed field gap, then the field is held on for the rest of the cell; a '1'
-// keeps the field on longer than a '0'. Constants mirror Proxmark3 armsrc/hitag_common.h,
-// which are in T0 units (T0 = one 125 kHz carrier cycle = 8 us): T_LOW=8 T0 (64us),
-// T_0=20 T0 (160us), T_1=28 T0 (224us), T_CODE_VIOLATION=36 T0 (288us). Chip tolerances
-// are wide (T_0 18..22, T_1 26..32 T0).
-#define HITAGMICRO_GAP_US           64 // T_LOW: leading field-off gap of every cell
-#define HITAGMICRO_BIT0_ON_US       96 // (T_0 - T_LOW): field-on tail of a '0' (160us cell)
-#define HITAGMICRO_BIT1_ON_US       160 // (T_1 - T_LOW): field-on tail of a '1' (224us cell)
+// Hitag BPLM/OOK cell timings live in hitag_bplm.h. The protocol-specific
+// code-violation and field-charge timings remain local below.
 #define HITAGMICRO_SOF_VIOLATION_US 288 // T_CODE_VIOLATION: field-on part of the SOF
 #define HITAGMICRO_CHARGE_US        3000 // field-on charge before the first frame
 
@@ -173,13 +165,13 @@ static size_t hitagmicro_build_read(uint8_t* tx, uint8_t page, uint8_t count) {
 // --- Modulation ------------------------------------------------------------------
 static void hitagmicro_gap(void) {
     furi_hal_rfid_tim_read_pause();
-    furi_delay_us(HITAGMICRO_GAP_US);
+    furi_delay_us(LFRFID_HITAG_BPLM_GAP_US);
     furi_hal_rfid_tim_read_continue();
 }
 
 static void hitagmicro_send_bit(bool bit) {
     hitagmicro_gap();
-    furi_delay_us(bit ? HITAGMICRO_BIT1_ON_US : HITAGMICRO_BIT0_ON_US);
+    furi_delay_us(bit ? LFRFID_HITAG_BPLM_BIT1_ON_US : LFRFID_HITAG_BPLM_BIT0_ON_US);
 }
 
 static void hitagmicro_send_sof(void) {

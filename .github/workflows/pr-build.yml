@@ -154,7 +154,7 @@ jobs:
             tools.tumoflip.test_kia_v5_file_lengths
 
       - name: Validate deterministic source gathering and LFRFID package contracts
-        run: python3 -m unittest tools.tumoflip.test_build_source_order tools.tumoflip.test_wisniowski_variants tools.tumoflip.test_lfrfid_write_targets tools.tumoflip.test_lfrfid_hitags_package
+        run: python3 -m unittest tools.tumoflip.test_build_source_order tools.tumoflip.test_wisniowski_variants tools.tumoflip.test_lfrfid_write_targets tools.tumoflip.test_lfrfid_hitags_package tools.tumoflip.test_lfrfid_bplm tools.tumoflip.test_lto_build
 
       - name: Build firmware (minimal / clean)
         id: build

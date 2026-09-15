@@ -22,6 +22,8 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("./fbt COMPACT=1 DEBUG=0", workflow)
         self.assertIn("updater_package fap_esp_flasher", workflow)
         self.assertIn("fap_lfrfid_hitags", workflow)
+        self.assertIn("test_lfrfid_bplm", workflow)
+        self.assertIn("test_lto_build", workflow)
         self.assertIn("fap_nearby_files", workflow)
         self.assertIn("fap_lfrfid_hitags", workflow)
         self.assertIn("validate_release.py", workflow)

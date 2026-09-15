@@ -11,6 +11,10 @@ TARGET_HW = 7
 # Optimization flags
 ## Optimize for size
 COMPACT = 1
+# Link-time optimization applies only to the resident image; extapps.scons
+# deliberately strips it from FAP builds so their symbol-table validation stays
+# intact. Override with LTO=0 for a diagnostic non-LTO build.
+LTO = 1
 ## Optimize for debugging experience
 DEBUG = 0
 
