@@ -140,8 +140,8 @@ QUAC_PACKAGE_FILE = "apps/Tools/quac.fap"
 NEARBY_FILES_PACKAGE_FILE = "apps/GPIO/nearby_files.fap"
 WEATHER_EDITOR_PACKAGE_FILE = "apps/Sub-GHz/weather_editor.fap"
 LFRFID_HITAGS_PACKAGE_FILE = "apps_data/lfrfid/plugins/lfrfid_hitags.fal"
-PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE = "apps_data/arf_subghz_full/modules/protopirate_to_subghz.fap"
-RENAULT_SEED_BF_PACKAGE_FILE = "apps_data/arf_subghz_full/modules/renault_seed_bf.fap"
+PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE = "apps_data/arf_subghz_full/packages/protopirate_to_subghz.fap"
+RENAULT_SEED_BF_PACKAGE_FILE = "apps_data/arf_subghz_full/packages/renault_seed_bf.fap"
 PACKAGE_ONLY_PACKAGE_FILES = frozenset(
     {
         "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
@@ -911,7 +911,11 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             for relative in (*MODULE_ONE_PACKAGE_FILES, *MODULE_ONE_PACKAGE_DATA_FILES)
         ],
         "arf": sorted((resources / "apps/ARF Tools").glob("*.fap"))
-        + sorted((resources / "apps_data/arf_subghz_full/modules").glob("*.fap")),
+        + sorted((resources / "apps_data/arf_subghz_full/modules").glob("*.fap"))
+        + [
+            resources / PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
+            resources / RENAULT_SEED_BF_PACKAGE_FILE,
+        ],
         "protocol_packs": sorted(
             (resources / "apps_data/subghz/plugins").glob("protocol_*.fal")
         ),

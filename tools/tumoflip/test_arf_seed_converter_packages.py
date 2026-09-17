@@ -13,7 +13,7 @@ from tools.tumoflip.validate_release import (
 
 
 ROOT = Path(__file__).resolve().parents[2]
-ARF_ROOT = "apps_data/arf_subghz_full/modules"
+ARF_ROOT = "apps_data/arf_subghz_full/packages"
 CONVERTER_TARGET = f"{ARF_ROOT}/protopirate_to_subghz.fap"
 SEED_TARGET = f"{ARF_ROOT}/renault_seed_bf.fap"
 
@@ -28,7 +28,7 @@ class ArfSeedConverterPackageTest(unittest.TestCase):
                 encoding="utf-8"
             )
             self.assertIn("fap_package_only=True", manifest)
-            self.assertIn('fap_dist_path="apps_data/arf_subghz_full/modules/{filename}"', manifest)
+            self.assertIn('fap_dist_path="apps_data/arf_subghz_full/packages/{filename}"', manifest)
             self.assertIn(target, PACKAGE_ONLY_PACKAGE_FILES)
             self.assertEqual(PACKAGE_ONLY_PACKAGE_GROUPS[target], "arf")
             self.assertIn(target, PACKAGE_RELEASE_OVERLAY_FILES)
@@ -52,6 +52,16 @@ class ArfSeedConverterPackageTest(unittest.TestCase):
         self.assertIn('"Recovered"', source)
         self.assertIn('"Seed"', source)
         self.assertNotIn("SubGhzWorker", source)
+
+    def test_release_workflows_build_all_three_artifacts(self) -> None:
+        for workflow in ("pr-build.yml", "release.yml"):
+            source = (ROOT / ".github/workflows" / workflow).read_text(encoding="utf-8")
+            for target in (
+                "fap_protocol_renault_v1",
+                "fap_protopirate_to_subghz",
+                "fap_renault_seed_bf",
+            ):
+                self.assertIn(target, source)
 
 
 if __name__ == "__main__":

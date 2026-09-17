@@ -10,6 +10,6 @@ App(
     fap_description="Recover a classic Hitag2 SEED from a saved Renault V1 capture.",
     fap_version="1.0",
     fap_package_only=True,
-    fap_dist_path="apps_data/arf_subghz_full/modules/{filename}",
+    fap_dist_path="apps_data/arf_subghz_full/packages/{filename}",
     sources=["renault_seed_bf.c", "hitag2_seed.c"],
 )

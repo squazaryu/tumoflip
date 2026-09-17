@@ -17,5 +17,5 @@ App(
     fap_version="1.0",
     fap_description="Bidirectionally converts car captures between ProtoPirate .psf and standard SubGHz .sub, organized by automotive brand.",
     fap_package_only=True,
-    fap_dist_path="apps_data/arf_subghz_full/modules/{filename}",
+    fap_dist_path="apps_data/arf_subghz_full/packages/{filename}",
 )
