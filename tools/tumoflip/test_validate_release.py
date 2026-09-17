@@ -18,6 +18,8 @@ try:
         MODULE_ONE_PACKAGE_FILES,
         MODULE_ONE_LEGACY_PATHS,
         LFRFID_HITAGS_PACKAGE_FILE,
+        PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
+        RENAULT_SEED_BF_PACKAGE_FILE,
         PACKAGE_ONLY_PACKAGE_FILES,
         PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
@@ -48,6 +50,8 @@ except ImportError:
         MODULE_ONE_PACKAGE_FILES,
         MODULE_ONE_LEGACY_PATHS,
         LFRFID_HITAGS_PACKAGE_FILE,
+        PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
+        RENAULT_SEED_BF_PACKAGE_FILE,
         PACKAGE_ONLY_PACKAGE_FILES,
         PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
@@ -103,13 +107,14 @@ def make_dfuse(elements: list[tuple[int, bytes]]) -> bytes:
 
 class ValidateReleaseTest(unittest.TestCase):
     def test_protocol_pack_inventory_covers_active_arf_registry(self) -> None:
-        self.assertEqual(len(PROTOCOL_PACKS), 31)
+        self.assertEqual(len(PROTOCOL_PACKS), 32)
         self.assertIn("protocol_ford_v3.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_gm_rolling.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_kia_v7.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_star_line.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_superrollo.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_toyota_lexus.fal", PROTOCOL_PACKS)
+        self.assertIn("protocol_renault_v1.fal", PROTOCOL_PACKS)
 
     def test_visible_arf_tools_inventory(self) -> None:
         self.assertEqual(
@@ -278,8 +283,11 @@ class ValidateReleaseTest(unittest.TestCase):
         nearby = "apps/GPIO/nearby_files.fap"
         weather = "apps/Sub-GHz/weather_editor.fap"
         hitags = LFRFID_HITAGS_PACKAGE_FILE
+        converter = PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE
+        seed_bf = RENAULT_SEED_BF_PACKAGE_FILE
         self.assertEqual(
-            PACKAGE_ONLY_PACKAGE_FILES, {package_only, quac, nearby, weather, hitags}
+            PACKAGE_ONLY_PACKAGE_FILES,
+            {package_only, quac, nearby, weather, hitags, converter, seed_bf},
         )
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -289,6 +297,8 @@ class ValidateReleaseTest(unittest.TestCase):
                 nearby: "base",
                 weather: "base",
                 hitags: "base",
+                converter: "arf",
+                seed_bf: "arf",
             },
         )
         regular = "apps/Tools/clock.fap"
