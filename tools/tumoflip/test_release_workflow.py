@@ -24,6 +24,8 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("fap_lfrfid_hitags", workflow)
         self.assertIn("test_lfrfid_bplm", workflow)
         self.assertIn("test_lto_build", workflow)
+        self.assertIn("test_upstream_1149_rfid", workflow)
+        self.assertIn("test_arf_converter_packages", workflow)
         self.assertIn("fap_nearby_files", workflow)
         self.assertIn("fap_lfrfid_hitags", workflow)
         self.assertIn("validate_release.py", workflow)

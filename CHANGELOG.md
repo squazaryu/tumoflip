@@ -1,3 +1,10 @@
+## Tumoflip Dev 009-002
+- RFID: add manual FC/ID entry and app-side renderers for HID H10302/H10304/H10306, AMAG S10401, Corporate 1000 35-bit and Casi-Rusco C10106; Generic HIDProx rendering now reports frame length without duplicating raw data.
+- GUI: an empty bounded NumberInput field now resolves to the nearest valid value around zero when submitted.
+- ARF packages: add a file-only Capture converter in the ARF hub. It copies canonical `.psf` ↔ `.sub` captures without rewriting protocol names or dropping metadata. Originals and existing destination files are never overwritten; success requires sync, close and byte-for-byte readback.
+- Converter: allow cancellation while scanning or copying; report invalid files, SD errors and cancellation separately. No cryptographic recovery or new protocol encoder is added.
+- API remains `88.9`; no user-data migration is required. Hardware acceptance is still pending.
+
 ## Tumoflip Dev 009-001
 - LFRFID: harden Keri PSK decoding against slicer skew by checking two complete frames for matching IDs before accepting a read; include regression vectors for clean and mismatched frames.
 - NFC: award the existing Dolphin deed when launching directly into card emulation, matching the saved-card path.

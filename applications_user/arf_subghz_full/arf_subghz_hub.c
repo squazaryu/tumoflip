@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define ARF_MODULES_PATH EXT_PATH("apps_data/arf_subghz_full/modules/")
+#define ARF_MODULES_PATH       EXT_PATH("apps_data/arf_subghz_full/modules/")
 #define SUBGHZ_WARDRIVING_PATH EXT_PATH("apps/Sub-GHz/subghz_wardriving.fap")
 
 typedef struct {
@@ -26,6 +26,8 @@ typedef struct {
 static const ArfSubGhzHubItem arf_subghz_hub_items[] = {
     {.label = "Standard Sub-GHz", .target = "Sub-GHz"},
     {.label = "Sub-GHz Wardriving", .target = SUBGHZ_WARDRIVING_PATH},
+    {.label = "Capture converter",
+     .target = EXT_PATH("apps_data/arf_subghz_full/packages/protopirate_to_subghz.fap")},
     {.label = "ARF KeeLoq", .target = ARF_MODULES_PATH "arf_keeloq.fap"},
     {.label = "ARF Counter BF", .target = ARF_MODULES_PATH "arf_counter_bf.fap"},
     {.label = "ARF Car Emulate", .target = ARF_MODULES_PATH "arf_car_emulate.fap"},
@@ -81,11 +83,7 @@ static ArfSubGhzHub* arf_subghz_hub_alloc(uint32_t selected_item) {
 
     for(size_t i = 0; i < COUNT_OF(arf_subghz_hub_items); i++) {
         submenu_add_item(
-            app->submenu,
-            arf_subghz_hub_items[i].label,
-            i,
-            arf_subghz_hub_launch_callback,
-            app);
+            app->submenu, arf_subghz_hub_items[i].label, i, arf_subghz_hub_launch_callback, app);
     }
     submenu_set_selected_item(app->submenu, selected_item);
 
