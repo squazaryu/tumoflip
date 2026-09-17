@@ -1,12 +1,9 @@
-// protopirate_to_subghz.c - app shell: alloc/free/entry, submenu, views,
-// worker thread, custom events, summary.
 #include <furi.h>
 #include <gui/gui.h>
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
 #include <gui/modules/submenu.h>
 #include <gui/modules/widget.h>
-#include <storage/storage.h>
 #include <toolbox/dir_walk.h>
 #include <string.h>
 #include <strings.h>
@@ -14,438 +11,227 @@
 #include "converter.h"
 #include "paths.h"
 
-#define TAG "P2s"
+#define P2S_WORKER_FLAG_STOP (1U << 0)
 
-typedef enum {
-    P2sSubmenuIndexPsfToSub,
-    P2sSubmenuIndexSubToPsf,
-    P2sSubmenuIndexAbout,
-} P2sSubmenuIndex;
-
-typedef enum {
-    P2sViewSubmenu,
-    P2sViewProgress,
-    P2sViewSummary,
-} P2sView;
-
-typedef enum {
-    P2sDirectionPsfToSub,
-    P2sDirectionSubToPsf,
-} P2sDirection;
-
-// Custom events posted by the worker thread to the UI thread.
-typedef enum {
-    P2sEventProgress, // update the progress view from the model
-    P2sEventFinished, // switch to the summary view
-} P2sEvent;
-
-// Worker thread control flag.
-#define P2S_WORKER_FLAG_STOP (1u << 0)
-
+typedef enum { P2sViewMenu, P2sViewProgress, P2sViewSummary } P2sView;
+typedef enum { P2sToSub, P2sToPsf, P2sAbout } P2sAction;
 typedef struct {
-    // progress
     uint32_t total;
     uint32_t current;
-    // results
     uint32_t converted;
     uint32_t skipped;
     uint32_t errors;
-} P2sProgressModel;
+    bool scanning;
+    bool cancelled;
+} P2sProgress;
 
 typedef struct {
-    ViewDispatcher* view_dispatcher;
-    Submenu* submenu;
-    View* view_progress;
-    Widget* widget_summary;
-
+    ViewDispatcher* dispatcher;
+    Submenu* menu;
+    View* progress;
+    Widget* summary;
     FuriThread* worker;
-    volatile bool worker_running;
-    P2sDirection direction;
-    uint32_t last_progress_tick; // [FREEZE FIX] throttle progress events
+    P2sAction direction;
 } P2sApp;
 
-// ---------------------------------------------------------------------------
-// Navigation
-// ---------------------------------------------------------------------------
-static uint32_t p2s_nav_exit_callback(void* ctx) {
-    UNUSED(ctx);
+static uint32_t p2s_exit(void* context) {
+    UNUSED(context);
     return VIEW_NONE;
 }
 
-static uint32_t p2s_nav_submenu_callback(void* ctx) {
-    UNUSED(ctx);
-    return P2sViewSubmenu;
+static uint32_t p2s_menu(void* context) {
+    UNUSED(context);
+    return P2sViewMenu;
 }
 
-// ---------------------------------------------------------------------------
-// Progress view drawing
-// ---------------------------------------------------------------------------
-static void p2s_progress_draw_callback(Canvas* canvas, void* model) {
-    P2sProgressModel* m = (P2sProgressModel*)model;
-    canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 2, 12, "Converting...");
-    canvas_set_font(canvas, FontSecondary);
-
-    char buf[32];
-    snprintf(buf, sizeof(buf), "%lu / %lu", (unsigned long)m->current, (unsigned long)m->total);
-    canvas_draw_str(canvas, 2, 28, buf);
-
-    snprintf(
-        buf,
-        sizeof(buf),
-        "OK:%lu Skip:%lu Err:%lu",
-        (unsigned long)m->converted,
-        (unsigned long)m->skipped,
-        (unsigned long)m->errors);
-    canvas_draw_str(canvas, 2, 44, buf);
-
-    canvas_draw_str(canvas, 2, 60, "Back to cancel");
-}
-
-// Back on the progress view: request the worker to stop.
-static bool p2s_progress_input_callback(InputEvent* event, void* context) {
-    P2sApp* app = (P2sApp*)context;
-    if(event->type == InputTypeShort && event->key == InputKeyBack) {
-        if(app->worker_running) {
-            furi_thread_flags_set(furi_thread_get_id(app->worker), P2S_WORKER_FLAG_STOP);
-        }
-        return true; // swallow back; the worker will post Finished
-    }
-    return false;
-}
-
-// ---------------------------------------------------------------------------
-// dir_walk filter callbacks
-// ---------------------------------------------------------------------------
-typedef struct {
-    const char* ext; // extension to accept
-} P2sWalkFilter;
-
-static bool p2s_has_ext(const char* name, const char* ext) {
-    size_t nl = strlen(name);
-    size_t el = strlen(ext);
-    if(nl < el) return false;
-    return strcasecmp(name + (nl - el), ext) == 0;
-}
-
-static bool p2s_filter_cb(const char* name, FileInfo* fileinfo, void* ctx) {
-    P2sWalkFilter* f = (P2sWalkFilter*)ctx;
-    if(file_info_is_dir(fileinfo)) {
-        return false; // don't emit directories
-    }
-    return p2s_has_ext(name, f->ext);
-}
-
-// ---------------------------------------------------------------------------
-// Worker thread
-// ---------------------------------------------------------------------------
-static bool p2s_worker_should_stop(void) {
+static bool p2s_cancelled(void* context) {
+    UNUSED(context);
     return (furi_thread_flags_get() & P2S_WORKER_FLAG_STOP) != 0;
 }
 
-// [FREEZE FIX] Throttle progress events. Posting one custom event per file with
-// view_dispatcher_send_custom_event (which blocks FuriWaitForever when the event
-// queue is full) could stall the low-priority worker against a busy UI thread and
-// hang the app. We instead update the view-model directly (thread-safe) on every
-// file and only post a redraw event at most every ~150ms.
-static void p2s_worker_post_progress(P2sApp* app) {
-    uint32_t now = furi_get_tick();
-    if(now - app->last_progress_tick < furi_ms_to_ticks(150)) return;
-    app->last_progress_tick = now;
-    view_dispatcher_send_custom_event(app->view_dispatcher, P2sEventProgress);
+static bool p2s_matches(const char* path, const char* extension) {
+    const size_t size = strlen(path);
+    const size_t ext_size = strlen(extension);
+    return size >= ext_size && strcasecmp(path + size - ext_size, extension) == 0;
 }
 
-static int32_t p2s_worker_thread(void* context) {
-    P2sApp* app = (P2sApp*)context;
+static void p2s_draw(Canvas* canvas, void* model) {
+    P2sProgress* m = model;
+    char text[40];
+    canvas_set_font(canvas, FontPrimary);
+    canvas_draw_str(canvas, 2, 12, m->cancelled ? "Stopping..." :
+        (m->scanning ? "Scanning..." : "Copying + verifying"));
+    canvas_set_font(canvas, FontSecondary);
+    snprintf(text, sizeof(text), "%lu / %lu", (unsigned long)m->current, (unsigned long)m->total);
+    canvas_draw_str(canvas, 2, 28, text);
+    snprintf(text, sizeof(text), "OK:%lu Skip:%lu Err:%lu",
+        (unsigned long)m->converted, (unsigned long)m->skipped, (unsigned long)m->errors);
+    canvas_draw_str(canvas, 2, 44, text);
+    canvas_draw_str(canvas, 2, 60, "Back: cancel");
+}
 
-    const char* root = (app->direction == P2sDirectionPsfToSub) ? PP_SAVED_DIR : SUBGHZ_DIR;
-    P2sWalkFilter filter = {
-        .ext = (app->direction == P2sDirectionPsfToSub) ? PP_EXTENSION : SUB_EXTENSION};
-
-    Storage* storage = furi_record_open(RECORD_STORAGE);
-
-    // First pass: count matching files for the total.
-    uint32_t total = 0;
-    {
-        DirWalk* dir_walk = dir_walk_alloc(storage);
-        dir_walk_set_recursive(dir_walk, true);
-        dir_walk_set_filter_cb(dir_walk, p2s_filter_cb, &filter);
-        if(dir_walk_open(dir_walk, root)) {
-            FuriString* path = furi_string_alloc();
-            FileInfo info;
-            while(dir_walk_read(dir_walk, path, &info) == DirWalkOK) {
-                total++;
-            }
-            furi_string_free(path);
-        }
-        dir_walk_close(dir_walk);
-        dir_walk_free(dir_walk);
+static bool p2s_input(InputEvent* event, void* context) {
+    P2sApp* app = context;
+    if(event->key != InputKeyBack || event->type != InputTypeShort) return false;
+    if(app->worker && furi_thread_get_state(app->worker) != FuriThreadStateStopped) {
+        furi_thread_flags_set(furi_thread_get_id(app->worker), P2S_WORKER_FLAG_STOP);
+        with_view_model(app->progress, P2sProgress* m, { m->cancelled = true; }, true);
     }
+    return true;
+}
 
-    with_view_model(
-        app->view_progress,
-        P2sProgressModel * m,
-        {
-            m->total = total;
-            m->current = 0;
-            m->converted = 0;
-            m->skipped = 0;
-            m->errors = 0;
-        },
-        false);
-    p2s_worker_post_progress(app);
-
-    // Second pass: convert.
-    DirWalk* dir_walk = dir_walk_alloc(storage);
-    dir_walk_set_recursive(dir_walk, true);
-    dir_walk_set_filter_cb(dir_walk, p2s_filter_cb, &filter);
-
-    if(dir_walk_open(dir_walk, root)) {
-        FuriString* path = furi_string_alloc();
+static void p2s_walk(P2sApp* app, Storage* storage, bool count_only) {
+    const char* root = app->direction == P2sToSub ? PP_SAVED_DIR : SUBGHZ_DIR;
+    const char* ext = app->direction == P2sToSub ? PP_EXTENSION : SUB_EXTENSION;
+    DirWalk* walk = dir_walk_alloc(storage);
+    dir_walk_set_recursive(walk, true);
+    FuriString* path = furi_string_alloc();
+    bool error = !dir_walk_open(walk, root);
+    if(!error) {
         FileInfo info;
-        while(dir_walk_read(dir_walk, path, &info) == DirWalkOK) {
-            if(p2s_worker_should_stop()) {
-                break;
+        // No extension filter in DirWalk: cancellation is checked for every entry,
+        // even when a large directory contains no matching captures.
+        while(!p2s_cancelled(NULL)) {
+            const DirWalkResult state = dir_walk_read(walk, path, &info);
+            if(state == DirWalkError) { error = true; break; }
+            if(state != DirWalkOK) break;
+            if(file_info_is_dir(&info) || !p2s_matches(furi_string_get_cstr(path), ext)) continue;
+            if(count_only) {
+                with_view_model(app->progress, P2sProgress* m, { m->total++; }, false);
+                continue;
             }
-
-            P2sResult r;
-            if(app->direction == P2sDirectionPsfToSub) {
-                r = p2s_convert_psf_to_sub(furi_string_get_cstr(path));
-            } else {
-                r = p2s_convert_sub_to_psf(furi_string_get_cstr(path));
-            }
-
-            with_view_model(
-                app->view_progress,
-                P2sProgressModel * m,
-                {
-                    m->current++;
-                    if(r == P2sResultOk) {
-                        m->converted++;
-                    } else if(r == P2sResultSkipped) {
-                        m->skipped++;
-                    } else {
-                        m->errors++;
-                    }
-                },
-                false);
-            p2s_worker_post_progress(app);
+            const P2sResult result = app->direction == P2sToSub ?
+                p2s_convert_psf_to_sub(furi_string_get_cstr(path), p2s_cancelled, NULL) :
+                p2s_convert_sub_to_psf(furi_string_get_cstr(path), p2s_cancelled, NULL);
+            if(result == P2sResultCancelled) break;
+            with_view_model(app->progress, P2sProgress* m, {
+                m->current++;
+                if(result == P2sResultOk) m->converted++;
+                else if(result == P2sResultSkipped) m->skipped++;
+                else m->errors++;
+            }, false);
         }
-        furi_string_free(path);
     }
-    dir_walk_close(dir_walk);
-    dir_walk_free(dir_walk);
+    if(error) {
+        with_view_model(app->progress, P2sProgress* m, { m->errors++; }, false);
+    }
+    furi_string_free(path);
+    dir_walk_close(walk);
+    dir_walk_free(walk);
+}
 
+static int32_t p2s_worker(void* context) {
+    P2sApp* app = context;
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    p2s_walk(app, storage, true);
+    bool scan_ok = false;
+    with_view_model(app->progress, P2sProgress* m, {
+        m->scanning = false;
+        scan_ok = m->errors == 0;
+    }, false);
+    if(scan_ok && !p2s_cancelled(NULL)) p2s_walk(app, storage, false);
+    with_view_model(app->progress, P2sProgress* m, {
+        m->cancelled = m->cancelled || p2s_cancelled(NULL);
+    }, false);
     furi_record_close(RECORD_STORAGE);
-
-    app->worker_running = false;
-    view_dispatcher_send_custom_event(app->view_dispatcher, P2sEventFinished);
     return 0;
 }
 
-static void p2s_start_worker(P2sApp* app, P2sDirection direction) {
-    app->direction = direction;
-    app->worker_running = true;
-
-    // Reset the progress model.
-    with_view_model(
-        app->view_progress,
-        P2sProgressModel * m,
-        {
-            m->total = 0;
-            m->current = 0;
-            m->converted = 0;
-            m->skipped = 0;
-            m->errors = 0;
-        },
-        true);
-
-    app->last_progress_tick = 0;
-    app->worker = furi_thread_alloc_ex("P2sWorker", 4 * 1024, p2s_worker_thread, app);
-    // [FREEZE FIX] Low priority so the file-I/O worker never starves the UI thread.
-    furi_thread_set_priority(app->worker, FuriThreadPriorityLow);
-    furi_thread_start(app->worker);
-
-    view_dispatcher_switch_to_view(app->view_dispatcher, P2sViewProgress);
-}
-
-static void p2s_join_worker(P2sApp* app) {
-    if(app->worker) {
-        furi_thread_join(app->worker);
-        furi_thread_free(app->worker);
-        app->worker = NULL;
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Summary
-// ---------------------------------------------------------------------------
-static void p2s_show_summary(P2sApp* app) {
-    p2s_join_worker(app);
-
-    uint32_t converted = 0, skipped = 0, errors = 0;
-    with_view_model(
-        app->view_progress,
-        P2sProgressModel * m,
-        {
-            converted = m->converted;
-            skipped = m->skipped;
-            errors = m->errors;
-        },
-        false);
-
-    FuriString* text = furi_string_alloc();
-    furi_string_printf(
-        text,
-        "Done!\n\nConverted: %lu\nSkipped: %lu\nErrors: %lu",
-        (unsigned long)converted,
-        (unsigned long)skipped,
-        (unsigned long)errors);
-
-    widget_reset(app->widget_summary);
-    widget_add_text_scroll_element(
-        app->widget_summary, 0, 0, 128, 64, furi_string_get_cstr(text));
-    furi_string_free(text);
-
-    view_dispatcher_switch_to_view(app->view_dispatcher, P2sViewSummary);
-}
-
-// ---------------------------------------------------------------------------
-// Custom events (UI thread)
-// ---------------------------------------------------------------------------
-static bool p2s_custom_event_callback(void* context, uint32_t event) {
-    P2sApp* app = (P2sApp*)context;
-    switch(event) {
-    case P2sEventProgress: {
-        bool redraw = true;
-        with_view_model(
-            app->view_progress, P2sProgressModel * m, { UNUSED(m); }, redraw);
-        return true;
-    }
-    case P2sEventFinished:
-        p2s_show_summary(app);
-        return true;
-    default:
-        return false;
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Submenu
-// ---------------------------------------------------------------------------
-static void p2s_submenu_callback(void* context, uint32_t index) {
-    P2sApp* app = (P2sApp*)context;
-    switch(index) {
-    case P2sSubmenuIndexPsfToSub:
-        p2s_start_worker(app, P2sDirectionPsfToSub);
-        break;
-    case P2sSubmenuIndexSubToPsf:
-        p2s_start_worker(app, P2sDirectionSubToPsf);
-        break;
-    case P2sSubmenuIndexAbout:
-        widget_reset(app->widget_summary);
-        widget_add_text_scroll_element(
-            app->widget_summary,
-            0,
-            0,
-            128,
-            64,
-            "ProtoPirate <-> SubGhz\n\n"
-            "Converts car captures\n"
-            "between ProtoPirate .psf\n"
-            "and standard .sub files.\n\n"
-            ".psf -> .sub writes to\n"
-            "/ext/subghz/cars/<Brand>/\n"
-            "with translated protocol\n"
-            "names so they load in the\n"
-            "main Sub-GHz app.\n\n"
-            ".sub -> .psf writes to\n"
-            "/ext/apps_data/\n"
-            "proto_pirate/saved/");
-        view_dispatcher_switch_to_view(app->view_dispatcher, P2sViewSummary);
-        break;
-    default:
-        break;
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Alloc / free
-// ---------------------------------------------------------------------------
-static P2sApp* p2s_app_alloc(void) {
-    P2sApp* app = malloc(sizeof(P2sApp));
+static void p2s_join(P2sApp* app) {
+    if(!app->worker) return;
+    furi_thread_join(app->worker);
+    furi_thread_free(app->worker);
     app->worker = NULL;
-    app->worker_running = false;
-    app->direction = P2sDirectionPsfToSub;
-
-    Gui* gui = furi_record_open(RECORD_GUI);
-
-    app->view_dispatcher = view_dispatcher_alloc();
-    view_dispatcher_attach_to_gui(app->view_dispatcher, gui, ViewDispatcherTypeFullscreen);
-    view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
-    view_dispatcher_set_custom_event_callback(app->view_dispatcher, p2s_custom_event_callback);
-
-    // Submenu
-    app->submenu = submenu_alloc();
-    submenu_add_item(
-        app->submenu,
-        "ProtoPirate -> SubGhz (cars/)",
-        P2sSubmenuIndexPsfToSub,
-        p2s_submenu_callback,
-        app);
-    submenu_add_item(
-        app->submenu, "SubGhz -> ProtoPirate", P2sSubmenuIndexSubToPsf, p2s_submenu_callback, app);
-    submenu_add_item(app->submenu, "About", P2sSubmenuIndexAbout, p2s_submenu_callback, app);
-    view_set_previous_callback(submenu_get_view(app->submenu), p2s_nav_exit_callback);
-    view_dispatcher_add_view(app->view_dispatcher, P2sViewSubmenu, submenu_get_view(app->submenu));
-
-    // Progress view
-    app->view_progress = view_alloc();
-    view_set_context(app->view_progress, app);
-    view_set_draw_callback(app->view_progress, p2s_progress_draw_callback);
-    view_set_input_callback(app->view_progress, p2s_progress_input_callback);
-    view_allocate_model(
-        app->view_progress, ViewModelTypeLocking, sizeof(P2sProgressModel));
-    view_dispatcher_add_view(app->view_dispatcher, P2sViewProgress, app->view_progress);
-
-    // Summary widget
-    app->widget_summary = widget_alloc();
-    view_set_previous_callback(widget_get_view(app->widget_summary), p2s_nav_submenu_callback);
-    view_dispatcher_add_view(
-        app->view_dispatcher, P2sViewSummary, widget_get_view(app->widget_summary));
-
-    view_dispatcher_switch_to_view(app->view_dispatcher, P2sViewSubmenu);
-    return app;
 }
 
-static void p2s_app_free(P2sApp* app) {
-    // Make sure the worker is stopped and joined before tearing down views.
-    if(app->worker) {
-        if(app->worker_running) {
-            furi_thread_flags_set(furi_thread_get_id(app->worker), P2S_WORKER_FLAG_STOP);
-        }
-        p2s_join_worker(app);
+// UI polls worker state. No blocking event sends can outlive the dispatcher.
+static void p2s_tick(void* context) {
+    P2sApp* app = context;
+    if(!app->worker) return;
+    if(furi_thread_get_state(app->worker) != FuriThreadStateStopped) {
+        with_view_model(app->progress, P2sProgress* m, { UNUSED(m); }, true);
+        return;
     }
+    p2s_join(app);
+    P2sProgress result;
+    with_view_model(app->progress, P2sProgress* m, { result = *m; }, false);
+    char text[160];
+    snprintf(text, sizeof(text), "%s\nCopied: %lu\nSkipped: %lu\nErrors: %lu\nOriginals unchanged",
+        result.cancelled ? "Cancelled" : (result.errors ? "Finished with errors" : "Done"),
+        (unsigned long)result.converted, (unsigned long)result.skipped, (unsigned long)result.errors);
+    widget_reset(app->summary);
+    widget_add_text_scroll_element(app->summary, 0, 0, 128, 64, text);
+    view_dispatcher_switch_to_view(app->dispatcher, P2sViewSummary);
+}
 
-    view_dispatcher_remove_view(app->view_dispatcher, P2sViewSummary);
-    widget_free(app->widget_summary);
-    view_dispatcher_remove_view(app->view_dispatcher, P2sViewProgress);
-    view_free(app->view_progress);
-    view_dispatcher_remove_view(app->view_dispatcher, P2sViewSubmenu);
-    submenu_free(app->submenu);
-    view_dispatcher_free(app->view_dispatcher);
+static void p2s_select(void* context, uint32_t action) {
+    P2sApp* app = context;
+    if(app->worker) return;
+    if(action == P2sAbout) {
+        widget_reset(app->summary);
+        widget_add_text_scroll_element(app->summary, 0, 0, 128, 64,
+            "Capture converter\n\n"
+            "Copies saved .psf/.sub\nkey captures unchanged.\n"
+            "No decoding or radio use.\n\n"
+            ".sub output: /subghz/imported\n"
+            ".psf output: ProtoPirate/saved\n\n"
+            "Select the original protocol\npack to open the copy.\n"
+            "RAW recordings and invalid\nheaders are skipped.\n"
+            "Back cancels safely.");
+        view_dispatcher_switch_to_view(app->dispatcher, P2sViewSummary);
+        return;
+    }
+    if(action != P2sToSub && action != P2sToPsf) return;
+    app->direction = action;
+    with_view_model(app->progress, P2sProgress* m, {
+        memset(m, 0, sizeof(*m));
+        m->scanning = true;
+    }, true);
+    app->worker = furi_thread_alloc_ex("CaptureCopy", 4096, p2s_worker, app);
+    furi_thread_set_priority(app->worker, FuriThreadPriorityLow);
+    // Start before switching view: Back always sees a valid worker thread.
+    furi_thread_start(app->worker);
+    view_dispatcher_switch_to_view(app->dispatcher, P2sViewProgress);
+}
 
+int32_t protopirate_to_subghz_app(void* context) {
+    UNUSED(context);
+    P2sApp* app = calloc(1, sizeof(P2sApp));
+    app->dispatcher = view_dispatcher_alloc();
+    app->menu = submenu_alloc();
+    app->progress = view_alloc();
+    app->summary = widget_alloc();
+    view_dispatcher_set_event_callback_context(app->dispatcher, app);
+    view_dispatcher_set_tick_event_callback(app->dispatcher, p2s_tick, 150);
+    view_dispatcher_attach_to_gui(app->dispatcher, furi_record_open(RECORD_GUI), ViewDispatcherTypeFullscreen);
+
+    submenu_add_item(app->menu, "PSF -> SUB", P2sToSub, p2s_select, app);
+    submenu_add_item(app->menu, "SUB -> PSF", P2sToPsf, p2s_select, app);
+    submenu_add_item(app->menu, "About / paths", P2sAbout, p2s_select, app);
+    view_set_previous_callback(submenu_get_view(app->menu), p2s_exit);
+    view_dispatcher_add_view(app->dispatcher, P2sViewMenu, submenu_get_view(app->menu));
+
+    view_set_context(app->progress, app);
+    view_set_draw_callback(app->progress, p2s_draw);
+    view_set_input_callback(app->progress, p2s_input);
+    view_allocate_model(app->progress, ViewModelTypeLocking, sizeof(P2sProgress));
+    view_dispatcher_add_view(app->dispatcher, P2sViewProgress, app->progress);
+    view_set_previous_callback(widget_get_view(app->summary), p2s_menu);
+    view_dispatcher_add_view(app->dispatcher, P2sViewSummary, widget_get_view(app->summary));
+    view_dispatcher_switch_to_view(app->dispatcher, P2sViewMenu);
+    view_dispatcher_run(app->dispatcher);
+
+    if(app->worker && furi_thread_get_state(app->worker) != FuriThreadStateStopped)
+        furi_thread_flags_set(furi_thread_get_id(app->worker), P2S_WORKER_FLAG_STOP);
+    p2s_join(app);
+    view_dispatcher_remove_view(app->dispatcher, P2sViewSummary);
+    view_dispatcher_remove_view(app->dispatcher, P2sViewProgress);
+    view_dispatcher_remove_view(app->dispatcher, P2sViewMenu);
+    widget_free(app->summary);
+    view_free(app->progress);
+    submenu_free(app->menu);
+    view_dispatcher_free(app->dispatcher);
     furi_record_close(RECORD_GUI);
     free(app);
-}
-
-// ---------------------------------------------------------------------------
-// Entry point
-// ---------------------------------------------------------------------------
-int32_t protopirate_to_subghz_app(void* p) {
-    UNUSED(p);
-    P2sApp* app = p2s_app_alloc();
-    view_dispatcher_run(app->view_dispatcher);
-    p2s_app_free(app);
     return 0;
 }

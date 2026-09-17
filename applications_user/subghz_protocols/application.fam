@@ -290,20 +290,6 @@ App(
 )
 
 App(
-    appid="protocol_renault_v1",
-    apptype=FlipperAppType.PLUGIN,
-    targets=["f7"],
-    entry_point="subghz_protocol_renault_v1_plugin_ep",
-    requires=["subghz"],
-    sources=[
-        "renault_v1_plugin.c",
-        "renault_v1.c",
-        "fiat_v1.c",
-        "hitag2_seed.c",
-    ],
-)
-
-App(
     appid="protocol_toyota_lexus",
     apptype=FlipperAppType.PLUGIN,
     targets=["f7"],

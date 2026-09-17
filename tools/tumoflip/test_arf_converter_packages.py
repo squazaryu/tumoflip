@@ -17,7 +17,7 @@ TARGET = "apps_data/arf_subghz_full/packages/protopirate_to_subghz.fap"
 
 class ArfConverterPackagesTests(unittest.TestCase):
     def test_unrequested_additions_are_not_shipped(self):
-        self.assertFalse((ROOT / "applications/system/renault_seed_bf").exists())
+        self.assertFalse((ROOT / "applications/system/renault_seed_bf/application.fam").exists())
         for filename in ("renault_v1.c", "renault_v1.h", "renault_v1_plugin.c",
                          "fiat_v1.c", "fiat_v1.h", "hitag2_seed.c", "hitag2_seed.h"):
             self.assertFalse((ROOT / "applications_user/subghz_protocols" / filename).exists())

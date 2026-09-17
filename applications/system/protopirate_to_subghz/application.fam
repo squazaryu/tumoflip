@@ -1,6 +1,6 @@
 App(
     appid="protopirate_to_subghz",
-    name="ProtoPirate to SubGhz",
+    name="Capture converter",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="protopirate_to_subghz_app",
     stack_size=8 * 1024,
@@ -10,12 +10,12 @@ App(
     sources=[
         "protopirate_to_subghz.c",
         "converter.c",
-        "ff_copy.c",
+        "copy_file.c",
     ],
     fap_icon="icon.png",
     fap_category="ARF Tools",
     fap_version="1.0",
-    fap_description="Bidirectionally converts car captures between ProtoPirate .psf and standard SubGHz .sub, organized by automotive brand.",
+    fap_description="Copy saved captures between .psf and .sub without changing their contents; verify every output and preserve the originals.",
     fap_package_only=True,
     fap_dist_path="apps_data/arf_subghz_full/packages/{filename}",
 )

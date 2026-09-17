@@ -60,7 +60,6 @@ static const SubGhzProtocolPackEntry subghz_protocol_pack_entries[] = {
     {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_hyundai_new.fal"},
     {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_nissan.fal"},
     {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_renault.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_renault_v1.fal"},
     {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_toyota_lexus.fal"},
 };
 

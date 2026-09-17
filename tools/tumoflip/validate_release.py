@@ -61,7 +61,6 @@ PROTOCOL_PACKS = {
     "protocol_porsche_cayenne.fal",
     "protocol_psa.fal",
     "protocol_renault.fal",
-    "protocol_renault_v1.fal",
     "protocol_scher_khan.fal",
     "protocol_sheriff_cfm.fal",
     "protocol_star_line.fal",
@@ -141,7 +140,6 @@ NEARBY_FILES_PACKAGE_FILE = "apps/GPIO/nearby_files.fap"
 WEATHER_EDITOR_PACKAGE_FILE = "apps/Sub-GHz/weather_editor.fap"
 LFRFID_HITAGS_PACKAGE_FILE = "apps_data/lfrfid/plugins/lfrfid_hitags.fal"
 PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE = "apps_data/arf_subghz_full/packages/protopirate_to_subghz.fap"
-RENAULT_SEED_BF_PACKAGE_FILE = "apps_data/arf_subghz_full/packages/renault_seed_bf.fap"
 PACKAGE_ONLY_PACKAGE_FILES = frozenset(
     {
         "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
@@ -150,7 +148,6 @@ PACKAGE_ONLY_PACKAGE_FILES = frozenset(
         WEATHER_EDITOR_PACKAGE_FILE,
         LFRFID_HITAGS_PACKAGE_FILE,
         PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
-        RENAULT_SEED_BF_PACKAGE_FILE,
     }
 )
 TOTP_CLI_PLUGIN_APP_IDS = (
@@ -192,7 +189,6 @@ PACKAGE_ONLY_PACKAGE_GROUPS = {
     WEATHER_EDITOR_PACKAGE_FILE: "base",
     LFRFID_HITAGS_PACKAGE_FILE: "base",
     PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE: "arf",
-    RENAULT_SEED_BF_PACKAGE_FILE: "arf",
 }
 PACKAGE_RELEASE_OVERLAY_GROUPS = {
     **PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -356,7 +352,6 @@ def package_extapp_exports() -> dict[str, str]:
     exports["weather_editor.fap"] = WEATHER_EDITOR_PACKAGE_FILE
     exports["lfrfid_hitags.fal"] = LFRFID_HITAGS_PACKAGE_FILE
     exports["protopirate_to_subghz.fap"] = PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE
-    exports["renault_seed_bf.fap"] = RENAULT_SEED_BF_PACKAGE_FILE
     exports["module_one_cockpit.fap"] = "apps/Module One/Diagnostics/cockpit.fap"
     exports.update(
         {
@@ -914,7 +909,6 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
         + sorted((resources / "apps_data/arf_subghz_full/modules").glob("*.fap"))
         + [
             resources / PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
-            resources / RENAULT_SEED_BF_PACKAGE_FILE,
         ],
         "protocol_packs": sorted(
             (resources / "apps_data/subghz/plugins").glob("protocol_*.fal")
