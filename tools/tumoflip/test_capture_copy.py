@@ -13,6 +13,7 @@ class CaptureCopyTests(unittest.TestCase):
         self.assertTrue(path.exists(), "A checked copy transaction is required")
         source = "\n".join(line for line in path.read_text().splitlines()
                            if not line.startswith("#include"))
+        self.assertTrue("p2s_check_text" in source, "Bound field parsing before allocating strings")
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>
@@ -94,6 +95,15 @@ int main(void) {
         assert(!memcmp(original,saved,original_size));
         assert(allocated==0 && open_files==0);
     }
+    fault=0;exists=false;original_size=2000;
+    memset(original,'x',original_size);original[999]='\n';original[1999]='\n';
+    assert(p2s_check_text(NULL,"source",NULL,NULL)==P2sResultOk);
+    original[999]='x';
+    assert(p2s_check_text(NULL,"source",NULL,NULL)==P2sResultSkipped);
+    original[999]='\n';original[17]=0;
+    assert(p2s_check_text(NULL,"source",NULL,NULL)==P2sResultSkipped);
+    fault=1;assert(p2s_check_text(NULL,"source",NULL,NULL)==P2sResultError);
+    fault=11;assert(p2s_check_text(NULL,"source",cancelled,NULL)==P2sResultCancelled);
     fault=0;exists=true;output_size=100;memset(output,0x7a,100);removed=0;
     assert(p2s_copy_verified(NULL,"source","destination",NULL,NULL)==P2sResultError);
     assert(exists && output_size==100 && output[0]==0x7a && removed==0);
