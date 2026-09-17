@@ -1,3 +1,11 @@
+## Tumoflip Dev 009-002
+- RFID: add manual FC/ID entry and app-side renderers for HID H10302/H10304/H10306, AMAG S10401, Corporate 1000 35-bit and Casi-Rusco C10106; Generic HIDProx rendering now reports frame length without duplicating raw data.
+- GUI: an empty bounded NumberInput field now resolves to the nearest valid value around zero when submitted.
+- ARF packages: add ProtoPirate `.psf` ↔ Standard Sub-GHz `.sub` conversion with recursive progress/cancel handling.
+- ARF packages: add a cooperative Renault V1 classic-Hitag2 Seed BF tool that writes `Seed`/`Recovered` transaction fields without running during live capture.
+- Protocol Packs: add Renault V1 as a separate package-loaded FAL; it remains outside resident firmware.
+- API remains `88.9`; no user-data migration is required. Hardware acceptance is still pending.
+
 ## Tumoflip Dev 009-001
 - LFRFID: harden Keri PSK decoding against slicer skew by checking two complete frames for matching IDs before accepting a read; include regression vectors for clean and mismatched frames.
 - NFC: award the existing Dolphin deed when launching directly into card emulation, matching the saved-card path.
