@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define ARF_MODULES_PATH EXT_PATH("apps_data/arf_subghz_full/modules/")
+#define ARF_MODULES_PATH       EXT_PATH("apps_data/arf_subghz_full/modules/")
 #define SUBGHZ_WARDRIVING_PATH EXT_PATH("apps/Sub-GHz/subghz_wardriving.fap")
 
 typedef struct {
@@ -83,11 +83,7 @@ static ArfSubGhzHub* arf_subghz_hub_alloc(uint32_t selected_item) {
 
     for(size_t i = 0; i < COUNT_OF(arf_subghz_hub_items); i++) {
         submenu_add_item(
-            app->submenu,
-            arf_subghz_hub_items[i].label,
-            i,
-            arf_subghz_hub_launch_callback,
-            app);
+            app->submenu, arf_subghz_hub_items[i].label, i, arf_subghz_hub_launch_callback, app);
     }
     submenu_set_selected_item(app->submenu, selected_item);
 

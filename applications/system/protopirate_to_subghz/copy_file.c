@@ -1,6 +1,50 @@
 #include "copy_file.h"
 #include <string.h>
 
+P2sResult
+    p2s_check_text(Storage* storage, const char* source, P2sCancelCallback cancel, void* context) {
+    File* file = storage_file_alloc(storage);
+    P2sResult result = P2sResultError;
+    uint8_t data[512];
+    size_t line_length = 0;
+    do {
+        if(cancel && cancel(context)) {
+            result = P2sResultCancelled;
+            break;
+        }
+        if(!storage_file_open(file, source, FSAM_READ, FSOM_OPEN_EXISTING)) break;
+        uint64_t remaining = storage_file_size(file);
+        if(!remaining || remaining > P2S_MAX_FILE_BYTES) {
+            result = P2sResultSkipped;
+            break;
+        }
+        result = P2sResultOk;
+        while(remaining && result == P2sResultOk) {
+            if(cancel && cancel(context)) {
+                result = P2sResultCancelled;
+                break;
+            }
+            const size_t chunk = MIN(remaining, sizeof(data));
+            if(storage_file_read(file, data, chunk) != chunk) {
+                result = P2sResultError;
+                break;
+            }
+            for(size_t i = 0; i < chunk; i++) {
+                if(data[i] == '\n')
+                    line_length = 0;
+                else if(!data[i] || ++line_length > 1024) {
+                    result = P2sResultSkipped;
+                    break;
+                }
+            }
+            remaining -= chunk;
+        }
+    } while(false);
+    if(!storage_file_close(file) && result == P2sResultOk) result = P2sResultError;
+    storage_file_free(file);
+    return result;
+}
+
 P2sResult p2s_copy_verified(
     Storage* storage,
     const char* source,
@@ -52,8 +96,8 @@ P2sResult p2s_copy_verified(
             }
             const size_t chunk = MIN(remaining, sizeof(data));
             if(storage_file_read(input, data, chunk) != chunk ||
-               storage_file_read(output, check, chunk) != chunk ||
-               memcmp(data, check, chunk) != 0) break;
+               storage_file_read(output, check, chunk) != chunk || memcmp(data, check, chunk) != 0)
+                break;
             remaining -= chunk;
         }
         if(remaining) break;

@@ -27,6 +27,7 @@ try:
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         LFRFID_HITAGS_PACKAGE_FILE,
+        PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
         PACKAGE_RELEASE_OVERLAY_FILES,
         PROTOCOL_PACKS,
         TOTP_CLI_PLUGIN_PACKAGE_FILES,
@@ -54,6 +55,7 @@ except ImportError:
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         LFRFID_HITAGS_PACKAGE_FILE,
+        PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
         PACKAGE_RELEASE_OVERLAY_FILES,
         PROTOCOL_PACKS,
         TOTP_CLI_PLUGIN_PACKAGE_FILES,
@@ -128,6 +130,7 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
         "apps/Tools/totp.fap",
         "apps_data/js_app/plugins/js_gui.fal",
         "apps_data/js_app/plugins/js_subghz.fal",
+        PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
     ):
         write_file(resources / relative, relative.encode())
 

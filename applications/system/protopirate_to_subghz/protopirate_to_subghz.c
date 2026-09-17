@@ -13,8 +13,16 @@
 
 #define P2S_WORKER_FLAG_STOP (1U << 0)
 
-typedef enum { P2sViewMenu, P2sViewProgress, P2sViewSummary } P2sView;
-typedef enum { P2sToSub, P2sToPsf, P2sAbout } P2sAction;
+typedef enum {
+    P2sViewMenu,
+    P2sViewProgress,
+    P2sViewSummary
+} P2sView;
+typedef enum {
+    P2sToSub,
+    P2sToPsf,
+    P2sAbout
+} P2sAction;
 typedef struct {
     uint32_t total;
     uint32_t current;
@@ -59,13 +67,21 @@ static void p2s_draw(Canvas* canvas, void* model) {
     P2sProgress* m = model;
     char text[40];
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 2, 12, m->cancelled ? "Stopping..." :
-        (m->scanning ? "Scanning..." : "Copying + verifying"));
+    canvas_draw_str(
+        canvas,
+        2,
+        12,
+        m->cancelled ? "Stopping..." : (m->scanning ? "Scanning..." : "Copying + verifying"));
     canvas_set_font(canvas, FontSecondary);
     snprintf(text, sizeof(text), "%lu / %lu", (unsigned long)m->current, (unsigned long)m->total);
     canvas_draw_str(canvas, 2, 28, text);
-    snprintf(text, sizeof(text), "OK:%lu Skip:%lu Err:%lu",
-        (unsigned long)m->converted, (unsigned long)m->skipped, (unsigned long)m->errors);
+    snprintf(
+        text,
+        sizeof(text),
+        "OK:%lu Skip:%lu Err:%lu",
+        (unsigned long)m->converted,
+        (unsigned long)m->skipped,
+        (unsigned long)m->errors);
     canvas_draw_str(canvas, 2, 44, text);
     canvas_draw_str(canvas, 2, 60, "Back: cancel");
 }
@@ -75,7 +91,7 @@ static bool p2s_input(InputEvent* event, void* context) {
     if(event->key != InputKeyBack || event->type != InputTypeShort) return false;
     if(app->worker && furi_thread_get_state(app->worker) != FuriThreadStateStopped) {
         furi_thread_flags_set(furi_thread_get_id(app->worker), P2S_WORKER_FLAG_STOP);
-        with_view_model(app->progress, P2sProgress* m, { m->cancelled = true; }, true);
+        with_view_model(app->progress, P2sProgress * m, { m->cancelled = true; }, true);
     }
     return true;
 }
@@ -93,27 +109,38 @@ static void p2s_walk(P2sApp* app, Storage* storage, bool count_only) {
         // even when a large directory contains no matching captures.
         while(!p2s_cancelled(NULL)) {
             const DirWalkResult state = dir_walk_read(walk, path, &info);
-            if(state == DirWalkError) { error = true; break; }
+            if(state == DirWalkError) {
+                error = true;
+                break;
+            }
             if(state != DirWalkOK) break;
             if(file_info_is_dir(&info) || !p2s_matches(furi_string_get_cstr(path), ext)) continue;
             if(count_only) {
-                with_view_model(app->progress, P2sProgress* m, { m->total++; }, false);
+                with_view_model(app->progress, P2sProgress * m, { m->total++; }, false);
                 continue;
             }
-            const P2sResult result = app->direction == P2sToSub ?
-                p2s_convert_psf_to_sub(furi_string_get_cstr(path), p2s_cancelled, NULL) :
-                p2s_convert_sub_to_psf(furi_string_get_cstr(path), p2s_cancelled, NULL);
+            const P2sResult result =
+                app->direction == P2sToSub ?
+                    p2s_convert_psf_to_sub(furi_string_get_cstr(path), p2s_cancelled, NULL) :
+                    p2s_convert_sub_to_psf(furi_string_get_cstr(path), p2s_cancelled, NULL);
             if(result == P2sResultCancelled) break;
-            with_view_model(app->progress, P2sProgress* m, {
-                m->current++;
-                if(result == P2sResultOk) m->converted++;
-                else if(result == P2sResultSkipped) m->skipped++;
-                else m->errors++;
-            }, false);
+            with_view_model(
+                app->progress,
+                P2sProgress * m,
+                {
+                    m->current++;
+                    if(result == P2sResultOk)
+                        m->converted++;
+                    else if(result == P2sResultSkipped)
+                        m->skipped++;
+                    else
+                        m->errors++;
+                },
+                false);
         }
     }
     if(error) {
-        with_view_model(app->progress, P2sProgress* m, { m->errors++; }, false);
+        with_view_model(app->progress, P2sProgress * m, { m->errors++; }, false);
     }
     furi_string_free(path);
     dir_walk_close(walk);
@@ -125,14 +152,20 @@ static int32_t p2s_worker(void* context) {
     Storage* storage = furi_record_open(RECORD_STORAGE);
     p2s_walk(app, storage, true);
     bool scan_ok = false;
-    with_view_model(app->progress, P2sProgress* m, {
-        m->scanning = false;
-        scan_ok = m->errors == 0;
-    }, false);
+    with_view_model(
+        app->progress,
+        P2sProgress * m,
+        {
+            m->scanning = false;
+            scan_ok = m->errors == 0;
+        },
+        false);
     if(scan_ok && !p2s_cancelled(NULL)) p2s_walk(app, storage, false);
-    with_view_model(app->progress, P2sProgress* m, {
-        m->cancelled = m->cancelled || p2s_cancelled(NULL);
-    }, false);
+    with_view_model(
+        app->progress,
+        P2sProgress * m,
+        { m->cancelled = m->cancelled || p2s_cancelled(NULL); },
+        false);
     furi_record_close(RECORD_STORAGE);
     return 0;
 }
@@ -149,16 +182,21 @@ static void p2s_tick(void* context) {
     P2sApp* app = context;
     if(!app->worker) return;
     if(furi_thread_get_state(app->worker) != FuriThreadStateStopped) {
-        with_view_model(app->progress, P2sProgress* m, { UNUSED(m); }, true);
+        with_view_model(app->progress, P2sProgress * m, { UNUSED(m); }, true);
         return;
     }
     p2s_join(app);
     P2sProgress result;
-    with_view_model(app->progress, P2sProgress* m, { result = *m; }, false);
+    with_view_model(app->progress, P2sProgress * m, { result = *m; }, false);
     char text[160];
-    snprintf(text, sizeof(text), "%s\nCopied: %lu\nSkipped: %lu\nErrors: %lu\nOriginals unchanged",
+    snprintf(
+        text,
+        sizeof(text),
+        "%s\nCopied: %lu\nSkipped: %lu\nErrors: %lu\nOriginals unchanged",
         result.cancelled ? "Cancelled" : (result.errors ? "Finished with errors" : "Done"),
-        (unsigned long)result.converted, (unsigned long)result.skipped, (unsigned long)result.errors);
+        (unsigned long)result.converted,
+        (unsigned long)result.skipped,
+        (unsigned long)result.errors);
     widget_reset(app->summary);
     widget_add_text_scroll_element(app->summary, 0, 0, 128, 64, text);
     view_dispatcher_switch_to_view(app->dispatcher, P2sViewSummary);
@@ -169,7 +207,12 @@ static void p2s_select(void* context, uint32_t action) {
     if(app->worker) return;
     if(action == P2sAbout) {
         widget_reset(app->summary);
-        widget_add_text_scroll_element(app->summary, 0, 0, 128, 64,
+        widget_add_text_scroll_element(
+            app->summary,
+            0,
+            0,
+            128,
+            64,
             "Capture converter\n\n"
             "Copies saved .psf/.sub\nkey captures unchanged.\n"
             "No decoding or radio use.\n\n"
@@ -183,10 +226,14 @@ static void p2s_select(void* context, uint32_t action) {
     }
     if(action != P2sToSub && action != P2sToPsf) return;
     app->direction = action;
-    with_view_model(app->progress, P2sProgress* m, {
-        memset(m, 0, sizeof(*m));
-        m->scanning = true;
-    }, true);
+    with_view_model(
+        app->progress,
+        P2sProgress * m,
+        {
+            memset(m, 0, sizeof(*m));
+            m->scanning = true;
+        },
+        true);
     app->worker = furi_thread_alloc_ex("CaptureCopy", 4096, p2s_worker, app);
     furi_thread_set_priority(app->worker, FuriThreadPriorityLow);
     // Start before switching view: Back always sees a valid worker thread.
@@ -203,7 +250,8 @@ int32_t protopirate_to_subghz_app(void* context) {
     app->summary = widget_alloc();
     view_dispatcher_set_event_callback_context(app->dispatcher, app);
     view_dispatcher_set_tick_event_callback(app->dispatcher, p2s_tick, 150);
-    view_dispatcher_attach_to_gui(app->dispatcher, furi_record_open(RECORD_GUI), ViewDispatcherTypeFullscreen);
+    view_dispatcher_attach_to_gui(
+        app->dispatcher, furi_record_open(RECORD_GUI), ViewDispatcherTypeFullscreen);
 
     submenu_add_item(app->menu, "PSF -> SUB", P2sToSub, p2s_select, app);
     submenu_add_item(app->menu, "SUB -> PSF", P2sToPsf, p2s_select, app);
