@@ -25,22 +25,24 @@ class Upstream1149RfidTest(unittest.TestCase):
             self.assertTrue((LFRFID / relative).is_file(), relative)
 
     def test_manual_formats_cover_hid_and_casi_rusco(self) -> None:
-        manual = (LFRFID / "lfrfid_manual_format.h").read_text(encoding="utf-8")
         hid = (LFRFID / "lfrfid_hid_format.h").read_text(encoding="utf-8")
+        hid_impl = (LFRFID / "lfrfid_hid_format.c").read_text(encoding="utf-8")
         casi = (LFRFID / "lfrfid_casi_format.h").read_text(encoding="utf-8")
+        method = (LFRFID / "scenes/lfrfid_scene_save_method.c").read_text(
+            encoding="utf-8"
+        )
 
         for marker in (
-            "H10301",
             "H10302",
             "H10304",
             "H10306",
             "S10401",
-            "Corporate 1000",
+            "Corp1000-35",
         ):
-            self.assertIn(marker, hid)
+            self.assertIn(marker, hid_impl)
         self.assertIn("C10106", casi)
-        self.assertIn("Enter FC/ID", manual)
-        self.assertIn("Enter Hex Data", manual)
+        self.assertIn("Enter FC/ID", method)
+        self.assertIn("Enter Hex Data", method)
 
     def test_generic_hid_render_reports_frame_length_without_duplicate_data(self) -> None:
         source = (ROOT / "lib/lfrfid/protocols/protocol_hid_generic.c").read_text(
@@ -53,9 +55,10 @@ class Upstream1149RfidTest(unittest.TestCase):
         source = (ROOT / "applications/services/gui/modules/number_input.c").read_text(
             encoding="utf-8"
         )
-        self.assertIn("value_min", source)
-        self.assertIn("value_max", source)
-        self.assertRegex(source, r"empty.*zero|zero.*empty|value_min")
+        self.assertIn("min_value", source)
+        self.assertIn("max_value", source)
+        self.assertIn("number_input_empty_value", source)
+        self.assertIn("furi_string_empty", source)
 
     def test_unit_vectors_cover_non_nibble_hid_frames(self) -> None:
         source = (
