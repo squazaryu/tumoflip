@@ -1,7 +1,11 @@
 #include "../subghz_i.h" // IWYU pragma: keep
+#include <loader/loader.h>
+
+#define CAPTURE_INSPECTOR_PATH EXT_PATH("apps_data/arf_subghz_full/packages/capture_inspector.fap")
 
 enum SubmenuIndex {
     SubmenuIndexEmulate,
+    SubmenuIndexInspect,
     SubmenuIndexEdit,
     SubmenuIndexDelete,
     SubmenuIndexSignalSettings
@@ -57,6 +61,13 @@ void subghz_scene_saved_menu_on_enter(void* context) {
 
     submenu_add_item(
         subghz->submenu,
+        "Inspect / Compare",
+        SubmenuIndexInspect,
+        subghz_scene_saved_menu_submenu_callback,
+        subghz);
+
+    submenu_add_item(
+        subghz->submenu,
         "Rename",
         SubmenuIndexEdit,
         subghz_scene_saved_menu_submenu_callback,
@@ -80,6 +91,28 @@ bool subghz_scene_saved_menu_on_event(void* context, SceneManagerEvent event) {
     SubGhz* subghz = context;
 
     if(event.type == SceneManagerEventTypeCustom) {
+        if(event.event == SubmenuIndexInspect) {
+            Storage* storage = furi_record_open(RECORD_STORAGE);
+            const bool installed = storage_file_exists(storage, CAPTURE_INSPECTOR_PATH);
+            furi_record_close(RECORD_STORAGE);
+            if(!installed) {
+                dialog_message_show_storage_error(
+                    subghz->dialogs, "Install Capture Inspector\nfrom matching FW Packages.");
+                return true;
+            }
+            Loader* loader = furi_record_open(RECORD_LOADER);
+            loader_clear_launch_queue(loader);
+            loader_enqueue_launch(
+                loader,
+                CAPTURE_INSPECTOR_PATH,
+                furi_string_get_cstr(subghz->file_path),
+                LoaderDeferredLaunchFlagGui);
+            loader_enqueue_launch(loader, "Sub-GHz", NULL, LoaderDeferredLaunchFlagGui);
+            furi_record_close(RECORD_LOADER);
+            scene_manager_stop(subghz->scene_manager);
+            view_dispatcher_stop(subghz->view_dispatcher);
+            return true;
+        }
         if(event.event == SubmenuIndexEmulate) {
             scene_manager_set_scene_state(
                 subghz->scene_manager, SubGhzSceneSavedMenu, SubmenuIndexEmulate);

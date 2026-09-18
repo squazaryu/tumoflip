@@ -32,7 +32,8 @@ typedef enum {FlipperApplicationPreloadStatusSuccess,FlipperApplicationPreloadSt
 typedef struct {struct {struct {uint16_t major,minor;} api_version;uint16_t hardware_target_id;} base;
  uint32_t app_version;char name[32];} FlipperApplicationManifest;
 typedef int FlipperApplication;
-static int api,allocated,preloads,mode;static const int* firmware_api_interface=&api;
+typedef int ElfApiInterface;
+static int api,allocated,preloads,mode;const ElfApiInterface* const firmware_api_interface=&api;
 static FlipperApplicationManifest manifest;
 static FS_Error storage_common_stat(Storage* s,const char* p,FileInfo* out){
  (void)s;(void)p;if(mode==1)return FSE_NOT_EXIST;if(mode==2)return FSE_INTERNAL;

@@ -1,0 +1,14 @@
+App(
+    appid="capture_inspector",
+    name="Capture Inspector",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="capture_inspector_app",
+    stack_size=4096,
+    requires=["gui", "dialogs"],
+    fap_icon="../protopirate_to_subghz/icon.png",
+    fap_category="ARF Tools",
+    fap_version="1.0",
+    fap_description="Read-only SUB/PSF metadata inspection and field comparison. No radio use.",
+    fap_package_only=True,
+    fap_dist_path="apps_data/arf_subghz_full/packages/{filename}",
+)

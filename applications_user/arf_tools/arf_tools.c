@@ -7,6 +7,10 @@
 #include <subghz_radio_broker/subghz_radio_broker.h>
 #include <lib/subghz/subghz_protocol_registry.h>
 #include <toolbox/path.h>
+#include <string.h>
+#include "arf_file_probe.h"
+
+#define ARF_STATUS_STOP (1U << 0)
 
 #define TAG "ArfStatus"
 
@@ -20,12 +24,14 @@ typedef enum {
 
 typedef enum {
     ArfToolsMenuAssets,
+    ArfToolsMenuPacks,
     ArfToolsMenuCapabilities,
     ArfToolsMenuAbout,
 } ArfToolsMenu;
 
 typedef enum {
     ArfToolsEventAssets,
+    ArfToolsEventPacks,
     ArfToolsEventCapabilities,
     ArfToolsEventAbout,
 } ArfToolsEvent;
@@ -37,42 +43,139 @@ typedef struct {
     Submenu* main_menu;
     TextBox* text_box;
     FuriString* text;
+    FuriString* scan_text;
+    FuriThread* scan_worker;
+    bool scan_packs;
+    bool scan_cancelled;
+    bool showing_text;
 } ArfToolsApp;
 
 static void arf_tools_set_text(ArfToolsApp* app, const char* text) {
     furi_string_set_str(app->text, text);
+    text_box_reset(app->text_box);
     text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
+    app->showing_text = true;
     view_dispatcher_switch_to_view(app->view_dispatcher, ArfToolsViewText);
 }
 
 static void arf_tools_set_text_string(ArfToolsApp* app) {
+    text_box_reset(app->text_box);
     text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
+    app->showing_text = true;
     view_dispatcher_switch_to_view(app->view_dispatcher, ArfToolsViewText);
 }
 
-static bool arf_tools_path_exists(ArfToolsApp* app, const char* path) {
-    return storage_common_stat(app->storage, path, NULL) == FSE_OK;
+static bool arf_tools_scan_cancelled(void) {
+    return (furi_thread_flags_get() & ARF_STATUS_STOP) != 0;
 }
 
-static void arf_tools_append_exists(ArfToolsApp* app, const char* label, const char* path) {
-    furi_string_cat_printf(
-        app->text, "%s: %s\n", label, arf_tools_path_exists(app, path) ? "OK" : "missing");
+static void arf_tools_probe(ArfToolsApp* app, const char* label, const char* path) {
+    if(arf_tools_scan_cancelled()) return;
+    ArfFileProbe probe;
+    arf_file_probe(app->storage, path, &probe);
+    furi_string_cat_printf(app->scan_text, "%s\n%s\n", label, arf_file_status_text(probe.status));
+    if(probe.status == ArfFileHeaderCompatible) {
+        furi_string_cat_printf(
+            app->scan_text,
+            "API %u.%u; F%u; v%lu.%lu\n%lu bytes\n",
+            probe.api_major,
+            probe.api_minor,
+            probe.target,
+            (unsigned long)(probe.app_version >> 16),
+            (unsigned long)(probe.app_version & 0xffff),
+            (unsigned long)probe.bytes);
+    }
+    furi_string_cat_str(app->scan_text, "\n");
 }
 
-static void arf_tools_show_assets(ArfToolsApp* app) {
-    furi_string_set_str(app->text, "ARF Full status\n\n");
-    arf_tools_append_exists(app, "Full launcher", ARF_FULL_PATH);
-    arf_tools_append_exists(app, "Status", ARF_MODULES_PATH "arf_status.fap");
-    arf_tools_append_exists(app, "ProtoPirate", ARF_MODULES_PATH "proto_pirate.fap");
-    arf_tools_append_exists(app, "KeeLoq", ARF_MODULES_PATH "arf_keeloq.fap");
-    arf_tools_append_exists(app, "Counter BF", ARF_MODULES_PATH "arf_counter_bf.fap");
-    arf_tools_append_exists(app, "Car Emulate", ARF_MODULES_PATH "arf_car_emulate.fap");
-    arf_tools_append_exists(app, "PSA Decrypt", ARF_MODULES_PATH "arf_psa_decrypt.fap");
-    furi_string_cat_str(app->text, "Analyzer: core Sub-GHz\n");
-    arf_tools_append_exists(app, "RollJam", ARF_MODULES_PATH "rolljam.fap");
-    arf_tools_append_exists(app, "SubBrute", ARF_MODULES_PATH "subghz_bruteforcer.fap");
-    arf_tools_append_exists(app, "Protocol packs", EXT_PATH("apps_data/subghz/plugins"));
-    arf_tools_set_text_string(app);
+static void arf_tools_scan_modules(ArfToolsApp* app) {
+    static const struct {
+        const char* label;
+        const char* path;
+    } modules[] = {
+        {"Full launcher", ARF_FULL_PATH},
+        {"Status", ARF_MODULES_PATH "arf_status.fap"},
+        {"ProtoPirate", ARF_MODULES_PATH "proto_pirate.fap"},
+        {"KeeLoq", ARF_MODULES_PATH "arf_keeloq.fap"},
+        {"Counter BF", ARF_MODULES_PATH "arf_counter_bf.fap"},
+        {"Car Emulate", ARF_MODULES_PATH "arf_car_emulate.fap"},
+        {"PSA Decrypt", ARF_MODULES_PATH "arf_psa_decrypt.fap"},
+        {"RollJam", ARF_MODULES_PATH "rolljam.fap"},
+        {"SubBrute", ARF_MODULES_PATH "subghz_bruteforcer.fap"},
+        {"Capture converter",
+         EXT_PATH("apps_data/arf_subghz_full/packages/protopirate_to_subghz.fap")},
+        {"Capture Inspector",
+         EXT_PATH("apps_data/arf_subghz_full/packages/capture_inspector.fap")},
+    };
+    for(size_t i = 0; i < COUNT_OF(modules) && !arf_tools_scan_cancelled(); i++)
+        arf_tools_probe(app, modules[i].label, modules[i].path);
+}
+
+static void arf_tools_scan_packs(ArfToolsApp* app) {
+    File* directory = storage_file_alloc(app->storage);
+    FuriString* path = furi_string_alloc();
+    unsigned count = 0;
+    if(storage_dir_open(directory, EXT_PATH("apps_data/subghz/plugins"))) {
+        FileInfo info;
+        char name[128];
+        while(!arf_tools_scan_cancelled() &&
+              storage_dir_read(directory, &info, name, sizeof(name))) {
+            const size_t length = strlen(name);
+            if(file_info_is_dir(&info) || length < 5 || strcmp(name + length - 4, ".fal"))
+                continue;
+            if(count >= 64) {
+                furi_string_cat_str(app->scan_text, "Scan limit reached; incomplete.\n");
+                break;
+            }
+            furi_string_printf(path, EXT_PATH("apps_data/subghz/plugins/%s"), name);
+            arf_tools_probe(app, name, furi_string_get_cstr(path));
+            count++;
+        }
+        FS_Error error = storage_file_get_error(directory);
+        if(error != FSE_OK && error != FSE_NOT_EXIST)
+            furi_string_cat_str(app->scan_text, "Directory read error; incomplete.\n");
+        furi_string_cat_printf(app->scan_text, "Files examined: %u\n", count);
+    } else {
+        furi_string_cat_str(app->scan_text, "Cannot open Protocol Packs directory.\n");
+    }
+    storage_dir_close(directory);
+    storage_file_free(directory);
+    furi_string_free(path);
+}
+
+static int32_t arf_tools_scan_worker(void* context) {
+    ArfToolsApp* app = context;
+    furi_string_set(
+        app->scan_text,
+        "Manifest/API check only\nHash: not verified\nNo trusted hash reference.\n"
+        "Imports/run: not tested.\nHardware: not tested.\n\n");
+    if(app->scan_packs)
+        arf_tools_scan_packs(app);
+    else
+        arf_tools_scan_modules(app);
+    app->scan_cancelled = arf_tools_scan_cancelled();
+    if(app->scan_cancelled) furi_string_cat_str(app->scan_text, "Cancelled; incomplete scan.\n");
+    return 0;
+}
+
+static void arf_tools_start_scan(ArfToolsApp* app, bool packs) {
+    if(app->scan_worker) return;
+    app->scan_packs = packs;
+    app->scan_cancelled = false;
+    arf_tools_set_text(app, "Reading metadata...\nNo apps are executed.\nBack: cancel");
+    app->scan_worker = furi_thread_alloc_ex("ArfMetadata", 3072, arf_tools_scan_worker, app);
+    furi_thread_set_priority(app->scan_worker, FuriThreadPriorityLow);
+    furi_thread_start(app->scan_worker);
+}
+
+static void arf_tools_tick(void* context) {
+    ArfToolsApp* app = context;
+    if(!app->scan_worker || furi_thread_get_state(app->scan_worker) != FuriThreadStateStopped)
+        return;
+    furi_thread_join(app->scan_worker);
+    furi_thread_free(app->scan_worker);
+    app->scan_worker = NULL;
+    arf_tools_set_text(app, furi_string_get_cstr(app->scan_text));
 }
 
 static void arf_tools_append_protocol_capability(ArfToolsApp* app, const char* name) {
@@ -131,15 +234,17 @@ static void arf_tools_show_capabilities(ArfToolsApp* app) {
     arf_tools_append_protocol_capability(app, "Linear");
     arf_tools_append_protocol_capability(app, "Cham_Code");
     furi_string_cat_str(
-        app->text, "\nUnsupported band, preset, direction, or radio is blocked before TX.");
+        app->text,
+        "\nCore registry only. Installed packs are not activated by this check.\nNot a transmission permit.");
     arf_tools_set_text_string(app);
 }
 
 static void arf_tools_show_about(ArfToolsApp* app) {
     arf_tools_set_text(
         app,
-        "ARF Status 0.3\n\n"
-        "Checks modules and runtime RF capabilities.\n\n"
+        "ARF Status 0.4\n\n"
+        "Reads ELF metadata without executing apps or unpacking their assets.\n\n"
+        "Header compatibility is not proof of integrity, resolved imports or hardware acceptance.\n\n"
         "Frequency Analyzer is provided by the core Sub-GHz app.");
 }
 
@@ -151,9 +256,13 @@ static void arf_tools_menu_callback(void* context, uint32_t index) {
 static bool arf_tools_custom_event_callback(void* context, uint32_t event) {
     ArfToolsApp* app = context;
 
+    if(app->scan_worker) return true;
     switch(event) {
     case ArfToolsEventAssets:
-        arf_tools_show_assets(app);
+        arf_tools_start_scan(app, false);
+        return true;
+    case ArfToolsEventPacks:
+        arf_tools_start_scan(app, true);
         return true;
     case ArfToolsEventCapabilities:
         arf_tools_show_capabilities(app);
@@ -166,25 +275,32 @@ static bool arf_tools_custom_event_callback(void* context, uint32_t event) {
     }
 }
 
-static uint32_t arf_tools_nav_exit(void* context) {
-    UNUSED(context);
-    return VIEW_NONE;
-}
-
-static uint32_t arf_tools_nav_to_main(void* context) {
-    UNUSED(context);
-    return ArfToolsViewMain;
+static bool arf_tools_back(void* context) {
+    ArfToolsApp* app = context;
+    if(app->scan_worker) {
+        if(furi_thread_get_state(app->scan_worker) != FuriThreadStateStopped)
+            furi_thread_flags_set(furi_thread_get_id(app->scan_worker), ARF_STATUS_STOP);
+        arf_tools_set_text(app, "Cancelling metadata check...");
+        return true;
+    }
+    if(!app->showing_text) return false;
+    app->showing_text = false;
+    view_dispatcher_switch_to_view(app->view_dispatcher, ArfToolsViewMain);
+    return true;
 }
 
 static ArfToolsApp* arf_tools_app_alloc(void) {
-    ArfToolsApp* app = malloc(sizeof(ArfToolsApp));
+    ArfToolsApp* app = calloc(1, sizeof(ArfToolsApp));
 
     app->gui = furi_record_open(RECORD_GUI);
     app->storage = furi_record_open(RECORD_STORAGE);
     app->text = furi_string_alloc();
+    app->scan_text = furi_string_alloc();
 
     app->view_dispatcher = view_dispatcher_alloc();
     view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
+    view_dispatcher_set_navigation_event_callback(app->view_dispatcher, arf_tools_back);
+    view_dispatcher_set_tick_event_callback(app->view_dispatcher, arf_tools_tick, 100);
     view_dispatcher_set_custom_event_callback(
         app->view_dispatcher, arf_tools_custom_event_callback);
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
@@ -192,17 +308,17 @@ static ArfToolsApp* arf_tools_app_alloc(void) {
     app->main_menu = submenu_alloc();
     submenu_set_header(app->main_menu, "ARF Status");
     submenu_add_item(
-        app->main_menu, "Assets Status", ArfToolsMenuAssets, arf_tools_menu_callback, app);
+        app->main_menu, "Module metadata", ArfToolsMenuAssets, arf_tools_menu_callback, app);
+    submenu_add_item(
+        app->main_menu, "Protocol Pack files", ArfToolsMenuPacks, arf_tools_menu_callback, app);
     submenu_add_item(
         app->main_menu, "RF Capabilities", ArfToolsMenuCapabilities, arf_tools_menu_callback, app);
     submenu_add_item(app->main_menu, "About", ArfToolsMenuAbout, arf_tools_menu_callback, app);
-    view_set_previous_callback(submenu_get_view(app->main_menu), arf_tools_nav_exit);
     view_dispatcher_add_view(
         app->view_dispatcher, ArfToolsViewMain, submenu_get_view(app->main_menu));
 
     app->text_box = text_box_alloc();
     text_box_set_font(app->text_box, TextBoxFontText);
-    view_set_previous_callback(text_box_get_view(app->text_box), arf_tools_nav_to_main);
     view_dispatcher_add_view(
         app->view_dispatcher, ArfToolsViewText, text_box_get_view(app->text_box));
 
@@ -212,6 +328,12 @@ static ArfToolsApp* arf_tools_app_alloc(void) {
 
 static void arf_tools_app_free(ArfToolsApp* app) {
     furi_assert(app);
+    if(app->scan_worker) {
+        if(furi_thread_get_state(app->scan_worker) != FuriThreadStateStopped)
+            furi_thread_flags_set(furi_thread_get_id(app->scan_worker), ARF_STATUS_STOP);
+        furi_thread_join(app->scan_worker);
+        furi_thread_free(app->scan_worker);
+    }
 
     view_dispatcher_remove_view(app->view_dispatcher, ArfToolsViewText);
     view_dispatcher_remove_view(app->view_dispatcher, ArfToolsViewMain);
@@ -220,6 +342,7 @@ static void arf_tools_app_free(ArfToolsApp* app) {
     view_dispatcher_free(app->view_dispatcher);
 
     furi_string_free(app->text);
+    furi_string_free(app->scan_text);
     furi_record_close(RECORD_STORAGE);
     furi_record_close(RECORD_GUI);
     free(app);
