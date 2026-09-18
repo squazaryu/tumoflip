@@ -9,6 +9,7 @@
 #include <toolbox/path.h>
 #include <string.h>
 #include "arf_file_probe.h"
+#include "arf_expected_packs.h"
 
 #define ARF_STATUS_STOP (1U << 0)
 
@@ -112,34 +113,15 @@ static void arf_tools_scan_modules(ArfToolsApp* app) {
 }
 
 static void arf_tools_scan_packs(ArfToolsApp* app) {
-    File* directory = storage_file_alloc(app->storage);
     FuriString* path = furi_string_alloc();
-    unsigned count = 0;
-    if(storage_dir_open(directory, EXT_PATH("apps_data/subghz/plugins"))) {
-        FileInfo info;
-        char name[128];
-        while(!arf_tools_scan_cancelled() &&
-              storage_dir_read(directory, &info, name, sizeof(name))) {
-            const size_t length = strlen(name);
-            if(file_info_is_dir(&info) || length < 5 || strcmp(name + length - 4, ".fal"))
-                continue;
-            if(count >= 64) {
-                furi_string_cat_str(app->scan_text, "Scan limit reached; incomplete.\n");
-                break;
-            }
-            furi_string_printf(path, EXT_PATH("apps_data/subghz/plugins/%s"), name);
-            arf_tools_probe(app, name, furi_string_get_cstr(path));
-            count++;
-        }
-        FS_Error error = storage_file_get_error(directory);
-        if(error != FSE_OK && error != FSE_NOT_EXIST)
-            furi_string_cat_str(app->scan_text, "Directory read error; incomplete.\n");
-        furi_string_cat_printf(app->scan_text, "Files examined: %u\n", count);
-    } else {
-        furi_string_cat_str(app->scan_text, "Cannot open Protocol Packs directory.\n");
+    unsigned examined = 0;
+    for(size_t i = 0; i < COUNT_OF(arf_expected_packs) && !arf_tools_scan_cancelled(); i++) {
+        furi_string_printf(path, EXT_PATH("apps_data/subghz/plugins/%s"), arf_expected_packs[i]);
+        arf_tools_probe(app, arf_expected_packs[i], furi_string_get_cstr(path));
+        examined++;
     }
-    storage_dir_close(directory);
-    storage_file_free(directory);
+    furi_string_cat_printf(app->scan_text, "Managed files examined: %u/%u\nExtra custom files are not checked.\n",
+        examined, (unsigned)COUNT_OF(arf_expected_packs));
     furi_string_free(path);
 }
 

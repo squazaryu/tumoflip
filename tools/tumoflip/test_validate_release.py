@@ -19,6 +19,7 @@ try:
         MODULE_ONE_LEGACY_PATHS,
         LFRFID_HITAGS_PACKAGE_FILE,
         PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
+        CAPTURE_INSPECTOR_PACKAGE_FILE,
         PACKAGE_ONLY_PACKAGE_FILES,
         PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
@@ -50,6 +51,7 @@ except ImportError:
         MODULE_ONE_LEGACY_PATHS,
         LFRFID_HITAGS_PACKAGE_FILE,
         PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
+        CAPTURE_INSPECTOR_PACKAGE_FILE,
         PACKAGE_ONLY_PACKAGE_FILES,
         PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
@@ -282,9 +284,10 @@ class ValidateReleaseTest(unittest.TestCase):
         weather = "apps/Sub-GHz/weather_editor.fap"
         hitags = LFRFID_HITAGS_PACKAGE_FILE
         converter = PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE
+        inspector = CAPTURE_INSPECTOR_PACKAGE_FILE
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_FILES,
-            {package_only, quac, nearby, weather, hitags, converter},
+            {package_only, quac, nearby, weather, hitags, converter, inspector},
         )
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -295,6 +298,7 @@ class ValidateReleaseTest(unittest.TestCase):
                 weather: "base",
                 hitags: "base",
                 converter: "arf",
+                inspector: "arf",
             },
         )
         regular = "apps/Tools/clock.fap"
