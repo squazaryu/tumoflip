@@ -98,6 +98,7 @@ static void ci_export_report(CiApp* app) {
     File* file = storage_file_alloc(app->storage);
     bool created = false;
     bool success = false;
+    bool cleanup_failed = false;
     furi_string_set(app->result, "Report was not saved.");
     do {
         if(!storage_simply_mkdir(app->storage, CI_REPORT_DIR)) break;
@@ -154,7 +155,8 @@ static void ci_export_report(CiApp* app) {
     storage_file_free(file);
     success = success && closed;
     if(created && !success) {
-        if(storage_common_remove(app->storage, furi_string_get_cstr(path)) != FSE_OK)
+        cleanup_failed = storage_common_remove(app->storage, furi_string_get_cstr(path)) != FSE_OK;
+        if(cleanup_failed)
             furi_string_set(
                 app->result, "Save failed. SD unavailable.\nAn incomplete report may remain.");
     }
@@ -163,7 +165,7 @@ static void ci_export_report(CiApp* app) {
             app->result,
             "Report saved\n%s\n\nMay contain private capture data.",
             furi_string_get_cstr(path));
-    else if(ci_cancelled(NULL))
+    else if(!cleanup_failed && ci_cancelled(NULL))
         furi_string_set(app->result, "Export cancelled.\nOriginal captures unchanged.");
     furi_string_free(line);
     furi_string_free(path);

@@ -120,8 +120,11 @@ static void arf_tools_scan_packs(ArfToolsApp* app) {
         arf_tools_probe(app, arf_expected_packs[i], furi_string_get_cstr(path));
         examined++;
     }
-    furi_string_cat_printf(app->scan_text, "Managed files examined: %u/%u\nExtra custom files are not checked.\n",
-        examined, (unsigned)COUNT_OF(arf_expected_packs));
+    furi_string_cat_printf(
+        app->scan_text,
+        "Managed files examined: %u/%u\nExtra custom files are not checked.\n",
+        examined,
+        (unsigned)COUNT_OF(arf_expected_packs));
     furi_string_free(path);
 }
 
