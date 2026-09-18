@@ -73,6 +73,14 @@ int main(void){
         self.assertIn("arf_file_probe", source)
         self.assertIn("not verified", source)
 
+    def test_managed_inventory_matches_release_contract(self):
+        import re
+        from tools.tumoflip.validate_release import PROTOCOL_PACKS
+        path = APP / "arf_expected_packs.h"
+        self.assertTrue(path.exists(), "Missing packages must also be diagnosed")
+        names = set(re.findall(r'"(protocol_[a-z0-9_]+\.fal)"', path.read_text()))
+        self.assertEqual(names, PROTOCOL_PACKS)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -104,6 +104,20 @@ int main(void) {
         saved = (ROOT / "applications/main/subghz/scenes/subghz_scene_saved_menu.c").read_text()
         self.assertIn("capture_inspector.fap", hub)
         self.assertIn("capture_inspector.fap", saved)
+        from tools.tumoflip.validate_release import PACKAGE_ONLY_PACKAGE_FILES, PACKAGE_ONLY_PACKAGE_GROUPS
+        target = "apps_data/arf_subghz_full/packages/capture_inspector.fap"
+        self.assertIn(target, PACKAGE_ONLY_PACKAGE_FILES)
+        self.assertEqual(PACKAGE_ONLY_PACKAGE_GROUPS[target], "arf")
+        self.assertIn('loader_enqueue_launch(loader, "Sub-GHz", NULL', saved)
+
+    def test_no_radio_or_source_write_path(self):
+        storage = (APP / "capture_storage.c").read_text()
+        self.assertNotIn("FSAM_WRITE", storage)
+        self.assertNotIn("FSAM_READ_WRITE", storage)
+        for file in APP.glob("*.c"):
+            source = file.read_text()
+            for marker in ("subghz_tx_start", "start_async_tx", "subghz_transmitter_", "_seed_recover"):
+                self.assertNotIn(marker, source)
 
 
 if __name__ == "__main__":
