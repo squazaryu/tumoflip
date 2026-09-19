@@ -73,6 +73,7 @@ struct SubGhz {
     SubGhzViewReceiver* subghz_receiver;
     SubGhzViewTransmitter* subghz_transmitter;
     VariableItemList* variable_item_list;
+    VariableItem* rx_profile_item;
 
     SubGhzFrequencyAnalyzer* subghz_frequency_analyzer;
     SubGhzReadRAW* subghz_read_raw;

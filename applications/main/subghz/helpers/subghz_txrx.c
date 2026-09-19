@@ -6,6 +6,7 @@
 #include <lib/subghz/blocks/custom_btn.h>
 #include <lib/subghz/subghz_hopper_plan.h>
 #include <lib/subghz/subghz_preset_modulation.h>
+#include <lib/subghz/subghz_rx_profiles.h>
 #include <lib/subghz/subghz_worker_i.h>
 
 #define TAG "SubGhzTxRx"
@@ -147,6 +148,7 @@ SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group) {
         instance->radio_broker, "system_subghz", FuriWaitForever, &instance->radio_lease));
     instance->setting = subghz_setting_alloc();
     subghz_setting_load(instance->setting, EXT_PATH("subghz/assets/setting_user"));
+    subghz_rx_profiles_init(instance->setting);
 
     instance->preset = malloc(sizeof(SubGhzRadioPreset));
     instance->preset->name = furi_string_alloc();
