@@ -5,7 +5,7 @@ Vendored from `xMasterX/all-the-plugins` commit
 Specter 3.0 by at0m-b0mb. Original project:
 https://github.com/at0m-b0mb/Specter-FlipperZero. MIT license retained in LICENSE.
 
-Tumoflip 3.0.1 changes: package-only delivery; preflight full log-entry capacity;
+Tumoflip 3.1.0 changes: package-only delivery; preflight full log-entry capacity;
 check sync/close; best-effort rollback of a partial append; report failure if
 either TXT or CSV output fails. The two files are not a transactional filesystem:
 on CSV failure a complete TXT entry may remain. Never claim both were saved.
