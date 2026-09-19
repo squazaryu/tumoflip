@@ -799,9 +799,24 @@ NfcCommand mf_classic_poller_handler_backdoor_read_sector(MfClassicPoller* insta
     return command;
 }
 
+// Use the detected card's sector count, not the type of a previously loaded dump.
+// Key reuse can finish a card before the dictionary cursor reaches the last sector.
+static bool mf_classic_poller_is_card_read(MfClassicPoller* instance) {
+    uint8_t sectors_read = 0;
+    uint8_t keys_found = 0;
+    mf_classic_get_read_sectors_and_keys(instance->data, &sectors_read, &keys_found);
+    return instance->sectors_total > 0 && sectors_read == instance->sectors_total &&
+           keys_found == instance->sectors_total * 2;
+}
+
 NfcCommand mf_classic_poller_handler_request_key(MfClassicPoller* instance) {
     NfcCommand command = NfcCommandContinue;
     MfClassicPollerDictAttackContext* dict_attack_ctx = &instance->mode_ctx.dict_attack_ctx;
+
+    if(mf_classic_poller_is_card_read(instance)) {
+        instance->state = MfClassicPollerStateSuccess;
+        return command;
+    }
 
     instance->mfc_event.type = MfClassicPollerEventTypeRequestKey;
     command = instance->callback(instance->general_event, instance->context);
@@ -1972,6 +1987,10 @@ NfcCommand mf_classic_poller_handler_nested_controller(MfClassicPoller* instance
     MfClassicPollerDictAttackContext* dict_attack_ctx = &instance->mode_ctx.dict_attack_ctx;
     bool initial_dict_attack_iter = false;
     if(dict_attack_ctx->nested_phase == MfClassicNestedPhaseNone) {
+        if(mf_classic_poller_is_card_read(instance)) {
+            instance->state = MfClassicPollerStateSuccess;
+            return command;
+        }
         dict_attack_ctx->auth_passed = true;
         bool backdoor_present = (dict_attack_ctx->backdoor != MfClassicBackdoorNone);
         if(!(backdoor_present)) {
