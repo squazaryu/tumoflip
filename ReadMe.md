@@ -29,7 +29,7 @@ The project is independent. We selectively integrate upstream improvements and
 keep Tumoflip-specific changes, release identities, and package contracts in
 this repository.
 
-> **Current stable:** `t-flppr-fw-007` (`v1.0.7`) · API `88.4` · Flipper Zero F7
+> **Current stable:** `t-flppr-fw-008` (`v1.0.8`) · API `88.7` · Flipper Zero F7
 >
 > Dev builds are for testing. Stable releases are immutable and are promoted
 > only after the agreed software checks and physical-device validation.
@@ -192,7 +192,7 @@ rollback rules, checksums, and catalog baseline policy.
 
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
-| **Stable** | `t-flppr-fw-007` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
+| **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
 | **Dev** | `t-dev-009-002` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
@@ -205,7 +205,7 @@ new firmware release does not rewrite an older package catalog.
 
 1. Install or update [TumoCompanion](https://github.com/squazaryu/TumoCompanion).
 2. Connect the Flipper Zero over BLE.
-3. Open **Updates → Firmware → Stable** and select `t-flppr-fw-007`.
+3. Open **Updates → Firmware → Stable** and select `t-flppr-fw-008`.
 4. Install FW Packages separately from **Updates → FW Packages** when needed.
 
 Back up `/int` and important SD-card files before flashing. Custom apps,
@@ -224,7 +224,7 @@ flipper-z-f7-update-t-dev-009-002.tgz
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: Dev `88.9`; immutable stable `v1.0.7` remains `88.4`.
+- Firmware API: Dev `88.9`; immutable stable `v1.0.8` remains `88.7`.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or
   rebuilt from the matching FW Packages catalog.
 - The JS Runner is an application (`js_app.fap`); it is not required by the
