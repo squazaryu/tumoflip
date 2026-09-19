@@ -8,6 +8,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class RxProfilesTest(unittest.TestCase):
+    def test_profiles_do_not_shift_protopirate_plugin_context_layout(self):
+        header = (ROOT / "applications_user/protopirate/protopirate_app_i.h").read_text()
+        self.assertNotIn("VariableItem* rx_profile_item;", header)
+
     def test_preset_registration_does_not_publish_partial_allocations(self):
         source = (ROOT / "lib/subghz/subghz_setting.c").read_text()
         body = function(source, "bool subghz_setting_load_custom_preset(")
