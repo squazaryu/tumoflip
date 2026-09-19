@@ -16,6 +16,10 @@
  * real 2000-2099 date ever needs. */
 #define STAMP_MAX  32u
 
+// Logging and its result UI run on the application thread. Preserve a preflight
+// capacity error even when the last complete record ends just below the cap.
+static bool specter_log_last_full;
+
 static void stamp_now(char* out, size_t n) {
     DateTime dt;
     furi_hal_rtc_get_datetime(&dt);
@@ -107,11 +111,11 @@ bool specter_log_append(const char* type, const char* fmt, ...) {
     Storage* storage = furi_record_open(RECORD_STORAGE);
     storage_common_mkdir(storage, STORAGE_APP_DATA_PATH_PREFIX);
 
-    bool full = false;
-    bool ok = append_to(storage, LOG_PATH, NULL, txt, &full);
+    specter_log_last_full = false;
+    bool ok = append_to(storage, LOG_PATH, NULL, txt, &specter_log_last_full);
     // Both advertised outputs must succeed. A CSV failure may leave a complete
     // TXT entry, but it must never be presented as a successful dual save.
-    if(ok) ok = append_to(storage, CSV_PATH, CSV_HEADER, csv, NULL);
+    if(ok) ok = append_to(storage, CSV_PATH, CSV_HEADER, csv, &specter_log_last_full);
 
     furi_record_close(RECORD_STORAGE);
     return ok;
@@ -188,12 +192,13 @@ bool specter_log_clear(void) {
     Storage* storage = furi_record_open(RECORD_STORAGE);
     bool ok = truncate_file(storage, LOG_PATH);
     const bool csv_ok = truncate_file(storage, CSV_PATH);
+    if(ok && csv_ok) specter_log_last_full = false;
     furi_record_close(RECORD_STORAGE);
     return ok && csv_ok;
 }
 
 bool specter_log_is_full(void) {
-    return specter_log_size() >= SPECTER_LOG_MAX_BYTES;
+    return specter_log_last_full || specter_log_size() >= SPECTER_LOG_MAX_BYTES;
 }
 
 uint32_t specter_log_size(void) {
