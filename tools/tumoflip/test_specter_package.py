@@ -9,6 +9,14 @@ APP = ROOT / "applications_user/specter"
 
 
 class SpecterPackageTest(unittest.TestCase):
+    def test_specter_is_in_paired_packages_and_ci(self):
+        from tools.tumoflip import validate_release as release
+        target = "apps/NFC/specter.fap"
+        self.assertIn(target, release.PACKAGE_ONLY_PACKAGE_FILES)
+        self.assertEqual(release.PACKAGE_ONLY_PACKAGE_GROUPS[target], "base")
+        for name in ("pr-build.yml", "release.yml"):
+            self.assertIn("fap_specter", (ROOT / ".github/workflows" / name).read_text())
+
     def test_package_boundary_and_passive_receiver(self):
         self.assertTrue((APP / "application.fam").exists(), "Specter adaptation missing")
         self.assertIn("fap_package_only=True", (APP / "application.fam").read_text())
