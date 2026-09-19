@@ -20,7 +20,7 @@ class RxProfilesTest(unittest.TestCase):
 #include <assert.h>
 enum {SubGhzHoppingModeOff,SubGhzHoppingModeFrequency};
 enum {SubGhzSettingIndexFrequency,SubGhzSettingIndexModulation};
-typedef struct {const char*label;unsigned long frequency;const char*preset;} SubGhzRxProfile;
+typedef struct {const char*label;uint32_t frequency;const char*preset;} SubGhzRxProfile;
 typedef struct {int hopping_mode;uint32_t frequency,raw_frequency;int preset_index,raw_preset_index;} Settings;
 typedef struct {void*context;unsigned index;char text[32];}VariableItem;
 typedef int SubGhzSetting;

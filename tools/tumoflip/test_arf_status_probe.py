@@ -51,7 +51,9 @@ ArfElfStatus arf_elf_metadata_read(ArfElfRead read_at,void* context,uint64_t siz
  if(!read_at(context,0,bytes,sizeof(bytes)))return ArfElfIoError;
  memset(m,0,sizeof(*m));m->api_major=mode==9?87:(mode==10?89:88);m->api_minor=mode==12?10:9;
  m->target=mode==8?18:7;m->app_version=3;memset(m->name,'x',32);
- if(mode==5)return ArfElfInvalid;if(mode==6)return ArfElfBadManifest;if(mode==7)return ArfElfIoError;
+ if(mode==5)return ArfElfInvalid;
+ if(mode==6)return ArfElfBadManifest;
+ if(mode==7)return ArfElfIoError;
  return ArfElfOk;
 }
 ''' + strip("arf_file_probe.h") + source + r'''

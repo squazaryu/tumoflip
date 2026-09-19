@@ -458,8 +458,8 @@ static void subghz_scene_receiver_config_set_rx_profile(VariableItem* item) {
         text,
         sizeof(text),
         "%lu.%02lu",
-        profile->frequency / 1000000,
-        (profile->frequency % 1000000) / 10000);
+        (unsigned long)(profile->frequency / 1000000),
+        (unsigned long)((profile->frequency % 1000000) / 10000));
     variable_item_set_current_value_text(frequency, text);
     variable_item_set_current_value_index(
         frequency, subghz_scene_receiver_config_next_frequency(profile->frequency, subghz));

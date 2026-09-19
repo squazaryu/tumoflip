@@ -97,7 +97,9 @@ static FS_Error storage_common_stat(Storage* s,const char* p,void* out){
 }
 static bool storage_file_open(File* f,const char* p,int access,int how){
  assert(strstr(p,"compare_"));assert(access==FSAM_WRITE&&how==FSOM_CREATE_NEW);
- if(mode==1)return false;exists=f->open=true;return true;
+ if(mode==1)return false;
+ exists=f->open=true;
+ return true;
 }
 static size_t storage_file_write(File* f,const void* d,size_t n){assert(f->open);(void)d;writes++;return mode==2?n-1:n;}
 static bool storage_file_sync(File* f){assert(f->open);return mode!=3;}

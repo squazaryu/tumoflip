@@ -18,11 +18,17 @@ def run_c(body):
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory)
         (path / "test.c").write_text(body)
-        subprocess.run(
+        compiled = subprocess.run(
             ["cc", "-std=c11", "-Wall", "-Werror", str(path / "test.c"), "-o", str(path / "test")],
-            check=True, capture_output=True, text=True,
+            capture_output=True, text=True,
         )
-        subprocess.run([str(path / "test")], check=True, capture_output=True, text=True)
+        if compiled.returncode:
+            raise AssertionError(f"C fixture compilation failed:\n{compiled.stdout}{compiled.stderr}")
+        executed = subprocess.run([str(path / "test")], capture_output=True, text=True)
+        if executed.returncode:
+            raise AssertionError(
+                f"C fixture exited {executed.returncode}:\n{executed.stdout}{executed.stderr}"
+            )
 
 
 class HotplugAssetsTests(unittest.TestCase):
