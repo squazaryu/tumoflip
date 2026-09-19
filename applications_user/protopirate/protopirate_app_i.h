@@ -74,7 +74,6 @@ struct ProtoPirateApp {
     NotificationApp* notifications;
     DialogsApp* dialogs;
     VariableItemList* variable_item_list;
-    VariableItem* rx_profile_item;
     Submenu* submenu;
     Widget* widget;
     TextInput* text_input;

@@ -102,10 +102,10 @@ uint8_t protopirate_scene_receiver_config_hopper_value_index(
 
 static void protopirate_scene_receiver_config_set_frequency(VariableItem* item) {
     ProtoPirateApp* app = variable_item_get_context(item);
-    if(app->rx_profile_item) {
-        variable_item_set_current_value_index(app->rx_profile_item, 0);
-        variable_item_set_current_value_text(app->rx_profile_item, "Manual");
-    }
+    VariableItem* profile_item = variable_item_list_get(
+        app->variable_item_list, ProtoPirateSettingIndexLock + 1);
+    variable_item_set_current_value_index(profile_item, 0);
+    variable_item_set_current_value_text(profile_item, "Manual");
     uint8_t index = variable_item_get_current_value_index(item);
 
     if(app->txrx->hopper_state == ProtoPirateHopperStateOFF) {
@@ -126,10 +126,10 @@ static void protopirate_scene_receiver_config_set_frequency(VariableItem* item) 
 
 static void protopirate_scene_receiver_config_set_preset(VariableItem* item) {
     ProtoPirateApp* app = variable_item_get_context(item);
-    if(app->rx_profile_item) {
-        variable_item_set_current_value_index(app->rx_profile_item, 0);
-        variable_item_set_current_value_text(app->rx_profile_item, "Manual");
-    }
+    VariableItem* profile_item = variable_item_list_get(
+        app->variable_item_list, ProtoPirateSettingIndexLock + 1);
+    variable_item_set_current_value_index(profile_item, 0);
+    variable_item_set_current_value_text(profile_item, "Manual");
     uint8_t index = variable_item_get_current_value_index(item);
     variable_item_set_current_value_text(
         item, subghz_setting_get_preset_name(app->setting, index));
@@ -258,7 +258,6 @@ static void protopirate_scene_receiver_config_set_rx_profile(VariableItem* item)
 
 void protopirate_scene_receiver_config_on_enter(void* context) {
     ProtoPirateApp* app = context;
-    app->rx_profile_item = NULL;
     VariableItem* item;
     uint8_t value_index;
 
@@ -345,9 +344,9 @@ void protopirate_scene_receiver_config_on_enter(void* context) {
     variable_item_list_set_enter_callback(
         app->variable_item_list, protopirate_scene_receiver_config_var_list_enter_callback, app);
 
-    app->rx_profile_item = variable_item_list_add(app->variable_item_list, "RX profile",
+    item = variable_item_list_add(app->variable_item_list, "RX profile",
         SUBGHZ_RX_PROFILE_COUNT, protopirate_scene_receiver_config_set_rx_profile, app);
-    variable_item_set_current_value_text(app->rx_profile_item, "Manual");
+    variable_item_set_current_value_text(item, "Manual");
     view_dispatcher_switch_to_view(app->view_dispatcher, ProtoPirateViewVariableItemList);
 }
 
@@ -367,7 +366,6 @@ bool protopirate_scene_receiver_config_on_event(void* context, SceneManagerEvent
 
 void protopirate_scene_receiver_config_on_exit(void* context) {
     ProtoPirateApp* app = context;
-    app->rx_profile_item = NULL;
     variable_item_list_set_selected_item(app->variable_item_list, 0);
     variable_item_list_reset(app->variable_item_list);
 }
