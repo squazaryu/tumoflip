@@ -1,5 +1,6 @@
 """Specter is receive-only and must not acknowledge failed SD writes."""
 from pathlib import Path
+import json
 import unittest
 from tools.tumoflip.test_hotplug_assets import function
 from tools.tumoflip.test_nfc_completion_equality import native
@@ -9,6 +10,13 @@ APP = ROOT / "applications_user/specter"
 
 
 class SpecterPackageTest(unittest.TestCase):
+    def test_specter_source_ownership_is_explicit(self):
+        imports = json.loads((ROOT / "tools/tumoflip/protected_app_imports.json").read_text())
+        entries = [item for item in imports["imports"] if item["appId"] == "specter"]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["localSourcePath"], "applications_user/specter")
+        self.assertEqual(entries[0]["upstreamCommit"], "8970b6ba0e48a9c63b4bfaf07ca121f5b08e5b34")
+
     def test_capacity_failure_is_not_misreported_as_missing_sd(self):
         source = (APP / "helpers/specter_log.c").read_text()
         append = function(source, "bool specter_log_append(")
