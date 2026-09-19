@@ -16,6 +16,21 @@
 
 #define TAG "SubGhzProtocolKeeloq"
 
+// Received Monarch discriminator, preserved as metadata rather than regenerated.
+#define KEELOQ_MONARCH_DISCRIMINATOR_A 0x100u
+#define KEELOQ_MONARCH_DISCRIMINATOR_B 0x280u
+
+// KEY discriminator, constant. Only one remote seen so far - add values here if another
+// one turns up with a different constant.
+#define KEELOQ_KEY_DISCRIMINATOR 0x2FFu
+
+// This adaptation adds recognition only. Keep the existing Monarch variant's
+// behavior, but reject newly recognized variants before any TX/counter mutation.
+static bool subghz_protocol_keeloq_receive_only(const char* name, uint32_t discriminator) {
+    return strcmp(name, "KEY") == 0 ||
+           (strcmp(name, "Monarch") == 0 && discriminator == KEELOQ_MONARCH_DISCRIMINATOR_B);
+}
+
 //variable used to bypass CounterMode settings if user just change Counter or Button
 static bool bypass = false;
 
@@ -807,6 +822,12 @@ SubGhzProtocolStatus
         subghz_protocol_keeloq_check_remote_controller(
             &instance->generic, instance->keystore, &instance->manufacture_name);
 
+        if(subghz_protocol_keeloq_receive_only(instance->manufacture_name, instance->generic.seed)) {
+            FURI_LOG_W(TAG, "This variant supports receive/inspection only");
+            ret = SubGhzProtocolStatusErrorEncoderGetUpload;
+            break;
+        }
+
         // Optional value
         flipper_format_read_uint32(
             flipper_format, "Repeat", (uint32_t*)&instance->encoder.repeat, 1);
@@ -1018,6 +1039,39 @@ static inline bool subghz_protocol_keeloq_check_decrypt_centurion(
     return false;
 }
 
+// Monarch specific check
+// Preserve the received variant for file inspection; no new encoder is enabled.
+static inline bool subghz_protocol_keeloq_check_decrypt_monarch(
+    SubGhzBlockGeneric* instance,
+    uint32_t decrypt,
+    uint8_t btn) {
+    furi_assert(instance);
+
+    uint16_t disc = ((uint16_t)(decrypt >> 16)) & 0xFFF;
+    if((decrypt >> 28 == btn) && ((disc == KEELOQ_MONARCH_DISCRIMINATOR_A) ||
+                                  (disc == KEELOQ_MONARCH_DISCRIMINATOR_B))) {
+        instance->cnt = decrypt & 0x0000FFFF;
+        instance->seed = disc;
+        return true;
+    }
+    return false;
+}
+
+// KEY specific check - constant discriminator, same situation as Monarch
+static inline bool subghz_protocol_keeloq_check_decrypt_key(
+    SubGhzBlockGeneric* instance,
+    uint32_t decrypt,
+    uint8_t btn) {
+    furi_assert(instance);
+
+    if((decrypt >> 28 == btn) &&
+       ((((uint16_t)(decrypt >> 16)) & 0xFFF) == KEELOQ_KEY_DISCRIMINATOR)) {
+        instance->cnt = decrypt & 0x0000FFFF;
+        return true;
+    }
+    return false;
+}
+
 // Pecinin specific check
 static inline bool subghz_protocol_keeloq_check_decrypt_pecinin(
     SubGhzBlockGeneric* instance,
@@ -1084,6 +1138,12 @@ static uint32_t subghz_protocol_keeloq_check_remote_controller_selector(
                             instance->btn = decrypt >> 28;
                             return decrypt;
                         }
+                    } else if((strcmp(furi_string_get_cstr(manufacture_code->name), "KEY") == 0)) {
+                        if(subghz_protocol_keeloq_check_decrypt_key(instance, decrypt, btn)) {
+                            *manufacture_name = furi_string_get_cstr(manufacture_code->name);
+                            keystore->mfname = *manufacture_name;
+                            return decrypt;
+                        }
                     } else {
                         if(subghz_protocol_keeloq_check_decrypt(
                                instance, decrypt, btn, end_serial)) {
@@ -1101,6 +1161,13 @@ static uint32_t subghz_protocol_keeloq_check_remote_controller_selector(
                     decrypt = subghz_protocol_keeloq_common_decrypt(hop, man);
                     if((strcmp(furi_string_get_cstr(manufacture_code->name), "Centurion") == 0)) {
                         if(subghz_protocol_keeloq_check_decrypt_centurion(instance, decrypt, btn)) {
+                            *manufacture_name = furi_string_get_cstr(manufacture_code->name);
+                            keystore->mfname = *manufacture_name;
+                            return decrypt;
+                        }
+                    } else if((strcmp(
+                                   furi_string_get_cstr(manufacture_code->name), "Monarch") == 0)) {
+                        if(subghz_protocol_keeloq_check_decrypt_monarch(instance, decrypt, btn)) {
                             *manufacture_name = furi_string_get_cstr(manufacture_code->name);
                             keystore->mfname = *manufacture_name;
                             return decrypt;
@@ -1494,7 +1561,9 @@ SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(
     subghz_protocol_keeloq_check_remote_controller(
         &instance->generic, instance->keystore, &instance->manufacture_name);
 
-    if(strcmp(instance->manufacture_name, "BFT") == 0) {
+    // Monarch keeps its discriminator in seed, so it has to be saved like the BFT seed
+    if((strcmp(instance->manufacture_name, "BFT") == 0) ||
+       (strcmp(instance->manufacture_name, "Monarch") == 0)) {
         uint8_t seed_data[sizeof(uint32_t)] = {0};
         for(size_t i = 0; i < sizeof(uint32_t); i++) {
             seed_data[sizeof(uint32_t) - i - 1] = (instance->generic.seed >> i * 8) & 0xFF;
