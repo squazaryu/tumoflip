@@ -8,6 +8,50 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class RxProfilesTest(unittest.TestCase):
+    def test_production_config_callback_preserves_raw_isolation(self):
+        source = (ROOT / "applications/main/subghz/scenes/subghz_scene_receiver_config.c").read_text()
+        callback = function(source, "static void subghz_scene_receiver_config_set_rx_profile(")
+        native(r'''
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+enum {SubGhzHoppingModeOff,SubGhzHoppingModeFrequency};
+enum {SubGhzSettingIndexFrequency,SubGhzSettingIndexModulation};
+typedef struct {const char*label;unsigned long frequency;const char*preset;} SubGhzRxProfile;
+typedef struct {int hopping_mode;uint32_t frequency,raw_frequency;int preset_index,raw_preset_index;} Settings;
+typedef struct {void*context;unsigned index;char text[32];}VariableItem;
+typedef int SubGhzSetting;
+typedef struct {void*txrx;Settings*last_settings;VariableItem*variable_item_list;bool raw;int tx_power;}SubGhz;
+static int applied,available=1;static bool valid=true;
+static const SubGhzRxProfile profile={"433 FM476",433920000,"FM476"};
+static void* variable_item_get_context(VariableItem*i){return i->context;}
+static unsigned variable_item_get_current_value_index(VariableItem*i){return i->index;}
+static void variable_item_set_current_value_index(VariableItem*i,unsigned v){i->index=v;}
+static void variable_item_set_current_value_text(VariableItem*i,const char*t){snprintf(i->text,sizeof(i->text),"%s",t);}
+static VariableItem* variable_item_list_get(VariableItem*i,unsigned v){return i+v;}
+static const SubGhzRxProfile* subghz_rx_profile_get(unsigned i){return i==2?&profile:NULL;}
+static bool subghz_scene_receiver_config_is_raw(SubGhz*s){return s->raw;}
+static SubGhzSetting* subghz_txrx_get_setting(void*x){return x;}
+static int subghz_rx_profile_preset_index(SubGhzSetting*s,unsigned i){(void)s;(void)i;return available;}
+static bool furi_hal_subghz_is_frequency_valid(uint32_t f){(void)f;return valid;}
+static void subghz_txrx_set_preset_internal(void*t,uint32_t f,int p,int power){(void)t;(void)f;(void)p;(void)power;applied++;}
+static unsigned subghz_scene_receiver_config_next_frequency(uint32_t f,SubGhz*s){(void)f;(void)s;return 3;}
+static const char* subghz_setting_get_preset_name(SubGhzSetting*s,int p){(void)s;(void)p;return "FM476";}
+''' + callback + r'''
+int main(void){Settings settings={0,315000000,868350000,0,4};VariableItem rows[2]={0};SubGhz app={NULL,&settings,rows,false,0};VariableItem choice={.context=&app,.index=2};
+ subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==1&&settings.frequency==433920000&&settings.raw_frequency==868350000&&settings.raw_preset_index==4);
+ assert(!strcmp(rows[0].text,"433.92")&&!strcmp(rows[1].text,"FM476"));
+ app.raw=true;settings.hopping_mode=SubGhzHoppingModeFrequency;settings.frequency=315000000;
+ subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==2&&settings.raw_frequency==433920000&&settings.frequency==315000000&&settings.raw_preset_index==1);
+ app.raw=false;choice.index=2;subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==2&&choice.index==0);
+ settings.hopping_mode=SubGhzHoppingModeOff;available=-1;choice.index=2;subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==2&&!strcmp(choice.text,"Unavailable"));
+ available=1;valid=false;choice.index=2;subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==2);
+ choice.index=0;subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==2&&!strcmp(choice.text,"Manual"));return 0;}
+''')
+
     def test_profiles_do_not_shift_protopirate_plugin_context_layout(self):
         header = (ROOT / "applications_user/protopirate/protopirate_app_i.h").read_text()
         self.assertNotIn("VariableItem* rx_profile_item;", header)

@@ -9,6 +9,10 @@ APP = ROOT / "applications_user/specter"
 
 
 class SpecterPackageTest(unittest.TestCase):
+    def test_adaptation_version_is_visible_in_two_component_fap_metadata(self):
+        # FAP manifests encode major/minor only: 3.0.1 would still appear as 3.0.
+        self.assertIn('fap_version="3.1.0"', (APP / "application.fam").read_text())
+
     def test_specter_is_in_paired_packages_and_ci(self):
         from tools.tumoflip import validate_release as release
         target = "apps/NFC/specter.fap"
