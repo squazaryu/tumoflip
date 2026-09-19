@@ -177,7 +177,7 @@ jobs:
             tools.tumoflip.test_weather_package_export \
             tools.tumoflip.test_kia_v5_file_lengths
 
-          python3 -m unittest tools.tumoflip.test_build_source_order tools.tumoflip.test_wisniowski_variants tools.tumoflip.test_lfrfid_write_targets tools.tumoflip.test_lfrfid_hitags_package tools.tumoflip.test_lfrfid_bplm tools.tumoflip.test_lto_build tools.tumoflip.test_upstream_1149_rfid tools.tumoflip.test_arf_converter_packages tools.tumoflip.test_capture_copy tools.tumoflip.test_upstream_1149_rfid_native tools.tumoflip.test_package_release tools.tumoflip.test_capture_inspector tools.tumoflip.test_arf_status_probe tools.tumoflip.test_capture_storage tools.tumoflip.test_arf_elf_metadata
+          python3 -m unittest tools.tumoflip.test_build_source_order tools.tumoflip.test_wisniowski_variants tools.tumoflip.test_lfrfid_write_targets tools.tumoflip.test_lfrfid_hitags_package tools.tumoflip.test_lfrfid_bplm tools.tumoflip.test_lto_build tools.tumoflip.test_upstream_1149_rfid tools.tumoflip.test_arf_converter_packages tools.tumoflip.test_capture_copy tools.tumoflip.test_upstream_1149_rfid_native tools.tumoflip.test_package_release tools.tumoflip.test_capture_inspector tools.tumoflip.test_arf_status_probe tools.tumoflip.test_capture_storage tools.tumoflip.test_arf_elf_metadata tools.tumoflip.test_nfc_completion_equality tools.tumoflip.test_keeloq_receive_metadata tools.tumoflip.test_subghz_modulation_filter
 
       - name: Render and validate native Weather Editor UI
         run: toolchain/x86_64-linux/bin/python3 tools/tumoflip/render_weather_native.py /tmp/weather-editor-native-ui --sanitize
