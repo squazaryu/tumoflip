@@ -36,6 +36,7 @@ int main(void){uint32_t value=77;
  assert(quac_duration_parse("150",false,&value)&&value==150);
  assert(quac_duration_parse("60000",false,&value)&&value==60000);
  assert(quac_duration_parse("0",true,&value)&&value==0);
+ assert(quac_duration_parse("25",true,&value)&&value==25);
  const char* bad[]={"0","99","60001","4294967296","-1","+150","150x","150 200",""};
  for(unsigned i=0;i<sizeof(bad)/sizeof(bad[0]);i++){value=77;assert(!quac_duration_parse(bad[i],false,&value));assert(value==77);}
  return 0;}
