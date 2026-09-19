@@ -10,7 +10,7 @@ App(
     fap_category="Tools",
     fap_package_only=True,
     # Optional values
-    fap_version="0.10.0",
+    fap_version="0.11.0",
     fap_icon="images/quac.png",  # 10x10 1-bit PNG
     fap_description="Quick Action remote control app",
     fap_author="Roberto De Feo",

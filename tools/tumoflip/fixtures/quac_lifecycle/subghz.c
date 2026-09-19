@@ -47,7 +47,9 @@ typedef struct {
     struct {
         uint32_t subghz_duration;
     } settings;
+    bool action_cancelled;
 } App;
+typedef struct { App* app; bool complete; } QuacActionWait;
 typedef struct {
     FlipperFormat data;
     bool active;
@@ -62,6 +64,15 @@ typedef struct {
 static const char* mode;
 static unsigned starts, waits, delays, callback_installs, saves, cleaned, live;
 static uint32_t delayed_ms;
+static bool quac_duration_valid(uint32_t ms) { return ms >= 100 && ms <= 60000; }
+static QuacActionWait* quac_action_wait_alloc(App* app) { live++; QuacActionWait* w=calloc(1,sizeof(*w)); w->app=app; return w; }
+static void quac_action_wait_complete(void* context) { ((QuacActionWait*)context)->complete=true; }
+static bool quac_action_wait_run(QuacActionWait* w,uint32_t ms) {
+    if(ms==FuriWaitForever) { assert(w->complete); waits++; }
+    else { delays++; delayed_ms=ms; }
+    return true;
+}
+static void quac_action_wait_free(QuacActionWait* w) { free(w); live--; }
 static bool raw;
 static bool is(const char* value) {
     return !strcmp(mode, value);

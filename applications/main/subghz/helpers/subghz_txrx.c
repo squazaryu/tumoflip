@@ -5,6 +5,8 @@
 #include <lib/subghz/devices/cc1101_int/cc1101_int_interconnect.h>
 #include <lib/subghz/blocks/custom_btn.h>
 #include <lib/subghz/subghz_hopper_plan.h>
+#include <lib/subghz/subghz_preset_modulation.h>
+#include <lib/subghz/subghz_rx_profiles.h>
 #include <lib/subghz/subghz_worker_i.h>
 
 #define TAG "SubGhzTxRx"
@@ -95,6 +97,12 @@ static void subghz_txrx_configure_receiver(
     SubGhzReceiver* receiver,
     SubGhzTxRxReceiverContext* context) {
     subghz_receiver_set_filter(receiver, instance->receiver_filter);
+    subghz_receiver_set_modulation_filter(
+        receiver,
+        subghz_preset_modulation(
+            furi_string_get_cstr(instance->preset->name),
+            instance->preset->data,
+            instance->preset->data_size));
     subghz_receiver_set_rx_callback(receiver, subghz_txrx_receiver_callback, context);
     context->receiver = receiver;
     subghz_worker_set_overrun_callback(worker, subghz_txrx_worker_overrun_callback);
@@ -140,6 +148,7 @@ SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group) {
         instance->radio_broker, "system_subghz", FuriWaitForever, &instance->radio_lease));
     instance->setting = subghz_setting_alloc();
     subghz_setting_load(instance->setting, EXT_PATH("subghz/assets/setting_user"));
+    subghz_rx_profiles_init(instance->setting);
 
     instance->preset = malloc(sizeof(SubGhzRadioPreset));
     instance->preset->name = furi_string_alloc();
@@ -294,6 +303,13 @@ void subghz_txrx_set_preset(
     preset->frequency = frequency;
     preset->data = preset_data;
     preset->data_size = preset_data_size;
+    const SubGhzProtocolFlag modulation =
+        subghz_preset_modulation(preset_name, preset_data, preset_data_size);
+    if(instance->receiver) subghz_receiver_set_modulation_filter(instance->receiver, modulation);
+    // AUTO diversity programs the same preset into both radios. Receivers still
+    // own separate gates and decoder state; no broker-global modulation state.
+    if(instance->diversity_receiver)
+        subghz_receiver_set_modulation_filter(instance->diversity_receiver, modulation);
 }
 
 uint8_t*

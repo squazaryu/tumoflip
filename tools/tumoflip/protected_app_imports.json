@@ -2,9 +2,17 @@
   "schema": 1,
   "implementation": {
     "repository": "squazaryu/tumoflip",
-    "commit": "e2d03acda01a8f71f9b80719fc788f2cf6a42f6a"
+    "commit": "90c636a0c9d1bbce13b9bdfe5ebf83878454fd93"
   },
   "imports": [
+    {
+      "appId": "specter",
+      "localSourcePath": "applications_user/specter",
+      "implementationCommit": "095d0ef2e08d3c135bffebc940a08f139c8bffaf",
+      "upstreamRepository": "https://github.com/xMasterX/all-the-plugins.git",
+      "upstreamRef": "release-source",
+      "upstreamCommit": "8970b6ba0e48a9c63b4bfaf07ca121f5b08e5b34"
+    },
     {
       "appId": "esp32_wifi_marauder",
       "localSourcePath": "applications_user/esp32_wifi_marauder",

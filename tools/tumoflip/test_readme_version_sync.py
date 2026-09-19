@@ -12,6 +12,15 @@ from tools.tumoflip.sync_readme_version import (
 
 
 class ReadmeVersionSyncTest(unittest.TestCase):
+    def test_stable_008_identity_is_preserved_beside_dev(self) -> None:
+        """Regression for #484: synchronizing dev must not hide published stable."""
+        readme = (REPO_ROOT / "ReadMe.md").read_text(encoding="utf-8")
+        self.assertIn("`t-flppr-fw-008` (`v1.0.8`) · API `88.7`", readme)
+        self.assertIn("immutable stable `v1.0.8` remains `88.7`", readme)
+        self.assertNotIn("t-flppr-fw-007", readme)
+        self.assertIn(f"`{fbt_options.DIST_SUFFIX}`", readme)
+        self.assertIn("Dev%20API-88.10", readme)
+
     def test_parse_dist_suffix(self) -> None:
         self.assertEqual(
             parse_dist_suffix("t-flppr-fw-001"),

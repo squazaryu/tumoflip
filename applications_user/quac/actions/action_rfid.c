@@ -20,6 +20,10 @@ void action_rfid_tx(void* context, const FuriString* action_path, FuriString* er
     UNUSED(error);
 
     App* app = context;
+    if(!quac_duration_valid(app->settings.rfid_duration)) {
+        ACTION_SET_ERROR("RFID: Duration must be 100..60000 ms");
+        return;
+    }
     const char* file_name = furi_string_get_cstr(action_path);
 
     FlipperFormat* fff_data_file = flipper_format_file_alloc(app->storage);
@@ -88,20 +92,17 @@ void action_rfid_tx(void* context, const FuriString* action_path, FuriString* er
         LFRFIDWorker* worker = lfrfid_worker_alloc(dict);
 
         lfrfid_worker_start_thread(worker);
+        QuacActionWait* wait = quac_action_wait_alloc(app);
         lfrfid_worker_emulate_start(worker, protocol);
 
-        int16_t time_ms = app->settings.rfid_duration;
-        FURI_LOG_I(TAG, "RFID: Emulating (%s) for %d ms", file_name, time_ms);
-        int16_t interval_ms = 100;
-        while(time_ms > 0) {
-            furi_delay_ms(interval_ms);
-            time_ms -= interval_ms;
-        }
+        if(!quac_action_wait_run(wait, app->settings.rfid_duration) && !app->action_cancelled)
+            ACTION_SET_ERROR("RFID: Wait failed");
         FURI_LOG_I(TAG, "RFID: Emulation stopped");
 
         lfrfid_worker_stop(worker);
         lfrfid_worker_stop_thread(worker);
         lfrfid_worker_free(worker);
+        quac_action_wait_free(wait);
     }
 
     furi_string_free(temp_str);

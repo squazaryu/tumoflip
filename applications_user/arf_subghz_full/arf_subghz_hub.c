@@ -28,6 +28,8 @@ static const ArfSubGhzHubItem arf_subghz_hub_items[] = {
     {.label = "Sub-GHz Wardriving", .target = SUBGHZ_WARDRIVING_PATH},
     {.label = "Capture converter",
      .target = EXT_PATH("apps_data/arf_subghz_full/packages/protopirate_to_subghz.fap")},
+    {.label = "Capture Inspector",
+     .target = EXT_PATH("apps_data/arf_subghz_full/packages/capture_inspector.fap")},
     {.label = "ARF KeeLoq", .target = ARF_MODULES_PATH "arf_keeloq.fap"},
     {.label = "ARF Counter BF", .target = ARF_MODULES_PATH "arf_counter_bf.fap"},
     {.label = "ARF Car Emulate", .target = ARF_MODULES_PATH "arf_car_emulate.fap"},

@@ -45,9 +45,7 @@ void action_subghz_need_save_callback(void* context) {
 static void action_subghz_raw_end_callback(void* context) {
     FURI_LOG_I(TAG, "Stopping TX on RAW");
     furi_assert(context);
-    FuriThread* thread = context;
-
-    furi_thread_flags_set(furi_thread_get_id(thread), 0);
+    quac_action_wait_complete(context);
 }
 
 void action_subghz_tx(void* context, const FuriString* action_path, FuriString* error) {
@@ -181,15 +179,24 @@ void action_subghz_tx(void* context, const FuriString* action_path, FuriString* 
     flipper_format_file_close(fff_data_file);
     flipper_format_free(fff_data_file);
 
+    if(loaded && !is_raw && !quac_duration_valid(app->settings.subghz_duration)) {
+        ACTION_SET_ERROR("Sub-GHz: Duration must be 100..60000 ms");
+        loaded = false;
+    }
+    QuacActionWait* wait = NULL;
     if(loaded) {
+        wait = quac_action_wait_alloc(app);
         if(subghz_txrx_tx_start(txrx, subghz_txrx_get_fff_data(txrx)) ==
            SubGhzTxRxStartTxStateOk) {
             if(is_raw) {
                 subghz_txrx_set_raw_file_encoder_worker_callback_end(
-                    txrx, action_subghz_raw_end_callback, furi_thread_get_current());
-                furi_thread_flags_wait(0, FuriFlagWaitAll, FuriWaitForever);
+                    txrx, action_subghz_raw_end_callback, wait);
+                if(!quac_action_wait_run(wait, FuriWaitForever) && !app->action_cancelled)
+                    ACTION_SET_ERROR("Sub-GHz: Wait failed");
             } else {
-                furi_delay_ms(app->settings.subghz_duration);
+                if(!quac_action_wait_run(wait, app->settings.subghz_duration) &&
+                   !app->action_cancelled)
+                    ACTION_SET_ERROR("Sub-GHz: Wait failed");
             }
         } else {
             FURI_LOG_E(TAG, "Failed to start TX");
@@ -201,6 +208,7 @@ void action_subghz_tx(void* context, const FuriString* action_path, FuriString* 
 
     // This will call need_save_callback, if necessary
     subghz_txrx_stop(txrx);
+    if(wait) quac_action_wait_free(wait);
 
     subghz_txrx_free(txrx);
     furi_string_free(preset_name);

@@ -245,7 +245,7 @@ class QuacPicopassIntegrationGuardTest(unittest.TestCase):
         self.assertIn('appid="quac"', manifest)
         self.assertIn('requires=["subghz_radio_broker"]', manifest)
         self.assertIn("fap_package_only=True", manifest)
-        self.assertIn('fap_version="0.10.0"', manifest)
+        self.assertIn('fap_version="0.11.0"', manifest)
         package_test = (ROOT / "tools/tumoflip/test_quac_package_migration.py").read_text()
         self.assertIn('QUAC_DATA = "/ext/apps_data/quac"', package_test)
         for workflow in ("pr-build.yml", "release.yml"):
