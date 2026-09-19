@@ -29,8 +29,8 @@ QuacActionWait* quac_action_wait_alloc(App* app) {
 }
 
 bool quac_action_wait_run(QuacActionWait* wait, uint32_t timeout_ms) {
-    const uint32_t timeout =
-        timeout_ms == FuriWaitForever ? FuriWaitForever : furi_ms_to_ticks(timeout_ms);
+    const uint32_t timeout = timeout_ms == FuriWaitForever ? FuriWaitForever :
+                                                             furi_ms_to_ticks(timeout_ms);
     const uint32_t flags = furi_event_flag_wait(
         wait->flags, QUAC_WAIT_CANCEL | QUAC_WAIT_DONE, FuriFlagWaitAny, timeout);
     if(flags == (uint32_t)FuriFlagErrorTimeout) return true;

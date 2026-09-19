@@ -194,7 +194,8 @@ void action_subghz_tx(void* context, const FuriString* action_path, FuriString* 
                 if(!quac_action_wait_run(wait, FuriWaitForever) && !app->action_cancelled)
                     ACTION_SET_ERROR("Sub-GHz: Wait failed");
             } else {
-                if(!quac_action_wait_run(wait, app->settings.subghz_duration) && !app->action_cancelled)
+                if(!quac_action_wait_run(wait, app->settings.subghz_duration) &&
+                   !app->action_cancelled)
                     ACTION_SET_ERROR("Sub-GHz: Wait failed");
             }
         } else {

@@ -102,8 +102,8 @@ uint8_t protopirate_scene_receiver_config_hopper_value_index(
 
 static void protopirate_scene_receiver_config_set_frequency(VariableItem* item) {
     ProtoPirateApp* app = variable_item_get_context(item);
-    VariableItem* profile_item = variable_item_list_get(
-        app->variable_item_list, ProtoPirateSettingIndexLock + 1);
+    VariableItem* profile_item =
+        variable_item_list_get(app->variable_item_list, ProtoPirateSettingIndexLock + 1);
     variable_item_set_current_value_index(profile_item, 0);
     variable_item_set_current_value_text(profile_item, "Manual");
     uint8_t index = variable_item_get_current_value_index(item);
@@ -126,8 +126,8 @@ static void protopirate_scene_receiver_config_set_frequency(VariableItem* item) 
 
 static void protopirate_scene_receiver_config_set_preset(VariableItem* item) {
     ProtoPirateApp* app = variable_item_get_context(item);
-    VariableItem* profile_item = variable_item_list_get(
-        app->variable_item_list, ProtoPirateSettingIndexLock + 1);
+    VariableItem* profile_item =
+        variable_item_list_get(app->variable_item_list, ProtoPirateSettingIndexLock + 1);
     variable_item_set_current_value_index(profile_item, 0);
     variable_item_set_current_value_text(profile_item, "Manual");
     uint8_t index = variable_item_get_current_value_index(item);
@@ -237,7 +237,10 @@ static void protopirate_scene_receiver_config_set_rx_profile(VariableItem* item)
         variable_item_set_current_value_text(item, "Unavailable");
         return;
     }
-    protopirate_preset_init(app, profile->preset, profile->frequency,
+    protopirate_preset_init(
+        app,
+        profile->preset,
+        profile->frequency,
         subghz_setting_get_preset_data(app->setting, preset_index),
         subghz_setting_get_preset_data_size(app->setting, preset_index));
     if(!protopirate_refresh_protocol_registry(app, false)) {
@@ -245,12 +248,20 @@ static void protopirate_scene_receiver_config_set_rx_profile(VariableItem* item)
         notification_message(app->notifications, &sequence_error);
         return;
     }
-    VariableItem* frequency = variable_item_list_get(app->variable_item_list, ProtoPirateSettingIndexFrequency);
+    VariableItem* frequency =
+        variable_item_list_get(app->variable_item_list, ProtoPirateSettingIndexFrequency);
     char text[12];
-    snprintf(text, sizeof(text), "%lu.%02lu", profile->frequency / 1000000, (profile->frequency % 1000000) / 10000);
+    snprintf(
+        text,
+        sizeof(text),
+        "%lu.%02lu",
+        profile->frequency / 1000000,
+        (profile->frequency % 1000000) / 10000);
     variable_item_set_current_value_text(frequency, text);
-    variable_item_set_current_value_index(frequency, protopirate_scene_receiver_config_next_frequency(profile->frequency, app));
-    VariableItem* modulation = variable_item_list_get(app->variable_item_list, ProtoPirateSettingIndexModulation);
+    variable_item_set_current_value_index(
+        frequency, protopirate_scene_receiver_config_next_frequency(profile->frequency, app));
+    VariableItem* modulation =
+        variable_item_list_get(app->variable_item_list, ProtoPirateSettingIndexModulation);
     variable_item_set_current_value_index(modulation, preset_index);
     variable_item_set_current_value_text(modulation, profile->preset);
     variable_item_set_current_value_text(item, profile->label);
@@ -344,8 +355,12 @@ void protopirate_scene_receiver_config_on_enter(void* context) {
     variable_item_list_set_enter_callback(
         app->variable_item_list, protopirate_scene_receiver_config_var_list_enter_callback, app);
 
-    item = variable_item_list_add(app->variable_item_list, "RX profile",
-        SUBGHZ_RX_PROFILE_COUNT, protopirate_scene_receiver_config_set_rx_profile, app);
+    item = variable_item_list_add(
+        app->variable_item_list,
+        "RX profile",
+        SUBGHZ_RX_PROFILE_COUNT,
+        protopirate_scene_receiver_config_set_rx_profile,
+        app);
     variable_item_set_current_value_text(item, "Manual");
     view_dispatcher_switch_to_view(app->view_dispatcher, ProtoPirateViewVariableItemList);
 }
