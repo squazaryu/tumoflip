@@ -8,6 +8,7 @@
 #include "subghz_preset_delta.h"
 #include <lib/subghz/blocks/custom_btn.h>
 #include <lib/subghz/subghz_hopper_plan.h>
+#include <lib/subghz/subghz_preset_modulation.h>
 
 #define TAG "SubGhzTxRx"
 
@@ -95,6 +96,12 @@ SubGhzTxRx* subghz_txrx_alloc(SubGhzProtocolPackGroup protocol_pack_group) {
         subghz_protocol_pack_registry_get(instance->protocol_pack_registry));
     instance->receiver = subghz_receiver_alloc_init(instance->environment);
     subghz_receiver_set_filter(instance->receiver, instance->receiver_filter);
+    subghz_receiver_set_modulation_filter(
+        instance->receiver,
+        subghz_preset_modulation(
+            furi_string_get_cstr(instance->preset->name),
+            instance->preset->data,
+            instance->preset->data_size));
 
     subghz_worker_set_overrun_callback(instance->worker, subghz_txrx_worker_overrun_callback);
     subghz_worker_set_pair_callback(instance->worker, subghz_txrx_worker_pair_callback);
@@ -136,6 +143,12 @@ bool subghz_txrx_reload_protocol_pack(
 
     instance->receiver = subghz_receiver_alloc_init(instance->environment);
     subghz_receiver_set_filter(instance->receiver, instance->receiver_filter);
+    subghz_receiver_set_modulation_filter(
+        instance->receiver,
+        subghz_preset_modulation(
+            furi_string_get_cstr(instance->preset->name),
+            instance->preset->data,
+            instance->preset->data_size));
     subghz_receiver_set_rx_callback(
         instance->receiver, instance->rx_callback, instance->rx_context);
     subghz_worker_set_context(instance->worker, instance);
@@ -194,6 +207,9 @@ void subghz_txrx_set_preset(
     preset->frequency = frequency;
     preset->data = preset_data;
     preset->data_size = preset_data_size;
+    if(instance->receiver)
+        subghz_receiver_set_modulation_filter(
+            instance->receiver, subghz_preset_modulation(preset_name, preset_data, preset_data_size));
 }
 
 uint8_t*

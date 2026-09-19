@@ -17,7 +17,7 @@ class Api88CcidMigrationTest(unittest.TestCase):
         )
 
     def test_f7_and_f18_versions_track_the_gui_api_addition(self) -> None:
-        self.assertIn("Version,+,88.9,,", self.f7_api)
+        self.assertIn("Version,+,88.10,,", self.f7_api)
         self.assertIn("Version,+,88.1,,", self.f18_api)
 
     def test_legacy_ccid_hal_is_not_exported(self) -> None:

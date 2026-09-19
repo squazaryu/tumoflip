@@ -59,6 +59,14 @@ void subghz_receiver_set_rx_callback(
  */
 void subghz_receiver_set_filter(SubGhzReceiver* instance, SubGhzProtocolFlag filter);
 
+/** Optional receive modulation gate. Zero disables it (default); RAW/unspecified
+ * protocols pass through. Configure only while the receiver worker is stopped.
+ * This is independent of the protocol-category filter and never authorizes TX.
+ */
+void subghz_receiver_set_modulation_filter(
+    SubGhzReceiver* instance,
+    SubGhzProtocolFlag modulation_filter);
+
 /**
  * Search for a cattery by his name.
  * @param instance Pointer to a SubGhzReceiver instance

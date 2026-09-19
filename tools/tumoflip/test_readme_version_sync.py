@@ -19,7 +19,7 @@ class ReadmeVersionSyncTest(unittest.TestCase):
         self.assertIn("immutable stable `v1.0.8` remains `88.7`", readme)
         self.assertNotIn("t-flppr-fw-007", readme)
         self.assertIn(f"`{fbt_options.DIST_SUFFIX}`", readme)
-        self.assertIn("Dev%20API-88.9", readme)
+        self.assertIn("Dev%20API-88.10", readme)
 
     def test_parse_dist_suffix(self) -> None:
         self.assertEqual(
