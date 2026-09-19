@@ -104,3 +104,50 @@ remove existing core functionality or guarantee a net flash saving.
 
 ARF XIP/library migration, optional RX preset distribution and new experimental
 encoder/counter behavior are not part of this implementation.
+
+### Measured result
+
+Clean source build: `e280237b861a1dd1492d6c3faad520f4973a2c61`, `BUILD_DIRTY=0`.
+The following evidence-only commit does not change the compiled source. Baseline
+uses the same toolchain/options; build date and commit metadata differ, so these
+are footprint comparisons, not a claim of identical binary hashes.
+
+| Metric | Published 009-002 baseline | Candidate | Delta |
+|---|---:|---:|---:|
+| Core `.text` | 690,780 B | 691,804 B | +1,024 B |
+| Core `.rodata` | 176,776 B | 176,960 B | +184 B |
+| Section gap before C2 | 12,008 B | 10,800 B | -1,208 B |
+| Page-aligned C2 gap | 8,192 B | 8,192 B | 0 B |
+| Core `.bss` | 7,564 B | 7,564 B | 0 B |
+| ARF Status FAP on SD | 6,740 B | 13,232 B | +6,492 B |
+| Capture Inspector FAP on SD | absent | 14,432 B | +14,432 B |
+
+The combined adaptation does **not** reclaim resident flash: it adds 1,208 B.
+Inspector's model is 4,820 B per snapshot and its app structure 9,696 B on ARM;
+these sizes exclude GUI/string allocations, loaded FAP sections and thread stacks.
+They are not peak runtime RAM measurements. No existing functionality was removed
+to improve the numbers. Page-aligned gaps are calculated from build images/radio
+address, not read from a physical device.
+
+Validation results:
+
+- 374 release-workflow tests passed on the final source.
+- F7/updater/SDK and paired package targets built with `-j2`, COMPACT/DEBUG/LTO
+  settings above; API 88.10 is accepted by SDKCHK and package APPCHK succeeded.
+- Updater validation passed: 119,073 B updater and no C2 overlap.
+- All 115 paired ZIP entries match manifest size, SHA-256 and MD5.
+- 12 representative GUI frames rendered with production drawing code and
+  ASan/UBSan; screenshot: `build/inspector-native-ui/contact-sheet.png`.
+- Capture model coverage: 100% lines/functions, 88.67% branches.
+- ELF metadata parser coverage: 100% lines/functions, 95.45% branches.
+- Existing duplicate-environment and serial-LTO build warnings remain; no new
+  compiler failure was suppressed. Initial validator invocation lacked the
+  toolchain in PATH; the corrected pinned-toolchain invocation passed.
+
+Machine-readable results and artifact digests:
+`.ecc/benchmarks/arf-inspector-status-after.json`.
+
+No remote merge, firmware/package release, independent catalog update, device
+installation or hardware acceptance was performed. The local test distribution
+suffix intentionally remains 009-002 for the controlled comparison; publishing
+requires a fresh version/tag and matching packages, never replacement of 009-002.
