@@ -9,6 +9,19 @@ QUAC = ROOT / "applications_user/quac"
 
 
 class QuacDurationTest(unittest.TestCase):
+    def test_settings_and_playlists_validate_before_using_values(self):
+        settings = (QUAC / "quac_settings.c").read_text()
+        self.assertGreaterEqual(settings.count("quac_duration_valid(temp_data32)"), 4)
+        playlist = (QUAC / "actions/action_qpl.c").read_text()
+        self.assertGreaterEqual(playlist.count("quac_duration_parse("), 5)
+        self.assertNotIn("furi_delay_ms(pause_length)", playlist)
+
+    def test_raw_wait_has_cancellation_and_keeps_callback_alive_until_stop(self):
+        source = (QUAC / "actions/action_subghz.c").read_text()
+        self.assertIn("quac_action_wait_complete(context)", source)
+        self.assertIn("quac_action_wait_run(wait, FuriWaitForever)", source)
+        self.assertGreater(source.index("quac_action_wait_free(wait)"), source.index("subghz_txrx_stop(txrx)"))
+
     def test_strict_duration_boundaries(self):
         header = QUAC / "actions/action_duration.h"
         code = header.read_text() if header.exists() else "bool quac_duration_valid(uint32_t);bool quac_duration_parse(const char*,bool,uint32_t*);"
