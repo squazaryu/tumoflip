@@ -1,3 +1,12 @@
+## Tumoflip Dev 009-003
+- NFC: compare complete FeliCa/DESFire results and stop completed MIFARE Classic reads without changing the CUID/Skip paths.
+- Sub-GHz: add receive-only Monarch/KEY metadata, per-receiver AM/FM filtering, and bounded Manual/seven-profile frequency/modulation choices; Standard and Read RAW retain independent settings.
+- ARF: add the package-only Capture Inspector/Compare for saved captures and a bounded Status probe that distinguishes header compatibility from unverified integrity/imports.
+- Quac 0.11.0: validate action durations and playlist pauses, preserve millisecond timing, and handle Back/cancellation without releasing RAW worker context early.
+- Specter 3.1.0-tumo: package-only passive NFC field diagnostics with checked log writes, sync/close failures, capacity checks and best-effort rollback. The adapted app has explicit protected source ownership.
+- API advances additively from `88.9` to `88.10`. Rebuilt paired packages are attached; use the matching FW Packages channel for separately installed applications.
+- No factory reset, new protocol encoder or secret-recovery feature. Hardware acceptance remains pending.
+
 ## Tumoflip Dev 009-002
 - RFID: add manual FC/ID entry and app-side renderers for HID H10302/H10304/H10306, AMAG S10401, Corporate 1000 35-bit and Casi-Rusco C10106; Generic HIDProx rendering now reports frame length without duplicating raw data.
 - GUI: an empty bounded NumberInput field now resolves to the nearest valid value around zero when submitted.
