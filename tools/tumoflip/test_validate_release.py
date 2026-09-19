@@ -285,9 +285,10 @@ class ValidateReleaseTest(unittest.TestCase):
         hitags = LFRFID_HITAGS_PACKAGE_FILE
         converter = PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE
         inspector = CAPTURE_INSPECTOR_PACKAGE_FILE
+        specter = "apps/NFC/specter.fap"
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_FILES,
-            {package_only, quac, nearby, weather, hitags, converter, inspector},
+            {package_only, quac, nearby, weather, hitags, converter, inspector, specter},
         )
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -299,6 +300,7 @@ class ValidateReleaseTest(unittest.TestCase):
                 hitags: "base",
                 converter: "arf",
                 inspector: "arf",
+                specter: "base",
             },
         )
         regular = "apps/Tools/clock.fap"

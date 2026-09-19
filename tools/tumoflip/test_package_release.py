@@ -127,6 +127,7 @@ def prepare_package_tree(root: Path) -> tuple[Path, Path, Path]:
         "apps/Tools/quac.fap",
         "apps/GPIO/nearby_files.fap",
         "apps/Sub-GHz/weather_editor.fap",
+        "apps/NFC/specter.fap",
         LFRFID_HITAGS_PACKAGE_FILE,
         "apps/Tools/tumoflip_packages.fap",
         "apps/Tools/totp.fap",

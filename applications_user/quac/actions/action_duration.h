@@ -18,7 +18,8 @@ static inline bool quac_duration_parse(const char* text, bool allow_zero, uint32
         if(value > (QUAC_ACTION_MAX_MS - digit) / 10U) return false;
         value = value * 10U + digit;
     }
-    if(!(allow_zero && !value) && !quac_duration_valid(value)) return false;
+    // Pauses allow 0..60000 ms; active emulation requires at least 100 ms.
+    if(!allow_zero && !quac_duration_valid(value)) return false;
     *result = value;
     return true;
 }

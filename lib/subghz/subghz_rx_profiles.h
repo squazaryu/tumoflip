@@ -13,7 +13,7 @@ typedef struct {
 } SubGhzRxProfile;
 
 #define SUBGHZ_RX_PROFILE_COUNT 8U // Manual + seven explicit choices
-#define SUBGHZ_RX_CUSTOM_NAME   "Tumo RX Honda"
+#define SUBGHZ_RX_CUSTOM_NAME   "TumoHonda"
 
 static const uint8_t subghz_rx_honda_preset[] = {
     0x02, 0x0D, 0x0B, 0x06, 0x08, 0x32, 0x07, 0x04, 0x14, 0x00, 0x13, 0x02,
