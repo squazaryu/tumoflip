@@ -79,6 +79,24 @@ int main(void) {
  assert(ci_snapshot_finish(b)==CiParseLimit);
  assert(strstr(ci_parse_status_text(CiParseLimit),"limit"));
  assert(!ci_snapshot_find(a,"Absent",0));
+ for(unsigned i=0;i<8;i++)assert(ci_parse_status_text((CiParseStatus)i));
+ assert(ci_snapshot_finish(a)==CiParseOk);assert(ci_snapshot_feed(a,"ignored",7)==CiParseOk);
+ ci_snapshot_reset(b);assert(ci_snapshot_feed(b,NULL,1)==CiParseMalformed);
+ ci_snapshot_reset(b);assert(!ci_diff_row(a,b,0,&r));
+ assert(parse(b,"Empty: \n",1)==CiParseMalformed);
+ assert(parse(b," : value\n",1)==CiParseMalformed);
+ memset(input,'k',CI_KEY_CAP);strcpy(input+CI_KEY_CAP,": value\n");
+ assert(parse(b,input,1)==CiParseLimit);
+ memset(input,'k',CI_LINE_CAP+4);input[CI_LINE_CAP+4]=0;
+ assert(parse(b,input,1)==CiParseLimit);
+ const char* bad_freqs[]={"4294967296","12x","0"};
+ for(unsigned i=0;i<3;i++){
+  snprintf(input,sizeof(input),"Filetype: Flipper SubGhz Key File\nVersion: 1\nFrequency: %s\nPreset: AM650\nProtocol: Example\nKey: 01\n",bad_freqs[i]);
+  assert(parse(b,input,1)==CiParseMissingField);
+ }
+ assert(parse(b,"Filetype: Flipper SubGhz Key File\nVersion: 1\nFrequency: 433920000\nPreset: AM650\nProtocol: Example\n",1)==CiParseMissingField);
+ assert(parse(b,"Filetype: Flipper SubGhz Key File\nVersion: 1\nFrequency: 433920000\nPreset: AM650\n",1)==CiParseMissingField);
+ assert(parse(b,"Filetype: Flipper SubGhz Key File\nVersion: 1\nFrequency: 433920000\n",1)==CiParseMissingField);
  printf("snapshot_bytes=%zu\n",sizeof(*a));
  free(a);free(b);return 0;
 }

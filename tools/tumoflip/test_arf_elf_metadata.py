@@ -16,10 +16,10 @@ class ArfElfMetadataTests(unittest.TestCase):
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-static uint8_t data[512],baseline[512];static bool io_fail;
+static uint8_t data[512],baseline[512];static bool io_fail;static unsigned reads,fail_read;
 static void put16(size_t at,uint16_t v){data[at]=v;data[at+1]=v>>8;}
 static void put32(size_t at,uint32_t v){put16(at,v);put16(at+2,v>>16);}
-static bool read_at(void* ctx,uint32_t at,void* out,size_t n){(void)ctx;assert(n<=85);if(io_fail||at>sizeof(data)||n>sizeof(data)-at)return false;memcpy(out,data+at,n);return true;}
+static bool read_at(void* ctx,uint32_t at,void* out,size_t n){(void)ctx;assert(n<=85);if(io_fail||++reads==fail_read||at>sizeof(data)||n>sizeof(data)-at)return false;memcpy(out,data+at,n);return true;}
 static bool file_read(void* ctx,uint32_t at,void* out,size_t n){return !fseek(ctx,at,SEEK_SET)&&fread(out,1,n,ctx)==n;}
 int main(int argc,char** argv){
  memcpy(data,"\177ELF\1\1\1",7);put16(16,1);put16(18,40);put32(20,1);
@@ -57,6 +57,16 @@ int main(int argc,char** argv){
  assert(arf_elf_metadata_read(read_at,NULL,sizeof(data),&out)==ArfElfOk);
  memcpy(data,baseline,sizeof(data));put32(64,1);put32(68,1);put32(80,320);put32(84,85);
  assert(arf_elf_metadata_read(read_at,NULL,sizeof(data),&out)==ArfElfInvalid);
+ memcpy(data,baseline,sizeof(data));
+ for(fail_read=1;fail_read<=9;fail_read++){
+  reads=0;assert(arf_elf_metadata_read(read_at,NULL,sizeof(data),&out)==ArfElfIoError);
+ }
+ fail_read=0;assert(arf_elf_metadata_read(read_at,NULL,16*1024*1024+1,&out)==ArfElfInvalid);
+ const unsigned corrupt_at[]={4,6,16,20,40,46,48,108,124};
+ for(unsigned i=0;i<sizeof(corrupt_at)/sizeof(corrupt_at[0]);i++){
+  memcpy(data,baseline,sizeof(data));data[corrupt_at[i]]=0;
+  assert(arf_elf_metadata_read(read_at,NULL,sizeof(data),&out)!=ArfElfOk);
+ }
  if(argc>1){FILE* f=fopen(argv[1],"rb");assert(f);fseek(f,0,SEEK_END);long n=ftell(f);
   assert(arf_elf_metadata_read(file_read,f,n,&out)==ArfElfOk);assert(out.target==7&&out.api_major==88);fclose(f);}
  return 0;
