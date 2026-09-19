@@ -2,7 +2,6 @@
 from pathlib import Path
 import unittest
 from tools.tumoflip.test_nfc_completion_equality import native
-from tools.tumoflip.test_hotplug_assets import function
 
 ROOT = Path(__file__).resolve().parents[2]
 QUAC = ROOT / "applications_user/quac"
@@ -57,14 +56,13 @@ int main(void){uint32_t value=77;
         self.assertIn("furi_pubsub_unsubscribe", source)
         self.assertIn("suppress_next_back = true", source)
         self.assertIn("furi_ms_to_ticks", source)
-        production = function(source, "static void quac_action_wait_input(")
-        production += "\n" + function(source, "bool quac_action_wait_run(")
+        production = "\n".join(line for line in source.splitlines() if not line.startswith("#include"))
         native(r'''
 #include <stdbool.h>
 #include <stdint.h>
 #include <assert.h>
-#define QUAC_WAIT_CANCEL 1U
-#define QUAC_WAIT_DONE 2U
+#include <stdlib.h>
+#define RECORD_INPUT_EVENTS "input_events"
 #define FuriWaitForever UINT32_MAX
 #define FuriFlagError 0x80000000U
 #define FuriFlagErrorTimeout 0xfffffffeU
@@ -72,19 +70,30 @@ int main(void){uint32_t value=77;
 enum{InputKeyBack,InputKeyOk,InputTypePress,InputTypeRelease};
 typedef struct{int key,type;}InputEvent;
 typedef struct{bool action_cancelled,suppress_next_back;}App;
-typedef struct{App*app;void*flags;}QuacActionWait;
+typedef int FuriEventFlag;typedef int FuriPubSub;typedef int FuriPubSubSubscription;
+typedef struct QuacActionWait QuacActionWait;
+static unsigned resources;
+static FuriEventFlag* furi_event_flag_alloc(void){resources++;return calloc(1,sizeof(int));}
+static void furi_event_flag_free(FuriEventFlag*f){free(f);resources--;}
+static FuriPubSub* furi_record_open(const char*n){(void)n;static int p;resources++;return &p;}
+static void furi_record_close(const char*n){(void)n;resources--;}
+static FuriPubSubSubscription* furi_pubsub_subscribe(FuriPubSub*p,void(*cb)(const void*,void*),void*c){(void)p;(void)cb;(void)c;resources++;return calloc(1,sizeof(int));}
+static void furi_pubsub_unsubscribe(FuriPubSub*p,FuriPubSubSubscription*s){(void)p;free(s);resources--;}
 static uint32_t result,timeout,marked;
 static void furi_event_flag_set(void*f,uint32_t v){(void)f;marked|=v;}
 static uint32_t furi_ms_to_ticks(uint32_t v){return v*2;}
 static uint32_t furi_event_flag_wait(void*f,uint32_t bits,int option,uint32_t ticks){(void)f;(void)bits;(void)option;timeout=ticks;return result;}
 ''' + production + r'''
-int main(void){App app={0};QuacActionWait wait={&app,0};InputEvent event={InputKeyBack,InputTypePress};
- quac_action_wait_input(&event,&wait);assert(marked==1);marked=0;event.type=InputTypeRelease;quac_action_wait_input(&event,&wait);assert(!marked);
- result=FuriFlagErrorTimeout;assert(quac_action_wait_run(&wait,150));assert(timeout==300&&!app.action_cancelled);
- result=QUAC_WAIT_CANCEL;assert(!quac_action_wait_run(&wait,60000));assert(app.action_cancelled&&app.suppress_next_back&&timeout==120000);
- result=QUAC_WAIT_DONE;assert(quac_action_wait_run(&wait,FuriWaitForever));assert(timeout==FuriWaitForever);
- result=FuriFlagError;assert(!quac_action_wait_run(&wait,100));
- result=QUAC_WAIT_CANCEL|QUAC_WAIT_DONE;assert(!quac_action_wait_run(&wait,100));return 0;}
+int main(void){App app={0};QuacActionWait* wait=quac_action_wait_alloc(&app);assert(resources==3);InputEvent event={InputKeyBack,InputTypePress};
+ quac_action_wait_input(&event,wait);assert(marked==1);marked=0;event.type=InputTypeRelease;quac_action_wait_input(&event,wait);assert(!marked);
+ event.key=InputKeyOk;event.type=InputTypePress;quac_action_wait_input(&event,wait);assert(!marked);
+ quac_action_wait_complete(wait);assert(marked==QUAC_WAIT_DONE);
+ result=FuriFlagErrorTimeout;assert(quac_action_wait_run(wait,150));assert(timeout==300&&!app.action_cancelled);
+ result=QUAC_WAIT_CANCEL;assert(!quac_action_wait_run(wait,60000));assert(app.action_cancelled&&app.suppress_next_back&&timeout==120000);
+ result=QUAC_WAIT_DONE;assert(quac_action_wait_run(wait,FuriWaitForever));assert(timeout==FuriWaitForever);
+ result=FuriFlagError;assert(!quac_action_wait_run(wait,100));
+ result=QUAC_WAIT_CANCEL|QUAC_WAIT_DONE;assert(!quac_action_wait_run(wait,100));
+ quac_action_wait_free(wait);assert(resources==0);return 0;}
 ''')
 
 
