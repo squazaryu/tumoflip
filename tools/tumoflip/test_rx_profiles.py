@@ -2,11 +2,37 @@
 from pathlib import Path
 import unittest
 from tools.tumoflip.test_nfc_completion_equality import native
+from tools.tumoflip.test_hotplug_assets import function
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class RxProfilesTest(unittest.TestCase):
+    def test_preset_registration_does_not_publish_partial_allocations(self):
+        source = (ROOT / "lib/subghz/subghz_setting.c").read_text()
+        body = function(source, "bool subghz_setting_load_custom_preset(")
+        native(r'''
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <assert.h>
+#define furi_check assert
+#define FURI_LOG_E(...) ((void)0)
+typedef int FlipperFormat;typedef int FuriString;
+typedef struct {FuriString* custom_preset_name;uint32_t custom_preset_data_size;uint8_t* custom_preset_data;} SubGhzSettingCustomPresetItem;
+typedef struct {struct {int data;}*preset;}SubGhzSetting;
+static unsigned added;static int mode;static SubGhzSettingCustomPresetItem item;
+static SubGhzSettingCustomPresetItem* SubGhzSettingCustomPresetItemArray_push_raw(int a){(void)a;added++;return &item;}
+static FuriString* furi_string_alloc(void){static int s;return &s;}
+static void furi_string_set(FuriString*s,const char*v){(void)s;(void)v;}
+static bool flipper_format_get_value_count(FlipperFormat*f,const char*k,uint32_t*n){(void)f;(void)k;*n=mode==1?3:4;return mode!=0;}
+static bool flipper_format_read_hex(FlipperFormat*f,const char*k,uint8_t*d,size_t n){(void)f;(void)k;(void)d;(void)n;return mode==3;}
+''' + body + r'''
+int main(void){struct{int data;}preset={0};SubGhzSetting s={(void*)&preset};int ff=0;
+ for(mode=0;mode<3;mode++){added=0;assert(!subghz_setting_load_custom_preset(&s,"test",&ff));assert(added==0);}
+ mode=3;assert(subghz_setting_load_custom_preset(&s,"test",&ff));assert(added==1&&item.custom_preset_data_size==4);free(item.custom_preset_data);return 0;}
+''')
+
     def test_catalog_is_bounded_and_data_is_owned_by_settings(self):
         path = ROOT / "lib/subghz/subghz_rx_profiles.h"
         self.assertTrue(path.exists(), "shared RX profile catalog missing")
