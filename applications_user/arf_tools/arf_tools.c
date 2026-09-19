@@ -75,7 +75,7 @@ static void arf_tools_probe(ArfToolsApp* app, const char* label, const char* pat
     ArfFileProbe probe;
     arf_file_probe(app->storage, path, &probe);
     furi_string_cat_printf(app->scan_text, "%s\n%s\n", label, arf_file_status_text(probe.status));
-    if(probe.status == ArfFileHeaderCompatible) {
+    if(probe.api_major) {
         furi_string_cat_printf(
             app->scan_text,
             "API %u.%u; F%u; v%lu.%lu\n%lu bytes\n",

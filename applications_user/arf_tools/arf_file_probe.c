@@ -1,9 +1,15 @@
 #include "arf_file_probe.h"
-#include <flipper_application/flipper_application.h>
+#include "arf_elf_metadata.h"
 #include <flipper_application/elf/elf_api_interface.h>
+#include <furi_hal_version.h>
 #include <string.h>
 
 extern const ElfApiInterface* const firmware_api_interface;
+
+static bool arf_probe_read(void* context, uint32_t offset, void* bytes, size_t size) {
+    File* file = context;
+    return storage_file_seek(file, offset, true) && storage_file_read(file, bytes, size) == size;
+}
 
 void arf_file_probe(Storage* storage, const char* path, ArfFileProbe* result) {
     memset(result, 0, sizeof(*result));
@@ -28,46 +34,42 @@ void arf_file_probe(Storage* storage, const char* path, ArfFileProbe* result) {
         result->status = ArfFileTooLarge;
         return;
     }
-    FlipperApplication* app = flipper_application_alloc(storage, firmware_api_interface);
-    if(!app) {
-        result->status = ArfFileNoMemory;
-        return;
-    }
-    // Manifest-only: no asset extraction, mapping, constructors or app execution.
-    const FlipperApplicationPreloadStatus status = flipper_application_preload_manifest(app, path);
-    switch(status) {
-    case FlipperApplicationPreloadStatusSuccess: {
-        const FlipperApplicationManifest* manifest = flipper_application_get_manifest(app);
-        result->status = ArfFileHeaderCompatible;
-        result->api_major = manifest->base.api_version.major;
-        result->api_minor = manifest->base.api_version.minor;
-        result->target = manifest->base.hardware_target_id;
-        result->app_version = manifest->app_version;
-        memcpy(result->name, manifest->name, 32);
-        result->name[32] = 0;
-        break;
-    }
-    case FlipperApplicationPreloadStatusInvalidFile:
-        result->status = ArfFileInvalid;
-        break;
-    case FlipperApplicationPreloadStatusInvalidManifest:
-        result->status = ArfFileInvalidManifest;
-        break;
-    case FlipperApplicationPreloadStatusApiTooOld:
-        result->status = ArfFileApiOld;
-        break;
-    case FlipperApplicationPreloadStatusApiTooNew:
-        result->status = ArfFileApiNew;
-        break;
-    case FlipperApplicationPreloadStatusTargetMismatch:
-        result->status = ArfFileWrongTarget;
-        break;
-    case FlipperApplicationPreloadStatusNotEnoughMemory:
-        result->status = ArfFileNoMemory;
-        break;
-    }
-    flipper_application_free(app);
-    // A compatible header proves neither payload integrity nor resolved imports.
+    File* file = storage_file_alloc(storage);
+    do {
+        if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
+            if(storage_file_get_error(file) == FSE_ALREADY_OPEN) result->status = ArfFileInUse;
+            break;
+        }
+        const uint64_t size = storage_file_size(file);
+        if(size != info.size) break;
+        ArfElfMetadata metadata;
+        const ArfElfStatus status = arf_elf_metadata_read(arf_probe_read, file, size, &metadata);
+        if(status != ArfElfOk) {
+            result->status =
+                status == ArfElfIoError ?
+                    ArfFileIoError :
+                    (status == ArfElfBadManifest ? ArfFileInvalidManifest : ArfFileInvalid);
+            break;
+        }
+        result->api_major = metadata.api_major;
+        result->api_minor = metadata.api_minor;
+        result->target = metadata.target;
+        result->app_version = metadata.app_version;
+        memcpy(result->name, metadata.name, sizeof(result->name));
+        if(metadata.target != furi_hal_version_get_hw_target())
+            result->status = ArfFileWrongTarget;
+        else if(metadata.api_major < firmware_api_interface->api_version_major)
+            result->status = ArfFileApiOld;
+        else if(metadata.api_major > firmware_api_interface->api_version_major)
+            result->status = ArfFileApiNew;
+        else if(metadata.api_minor > firmware_api_interface->api_version_minor)
+            result->status = ArfFileNewerMinor;
+        else
+            result->status = ArfFileHeaderCompatible;
+    } while(false);
+    if(!storage_file_close(file)) result->status = ArfFileIoError;
+    storage_file_free(file);
+    // Neither payload hashes, imports, assets, nor executable code are loaded.
 }
 
 const char* arf_file_status_text(ArfFileStatus status) {
@@ -85,7 +87,7 @@ const char* arf_file_status_text(ArfFileStatus status) {
     case ArfFileTooLarge:
         return "File too large";
     case ArfFileInvalid:
-        return "Invalid ELF file";
+        return "Invalid/unsupported ELF";
     case ArfFileInvalidManifest:
         return "Invalid manifest";
     case ArfFileApiOld:
@@ -94,8 +96,10 @@ const char* arf_file_status_text(ArfFileStatus status) {
         return "API too new";
     case ArfFileWrongTarget:
         return "Wrong hardware target";
-    case ArfFileNoMemory:
-        return "Not enough memory";
+    case ArfFileInUse:
+        return "In use; not rescanned";
+    case ArfFileNewerMinor:
+        return "Newer API minor; unchecked";
     default:
         return "Not checked";
     }

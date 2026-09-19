@@ -9,61 +9,75 @@ APP = ROOT / "applications_user/arf_tools"
 
 class ArfStatusProbeTests(unittest.TestCase):
     def test_manifest_only_probe_and_explicit_unknown_integrity(self):
-        path = APP / "arf_file_probe.c"
-        self.assertTrue(path.exists(), "Metadata probe is missing")
-        source = "\n".join(l for l in path.read_text().splitlines() if not l.startswith("#include"))
-        header = "\n".join(l for l in (APP / "arf_file_probe.h").read_text().splitlines()
-                           if not l.startswith(("#include", "#pragma")))
+        def strip(name):
+            return "\n".join(line for line in (APP / name).read_text().splitlines()
+                             if not line.startswith(("#include", "#pragma")))
+        source = strip("arf_file_probe.c")
+        self.assertNotIn("flipper_application_preload", source)
+        self.assertNotIn("FSAM_WRITE", source)
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 typedef int Storage;
-enum {FSE_OK,FSE_NOT_EXIST,FSE_INTERNAL};
+enum {FSE_OK,FSE_NOT_EXIST,FSE_INTERNAL,FSE_ALREADY_OPEN,FSAM_READ,FSOM_OPEN_EXISTING};
 typedef int FS_Error;
 typedef struct {uint64_t size;bool directory;} FileInfo;
 static bool file_info_is_dir(const FileInfo* f){return f->directory;}
-typedef enum {FlipperApplicationPreloadStatusSuccess,FlipperApplicationPreloadStatusInvalidFile,
- FlipperApplicationPreloadStatusNotEnoughMemory,FlipperApplicationPreloadStatusInvalidManifest,
- FlipperApplicationPreloadStatusApiTooOld,FlipperApplicationPreloadStatusApiTooNew,
- FlipperApplicationPreloadStatusTargetMismatch} FlipperApplicationPreloadStatus;
-typedef struct {struct {struct {uint16_t major,minor;} api_version;uint16_t hardware_target_id;} base;
- uint32_t app_version;char name[32];} FlipperApplicationManifest;
-typedef int FlipperApplication;
-typedef int ElfApiInterface;
-static int api,allocated,preloads,mode;const ElfApiInterface* const firmware_api_interface=&api;
-static FlipperApplicationManifest manifest;
+typedef struct {bool open;} File;
+typedef struct {uint16_t api_version_major,api_version_minor;} ElfApiInterface;
+static ElfApiInterface api={88,9};
+const ElfApiInterface* const firmware_api_interface=&api;
+static int allocated,preloads,mode;
 static FS_Error storage_common_stat(Storage* s,const char* p,FileInfo* out){
  (void)s;(void)p;if(mode==1)return FSE_NOT_EXIST;if(mode==2)return FSE_INTERNAL;
- out->directory=mode==3;out->size=mode==4?0:1024;return FSE_OK;
+ out->directory=mode==3;out->size=mode==4?0:(mode==11?17U*1024U*1024U:1024);return FSE_OK;
 }
-static FlipperApplication* flipper_application_alloc(Storage* s,const void* a){
- (void)s;assert(a==firmware_api_interface);allocated++;return &api;
+static File* storage_file_alloc(Storage* s){(void)s;allocated++;return calloc(1,sizeof(File));}
+static void storage_file_free(File* f){assert(!f->open);allocated--;free(f);}
+static bool storage_file_open(File* f,const char* p,int a,int m){(void)p;assert(a==FSAM_READ&&m==FSOM_OPEN_EXISTING);f->open=mode!=13&&mode!=15;return f->open;}
+static FS_Error storage_file_get_error(File* f){(void)f;return mode==13?FSE_ALREADY_OPEN:FSE_INTERNAL;}
+static bool storage_file_close(File* f){f->open=false;return mode!=14;}
+static uint64_t storage_file_size(File* f){assert(f->open);return 1024;}
+static bool storage_file_seek(File* f,uint32_t p,bool start){assert(f->open&&p==0&&start);return true;}
+static size_t storage_file_read(File* f,void* b,size_t n){assert(f->open);memset(b,0,n);return mode==16?0:n;}
+static uint8_t furi_hal_version_get_hw_target(void){return 7;}
+''' + strip("arf_elf_metadata.h") + r'''
+ArfElfStatus arf_elf_metadata_read(ArfElfRead read_at,void* context,uint64_t size,ArfElfMetadata* m){
+ assert(size==1024);preloads++;uint8_t bytes[4];
+ if(!read_at(context,0,bytes,sizeof(bytes)))return ArfElfIoError;
+ memset(m,0,sizeof(*m));m->api_major=mode==9?87:(mode==10?89:88);m->api_minor=mode==12?10:9;
+ m->target=mode==8?18:7;m->app_version=3;memset(m->name,'x',32);
+ if(mode==5)return ArfElfInvalid;if(mode==6)return ArfElfBadManifest;if(mode==7)return ArfElfIoError;
+ return ArfElfOk;
 }
-static void flipper_application_free(FlipperApplication* a){(void)a;allocated--;}
-static FlipperApplicationPreloadStatus flipper_application_preload_manifest(FlipperApplication* a,const char* p){
- (void)a;(void)p;preloads++;return mode>=5?(FlipperApplicationPreloadStatus)(mode-4):FlipperApplicationPreloadStatusSuccess;
-}
-static const FlipperApplicationManifest* flipper_application_get_manifest(FlipperApplication* a){(void)a;return &manifest;}
-''' + header + source + r'''
+''' + strip("arf_file_probe.h") + source + r'''
 int main(void){
- manifest.base.api_version.major=88;manifest.base.api_version.minor=9;
- manifest.base.hardware_target_id=7;manifest.app_version=3;memset(manifest.name,'x',32);
- for(mode=0;mode<=10;mode++){
+ for(mode=0;mode<=16;mode++){
   preloads=allocated=0;ArfFileProbe out;memset(&out,0x77,sizeof(out));
   arf_file_probe(NULL,"test.fap",&out);
   assert(!allocated && !out.integrity_verified && !out.imports_verified);
-  if(mode==0){assert(out.status==ArfFileHeaderCompatible && out.api_major==88 && out.api_minor==9);assert(out.name[32]==0);}
-  else if(mode==1)assert(out.status==ArfFileMissing && !preloads);
-  else if(mode==2)assert(out.status==ArfFileIoError && !preloads);
-  else if(mode==3)assert(out.status==ArfFileNotRegular && !preloads);
-  else if(mode==4)assert(out.status==ArfFileEmpty && !preloads);
-  else assert(out.status!=ArfFileHeaderCompatible && preloads==1);
+  switch(mode){
+  case 0:assert(out.status==ArfFileHeaderCompatible&&out.api_major==88&&out.api_minor==9&&out.name[32]==0);break;
+  case 1:assert(out.status==ArfFileMissing&&!preloads);break;
+  case 2:case 7:case 14:case 15:case 16:assert(out.status==ArfFileIoError);break;
+  case 3:assert(out.status==ArfFileNotRegular&&!preloads);break;
+  case 4:assert(out.status==ArfFileEmpty&&!preloads);break;
+  case 5:assert(out.status==ArfFileInvalid);break;
+  case 6:assert(out.status==ArfFileInvalidManifest);break;
+  case 8:assert(out.status==ArfFileWrongTarget);break;
+  case 9:assert(out.status==ArfFileApiOld);break;
+  case 10:assert(out.status==ArfFileApiNew);break;
+  case 11:assert(out.status==ArfFileTooLarge&&!preloads);break;
+  case 12:assert(out.status==ArfFileNewerMinor);break;
+  case 13:assert(out.status==ArfFileInUse&&!preloads);break;
+  }
   assert(arf_file_status_text(out.status)[0]);
  }
- return 0;
+ assert(!strcmp(arf_file_status_text(999),"Not checked"));return 0;
 }
 ''')
 

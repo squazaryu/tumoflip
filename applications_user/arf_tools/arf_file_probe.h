@@ -15,7 +15,8 @@ typedef enum {
     ArfFileApiOld,
     ArfFileApiNew,
     ArfFileWrongTarget,
-    ArfFileNoMemory,
+    ArfFileInUse,
+    ArfFileNewerMinor,
 } ArfFileStatus;
 
 typedef struct {

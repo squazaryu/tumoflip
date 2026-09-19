@@ -69,11 +69,13 @@ int main(int argc,char** argv){
                 "-fsanitize=address,undefined", "-I", str(APP), str(work / "test.c"),
                 str(APP / "arf_elf_metadata.c"), "-o", str(work / "test")], text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            command = [str(work / "test")]
-            fap = ROOT / "build/f7-firmware-C/.extapps/capture_inspector.fap"
-            if fap.exists(): command.append(str(fap))
-            result = subprocess.run(command, text=True, capture_output=True)
+            result = subprocess.run([str(work / "test")], text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
+            artifacts = ROOT / "build/f7-firmware-C/.extapps"
+            for fap in sorted([*artifacts.glob("*.fap"), *artifacts.glob("*.fal")]):
+                with self.subTest(artifact=fap.name):
+                    result = subprocess.run([str(work / "test"), str(fap)], text=True, capture_output=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":
