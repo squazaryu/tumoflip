@@ -17,6 +17,7 @@ class BleRemotePeersTests(unittest.TestCase):
 #include <stdbool.h>
 #include <string.h>
 #define GAP_BONDED_DEVICES_MAX 35
+#define GAP_MAC_ADDR_SIZE 6
 #define BLE_STATUS_SUCCESS 0
 typedef struct {uint8_t address_type;uint8_t address[6];} GapBondedDevice;
 typedef struct {uint8_t count;GapBondedDevice devices[GAP_BONDED_DEVICES_MAX];} GapBondedDevices;
@@ -32,7 +33,8 @@ static int aci_gap_add_devices_to_list(uint8_t n,const List_Entry_t*p,uint8_t mo
  assert(n==1&&mode==5&&p->Address[0]==1);stage=1;return failure==3;
 }
 static int hci_le_set_address_resolution_enable(uint8_t enabled){
- if(enabled)assert(stage==1);stage=2;return failure==4;
+ if(enabled)assert(stage==1);
+ stage=2;return failure==4;
 }
 static int aci_gap_configure_filter_accept_list(void){assert(stage==2);stage=3;return failure==5;}
 static int aci_gap_remove_bonded_device(uint8_t type,const uint8_t*addr){assert(type<2&&addr[0]==1);removes++;return failure==6;}

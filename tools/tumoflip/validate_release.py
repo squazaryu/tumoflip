@@ -142,6 +142,7 @@ LFRFID_HITAGS_PACKAGE_FILE = "apps_data/lfrfid/plugins/lfrfid_hitags.fal"
 PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE = "apps_data/arf_subghz_full/packages/protopirate_to_subghz.fap"
 CAPTURE_INSPECTOR_PACKAGE_FILE = "apps_data/arf_subghz_full/packages/capture_inspector.fap"
 SPECTER_PACKAGE_FILE = "apps/NFC/specter.fap"
+BLE_REMOTE_PACKAGE_FILE = "apps/Bluetooth/hid_ble.fap"
 PACKAGE_ONLY_PACKAGE_FILES = frozenset(
     {
         "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
@@ -152,6 +153,7 @@ PACKAGE_ONLY_PACKAGE_FILES = frozenset(
         PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
         CAPTURE_INSPECTOR_PACKAGE_FILE,
         SPECTER_PACKAGE_FILE,
+        BLE_REMOTE_PACKAGE_FILE,
     }
 )
 TOTP_CLI_PLUGIN_APP_IDS = (
@@ -195,6 +197,7 @@ PACKAGE_ONLY_PACKAGE_GROUPS = {
     PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE: "arf",
     CAPTURE_INSPECTOR_PACKAGE_FILE: "arf",
     SPECTER_PACKAGE_FILE: "base",
+    BLE_REMOTE_PACKAGE_FILE: "base",
 }
 PACKAGE_RELEASE_OVERLAY_GROUPS = {
     **PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -360,6 +363,7 @@ def package_extapp_exports() -> dict[str, str]:
     exports["protopirate_to_subghz.fap"] = PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE
     exports["capture_inspector.fap"] = CAPTURE_INSPECTOR_PACKAGE_FILE
     exports["specter.fap"] = SPECTER_PACKAGE_FILE
+    exports["hid_ble.fap"] = BLE_REMOTE_PACKAGE_FILE
     exports["module_one_cockpit.fap"] = "apps/Module One/Diagnostics/cockpit.fap"
     exports.update(
         {

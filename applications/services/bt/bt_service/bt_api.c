@@ -1,10 +1,11 @@
 #include "bt_api.h"
 #include <string.h>
 
-FuriHalBleProfileBase* bt_profile_start(
+static FuriHalBleProfileBase* bt_profile_start_internal(
     Bt* bt,
     const FuriHalBleProfileTemplate* profile_template,
-    FuriHalBleProfileParams params) {
+    FuriHalBleProfileParams params,
+    bool start_idle) {
     furi_check(bt);
 
     // Send message
@@ -16,6 +17,7 @@ FuriHalBleProfileBase* bt_profile_start(
         .profile_instance = &profile_instance,
         .data.profile.params = params,
         .data.profile.template = profile_template,
+        .data.profile.start_idle = start_idle,
     };
     furi_check(
         furi_message_queue_put(bt->message_queue, &message, FuriWaitForever) == FuriStatusOk);
@@ -24,6 +26,45 @@ FuriHalBleProfileBase* bt_profile_start(
 
     bt->current_profile = profile_instance;
     return profile_instance;
+}
+
+FuriHalBleProfileBase* bt_profile_start(
+    Bt* bt,
+    const FuriHalBleProfileTemplate* profile_template,
+    FuriHalBleProfileParams params) {
+    return bt_profile_start_internal(bt, profile_template, params, false);
+}
+
+FuriHalBleProfileBase* bt_profile_start_idle(
+    Bt* bt,
+    const FuriHalBleProfileTemplate* profile_template,
+    FuriHalBleProfileParams params) {
+    return bt_profile_start_internal(bt, profile_template, params, true);
+}
+
+static bool bt_peer_call(Bt* bt, BtMessageType type, BtMessageData data) {
+    furi_check(bt);
+    bool ok = false;
+    BtMessage message = {
+        .lock = api_lock_alloc_locked(), .type = type, .data = data, .result = &ok};
+    furi_check(furi_message_queue_put(bt->message_queue, &message, FuriWaitForever) == FuriStatusOk);
+    api_lock_wait_unlock_and_free(message.lock);
+    return ok;
+}
+
+bool bt_get_bonded_devices(Bt* bt, GapBondedDevices* devices) {
+    if(!devices) return false;
+    memset(devices, 0, sizeof(*devices));
+    return bt_peer_call(bt, BtMessageTypeGetBondedDevices, (BtMessageData){.bonded_devices = devices});
+}
+
+bool bt_set_connection_peer(Bt* bt, const GapBondedDevice* peer) {
+    return bt_peer_call(bt, BtMessageTypeSetConnectionPeer, (BtMessageData){.peer = peer});
+}
+
+bool bt_forget_bonded_device(Bt* bt, const GapBondedDevice* peer) {
+    if(!peer) return false;
+    return bt_peer_call(bt, BtMessageTypeForgetBondedDevice, (BtMessageData){.peer = peer});
 }
 
 bool bt_profile_restore_default(Bt* bt) {
