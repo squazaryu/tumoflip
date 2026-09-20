@@ -20,9 +20,12 @@ class BleRemotePeersTests(unittest.TestCase):
 #define furi_assert assert
 #define RECORD_STORAGE "storage"
 typedef int Storage;typedef int FS_Error;
+typedef struct{uint8_t irk[16],erk[16];}GapRootSecurityKeys;
 enum{FSE_OK,FSE_NOT_EXIST,FSE_INTERNAL};
 typedef struct{const char*file_path;uint8_t*nvm_sram_buff;uint16_t nvm_sram_buff_size;uint32_t current_size;}BtKeysStorage;
 static int status,loads,saves,generated;static bool load_ok,save_ok;
+static size_t payload=32;
+bool bt_keys_storage_validate_file(const char*p,size_t*n,uint8_t*v){(void)p;*n=payload;*v=1;return true;}
 static const char*furi_string_get_cstr(const char*p){return p;}
 static void*furi_record_open(const char*n){(void)n;return NULL;}
 static void furi_record_close(const char*n){(void)n;}
@@ -35,6 +38,7 @@ static void furi_hal_bt_nvm_sram_sem_release(void){}
 ''' + body + r'''
 int main(void){uint8_t memory[16];memset(memory,0xA5,sizeof(memory));BtKeysStorage s={"hid keys",memory,16,16};
  status=FSE_OK;load_ok=false;assert(!bt_keys_storage_load_or_create(&s));assert(loads==1&&saves==0&&generated==0&&memory[0]==0xA5);
+ payload=100;load_ok=true;assert(!bt_keys_storage_load_or_create(&s));assert(loads==1);payload=32;
  status=FSE_INTERNAL;assert(!bt_keys_storage_load_or_create(&s));assert(saves==0&&memory[0]==0xA5);
  status=FSE_NOT_EXIST;save_ok=true;assert(bt_keys_storage_load_or_create(&s));assert(saves==1&&generated==1&&!s.current_size);
  for(unsigned i=0;i<16;i++)assert(memory[i]==0);
