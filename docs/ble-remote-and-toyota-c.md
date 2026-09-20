@@ -12,6 +12,12 @@ The app ID/data directory remain unchanged. Its existing `.bt_hid.keys` and
 (`hid_usb`) remains separate and bundled; BadUSB and the Community Kodi remote
 are not moved or modified.
 
+The new idle-start path strictly loads bounded HID key records. A genuinely
+absent key file is initialized with new app-specific root keys and an empty
+bond table, never copied from Companion. An unreadable/corrupt existing file
+is left untouched and startup fails closed. Legacy profile-start behavior is
+unchanged; regression fixtures cover both paths.
+
 Startup always opens **Device** before advertising. The last selected row is
 remembered/highlighted, but the user confirms the target for each Remote session.
 This prevents a previously paired phone connecting before the user chooses a PC.

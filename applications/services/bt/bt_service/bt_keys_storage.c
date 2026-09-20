@@ -303,15 +303,17 @@ bool bt_keys_storage_load(BtKeysStorage* instance) {
 bool bt_keys_storage_load_or_create(BtKeysStorage* instance) {
     furi_assert(instance);
     Storage* storage = furi_record_open(RECORD_STORAGE);
-    const FS_Error status = storage_common_stat(
-        storage, furi_string_get_cstr(instance->file_path), NULL);
+    const FS_Error status =
+        storage_common_stat(storage, furi_string_get_cstr(instance->file_path), NULL);
     furi_record_close(RECORD_STORAGE);
     if(status == FSE_OK) {
         size_t payload_size = 0;
         uint8_t version = 0;
         if(!bt_keys_storage_validate_file(
-               furi_string_get_cstr(instance->file_path), &payload_size, &version)) return false;
-        const size_t header_size = version == BT_KEYS_STORAGE_LEGACY_VERSION ? 0 : sizeof(GapRootSecurityKeys);
+               furi_string_get_cstr(instance->file_path), &payload_size, &version))
+            return false;
+        const size_t header_size =
+            version == BT_KEYS_STORAGE_LEGACY_VERSION ? 0 : sizeof(GapRootSecurityKeys);
         if(payload_size < header_size || payload_size > instance->nvm_sram_buff_size + header_size)
             return false;
         return bt_keys_storage_load(instance);
