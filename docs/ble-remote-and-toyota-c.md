@@ -71,7 +71,8 @@ New saved captures carry `ToyotaVariant`; C also stores `ToyotaTail` so the bits
 beyond the normalized 64-bit Key survive save/reopen. Old A/B files infer their
 variant from the existing bit count. Invalid explicit variants/tails fail closed.
 The Toyota protocol remains decoder-only (`encoder = NULL`). No TX behavior is
-added to Standard or ARF. Use the matching rebuilt protocol package.
+added to Standard or ARF. Variant C belongs to the built-in Toyota decoder;
+the separate Toyota/Lexus protocol-pack decoder is unchanged by this adaptation.
 
 ## Verification and delivery gate
 

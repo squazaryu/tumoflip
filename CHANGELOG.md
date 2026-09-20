@@ -1,3 +1,10 @@
+## Tumoflip Dev 009-004
+- Bluetooth Remote: choose a bonded device before advertising, keep only that identity allowed, and never fall back to the phone when the chosen host is unavailable. Add local device labels, individual unpairing and explicit host-side pairing.
+- Keep existing HID keys/config paths. Selection preferences are separately journalled; missing key stores are initialized independently of Companion, while corrupt/oversized stores fail closed.
+- Move only `hid_ble.fap` into FW Packages Base. USB Remote stays bundled; BadUSB and the Kodi remote are unchanged. Install Companion 1.11.23 first, this firmware second, and FW Packages Dev 018 last.
+- Toyota: add receive-only Variant C alongside A/B. Preserve the variant and trailing bits in saved captures; reject malformed metadata and incomplete/oversized frames. No new encoder or secret-recovery behavior.
+- F7 API advances additively to `88.11` for the four Bluetooth peer-selection service calls. Existing public profile layout is unchanged. Hardware acceptance remains pending.
+
 ## Tumoflip Dev 009-003
 - NFC: compare complete FeliCa/DESFire results and stop completed MIFARE Classic reads without changing the CUID/Skip paths.
 - Sub-GHz: add receive-only Monarch/KEY metadata, per-receiver AM/FM filtering, and bounded Manual/seven-profile frequency/modulation choices; Standard and Read RAW retain independent settings.
