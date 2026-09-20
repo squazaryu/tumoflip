@@ -36,7 +36,8 @@ bool gap_peer_select(const GapBondedDevice* peer) {
     memcpy(entry.Address, peer->address, sizeof(entry.Address));
     // Mode 5 replaces BOTH lists from the existing bond, including its peer IRK.
     // A phone changing its private address is still the same bonded identity.
-    return aci_gap_add_devices_to_list(1, &entry, 5) == BLE_STATUS_SUCCESS &&
+    return hci_le_set_address_resolution_enable(0) == BLE_STATUS_SUCCESS &&
+           aci_gap_add_devices_to_list(1, &entry, 5) == BLE_STATUS_SUCCESS &&
            hci_le_set_address_resolution_enable(1) == BLE_STATUS_SUCCESS;
 }
 

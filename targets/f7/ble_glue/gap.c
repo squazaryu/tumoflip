@@ -430,7 +430,7 @@ static void gap_advertise_start(GapState new_state) {
     uint16_t min_interval;
     uint16_t max_interval;
 
-    if(!gap->peer_filter_valid) {
+    if(!gap->peer_filter_valid || !gap->enable_adv) {
         gap->state = GapStateIdle;
         gap->enable_adv = false;
         return;
@@ -552,8 +552,20 @@ bool gap_get_bonded_devices(GapBondedDevices* devices) {
     return ok;
 }
 
+static bool gap_wait_peer_idle(void) {
+    const uint32_t start = furi_get_tick();
+    do {
+        furi_mutex_acquire(gap->state_mutex, FuriWaitForever);
+        const bool ready = gap->state == GapStateIdle && gap->service.connection_handle == 0;
+        furi_mutex_release(gap->state_mutex);
+        if(ready) return true;
+        furi_delay_ms(5);
+    } while((uint32_t)(furi_get_tick() - start) < furi_ms_to_ticks(500));
+    return false;
+}
+
 bool gap_set_connection_peer(const GapBondedDevice* peer) {
-    if(!gap) return false;
+    if(!gap || !gap_wait_peer_idle()) return false;
     furi_mutex_acquire(gap->state_mutex, FuriWaitForever);
     bool ok = false;
     if(gap->state == GapStateIdle && gap->service.connection_handle == 0) {
@@ -568,7 +580,7 @@ bool gap_set_connection_peer(const GapBondedDevice* peer) {
 }
 
 bool gap_forget_bonded_device(const GapBondedDevice* peer) {
-    if(!gap || !peer) return false;
+    if(!gap || !peer || !gap_wait_peer_idle()) return false;
     furi_mutex_acquire(gap->state_mutex, FuriWaitForever);
     bool ok = false;
     if(gap->state == GapStateIdle && gap->service.connection_handle == 0) {

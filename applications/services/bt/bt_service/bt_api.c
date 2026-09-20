@@ -47,7 +47,8 @@ static bool bt_peer_call(Bt* bt, BtMessageType type, BtMessageData data) {
     bool ok = false;
     BtMessage message = {
         .lock = api_lock_alloc_locked(), .type = type, .data = data, .result = &ok};
-    furi_check(furi_message_queue_put(bt->message_queue, &message, FuriWaitForever) == FuriStatusOk);
+    furi_check(
+        furi_message_queue_put(bt->message_queue, &message, FuriWaitForever) == FuriStatusOk);
     api_lock_wait_unlock_and_free(message.lock);
     return ok;
 }
@@ -55,7 +56,8 @@ static bool bt_peer_call(Bt* bt, BtMessageType type, BtMessageData data) {
 bool bt_get_bonded_devices(Bt* bt, GapBondedDevices* devices) {
     if(!devices) return false;
     memset(devices, 0, sizeof(*devices));
-    return bt_peer_call(bt, BtMessageTypeGetBondedDevices, (BtMessageData){.bonded_devices = devices});
+    return bt_peer_call(
+        bt, BtMessageTypeGetBondedDevices, (BtMessageData){.bonded_devices = devices});
 }
 
 bool bt_set_connection_peer(Bt* bt, const GapBondedDevice* peer) {

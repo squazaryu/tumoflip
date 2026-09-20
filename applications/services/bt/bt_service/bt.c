@@ -669,7 +669,8 @@ static void bt_handle_peer_request(Bt* bt, BtMessage* message) {
                 // Persist the controller's complete remaining bond table before
                 // acknowledging removal. Never delete/re-key the entire store.
                 if(ok) {
-                    ok = bt_keys_storage_update(bt->keys_storage, bt->bt_keys_addr_start, bt->bt_keys_size);
+                    ok = bt_keys_storage_update(
+                        bt->keys_storage, bt->bt_keys_addr_start, bt->bt_keys_size);
                 }
             }
         }
@@ -880,9 +881,10 @@ int32_t bt_srv(void* p) {
             bt_transfer_activity_set(bt, message.data.transfer_active);
         } else if(message.type == BtMessageTypeTransferTick) {
             bt_transfer_activity_tick(bt);
-        } else if(message.type == BtMessageTypeGetBondedDevices ||
-                  message.type == BtMessageTypeSetConnectionPeer ||
-                  message.type == BtMessageTypeForgetBondedDevice) {
+        } else if(
+            message.type == BtMessageTypeGetBondedDevices ||
+            message.type == BtMessageTypeSetConnectionPeer ||
+            message.type == BtMessageTypeForgetBondedDevice) {
             bt_handle_peer_request(bt, &message);
         }
 

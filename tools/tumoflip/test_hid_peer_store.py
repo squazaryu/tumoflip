@@ -27,6 +27,7 @@ class HidPeerStoreTests(unittest.TestCase):
 #define APP_DATA_PATH(x) x
 typedef struct {uint8_t address_type;uint8_t address[6];} GapBondedDevice;
 typedef int Storage;
+typedef int FS_Error;
 typedef struct{int slot;bool open;} File;
 typedef struct{uint64_t size;} FileInfo;
 enum{FSE_OK,FSE_NOT_EXIST,FSE_INTERNAL,FSAM_READ,FSAM_WRITE,FSOM_OPEN_EXISTING,FSOM_CREATE_ALWAYS};

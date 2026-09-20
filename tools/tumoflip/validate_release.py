@@ -909,6 +909,7 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             resources / "apps/GPIO/nearby_files.fap",
             resources / WEATHER_EDITOR_PACKAGE_FILE,
             resources / SPECTER_PACKAGE_FILE,
+            resources / BLE_REMOTE_PACKAGE_FILE,
             resources / LFRFID_HITAGS_PACKAGE_FILE,
             resources / "apps/Tools/tumoflip_packages.fap",
             resources / "apps/Tools/totp.fap",

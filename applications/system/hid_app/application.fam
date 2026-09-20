@@ -20,7 +20,7 @@ App(
     name="Bluetooth Remote",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="hid_ble_app",
-    stack_size=2 * 1024,
+    stack_size=4 * 1024,
     sources=["*.c", "!transport_usb.c"],
     cdefines=["HID_TRANSPORT_BLE"],
     fap_libs=["ble_profile"],

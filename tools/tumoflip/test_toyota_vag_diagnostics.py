@@ -1,5 +1,6 @@
 """Host execution of receive-only Toyota framing and VAG diagnostic extraction."""
 from pathlib import Path
+import re
 import unittest
 from tools.tumoflip.test_hotplug_assets import run_c
 
@@ -7,7 +8,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def function(source, signature):
-    start = source.index(signature)
+    match = re.search(r"\s+".join(re.escape(part) for part in signature.split()), source)
+    if match is None:
+        raise ValueError(f"missing production function: {signature}")
+    start = match.start()
     brace = source.index("{", start)
     depth = 1
     end = brace + 1
@@ -42,7 +46,7 @@ typedef struct { const uint16_t te_long,te_short,te_delta;const uint8_t min_coun
 typedef struct Base { void (*callback)(struct Base*,void*);void* context; } SubGhzProtocolDecoderBase;
 typedef struct { int parser_step;uint32_t te_last;uint64_t decode_data;uint16_t decode_count_bit; } SubGhzBlockDecoder;
 typedef struct { uint64_t data,data_2;uint16_t data_count_bit;uint32_t serial,btn,cnt; } SubGhzBlockGeneric;
-""" + declarations + "\n".join(function(source, s) for s in signatures if s in source) + r"""
+""" + declarations + "\n".join(function(source, s) for s in signatures) + r"""
 static int found;
 static uint16_t bits;
 static uint32_t variant;
