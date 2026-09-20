@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,88.10,,
+Version,+,88.11,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/services/applications.h,,
 Header,+,applications/services/bt/bt_service/bt.h,,
@@ -870,7 +870,9 @@ Function,+,bt_app_bridge_send_text,_Bool,"Bt*, const char*, const char*, const c
 Function,+,bt_app_bridge_send_text_v2,_Bool,"Bt*, const char*, const char*, uint32_t, uint8_t, const char*"
 Function,+,bt_app_bridge_send_v2,_Bool,"Bt*, const char*, const char*, uint32_t, uint8_t, uint8_t, uint8_t, const uint8_t*, uint16_t"
 Function,+,bt_disconnect,void,Bt*
+Function,+,bt_forget_bonded_device,_Bool,"Bt*, const GapBondedDevice*"
 Function,+,bt_forget_bonded_devices,void,Bt*
+Function,+,bt_get_bonded_devices,_Bool,"Bt*, GapBondedDevices*"
 Function,+,bt_get_settings,void,"Bt*, BtSettings*"
 Function,+,bt_keys_storage_alloc,BtKeysStorage*,const char*
 Function,+,bt_keys_storage_delete,_Bool,BtKeysStorage*
@@ -878,6 +880,7 @@ Function,+,bt_keys_storage_free,void,BtKeysStorage*
 Function,+,bt_keys_storage_get_root_keys,const GapRootSecurityKeys*,BtKeysStorage*
 Function,+,bt_keys_storage_is_changed,_Bool,BtKeysStorage*
 Function,+,bt_keys_storage_load,_Bool,BtKeysStorage*
+Function,-,bt_keys_storage_load_or_create,_Bool,BtKeysStorage*
 Function,+,bt_keys_storage_set_default_path,void,Bt*
 Function,+,bt_keys_storage_set_file_path,void,"BtKeysStorage*, const char*"
 Function,+,bt_keys_storage_set_ram_params,void,"BtKeysStorage*, uint8_t*, uint16_t"
@@ -885,6 +888,8 @@ Function,+,bt_keys_storage_set_storage_path,void,"Bt*, const char*"
 Function,+,bt_keys_storage_update,_Bool,"BtKeysStorage*, uint8_t*, uint32_t"
 Function,+,bt_profile_restore_default,_Bool,Bt*
 Function,+,bt_profile_start,FuriHalBleProfileBase*,"Bt*, const FuriHalBleProfileTemplate*, FuriHalBleProfileParams"
+Function,+,bt_profile_start_idle,FuriHalBleProfileBase*,"Bt*, const FuriHalBleProfileTemplate*, FuriHalBleProfileParams"
+Function,+,bt_set_connection_peer,_Bool,"Bt*, const GapBondedDevice*"
 Function,+,bt_set_settings,void,"Bt*, const BtSettings*"
 Function,+,bt_set_status_changed_callback,void,"Bt*, BtStatusChangedCallback, void*"
 Function,+,bt_settings_load,void,BtSettings*
@@ -2133,8 +2138,11 @@ Function,-,gap_extra_beacon_set_config,_Bool,const GapExtraBeaconConfig*
 Function,-,gap_extra_beacon_set_data,_Bool,"const uint8_t*, uint8_t"
 Function,-,gap_extra_beacon_start,_Bool,
 Function,-,gap_extra_beacon_stop,_Bool,
+Function,-,gap_forget_bonded_device,_Bool,const GapBondedDevice*
+Function,-,gap_get_bonded_devices,_Bool,GapBondedDevices*
 Function,-,gap_get_state,GapState,
 Function,-,gap_init,_Bool,"GapConfig*, const GapRootSecurityKeys*, GapEventCallback, void*"
+Function,-,gap_set_connection_peer,_Bool,const GapBondedDevice*
 Function,-,gap_start_advertising,void,
 Function,-,gap_stop_advertising,void,
 Function,-,gap_thread_stop,void,

@@ -15,6 +15,11 @@
 bool hid_custom_event_callback(void* context, uint32_t event) {
     furi_assert(context);
     Hid* app = context;
+#ifdef HID_TRANSPORT_BLE
+    if(event == HidPeerConnected || event == HidPeerDisconnected) {
+        app->peer_connected = event == HidPeerConnected;
+    }
+#endif
     return scene_manager_handle_custom_event(app->scene_manager, event);
 }
 
@@ -34,10 +39,17 @@ void bt_hid_remove_pairing(Hid* app) {
     furi_hal_bt_stop_advertising();
 
     bt_forget_bonded_devices(bt);
-
+#ifdef HID_TRANSPORT_BLE
+    HidPeerPreferences empty = {0};
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    hid_peer_store_save(storage, &app->peer_store, &empty);
+    furi_record_close(RECORD_STORAGE);
+#else
     furi_hal_bt_start_advertising();
+#endif
 }
 
+#ifdef HID_TRANSPORT_BLE
 static void bt_hid_load_cfg(Hid* app) {
     Storage* storage = furi_record_open(RECORD_STORAGE);
     FlipperFormat* fff = flipper_format_file_alloc(storage);
@@ -75,6 +87,7 @@ static void bt_hid_load_cfg(Hid* app) {
         app->ble_hid_cfg.name[0] = '\0';
     }
 }
+#endif
 
 void bt_hid_save_cfg(Hid* app) {
     Storage* storage = furi_record_open(RECORD_STORAGE);
@@ -92,10 +105,15 @@ void bt_hid_save_cfg(Hid* app) {
     furi_record_close(RECORD_STORAGE);
 }
 
+#ifdef HID_TRANSPORT_BLE
 static void bt_hid_connection_status_changed_callback(BtStatus status, void* context) {
     furi_assert(context);
     Hid* hid = context;
     const bool connected = (status == BtStatusConnected);
+#ifdef HID_TRANSPORT_BLE
+    view_dispatcher_send_custom_event(
+        hid->view_dispatcher, connected ? HidPeerConnected : HidPeerDisconnected);
+#endif
     notification_internal_message(
         hid->notifications, connected ? &sequence_set_blue_255 : &sequence_reset_blue);
     hid_keynote_set_connected_status(hid->hid_keynote, connected);
@@ -111,6 +129,7 @@ static void bt_hid_connection_status_changed_callback(BtStatus status, void* con
     hid_ptt_set_connected_status(hid->hid_ptt, connected);
     hid_tiktok_set_connected_status(hid->hid_tiktok, connected);
 }
+#endif
 
 static uint32_t hid_ptt_menu_view(void* context) {
     UNUSED(context);
@@ -119,6 +138,15 @@ static uint32_t hid_ptt_menu_view(void* context) {
 
 Hid* hid_alloc() {
     Hid* app = malloc(sizeof(Hid));
+#ifdef HID_TRANSPORT_BLE
+    memset(&app->peer_store, 0, sizeof(app->peer_store));
+    memset(&app->peer_list, 0, sizeof(app->peer_list));
+    app->peer_connected = false;
+    app->peer_active = false;
+    app->peer_dialog = false;
+    app->peer_confirm_forget = false;
+    app->peer_pairing_dialog = false;
+#endif
 
     // Gui
     app->gui = furi_record_open(RECORD_GUI);
@@ -309,6 +337,7 @@ int32_t hid_usb_app(void* p) {
     return 0;
 }
 
+#ifdef HID_TRANSPORT_BLE
 int32_t hid_ble_app(void* p) {
     UNUSED(p);
     Hid* app = hid_alloc();
@@ -334,16 +363,19 @@ int32_t hid_ble_app(void* p) {
 
     bt_hid_load_cfg(app);
 
-    app->ble_hid_profile = bt_profile_start(app->bt, ble_profile_hid_ext, &app->ble_hid_cfg);
+    app->ble_hid_profile = bt_profile_start_idle(app->bt, ble_profile_hid_ext, &app->ble_hid_cfg);
 
-    furi_check(app->ble_hid_profile);
-
-    furi_hal_bt_start_advertising();
     bt_set_status_changed_callback(app->bt, bt_hid_connection_status_changed_callback, app);
 
     dolphin_deed(DolphinDeedPluginStart);
 
+    Storage* peer_storage = furi_record_open(RECORD_STORAGE);
+    hid_peer_store_load(peer_storage, &app->peer_store);
+    furi_record_close(RECORD_STORAGE);
+    // Remember the last selected row, but never let a phone auto-connect before
+    // the user has chosen a target for this Remote session.
     scene_manager_next_scene(app->scene_manager, HidSceneStart);
+    scene_manager_next_scene(app->scene_manager, HidSceneDevices);
 
     view_dispatcher_run(app->view_dispatcher);
 
@@ -356,9 +388,11 @@ int32_t hid_ble_app(void* p) {
 
     bt_keys_storage_set_default_path(app->bt);
 
-    furi_check(bt_profile_restore_default(app->bt));
+    if(!bt_profile_restore_default(app->bt))
+        FURI_LOG_E(TAG, "Could not restore Bluetooth profile");
 
     hid_free(app);
 
     return 0;
 }
+#endif

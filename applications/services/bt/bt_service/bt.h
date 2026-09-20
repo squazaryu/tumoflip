@@ -6,6 +6,7 @@
 #include <furi_ble/profile_interface.h>
 #include <core/common_defines.h>
 #include <services/serial_service.h>
+#include <gap.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,6 +69,19 @@ FURI_WARN_UNUSED FuriHalBleProfileBase* bt_profile_start(
     Bt* bt,
     const FuriHalBleProfileTemplate* profile_template,
     FuriHalBleProfileParams params);
+
+/** Start a profile with no automatic advertising, for explicit peer selection. */
+FURI_WARN_UNUSED FuriHalBleProfileBase* bt_profile_start_idle(
+    Bt* bt,
+    const FuriHalBleProfileTemplate* profile_template,
+    FuriHalBleProfileParams params);
+
+/** List bonds belonging to the active profile's key storage. */
+bool bt_get_bonded_devices(Bt* bt, GapBondedDevices* devices);
+/** Disconnect then allow only this bonded identity. NULL explicitly enables pairing. */
+bool bt_set_connection_peer(Bt* bt, const GapBondedDevice* peer);
+/** Forget only this identity; advertising remains stopped, including on error. */
+bool bt_forget_bonded_device(Bt* bt, const GapBondedDevice* peer);
 
 /** Stop current BLE Profile and restore default profile
  * @note Call of this function leads to 2nd core restart

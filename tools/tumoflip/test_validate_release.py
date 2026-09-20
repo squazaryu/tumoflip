@@ -286,9 +286,10 @@ class ValidateReleaseTest(unittest.TestCase):
         converter = PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE
         inspector = CAPTURE_INSPECTOR_PACKAGE_FILE
         specter = "apps/NFC/specter.fap"
+        ble_remote = "apps/Bluetooth/hid_ble.fap"
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_FILES,
-            {package_only, quac, nearby, weather, hitags, converter, inspector, specter},
+            {package_only, quac, nearby, weather, hitags, converter, inspector, specter, ble_remote},
         )
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -301,6 +302,7 @@ class ValidateReleaseTest(unittest.TestCase):
                 converter: "arf",
                 inspector: "arf",
                 specter: "base",
+                ble_remote: "base",
             },
         )
         regular = "apps/Tools/clock.fap"

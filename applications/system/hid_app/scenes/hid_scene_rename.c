@@ -52,13 +52,10 @@ bool hid_scene_rename_on_event(void* context, SceneManagerEvent event) {
         consumed = true;
         if(event.event == HidSceneRenameEventTextInput) {
 #ifdef HID_TRANSPORT_BLE
-            furi_hal_bt_stop_advertising();
-
-            app->ble_hid_profile =
-                bt_profile_start(app->bt, ble_profile_hid_ext, &app->ble_hid_cfg);
-            furi_check(app->ble_hid_profile);
-
-            furi_hal_bt_start_advertising();
+            if(!hid_peer_restart(app)) {
+                popup_set_header(app->popup, "Reconnect failed", 64, 12, AlignCenter, AlignTop);
+                popup_set_icon(app->popup, 0, 0, NULL);
+            }
 #endif
 
             bt_hid_save_cfg(app);

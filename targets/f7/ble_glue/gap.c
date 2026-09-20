@@ -1,4 +1,5 @@
 #include "gap.h"
+#include "gap_peer_policy.h"
 
 #include "app_common.h"
 #include <core/mutex.h>
@@ -42,6 +43,8 @@ typedef struct {
     bool enable_adv;
     bool is_secure;
     uint8_t negotiation_round;
+    bool peer_filter_selected;
+    bool peer_filter_valid;
 } Gap;
 
 typedef enum {
@@ -427,6 +430,12 @@ static void gap_advertise_start(GapState new_state) {
     uint16_t min_interval;
     uint16_t max_interval;
 
+    if(!gap->peer_filter_valid || !gap->enable_adv) {
+        gap->state = GapStateIdle;
+        gap->enable_adv = false;
+        return;
+    }
+
     FURI_LOG_D(TAG, "Start: %d", new_state);
 
     if(new_state == GapStateAdvFast) {
@@ -460,7 +469,7 @@ static void gap_advertise_start(GapState new_state) {
         min_interval,
         max_interval,
         CFG_IDENTITY_ADDRESS,
-        0,
+        gap->peer_filter_selected ? 3 : 0,
         strlen(gap->service.adv_name),
         (uint8_t*)gap->service.adv_name,
         gap->service.adv_svc_uuid_len,
@@ -469,6 +478,9 @@ static void gap_advertise_start(GapState new_state) {
         0);
     if(status) {
         FURI_LOG_E(TAG, "set_discoverable failed %d", status);
+        gap->state = GapStateIdle;
+        gap->enable_adv = false;
+        return;
     }
     gap->state = new_state;
     GapEvent event = {.type = GapEventTypeStartAdvertising};
@@ -505,7 +517,7 @@ static void gap_advertise_stop(void) {
 
 void gap_start_advertising(void) {
     furi_check(furi_mutex_acquire(gap->state_mutex, FuriWaitForever) == FuriStatusOk);
-    if(gap->state == GapStateIdle) {
+    if(gap->state == GapStateIdle && gap->peer_filter_valid) {
         gap->state = GapStateStartingAdv;
         FURI_LOG_I(TAG, "Start advertising");
         gap->enable_adv = true;
@@ -532,6 +544,53 @@ static void gap_advertise_timer_callback(void* context) {
     furi_check(furi_message_queue_put(gap->command_queue, &command, 0) == FuriStatusOk);
 }
 
+bool gap_get_bonded_devices(GapBondedDevices* devices) {
+    if(!gap || !devices) return false;
+    furi_mutex_acquire(gap->state_mutex, FuriWaitForever);
+    const bool ok = gap_peer_read(devices);
+    furi_mutex_release(gap->state_mutex);
+    return ok;
+}
+
+static bool gap_wait_peer_idle(void) {
+    const uint32_t start = furi_get_tick();
+    do {
+        furi_mutex_acquire(gap->state_mutex, FuriWaitForever);
+        const bool ready = gap->state == GapStateIdle && gap->service.connection_handle == 0;
+        furi_mutex_release(gap->state_mutex);
+        if(ready) return true;
+        furi_delay_ms(5);
+    } while((uint32_t)(furi_get_tick() - start) < furi_ms_to_ticks(500));
+    return false;
+}
+
+bool gap_set_connection_peer(const GapBondedDevice* peer) {
+    if(!gap || !gap_wait_peer_idle()) return false;
+    furi_mutex_acquire(gap->state_mutex, FuriWaitForever);
+    bool ok = false;
+    if(gap->state == GapStateIdle && gap->service.connection_handle == 0) {
+        gap->peer_filter_valid = false;
+        gap->enable_adv = false;
+        gap->peer_filter_selected = peer != NULL;
+        ok = gap_peer_select(peer);
+        gap->peer_filter_valid = ok;
+    }
+    furi_mutex_release(gap->state_mutex);
+    return ok;
+}
+
+bool gap_forget_bonded_device(const GapBondedDevice* peer) {
+    if(!gap || !peer || !gap_wait_peer_idle()) return false;
+    furi_mutex_acquire(gap->state_mutex, FuriWaitForever);
+    bool ok = false;
+    if(gap->state == GapStateIdle && gap->service.connection_handle == 0) {
+        gap->peer_filter_valid = false;
+        ok = gap_peer_forget(peer);
+    }
+    furi_mutex_release(gap->state_mutex);
+    return ok;
+}
+
 bool gap_init(
     GapConfig* config,
     const GapRootSecurityKeys* root_keys,
@@ -545,6 +604,9 @@ bool gap_init(
 
     gap = malloc(sizeof(Gap));
     gap->config = config;
+    gap->service.connection_handle = 0;
+    gap->peer_filter_selected = false;
+    gap->peer_filter_valid = true;
     // Create advertising timer
     gap->advertise_timer = furi_timer_alloc(gap_advertise_timer_callback, FuriTimerTypeOnce, NULL);
     // Initialization of GATT & GAP layer

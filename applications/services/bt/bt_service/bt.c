@@ -612,7 +612,17 @@ static void bt_change_profile(Bt* bt, BtMessage* message) {
 
         bt_close_rpc_connection(bt);
 
-        bt_keys_storage_load(bt->keys_storage);
+        if(message->data.profile.start_idle) {
+            furi_hal_bt_stop_advertising();
+            if(!bt_keys_storage_load_or_create(bt->keys_storage)) {
+                FURI_LOG_E(TAG, "Cannot load profile pairing data");
+                if(message->profile_instance) *message->profile_instance = NULL;
+                if(message->result) *message->result = false;
+                return;
+            }
+        } else {
+            bt_keys_storage_load(bt->keys_storage);
+        }
 
         bt->current_profile = furi_hal_bt_change_app(
             message->data.profile.template,
@@ -623,7 +633,7 @@ static void bt_change_profile(Bt* bt, BtMessage* message) {
         if(bt->current_profile) {
             FURI_LOG_I(TAG, "Bt App started");
             bt_app_bridge_bind(bt);
-            if(bt->bt_settings.enabled) {
+            if(bt->bt_settings.enabled && !message->data.profile.start_idle) {
                 furi_hal_bt_start_advertising();
             }
             furi_hal_bt_set_key_storage_change_callback(bt_on_key_storage_change_callback, bt);
@@ -651,6 +661,31 @@ static void bt_change_profile(Bt* bt, BtMessage* message) {
 static void bt_close_connection(Bt* bt) {
     bt_close_rpc_connection(bt);
     furi_hal_bt_stop_advertising();
+}
+
+static void bt_handle_peer_request(Bt* bt, BtMessage* message) {
+    bool ok = false;
+    if(furi_hal_bt_is_gatt_gap_supported() && bt->current_profile &&
+       !furi_hal_bt_check_profile_type(bt->current_profile, ble_profile_serial)) {
+        if(message->type == BtMessageTypeGetBondedDevices) {
+            ok = gap_get_bonded_devices(message->data.bonded_devices);
+        } else {
+            bt_close_connection(bt);
+            if(message->type == BtMessageTypeSetConnectionPeer) {
+                ok = gap_set_connection_peer(message->data.peer);
+                if(ok) furi_hal_bt_start_advertising();
+            } else {
+                ok = gap_forget_bonded_device(message->data.peer);
+                // Persist the controller's complete remaining bond table before
+                // acknowledging removal. Never delete/re-key the entire store.
+                if(ok) {
+                    ok = bt_keys_storage_update(
+                        bt->keys_storage, bt->bt_keys_addr_start, bt->bt_keys_size);
+                }
+            }
+        }
+    }
+    if(message->result) *message->result = ok;
 }
 
 static void bt_apply_settings(Bt* bt) {
@@ -856,6 +891,11 @@ int32_t bt_srv(void* p) {
             bt_transfer_activity_set(bt, message.data.transfer_active);
         } else if(message.type == BtMessageTypeTransferTick) {
             bt_transfer_activity_tick(bt);
+        } else if(
+            message.type == BtMessageTypeGetBondedDevices ||
+            message.type == BtMessageTypeSetConnectionPeer ||
+            message.type == BtMessageTypeForgetBondedDevice) {
+            bt_handle_peer_request(bt, &message);
         }
 
         if(message.lock) api_lock_unlock(message.lock);
