@@ -216,6 +216,15 @@ static uint32_t toyota_extract(
  * ---------------------------------------------------------------- */
 
 static const char* toyota_button_name(uint8_t btn, uint8_t variant) {
+    if(variant == 2) {
+        switch(btn & 0x0F) {
+        case 0xB: return "Lock";
+        case 0xE: return "Unlock";
+        case 0xD: return "Trunk";
+        case 0x7: return "Panic";
+        default: return "Unknown";
+        }
+    }
     if(variant == 1) {
         switch(btn & 0x0F) {
         case TOYOTA_B_BTN_LOCK:   return "Lock";
@@ -236,6 +245,7 @@ static const char* toyota_button_name(uint8_t btn, uint8_t variant) {
 }
 
 static const char* toyota_model_name(uint8_t variant) {
+    if(variant == 2) return "Toyota C";
     return (variant == 1) ? "Tundra" : "Corolla";
 }
 
@@ -631,7 +641,17 @@ SubGhzProtocolStatus subghz_protocol_decoder_toyota_serialize(
     furi_assert(context);
     SubGhzProtocolDecoderToyota* inst = context;
     inst->generic.cnt = inst->variant;
-    return subghz_block_generic_serialize(&inst->generic, flipper_format, preset);
+    SubGhzProtocolStatus status = subghz_block_generic_serialize(&inst->generic, flipper_format, preset);
+    if(status != SubGhzProtocolStatusOk) return status;
+    uint32_t variant = inst->variant;
+    if(!flipper_format_write_uint32(flipper_format, "ToyotaVariant", &variant, 1))
+        return SubGhzProtocolStatusErrorParserOthers;
+    if(variant == 2) {
+        uint32_t tail = inst->generic.data_2;
+        if(!flipper_format_write_uint32(flipper_format, "ToyotaTail", &tail, 1))
+            return SubGhzProtocolStatusErrorParserOthers;
+    }
+    return SubGhzProtocolStatusOk;
 }
 
 /* ----------------------------------------------------------------
@@ -649,17 +669,35 @@ SubGhzProtocolStatus subghz_protocol_decoder_toyota_deserialize(
         subghz_block_generic_deserialize_check_count_bit(
             &inst->generic,
             flipper_format,
-            toyota_const_b.min_count_bit_for_found);
+            66);
 
     if(ret == SubGhzProtocolStatusOk) {
+        uint32_t variant = inst->generic.data_count_bit == 67 ? 1 : 0;
+        uint32_t parsed_variant = 0;
+        uint32_t tail = 0;
+        if(!flipper_format_rewind(flipper_format)) return SubGhzProtocolStatusErrorParserOthers;
+        const bool explicit_variant = flipper_format_read_uint32(flipper_format, "ToyotaVariant", &parsed_variant, 1);
+        if(explicit_variant) variant = parsed_variant;
+        const uint16_t bits = inst->generic.data_count_bit;
+        if(variant > 2 || (variant == 0 && bits != 68) || (variant == 1 && bits != 67) ||
+           (variant == 2 && (!explicit_variant || bits < 66 || bits > 68))) {
+            return SubGhzProtocolStatusErrorParserBitCount;
+        }
+        if(variant == 2 &&
+           (!flipper_format_rewind(flipper_format) ||
+            !flipper_format_read_uint32(flipper_format, "ToyotaTail", &tail, 1) ||
+            tail >= (1U << (bits - 64)))) {
+            return SubGhzProtocolStatusErrorParserOthers;
+        }
         inst->hop    = (uint32_t)(inst->generic.data >> 32);
         inst->serial = (uint32_t)((inst->generic.data >> 4) & 0x0FFFFFFF);
         inst->button = (uint8_t)(inst->generic.data & 0x0F);
 
         inst->generic.serial = inst->serial;
         inst->generic.btn    = inst->button;
-        inst->variant        = (inst->generic.cnt != 0) ? 1 : 0;
+        inst->variant        = variant;
         inst->generic.cnt    = inst->variant;
+        inst->generic.data_2 = tail;
     }
 
     return ret;
@@ -676,7 +714,7 @@ void subghz_protocol_decoder_toyota_get_string(void* context, FuriString* output
     uint32_t hop    = (uint32_t)(inst->generic.data >> 32);
     uint32_t serial = (uint32_t)((inst->generic.data >> 4) & 0x0FFFFFFF);
     uint8_t  button = (uint8_t)(inst->generic.data & 0x0F);
-    uint8_t  var    = (inst->generic.cnt != 0) ? 1 : 0;
+    uint8_t  var    = inst->variant;
 
     furi_string_cat_printf(
         output,
