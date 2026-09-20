@@ -19,6 +19,7 @@ class BleRemotePeersTests(unittest.TestCase):
 #include <assert.h>
 #define furi_assert assert
 #define RECORD_STORAGE "storage"
+#define BT_KEYS_STORAGE_LEGACY_VERSION 0
 typedef int Storage;typedef int FS_Error;
 typedef struct{uint8_t irk[16],erk[16];}GapRootSecurityKeys;
 enum{FSE_OK,FSE_NOT_EXIST,FSE_INTERNAL};
