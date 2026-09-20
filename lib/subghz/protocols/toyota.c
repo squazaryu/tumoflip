@@ -115,6 +115,7 @@ typedef enum {
     ToyotaStepDataA,
     ToyotaStepPreambleB,
     ToyotaStepDataB,
+    ToyotaStepDataC,
 } ToyotaDecoderStep;
 
 /* ----------------------------------------------------------------
@@ -244,11 +245,25 @@ static const char* toyota_model_name(uint8_t variant) {
 
 static void toyota_decode_and_fire(SubGhzProtocolDecoderToyota* inst) {
     const uint8_t expected_bits = inst->variant == 1 ? TOYOTA_B_BITS : TOYOTA_A_BITS;
-    if(inst->bit_count != expected_bits) return;
+    if(inst->variant == 2) {
+        if(inst->bit_count < 66 || inst->bit_count > 68) return;
+    } else if(inst->bit_count != expected_bits) {
+        return;
+    }
 
     inst->hop    = toyota_extract(inst,  0, 32);
     inst->serial = toyota_extract(inst, 32, 28);
     inst->button = (uint8_t)toyota_extract(inst, 60, 4);
+
+    if(inst->variant == 2 &&
+       (inst->serial == 0 || inst->serial == 0x0FFFFFFFU || inst->hop == 0 ||
+        inst->hop == UINT32_MAX ||
+        (inst->button != 0xB && inst->button != 0xE && inst->button != 0xD && inst->button != 7))) {
+        return;
+    }
+    if(inst->variant == 2) {
+        inst->generic.data_2 = toyota_extract(inst, 64, inst->bit_count - 64);
+    }
 
     inst->generic.data =
         ((uint64_t)inst->hop    << 32) |
@@ -343,6 +358,17 @@ static void toyota_feed_variant_a(
 
         if(hs && ls) {
             inst->preamble_count++;
+            return;
+        }
+
+        // Variant C is distinguished by its long sync after >=6 short pairs.
+        // Keep the original no-sync A framing intact (unlike the upstream dispatcher).
+        if(hs && inst->preamble_count >= 6 && duration >= 1050 && duration <= 1500) {
+            inst->variant = 2;
+            inst->bits_lo = 0;
+            inst->bits_hi = 0;
+            inst->bit_count = 0;
+            inst->decoder.parser_step = ToyotaStepDataC;
             return;
         }
 
@@ -512,6 +538,29 @@ static void toyota_feed_variant_b(
  * Public feed — dispatcher
  * ---------------------------------------------------------------- */
 
+static void toyota_feed_variant_c(
+    SubGhzProtocolDecoderToyota* inst,
+    bool level,
+    uint32_t duration) {
+    // Decode-only adaptation of ARF 976a03f299. Bound the full frame and wait for
+    // its end so an oversized frame cannot be accepted as a truncated 68-bit one.
+    if(level) {
+        if(inst->have_high || duration < 200 || duration > 1050 || inst->bit_count >= 68) {
+            subghz_protocol_decoder_toyota_reset(inst);
+            return;
+        }
+        toyota_push_bit(inst, duration > 600);
+        inst->have_high = true;
+    } else if(duration > 1000) {
+        toyota_decode_and_fire(inst);
+        subghz_protocol_decoder_toyota_reset(inst);
+    } else if(!inst->have_high || duration < 200) {
+        subghz_protocol_decoder_toyota_reset(inst);
+    } else {
+        inst->have_high = false;
+    }
+}
+
 void subghz_protocol_decoder_toyota_feed(void* context, bool level, uint32_t duration) {
     furi_assert(context);
     SubGhzProtocolDecoderToyota* inst = context;
@@ -551,6 +600,8 @@ void subghz_protocol_decoder_toyota_feed(void* context, bool level, uint32_t dur
 
     if(inst->variant == 1) {
         toyota_feed_variant_b(inst, level, duration);
+    } else if(inst->variant == 2) {
+        toyota_feed_variant_c(inst, level, duration);
     } else {
         toyota_feed_variant_a(inst, level, duration);
     }
