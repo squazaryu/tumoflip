@@ -56,12 +56,14 @@ void hid_peer_show_error(Hid* app, const char* text) {
 }
 
 bool hid_peer_restart(Hid* app) {
+    const bool reconnect = app->peer_active;
+    app->peer_active = false;
     bt_disconnect(app->bt);
     app->peer_connected = false;
     app->ble_hid_profile = bt_profile_start_idle(app->bt, ble_profile_hid_ext, &app->ble_hid_cfg);
     if(!app->ble_hid_profile) return false;
     const HidPeerPreferences* prefs = &app->peer_store.preferences;
-    if(app->peer_active && prefs->selected) {
+    if(reconnect && prefs->selected) {
         app->peer_active = bt_set_connection_peer(app->bt, &prefs->peer);
         return app->peer_active;
     }
