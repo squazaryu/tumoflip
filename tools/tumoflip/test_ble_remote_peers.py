@@ -2,11 +2,45 @@
 from pathlib import Path
 import unittest
 from tools.tumoflip.test_hotplug_assets import run_c
+from tools.tumoflip.test_toyota_vag_diagnostics import function
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class BleRemotePeersTests(unittest.TestCase):
+    def test_missing_hid_store_never_inherits_companion_bonds(self):
+        source = (ROOT / "applications/services/bt/bt_service/bt_keys_storage.c").read_text()
+        self.assertIn("bool bt_keys_storage_load_or_create(", source)
+        body = function(source, "bool bt_keys_storage_load_or_create(")
+        run_c(r'''
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
+#include <assert.h>
+#define furi_assert assert
+#define RECORD_STORAGE "storage"
+typedef int Storage;typedef int FS_Error;
+enum{FSE_OK,FSE_NOT_EXIST,FSE_INTERNAL};
+typedef struct{const char*file_path;uint8_t*nvm_sram_buff;uint16_t nvm_sram_buff_size;uint32_t current_size;}BtKeysStorage;
+static int status,loads,saves,generated;static bool load_ok,save_ok;
+static const char*furi_string_get_cstr(const char*p){return p;}
+static void*furi_record_open(const char*n){(void)n;return NULL;}
+static void furi_record_close(const char*n){(void)n;}
+static int storage_common_stat(Storage*s,const char*p,void*i){(void)s;(void)i;assert(!strcmp(p,"hid keys"));return status;}
+static bool bt_keys_storage_load(BtKeysStorage*s){(void)s;loads++;return load_ok;}
+static bool bt_keys_storage_save(BtKeysStorage*s){assert(!s->current_size);saves++;return save_ok;}
+static void bt_keys_storage_regenerate_root_keys(BtKeysStorage*s){(void)s;generated++;}
+static void furi_hal_bt_nvm_sram_sem_acquire(void){}
+static void furi_hal_bt_nvm_sram_sem_release(void){}
+''' + body + r'''
+int main(void){uint8_t memory[16];memset(memory,0xA5,sizeof(memory));BtKeysStorage s={"hid keys",memory,16,16};
+ status=FSE_OK;load_ok=false;assert(!bt_keys_storage_load_or_create(&s));assert(loads==1&&saves==0&&generated==0&&memory[0]==0xA5);
+ status=FSE_INTERNAL;assert(!bt_keys_storage_load_or_create(&s));assert(saves==0&&memory[0]==0xA5);
+ status=FSE_NOT_EXIST;save_ok=true;assert(bt_keys_storage_load_or_create(&s));assert(saves==1&&generated==1&&!s.current_size);
+ for(unsigned i=0;i<16;i++)assert(memory[i]==0);
+ save_ok=false;assert(!bt_keys_storage_load_or_create(&s));return 0;}
+''')
+
     def test_controller_peer_policy_is_bounded_and_fail_closed(self):
         path = ROOT / "targets/f7/ble_glue/gap_peer_policy.c"
         self.assertTrue(path.exists(), "selected-peer controller policy is missing")
