@@ -612,7 +612,17 @@ static void bt_change_profile(Bt* bt, BtMessage* message) {
 
         bt_close_rpc_connection(bt);
 
-        bt_keys_storage_load(bt->keys_storage);
+        if(message->data.profile.start_idle) {
+            furi_hal_bt_stop_advertising();
+            if(!bt_keys_storage_load_or_create(bt->keys_storage)) {
+                FURI_LOG_E(TAG, "Cannot load profile pairing data");
+                if(message->profile_instance) *message->profile_instance = NULL;
+                if(message->result) *message->result = false;
+                return;
+            }
+        } else {
+            bt_keys_storage_load(bt->keys_storage);
+        }
 
         bt->current_profile = furi_hal_bt_change_app(
             message->data.profile.template,

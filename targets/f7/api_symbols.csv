@@ -880,6 +880,7 @@ Function,+,bt_keys_storage_free,void,BtKeysStorage*
 Function,+,bt_keys_storage_get_root_keys,const GapRootSecurityKeys*,BtKeysStorage*
 Function,+,bt_keys_storage_is_changed,_Bool,BtKeysStorage*
 Function,+,bt_keys_storage_load,_Bool,BtKeysStorage*
+Function,-,bt_keys_storage_load_or_create,_Bool,BtKeysStorage*
 Function,+,bt_keys_storage_set_default_path,void,Bt*
 Function,+,bt_keys_storage_set_file_path,void,"BtKeysStorage*, const char*"
 Function,+,bt_keys_storage_set_ram_params,void,"BtKeysStorage*, uint8_t*, uint16_t"

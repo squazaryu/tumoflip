@@ -300,6 +300,25 @@ bool bt_keys_storage_load(BtKeysStorage* instance) {
     return loaded;
 }
 
+bool bt_keys_storage_load_or_create(BtKeysStorage* instance) {
+    furi_assert(instance);
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    const FS_Error status = storage_common_stat(
+        storage, furi_string_get_cstr(instance->file_path), NULL);
+    furi_record_close(RECORD_STORAGE);
+    if(status == FSE_OK) return bt_keys_storage_load(instance);
+    if(status != FSE_NOT_EXIST) return false;
+
+    // The caller has stopped the previous profile. Never carry its bonds into
+    // a new app's missing key store; never overwrite a corrupted existing file.
+    furi_hal_bt_nvm_sram_sem_acquire();
+    memset(instance->nvm_sram_buff, 0, instance->nvm_sram_buff_size);
+    instance->current_size = 0;
+    furi_hal_bt_nvm_sram_sem_release();
+    bt_keys_storage_regenerate_root_keys(instance);
+    return bt_keys_storage_save(instance);
+}
+
 bool bt_keys_storage_update(BtKeysStorage* instance, uint8_t* start_addr, uint32_t size) {
     furi_assert(instance);
     furi_assert(start_addr);

@@ -24,7 +24,6 @@ static FuriHalBleProfileBase* bt_profile_start_internal(
     // Wait for unlock
     api_lock_wait_unlock_and_free(message.lock);
 
-    bt->current_profile = profile_instance;
     return profile_instance;
 }
 
