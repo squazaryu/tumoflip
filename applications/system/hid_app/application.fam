@@ -25,7 +25,7 @@ App(
     cdefines=["HID_TRANSPORT_BLE"],
     fap_libs=["ble_profile"],
     fap_description="Use Flipper as a HID remote control over Bluetooth",
-    fap_version="1.2",
+    fap_version="1.3",
     fap_package_only=True,
     fap_category="Bluetooth",
     fap_icon="hid_ble_10px.png",

@@ -12,24 +12,62 @@ enum {
     PeerFirst = 100
 };
 
-void hid_peer_label(Hid* app, const GapBondedDevice* peer, char* out, size_t size) {
+bool hid_peer_name_valid(const char* name) {
+    bool visible = false;
+    for(size_t i = 0; i < HID_PEER_NAME_SIZE; i++) {
+        const unsigned char ch = name[i];
+        if(ch == 0) return visible;
+        if(ch < 32 || ch > 126) return false;
+        if(ch != ' ') visible = true;
+    }
+    return false;
+}
+
+static const char* hid_peer_saved_name(Hid* app, const GapBondedDevice* peer) {
     const HidPeerPreferences* prefs = &app->peer_store.preferences;
     for(unsigned i = 0; i < prefs->count; i++) {
-        if(!memcmp(peer, &prefs->labels[i].peer, sizeof(*peer)) && prefs->labels[i].name[0]) {
-            snprintf(out, size, "%s", prefs->labels[i].name);
+        if(!memcmp(peer, &prefs->labels[i].peer, sizeof(*peer)) &&
+           hid_peer_name_valid(prefs->labels[i].name)) {
+            return prefs->labels[i].name;
+        }
+    }
+    return NULL;
+}
+
+bool hid_peer_has_name(Hid* app, const GapBondedDevice* peer) {
+    return hid_peer_saved_name(app, peer) != NULL;
+}
+
+static bool hid_peer_name_in_use(Hid* app, const char* name) {
+    const HidPeerPreferences* prefs = &app->peer_store.preferences;
+    for(unsigned i = 0; i < prefs->count; i++) {
+        if(strcmp(name, prefs->labels[i].name) == 0) return true;
+    }
+    return false;
+}
+
+void hid_peer_label(Hid* app, const GapBondedDevice* peer, char* out, size_t size) {
+    const char* saved = hid_peer_saved_name(app, peer);
+    if(saved) {
+        snprintf(out, size, "%s", saved);
+        return;
+    }
+    // The bond list contains identities, not host names. Temporary labels do not
+    // write to SD; the first explicit selection asks the owner to name the identity.
+    unsigned number = 1;
+    for(unsigned i = 0; i < app->peer_list.count; i++) {
+        const GapBondedDevice* candidate = &app->peer_list.devices[i];
+        if(hid_peer_has_name(app, candidate)) continue;
+        char label[HID_PEER_NAME_SIZE];
+        do {
+            snprintf(label, sizeof(label), "Device %u", number++);
+        } while(hid_peer_name_in_use(app, label));
+        if(!memcmp(candidate, peer, sizeof(*peer))) {
+            snprintf(out, size, "%s", label);
             return;
         }
     }
-    snprintf(
-        out,
-        size,
-        "%02X%02X%02X%02X%02X%02X",
-        peer->address[5],
-        peer->address[4],
-        peer->address[3],
-        peer->address[2],
-        peer->address[1],
-        peer->address[0]);
+    snprintf(out, size, "Saved device");
 }
 
 static void hid_peer_item(void* context, uint32_t event) {
@@ -95,7 +133,7 @@ void hid_peer_devices_refresh(Hid* app) {
     }
     submenu_add_item(app->submenu, "Add device", PeerPair, hid_peer_item, app);
     if(prefs->selected) {
-        submenu_add_item(app->submenu, "Name selected", PeerRename, hid_peer_item, app);
+        submenu_add_item(app->submenu, "Rename selected", PeerRename, hid_peer_item, app);
         submenu_add_item(app->submenu, "Forget selected", PeerForget, hid_peer_item, app);
     }
     submenu_add_item(app->submenu, "Refresh devices", PeerRefresh, hid_peer_item, app);
@@ -166,6 +204,12 @@ bool hid_scene_devices_on_event(void* context, SceneManagerEvent event) {
         HidPeerPreferences prefs = app->peer_store.preferences;
         prefs.peer = app->peer_list.devices[id - PeerFirst];
         prefs.selected = 1;
+        if(!hid_peer_has_name(app, &prefs.peer)) {
+            app->peer_name_target = prefs.peer;
+            app->peer_connect_after_name = true;
+            scene_manager_next_scene(app->scene_manager, HidScenePeerName);
+            return true;
+        }
         if(!hid_peer_save(app, &prefs)) {
             hid_peer_show_error(app, "Settings not saved\nCheck SD card");
         } else if(!bt_set_connection_peer(app->bt, &prefs.peer)) {
@@ -186,6 +230,8 @@ bool hid_scene_devices_on_event(void* context, SceneManagerEvent event) {
             dialog_ex_set_left_button_text(app->dialog, "Done");
         }
     } else if(id == PeerRename) {
+        app->peer_name_target = app->peer_store.preferences.peer;
+        app->peer_connect_after_name = false;
         scene_manager_next_scene(app->scene_manager, HidScenePeerName);
     } else if(id == PeerForget) {
         hid_peer_show_error(app, "Only selected device\nwill be unpaired");

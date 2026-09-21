@@ -15,6 +15,10 @@
 #define FAST_ADV_TIMEOUT    30000
 #define INITIAL_ADV_TIMEOUT 60000
 
+// Zero is a valid HCI connection handle. Use the same absent value at startup
+// and after disconnection, including while an asynchronous termination is pending.
+#define GAP_CONNECTION_HANDLE_INVALID UINT16_MAX
+
 #define GAP_INTERVAL_TO_MS(x) (uint16_t)((x) * 1.25)
 
 typedef struct {
@@ -134,7 +138,7 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
         hci_disconnection_complete_event_rp0* disconnection_complete_event =
             (hci_disconnection_complete_event_rp0*)event_pckt->data;
         if(disconnection_complete_event->Connection_Handle == gap->service.connection_handle) {
-            gap->service.connection_handle = 0;
+            gap->service.connection_handle = GAP_CONNECTION_HANDLE_INVALID;
             gap->state = GapStateIdle;
             FURI_LOG_I(
                 TAG, "Disconnect from client. Reason: %02X", disconnection_complete_event->Reason);
@@ -556,7 +560,8 @@ static bool gap_wait_peer_idle(void) {
     const uint32_t start = furi_get_tick();
     do {
         furi_mutex_acquire(gap->state_mutex, FuriWaitForever);
-        const bool ready = gap->state == GapStateIdle && gap->service.connection_handle == 0;
+        const bool ready = gap->state == GapStateIdle &&
+                           gap->service.connection_handle == GAP_CONNECTION_HANDLE_INVALID;
         furi_mutex_release(gap->state_mutex);
         if(ready) return true;
         furi_delay_ms(5);
@@ -568,7 +573,8 @@ bool gap_set_connection_peer(const GapBondedDevice* peer) {
     if(!gap || !gap_wait_peer_idle()) return false;
     furi_mutex_acquire(gap->state_mutex, FuriWaitForever);
     bool ok = false;
-    if(gap->state == GapStateIdle && gap->service.connection_handle == 0) {
+    if(gap->state == GapStateIdle &&
+       gap->service.connection_handle == GAP_CONNECTION_HANDLE_INVALID) {
         gap->peer_filter_valid = false;
         gap->enable_adv = false;
         gap->peer_filter_selected = peer != NULL;
@@ -583,7 +589,8 @@ bool gap_forget_bonded_device(const GapBondedDevice* peer) {
     if(!gap || !peer || !gap_wait_peer_idle()) return false;
     furi_mutex_acquire(gap->state_mutex, FuriWaitForever);
     bool ok = false;
-    if(gap->state == GapStateIdle && gap->service.connection_handle == 0) {
+    if(gap->state == GapStateIdle &&
+       gap->service.connection_handle == GAP_CONNECTION_HANDLE_INVALID) {
         gap->peer_filter_valid = false;
         ok = gap_peer_forget(peer);
     }
@@ -604,7 +611,7 @@ bool gap_init(
 
     gap = malloc(sizeof(Gap));
     gap->config = config;
-    gap->service.connection_handle = 0;
+    gap->service.connection_handle = GAP_CONNECTION_HANDLE_INVALID;
     gap->peer_filter_selected = false;
     gap->peer_filter_valid = true;
     // Create advertising timer
@@ -616,7 +623,6 @@ bool gap_init(
     // Initialization of the GAP state
     gap->state_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     gap->state = GapStateIdle;
-    gap->service.connection_handle = 0xFFFF;
     gap->enable_adv = true;
 
     // Command queue allocation
