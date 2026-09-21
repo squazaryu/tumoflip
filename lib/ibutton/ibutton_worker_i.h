@@ -41,6 +41,12 @@ struct iButtonWorker {
     iButtonWorkerWriteCallback write_cb;
     iButtonWorkerEmulateCallback emulate_cb;
 
+    iButtonWriteTargetMask write_target_mask;
+    // New progress/result values are opt-in so legacy FAP callbacks keep their enum contract.
+    bool write_targets_configured;
+    // iButtonWriteTargetMax until a target is attempted; the name is derived, not copied.
+    iButtonWriteTarget write_target;
+
     void* cb_ctx;
 };
 

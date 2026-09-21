@@ -97,7 +97,7 @@ int main(void) {
             "void ibutton_worker_mode_write_copy_tick(iButtonWorker* worker) {",
         ))
         run_c(TYPES + r'''
-enum {iButtonWorkerModeIdle,iButtonWorkerWriteOK,iButtonWorkerWriteNoDetect,iButtonWorkerWriteStartTarget,iButtonWorkerWriteNoEnabledTarget};
+enum {iButtonWorkerModeIdle,iButtonWorkerWriteOK,iButtonWorkerWriteNoDetect,iButtonWorkerWriteStartTarget,iButtonWorkerWriteNoEnabledTarget,iButtonWorkerWriteCannotWrite};
 typedef int iButtonWorkerWriteResult;
 typedef struct {void* key;void* protocols;void (*write_cb)(void*,int);void* cb_ctx;iButtonWriteTarget write_target;uint32_t write_target_mask;bool write_targets_configured;} iButtonWorker;
 static int reports,last,delays,id_writes,copy_writes,idles;
