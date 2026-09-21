@@ -184,7 +184,7 @@ HidMouseJiggler* hid_mouse_jiggler_alloc(Hid* hid) {
 void hid_mouse_jiggler_free(HidMouseJiggler* hid_mouse_jiggler) {
     furi_assert(hid_mouse_jiggler);
 
-    furi_timer_stop(hid_mouse_jiggler->timer);
+    hid_mouse_jiggler_exit_callback(hid_mouse_jiggler);
     furi_timer_free(hid_mouse_jiggler->timer);
 
     view_free(hid_mouse_jiggler->view);
