@@ -1,3 +1,11 @@
+## Unreleased — Unleashed 1428–1435 adaptations
+- Bluetooth/USB Remote: stop and drain Mouse Jiggler timers on Stop/Back, reset the running state, use one-shot Stealth scheduling, and wait for BLE connection. Keep Tumoflip device selection and package-only Bluetooth Remote (upstream #1112).
+- Sub-GHz: free Security+ 2.0 scratch transmitters, use local ownership in all 15 existing generators, clear the live pointer on TX stop, and log missing encoders. No new generation or transmission functionality (upstream #1104, follow-ups #1159/#1160).
+- RFID: show an in-range numeric starting value, use consistent manual-format labels and simplify field restoration without losing location sidecars. Existing HID/Casi formats remain unchanged; S10401/Casi hardware edge cases remain pending (upstream #1149/#1158).
+- iButton: select permitted blank types, show the current write target and handle an empty/inapplicable selection. Preserve Full Writing and legacy FAP callback values; unreadable settings disable Write ID targets, and opening settings without edits does not overwrite a file (upstream #1153).
+- Local F7 API 88.12 adds five iButton functions without removing existing exports. Rebuild matching applications/resources and FW Packages before publication. Upstream RW1990.1 issue #1143 is not resolved by these changes.
+- Hardware acceptance and publication are pending. The reverted loader relaunch series, new menu layouts, Community Pack refresh and monitoring changes are excluded.
+
 ## Tumoflip Dev 009-004
 - Bluetooth Remote: choose a bonded device before advertising, keep only that identity allowed, and never fall back to the phone when the chosen host is unavailable. Add local device labels, individual unpairing and explicit host-side pairing.
 - Keep existing HID keys/config paths. Selection preferences are separately journalled; missing key stores are initialized independently of Companion, while corrupt/oversized stores fail closed.

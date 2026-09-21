@@ -57,7 +57,7 @@ class Upstream1149RfidTest(unittest.TestCase):
         )
         self.assertIn("min_value", source)
         self.assertIn("max_value", source)
-        self.assertIn("number_input_empty_value", source)
+        self.assertIn("number_input_get_value", source)
         self.assertIn("furi_string_empty", source)
 
     def test_unit_vectors_cover_non_nibble_hid_frames(self) -> None:

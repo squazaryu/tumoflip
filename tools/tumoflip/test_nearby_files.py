@@ -22,7 +22,7 @@ class NearbyFilesTest(unittest.TestCase):
         self.assertIn('fap_dist_path="apps/GPIO/nearby_files.fap"', manifest)
         self.assertIn('fap_libs=["tumoflip_device_services"]', manifest)
         self.assertIn("fap_package_only=True", manifest)
-        self.assertEqual(api.splitlines()[1], "Version,+,88.11,,")
+        self.assertEqual(api.splitlines()[1], "Version,+,88.12,,")
 
     def test_companion_source_uses_one_shot_device_services(self) -> None:
         header = self.read("gps_reader.h")

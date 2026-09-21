@@ -66,18 +66,30 @@ int main(void) {
 }
 ''')
 
-    def test_empty_numeric_input_clamps_to_declared_range(self):
+    def test_empty_numeric_input_means_zero_and_invalid_input_is_rejected(self):
         source = (ROOT / "applications/services/gui/modules/number_input.c").read_text()
         run_c(r'''
 #include <assert.h>
 #include <stdint.h>
-#define CLAMP(x,hi,lo) ((x)>(hi)?(hi):((x)<(lo)?(lo):(x)))
-typedef struct {int32_t min_value,max_value;} NumberInputModel;
-''' + function(source, "static int32_t number_input_empty_value(") + r'''
+#include <stdbool.h>
+#include <stdlib.h>
+#include <errno.h>
+typedef struct {const char* text_buffer;} NumberInputModel;
+#define StrintParseNoError 0
+static bool furi_string_empty(const char* s) {return !s[0];}
+static const char* furi_string_get_cstr(const char* s) {return s;}
+static int strint_to_int64(const char* s,void* unused,int64_t* out,int base) {
+    (void)unused;char* end;errno=0;*out=strtoll(s,&end,base);
+    return errno || *end || end==s;
+}
+''' + function(source, "static bool number_input_get_value(") + r'''
 int main(void) {
-    NumberInputModel ranges[]={{0,100},{1,100},{-100,-1},{-100,100},{INT32_MIN,INT32_MAX}};
-    int32_t expected[]={0,1,-1,0,0};
-    for(unsigned i=0;i<5;i++)assert(number_input_empty_value(&ranges[i])==expected[i]);
+    NumberInputModel model={.text_buffer=""};int64_t value=99;
+    assert(number_input_get_value(&model,&value) && value==0);
+    model.text_buffer="-2147483648";assert(number_input_get_value(&model,&value) && value==INT32_MIN);
+    model.text_buffer="2147483647";assert(number_input_get_value(&model,&value) && value==INT32_MAX);
+    model.text_buffer="-";assert(!number_input_get_value(&model,&value));
+    model.text_buffer="999999999999999999999999";assert(!number_input_get_value(&model,&value));
     return 0;
 }
 ''')

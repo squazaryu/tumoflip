@@ -51,7 +51,7 @@ class GuiStartupLoadingTest(unittest.TestCase):
     def test_public_loading_api_and_private_state_exist(self) -> None:
         self.assertIn("void view_dispatcher_show_loading(ViewDispatcher* view_dispatcher);", self.dispatcher_header)
         self.assertIn("struct Loading* loading;", self.dispatcher_internal)
-        self.assertEqual(self.api_symbols.splitlines()[1], "Version,+,88.11,,")
+        self.assertEqual(self.api_symbols.splitlines()[1], "Version,+,88.12,,")
         self.assertIn("Function,+,view_dispatcher_show_loading,void,ViewDispatcher*", self.api_symbols)
 
     def test_dispatcher_initializes_loading_state(self) -> None:
