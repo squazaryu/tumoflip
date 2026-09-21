@@ -8,9 +8,64 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class RxProfilesTest(unittest.TestCase):
+    def test_visible_modulation_mapping_skips_honda_profile_preset(self):
+        source = (ROOT / "applications/main/subghz/scenes/subghz_scene_receiver_config.c").read_text()
+        helpers = "\n".join(
+            function(source, signature)
+            for signature in (
+                "static bool subghz_scene_receiver_config_is_profile_preset(",
+                "static size_t subghz_scene_receiver_config_modulation_count(",
+                "static int\n    subghz_scene_receiver_config_modulation_index(",
+                "static uint8_t\n    subghz_scene_receiver_config_visible_preset_index(",
+            )
+        )
+        native(r'''
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+#include <assert.h>
+#define SUBGHZ_RX_CUSTOM_NAME "TumoHonda"
+typedef struct SubGhzSetting SubGhzSetting;
+static const char* names[] = {"AM650", "TumoHonda", "FM476"};
+static size_t subghz_setting_get_preset_count(SubGhzSetting*s){(void)s;return 3;}
+static const char* subghz_setting_get_preset_name(SubGhzSetting*s,size_t i){(void)s;return names[i];}
+''' + helpers + r'''
+int main(void){
+ SubGhzSetting* setting=NULL;
+ assert(subghz_scene_receiver_config_modulation_count(setting)==2);
+ assert(subghz_scene_receiver_config_modulation_index(setting,0)==0);
+ assert(subghz_scene_receiver_config_modulation_index(setting,1)==2);
+ assert(subghz_scene_receiver_config_modulation_index(setting,2)==-1);
+ assert(subghz_scene_receiver_config_visible_preset_index(setting,0)==0);
+ assert(subghz_scene_receiver_config_visible_preset_index(setting,2)==1);
+ assert(subghz_scene_receiver_config_visible_preset_index(setting,1)==0);
+ return 0;
+}
+''')
+
+    def test_profile_owned_preset_is_not_part_of_core_modulation_choices(self):
+        source = (ROOT / "applications/main/subghz/scenes/subghz_scene_receiver_config.c").read_text()
+        self.assertIn("subghz_scene_receiver_config_modulation_count", source)
+        self.assertIn("subghz_scene_receiver_config_modulation_index", source)
+        self.assertIn("subghz_scene_receiver_config_visible_preset_index", source)
+        self.assertIn('"Honda RX Custom"', source)
+        self.assertIn(
+            "subghz_scene_receiver_config_modulation_count(setting)",
+            source,
+        )
+
     def test_production_config_callback_preserves_raw_isolation(self):
         source = (ROOT / "applications/main/subghz/scenes/subghz_scene_receiver_config.c").read_text()
         callback = function(source, "static void subghz_scene_receiver_config_set_rx_profile(")
+        helpers = "\n".join(
+            function(source, signature)
+            for signature in (
+                "static bool subghz_scene_receiver_config_is_profile_preset(",
+                "static uint8_t\n    subghz_scene_receiver_config_visible_preset_index(",
+                "static const char*\n    subghz_scene_receiver_config_preset_label(",
+            )
+        )
         native(r'''
 #include <stdint.h>
 #include <stdbool.h>
@@ -18,6 +73,7 @@ class RxProfilesTest(unittest.TestCase):
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#define SUBGHZ_RX_CUSTOM_NAME "TumoHonda"
 enum {SubGhzHoppingModeOff,SubGhzHoppingModeFrequency};
 enum {SubGhzSettingIndexFrequency,SubGhzSettingIndexModulation};
 typedef struct {const char*label;uint32_t frequency;const char*preset;} SubGhzRxProfile;
@@ -40,7 +96,8 @@ static bool furi_hal_subghz_is_frequency_valid(uint32_t f){(void)f;return valid;
 static void subghz_txrx_set_preset_internal(void*t,uint32_t f,int p,int power){(void)t;(void)f;(void)p;(void)power;applied++;}
 static unsigned subghz_scene_receiver_config_next_frequency(uint32_t f,SubGhz*s){(void)f;(void)s;return 3;}
 static const char* subghz_setting_get_preset_name(SubGhzSetting*s,int p){(void)s;(void)p;return "FM476";}
-''' + callback + r'''
+static size_t subghz_setting_get_preset_count(SubGhzSetting*s){(void)s;return 3;}
+''' + helpers + callback + r'''
 int main(void){Settings settings={0,315000000,868350000,0,4};VariableItem rows[2]={0};SubGhz app={NULL,&settings,rows,false,0};VariableItem choice={.context=&app,.index=2};
  subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==1&&settings.frequency==433920000&&settings.raw_frequency==868350000&&settings.raw_preset_index==4);
  assert(!strcmp(rows[0].text,"433.92")&&!strcmp(rows[1].text,"FM476"));
