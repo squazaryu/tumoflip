@@ -32,6 +32,23 @@ static int model_lock;
 
 
 class Upstream1435NativeTests(unittest.TestCase):
+    def test_stealth_moves_are_nonzero_signed_hid_deltas(self):
+        text = source("applications/system/hid_app/views/hid_mouse_jiggler_stealth.c")
+        run_c(PRELUDE + r'''
+static int next_random;
+#define rand() next_random
+''' + function(text, "static int8_t hid_mouse_jiggler_stealth_random_move(") + r'''
+int main(void) {
+    (void)model_lock;bool found[255]={0};
+    for(next_random=0;next_random<254;next_random++) {
+        int delta=hid_mouse_jiggler_stealth_random_move();
+        assert(delta && delta>=-127 && delta<=127);found[delta+127]=true;
+    }
+    for(int i=0;i<255;i++)assert(found[i]==(i!=127));
+    return 0;
+}
+''')
+
     def test_jigglers_stop_exit_and_connection_gating(self):
         for stealth in (False, True):
             name = "hid_mouse_jiggler" + ("_stealth" if stealth else "")
@@ -63,7 +80,7 @@ static void furi_timer_flush(void) {assert(!model_lock);flushes++;}
 static void hid_hal_mouse_move(Hid* h,int8_t x,int8_t y) {
     (void)h;(void)x;(void)y;assert(!model_lock);reports++;
 }
-""" + policy + types
+""" + policy + "\n" + types
                     for suffix in ("timer_callback", "exit_callback", "input_callback"):
                         fixture += function(text, f"static {'bool' if suffix == 'input_callback' else 'void'} {name}_{suffix}(") + "\n"
                     fixture += f"\nint main(void) {{\n{typename}Model m={{0}};\nFuriTimer timer={{0}};\n{typename} app={{.view=&m,.timer=&timer}};\n"
