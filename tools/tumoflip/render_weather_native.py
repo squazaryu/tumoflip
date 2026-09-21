@@ -306,6 +306,10 @@ def build_source(ref, skip_text_input=False):
     chunks.append(function(elements,"void elements_text_box("))
     number=read("applications/services/gui/modules/number_input.c",ref)
     chunks.append(number[number.index("typedef struct"):number.index("static size_t number_input_get_row_size")])
+    # The shared widget now parses through a helper. Keep old --ref renders supported
+    # while compiling the real dependency, not a separate renderer-only implementation.
+    if "static bool number_input_get_value(" in number:
+        chunks.append(function(number,"static bool number_input_get_value("))
     for name in ["static size_t number_input_get_row_size(","static const NumberInputKey* number_input_get_row(","static void number_input_draw_input(","static bool number_input_use_sign(","static bool is_number_too_large(","static bool is_number_too_small(","static void number_input_view_draw_callback("]:
         chunks.append(function(number,name))
     text_input=read("applications/services/gui/modules/text_input.c",ref).replace("keyboard_","text_keyboard_")
