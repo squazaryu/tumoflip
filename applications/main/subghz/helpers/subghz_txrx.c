@@ -626,6 +626,7 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
                 ret = SubGhzTxRxStartTxStateErrorParserOthers;
             }
         } else {
+            FURI_LOG_E(TAG, "Protocol \"%s\" has no encoder", furi_string_get_cstr(temp_str));
             ret = SubGhzTxRxStartTxStateErrorParserOthers;
         }
         if(ret != SubGhzTxRxStartTxStateOk) {
@@ -718,6 +719,7 @@ static void subghz_txrx_tx_stop(SubGhzTxRx* instance) {
     subghz_devices_stop_async_tx(instance->radio_device);
     subghz_transmitter_stop(instance->transmitter);
     subghz_transmitter_free(instance->transmitter);
+    instance->transmitter = NULL;
 
     // Persist a dynamic counter only when TX used the format bound to file_path.
     if(instance->tx_from_internal_fff &&

@@ -144,6 +144,15 @@ int main(void) {
 }
 """)
 
+    def test_all_generation_helpers_use_function_local_transmitters(self):
+        text = source("applications/main/subghz/helpers/subghz_txrx_create_protocol_key.c")
+        self.assertNotIn("->transmitter", text)
+        self.assertEqual(text.count("subghz_transmitter_alloc_init("), 15)
+        self.assertEqual(text.count("subghz_transmitter_free(transmitter)"), 15)
+        txrx = source("applications/main/subghz/helpers/subghz_txrx.c")
+        stop = function(txrx, "static void subghz_txrx_tx_stop(")
+        self.assertIn("instance->transmitter = NULL", stop)
+
     def test_number_input_starts_inside_range(self):
         text = source("applications/services/gui/modules/number_input.c")
         run_c(PRELUDE + r"""
