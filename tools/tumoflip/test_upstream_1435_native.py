@@ -35,6 +35,13 @@ static int model_lock;
 
 
 class Upstream1435NativeTests(unittest.TestCase):
+    def test_weather_renderer_includes_number_input_dependencies(self):
+        from tools.tumoflip.render_weather_native import build_source
+        generated = build_source(None)
+        helper = "static bool number_input_get_value("
+        self.assertTrue(helper in generated, "Weather renderer omits the shared number-input parser")
+        self.assertLess(generated.index(helper), generated.index("static bool is_number_too_large("))
+
     def test_stealth_moves_are_nonzero_signed_hid_deltas(self):
         text = source("applications/system/hid_app/views/hid_mouse_jiggler_stealth.c")
         run_c(PRELUDE + r'''
