@@ -75,6 +75,8 @@ struct Hid {
     bool peer_dialog;
     bool peer_confirm_forget;
     bool peer_pairing_dialog;
+    bool peer_connect_after_name;
+    GapBondedDevice peer_name_target;
     char peer_name[HID_PEER_NAME_SIZE];
     char peer_header[32];
 #endif
@@ -89,6 +91,8 @@ enum {
     HidPeerDialogConfirm
 };
 bool hid_peer_restart(Hid* app);
+bool hid_peer_name_valid(const char* name);
+bool hid_peer_has_name(Hid* app, const GapBondedDevice* peer);
 void hid_peer_label(Hid* app, const GapBondedDevice* peer, char* out, size_t size);
 void hid_peer_show_error(Hid* app, const char* text);
 void hid_peer_devices_refresh(Hid* app);

@@ -69,7 +69,7 @@ static void text_input_reset(void*v){(void)v;}
 static void text_input_set_header_text(void*v,const char*t){(void)v;(void)t;}
 static void text_input_set_result_callback(void*v,void(*cb)(void*),void*c,char*t,size_t n,bool b){(void)v;text_cb=cb;(void)c;(void)t;assert(n==13);(void)b;}
 ''' + stripped(APP / "scenes/hid_scene_devices.c") + "\n" + stripped(APP / "scenes/hid_scene_peer_name.c") + r'''
-static void event(Hid*a,uint32_t id){assert(hid_scene_devices_on_event(a,(SceneManagerEvent){SceneManagerEventTypeCustom,id}));}
+__attribute__((unused)) static void event(Hid*a,uint32_t id){assert(hid_scene_devices_on_event(a,(SceneManagerEvent){SceneManagerEventTypeCustom,id}));}
 '''
 
 
