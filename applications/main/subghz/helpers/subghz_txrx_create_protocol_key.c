@@ -110,15 +110,14 @@ bool subghz_txrx_gen_keeloq_protocol( //TODO lead to a general appearance
         subghz_transmitter_alloc_init(instance->environment, SUBGHZ_PROTOCOL_KEELOQ_NAME);
     subghz_txrx_set_preset(instance, preset_name, frequency, NULL, 0);
 
-    if(transmitter &&
-       subghz_protocol_keeloq_create_data(
-           subghz_transmitter_get_protocol_instance(transmitter),
-           instance->fff_data,
-           serial,
-           btn,
-           cnt,
-           manufacture_name,
-           instance->preset)) {
+    if(transmitter && subghz_protocol_keeloq_create_data(
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          instance->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          manufacture_name,
+                          instance->preset)) {
         flipper_format_write_string_cstr(instance->fff_data, "Manufacture", manufacture_name);
         res = true;
     }
@@ -144,14 +143,14 @@ bool subghz_txrx_gen_keeloq_seed_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_keeloq_seed_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                btn,
-                                cnt,
-                                seed,
-                                manufacture_name,
-                                txrx->preset)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          seed,
+                          manufacture_name,
+                          txrx->preset)) {
         res = true;
     }
 
@@ -188,13 +187,13 @@ bool subghz_txrx_gen_nice_flor_s_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_nice_flor_s_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                btn,
-                                cnt,
-                                txrx->preset,
-                                nice_one)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          txrx->preset,
+                          nice_one)) {
         res = true;
     }
 
@@ -221,14 +220,14 @@ bool subghz_txrx_gen_faac_slh_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_faac_slh_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                btn,
-                                cnt,
-                                seed,
-                                manufacture_name,
-                                txrx->preset)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          seed,
+                          manufacture_name,
+                          txrx->preset)) {
         res = true;
     }
 
@@ -264,12 +263,12 @@ bool subghz_txrx_gen_alutech_at_4n_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_alutech_at_4n_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                btn,
-                                cnt,
-                                txrx->preset)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          txrx->preset)) {
         res = true;
     }
 
@@ -293,11 +292,11 @@ bool subghz_txrx_gen_came_atomo_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_came_atomo_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                cnt,
-                                txrx->preset)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          cnt,
+                          txrx->preset)) {
         res = true;
     }
 
@@ -322,12 +321,12 @@ bool subghz_txrx_gen_somfy_telis_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_somfy_telis_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                btn,
-                                cnt,
-                                txrx->preset)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          txrx->preset)) {
         res = true;
     }
 
@@ -352,12 +351,12 @@ bool subghz_txrx_gen_somfy_keytis_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_somfy_keytis_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                btn,
-                                cnt,
-                                txrx->preset)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          txrx->preset)) {
         res = true;
     }
 
@@ -382,12 +381,12 @@ bool subghz_txrx_gen_kinggates_stylo_4k_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_kinggates_stylo_4k_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                btn,
-                                cnt,
-                                txrx->preset)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          txrx->preset)) {
         res = true;
     }
 
@@ -412,12 +411,12 @@ bool subghz_txrx_gen_beninca_arc_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_beninca_arc_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                btn,
-                                cnt,
-                                txrx->preset)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          txrx->preset)) {
         res = true;
     }
 
@@ -442,12 +441,12 @@ bool subghz_txrx_gen_jarolift_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_jarolift_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                btn,
-                                cnt,
-                                txrx->preset)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          txrx->preset)) {
         res = true;
     }
 
@@ -472,12 +471,12 @@ bool subghz_txrx_gen_superrollo_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_superrollo_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                btn,
-                                cnt,
-                                txrx->preset)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          txrx->preset)) {
         res = true;
     }
 
@@ -502,12 +501,12 @@ bool subghz_txrx_gen_ditec_gol4_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_ditec_gol4_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                btn,
-                                cnt,
-                                txrx->preset)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          txrx->preset)) {
         res = true;
     }
 
@@ -581,11 +580,11 @@ bool subghz_txrx_gen_phoenix_v2_protocol(
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
     if(transmitter && subghz_protocol_phoenix_v2_create_data(
-                                subghz_transmitter_get_protocol_instance(transmitter),
-                                txrx->fff_data,
-                                serial,
-                                cnt,
-                                txrx->preset)) {
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          cnt,
+                          txrx->preset)) {
         res = true;
     }
 

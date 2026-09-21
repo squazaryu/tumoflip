@@ -20,6 +20,7 @@ from tools.tumoflip import test_ibutton_write_targets_native as ibutton
 FUNCTIONS = {
     "hid_mouse_jiggler_timer_callback", "hid_mouse_jiggler_exit_callback",
     "hid_mouse_jiggler_input_callback", "hid_mouse_jiggler_stealth_random_move",
+    "hid_mouse_jiggler_free", "hid_mouse_jiggler_stealth_free",
     "hid_mouse_jiggler_stealth_random_period", "hid_mouse_jiggler_stealth_timer_callback",
     "hid_mouse_jiggler_stealth_exit_callback", "hid_mouse_jiggler_stealth_input_callback",
     "subghz_txrx_gen_secplus_v2_protocol", "number_input_set_result_callback",
@@ -62,9 +63,15 @@ def main():
             for item in report["data"][0]["functions"]:
                 name = item["name"].rsplit(":", 1)[-1]
                 if name in FUNCTIONS:
-                    regions = [region for region in item["regions"] if region[7] == 0]
+                    # File 0 is the extracted function body. Other file IDs are macro
+                    # expansions (including the fixture's mocked locks/assertions), not
+                    # production logic; counting their abort branches distorts coverage.
+                    regions = [region for region in item["regions"]
+                               if region[7] == 0 and region[5] == 0]
                     coverage.append({"function": name, "regions": len(regions),
-                                     "covered": sum(region[4] > 0 for region in regions)})
+                                     "covered": sum(region[4] > 0 for region in regions),
+                                     "uncovered": [body.splitlines()[region[0]-1].strip()
+                                                   for region in regions if not region[4]]})
 
     adaptation.run_c = ibutton.run_c = run_instrumented
     suite = unittest.TestSuite(unittest.defaultTestLoader.loadTestsFromModule(module)
@@ -74,7 +81,7 @@ def main():
     covered = sum(item["covered"] for item in coverage)
     missing = sorted(FUNCTIONS - {item["function"] for item in coverage})
     percent = 100 * covered / total if total else 0
-    print(json.dumps({"scope": "extracted production C functions across host fixtures",
+    print(json.dumps({"scope": "extracted production C functions, excluding mocked macro expansions",
                       "regions": total, "covered": covered, "percent": round(percent, 2),
                       "missing_functions": missing, "cases": coverage}, indent=2))
     return 0 if result.wasSuccessful() and not missing and percent >= 80 else 1

@@ -22,8 +22,10 @@ PRELUDE = r"""
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
-#define furi_assert assert
-#define furi_check assert
+// Keep the host assert implementation outside measured production functions.
+__attribute__((unused)) static void test_furi_check(bool condition) {assert(condition);}
+#define furi_assert(condition) test_furi_check(condition)
+#define furi_check(condition) test_furi_check(condition)
 #define COUNT_OF(a) (sizeof(a)/sizeof((a)[0]))
 #define CLAMP(x,hi,lo) ((x)>(hi)?(hi):((x)<(lo)?(lo):(x)))
 #define UNUSED(x) (void)(x)
