@@ -66,7 +66,7 @@ control. This table is a practical orientation, not a benchmark.
 | 🧭 | **Desktop** | Custom Wii, Wii Vertical, DSi, and Vertical layouts; Module One and ARF Tools folders; favorites for apps, scripts, and folders. |
 | 📱 | **Companion** | BLE App Bridge, RTC sync, package and firmware transfer activity, device verification, and iOS-first workflows. |
 | 🧩 | **Packages** | Separate Base, ARF, Module One, and Protocol Packs catalogs with content-addressed manifests and independent releases. Nearby Files is delivered as a Base package. |
-| 🛠️ | **Developer** | Development API 88.12 (unreleased), JS Runner as an FAP, SDK archives, release validation, acceptance telemetry, and reproducible build metadata. |
+| 🛠️ | **Developer** | Dev API 88.12, JS Runner as an FAP, SDK archives, release validation, acceptance telemetry, and reproducible build metadata. |
 
 ## Architecture at a glance
 
@@ -193,7 +193,7 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-009-004` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-009-005` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
@@ -218,15 +218,15 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-009-004.tgz
+flipper-z-f7-update-t-dev-009-005.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Development source API: `88.12` (unreleased). Published Dev `009-004` remains `88.11`;
-  immutable stable `v1.0.8` remains `88.7`. The additive iButton API needs matching rebuilt
-  applications and SD resources before delivery; the API number is local to this fork.
+- Firmware API: Dev `88.12`; immutable stable `v1.0.8` remains `88.7`.
+  Install Dev `009-005` before FW Packages Dev `019` for the Bluetooth Remote startup
+  fix and local device names. The API number is local to this fork.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or
   rebuilt from the matching FW Packages catalog.
 - The JS Runner is an application (`js_app.fap`); it is not required by the
