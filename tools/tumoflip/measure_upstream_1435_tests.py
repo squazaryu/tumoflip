@@ -14,9 +14,6 @@ import subprocess
 import tempfile
 import unittest
 
-from tools.tumoflip import test_upstream_1435_native as adaptation
-from tools.tumoflip import test_ibutton_write_targets_native as ibutton
-
 FUNCTIONS = {
     "hid_mouse_jiggler_timer_callback", "hid_mouse_jiggler_exit_callback",
     "hid_mouse_jiggler_input_callback", "hid_mouse_jiggler_stealth_random_move",
@@ -38,8 +35,10 @@ def llvm_tool(name):
         ["xcrun", "--find", name], text=True).strip()
 
 
-def main():
+def measure(modules, functions):
+    """Measure only explicit production functions in modules using a run_c fixture."""
     coverage = []
+    combined = {}
 
     def run_instrumented(body):
         with tempfile.TemporaryDirectory(prefix="tumoflip-1435-coverage-") as directory:
@@ -62,29 +61,45 @@ def main():
             ], text=True))
             for item in report["data"][0]["functions"]:
                 name = item["name"].rsplit(":", 1)[-1]
-                if name in FUNCTIONS:
+                if name in functions:
                     # File 0 is the extracted function body. Other file IDs are macro
                     # expansions (including the fixture's mocked locks/assertions), not
                     # production logic; counting their abort branches distorts coverage.
                     regions = [region for region in item["regions"]
                                if region[7] == 0 and region[5] == 0]
+                    # The same production function occurs in several scenario binaries.
+                    # Merge covered regions across the suite instead of counting every
+                    # uncalled copy as uncovered again. Line numbers are function-relative.
+                    if regions:
+                        origin = min(region[0] for region in regions)
+                        observed = combined.setdefault(name, {})
+                        for region in regions:
+                            key = (region[0]-origin, region[1], region[2]-origin, region[3])
+                            observed[key] = observed.get(key, False) or region[4] > 0
                     coverage.append({"function": name, "regions": len(regions),
                                      "covered": sum(region[4] > 0 for region in regions),
                                      "uncovered": [body.splitlines()[region[0]-1].strip()
                                                    for region in regions if not region[4]]})
 
-    adaptation.run_c = ibutton.run_c = run_instrumented
+    for module in modules:
+        module.run_c = run_instrumented
     suite = unittest.TestSuite(unittest.defaultTestLoader.loadTestsFromModule(module)
-                               for module in (adaptation, ibutton))
+                               for module in modules)
     result = unittest.TextTestRunner(verbosity=1).run(suite)
-    total = sum(item["regions"] for item in coverage)
-    covered = sum(item["covered"] for item in coverage)
-    missing = sorted(FUNCTIONS - {item["function"] for item in coverage})
+    total = sum(len(regions) for regions in combined.values())
+    covered = sum(sum(regions.values()) for regions in combined.values())
+    missing = sorted(functions - {item["function"] for item in coverage})
     percent = 100 * covered / total if total else 0
-    print(json.dumps({"scope": "extracted production C functions, excluding mocked macro expansions",
+    print(json.dumps({"scope": "suite-union of extracted production C functions, excluding mocked macro expansions",
                       "regions": total, "covered": covered, "percent": round(percent, 2),
                       "missing_functions": missing, "cases": coverage}, indent=2))
     return 0 if result.wasSuccessful() and not missing and percent >= 80 else 1
+
+
+def main():
+    from tools.tumoflip import test_upstream_1435_native as adaptation
+    from tools.tumoflip import test_ibutton_write_targets_native as ibutton
+    return measure((adaptation, ibutton), FUNCTIONS)
 
 
 if __name__ == "__main__":

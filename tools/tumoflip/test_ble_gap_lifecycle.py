@@ -5,7 +5,7 @@ import re
 import unittest
 
 from tools.tumoflip.test_toyota_vag_diagnostics import function
-from tools.tumoflip.test_nfc_completion_equality import native
+from tools.tumoflip.test_nfc_completion_equality import native as run_c
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -20,13 +20,14 @@ class BleGapLifecycleTests(unittest.TestCase):
             "static bool gap_wait_peer_idle(", "bool gap_set_connection_peer(",
             "bool gap_forget_bonded_device(", "bool gap_init(",
         ))
-        native(r'''
+        run_c(r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stddef.h>
-#define furi_check assert
+static void test_furi_check(bool condition){assert(condition);}
+#define furi_check(condition) test_furi_check(condition)
 #define furi_crash(...) abort()
 #define FURI_LOG_I(...) ((void)0)
 #define FURI_LOG_E(...) ((void)0)
@@ -106,6 +107,9 @@ int main(void){
     ticks=UINT32_MAX-10;gap->service.connection_handle=0;
     assert(!gap_set_connection_peer(&peer));assert((uint32_t)(ticks-(UINT32_MAX-10))==500);
     free(gap);gap=NULL;assert(!gap_set_connection_peer(NULL));assert(!gap_forget_bonded_device(&peer));
+    config.mfg_data_len=1;config.adv_service.UUID_Type=UUID_TYPE_128;
+    controller_ok=true;assert(gap_init(&config,NULL,event_callback,NULL));
+    assert(gap_set_connection_peer(&peer));free(gap);gap=NULL;
     return 0;
 }
 ''')

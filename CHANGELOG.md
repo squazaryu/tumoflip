@@ -1,4 +1,5 @@
 ## Unreleased — Unleashed 1428–1435 adaptations
+- Bluetooth Remote 1.3: fix the cold-start `Cannot select peer` failure by using one invalid GAP connection handle; valid handle zero is never confused with disconnection. Show readable temporary device labels, ask for a local name before first connection, and preserve existing names and pairing keys. Update both firmware and FW Packages to receive this fix.
 - Bluetooth/USB Remote: stop and drain Mouse Jiggler timers on Stop/Back, reset the running state, use one-shot Stealth scheduling, and wait for BLE connection. Keep Tumoflip device selection and package-only Bluetooth Remote (upstream #1112).
 - Sub-GHz: free Security+ 2.0 scratch transmitters, use local ownership in all 15 existing generators, clear the live pointer on TX stop, and log missing encoders. No new generation or transmission functionality (upstream #1104, follow-ups #1159/#1160).
 - RFID: show an in-range numeric starting value, use consistent manual-format labels and simplify field restoration without losing location sidecars. Existing HID/Casi formats remain unchanged; S10401/Casi hardware edge cases remain pending (upstream #1149/#1158).
