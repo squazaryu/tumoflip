@@ -36,8 +36,8 @@ static int model_lock;
 
 class Upstream1435NativeTests(unittest.TestCase):
     def test_weather_renderer_includes_number_input_dependencies(self):
-        from tools.tumoflip.render_weather_native import build_source
-        generated = build_source(None)
+        from tools.tumoflip.render_weather_native import number_input_chunks
+        generated = "\n".join(number_input_chunks(source("applications/services/gui/modules/number_input.c")))
         helper = "static bool number_input_get_value("
         self.assertTrue(helper in generated, "Weather renderer omits the shared number-input parser")
         self.assertLess(generated.index(helper), generated.index("static bool is_number_too_large("))

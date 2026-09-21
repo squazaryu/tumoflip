@@ -12,7 +12,6 @@ import os
 import json
 import hashlib
 import sys
-from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -281,7 +280,20 @@ int main(int argc,char** argv) {
 '''
 
 
+def number_input_chunks(number):
+    """Assemble the shared widget without image/toolchain dependencies."""
+    chunks = [number[number.index("typedef struct"):number.index("static size_t number_input_get_row_size")]]
+    # Older --ref snapshots do not use the parser helper.
+    if "static bool number_input_get_value(" in number:
+        chunks.append(function(number,"static bool number_input_get_value("))
+    for name in ["static size_t number_input_get_row_size(","static const NumberInputKey* number_input_get_row(","static void number_input_draw_input(","static bool number_input_use_sign(","static bool is_number_too_large(","static bool is_number_too_small(","static void number_input_view_draw_callback("]:
+        chunks.append(function(number,name))
+    return chunks
+
+
 def build_source(ref, skip_text_input=False):
+    from PIL import Image
+
     canvas = read("applications/services/gui/canvas.c", ref)
     elements = read("applications/services/gui/elements.c", ref)
     chunks = [SUPPORT]
@@ -305,13 +317,7 @@ def build_source(ref, skip_text_input=False):
     chunks.append("\n".join(re.findall(r"^#define ELEMENTS_.*$",read("applications/services/gui/elements.h",ref),re.MULTILINE)))
     chunks.append(function(elements,"void elements_text_box("))
     number=read("applications/services/gui/modules/number_input.c",ref)
-    chunks.append(number[number.index("typedef struct"):number.index("static size_t number_input_get_row_size")])
-    # The shared widget now parses through a helper. Keep old --ref renders supported
-    # while compiling the real dependency, not a separate renderer-only implementation.
-    if "static bool number_input_get_value(" in number:
-        chunks.append(function(number,"static bool number_input_get_value("))
-    for name in ["static size_t number_input_get_row_size(","static const NumberInputKey* number_input_get_row(","static void number_input_draw_input(","static bool number_input_use_sign(","static bool is_number_too_large(","static bool is_number_too_small(","static void number_input_view_draw_callback("]:
-        chunks.append(function(number,name))
+    chunks.extend(number_input_chunks(number))
     text_input=read("applications/services/gui/modules/text_input.c",ref).replace("keyboard_","text_keyboard_")
     chunks.append(text_input[text_input.index("typedef struct"):text_input.index("static uint8_t get_row_size(")])
     for name in ["static uint8_t get_row_size(","static const TextInputKey* get_row(","static bool char_is_lowercase(","static char char_to_uppercase(","static void text_input_view_draw_callback("]:
@@ -371,6 +377,8 @@ def build_source(ref, skip_text_input=False):
 
 
 def main():
+    from PIL import Image, ImageDraw, ImageFont
+
     ap=argparse.ArgumentParser();ap.add_argument("output",type=Path);ap.add_argument("--ref");ap.add_argument("--sanitize",action="store_true");ap.add_argument("--skip-text-input",action="store_true");ap.add_argument("--compare",type=Path)
     args=ap.parse_args();args.output.mkdir(parents=True,exist_ok=True)
     generated_source=build_source(args.ref,args.skip_text_input)
