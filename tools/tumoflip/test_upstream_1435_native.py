@@ -4,7 +4,8 @@ from pathlib import Path
 import re
 import unittest
 
-from tools.tumoflip.test_hotplug_assets import function, run_c
+from tools.tumoflip.test_hotplug_assets import function
+from tools.tumoflip.test_nfc_completion_equality import native as run_c
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -77,12 +78,17 @@ static uint32_t furi_ms_to_ticks(uint32_t ms) {return ms;}
 static void furi_timer_start(FuriTimer* t,uint32_t p) {t->active=true;t->period=p;}
 static void furi_timer_stop(FuriTimer* t) {assert(!model_lock);t->active=false;}
 static void furi_timer_flush(void) {assert(!model_lock);flushes++;}
+static void furi_timer_free(FuriTimer* t) {assert(!t->active);}
+static void view_free(void* v) {(void)v;}
+static void mock_free(void* p) {(void)p;}
+#define free mock_free
 static void hid_hal_mouse_move(Hid* h,int8_t x,int8_t y) {
     (void)h;(void)x;(void)y;assert(!model_lock);reports++;
 }
 """ + policy + "\n" + types
                     for suffix in ("timer_callback", "exit_callback", "input_callback"):
                         fixture += function(text, f"static {'bool' if suffix == 'input_callback' else 'void'} {name}_{suffix}(") + "\n"
+                    fixture += function(text, f"void {name}_free(") + "\n"
                     fixture += f"\nint main(void) {{\n{typename}Model m={{0}};\nFuriTimer timer={{0}};\n{typename} app={{.view=&m,.timer=&timer}};\n"
                     fixture += "m.min_interval=1;m.max_interval=2;\n" if stealth else "m.interval_idx=0;\n"
                     fixture += f"""
@@ -108,7 +114,26 @@ static void hid_hal_mouse_move(Hid* h,int8_t x,int8_t y) {
 }}
 """
                     # Helpers are intentionally used by the post-adaptation implementation.
-                    fixture += "\n"  # Silence only unused fixture functions on the RED baseline.
+                    arrows = f'''
+    InputEvent other={{99,InputKeyOk}};
+    assert(!{name}_input_callback(&other,&app));
+    int keys_to_try[]={{InputKeyLeft,InputKeyRight,InputKeyUp,InputKeyDown}};
+    for(size_t k=0;k<COUNT_OF(keys_to_try);k++)for(int n=0;n<65;n++){{
+        InputEvent event={{InputTypePress,keys_to_try[k]}};
+        {name}_input_callback(&event,&app);
+        assert({'m.min_interval>=1 && m.max_interval<=30 && m.min_interval<=m.max_interval' if stealth else 'm.interval_idx>=0 && m.interval_idx<6'});
+    }}
+    {name}_input_callback(&ok,&app);
+    int first={'m.min_interval' if stealth else 'm.interval_idx'};
+    for(size_t k=0;k<COUNT_OF(keys_to_try);k++){{
+        InputEvent event={{InputTypePress,keys_to_try[k]}};{name}_input_callback(&event,&app);
+    }}
+    assert(first=={'m.min_interval' if stealth else 'm.interval_idx'});
+    {name}_exit_callback(&app);
+    {name}_input_callback(&ok,&app);
+    {name}_free(&app);assert(!m.running && !timer.active);
+'''
+                    fixture = fixture.replace("    return 0;\n}", arrows + "    return 0;\n}")
                     run_c(fixture.replace("static uint32_t furi_ms_to_ticks", "__attribute__((unused)) static uint32_t furi_ms_to_ticks").replace("static void furi_timer_flush", "__attribute__((unused)) static void furi_timer_flush"))
 
     def test_secplus_generation_frees_scratch_and_preserves_live_tx(self):
@@ -160,7 +185,7 @@ typedef char FuriString;
 typedef void (*NumberInputCallback)(void*,int32_t);
 typedef struct {NumberInputCallback callback;void* callback_context;int32_t current_number,min_value,max_value;char* text_buffer;} NumberInputModel;
 typedef struct {void* view;} NumberInput;
-static void furi_string_printf(char* s,const char* f,int32_t n) {(void)f;sprintf(s,"%d",n);}
+static void furi_string_printf(char* s,const char* f,int32_t n) {(void)f;snprintf(s,64,"%d",n);}
 static void furi_string_set(char* s,const char* value) {strcpy(s,value);}
 """ + function(text, "void number_input_set_result_callback(") + r"""
 int main(void) {
@@ -183,6 +208,46 @@ int main(void) {
         header = source("lib/ibutton/ibutton_write_targets.h")
         self.assertIn("IBUTTON_WRITE_TARGET_MASK_ALL", header)
         self.assertIn("ibutton_write_target_write", text)
+
+    def test_number_input_confirm_agrees_with_range_and_empty_state(self):
+        text = source("applications/services/gui/modules/number_input.c")
+        run_c(PRELUDE + r'''
+#include <errno.h>
+#define StrintParseNoError 0
+typedef struct {const char* text_buffer;int32_t min_value,max_value,current_number;size_t selected_row,selected_column;void (*callback)(void*,int32_t);void* callback_context;} NumberInputModel;
+typedef struct {char text;} NumberInputKey;
+static const char enter_symbol='\r',backspace_symbol='\b',sign_symbol='-';
+static const NumberInputKey keys[]={{'\r'}};
+static const NumberInputKey* number_input_get_row(size_t row){(void)row;return keys;}
+static void number_input_backspace_cb(NumberInputModel* m){(void)m;assert(false);}
+static void number_input_sign(NumberInputModel* m){(void)m;assert(false);}
+static void number_input_add_digit(NumberInputModel* m,char* c){(void)m;(void)c;assert(false);}
+static bool furi_string_empty(const char* s){return !s[0];}
+static const char* furi_string_get_cstr(const char* s){return s;}
+static int strint_to_int64(const char* s,void* unused,int64_t* out,int base){
+    (void)unused;char* end;errno=0;*out=strtoll(s,&end,base);return errno||*end||end==s;
+}
+static int saves;
+static int32_t saved;
+static void save(void* c,int32_t n){(void)c;saves++;saved=n;}
+''' + function(text, "static bool number_input_get_value(")
+        + function(text, "static bool is_number_too_large(")
+        + function(text, "static bool is_number_too_small(")
+        + function(text, "static void number_input_handle_ok(") + r'''
+int main(void) {
+    (void)model_lock;NumberInputModel m={.callback=save};
+    const char* values[]={"", "-", "0", "1", "26", "27", "-1", "-2147483648", "2147483647", "999999999999999999999999"};
+    int32_t ranges[][2]={{0,100},{1,26},{-100,-1},{INT32_MIN,INT32_MAX}};
+    for(size_t r=0;r<COUNT_OF(ranges);r++)for(size_t i=0;i<COUNT_OF(values);i++){
+        m.min_value=ranges[r][0];m.max_value=ranges[r][1];m.text_buffer=values[i];
+        int64_t value=0;bool valid=number_input_get_value(&m,&value)&&value>=m.min_value&&value<=m.max_value;
+        assert((!is_number_too_small(&m)&&!is_number_too_large(&m))==valid);
+        saves=0;number_input_handle_ok(&m);assert(saves==(int)valid);
+        if(valid)assert(saved==value);
+    }
+    return 0;
+}
+''')
 
 
 if __name__ == "__main__":

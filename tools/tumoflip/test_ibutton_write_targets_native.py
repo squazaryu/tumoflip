@@ -1,8 +1,8 @@
 """Native iButton selection, legacy ABI and fail-closed persistence tests."""
 
 import unittest
-from tools.tumoflip.test_upstream_1435_native import PRELUDE, source
-from tools.tumoflip.test_hotplug_assets import function, run_c
+from tools.tumoflip.test_upstream_1435_native import PRELUDE, source, run_c
+from tools.tumoflip.test_hotplug_assets import function
 
 
 def body(path):
@@ -14,6 +14,23 @@ TYPES = PRELUDE + "\ntypedef int OneWireHost;\n" + body("lib/ibutton/ibutton_wri
 
 
 class IButtonWriteTargetsNativeTests(unittest.TestCase):
+    def test_settings_page_writes_only_after_edit_and_reports_save_failure(self):
+        text = source("applications/main/ibutton/plugins/settings/ibutton_settings_write_targets.c")
+        run_c(TYPES + r'''
+static struct {iButtonWriteTargetMask mask;bool dirty;} page;
+static int writes;
+static bool success;
+static bool ibutton_settings_set_write_targets(iButtonWriteTargetMask mask){assert(mask==4);writes++;return success;}
+''' + function(text, "static bool ibutton_settings_write_targets_on_save(") + r'''
+int main(void){
+    (void)model_lock;page.mask=4;
+    assert(ibutton_settings_write_targets_on_save() && !writes);
+    page.dirty=true;assert(!ibutton_settings_write_targets_on_save() && writes==1);
+    success=true;assert(ibutton_settings_write_targets_on_save() && writes==2);
+    return 0;
+}
+''')
+
     def test_masks_dispatch_only_selected_supported_targets(self):
         production = function(source("lib/ibutton/protocols/dallas/protocol_group_dallas.c"),
                               "static bool ibutton_protocol_group_dallas_write_id(")
