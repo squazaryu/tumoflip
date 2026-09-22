@@ -26,6 +26,7 @@ class TumoflipRuntimeTest(unittest.TestCase):
                 "ping",
                 "capabilities",
                 "status",
+                "loader_diag",
                 "trace",
                 "twin",
                 "transfer_begin",

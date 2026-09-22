@@ -66,6 +66,7 @@ typedef enum {
     SubGhzCustomEventViewFreqAnalPresetRx,
 
     SubGhzCustomEventByteInputDone,
+    SubGhzCustomEventSceneFeaturePluginMissing,
 } SubGhzCustomEvent;
 
 typedef enum {

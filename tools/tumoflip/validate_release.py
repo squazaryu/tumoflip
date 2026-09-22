@@ -882,6 +882,15 @@ def validate_resources_archive(
                 raise ValidationError(f"Package entry differs in resources.ths: {relative}")
 
 
+def validate_subghz_feature_resources(repo_root: Path, resources: Path, archive_path: Path) -> None:
+    archive_hashes = resources_archive_hashes(repo_root, archive_path)
+    for name in ("subghz_frequency_analyzer.fal", "subghz_add_manually.fal"):
+        relative = "apps_data/subghz/plugins/" + name
+        path = require_file(resources / relative, "Sub-GHz feature plugin")
+        if archive_hashes.get(relative) != sha256(path):
+            raise ValidationError(f"Sub-GHz feature differs or is absent in updater: {relative}")
+
+
 def prune_legacy_resource_exports(resources: Path) -> None:
     for legacy, canonical in RELEASE_CLEANUP_PATHS.items():
         if legacy == canonical:
@@ -1051,6 +1060,7 @@ def validate_release(
         build_dir / "resources/Manifest", "resource manifest"
     ).parent
     validate_static_sd_resources(repo_root, resources)
+    validate_subghz_feature_resources(repo_root, resources, referenced["Resources"])
     validate_layout(resources)
     unexpectedly_bundled = sorted(
         relative

@@ -2,6 +2,7 @@
 
 import re
 import unittest
+from tools.tumoflip.check_subghz_drift import core_shared_path, normalized_shared_source
 from pathlib import Path
 
 
@@ -267,7 +268,7 @@ class ArfSubGhzFullTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         view = (
             REPO_ROOT
-            / "applications/main/subghz/views/subghz_frequency_analyzer.c"
+            / "applications/main/subghz/plugins/frequency_analyzer/subghz_frequency_analyzer.c"
         ).read_text(encoding="utf-8")
         notebook = (
             REPO_ROOT
@@ -306,7 +307,7 @@ class ArfSubGhzFullTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         view = (
             REPO_ROOT
-            / "applications/main/subghz/views/subghz_frequency_analyzer.c"
+            / "applications/main/subghz/plugins/frequency_analyzer/subghz_frequency_analyzer.c"
         ).read_text(encoding="utf-8")
 
         self.assertIn("SubGhzCustomEventViewFreqAnalOkLong", view)
@@ -319,7 +320,6 @@ class ArfSubGhzFullTest(unittest.TestCase):
             "helpers/subghz_frequency_analyzer_worker.h",
             "helpers/subghz_frequency_notebook.c",
             "helpers/subghz_frequency_notebook.h",
-            "scenes/subghz_scene_frequency_analyzer.c",
             "views/subghz_frequency_analyzer.c",
             "views/subghz_frequency_analyzer.h",
         )
@@ -329,11 +329,11 @@ class ArfSubGhzFullTest(unittest.TestCase):
 
         for relative in shared_files:
             with self.subTest(relative=relative):
-                core = REPO_ROOT / "applications/main/subghz" / relative
+                core = core_shared_path(REPO_ROOT, relative)
                 arf = REPO_ROOT / "applications_user/arf_subghz_full" / relative
                 self.assertTrue(core.is_file())
                 self.assertTrue(arf.is_file())
-                self.assertEqual(core.read_bytes(), arf.read_bytes())
+                self.assertEqual(normalized_shared_source(core, relative), normalized_shared_source(arf, relative))
                 self.assertIn(relative, drift_manifest)
 
         core_app = (
@@ -342,14 +342,13 @@ class ArfSubGhzFullTest(unittest.TestCase):
         core_header = (
             REPO_ROOT / "applications/main/subghz/subghz_i.h"
         ).read_text(encoding="utf-8")
-        self.assertIn("void subghz_ensure_frequency_analyzer_view", core_app)
-        self.assertIn("void subghz_ensure_frequency_analyzer_view", core_header)
+        self.assertIn("bool subghz_ensure_frequency_analyzer_view", core_app)
+        self.assertIn("bool subghz_ensure_frequency_analyzer_view", core_header)
 
     def test_preset_scan_is_shared_with_the_canonical_core_analyzer(self) -> None:
         shared_files = (
             "helpers/subghz_frequency_analyzer_worker.c",
             "helpers/subghz_frequency_analyzer_worker.h",
-            "scenes/subghz_scene_frequency_analyzer.c",
             "views/subghz_frequency_analyzer.c",
             "views/subghz_frequency_analyzer.h",
         )
@@ -358,7 +357,7 @@ class ArfSubGhzFullTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         worker = (
             REPO_ROOT
-            / "applications/main/subghz/helpers/subghz_frequency_analyzer_worker.c"
+            / "applications/main/subghz/plugins/frequency_analyzer/subghz_frequency_analyzer_worker.c"
         ).read_text(encoding="utf-8")
         scene = (
             REPO_ROOT
@@ -368,9 +367,9 @@ class ArfSubGhzFullTest(unittest.TestCase):
         for relative in shared_files:
             with self.subTest(relative=relative):
                 self.assertIn(relative, drift_manifest)
-                core = REPO_ROOT / "applications/main/subghz" / relative
+                core = core_shared_path(REPO_ROOT, relative)
                 arf = REPO_ROOT / "applications_user/arf_subghz_full" / relative
-                self.assertEqual(core.read_bytes(), arf.read_bytes())
+                self.assertEqual(normalized_shared_source(core, relative), normalized_shared_source(arf, relative))
         self.assertIn("subghz_frequency_analyzer_worker_set_preset_callback", worker)
         self.assertIn("SubGhzCustomEventViewFreqAnalPresetRx", scene)
 

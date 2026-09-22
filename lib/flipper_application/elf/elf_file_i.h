@@ -51,6 +51,9 @@ struct ELFFile {
     ELFSection* fini_array;
 
     bool init_array_called;
+    size_t failed_allocation_size;
+    size_t failure_free_heap;
+    size_t failure_max_block;
 };
 
 #ifdef __cplusplus

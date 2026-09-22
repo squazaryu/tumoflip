@@ -146,7 +146,7 @@ static void hid_hal_mouse_move(Hid* h,int8_t x,int8_t y) {
                     run_c(fixture.replace("static uint32_t furi_ms_to_ticks", "__attribute__((unused)) static uint32_t furi_ms_to_ticks").replace("static void furi_timer_flush", "__attribute__((unused)) static void furi_timer_flush"))
 
     def test_secplus_generation_frees_scratch_and_preserves_live_tx(self):
-        text = source("applications/main/subghz/helpers/subghz_txrx_create_protocol_key.c")
+        text = source("applications/main/subghz/plugins/add_manually/subghz_txrx_create_protocol_key.c")
         run_c(PRELUDE + r"""
 typedef int SubGhzTransmitter;
 typedef struct {SubGhzTransmitter* transmitter;void* environment;void* fff_data;void* preset;} SubGhzTxRx;
@@ -179,7 +179,7 @@ int main(void) {
 """)
 
     def test_all_generation_helpers_use_function_local_transmitters(self):
-        text = source("applications/main/subghz/helpers/subghz_txrx_create_protocol_key.c")
+        text = source("applications/main/subghz/plugins/add_manually/subghz_txrx_create_protocol_key.c")
         self.assertNotIn("->transmitter", text)
         self.assertEqual(text.count("subghz_transmitter_alloc_init("), 15)
         self.assertEqual(text.count("subghz_transmitter_free(transmitter)"), 15)

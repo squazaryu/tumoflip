@@ -1,3 +1,8 @@
+## Unreleased — Dev 009-008
+- Sub-GHz: load Frequency Analyzer view/worker and Add Manually from checked feature FALs; retain notebook, preset handoff, radio ownership and creation behavior. Stop worker/callbacks before unmapping.
+- Loader: expose structured launch diagnostics, distinguish fragmented/insufficient RAM, add stack preflight and bound manifest reads. F7 API advances additively to 88.13.
+- Marauder Companion 7.13-tumo: add Recon/list/Protocol Info/SPIFFS status and backup, fix command-specific Back behavior and offer Wardrive POI via long OK in the running console. Hardware acceptance remains pending.
+
 ## Tumoflip Dev 009-007
 - Specter FW Package 3.2: adapt upstream 3.0.1 survey/fingerprint spacing, suppress the reader ring during calibration, report TOO SHORT for empty surveys under 10 seconds, and wrap text log entries while retaining checked SD writes and rollback.
 - Sub-GHz: allow existing PSA/PSA2 receivers through AM as well as FM filtering; add a bounded Honda 315 MHz RX profile shared by Standard/Read RAW and ProtoPirate. Existing profile indices and independent settings remain stable.

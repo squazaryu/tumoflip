@@ -5,12 +5,36 @@ from __future__ import annotations
 
 import argparse
 import sys
+import re
+import posixpath
 from pathlib import Path
 
 
 DEFAULT_MANIFEST = Path("tools/tumoflip/subghz_drift_manifest.txt")
 CORE_ROOT = Path("applications/main/subghz")
 ARF_ROOT = Path("applications_user/arf_subghz_full")
+
+CORE_RELOCATIONS = {
+    "scenes/subghz_scene_set_key.c": "plugins/add_manually/subghz_scene_set_key.c",
+    "helpers/subghz_frequency_analyzer_worker.c": "plugins/frequency_analyzer/subghz_frequency_analyzer_worker.c",
+    "views/subghz_frequency_analyzer.c": "plugins/frequency_analyzer/subghz_frequency_analyzer.c",
+}
+
+
+def core_shared_path(repo_root: Path, relative: str) -> Path:
+    return repo_root / CORE_ROOT / CORE_RELOCATIONS.get(relative, relative)
+
+
+def normalized_shared_source(path: Path, relative: str) -> str | bytes:
+    if path.suffix not in (".c", ".h"):
+        return path.read_bytes()
+    text = path.read_text(encoding="utf-8")
+    def include(match):
+        internal, quoted = match.groups()
+        name = internal or posixpath.normpath(posixpath.join(posixpath.dirname(relative), quoted))
+        return "#include <subghz/" + name + ">"
+    return re.sub(r'^#include (?:<subghz/([^>]+)>|"([^"]+)")',
+                  include, text, flags=re.M)
 
 
 def load_manifest(path: Path) -> list[str]:
@@ -53,7 +77,7 @@ def common_file_stats(repo_root: Path) -> tuple[int, int, int]:
 def check_manifest(repo_root: Path, manifest_path: Path) -> list[str]:
     failures: list[str] = []
     for relative in load_manifest(manifest_path):
-        core_path = repo_root / CORE_ROOT / relative
+        core_path = core_shared_path(repo_root, relative)
         arf_path = repo_root / ARF_ROOT / relative
         if not core_path.is_file():
             failures.append(f"missing core file: {relative}")
@@ -61,7 +85,7 @@ def check_manifest(repo_root: Path, manifest_path: Path) -> list[str]:
         if not arf_path.is_file():
             failures.append(f"missing ARF file: {relative}")
             continue
-        if core_path.read_bytes() != arf_path.read_bytes():
+        if normalized_shared_source(core_path, relative) != normalized_shared_source(arf_path, relative):
             failures.append(f"drifted shared file: {relative}")
     return failures
 

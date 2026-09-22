@@ -90,3 +90,12 @@ state.
 This boundary is deliberate: pure index calculation can be shared safely, but
 radio lifecycle code and scene navigation stay local until they have a smaller
 service/client API and hardware validation.
+# On-demand feature modules (Dev 009-008)
+
+Core Frequency Analyzer view/worker and Add Manually now live under
+`applications/main/subghz/plugins/`. The Sub-GHz private API table and explicit
+feature ABI resolve their imports; both modules ship with updater resources.
+The resident analyzer scene retains Tumoflip navigation and notebook behavior.
+Its lifecycle intentionally differs from ARF's bundled analyzer scene; shared
+view/worker bodies still pass the relocation-aware drift check.
+See [implementation and acceptance](dev-009-008-diagnostics.md).

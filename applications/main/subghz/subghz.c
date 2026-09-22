@@ -6,6 +6,7 @@
 #include <lib/toolbox/path.h>
 #include <float_tools.h>
 #include "subghz_i.h"
+#include "helpers/subghz_feature_plugin.h"
 
 #include <stdlib.h>
 
@@ -99,16 +100,34 @@ static void subghz_rpc_command_callback(const RpcAppSystemEvent* event, void* co
     }
 }
 
-void subghz_ensure_frequency_analyzer_view(SubGhz* subghz) {
+bool subghz_ensure_frequency_analyzer_view(SubGhz* subghz) {
     furi_assert(subghz);
 
     if(!subghz->subghz_frequency_analyzer) {
-        subghz->subghz_frequency_analyzer = subghz_frequency_analyzer_alloc(subghz->txrx);
+        subghz->analyzer_plugin = subghz_feature_plugin_load(
+            subghz, &subghz->analyzer_plugin_manager, SUBGHZ_ANALYZER_PLUGIN_APP_ID,
+            SUBGHZ_FEATURE_PLUGIN_DIR "subghz_frequency_analyzer.fal",
+            "Analyzer unavailable.\nUpdate firmware\nresources on SD.");
+        if(!subghz->analyzer_plugin) return false;
+        subghz->subghz_frequency_analyzer = subghz->analyzer_plugin->alloc(subghz->txrx);
         view_dispatcher_add_view(
             subghz->view_dispatcher,
             SubGhzViewIdFrequencyAnalyzer,
-            subghz_frequency_analyzer_get_view(subghz->subghz_frequency_analyzer));
+            subghz->analyzer_plugin->get_view(subghz->subghz_frequency_analyzer));
     }
+    return true;
+}
+
+void subghz_release_frequency_analyzer_view(SubGhz* subghz) {
+    if(subghz->subghz_frequency_analyzer) {
+        // Switch before removal: the view exit joins the plugin's worker.
+        view_dispatcher_switch_to_view(subghz->view_dispatcher, SubGhzViewIdWidget);
+        view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdFrequencyAnalyzer);
+        subghz->analyzer_plugin->free(subghz->subghz_frequency_analyzer);
+        subghz->subghz_frequency_analyzer = NULL;
+    }
+    subghz->analyzer_plugin = NULL;
+    subghz_feature_plugin_unload(subghz, &subghz->analyzer_plugin_manager);
 }
 
 void subghz_ensure_receiver_view(SubGhz* subghz) {
@@ -163,6 +182,15 @@ static void subghz_load_custom_presets(SubGhzSetting* setting) {
 
 SubGhz* subghz_alloc(bool alloc_for_tx_only) {
     SubGhz* subghz = malloc(sizeof(SubGhz));
+    subghz->subghz_frequency_analyzer = NULL;
+    subghz->analyzer_plugin = NULL;
+    subghz->analyzer_plugin_manager = NULL;
+    subghz->add_manually_plugin = NULL;
+    subghz->add_manually_plugin_manager = NULL;
+    subghz->add_manually_dispatch_depth = 0;
+    subghz->add_manually_unload_pending = false;
+    subghz->api_resolver = NULL;
+    subghz->api_resolver_refs = 0;
     subghz->return_to_launcher = false;
 
     subghz->file_path = furi_string_alloc();
@@ -257,13 +285,6 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
             SubGhzViewIdVariableItemList,
             variable_item_list_get_view(subghz->variable_item_list));
 
-        // Frequency Analyzer
-        // View knows too much
-        subghz->subghz_frequency_analyzer = subghz_frequency_analyzer_alloc(subghz->txrx);
-        view_dispatcher_add_view(
-            subghz->view_dispatcher,
-            SubGhzViewIdFrequencyAnalyzer,
-            subghz_frequency_analyzer_get_view(subghz->subghz_frequency_analyzer));
     }
     // Read RAW
     subghz->subghz_read_raw = subghz_read_raw_alloc(alloc_for_tx_only);
@@ -330,6 +351,8 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
 
 void subghz_free(SubGhz* subghz, bool alloc_for_tx_only) {
     furi_assert(subghz);
+    subghz_release_frequency_analyzer_view(subghz);
+    subghz_add_manually_plugin_unload(subghz);
 
     if(!alloc_for_tx_only &&
        (subghz->decode_raw_file_worker_encoder != NULL || subghz->decode_raw_auto)) {
@@ -375,9 +398,6 @@ void subghz_free(SubGhz* subghz, bool alloc_for_tx_only) {
         view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdVariableItemList);
         variable_item_list_free(subghz->variable_item_list);
 
-        // Frequency Analyzer
-        view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdFrequencyAnalyzer);
-        subghz_frequency_analyzer_free(subghz->subghz_frequency_analyzer);
     }
     // Read RAW
     view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdReadRAW);

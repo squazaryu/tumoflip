@@ -1,5 +1,6 @@
 #include <bt/bt_service/bt_i.h>
 #include <cli/cli.h>
+#include <loader/loader.h>
 #include <furi.h>
 #include <furi_hal_info.h>
 #include <furi_hal_power.h>
@@ -23,7 +24,7 @@
 #define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX  24U
 #define TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
 #define TUMOFLIP_RUNTIME_CAPABILITIES                                       \
-    "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;pkg=1;radio=2;sd=1;" \
+    "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;pkg=1;radio=2;sd=1;ld=1;" \
     "fabric=1;time=1;gps=1;net=1;feat=pkg,radio,trace,twin,transfer,fabric,time,gps,net"
 
 typedef struct {
@@ -494,6 +495,14 @@ static void
         char payload[TUMOFLIP_RUNTIME_STATUS_MAX];
         tumoflip_runtime_make_status_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "status", payload, false);
+    } else if(strcmp(command, "loader_diag") == 0) {
+        Loader* loader = furi_record_open(RECORD_LOADER);
+        FuriString* diagnostic = furi_string_alloc();
+        loader_get_last_diagnostic(loader, diagnostic);
+        tumoflip_runtime_reply(runtime, event->request_id, "loader_diag",
+                               furi_string_get_cstr(diagnostic), false);
+        furi_string_free(diagnostic);
+        furi_record_close(RECORD_LOADER);
     } else if(strcmp(command, "trace") == 0) {
         char payload[TUMOFLIP_RUNTIME_TRACE_MAX];
         tumoflip_runtime_make_trace_payload(runtime, payload, sizeof(payload));
