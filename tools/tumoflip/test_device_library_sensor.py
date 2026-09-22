@@ -93,14 +93,16 @@ int main(void){SensorObservation samples[4]={0};SensorFitResult r;
  assert(found);
  samples[3].measured10=400;assert(sensor_fit(samples,24,&r));
  for(unsigned i=0;i<r.count;i++)assert(!r.candidates[i].holdout_match);
- for(unsigned i=0;i<3;i++)samples[i].measured10=1;assert(!sensor_fit(samples,24,&r));
+ for(unsigned i=0;i<3;i++) { samples[i].measured10=1; }
+ assert(!sensor_fit(samples,24,&r));
  assert(!sensor_fit(NULL,24,&r));assert(!sensor_fit(samples,0,&r));
  for(unsigned i=0;i<4;i++){put(&samples[i],(uint16_t)(int16_t)(-200+(int)i*137));samples[i].measured10=-200+(int)i*137;}
  assert(sensor_fit(samples,24,&r));found=false;
  for(unsigned i=0;i<r.count;i++)if(r.candidates[i].start==8&&r.candidates[i].width==16&&r.candidates[i].signed_value&&r.candidates[i].scale10==1&&r.candidates[i].offset10==0){assert(r.candidates[i].holdout_match);found=true;}
  assert(found);
  memset(samples,0,sizeof(samples));assert(!sensor_fit(samples,24,&r));
- for(unsigned i=0;i<4;i++)samples[i].measured10=i*10;assert(!sensor_fit(samples,24,&r));
+ for(unsigned i=0;i<4;i++) { samples[i].measured10=i*10; }
+ assert(!sensor_fit(samples,24,&r));
  samples[0].measured10=1000001;assert(!sensor_fit(samples,24,&r));assert(!sensor_fit(samples,97,&r));assert(!sensor_fit(samples,24,NULL));
  for(unsigned i=0;i<4;i++){put(&samples[i],101+i*31);samples[i].measured10=(101+i*31)*10-5;}
  assert(sensor_fit(samples,24,&r));found=false;for(unsigned i=0;i<r.count;i++)if(r.candidates[i].scale10==10&&r.candidates[i].offset10==-5&&r.candidates[i].holdout_match)found=true;assert(found);

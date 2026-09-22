@@ -84,7 +84,8 @@ int main(void){CorpusRaw p;char s[2048];
  strcpy(s,"Preset: ");memset(s+8,'x',70);s[78]='\n';s[79]=0;assert(!parse(&p,s,1));
  snprintf(s,sizeof(s),"%sUnknown: preserved\nRAW_Data: 350 -700\n",header);assert(parse(&p,s,1));
  snprintf(s,sizeof(s),"%sCustom_preset_module: CC1101\nCustom_preset_data: ",header);
- for(unsigned i=0;i<100;i++)strcat(s,"00 ");strcat(s,"\nRAW_Data: 350 -700\n");
+ for(unsigned i=0;i<100;i++) { strcat(s,"00 "); }
+ strcat(s,"\nRAW_Data: 350 -700\n");
  assert(parse(&p,s,1));
  assert(sizeof(p)<768);return 0;
 }''', "corpus_raw.c", CORPUS)
