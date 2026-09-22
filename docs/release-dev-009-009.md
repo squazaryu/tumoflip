@@ -2,6 +2,12 @@
 
 ## Changes
 
+- **Bluetooth Remote**: repair the host-stack controller path behind persistent
+  `Cannot select peer / Retry from Devices`. Use supported ACI list operations,
+  an advertising mode that actually enforces the selected-host filter, and
+  controller privacy with the corresponding enhanced connection event. The
+  default Companion profile remains on its original startup path. Existing bonds
+  and local names are preserved; no pairing reset or radio-stack replacement.
 - **Work Profiles**: named, SD-backed Standard/Read RAW settings, preset names,
   Protocol Pack, hopping and radio choice. Explicit session-scoped Apply; the two
   frequency/modulation pairs stay independent. UI is an on-demand FAL.
@@ -24,6 +30,9 @@
 
 - Public F7 API remains **88.13**. Private Sub-GHz feature ABI is **1002**:
   update Analyzer, Add Manually and Work Profiles FALs together with firmware.
+- The BLE repair is in firmware, not `hid_ble.fap`. Bluetooth Remote 1.3 from
+  Dev 019/020 remains usable and is retained byte-for-byte in Dev 021. A package
+  reinstall alone cannot repair the old core. See [controller audit](ble-peer-controller-2026-09-22.md).
 - Device Library + file_history.fal are delivered through **FW Packages Dev 021**,
   not updater resources. Native NFC/IR, Tumo Acceptance and TumoSpectrum come from
   the firmware updater. Their paths are not independent-catalog managed overlays
@@ -59,6 +68,11 @@ Physical acceptance is still pending, not covered by host tests:
 5. Use four short captures of your own sensor with measured values. Confirm a
    failed held-out hypothesis stays failed; a match is not proof of semantics.
 6. Smoke-test Bluetooth/Companion, NFC, SD, native apps and FW Packages status.
+7. Cold-start Bluetooth Remote with a phone and PC nearby. Select/name the PC;
+   the phone must not take over while the PC is unavailable. Check explicit Add,
+   cancel, reconnect after host address rotation, rename, repeat launch, and return
+   to Companion. Test Forget only with a disposable bond. Record exact firmware,
+   FW Packages and Remote versions if any action still fails.
 
 No device installation, real-sensor acceptance or power-loss test is implied by
 the native fixtures or by publishing a Dev candidate.
