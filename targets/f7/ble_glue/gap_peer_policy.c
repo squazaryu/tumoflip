@@ -1,6 +1,17 @@
 #include "gap_peer_policy.h"
 #include <ble/ble.h>
+#include <furi.h>
 #include <string.h>
+
+#define TAG "BlePeer"
+
+static bool gap_peer_command_ok(const char* operation, tBleStatus status) {
+    if(status != BLE_STATUS_SUCCESS) {
+        // Keep the failing stage/status available without logging host identities or keys.
+        FURI_LOG_E(TAG, "%s failed: 0x%02X", operation, status);
+    }
+    return status == BLE_STATUS_SUCCESS;
+}
 
 bool gap_peer_read(GapBondedDevices* devices) {
     if(!devices) return false;
@@ -25,8 +36,7 @@ bool gap_peer_read(GapBondedDevices* devices) {
 bool gap_peer_select(const GapBondedDevice* peer) {
     if(!peer) {
         // Open pairing is explicit; a failed selected-peer operation never calls this.
-        return hci_le_set_address_resolution_enable(0) == BLE_STATUS_SUCCESS &&
-               aci_gap_configure_filter_accept_list() == BLE_STATUS_SUCCESS;
+        return gap_peer_command_ok("Pairing list", aci_gap_configure_filter_accept_list());
     }
     if(peer->address_type > 1 ||
        aci_gap_is_device_bonded(peer->address_type, peer->address) != BLE_STATUS_SUCCESS) {
@@ -36,9 +46,10 @@ bool gap_peer_select(const GapBondedDevice* peer) {
     memcpy(entry.Address, peer->address, sizeof(entry.Address));
     // Mode 5 replaces BOTH lists from the existing bond, including its peer IRK.
     // A phone changing its private address is still the same bonded identity.
-    return hci_le_set_address_resolution_enable(0) == BLE_STATUS_SUCCESS &&
-           aci_gap_add_devices_to_list(1, &entry, 5) == BLE_STATUS_SUCCESS &&
-           hci_le_set_address_resolution_enable(1) == BLE_STATUS_SUCCESS;
+    // ACI owns these lists on the host+controller stack. The raw HCI address-
+    // resolution command (0x202D) is exposed only by ST's LL-only stack variants;
+    // calling it here rejects every selection before ACI can configure the peer.
+    return gap_peer_command_ok("Selected list", aci_gap_add_devices_to_list(1, &entry, 5));
 }
 
 bool gap_peer_forget(const GapBondedDevice* peer) {
