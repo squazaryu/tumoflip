@@ -1,4 +1,5 @@
 #include "nfc_device_i.h"
+#include <toolbox/file_history.h>
 
 #include <storage/storage.h>
 #include <flipper_format/flipper_format.h>
@@ -167,6 +168,7 @@ bool nfc_device_save(NfcDevice* instance, const char* path) {
 
     do {
         // Open file
+        if(!file_history_before_write(storage, path)) break;
         if(!flipper_format_buffered_file_open_always(ff, path)) break;
 
         // Write header

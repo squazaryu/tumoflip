@@ -1,4 +1,5 @@
 #include "subghz_i.h"
+#include <toolbox/file_history.h>
 #include "assets_icons.h"
 #include "subghz/types.h"
 #include <furi.h>
@@ -324,6 +325,10 @@ bool subghz_save_protocol_to_file(
             break;
         }
 
+        if(!file_history_before_write(storage, dev_file_name)) {
+            dialog_message_show_storage_error(subghz->dialogs, "History backup failed.\nFile unchanged.");
+            break;
+        }
         if(!storage_simply_remove(storage, dev_file_name)) {
             break;
         }

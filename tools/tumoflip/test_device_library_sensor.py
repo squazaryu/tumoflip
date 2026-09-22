@@ -3,6 +3,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import re
 
 ROOT = Path(__file__).resolve().parents[2]
 LIBRARY = ROOT / "applications/system/device_library"
@@ -43,6 +44,29 @@ int main(void){
  memset(gen,0,sizeof(gen));assert(library_newest_slot(gen)==-1);assert(library_write_slot(gen)==0);
  return 0;
 }''', "library_model.c", LIBRARY)
+
+    def test_history_and_cards_with_real_files_and_fault_injection(self):
+        fixtures = ROOT / "tools/tumoflip/fixtures"
+        sources = [LIBRARY / "library_model.h", ROOT / "lib/toolbox/file_history.h",
+                   LIBRARY / "library_model.c", LIBRARY / "card_store.h",
+                   LIBRARY / "card_store.c", LIBRARY / "history_engine.c"]
+        body = '#include "library_io_stubs.h"\n'
+        for source in sources:
+            body += re.sub(r"^#(?:include|pragma).*\n", "", source.read_text(), flags=re.M) + "\n"
+        body += (fixtures / "library_io_host.c").read_text()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)
+            (path / "test.c").write_text(body)
+            (path / "sd").mkdir()
+            build = subprocess.run(["cc", "-std=c11", "-D_DEFAULT_SOURCE", "-Wall", "-Wextra",
+                "-Werror", "-Wno-unused-function", "-fsanitize=address,undefined",
+                '-DMBEDTLS_CONFIG_FILE="library_crypto_config.h"',
+                "-I", str(fixtures), "-I", str(ROOT / "lib/mbedtls/include"),
+                str(path / "test.c"), str(ROOT / "lib/mbedtls/library/sha256.c"),
+                str(ROOT / "lib/mbedtls/library/platform_util.c"), "-o", str(path / "test")], capture_output=True, text=True)
+            self.assertEqual(build.returncode, 0, build.stderr)
+            run = subprocess.run([str(path / "test"), str(path / "sd")], capture_output=True, text=True)
+            self.assertEqual(run.returncode, 0, run.stderr)
 
     def test_sensor_training_and_held_out_validation(self):
         self.native(r'''

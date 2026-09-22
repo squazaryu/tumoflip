@@ -1,0 +1,26 @@
+App(
+    appid="device_library",
+    name="Device Library",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="device_library_app",
+    sources=["device_library.c", "card_store.c", "library_model.c"],
+    requires=["gui", "dialogs", "storage", "loader"],
+    stack_size=4096,
+    fap_icon="../protopirate_to_subghz/icon.png",
+    fap_category="Tools",
+    fap_version="1.0.0",
+    fap_description="Local device cards and opt-in version history. No automatic radio actions.",
+    fap_package_only=True,
+    fap_libs=["mbedtls"],
+)
+App(
+    appid="file_history",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="file_history_ep",
+    requires=["device_library"],
+    sources=["history_engine.c", "library_model.c"],
+    fap_package_only=True,
+    fap_libs=["mbedtls"],
+)
