@@ -66,6 +66,12 @@ int aci_gap_slave_security_req(unsigned handle){assert(handle==0);security++;ret
 
 
 class BlePeerPrivacyTests(unittest.TestCase):
+    def test_pr_and_release_ci_run_the_controller_contract(self):
+        for workflow in ("pr-build.yml", "release.yml"):
+            with self.subTest(workflow=workflow):
+                text = (ROOT / ".github/workflows" / workflow).read_text()
+                self.assertIn("tools.tumoflip.test_ble_peer_privacy", text)
+
     def test_selected_advertising_filters_and_open_pairing_is_explicit(self):
         source = (ROOT / "targets/f7/ble_glue/gap.c").read_text()
         body = function(source, "static void gap_advertise_start(GapState new_state) {")
