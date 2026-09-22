@@ -80,10 +80,13 @@ int main(void){CorpusRaw p;char s[2048];
  const char* invalid[]={"Filetype: Other\n","Version: 9\n","Frequency: 0\n", "Frequency: 4294967296\n","Frequency: 43x\n","Preset: \n","Protocol: Nice\n"};
  for(unsigned i=0;i<sizeof(invalid)/sizeof(*invalid);i++)assert(!parse(&p,invalid[i],2));
  memset(s,'x',40);s[40]=0;assert(!parse(&p,s,2));
- strcpy(s,"Unknown: ");memset(s+9,'x',100);s[109]=0;assert(!parse(&p,s,1));
+ strcpy(s,"Unknown: ");memset(s+9,'x',600);s[609]=0;assert(!parse(&p,s,1));
  strcpy(s,"Preset: ");memset(s+8,'x',70);s[78]='\n';s[79]=0;assert(!parse(&p,s,1));
  snprintf(s,sizeof(s),"%sUnknown: preserved\nRAW_Data: 350 -700\n",header);assert(parse(&p,s,1));
- assert(sizeof(p)<256);return 0;
+ snprintf(s,sizeof(s),"%sCustom_preset_module: CC1101\nCustom_preset_data: ",header);
+ for(unsigned i=0;i<100;i++)strcat(s,"00 ");strcat(s,"\nRAW_Data: 350 -700\n");
+ assert(parse(&p,s,1));
+ assert(sizeof(p)<768);return 0;
 }''', "corpus_raw.c", CORPUS)
 
     def test_corpus_is_offline_and_preserves_references(self):
