@@ -189,6 +189,37 @@ static void scene_manager_next_scene(void*p,int s){(void)p;scene=s;}
 int main(void){NfcApp a={0};nfc_show_initial_scene_for_device(&a,true);assert(scene==NfcSceneSavedMenu&&deeds==0&&cache==1);nfc_show_initial_scene_for_device(&a,false);assert(scene==NfcSceneEmulate&&deeds==1);return 0;}
 ''')
 
+    def test_subghz_short_write_is_not_reported_as_saved(self):
+        body = function((ROOT / "applications/main/subghz/subghz_i.c").read_text(), "bool subghz_save_protocol_to_file(")
+        native(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+typedef int Storage;typedef int Stream;typedef int FlipperFormat;typedef int FuriString;typedef struct{void*dialogs;}SubGhz;
+#define furi_assert assert
+#define RECORD_STORAGE "storage"
+enum{FSE_OK,FSOM_CREATE_ALWAYS,StreamOffsetFromStart};
+static int storage,stream,text;static bool checkpoint=true;static size_t written=6;static int removed;
+static Storage*furi_record_open(const char*n){(void)n;return &storage;}
+static void furi_record_close(const char*n){(void)n;}
+static Stream*flipper_format_get_raw_stream(FlipperFormat*f){(void)f;return &stream;}
+static FuriString*furi_string_alloc(void){return &text;}
+static void furi_string_free(FuriString*f){(void)f;}
+static const char*furi_string_get_cstr(FuriString*f){(void)f;return "/ext/subghz";}
+static void path_extract_dirname(const char*p,FuriString*s){(void)p;(void)s;}
+static bool flipper_format_delete_key(FlipperFormat*f,const char*k){(void)f;(void)k;return true;}
+static bool storage_simply_mkdir(Storage*s,const char*p){(void)s;(void)p;return true;}
+static void dialog_message_show_storage_error(void*d,const char*m){(void)d;(void)m;}
+static bool file_history_before_write(Storage*s,const char*p){(void)s;(void)p;return checkpoint;}
+static bool storage_simply_remove(Storage*s,const char*p){(void)s;(void)p;removed++;return true;}
+static bool stream_seek(Stream*s,int p,int mode){(void)s;(void)p;(void)mode;return true;}
+static size_t __attribute__((unused)) stream_size(Stream*s){(void)s;return 6;}
+static size_t stream_save_to_file(Stream*s,Storage*d,const char*p,int mode){(void)s;(void)d;(void)p;(void)mode;return written;}
+static int storage_common_stat(Storage*s,const char*p,void*i){(void)s;(void)p;(void)i;return FSE_OK;}
+''' + body + r'''
+int main(void){SubGhz s={0};FlipperFormat f=0;assert(subghz_save_protocol_to_file(&s,&f,"/ext/subghz/Test.sub"));written=2;assert(!subghz_save_protocol_to_file(&s,&f,"/ext/subghz/Test.sub"));checkpoint=false;removed=0;assert(!subghz_save_protocol_to_file(&s,&f,"/ext/subghz/Test.sub")&&removed==0);return 0;}
+''')
+
 
 if __name__ == "__main__":
     unittest.main()
