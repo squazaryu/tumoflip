@@ -21,7 +21,7 @@ typedef struct {uint64_t size;bool directory;} FileInfo;
 typedef struct {Storage*s;FILE*fp;DIR*dir;FS_Error error;char path[1400];} File;
 typedef struct {char text[8192];} FuriString;
 static int64_t write_budget=-1,read_budget=-1;
-static bool sync_failure,sd_failure;
+static bool sync_failure,sd_failure,mkdir_failure,remove_failure;
 static FS_Error ferr(void){return errno==ENOENT?FSE_NOT_EXIST:errno==EEXIST?FSE_EXIST:FSE_INTERNAL;}
 static void local_path(Storage*s,const char*p,char*out){assert(!strncmp(p,"/ext/",5));snprintf(out,1400,"%s/%s",s->root,p+5);}
 static FuriString*furi_string_alloc(void){return calloc(1,sizeof(FuriString));}
@@ -42,8 +42,8 @@ static bool storage_file_close(File*f){if(!f->fp)return false;int r=fclose(f->fp
 static void storage_file_free(File*f){if(f->fp)fclose(f->fp);if(f->dir)closedir(f->dir);free(f);}
 static FS_Error storage_file_get_error(File*f){return f->error;}
 static FS_Error storage_common_stat(Storage*s,const char*p,FileInfo*i){char b[1400];local_path(s,p,b);struct stat st;if(stat(b,&st))return ferr();if(i){i->size=st.st_size;i->directory=S_ISDIR(st.st_mode);}return FSE_OK;}
-static FS_Error storage_common_remove(Storage*s,const char*p){char b[1400];local_path(s,p,b);return unlink(b)?ferr():FSE_OK;}
-static bool storage_simply_mkdir(Storage*s,const char*p){char b[1400];local_path(s,p,b);return !mkdir(b,0700)||errno==EEXIST;}
+static FS_Error storage_common_remove(Storage*s,const char*p){if(remove_failure)return FSE_INTERNAL;char b[1400];local_path(s,p,b);return unlink(b)?ferr():FSE_OK;}
+static bool storage_simply_mkdir(Storage*s,const char*p){if(mkdir_failure)return false;char b[1400];local_path(s,p,b);return !mkdir(b,0700)||errno==EEXIST;}
 static FS_Error storage_sd_status(Storage*s){(void)s;return sd_failure?FSE_INTERNAL:FSE_OK;}
 static bool storage_dir_open(File*f,const char*p){local_path(f->s,p,f->path);f->dir=opendir(f->path);return f->dir!=NULL;}
 static bool storage_dir_read(File*f,FileInfo*i,char*n,size_t cap){struct dirent*d;while((d=readdir(f->dir))){if(!strcmp(d->d_name,".")||!strcmp(d->d_name,".."))continue;char p[1800];snprintf(p,sizeof(p),"%s/%s",f->path,d->d_name);struct stat st;if(stat(p,&st))return false;i->directory=S_ISDIR(st.st_mode);i->size=st.st_size;snprintf(n,cap,"%s",d->d_name);return true;}return false;}

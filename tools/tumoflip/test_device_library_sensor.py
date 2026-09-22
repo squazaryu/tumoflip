@@ -33,14 +33,22 @@ int main(void){
  DeviceCard c={.name="Weather station",.notes="Own sensor",.tags="home outdoor"};
  assert(library_card_valid(&c));assert(library_name_valid("AC-01"));
  assert(!library_name_valid("../a"));assert(!library_name_valid(""));
+ assert(!library_name_valid(NULL));assert(!library_name_valid(" bad"));assert(!library_name_valid("bad "));assert(!library_name_valid("abcdefghijklmnopqrstuvwxyz"));
  assert(library_path_valid("/ext/subghz/Test.sub"));
  assert(!library_path_valid("/ext/subghz/../nfc/Test.nfc"));
  assert(!library_path_valid("/int/nfc/Test.nfc"));
  assert(!library_path_valid("/ext/a//b"));
  assert(!library_path_valid("/ext/a\nb"));
+ assert(!library_path_valid(NULL));assert(!library_path_valid("/ext/"));assert(!library_path_valid("/ext/a/"));assert(!library_path_valid("/ext/a/."));assert(!library_path_valid("/ext/a/.."));assert(!library_path_valid("/ext/a\\b"));assert(!library_path_valid("/ext/a/./b"));
+ assert(!library_card_valid(NULL));
  strcpy(c.links[0],"/ext/subghz/Test.sub");c.link_count=1;assert(library_card_valid(&c));
  c.link_count=9;assert(!library_card_valid(&c));c.link_count=1;
  memset(c.notes,'x',sizeof(c.notes));assert(!library_card_valid(&c));
+ memset(c.notes,0,sizeof(c.notes));strcpy(c.tags,"bad\ntag");assert(!library_card_valid(&c));c.tags[0]=0;
+ memset(c.name,'x',sizeof(c.name));assert(!library_card_valid(&c));strcpy(c.name,"Sensor");
+ memset(c.links[0],'x',256);assert(!library_card_valid(&c));strcpy(c.links[0],"/ext/a");strcpy(c.links[1],"/ext/a");c.link_count=2;assert(!library_card_valid(&c));
+ strcpy(c.links[1],"/int/file");assert(!library_card_valid(&c));
+ char long_path[300];memset(long_path,'a',sizeof(long_path));memcpy(long_path,"/ext/",5);long_path[299]=0;assert(!library_path_valid(long_path));
  uint32_t gen[4]={1,3,2,0};assert(library_newest_slot(gen)==1);assert(library_write_slot(gen)==3);
  gen[3]=4;assert(library_newest_slot(gen)==3);assert(library_write_slot(gen)==0);
  memset(gen,0,sizeof(gen));assert(library_newest_slot(gen)==-1);assert(library_write_slot(gen)==0);
@@ -91,8 +99,45 @@ int main(void){SensorObservation samples[4]={0};SensorFitResult r;
  assert(sensor_fit(samples,24,&r));found=false;
  for(unsigned i=0;i<r.count;i++)if(r.candidates[i].start==8&&r.candidates[i].width==16&&r.candidates[i].signed_value&&r.candidates[i].scale10==1&&r.candidates[i].offset10==0){assert(r.candidates[i].holdout_match);found=true;}
  assert(found);
- memset(samples,0,sizeof(samples));assert(!sensor_fit(samples,24,&r));return 0;}
+ memset(samples,0,sizeof(samples));assert(!sensor_fit(samples,24,&r));
+ for(unsigned i=0;i<4;i++)samples[i].measured10=i*10;assert(!sensor_fit(samples,24,&r));
+ samples[0].measured10=1000001;assert(!sensor_fit(samples,24,&r));assert(!sensor_fit(samples,97,&r));assert(!sensor_fit(samples,24,NULL));
+ for(unsigned i=0;i<4;i++){put(&samples[i],101+i*31);samples[i].measured10=(101+i*31)*10-5;}
+ assert(sensor_fit(samples,24,&r));found=false;for(unsigned i=0;i<r.count;i++)if(r.candidates[i].scale10==10&&r.candidates[i].offset10==-5&&r.candidates[i].holdout_match)found=true;assert(found);
+ for(unsigned i=0;i<4;i++){unsigned v=6011+i*137;put(&samples[i],v);samples[i].bits[1]=v;samples[i].bits[2]=v>>8;samples[i].measured10=v;}
+ assert(sensor_fit(samples,24,&r));found=false;for(unsigned i=0;i<r.count;i++)if(r.candidates[i].little_endian&&r.candidates[i].holdout_match)found=true;assert(found);
+ char description[192];SensorCandidate c={.start=8,.width=16,.scale10=1,.predicted10=319,.holdout_match=true};
+ assert(sensor_candidate_text(&c,1,319,description,sizeof(description)));assert(strstr(description,"#1 Check: MATCH")&&strstr(description,"31.9 / 31.9"));
+ c.holdout_match=false;c.predicted10=-5;c.offset10=-1;c.signed_value=true;
+ assert(sensor_candidate_text(&c,2,319,description,sizeof(description)));assert(strstr(description,"FAILED")&&strstr(description,"-0.5")&&strstr(description,"-0.1"));
+ assert(!sensor_candidate_text(NULL,1,0,description,sizeof(description)));assert(!sensor_candidate_text(&c,1,0,description,1));
+ return 0;}
 ''', "sensor_fit.c", WORKBENCH)
+
+    def test_sensor_decodes_real_pulse_pairs_and_rejects_truncated_sets(self):
+        self.native(r'''
+#include "tumospectrum_inference.h"
+#include <assert.h>
+#include <string.h>
+static size_t host_copy(char*d,const char*s,size_t n){size_t len=strlen(s);if(n){size_t k=len<n?len:n-1;memcpy(d,s,k);d[k]=0;}return len;}
+#define strlcpy host_copy
+#include "tumospectrum_analysis.c"
+static void capture(TumoSpectrumCapture*c,unsigned value){
+ memset(c,0,sizeof(*c));c->status=TumoSpectrumStatusOk;c->type=TumoSpectrumCaptureSubGhzRaw;c->frequency_hz=433920000;strcpy(c->preset,"AM650");
+ unsigned bits=0xA50000|value;
+ for(unsigned i=0;i<24;i++){bool one=(bits>>(23-i))&1;c->timings[c->timing_count++]=one?1050:350;c->timings[c->timing_count++]=one?-350:-1050;}
+ c->timings[c->timing_count++]=-10000;tumospectrum_analyze(c);
+}
+int main(void){TumoSpectrumCaptureSet s={.type=TumoSpectrumCaptureSubGhzRaw,.sample_count=4};
+ for(unsigned i=0;i<4;i++)capture(&s.samples[i],101+37*i);
+ SensorObservation observations[4]={0};observations[0].measured10=999;uint8_t bits=0;
+ assert(tumospectrum_sensor_decode(&s,observations,&bits));assert(bits==24&&observations[0].bits[0]==0xA5&&observations[0].bits[2]==101&&observations[0].measured10==999);
+ s.samples[3].truncated=true;assert(!tumospectrum_sensor_decode(&s,observations,&bits));s.samples[3].truncated=false;
+ s.samples[3].frequency_hz++;assert(!tumospectrum_sensor_decode(&s,observations,&bits));s.samples[3].frequency_hz--;
+ strcpy(s.samples[3].preset,"FM238");assert(!tumospectrum_sensor_decode(&s,observations,&bits));strcpy(s.samples[3].preset,"AM650");
+ s.sample_count=3;assert(!tumospectrum_sensor_decode(&s,observations,&bits));
+ assert(!tumospectrum_sensor_decode(NULL,observations,&bits));return 0;}
+''', "tumospectrum_inference.c", WORKBENCH)
 
     def test_history_gate_precedes_destructive_writes(self):
         for file, start, destructive in (
