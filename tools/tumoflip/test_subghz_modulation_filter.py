@@ -1,6 +1,7 @@
 """Receive-only modulation gate: actual decode loop and bounded preset parser."""
 from pathlib import Path
 import unittest
+import re
 from tools.tumoflip.test_hotplug_assets import function
 from tools.tumoflip.test_nfc_completion_equality import native
 
@@ -8,6 +9,47 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SubGhzModulationFilterTest(unittest.TestCase):
+    def test_psa_descriptors_reach_decode_loop_in_am_and_fm(self):
+        flags = []
+        for name in ("psa", "psa2"):
+            source = (ROOT / "lib/subghz/protocols" / (name + ".c")).read_text()
+            descriptor = source.split("const SubGhzProtocol subghz_protocol_" + name + " = {", 1)[1]
+            flags.append(re.search(r"\.flag\s*=\s*([^,]+),", descriptor)[1])
+        source = (ROOT / "lib/subghz/receiver.c").read_text()
+        decode = function(source, "void subghz_receiver_decode(")
+        native(r'''
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <assert.h>
+#define furi_check assert
+enum {SubGhzProtocolFlag_AM=1, SubGhzProtocolFlag_FM=2,
+SubGhzProtocolFlag_Decodable=4, SubGhzProtocolFlag_RAW=8,
+SubGhzProtocolFlag_433=16, SubGhzProtocolFlag_Load=32,
+SubGhzProtocolFlag_Save=64, SubGhzProtocolFlag_Send=128};
+typedef unsigned SubGhzProtocolFlag;
+typedef struct {void (*feed)(void*,bool,uint32_t);} Decoder;
+typedef struct {unsigned flag;Decoder* decoder;} Protocol;
+typedef struct {Protocol* protocol;} Base;
+typedef struct {Base* base;} Slot;
+typedef struct {Slot* slots;unsigned filter,modulation_filter;} SubGhzReceiver;
+#define M_EACH(slot,slots,type) (Slot* slot=(slots);slot<(slots)+2;++slot)
+static unsigned calls;
+static void feed(void* b,bool level,uint32_t duration){(void)b;(void)level;(void)duration;calls++;}
+''' + decode + '''
+int main(void){
+ Decoder d={feed};Protocol p[2]={{''' + flags[0] + ''',&d},{''' + flags[1] + ''',&d}};
+ Base b[2]={{p},{p+1}};Slot slots[2]={{b},{b+1}};
+ SubGhzReceiver r={slots,SubGhzProtocolFlag_Decodable,SubGhzProtocolFlag_AM};
+ subghz_receiver_decode(&r,true,250);assert(calls==2);
+ r.modulation_filter=SubGhzProtocolFlag_FM;
+ subghz_receiver_decode(&r,false,500);assert(calls==4);
+ r.filter=SubGhzProtocolFlag_RAW;
+ subghz_receiver_decode(&r,true,250);assert(calls==4);
+ return 0;
+}
+''')
+
     def test_receiver_keeps_raw_unknown_and_legacy_callers(self):
         source = (ROOT / "lib/subghz/receiver.c").read_text()
         setter = "void subghz_receiver_set_modulation_filter("
