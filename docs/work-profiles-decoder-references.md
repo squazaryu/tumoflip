@@ -85,8 +85,9 @@ references when comparison across multiple packs is required.
   repository GUI draw functions/U8g2 fonts and controlled display fixtures.
   Long values, scrolling, errors and cancellation are included.
 - Build firmware, the three feature plugins and Tumo Acceptance 0.3.0. The
-  managed package containing Acceptance must also be updated at release so an
-  older overlay cannot replace the new UI. Do not publish before visual review.
+  Acceptance FAP is shipped in firmware resources and the paired snapshot ZIP.
+  Independent Dev 020 does not manage this target, so it cannot replace the new UI;
+  do not migrate its ownership merely to publish this firmware update.
 
 Hardware acceptance remains open: save two profiles with distinct Standard/RAW
 settings; alternate them and test Back at every page; missing preset/SD/external
