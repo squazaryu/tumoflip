@@ -624,12 +624,14 @@ static bool nfc_is_hal_ready(void) {
     }
 }
 
-static void nfc_show_initial_scene_for_device(NfcApp* nfc) {
+static void nfc_show_initial_scene_for_device(NfcApp* nfc, bool inspect_only) {
     NfcProtocol prot = nfc_device_get_protocol(nfc->nfc_device);
-    uint32_t scene = nfc_protocol_support_has_feature(
-                         prot, nfc, NfcProtocolFeatureEmulateFull | NfcProtocolFeatureEmulateUid) ?
-                         NfcSceneEmulate :
-                         NfcSceneSavedMenu;
+    uint32_t scene =
+        !inspect_only &&
+                nfc_protocol_support_has_feature(
+                    prot, nfc, NfcProtocolFeatureEmulateFull | NfcProtocolFeatureEmulateUid) ?
+            NfcSceneEmulate :
+            NfcSceneSavedMenu;
     // Load plugins (parsers) in case if we are in the saved menu
     if(scene == NfcSceneSavedMenu) {
         nfc_show_loading_popup(nfc, true);
@@ -685,9 +687,10 @@ int32_t nfc_app(void* p) {
             view_dispatcher_attach_to_gui(
                 nfc->view_dispatcher, nfc->gui, ViewDispatcherTypeFullscreen);
 
-            furi_string_set(nfc->file_path, args);
+            const bool inspect_only = strncmp(args, "inspect:", 8) == 0;
+            furi_string_set(nfc->file_path, inspect_only ? args + 8 : args);
             if(nfc_load_file(nfc, nfc->file_path, true)) {
-                nfc_show_initial_scene_for_device(nfc);
+                nfc_show_initial_scene_for_device(nfc, inspect_only);
             } else {
                 view_dispatcher_stop(nfc->view_dispatcher);
             }

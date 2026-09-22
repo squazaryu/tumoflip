@@ -19,7 +19,7 @@ def validate(build, nm):
     missing_exports = private - definitions
     if missing_exports:
         raise ValueError(f"Host declarations missing from resident ELF: {sorted(missing_exports)}")
-    for app in ("subghz_frequency_analyzer", "subghz_add_manually"):
+    for app in ("subghz_frequency_analyzer", "subghz_add_manually", "subghz_workspaces"):
         output = subprocess.check_output(
             [nm, "-u", str(build / ".extapps" / (app + ".fal"))], text=True)
         imports = {line.split()[-1] for line in output.splitlines() if line.split()}

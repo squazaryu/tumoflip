@@ -18,7 +18,7 @@ class BleGapLifecycleTests(unittest.TestCase):
                             source.index("    case HCI_LE_META_EVT_CODE:")]
         production = "\n".join(function(source, signature) for signature in (
             "static bool gap_wait_peer_idle(", "bool gap_set_connection_peer(",
-            "bool gap_forget_bonded_device(", "bool gap_init(",
+            "bool gap_forget_bonded_device(", "bool gap_init_with_peer_selection(", "bool gap_init(",
         ))
         run_c(r'''
 #include <assert.h>
@@ -48,11 +48,11 @@ typedef struct {int type;} GapEvent;
 typedef void (*GapEventCallback)(GapEvent,void*);
 typedef struct {GapConfig* config;struct{uint16_t connection_handle;char* adv_name;int mfg_data_len,adv_svc_uuid_len;}service;
  void *advertise_timer,*state_mutex,*command_queue,*thread,*context;GapEventCallback on_event_cb;
- int state,negotiation_round;bool enable_adv,is_secure,peer_filter_selected,peer_filter_valid;}Gap;
+ int state,negotiation_round;bool enable_adv,is_secure,peer_filter_selected,peer_filter_valid,peer_selection;}Gap;
 static Gap* gap;
 static uint32_t ticks;
 static int selects,forgets;
-static bool stack_ready=true,controller_ok=true;
+static bool stack_ready=true,controller_ok=true,init_ok=true;
 static uint32_t furi_get_tick(void){return ticks;}
 static uint32_t furi_ms_to_ticks(uint32_t ms){return ms;}
 static void furi_delay_ms(uint32_t ms){ticks+=ms;}
@@ -64,7 +64,7 @@ static bool gap_peer_forget(const GapBondedDevice* p){assert(p);forgets++;return
 static bool ble_glue_is_radio_stack_ready(void){return stack_ready;}
 static void gap_advertise_timer_callback(void* context){(void)context;}
 static void* furi_timer_alloc(void(*cb)(void*),int type,void* c){(void)cb;(void)type;(void)c;return NULL;}
-static void gap_init_svc(Gap* g,const GapRootSecurityKeys* keys){(void)g;(void)keys;}
+static bool gap_init_svc(Gap* g,const GapRootSecurityKeys* keys){(void)g;(void)keys;return init_ok;}
 static void ble_event_dispatcher_init(void){}
 static void* furi_mutex_alloc(int type){(void)type;return NULL;}
 static void* furi_message_queue_alloc(int n,size_t size){(void)n;(void)size;return NULL;}
@@ -109,7 +109,12 @@ int main(void){
     free(gap);gap=NULL;assert(!gap_set_connection_peer(NULL));assert(!gap_forget_bonded_device(&peer));
     config.mfg_data_len=1;config.adv_service.UUID_Type=UUID_TYPE_128;
     controller_ok=true;assert(gap_init(&config,NULL,event_callback,NULL));
-    assert(gap_set_connection_peer(&peer));free(gap);gap=NULL;
+    assert(gap_set_connection_peer(&peer));assert(!gap->peer_selection);free(gap);gap=NULL;
+    init_ok=false;assert(!gap_init_with_peer_selection(&config,NULL,event_callback,NULL,true));assert(!gap);
+    init_ok=true;assert(gap_init_with_peer_selection(&config,NULL,event_callback,NULL,true));
+    assert(gap->peer_selection && !gap->peer_filter_valid && !gap->enable_adv);
+    assert(gap_set_connection_peer(&peer));assert(gap->peer_filter_valid);
+    free(gap);gap=NULL;
     return 0;
 }
 ''')

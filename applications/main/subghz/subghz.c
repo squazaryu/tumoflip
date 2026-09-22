@@ -189,6 +189,9 @@ SubGhz* subghz_alloc(bool alloc_for_tx_only) {
     subghz->add_manually_plugin_manager = NULL;
     subghz->add_manually_dispatch_depth = 0;
     subghz->add_manually_unload_pending = false;
+    subghz->workspace_plugin = NULL;
+    subghz->workspace_plugin_manager = NULL;
+    subghz->workspace_context = NULL;
     subghz->api_resolver = NULL;
     subghz->api_resolver_refs = 0;
     subghz->return_to_launcher = false;
@@ -353,6 +356,7 @@ void subghz_free(SubGhz* subghz, bool alloc_for_tx_only) {
     furi_assert(subghz);
     subghz_release_frequency_analyzer_view(subghz);
     subghz_add_manually_plugin_unload(subghz);
+    if(subghz->workspace_plugin_manager) subghz_scene_workspaces_on_exit(subghz);
 
     if(!alloc_for_tx_only &&
        (subghz->decode_raw_file_worker_encoder != NULL || subghz->decode_raw_auto)) {

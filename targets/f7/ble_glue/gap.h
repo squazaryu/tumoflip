@@ -110,6 +110,14 @@ bool gap_init(
     GapEventCallback on_event_cb,
     void* context);
 
+/** Firmware-internal startup; does not change GapConfig or the FAP ABI. */
+bool gap_init_with_peer_selection(
+    GapConfig* config,
+    const GapRootSecurityKeys* root_keys,
+    GapEventCallback on_event_cb,
+    void* context,
+    bool peer_selection);
+
 void gap_start_advertising(void);
 
 void gap_stop_advertising(void);

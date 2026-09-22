@@ -49,6 +49,7 @@ typedef struct {
     uint8_t negotiation_round;
     bool peer_filter_selected;
     bool peer_filter_valid;
+    bool peer_selection;
 } Gap;
 
 typedef enum {
@@ -116,6 +117,28 @@ static void gap_verify_connection_parameters(Gap* gap) {
             gap->negotiation_round);
         // Looks like the other side is open to negotiation
         gap->negotiation_round = 0;
+    }
+}
+
+static void gap_connection_complete(
+    uint8_t status,
+    uint16_t handle,
+    uint16_t interval,
+    uint16_t latency,
+    uint16_t timeout) {
+    if(status != BLE_STATUS_SUCCESS) {
+        FURI_LOG_E(TAG, "Connection failed: 0x%02X", status);
+        return;
+    }
+    gap->connection_params.conn_interval = interval;
+    gap->connection_params.slave_latency = latency;
+    gap->connection_params.supervisor_timeout = timeout;
+    furi_timer_stop(gap->advertise_timer);
+    gap->state = GapStateConnected;
+    gap->service.connection_handle = handle;
+    gap_verify_connection_parameters(gap);
+    if(gap->config->pairing_method != GapPairingNone) {
+        aci_gap_slave_security_req(handle);
     }
 }
 
@@ -189,23 +212,25 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
         case HCI_LE_CONNECTION_COMPLETE_SUBEVT_CODE: {
             hci_le_connection_complete_event_rp0* event =
                 (hci_le_connection_complete_event_rp0*)meta_evt->data;
-            gap->connection_params.conn_interval = event->Conn_Interval;
-            gap->connection_params.slave_latency = event->Conn_Latency;
-            gap->connection_params.supervisor_timeout = event->Supervision_Timeout;
+            gap_connection_complete(
+                event->Status,
+                event->Connection_Handle,
+                event->Conn_Interval,
+                event->Conn_Latency,
+                event->Supervision_Timeout);
+        } break;
 
-            // Stop advertising as connection completed
-            furi_timer_stop(gap->advertise_timer);
-
-            // Update connection status and handle
-            gap->state = GapStateConnected;
-            gap->service.connection_handle = event->Connection_Handle;
-
-            gap_verify_connection_parameters(gap);
-
-            if(gap->config->pairing_method != GapPairingNone) {
-                // Start pairing by sending security request
-                aci_gap_slave_security_req(event->Connection_Handle);
-            }
+        case HCI_LE_ENHANCED_CONNECTION_COMPLETE_SUBEVT_CODE: {
+            // Controller privacy switches to this event; its interval fields have
+            // different offsets because it also contains local and peer RPAs.
+            hci_le_enhanced_connection_complete_event_rp0* event =
+                (hci_le_enhanced_connection_complete_event_rp0*)meta_evt->data;
+            gap_connection_complete(
+                event->Status,
+                event->Connection_Handle,
+                event->Conn_Interval,
+                event->Conn_Latency,
+                event->Supervision_Timeout);
         } break;
 
         default:
@@ -335,7 +360,7 @@ static void set_manufacturer_data(uint8_t* mfg_data, uint8_t mfg_data_len) {
     gap->service.mfg_data_len += mfg_data_len;
 }
 
-static void gap_init_svc(Gap* gap, const GapRootSecurityKeys* root_keys) {
+static bool gap_init_svc(Gap* gap, const GapRootSecurityKeys* root_keys) {
     furi_check(root_keys);
 
     tBleStatus status;
@@ -365,13 +390,17 @@ static void gap_init_svc(Gap* gap, const GapRootSecurityKeys* root_keys) {
     // Initialize GAP interface
     // Skip first symbol AD_TYPE_COMPLETE_LOCAL_NAME
     char* name = gap->service.adv_name + 1;
-    aci_gap_init(
+    status = aci_gap_init(
         GAP_PERIPHERAL_ROLE,
-        0,
+        gap->peer_selection ? 2 : 0,
         strlen(name),
         &gap->service.gap_svc_handle,
         &gap->service.dev_name_char_handle,
         &gap->service.appearance_char_handle);
+    if(status != BLE_STATUS_SUCCESS) {
+        FURI_LOG_E(TAG, "GAP init failed: 0x%02X", status);
+        return false;
+    }
 
     // Set GAP characteristics
     status = aci_gatt_update_char_value(
@@ -427,6 +456,7 @@ static void gap_init_svc(Gap* gap, const GapRootSecurityKeys* root_keys) {
         CFG_IDENTITY_ADDRESS);
     // Configure whitelist
     aci_gap_configure_whitelist();
+    return true;
 }
 
 static void gap_advertise_start(GapState new_state) {
@@ -467,21 +497,47 @@ static void gap_advertise_start(GapState new_state) {
         hci_le_set_scan_response_data(gap->service.mfg_data_len, gap->service.mfg_data);
     }
 
-    // Configure advertising
-    status = aci_gap_set_discoverable(
-        ADV_IND,
-        min_interval,
-        max_interval,
-        CFG_IDENTITY_ADDRESS,
-        gap->peer_filter_selected ? 3 : 0,
-        strlen(gap->service.adv_name),
-        (uint8_t*)gap->service.adv_name,
-        gap->service.adv_svc_uuid_len,
-        gap->service.adv_svc_uuid,
-        0,
-        0);
+    if(gap->peer_filter_selected) {
+        // set_discoverable ignores its filter-policy argument in the ST stack.
+        // Set the payload while stopped, then start the actually filtered mode.
+        uint8_t data[31];
+        const size_t name_size = strlen(gap->service.adv_name);
+        const size_t svc_size = gap->service.adv_svc_uuid_len;
+        if(name_size + svc_size + 2 > sizeof(data)) {
+            FURI_LOG_E(TAG, "Selected advertising payload too large");
+            gap->state = GapStateIdle;
+            gap->enable_adv = false;
+            return;
+        }
+        data[0] = name_size;
+        memcpy(data + 1, gap->service.adv_name, name_size);
+        data[name_size + 1] = svc_size;
+        memcpy(data + name_size + 2, gap->service.adv_svc_uuid, svc_size);
+        status = aci_gap_update_adv_data(name_size + svc_size + 2, data);
+        if(status == BLE_STATUS_SUCCESS) {
+            status = aci_gap_set_undirected_connectable(
+                min_interval,
+                max_interval,
+                gap->peer_selection ? GAP_RESOLVABLE_PRIVATE_ADDR : CFG_IDENTITY_ADDRESS,
+                3);
+        }
+    } else {
+        // Unfiltered advertising is used only by the legacy profile or explicit Pair.
+        status = aci_gap_set_discoverable(
+            ADV_IND,
+            min_interval,
+            max_interval,
+            gap->peer_selection ? GAP_RESOLVABLE_PRIVATE_ADDR : CFG_IDENTITY_ADDRESS,
+            0,
+            strlen(gap->service.adv_name),
+            (uint8_t*)gap->service.adv_name,
+            gap->service.adv_svc_uuid_len,
+            gap->service.adv_svc_uuid,
+            0,
+            0);
+    }
     if(status) {
-        FURI_LOG_E(TAG, "set_discoverable failed %d", status);
+        FURI_LOG_E(TAG, "Advertising failed: 0x%02X", status);
         gap->state = GapStateIdle;
         gap->enable_adv = false;
         return;
@@ -598,11 +654,12 @@ bool gap_forget_bonded_device(const GapBondedDevice* peer) {
     return ok;
 }
 
-bool gap_init(
+bool gap_init_with_peer_selection(
     GapConfig* config,
     const GapRootSecurityKeys* root_keys,
     GapEventCallback on_event_cb,
-    void* context) {
+    void* context,
+    bool peer_selection) {
     if(!ble_glue_is_radio_stack_ready()) {
         return false;
     }
@@ -611,19 +668,25 @@ bool gap_init(
 
     gap = malloc(sizeof(Gap));
     gap->config = config;
+    gap->peer_selection = peer_selection;
     gap->service.connection_handle = GAP_CONNECTION_HANDLE_INVALID;
     gap->peer_filter_selected = false;
-    gap->peer_filter_valid = true;
-    // Create advertising timer
-    gap->advertise_timer = furi_timer_alloc(gap_advertise_timer_callback, FuriTimerTypeOnce, NULL);
+    // Even a settings-driven advertising request must wait for Select or Add.
+    gap->peer_filter_valid = !peer_selection;
     // Initialization of GATT & GAP layer
     gap->service.adv_name = config->adv_name;
-    gap_init_svc(gap, root_keys);
+    if(!gap_init_svc(gap, root_keys)) {
+        free(gap);
+        gap = NULL;
+        return false;
+    }
+    // Create resources only after the controller accepted GAP configuration.
+    gap->advertise_timer = furi_timer_alloc(gap_advertise_timer_callback, FuriTimerTypeOnce, NULL);
     ble_event_dispatcher_init();
     // Initialization of the GAP state
     gap->state_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     gap->state = GapStateIdle;
-    gap->enable_adv = true;
+    gap->enable_adv = !peer_selection;
 
     // Command queue allocation
     gap->command_queue = furi_message_queue_alloc(8, sizeof(GapCommand));
@@ -661,6 +724,14 @@ bool gap_init(
     gap->context = context;
 
     return true;
+}
+
+bool gap_init(
+    GapConfig* config,
+    const GapRootSecurityKeys* root_keys,
+    GapEventCallback on_event_cb,
+    void* context) {
+    return gap_init_with_peer_selection(config, root_keys, on_event_cb, context, false);
 }
 
 GapState gap_get_state(void) {

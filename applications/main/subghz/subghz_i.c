@@ -1,4 +1,5 @@
 #include "subghz_i.h"
+#include <toolbox/file_history.h>
 #include "assets_icons.h"
 #include "subghz/types.h"
 #include <furi.h>
@@ -324,12 +325,21 @@ bool subghz_save_protocol_to_file(
             break;
         }
 
+        if(!file_history_before_write(storage, dev_file_name)) {
+            dialog_message_show_storage_error(
+                subghz->dialogs, "History backup failed.\nFile unchanged.");
+            break;
+        }
         if(!storage_simply_remove(storage, dev_file_name)) {
             break;
         }
 
-        stream_seek(flipper_format_stream, 0, StreamOffsetFromStart);
-        stream_save_to_file(flipper_format_stream, storage, dev_file_name, FSOM_CREATE_ALWAYS);
+        if(!stream_seek(flipper_format_stream, 0, StreamOffsetFromStart)) break;
+        const size_t expected = stream_size(flipper_format_stream);
+        if(!expected ||
+           stream_save_to_file(
+               flipper_format_stream, storage, dev_file_name, FSOM_CREATE_ALWAYS) != expected)
+            break;
 
         if(storage_common_stat(storage, dev_file_name, NULL) != FSE_OK) {
             break;

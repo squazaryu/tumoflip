@@ -8,6 +8,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReleaseWorkflowTest(unittest.TestCase):
+    def test_all_package_producers_build_device_library_and_history(self) -> None:
+        for name in ("pr-build.yml", "release.yml"):
+            workflow = (REPO_ROOT / ".github/workflows" / name).read_text()
+            self.assertIn("fap_device_library", workflow, name)
+            self.assertIn("fap_file_history", workflow, name)
+
     def test_release_workflow_publishes_companion_packages(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text(
             encoding="utf-8"

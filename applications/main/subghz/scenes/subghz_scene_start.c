@@ -51,6 +51,12 @@ void subghz_scene_start_on_enter(void* context) {
         SubmenuIndexExtSettings,
         subghz_scene_start_submenu_callback,
         subghz);
+    submenu_add_item(
+        subghz->submenu,
+        "Work Profiles",
+        SubmenuIndexWorkspaces,
+        subghz_scene_start_submenu_callback,
+        subghz);
     submenu_set_selected_item(
         subghz->submenu, scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneStart));
 
@@ -65,6 +71,11 @@ bool subghz_scene_start_on_event(void* context, SceneManagerEvent event) {
         view_dispatcher_stop(subghz->view_dispatcher);
         return true;
     } else if(event.type == SceneManagerEventTypeCustom) {
+        if(event.event == SubmenuIndexWorkspaces) {
+            scene_manager_set_scene_state(subghz->scene_manager, SubGhzSceneStart, event.event);
+            scene_manager_next_scene(subghz->scene_manager, SubGhzSceneWorkspaces);
+            return true;
+        }
         if(event.event == SubmenuIndexReadRAW) {
             scene_manager_set_scene_state(
                 subghz->scene_manager, SubGhzSceneStart, SubmenuIndexReadRAW);

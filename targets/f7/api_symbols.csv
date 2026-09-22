@@ -1457,6 +1457,7 @@ Function,+,furi_hal_adc_init,void,
 Function,+,furi_hal_adc_read,uint16_t,"FuriHalAdcHandle*, FuriHalAdcChannel"
 Function,+,furi_hal_adc_release,void,FuriHalAdcHandle*
 Function,+,furi_hal_bt_change_app,FuriHalBleProfileBase*,"const FuriHalBleProfileTemplate*, FuriHalBleProfileParams, const GapRootSecurityKeys*, GapEventCallback, void*"
+Function,-,furi_hal_bt_change_app_with_peer_selection,FuriHalBleProfileBase*,"const FuriHalBleProfileTemplate*, FuriHalBleProfileParams, const GapRootSecurityKeys*, GapEventCallback, void*"
 Function,+,furi_hal_bt_check_profile_type,_Bool,"FuriHalBleProfileBase*, const FuriHalBleProfileTemplate*"
 Function,+,furi_hal_bt_clear_white_list,_Bool,
 Function,+,furi_hal_bt_dump_state,void,FuriString*
@@ -2145,6 +2146,7 @@ Function,-,gap_forget_bonded_device,_Bool,const GapBondedDevice*
 Function,-,gap_get_bonded_devices,_Bool,GapBondedDevices*
 Function,-,gap_get_state,GapState,
 Function,-,gap_init,_Bool,"GapConfig*, const GapRootSecurityKeys*, GapEventCallback, void*"
+Function,-,gap_init_with_peer_selection,_Bool,"GapConfig*, const GapRootSecurityKeys*, GapEventCallback, void*, _Bool"
 Function,-,gap_set_connection_peer,_Bool,const GapBondedDevice*
 Function,-,gap_start_advertising,void,
 Function,-,gap_stop_advertising,void,

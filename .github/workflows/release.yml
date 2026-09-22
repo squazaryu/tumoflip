@@ -120,10 +120,11 @@ jobs:
             updater_package fap_esp_flasher fap_quac fap_subghz_wardriving \
             fap_nearby_files fap_nice_o_code fap_secplus_pin fap_weather_editor \
             fap_lfrfid_hitags \
-            fap_protopirate_to_subghz fap_capture_inspector fap_specter fap_hid_ble fap_hid_usb
+            fap_protopirate_to_subghz fap_capture_inspector fap_specter fap_hid_ble fap_hid_usb \
+            fap_device_library fap_file_history fap_signal_workbench
 
       - name: Validate BLE Remote peer policy and Toyota C compatibility
-        run: python3 -m unittest tools.tumoflip.test_ble_gap_lifecycle tools.tumoflip.test_ble_remote_peers tools.tumoflip.test_ble_peer_service tools.tumoflip.test_hid_peer_store tools.tumoflip.test_hid_peer_scenes tools.tumoflip.test_toyota_c_files tools.tumoflip.test_toyota_vag_diagnostics
+        run: python3 -m unittest tools.tumoflip.test_ble_gap_lifecycle tools.tumoflip.test_ble_remote_peers tools.tumoflip.test_ble_peer_service tools.tumoflip.test_ble_peer_privacy tools.tumoflip.test_hid_peer_store tools.tumoflip.test_hid_peer_scenes tools.tumoflip.test_toyota_c_files tools.tumoflip.test_toyota_vag_diagnostics
 
       - name: Validate adapted HID, Sub-GHz, RFID and iButton behavior
         run: python3 -m unittest tools.tumoflip.test_upstream_1435_native tools.tumoflip.test_ibutton_write_targets_native tools.tumoflip.test_hid_mouse_jiggler_hints

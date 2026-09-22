@@ -143,6 +143,8 @@ PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE = "apps_data/arf_subghz_full/packages/protopi
 CAPTURE_INSPECTOR_PACKAGE_FILE = "apps_data/arf_subghz_full/packages/capture_inspector.fap"
 SPECTER_PACKAGE_FILE = "apps/NFC/specter.fap"
 BLE_REMOTE_PACKAGE_FILE = "apps/Bluetooth/hid_ble.fap"
+DEVICE_LIBRARY_PACKAGE_FILE = "apps/Tools/device_library.fap"
+FILE_HISTORY_PACKAGE_FILE = "apps_data/device_library/plugins/file_history.fal"
 PACKAGE_ONLY_PACKAGE_FILES = frozenset(
     {
         "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
@@ -154,6 +156,8 @@ PACKAGE_ONLY_PACKAGE_FILES = frozenset(
         CAPTURE_INSPECTOR_PACKAGE_FILE,
         SPECTER_PACKAGE_FILE,
         BLE_REMOTE_PACKAGE_FILE,
+        DEVICE_LIBRARY_PACKAGE_FILE,
+        FILE_HISTORY_PACKAGE_FILE,
     }
 )
 TOTP_CLI_PLUGIN_APP_IDS = (
@@ -198,6 +202,8 @@ PACKAGE_ONLY_PACKAGE_GROUPS = {
     CAPTURE_INSPECTOR_PACKAGE_FILE: "arf",
     SPECTER_PACKAGE_FILE: "base",
     BLE_REMOTE_PACKAGE_FILE: "base",
+    DEVICE_LIBRARY_PACKAGE_FILE: "base",
+    FILE_HISTORY_PACKAGE_FILE: "base",
 }
 PACKAGE_RELEASE_OVERLAY_GROUPS = {
     **PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -364,6 +370,8 @@ def package_extapp_exports() -> dict[str, str]:
     exports["capture_inspector.fap"] = CAPTURE_INSPECTOR_PACKAGE_FILE
     exports["specter.fap"] = SPECTER_PACKAGE_FILE
     exports["hid_ble.fap"] = BLE_REMOTE_PACKAGE_FILE
+    exports["device_library.fap"] = DEVICE_LIBRARY_PACKAGE_FILE
+    exports["file_history.fal"] = FILE_HISTORY_PACKAGE_FILE
     exports["module_one_cockpit.fap"] = "apps/Module One/Diagnostics/cockpit.fap"
     exports.update(
         {
@@ -884,7 +892,7 @@ def validate_resources_archive(
 
 def validate_subghz_feature_resources(repo_root: Path, resources: Path, archive_path: Path) -> None:
     archive_hashes = resources_archive_hashes(repo_root, archive_path)
-    for name in ("subghz_frequency_analyzer.fal", "subghz_add_manually.fal"):
+    for name in ("subghz_frequency_analyzer.fal", "subghz_add_manually.fal", "subghz_workspaces.fal"):
         relative = "apps_data/subghz/plugins/" + name
         path = require_file(resources / relative, "Sub-GHz feature plugin")
         if archive_hashes.get(relative) != sha256(path):
@@ -919,6 +927,8 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             resources / WEATHER_EDITOR_PACKAGE_FILE,
             resources / SPECTER_PACKAGE_FILE,
             resources / BLE_REMOTE_PACKAGE_FILE,
+            resources / DEVICE_LIBRARY_PACKAGE_FILE,
+            resources / FILE_HISTORY_PACKAGE_FILE,
             resources / LFRFID_HITAGS_PACKAGE_FILE,
             resources / "apps/Tools/tumoflip_packages.fap",
             resources / "apps/Tools/totp.fap",

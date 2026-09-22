@@ -18,6 +18,8 @@
 #include <gui/modules/submenu.h>
 #include <gui/modules/text_box.h>
 #include <gui/modules/text_input.h>
+#include <gui/modules/number_input.h>
+#include "sensor_fit.h"
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
 #include <loader/loader.h>
@@ -52,6 +54,8 @@ typedef enum {
     TumoSpectrumViewProfileName,
     TumoSpectrumViewProfileMenu,
     TumoSpectrumViewProtocol,
+    TumoSpectrumViewSensorMenu,
+    TumoSpectrumViewSensorInput,
 } TumoSpectrumView;
 
 typedef enum {
@@ -85,6 +89,7 @@ typedef enum {
     TumoSpectrumSetActionHandoff,
     TumoSpectrumSetActionDetails,
     TumoSpectrumSetActionClearSession,
+    TumoSpectrumSetActionSensorHelper,
 } TumoSpectrumSetAction;
 
 typedef enum {
@@ -161,6 +166,14 @@ struct TumoSpectrumApp {
     FuriMutex* device_services_mutex;
     TumoflipDeviceLocation phone_location;
     bool phone_location_valid;
+    Submenu* sensor_menu;
+    NumberInput* sensor_input;
+    int32_t sensor_values[4];
+    uint8_t sensor_entered;
+    uint8_t sensor_selected;
+    char sensor_header[32];
+    FuriString* sensor_report;
+    SensorFitResult sensor_result;
 };
 
 static const NotificationSequence tumospectrum_sequence_ok = {
@@ -1351,9 +1364,221 @@ static void tumospectrum_capture_set_clear_session(TumoSpectrumApp* app) {
     }
 }
 
+enum {
+    SensorBegin = 0x5000,
+    SensorValue,
+    SensorAnalyze = 0x5010,
+    SensorExport,
+    SensorAbout,
+    SensorDone,
+    SensorEdit,
+    SensorCandidateBase = 0x5100,
+};
+static uint32_t tumospectrum_sensor_previous(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewSensorMenu;
+}
+static uint32_t tumospectrum_sensor_parent(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewSetActions;
+}
+static void tumospectrum_sensor_action(void* context, uint32_t event) {
+    view_dispatcher_send_custom_event(((TumoSpectrumApp*)context)->view_dispatcher, event);
+}
+static void tumospectrum_sensor_menu(TumoSpectrumApp* app) {
+    submenu_reset(app->sensor_menu);
+    submenu_set_header(app->sensor_menu, "Sensor Helper");
+    for(unsigned i = 0; i < 4; i++) {
+        char label[48];
+        int32_t mag = abs(app->sensor_values[i]);
+        if(app->sensor_entered & (1U << i))
+            snprintf(
+                label,
+                sizeof(label),
+                "%u %s: %s%ld.%ld",
+                i + 1,
+                i == 3 ? "Check" : "Train",
+                app->sensor_values[i] < 0 ? "-" : "",
+                (long)(mag / 10),
+                (long)(mag % 10));
+        else
+            snprintf(label, sizeof(label), "%u %s: not set", i + 1, i == 3 ? "Check" : "Train");
+        submenu_add_item(
+            app->sensor_menu, label, SensorValue + i, tumospectrum_sensor_action, app);
+    }
+    submenu_add_item(
+        app->sensor_menu, "Find hypotheses", SensorAnalyze, tumospectrum_sensor_action, app);
+    submenu_add_item(
+        app->sensor_menu, "Export report", SensorExport, tumospectrum_sensor_action, app);
+    submenu_add_item(
+        app->sensor_menu, "How to measure", SensorAbout, tumospectrum_sensor_action, app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewSensorMenu);
+}
+static void tumospectrum_sensor_results_menu(TumoSpectrumApp* app) {
+    submenu_reset(app->sensor_menu);
+    submenu_set_header(app->sensor_menu, "Hypotheses");
+    for(unsigned i = 0; i < app->sensor_result.count; i++) {
+        const SensorCandidate* c = &app->sensor_result.candidates[i];
+        char label[48];
+        snprintf(
+            label,
+            sizeof(label),
+            "%u %s / %u..%u",
+            i + 1,
+            c->holdout_match ? "MATCH" : "FAIL",
+            c->start,
+            c->start + c->width - 1);
+        submenu_add_item(
+            app->sensor_menu, label, SensorCandidateBase + i, tumospectrum_sensor_action, app);
+    }
+    submenu_add_item(
+        app->sensor_menu, "Measurements", SensorEdit, tumospectrum_sensor_action, app);
+    submenu_add_item(
+        app->sensor_menu, "Export full report", SensorExport, tumospectrum_sensor_action, app);
+    submenu_add_item(
+        app->sensor_menu, "Scope / limits", SensorAbout, tumospectrum_sensor_action, app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewSensorMenu);
+}
+static void tumospectrum_sensor_text(TumoSpectrumApp* app, const char* text) {
+    if(text != furi_string_get_cstr(app->text)) furi_string_set(app->text, text);
+    text_box_reset(app->text_box);
+    text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
+    view_set_previous_callback(text_box_get_view(app->text_box), tumospectrum_sensor_previous);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewText);
+}
+static void tumospectrum_sensor_number(void* context, int32_t value) {
+    TumoSpectrumApp* app = context;
+    app->sensor_values[app->sensor_selected] = value;
+    view_dispatcher_send_custom_event(app->view_dispatcher, SensorDone);
+}
+static bool tumospectrum_sensor_event(void* context, uint32_t event) {
+    TumoSpectrumApp* app = context;
+    if(event == SensorBegin) {
+        app->sensor_entered = 0;
+        app->sensor_result.count = 0;
+        memset(app->sensor_values, 0, sizeof(app->sensor_values));
+        furi_string_reset(app->sensor_report);
+        tumospectrum_sensor_menu(app);
+    } else if(event >= SensorValue && event < SensorValue + 4) {
+        app->sensor_selected = event - SensorValue;
+        snprintf(
+            app->sensor_header,
+            sizeof(app->sensor_header),
+            "Sample %u: value x10",
+            app->sensor_selected + 1);
+        number_input_set_header_text(app->sensor_input, app->sensor_header);
+        number_input_set_result_callback(
+            app->sensor_input,
+            tumospectrum_sensor_number,
+            app,
+            app->sensor_values[app->sensor_selected],
+            -1000000,
+            1000000);
+        view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewSensorInput);
+    } else if(event == SensorDone) {
+        app->sensor_entered |= 1U << app->sensor_selected;
+        app->sensor_result.count = 0;
+        furi_string_reset(app->sensor_report);
+        tumospectrum_sensor_menu(app);
+    } else if(event == SensorAnalyze) {
+        SensorObservation samples[4] = {0};
+        uint8_t bits = 0;
+        if(app->sensor_entered != 15 ||
+           !tumospectrum_sensor_decode(&app->capture_set, samples, &bits)) {
+            tumospectrum_sensor_text(
+                app,
+                "Need four short, complete\nRAW files from one sensor,\nsame frequency / preset,\nand four measured values.\nNo hypothesis generated.");
+            return true;
+        }
+        for(unsigned i = 0; i < 4; i++)
+            samples[i].measured10 = app->sensor_values[i];
+        SensorFitResult result;
+        if(!sensor_fit(samples, bits, &result)) {
+            tumospectrum_sensor_text(
+                app,
+                "No matching hypothesis.\nNeed distinct training\nvalues or another encoding.");
+            return true;
+        }
+        furi_string_printf(
+            app->sensor_report,
+            "Sensor hypotheses v1\n%lu fits; showing %u\n\nNot a proven decoder.\nFirst 3 samples train;\n4th is held out.\n\n",
+            result.total,
+            result.count);
+        for(unsigned i = 0; i < 4; i++)
+            furi_string_cat_printf(
+                app->sensor_report,
+                "Sample %u (x10): %ld\n%s\n",
+                i + 1,
+                (long)app->sensor_values[i],
+                app->capture_set.samples[i].path);
+        for(unsigned i = 0; i < result.count; i++) {
+            const SensorCandidate* c = &result.candidates[i];
+            char description[192];
+            if(sensor_candidate_text(
+                   c, i + 1, app->sensor_values[3], description, sizeof(description)))
+                furi_string_cat_printf(app->sensor_report, "\n%s", description);
+        }
+        app->sensor_result = result;
+        tumospectrum_sensor_results_menu(app);
+    } else if(event >= SensorCandidateBase && event < (uint32_t)SensorCandidateBase + app->sensor_result.count) {
+        char description[192];
+        unsigned index = event - SensorCandidateBase;
+        if(sensor_candidate_text(
+               &app->sensor_result.candidates[index],
+               index + 1,
+               app->sensor_values[3],
+               description,
+               sizeof(description)))
+            tumospectrum_sensor_text(app, description);
+    } else if(event == SensorEdit) {
+        tumospectrum_sensor_menu(app);
+    } else if(event == SensorExport) {
+        if(furi_string_empty(app->sensor_report)) {
+            tumospectrum_sensor_text(app, "Analyze measurements first.");
+            return true;
+        }
+        FuriString* path = furi_string_alloc();
+        File* file = storage_file_alloc(app->storage);
+        bool ok = false;
+        for(unsigned i = 0; i < 1000; i++) {
+            furi_string_printf(path, TUMOSPECTRUM_REPORT_DIR "/sensor_%03u.txt", i);
+            if(storage_file_open(file, furi_string_get_cstr(path), FSAM_WRITE, FSOM_CREATE_NEW)) {
+                ok = storage_file_write(
+                         file,
+                         furi_string_get_cstr(app->sensor_report),
+                         furi_string_size(app->sensor_report)) ==
+                         furi_string_size(app->sensor_report) &&
+                     storage_file_sync(file);
+                ok = storage_file_close(file) && ok;
+                if(!ok) storage_common_remove(app->storage, furi_string_get_cstr(path));
+                break;
+            }
+            FS_Error error = storage_file_get_error(file);
+            storage_file_close(file);
+            if(error != FSE_EXIST) break;
+        }
+        storage_file_free(file);
+        if(ok) furi_string_printf(app->text, "Report saved:\n%s", furi_string_get_cstr(path));
+        tumospectrum_sensor_text(
+            app,
+            ok ? furi_string_get_cstr(app->text) :
+                 "Report save failed.\nCheck SD / report limit.");
+        furi_string_free(path);
+    } else if(event == SensorAbout)
+        tumospectrum_sensor_text(
+            app,
+            "Sensor Helper\n\nUse four recordings of one sensor with known measurements in the same unit.\n\nEnter value x10: 24.5 C -> 245. First three must differ. The fourth validates, never trains.\n\nSearch: 4..16-bit fields, signed/unsigned, 16-bit byte order, scales 0.1 / 1 / 10 with an offset.\n\nFits can be accidental. Confirm with more recordings. No TX or automatic protocol installation.");
+    else
+        return false;
+    return true;
+}
+
 static void tumospectrum_capture_set_action_callback(void* context, uint32_t index) {
     TumoSpectrumApp* app = context;
     switch(index) {
+    case TumoSpectrumSetActionSensorHelper:
+        view_dispatcher_send_custom_event(app->view_dispatcher, SensorBegin);
+        break;
     case TumoSpectrumSetActionCreateProfile:
         tumospectrum_capture_set_begin_profile(app);
         break;
@@ -1381,6 +1606,13 @@ static void tumospectrum_capture_set_action_callback(void* context, uint32_t ind
 static void tumospectrum_capture_set_build_actions(TumoSpectrumApp* app) {
     submenu_reset(app->set_actions);
     submenu_set_header(app->set_actions, "Capture Set Actions");
+    if(app->capture_set.type == TumoSpectrumCaptureSubGhzRaw && app->capture_set.sample_count == 4)
+        submenu_add_item(
+            app->set_actions,
+            "Sensor Helper",
+            TumoSpectrumSetActionSensorHelper,
+            tumospectrum_capture_set_action_callback,
+            app);
     if(app->capture_set.type == TumoSpectrumCaptureSubGhzRaw && app->capture_set.inferred &&
        app->capture_set.inference.compatible &&
        app->capture_set.sample_count >= TUMOSPECTRUM_SET_MIN_SAMPLES) {
@@ -1770,7 +2002,7 @@ static void tumospectrum_menu_callback(void* context, uint32_t index) {
     case TumoSpectrumMenuAbout:
         tumospectrum_show_text(
             app,
-            "TumoSpectrum 3.0",
+            "TumoSpectrum 3.1",
             "Autonomous receive-only Band Map, Smart Capture, profile building and multi-capture signal research workspace.\n\n"
             "Band Map: Left/Right tunes, Up changes band, Down selects radio. Long Up zooms, long Down snaps to peak and long OK holds the scan.\n\n"
             "Protocol Profiles performs bounded receive-only decoding on Flipper and logs changed observations to SD.\n\n"
@@ -2030,6 +2262,19 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     app->set_input = text_input_alloc();
     app->profile_name_input = text_input_alloc();
     app->text = furi_string_alloc();
+    app->sensor_report = furi_string_alloc();
+    app->sensor_menu = submenu_alloc();
+    app->sensor_input = number_input_alloc();
+    view_set_previous_callback(submenu_get_view(app->sensor_menu), tumospectrum_sensor_parent);
+    view_set_previous_callback(
+        number_input_get_view(app->sensor_input), tumospectrum_sensor_previous);
+    view_dispatcher_add_view(
+        app->view_dispatcher, TumoSpectrumViewSensorMenu, submenu_get_view(app->sensor_menu));
+    view_dispatcher_add_view(
+        app->view_dispatcher,
+        TumoSpectrumViewSensorInput,
+        number_input_get_view(app->sensor_input));
+    view_dispatcher_set_custom_event_callback(app->view_dispatcher, tumospectrum_sensor_event);
 
     view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
     view_dispatcher_set_navigation_event_callback(app->view_dispatcher, tumospectrum_back);
@@ -2173,6 +2418,11 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
 }
 
 static void tumospectrum_free(TumoSpectrumApp* app) {
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewSensorInput);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewSensorMenu);
+    number_input_free(app->sensor_input);
+    submenu_free(app->sensor_menu);
+    furi_string_free(app->sensor_report);
     tumoflip_device_services_client_free(app->device_services);
     furi_mutex_free(app->device_services_mutex);
     tumospectrum_band_map_stop(app->band_map);
