@@ -63,6 +63,8 @@ typedef struct {uint8_t count;GapBondedDevice devices[GAP_BONDED_DEVICES_MAX];} 
 typedef struct {uint8_t Address_Type;uint8_t Address[6];} Bonded_Device_Entry_t;
 typedef Bonded_Device_Entry_t List_Entry_t;
 static int failure,stage,removes;
+static bool ll_only_hci_unsupported;
+static int unsupported_calls;
 static uint8_t total=2;
 static int aci_gap_get_bonded_devices(uint8_t*n,Bonded_Device_Entry_t*out){
  *n=total;if(total<=35)for(unsigned i=0;i<total;i++){out[i].Address_Type=failure==2?2:i%2;memset(out[i].Address,i+1,6);}return failure==1;
@@ -72,6 +74,7 @@ static int aci_gap_add_devices_to_list(uint8_t n,const List_Entry_t*p,uint8_t mo
  assert(n==1&&mode==5&&p->Address[0]==1);stage=1;return failure==3;
 }
 static int hci_le_set_address_resolution_enable(uint8_t enabled){
+ if(ll_only_hci_unsupported){unsupported_calls++;return 0x01;}
  if(enabled)assert(stage==1);
  stage=2;return failure==4;
 }
@@ -90,6 +93,14 @@ int main(void){
  p.address_type=2;assert(!gap_peer_forget(&p)&&removes==2);
  failure=0;stage=0;assert(gap_peer_select(NULL)&&stage==3);
  failure=5;stage=0;assert(!gap_peer_select(NULL));
+ // STM32WB's host+controller stack uses ACI to manage resolving/accept lists.
+ // HCI_LE_SET_ADDRESS_RESOLUTION_ENABLE is only exposed by LL-only variants
+ // (ST wireless-interface command table, opcode 0x202D). Unknown Command must
+ // not make every Select/Add action fail before the supported ACI command.
+ failure=0;stage=0;ll_only_hci_unsupported=true;
+ assert(gap_peer_select(&p));
+ stage=2;assert(gap_peer_select(NULL));
+ assert(unsupported_calls==0);
  assert(!gap_peer_read(NULL));return 0;
 }
 ''')
