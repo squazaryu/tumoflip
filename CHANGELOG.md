@@ -1,3 +1,6 @@
+## Unreleased — Honda RX profile UI
+- Sub-GHz: keep the profile-owned `TumoHonda` receiver preset out of the generic Core modulation choices. The Honda RX profile still selects it and displays it as `Honda RX Custom`; saved actual preset indices remain stable. The Honda/Acura protocol remains in the Shuka Auto pack.
+
 ## Tumoflip Dev 009-005
 - Bluetooth Remote 1.3: fix the cold-start `Cannot select peer` failure by using one invalid GAP connection handle; valid handle zero is never confused with disconnection. Show readable temporary device labels, ask for a local name before first connection, and preserve existing names and pairing keys. Update both firmware and FW Packages to receive this fix.
 - Bluetooth/USB Remote: stop and drain Mouse Jiggler timers on Stop/Back, reset the running state, use one-shot Stealth scheduling, and wait for BLE connection. Keep Tumoflip device selection and package-only Bluetooth Remote (upstream #1112).
