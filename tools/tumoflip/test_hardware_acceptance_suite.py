@@ -31,7 +31,7 @@ class HardwareAcceptanceSuiteTest(unittest.TestCase):
         self.assertIn('fap_icon="icon.png"', self.manifest)
         self.assertTrue((APP_DIR / "icon.png").is_file())
         self.assertIn('icon="A_Plugins_14"', self.manifest)
-        self.assertIn('fap_version="0.2.0"', self.manifest)
+        self.assertIn('fap_version="0.3.0"', self.manifest)
 
     def test_report_covers_release_acceptance_inputs(self) -> None:
         for required in (

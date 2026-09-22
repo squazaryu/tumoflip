@@ -61,3 +61,12 @@ App(
     fap_libs=["assets", "hwdrivers"],
     fap_exclude_libs=["gcc"],
 )
+
+App(
+    appid="subghz_workspaces",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_workspaces_ep",
+    requires=["subghz"],
+    sources=["plugins/workspaces/*.c"],
+)

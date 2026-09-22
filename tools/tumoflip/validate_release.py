@@ -884,7 +884,7 @@ def validate_resources_archive(
 
 def validate_subghz_feature_resources(repo_root: Path, resources: Path, archive_path: Path) -> None:
     archive_hashes = resources_archive_hashes(repo_root, archive_path)
-    for name in ("subghz_frequency_analyzer.fal", "subghz_add_manually.fal"):
+    for name in ("subghz_frequency_analyzer.fal", "subghz_add_manually.fal", "subghz_workspaces.fal"):
         relative = "apps_data/subghz/plugins/" + name
         path = require_file(resources / relative, "Sub-GHz feature plugin")
         if archive_hashes.get(relative) != sha256(path):

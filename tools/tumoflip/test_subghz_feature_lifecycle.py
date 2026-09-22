@@ -16,7 +16,7 @@ class FeatureLifecycleTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             hashes = {}
-            for name in ("subghz_frequency_analyzer.fal", "subghz_add_manually.fal"):
+            for name in ("subghz_frequency_analyzer.fal", "subghz_add_manually.fal", "subghz_workspaces.fal"):
                 relative = "apps_data/subghz/plugins/" + name
                 file = root / relative
                 file.parent.mkdir(parents=True, exist_ok=True)

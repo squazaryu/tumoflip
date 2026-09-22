@@ -3,6 +3,13 @@
 
 // Private app exports, checked by the feature plugin ABI before entry.
 static constexpr auto subghz_app_api_table = sort(create_array_t<sym_entry>(
+    API_METHOD(
+        subghz_txrx_radio_device_set,
+        SubGhzRadioDeviceType,
+        (SubGhzTxRx*, SubGhzRadioDeviceType)),
+    API_METHOD(subghz_txrx_reload_protocol_pack, bool, (SubGhzTxRx*, SubGhzProtocolPackGroup)),
+    API_METHOD(subghz_txrx_get_protocol_pack_group, SubGhzProtocolPackGroup, (SubGhzTxRx*)),
+    API_METHOD(subghz_txrx_get_protocol_pack_report, const SubGhzProtocolPackReport*, (SubGhzTxRx*)),
     API_METHOD(subghz_txrx_get_setting, SubGhzSetting*, (SubGhzTxRx*)),
     API_METHOD(subghz_txrx_get_preset, SubGhzRadioPreset, (SubGhzTxRx*)),
     API_METHOD(subghz_txrx_radio_device_get, SubGhzRadioDeviceType, (SubGhzTxRx*)),
@@ -13,8 +20,10 @@ static constexpr auto subghz_app_api_table = sort(create_array_t<sym_entry>(
     API_METHOD(subghz_txrx_set_preset, void, (SubGhzTxRx*, const char*, uint32_t, uint8_t*, size_t)),
     API_METHOD(subghz_file_name_clear, void, (SubGhz*)),
     API_METHOD(subghz_scene_show_unsupported, void, (SubGhz*)),
-    API_METHOD(subghz_protocol_superrollo_create_data, bool,
-               (void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, SubGhzRadioPreset*)),
+    API_METHOD(
+        subghz_protocol_superrollo_create_data,
+        bool,
+        (void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, SubGhzRadioPreset*)),
     API_VARIABLE(subghz_protocol_came, const SubGhzProtocol),
     API_VARIABLE(subghz_protocol_nice_flo, const SubGhzProtocol),
     API_VARIABLE(subghz_protocol_bett, const SubGhzProtocol),

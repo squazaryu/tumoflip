@@ -3,6 +3,7 @@
 #include "helpers/subghz_types.h"
 #include "helpers/subghz_analyzer_plugin.h"
 #include "helpers/subghz_add_manually_plugin.h"
+#include "helpers/subghz_workspace_plugin.h"
 #include <flipper_application/plugins/plugin_manager.h>
 #include <flipper_application/plugins/composite_resolver.h>
 #include "helpers/subghz_gen_info.h"
@@ -120,6 +121,9 @@ struct SubGhz {
     SubGhzLoadTypeFile load_type_file;
     uint8_t tx_power;
     void* rpc_ctx;
+    const SubGhzWorkspacePlugin* workspace_plugin;
+    PluginManager* workspace_plugin_manager;
+    void* workspace_context;
 };
 
 #ifdef __cplusplus
