@@ -17,6 +17,11 @@ distinct from upstream. Bump it when shared structs/enums/callback signatures
 change. Public firmware exports and the private Sub-GHz table are checked
 separately against both FAL import lists and the resident ELF.
 
+Measured mapped code/data sections: Analyzer 7296 B, Add Manually 11509 B.
+Loader, view and worker allocations are additional while the feature is open.
+The local updater has a 16384-byte physical C2 gap versus 4096 in 009-007;
+physical peak-RAM and repeated-entry acceptance remain pending.
+
 Both FALs are mandatory updater resources, with archive hashes checked by the
 release validator. Missing/outdated modules show a recoverable error. These
 features now require SD resources at launch; their menu routes remain the same.
@@ -71,6 +76,9 @@ the Flipper never displays a fabricated success result.
 Board command semantics were checked against ESP32Marauder
 8ae4622abcc9c9c5729d4e97491907581d7f0c34. Features remain conditional on the
 connected board's firmware/hardware. This change does not flash the ESP32.
+Marauder is delivered by the firmware's resource archive. The existing independent
+FW Packages Dev 020 catalog remains compatible; no mass package rebuild is needed
+for these additive API exports.
 
 ## Acceptance
 
