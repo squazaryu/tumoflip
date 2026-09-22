@@ -112,7 +112,9 @@ int main(void){
     assert(gap_set_connection_peer(&peer));assert(!gap->peer_selection);free(gap);gap=NULL;
     init_ok=false;assert(!gap_init_with_peer_selection(&config,NULL,event_callback,NULL,true));assert(!gap);
     init_ok=true;assert(gap_init_with_peer_selection(&config,NULL,event_callback,NULL,true));
-    assert(gap->peer_selection);free(gap);gap=NULL;
+    assert(gap->peer_selection && !gap->peer_filter_valid && !gap->enable_adv);
+    assert(gap_set_connection_peer(&peer));assert(gap->peer_filter_valid);
+    free(gap);gap=NULL;
     return 0;
 }
 ''')
