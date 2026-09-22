@@ -4,6 +4,8 @@ import subprocess
 import tempfile
 import unittest
 import re
+from tools.tumoflip.test_hotplug_assets import function
+from tools.tumoflip.test_nfc_completion_equality import native
 
 ROOT = Path(__file__).resolve().parents[2]
 LIBRARY = ROOT / "applications/system/device_library"
@@ -119,6 +121,28 @@ int main(void){SensorObservation samples[4]={0};SensorFitResult r;
         self.assertIn("Sensor Helper", app)
         self.assertIn("sensor_values", app)
         self.assertIn("TumoSpectrumViewSensorInput", app)
+
+    def test_nfc_card_open_inspects_without_automatic_emulation(self):
+        source = (ROOT / "applications/main/nfc/nfc_app.c").read_text()
+        self.assertIn('"inspect:"', source)
+        helper = function(source, "static void nfc_show_initial_scene_for_device(")
+        native(r'''
+#include <stdbool.h>
+#include <stdint.h>
+#include <assert.h>
+typedef int NfcProtocol;
+typedef struct{void*nfc_device;void*nfc_supported_cards;void*scene_manager;}NfcApp;
+enum{NfcProtocolFeatureEmulateFull=1,NfcProtocolFeatureEmulateUid=2,NfcSceneEmulate=3,NfcSceneSavedMenu=4,DolphinDeedNfcEmulate=5};
+static int scene,deeds,cache;
+static int nfc_device_get_protocol(void*p){(void)p;return 0;}
+static bool nfc_protocol_support_has_feature(int p,NfcApp*a,int f){(void)p;(void)a;(void)f;return true;}
+static void nfc_show_loading_popup(NfcApp*a,bool b){(void)a;(void)b;}
+static void nfc_supported_cards_load_cache(void*p){(void)p;cache++;}
+static void dolphin_deed(int d){assert(d==DolphinDeedNfcEmulate);deeds++;}
+static void scene_manager_next_scene(void*p,int s){(void)p;scene=s;}
+''' + helper + r'''
+int main(void){NfcApp a={0};nfc_show_initial_scene_for_device(&a,true);assert(scene==NfcSceneSavedMenu&&deeds==0&&cache==1);nfc_show_initial_scene_for_device(&a,false);assert(scene==NfcSceneEmulate&&deeds==1);return 0;}
+''')
 
 
 if __name__ == "__main__":
