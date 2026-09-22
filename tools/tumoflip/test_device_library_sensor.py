@@ -220,6 +220,25 @@ static int storage_common_stat(Storage*s,const char*p,void*i){(void)s;(void)p;(v
 int main(void){SubGhz s={0};FlipperFormat f=0;assert(subghz_save_protocol_to_file(&s,&f,"/ext/subghz/Test.sub"));written=2;assert(!subghz_save_protocol_to_file(&s,&f,"/ext/subghz/Test.sub"));checkpoint=false;removed=0;assert(!subghz_save_protocol_to_file(&s,&f,"/ext/subghz/Test.sub")&&removed==0);return 0;}
 ''')
 
+    def test_auto_history_requires_live_firmware_capability(self):
+        header = (ROOT / "lib/toolbox/file_history.h").read_text()
+        self.assertIn("file_history_core_available", header)
+        source = (ROOT / "applications/services/storage/storage.c").read_text()
+        self.assertIn("furi_record_create(RECORD_FILE_HISTORY", source)
+        native(r'''
+#include <stdint.h>
+#include <stdbool.h>
+#include <assert.h>
+#define RECORD_FILE_HISTORY "history"
+#define FILE_HISTORY_CORE_CAPABILITY 1U
+static bool exists;static uint32_t version;static int opened,closed;
+static bool furi_record_exists(const char*k){(void)k;return exists;}
+static void*furi_record_open(const char*k){(void)k;opened++;return &version;}
+static void furi_record_close(const char*k){(void)k;closed++;}
+''' + function(header,"static inline bool file_history_core_available(") + r'''
+int main(void){assert(!file_history_core_available()&&opened==0);exists=true;assert(!file_history_core_available()&&opened==1&&closed==1);version=1;assert(file_history_core_available()&&opened==2&&closed==2);return 0;}
+''')
+
 
 if __name__ == "__main__":
     unittest.main()
