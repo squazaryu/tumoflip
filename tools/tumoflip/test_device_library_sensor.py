@@ -84,6 +84,18 @@ int main(void){SensorObservation samples[4]={0};SensorFitResult r;
         self.assertNotIn("FSOM_CREATE_ALWAYS", source)
         self.assertNotIn("storage_common_rename", source)
 
+    def test_sensor_adapter_uses_training_capture_not_holdout_for_decode_profile(self):
+        source = (WORKBENCH / "tumospectrum_inference.c").read_text()
+        adapter = source.split("bool tumospectrum_sensor_decode(", 1)[1]
+        self.assertIn("captures[0]", adapter)
+        self.assertIn("capture->truncated", adapter)
+        self.assertIn("sample_count != 4", adapter)
+        self.assertIn("tumospectrum_inference_decode_bits", adapter)
+        app = (WORKBENCH / "signal_workbench.c").read_text()
+        self.assertIn("Sensor Helper", app)
+        self.assertIn("sensor_values", app)
+        self.assertIn("TumoSpectrumViewSensorInput", app)
+
 
 if __name__ == "__main__":
     unittest.main()
