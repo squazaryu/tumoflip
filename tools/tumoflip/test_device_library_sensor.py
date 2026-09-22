@@ -68,6 +68,22 @@ int main(void){SensorObservation samples[4]={0};SensorFitResult r;
  memset(samples,0,sizeof(samples));assert(!sensor_fit(samples,24,&r));return 0;}
 ''', "sensor_fit.c", WORKBENCH)
 
+    def test_history_gate_precedes_destructive_writes(self):
+        for file, start, destructive in (
+            ("applications/main/subghz/subghz_i.c", "bool subghz_save_protocol_to_file(", "storage_simply_remove(storage, dev_file_name)"),
+            ("applications/main/infrared/infrared_remote.c", "static InfraredErrorCode infrared_remote_batch_start(", "storage_common_rename(storage, path_out, path_in)"),
+            ("lib/nfc/nfc_device.c", "bool nfc_device_save(", "flipper_format_buffered_file_open_always(ff, path)"),
+        ):
+            source = (ROOT / file).read_text().split(start, 1)[1]
+            self.assertLess(source.index("file_history_before_write("), source.index(destructive))
+
+    def test_history_requires_checked_sync_and_never_restores_over_original(self):
+        source = (LIBRARY / "history_engine.c").read_text()
+        for marker in ("FSOM_CREATE_NEW", "storage_file_sync", "memcmp", "mbedtls_sha256", "library_write_slot", "restored_"):
+            self.assertIn(marker, source)
+        self.assertNotIn("FSOM_CREATE_ALWAYS", source)
+        self.assertNotIn("storage_common_rename", source)
+
 
 if __name__ == "__main__":
     unittest.main()
