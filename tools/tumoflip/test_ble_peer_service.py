@@ -29,7 +29,7 @@ typedef struct{int type;bool*result;FuriHalBleProfileBase**profile_instance;
 static FuriHalBleProfileBase serial={1},hid={2};static void*ble_profile_serial=&serial;
 static void*bt_on_gap_event_callback;static void*bt_on_key_storage_change_callback;
 static bool supported=true,strict_ok=true,select_ok=true,forget_ok=true,save_ok=true;
-static int changes,starts,stops,strict_loads,legacy_loads,saves,forgets;
+static int changes,starts,stops,strict_loads,legacy_loads,saves,forgets,peer_starts;
 static bool furi_hal_bt_is_gatt_gap_supported(void){return supported;}
 static void bt_settings_load(BtSettings*s){(void)s;}
 static void bt_close_rpc_connection(Bt*b){(void)b;}
@@ -38,6 +38,8 @@ static bool bt_keys_storage_load_or_create(void*k){(void)k;strict_loads++;return
 static bool bt_keys_storage_load(void*k){(void)k;legacy_loads++;return false;}
 static void*bt_keys_storage_get_root_keys(void*k){return k;}
 static FuriHalBleProfileBase*furi_hal_bt_change_app(void*t,void*p,void*k,void*cb,void*c){(void)t;(void)p;(void)k;(void)cb;(void)c;changes++;return &hid;}
+FuriHalBleProfileBase*furi_hal_bt_change_app_with_peer_selection(void*t,void*p,void*k,void*cb,void*c){
+ peer_starts++;return furi_hal_bt_change_app(t,p,k,cb,c);}
 static void bt_app_bridge_bind(Bt*b){(void)b;}
 static void furi_hal_bt_start_advertising(void){starts++;}
 static void furi_hal_bt_set_key_storage_change_callback(void*c,void*b){(void)c;(void)b;}
@@ -53,8 +55,8 @@ int main(void){
  bool ok=true;FuriHalBleProfileBase*out=&hid;BtMessage m={.result=&ok,.profile_instance=&out};
  m.data.profile.start_idle=true;strict_ok=false;bt_change_profile(&b,&m);
  assert(!ok&&!out&&b.current_profile==&serial&&!changes&&!starts&&stops==1);
- strict_ok=true;bt_change_profile(&b,&m);assert(ok&&out==&hid&&changes==1&&!starts);
- m.data.profile.start_idle=false;bt_change_profile(&b,&m);assert(ok&&legacy_loads==1&&starts==1);
+ strict_ok=true;bt_change_profile(&b,&m);assert(ok&&out==&hid&&changes==1&&!starts&&peer_starts==1);
+ m.data.profile.start_idle=false;bt_change_profile(&b,&m);assert(ok&&legacy_loads==1&&starts==1&&peer_starts==1);
  b.bt_settings.enabled=false;bt_change_profile(&b,&m);assert(starts==1);
  m.type=BtMessageTypeGetBondedDevices;m.data.bonded_devices=&b;b.current_profile=&serial;bt_handle_peer_request(&b,&m);assert(!ok);
  b.current_profile=&hid;bt_handle_peer_request(&b,&m);assert(ok);
