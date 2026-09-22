@@ -632,20 +632,31 @@ const char* tumospectrum_field_kind_name(TumoSpectrumFieldKind kind) {
     }
 }
 
-bool tumospectrum_sensor_decode(const TumoSpectrumCaptureSet* set, SensorObservation samples[4], uint8_t* bit_count) {
-    if(!set || !samples || !bit_count || set->sample_count != 4 || set->type != TumoSpectrumCaptureSubGhzRaw) return false;
+bool tumospectrum_sensor_decode(
+    const TumoSpectrumCaptureSet* set,
+    SensorObservation samples[4],
+    uint8_t* bit_count) {
+    if(!set || !samples || !bit_count || set->sample_count != 4 ||
+       set->type != TumoSpectrumCaptureSubGhzRaw)
+        return false;
     const TumoSpectrumCapture* captures = set->samples;
     TumoSpectrumFrame first = tumospectrum_inference_reference_frame(&captures[0]);
     TumoSpectrumEncoding encoding = tumospectrum_inference_encoding(&captures[0], first);
-    TumoSpectrumDecodeProfile profile = tumospectrum_inference_decode_profile(&captures[0], first, encoding);
+    TumoSpectrumDecodeProfile profile =
+        tumospectrum_inference_decode_profile(&captures[0], first, encoding);
     *bit_count = 0;
     for(unsigned i = 0; i < 4; i++) {
         const TumoSpectrumCapture* capture = &captures[i];
-        if(capture->truncated || capture->status != TumoSpectrumStatusOk || capture->type != set->type ||
-            !capture->frequency_hz || capture->frequency_hz != captures[0].frequency_hz || strcmp(capture->preset, captures[0].preset)) return false;
+        if(capture->truncated || capture->status != TumoSpectrumStatusOk ||
+           capture->type != set->type || !capture->frequency_hz ||
+           capture->frequency_hz != captures[0].frequency_hz ||
+           strcmp(capture->preset, captures[0].preset))
+            return false;
         TumoSpectrumFrame frame = tumospectrum_inference_reference_frame(capture);
-        if(!frame.count || frame.count > SENSOR_MAX_BITS * 2 || frame.count != first.count) return false;
-        TumoSpectrumDecodedBits decoded = tumospectrum_inference_decode_bits(capture, frame, &profile);
+        if(!frame.count || frame.count > SENSOR_MAX_BITS * 2 || frame.count != first.count)
+            return false;
+        TumoSpectrumDecodedBits decoded =
+            tumospectrum_inference_decode_bits(capture, frame, &profile);
         if(!decoded.count || (i && decoded.count != *bit_count)) return false;
         *bit_count = decoded.count;
         memcpy(samples[i].bits, decoded.bits, sizeof(samples[i].bits));

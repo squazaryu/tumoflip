@@ -50,6 +50,9 @@ static bool storage_dir_read(File*f,FileInfo*i,char*n,size_t cap){struct dirent*
 static bool file_info_is_dir(FileInfo*i){return i->directory;}
 static uint32_t furi_hal_rtc_get_timestamp(void){return 123456;}
 typedef void PluginManager;
+static bool furi_record_exists(const char*k){(void)k;return false;}
+static void*furi_record_open(const char*k){(void)k;return NULL;}
+static void furi_record_close(const char*k){(void)k;}
 static const void*firmware_api_interface;
 enum{PluginManagerErrorNone};
 static PluginManager*plugin_manager_alloc(const char*a,unsigned b,const void*c){(void)a;(void)b;(void)c;return NULL;}

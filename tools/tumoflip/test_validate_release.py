@@ -287,9 +287,11 @@ class ValidateReleaseTest(unittest.TestCase):
         inspector = CAPTURE_INSPECTOR_PACKAGE_FILE
         specter = "apps/NFC/specter.fap"
         ble_remote = "apps/Bluetooth/hid_ble.fap"
+        device_library = "apps/Tools/device_library.fap"
+        file_history = "apps_data/device_library/plugins/file_history.fal"
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_FILES,
-            {package_only, quac, nearby, weather, hitags, converter, inspector, specter, ble_remote},
+            {package_only, quac, nearby, weather, hitags, converter, inspector, specter, ble_remote, device_library, file_history},
         )
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -303,6 +305,8 @@ class ValidateReleaseTest(unittest.TestCase):
                 inspector: "arf",
                 specter: "base",
                 ble_remote: "base",
+                device_library: "base",
+                file_history: "base",
             },
         )
         regular = "apps/Tools/clock.fap"

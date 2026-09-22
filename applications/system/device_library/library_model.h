@@ -8,6 +8,7 @@ typedef struct {
     char name[32];
     char notes[128];
     char tags[64];
+    char checked_at[24];
     char links[LIBRARY_LINKS][256];
     uint32_t link_count;
 } DeviceCard;

@@ -1,8 +1,9 @@
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
-#define SENSOR_SAMPLE_COUNT 4U
-#define SENSOR_MAX_BITS 96U
+#include <stddef.h>
+#define SENSOR_SAMPLE_COUNT   4U
+#define SENSOR_MAX_BITS       96U
 #define SENSOR_MAX_CANDIDATES 16U
 typedef struct {
     uint8_t bits[12];
@@ -24,4 +25,13 @@ typedef struct {
     uint32_t total;
     uint8_t count;
 } SensorFitResult;
-bool sensor_fit(const SensorObservation samples[SENSOR_SAMPLE_COUNT], uint8_t bits, SensorFitResult* result);
+bool sensor_fit(
+    const SensorObservation samples[SENSOR_SAMPLE_COUNT],
+    uint8_t bits,
+    SensorFitResult* result);
+bool sensor_candidate_text(
+    const SensorCandidate* candidate,
+    unsigned number,
+    int32_t measured10,
+    char* output,
+    size_t size);
