@@ -1,4 +1,4 @@
-## Unreleased
+## Tumoflip Dev 009-007
 - Specter FW Package 3.2: adapt upstream 3.0.1 survey/fingerprint spacing, suppress the reader ring during calibration, report TOO SHORT for empty surveys under 10 seconds, and wrap text log entries while retaining checked SD writes and rollback.
 - Sub-GHz: allow existing PSA/PSA2 receivers through AM as well as FM filtering; add a bounded Honda 315 MHz RX profile shared by Standard/Read RAW and ProtoPirate. Existing profile indices and independent settings remain stable.
 
