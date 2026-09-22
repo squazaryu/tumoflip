@@ -13,7 +13,8 @@ class AnalyzerOwnershipTest(unittest.TestCase):
     def test_repeated_exit_preserves_app_notification_record(self):
         for app in ("applications/main/subghz", "applications_user/arf_subghz_full"):
             with self.subTest(app=app):
-                source = (ROOT / app / "views/subghz_frequency_analyzer.c").read_text()
+                relative = "plugins/frequency_analyzer/subghz_frequency_analyzer.c" if app.startswith("applications/main") else "views/subghz_frequency_analyzer.c"
+                source = (ROOT / app / relative).read_text()
                 match = re.search(
                     r"void subghz_frequency_analyzer_exit\(void\* context\) \{.*?^\}",
                     source, re.M | re.S,

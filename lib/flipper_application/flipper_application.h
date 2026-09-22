@@ -122,6 +122,10 @@ FlipperApplicationPreloadStatus
  */
 const FlipperApplicationManifest* flipper_application_get_manifest(FlipperApplication* app);
 
+/** Allocation failure evidence, sampled before partial-load cleanup. */
+bool flipper_application_get_memory_failure(
+    const FlipperApplication* app, size_t* required, size_t* free_heap, size_t* max_block);
+
 /** Load sections and process relocations for already pre-loaded application
  * @param app Application pointer
  * @return Load result code

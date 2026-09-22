@@ -19,6 +19,7 @@ App(
     stack_size=3 * 1024,
     order=1,
     resources="resources",
+    sources=["*.c*", "!plugins"],
     fap_libs=["assets", "hwdrivers", "tumoflip_device_services"],
     fap_icon="icon.png",
     fap_category="Sub-GHz",
@@ -39,4 +40,24 @@ App(
     entry_point="subghz_dangerous_freq",
     requires=["storage", "subghz"],
     order=650,
+)
+
+App(
+    appid="subghz_add_manually",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_add_manually_ep",
+    requires=["subghz"],
+    sources=["plugins/add_manually/*.c"],
+)
+
+App(
+    appid="subghz_frequency_analyzer",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_frequency_analyzer_ep",
+    requires=["subghz"],
+    sources=["plugins/frequency_analyzer/*.c"],
+    fap_libs=["assets", "hwdrivers"],
+    fap_exclude_libs=["gcc"],
 )

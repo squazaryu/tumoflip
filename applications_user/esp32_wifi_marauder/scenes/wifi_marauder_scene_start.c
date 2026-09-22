@@ -24,7 +24,7 @@ typedef struct {
 } WifiMarauderItem;
 
 // NUM_MENU_ITEMS defined in wifi_marauder_app_i.h - if you add an entry here, increment it!
-const WifiMarauderItem items[NUM_MENU_ITEMS] = {
+const WifiMarauderItem items[] = {
     {"View Log from", {"start", "end"}, 2, {"", ""}, NO_ARGS, FOCUS_CONSOLE_TOGGLE, NO_TIP},
     {"Scan",
      {"all", "ping", "arp"},
@@ -40,10 +40,17 @@ const WifiMarauderItem items[NUM_MENU_ITEMS] = {
      INPUT_ARGS,
      FOCUS_CONSOLE_START,
      NO_TIP},
+    {"Recon",
+     {"wifi", "ble", "status", "stop"},
+     4,
+     {"recon wifi", "recon ble", "recon status", "recon stop"},
+     NO_ARGS,
+     FOCUS_CONSOLE_END,
+     SHOW_STOPSCAN_TIP},
     {"List",
-     {"ap", "ssid", "station", "airtag", "IPs", "probes"},
-     6,
-     {"list -a", "list -s", "list -c", "list -t", "list -i", "list -p"},
+     {"ap", "ssid", "station", "airtag", "IPs", "probes", "bluetooth", "flipper", "pineapple", "multissid"},
+     10,
+     {"list -a", "list -s", "list -c", "list -t", "list -i", "list -p", "list -b", "list -f", "list -x", "list -m"},
      NO_ARGS,
      FOCUS_CONSOLE_START,
      NO_TIP},
@@ -226,14 +233,7 @@ const WifiMarauderItem items[NUM_MENU_ITEMS] = {
      NO_ARGS,
      FOCUS_CONSOLE_END,
      SHOW_STOPSCAN_TIP},
-    {"GPS Tracker",
-     {"start", "stop"},
-     2,
-     {"gpstracker -c start", "gpstracker -c stop"},
-     NO_ARGS,
-     FOCUS_CONSOLE_END,
-     NO_TIP},
-    {"NMEA Stream", {""}, 1, {"nmea"}, NO_ARGS, FOCUS_CONSOLE_END, NO_TIP},
+    {"NMEA Stream", {""}, 1, {"nmea"}, NO_ARGS, FOCUS_CONSOLE_END, SHOW_STOPSCAN_TIP},
     {"GPS POI",
      {"start", "mark", "end"},
      3,
@@ -258,6 +258,14 @@ const WifiMarauderItem items[NUM_MENU_ITEMS] = {
     {"Shutdown WiFi", {""}, 1, {"stopscan -f"}, NO_ARGS, FOCUS_CONSOLE_START, NO_TIP},
     {"List SD", {""}, 1, {"ls /"}, INPUT_ARGS, FOCUS_CONSOLE_END, NO_TIP},
     {"Update", {"sd"}, 1, {"update -s"}, NO_ARGS, FOCUS_CONSOLE_END, NO_TIP},
+    {"Protocol Info", {""}, 1, {"protocolinfo"}, NO_ARGS, FOCUS_CONSOLE_START, NO_TIP},
+    {"SPIFFS",
+     {"status", "backup"},
+     2,
+     {"backupstatus", "backupspiffs"},
+     NO_ARGS,
+     FOCUS_CONSOLE_END,
+     NO_TIP},
     {"Reboot", {""}, 1, {"reboot"}, NO_ARGS, FOCUS_CONSOLE_END, NO_TIP},
     {"Help", {""}, 1, {"help"}, NO_ARGS, FOCUS_CONSOLE_START, SHOW_STOPSCAN_TIP},
     {"Info", {""}, 1, {"info"}, NO_ARGS, FOCUS_CONSOLE_START, NO_TIP},
@@ -271,15 +279,20 @@ const WifiMarauderItem items[NUM_MENU_ITEMS] = {
      NO_TIP},
 };
 
+_Static_assert(COUNT_OF(items) == NUM_MENU_ITEMS, "Marauder menu/state size mismatch");
+
 static void wifi_marauder_scene_start_var_list_enter_callback(void* context, uint32_t index) {
     furi_assert(context);
     WifiMarauderApp* app = context;
 
-    furi_assert(index < NUM_MENU_ITEMS);
+    if(index >= NUM_MENU_ITEMS) return;
     const WifiMarauderItem* item = &items[index];
 
-    const int selected_option_index = app->selected_option_index[index];
-    furi_assert(selected_option_index < item->num_options_menu);
+    int selected_option_index = app->selected_option_index[index];
+    if(selected_option_index < 0 || selected_option_index >= item->num_options_menu) {
+        selected_option_index = 0;
+        app->selected_option_index[index] = 0;
+    }
     app->selected_tx_string = item->actual_commands[selected_option_index];
     app->is_command = (1 <= index);
     app->is_custom_tx_string = false;
@@ -332,9 +345,10 @@ static void wifi_marauder_scene_start_var_list_change_callback(VariableItem* ite
     WifiMarauderApp* app = variable_item_get_context(item);
     furi_assert(app);
 
+    if((unsigned)app->selected_menu_index >= NUM_MENU_ITEMS) return;
     const WifiMarauderItem* menu_item = &items[app->selected_menu_index];
     uint8_t item_index = variable_item_get_current_value_index(item);
-    furi_assert(item_index < menu_item->num_options_menu);
+    if(item_index >= menu_item->num_options_menu) return;
     variable_item_set_current_value_text(item, menu_item->options_menu[item_index]);
     app->selected_option_index[app->selected_menu_index] = item_index;
 }
@@ -348,6 +362,10 @@ void wifi_marauder_scene_start_on_enter(void* context) {
 
     VariableItem* item;
     for(int i = 0; i < NUM_MENU_ITEMS; ++i) {
+        if(app->selected_option_index[i] < 0 ||
+           app->selected_option_index[i] >= items[i].num_options_menu) {
+            app->selected_option_index[i] = 0;
+        }
         item = variable_item_list_add(
             var_item_list,
             items[i].item_string,

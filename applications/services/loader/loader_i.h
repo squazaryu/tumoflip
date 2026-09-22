@@ -10,6 +10,7 @@
 #include <m-array.h>
 
 #include "loader.h"
+#include "loader_diagnostics.h"
 #include "loader_menu.h"
 #include "loader_applications.h"
 #include "loader_queue.h"
@@ -35,6 +36,7 @@ struct Loader {
     ViewHolder* view_holder;
     Loading* loading;
     bool assets_loading_visible;
+    LoaderDiagnostic diagnostic;
 };
 
 typedef enum {
@@ -53,12 +55,15 @@ typedef enum {
     LoaderMessageTypeGetApplicationLaunchPath,
     LoaderMessageTypeEnqueueLaunch,
     LoaderMessageTypeClearLaunchQueue,
+    LoaderMessageTypeGetDiagnostic,
+    LoaderMessageTypeStartWithDiagnostic,
 } LoaderMessageType;
 
 typedef struct {
     const char* name;
     const char* args;
     FuriString* error_message;
+    FuriString* diagnostic;
 } LoaderMessageStartByName;
 
 typedef struct {
@@ -80,6 +85,7 @@ typedef enum {
 typedef struct {
     LoaderStatus value;
     LoaderStatusError error;
+    LoaderDiagnostic diagnostic;
 } LoaderMessageLoaderStatusResult;
 
 typedef struct {

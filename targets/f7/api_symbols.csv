@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,88.12,,
+Version,+,88.13,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/services/applications.h,,
 Header,+,applications/services/bt/bt_service/bt.h,,
@@ -1291,6 +1291,7 @@ Function,+,flipper_application_alloc,FlipperApplication*,"Storage*, const ElfApi
 Function,+,flipper_application_alloc_thread,FuriThread*,"FlipperApplication*, const char*"
 Function,+,flipper_application_free,void,FlipperApplication*
 Function,+,flipper_application_get_manifest,const FlipperApplicationManifest*,FlipperApplication*
+Function,+,flipper_application_get_memory_failure,_Bool,"const FlipperApplication*, size_t*, size_t*, size_t*"
 Function,+,flipper_application_is_plugin,_Bool,FlipperApplication*
 Function,+,flipper_application_load_name_and_icon,_Bool,"FuriString*, Storage*, uint8_t**, FuriString*"
 Function,+,flipper_application_load_status_to_string,const char*,FlipperApplicationLoadStatus
@@ -2542,6 +2543,7 @@ Function,+,loader_clear_launch_queue,void,Loader*
 Function,+,loader_enqueue_launch,void,"Loader*, const char*, const char*, LoaderDeferredLaunchFlag"
 Function,+,loader_get_application_launch_path,_Bool,"Loader*, FuriString*"
 Function,+,loader_get_application_name,_Bool,"Loader*, FuriString*"
+Function,+,loader_get_last_diagnostic,void,"Loader*, FuriString*"
 Function,+,loader_get_pubsub,FuriPubSub*,Loader*
 Function,+,loader_is_locked,_Bool,Loader*
 Function,+,loader_lock,_Bool,Loader*
@@ -2549,6 +2551,7 @@ Function,+,loader_show_menu,void,Loader*
 Function,+,loader_signal,_Bool,"Loader*, uint32_t, void*"
 Function,+,loader_start,LoaderStatus,"Loader*, const char*, const char*, FuriString*"
 Function,+,loader_start_detached_with_gui_error,void,"Loader*, const char*, const char*"
+Function,+,loader_start_with_diagnostics,LoaderStatus,"Loader*, const char*, const char*, FuriString*, FuriString*"
 Function,+,loader_start_with_gui_error,LoaderStatus,"Loader*, const char*, const char*"
 Function,+,loader_unlock,void,Loader*
 Function,+,loading_alloc,Loading*,
@@ -3212,6 +3215,7 @@ Function,+,plugin_manager_get_ep,const void*,"PluginManager*, uint32_t"
 Function,+,plugin_manager_load_all,PluginManagerError,"PluginManager*, const char*"
 Function,+,plugin_manager_load_all_with_prefix,PluginManagerError,"PluginManager*, const char*, const char*"
 Function,+,plugin_manager_load_single,PluginManagerError,"PluginManager*, const char*"
+Function,+,plugin_manager_load_single_detailed,PluginManagerLoadStatus,"PluginManager*, const char*"
 Function,-,popen,FILE*,"const char*, const char*"
 Function,+,popup_alloc,Popup*,
 Function,+,popup_disable_timeout,void,Popup*

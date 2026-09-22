@@ -1,10 +1,10 @@
-#include "subghz_frequency_analyzer.h"
+#include <subghz/views/subghz_frequency_analyzer.h>
 
 #include <furi.h>
 #include <input/input.h>
 #include <notification/notification_messages.h>
 #include <gui/elements.h>
-#include "../helpers/subghz_frequency_analyzer_worker.h"
+#include <subghz/helpers/subghz_frequency_analyzer_worker.h>
 
 #include <assets_icons.h>
 #include <float_tools.h>

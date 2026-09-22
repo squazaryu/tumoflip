@@ -173,10 +173,10 @@ class SuperrolloProtocolTests(unittest.TestCase):
         )
         create = (
             ROOT
-            / "applications/main/subghz/helpers/subghz_txrx_create_protocol_key.c"
+            / "applications/main/subghz/plugins/add_manually/subghz_txrx_create_protocol_key.c"
         ).read_text(encoding="utf-8")
         scene = (
-            ROOT / "applications/main/subghz/scenes/subghz_scene_set_type.c"
+            ROOT / "applications/main/subghz/plugins/add_manually/subghz_scene_set_type.c"
         ).read_text(encoding="utf-8")
         self.assertNotIn("&subghz_protocol_superrollo", registry)
         self.assertIn("subghz_protocol_superrollo_create_data", create)

@@ -58,7 +58,7 @@ class SubGhzUnleashed090Test(unittest.TestCase):
         self.assertIn('"FM12K"', settings)
 
     def test_cardin_s449_uses_fm12k_and_keeloq_manufacturer(self) -> None:
-        generator = source("applications/main/subghz/helpers/subghz_gen_info.c")
+        generator = source("applications/main/subghz/plugins/add_manually/subghz_gen_info.c")
         keeloq = source("lib/subghz/protocols/keeloq.c")
 
         # Keeloq generation metadata is table-driven in the compact build.

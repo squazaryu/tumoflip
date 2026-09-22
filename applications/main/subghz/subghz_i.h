@@ -1,6 +1,10 @@
 #pragma once
 
 #include "helpers/subghz_types.h"
+#include "helpers/subghz_analyzer_plugin.h"
+#include "helpers/subghz_add_manually_plugin.h"
+#include <flipper_application/plugins/plugin_manager.h>
+#include <flipper_application/plugins/composite_resolver.h>
 #include "helpers/subghz_gen_info.h"
 #include <lib/subghz/types.h>
 #include "subghz.h"
@@ -76,6 +80,14 @@ struct SubGhz {
     VariableItem* rx_profile_item;
 
     SubGhzFrequencyAnalyzer* subghz_frequency_analyzer;
+    const SubGhzAnalyzerPlugin* analyzer_plugin;
+    PluginManager* analyzer_plugin_manager;
+    const SubGhzAddManuallyPlugin* add_manually_plugin;
+    PluginManager* add_manually_plugin_manager;
+    uint8_t add_manually_dispatch_depth;
+    bool add_manually_unload_pending;
+    CompositeApiResolver* api_resolver;
+    uint8_t api_resolver_refs;
     SubGhzReadRAW* subghz_read_raw;
     bool raw_send_only;
     bool return_to_launcher;
@@ -110,6 +122,10 @@ struct SubGhz {
     void* rpc_ctx;
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void subghz_blink_start(SubGhz* subghz);
 void subghz_blink_stop(SubGhz* subghz);
 
@@ -140,7 +156,8 @@ bool subghz_is_locked(SubGhz* subghz);
 void subghz_rx_key_state_set(SubGhz* subghz, SubGhzRxKeyState state);
 SubGhzRxKeyState subghz_rx_key_state_get(SubGhz* subghz);
 
-void subghz_ensure_frequency_analyzer_view(SubGhz* subghz);
+bool subghz_ensure_frequency_analyzer_view(SubGhz* subghz);
+void subghz_release_frequency_analyzer_view(SubGhz* subghz);
 void subghz_ensure_receiver_view(SubGhz* subghz);
 void subghz_request_location_sidecar(SubGhz* subghz);
 
@@ -148,3 +165,7 @@ void subghz_scene_show_unsupported(SubGhz* subghz);
 
 extern const NotificationSequence subghz_sequence_rx;
 extern const NotificationSequence subghz_sequence_rx_locked;
+
+#ifdef __cplusplus
+}
+#endif

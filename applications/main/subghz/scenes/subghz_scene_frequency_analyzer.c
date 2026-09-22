@@ -2,6 +2,7 @@
 #include "../helpers/subghz_frequency_notebook.h"
 #include "../views/subghz_frequency_analyzer.h"
 #include <loader/loader.h>
+#include "../helpers/subghz_feature_plugin.h"
 
 #define TAG "SubGhzSceneFrequencyAnalyzer"
 
@@ -60,11 +61,11 @@ void subghz_scene_frequency_analyzer_callback(SubGhzCustomEvent event, void* con
 void subghz_scene_frequency_analyzer_on_enter(void* context) {
     SubGhz* subghz = context;
 #if !defined(ARF_PROFILE_FA)
-    subghz_ensure_frequency_analyzer_view(subghz);
+    if(!subghz_ensure_frequency_analyzer_view(subghz)) return;
 #endif
-    subghz_frequency_analyzer_set_callback(
+    subghz->analyzer_plugin->set_callback(
         subghz->subghz_frequency_analyzer, subghz_scene_frequency_analyzer_callback, subghz);
-    subghz_frequency_analyzer_feedback_level(
+    subghz->analyzer_plugin->feedback_level(
         subghz->subghz_frequency_analyzer,
         subghz->last_settings->frequency_analyzer_feedback_level,
         true);
@@ -73,10 +74,12 @@ void subghz_scene_frequency_analyzer_on_enter(void* context) {
 
 bool subghz_scene_frequency_analyzer_on_event(void* context, SceneManagerEvent event) {
     SubGhz* subghz = context;
+    if(subghz_feature_plugin_handle_missing(subghz, event)) return true;
+    if(!subghz->analyzer_plugin) return false;
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == SubGhzCustomEventSceneAnalyzerLock) {
             notification_message(subghz->notifications, &sequence_set_green_255);
-            switch(subghz_frequency_analyzer_feedback_level(
+            switch(subghz->analyzer_plugin->feedback_level(
                 subghz->subghz_frequency_analyzer,
                 SubGHzFrequencyAnalyzerFeedbackLevelAll,
                 false)) {
@@ -96,7 +99,7 @@ bool subghz_scene_frequency_analyzer_on_event(void* context, SceneManagerEvent e
             return true;
         } else if(event.event == SubGhzCustomEventViewFreqAnalOkShort) {
             SubGhzFrequencyAnalyzerObservation observation;
-            const bool has_observation = subghz_frequency_analyzer_get_observation(
+            const bool has_observation = subghz->analyzer_plugin->get_observation(
                 subghz->subghz_frequency_analyzer, &observation);
             const bool notebook_saved = has_observation &&
                                         subghz_frequency_notebook_append(&observation);
@@ -104,7 +107,7 @@ bool subghz_scene_frequency_analyzer_on_event(void* context, SceneManagerEvent e
                 subghz->notifications, notebook_saved ? &sequence_saved : &sequence_error);
 
             uint32_t frequency = has_observation ? observation.frequency :
-                                                   subghz_frequency_analyzer_get_frequency_to_save(
+                                                   subghz->analyzer_plugin->get_frequency_to_save(
                                                        subghz->subghz_frequency_analyzer);
             if(frequency > 0) {
                 subghz->last_settings->frequency = frequency;
@@ -127,7 +130,7 @@ bool subghz_scene_frequency_analyzer_on_event(void* context, SceneManagerEvent e
         } else if(event.event == SubGhzCustomEventViewFreqAnalPresetRx) {
             uint32_t frequency = 0;
             uint32_t preset_index = 0;
-            if(!subghz_frequency_analyzer_get_selected_preset(
+            if(!subghz->analyzer_plugin->get_selected_preset(
                    subghz->subghz_frequency_analyzer, &frequency, &preset_index)) {
                 notification_message(subghz->notifications, &sequence_error);
                 return true;
@@ -148,11 +151,13 @@ bool subghz_scene_frequency_analyzer_on_event(void* context, SceneManagerEvent e
 
 void subghz_scene_frequency_analyzer_on_exit(void* context) {
     SubGhz* subghz = context;
+    if(!subghz->analyzer_plugin) return;
     notification_message(subghz->notifications, &sequence_reset_rgb);
 
     subghz->last_settings->frequency_analyzer_feedback_level =
-        subghz_frequency_analyzer_feedback_level(subghz->subghz_frequency_analyzer, 0, false);
+        subghz->analyzer_plugin->feedback_level(subghz->subghz_frequency_analyzer, 0, false);
     subghz->last_settings->frequency_analyzer_trigger =
-        subghz_frequency_analyzer_get_trigger_level(subghz->subghz_frequency_analyzer);
+        subghz->analyzer_plugin->get_trigger_level(subghz->subghz_frequency_analyzer);
     subghz_last_settings_save(subghz->last_settings);
+    subghz_release_frequency_analyzer_view(subghz);
 }

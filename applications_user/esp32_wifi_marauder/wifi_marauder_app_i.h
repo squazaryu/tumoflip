@@ -15,6 +15,7 @@
 
 #include <gui/gui.h>
 #include <gui/view_dispatcher.h>
+#include <gui/view_stack.h>
 #include <gui/scene_manager.h>
 #include <gui/modules/text_box.h>
 #include <gui/modules/submenu.h>
@@ -27,7 +28,7 @@
 #include <lib/toolbox/path.h>
 #include <dialogs/dialogs.h>
 
-#define NUM_MENU_ITEMS (34)
+#define NUM_MENU_ITEMS (36)
 
 #define WIFI_MARAUDER_TEXT_BOX_STORE_SIZE (4096)
 #define WIFI_MARAUDER_TEXT_INPUT_STORE_SIZE (512)
@@ -60,6 +61,8 @@ struct WifiMarauderApp {
     FuriString* text_box_store;
     size_t text_box_store_strlen;
     TextBox* text_box;
+    ViewStack* console_stack;
+    View* console_input;
     WIFI_TextInput* text_input;
     Storage* storage;
     File* capture_file;

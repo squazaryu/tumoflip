@@ -13,6 +13,10 @@ extern "C" {
 
 typedef struct ELFFile ELFFile;
 
+/** Snapshot captured before a section allocation is refused. */
+bool elf_file_get_memory_failure(
+    const ELFFile* elf, size_t* required, size_t* free_heap, size_t* max_block);
+
 typedef struct {
     const char* name;
     uint32_t address;
