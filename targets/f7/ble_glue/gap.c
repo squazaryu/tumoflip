@@ -671,7 +671,8 @@ bool gap_init_with_peer_selection(
     gap->peer_selection = peer_selection;
     gap->service.connection_handle = GAP_CONNECTION_HANDLE_INVALID;
     gap->peer_filter_selected = false;
-    gap->peer_filter_valid = true;
+    // Even a settings-driven advertising request must wait for Select or Add.
+    gap->peer_filter_valid = !peer_selection;
     // Initialization of GATT & GAP layer
     gap->service.adv_name = config->adv_name;
     if(!gap_init_svc(gap, root_keys)) {
@@ -685,7 +686,7 @@ bool gap_init_with_peer_selection(
     // Initialization of the GAP state
     gap->state_mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     gap->state = GapStateIdle;
-    gap->enable_adv = true;
+    gap->enable_adv = !peer_selection;
 
     // Command queue allocation
     gap->command_queue = furi_message_queue_alloc(8, sizeof(GapCommand));
