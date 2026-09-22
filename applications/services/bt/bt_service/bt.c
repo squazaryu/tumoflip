@@ -624,12 +624,14 @@ static void bt_change_profile(Bt* bt, BtMessage* message) {
             bt_keys_storage_load(bt->keys_storage);
         }
 
-        bt->current_profile = furi_hal_bt_change_app(
-            message->data.profile.template,
-            message->data.profile.params,
-            bt_keys_storage_get_root_keys(bt->keys_storage),
-            bt_on_gap_event_callback,
-            bt);
+        bt->current_profile =
+            (message->data.profile.start_idle ? furi_hal_bt_change_app_with_peer_selection :
+                                                furi_hal_bt_change_app)(
+                message->data.profile.template,
+                message->data.profile.params,
+                bt_keys_storage_get_root_keys(bt->keys_storage),
+                bt_on_gap_event_callback,
+                bt);
         if(bt->current_profile) {
             FURI_LOG_I(TAG, "Bt App started");
             bt_app_bridge_bind(bt);

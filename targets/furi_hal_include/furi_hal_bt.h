@@ -114,6 +114,14 @@ FURI_WARN_UNUSED FuriHalBleProfileBase* furi_hal_bt_change_app(
     GapEventCallback event_cb,
     void* context);
 
+/** Firmware-internal peer-selection startup. Not exported to FAPs. */
+FURI_WARN_UNUSED FuriHalBleProfileBase* furi_hal_bt_change_app_with_peer_selection(
+    const FuriHalBleProfileTemplate* profile_template,
+    FuriHalBleProfileParams profile_params,
+    const GapRootSecurityKeys* root_keys,
+    GapEventCallback event_cb,
+    void* context);
+
 /** Update battery level
  *
  * @param battery_level battery level

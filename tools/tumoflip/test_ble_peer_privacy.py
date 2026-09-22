@@ -119,8 +119,11 @@ int aci_gap_set_authentication_requirement(int a,int b,int c,int d,int e,int f,i
 int aci_gap_configure_whitelist(void){return 0;}
 ''' + body + r'''
 int main(void){GapRootSecurityKeys keys={0};
- prepare();gap->peer_selection=true;gap_init_svc(gap,&keys);assert(privacy==2);
- prepare();gap_init_svc(gap,&keys);assert(privacy==0);return 0;}
+ prepare();gap->peer_selection=true;assert(gap_init_svc(gap,&keys));assert(privacy==2);
+ prepare();assert(gap_init_svc(gap,&keys));assert(privacy==0);
+ prepare();gap->peer_selection=true;init_status=1;assert(!gap_init_svc(gap,&keys));
+ prepare();config.pairing_method=GapPairingPinCodeShow;assert(gap_init_svc(gap,&keys));
+ config.pairing_method=GapPairingPinCodeVerifyYesNo;assert(gap_init_svc(gap,&keys));return 0;}
 ''')
 
     def test_enhanced_connection_event_updates_handle_and_security(self):
@@ -154,6 +157,49 @@ int main(void){
  prepare();legacy.Status=0x3e;event(1,&legacy);assert(gap->service.connection_handle==UINT16_MAX && !security);
  return 0;
 }
+''')
+
+    def test_hal_peer_start_and_restore_leave_legacy_api_unchanged(self):
+        source = (ROOT / "targets/f7/furi_hal/furi_hal_bt.c").read_text()
+        body = "\n".join(function(source, signature) for signature in (
+            "static FuriHalBleProfileBase* furi_hal_bt_start_app_internal(",
+            "FuriHalBleProfileBase* furi_hal_bt_start_app(",
+            "FuriHalBleProfileBase* furi_hal_bt_change_app(",
+            "FuriHalBleProfileBase* furi_hal_bt_change_app_with_peer_selection(",
+        ))
+        run_c(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+#define furi_check assert
+#define FURI_LOG_E(...) ((void)0)
+typedef int FuriHalBleProfileBase,GapConfig,GapRootSecurityKeys;
+typedef void* FuriHalBleProfileParams;
+typedef void(*GapEventCallback)(void);
+typedef struct {void(*get_gap_config)(GapConfig*,void*);FuriHalBleProfileBase*(*start)(void*);}FuriHalBleProfileTemplate;
+static FuriHalBleProfileBase instance,*current_profile;
+static GapConfig current_config;
+static bool mode,ready=true,supported=true,init_ok=true;
+static unsigned resets,starts,stops;
+static bool ble_glue_is_radio_stack_ready(void){return ready;}
+static bool furi_hal_bt_is_gatt_gap_supported(void){return supported;}
+static bool gap_init_with_peer_selection(GapConfig*c,const GapRootSecurityKeys*k,GapEventCallback cb,void*ctx,bool peer){
+ (void)c;(void)k;(void)cb;(void)ctx;mode=peer;return init_ok;}
+static void gap_thread_stop(void){stops++;}
+static void furi_hal_bt_reinit(void){resets++;current_profile=NULL;}
+static void config_cb(GapConfig*c,void*p){(void)c;(void)p;}
+static FuriHalBleProfileBase* start_cb(void*p){(void)p;starts++;return &instance;}
+static void event_cb(void){}
+''' + body + r'''
+int main(void){FuriHalBleProfileTemplate profile={config_cb,start_cb};GapRootSecurityKeys keys=0;
+ assert(furi_hal_bt_start_app(&profile,NULL,&keys,event_cb,NULL));assert(!mode && starts==1);
+ assert(furi_hal_bt_change_app_with_peer_selection(&profile,NULL,&keys,event_cb,NULL));assert(mode && starts==2 && resets==1);
+ assert(furi_hal_bt_change_app(&profile,NULL,&keys,event_cb,NULL));assert(!mode && starts==3 && resets==2);
+ init_ok=false;assert(!furi_hal_bt_change_app_with_peer_selection(&profile,NULL,&keys,event_cb,NULL));
+ assert(mode && starts==3 && stops==1);
+ ready=false;assert(!furi_hal_bt_change_app(&profile,NULL,&keys,event_cb,NULL));assert(starts==3);
+ ready=true;supported=false;assert(!furi_hal_bt_change_app(&profile,NULL,&keys,event_cb,NULL));assert(starts==3);
+ return 0;}
 ''')
 
 

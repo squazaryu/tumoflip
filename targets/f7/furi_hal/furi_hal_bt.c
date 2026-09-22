@@ -162,12 +162,13 @@ bool furi_hal_bt_check_profile_type(
     return profile->config == profile_template;
 }
 
-FuriHalBleProfileBase* furi_hal_bt_start_app(
+static FuriHalBleProfileBase* furi_hal_bt_start_app_internal(
     const FuriHalBleProfileTemplate* profile_template,
     FuriHalBleProfileParams params,
     const GapRootSecurityKeys* root_keys,
     GapEventCallback event_cb,
-    void* context) {
+    void* context,
+    bool peer_selection) {
     furi_check(event_cb);
     furi_check(profile_template);
     furi_check(root_keys);
@@ -185,7 +186,8 @@ FuriHalBleProfileBase* furi_hal_bt_start_app(
 
         profile_template->get_gap_config(&current_config, params);
 
-        if(!gap_init(&current_config, root_keys, event_cb, context)) {
+        if(!gap_init_with_peer_selection(
+               &current_config, root_keys, event_cb, context, peer_selection)) {
             gap_thread_stop();
             FURI_LOG_E(TAG, "Failed to init GAP");
             break;
@@ -197,6 +199,16 @@ FuriHalBleProfileBase* furi_hal_bt_start_app(
     } while(false);
 
     return current_profile;
+}
+
+FuriHalBleProfileBase* furi_hal_bt_start_app(
+    const FuriHalBleProfileTemplate* profile_template,
+    FuriHalBleProfileParams params,
+    const GapRootSecurityKeys* root_keys,
+    GapEventCallback event_cb,
+    void* context) {
+    return furi_hal_bt_start_app_internal(
+        profile_template, params, root_keys, event_cb, context, false);
 }
 
 void furi_hal_bt_reinit(void) {
@@ -246,6 +258,17 @@ FuriHalBleProfileBase* furi_hal_bt_change_app(
     void* context) {
     furi_hal_bt_reinit();
     return furi_hal_bt_start_app(profile_template, profile_params, root_keys, event_cb, context);
+}
+
+FuriHalBleProfileBase* furi_hal_bt_change_app_with_peer_selection(
+    const FuriHalBleProfileTemplate* profile_template,
+    FuriHalBleProfileParams profile_params,
+    const GapRootSecurityKeys* root_keys,
+    GapEventCallback event_cb,
+    void* context) {
+    furi_hal_bt_reinit();
+    return furi_hal_bt_start_app_internal(
+        profile_template, profile_params, root_keys, event_cb, context, true);
 }
 
 bool furi_hal_bt_is_active(void) {
