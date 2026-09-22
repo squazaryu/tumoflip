@@ -1,3 +1,7 @@
+## Unreleased
+- Specter FW Package 3.2: adapt upstream 3.0.1 survey/fingerprint spacing, suppress the reader ring during calibration, report TOO SHORT for empty surveys under 10 seconds, and wrap text log entries while retaining checked SD writes and rollback.
+- Sub-GHz: allow existing PSA/PSA2 receivers through AM as well as FM filtering; add a bounded Honda 315 MHz RX profile shared by Standard/Read RAW and ProtoPirate. Existing profile indices and independent settings remain stable.
+
 ## Tumoflip Dev 009-006
 - Sub-GHz: keep the profile-owned `TumoHonda` receiver preset out of the generic Core modulation choices. The Honda RX profile still selects it and displays it as `Honda RX Custom`; saved actual preset indices remain stable. The Honda/Acura protocol remains in the Shuka Auto pack.
 

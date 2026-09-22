@@ -2,6 +2,8 @@
 from pathlib import Path
 import json
 import unittest
+import subprocess
+import tempfile
 from tools.tumoflip.test_hotplug_assets import function
 from tools.tumoflip.test_nfc_completion_equality import native
 
@@ -10,6 +12,21 @@ APP = ROOT / "applications_user/specter"
 
 
 class SpecterPackageTest(unittest.TestCase):
+    def test_native_survey_and_wrapped_log_filter(self):
+        for name, dependencies in (
+            ("test_survey", [APP / "helpers/survey_verdict.c"]),
+            ("test_logwrap", []),
+        ):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                executable = str(Path(directory) / name)
+                subprocess.run(
+                    ["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O1",
+                     "-fsanitize=address,undefined", str(APP / "test" / (name + ".c")),
+                     *map(str, dependencies), "-o", executable],
+                    check=True, capture_output=True, text=True,
+                )
+                subprocess.run([executable], check=True, capture_output=True, text=True)
+
     def test_specter_source_ownership_is_explicit(self):
         imports = json.loads((ROOT / "tools/tumoflip/protected_app_imports.json").read_text())
         entries = [item for item in imports["imports"] if item["appId"] == "specter"]
@@ -26,7 +43,7 @@ class SpecterPackageTest(unittest.TestCase):
 
     def test_adaptation_version_is_visible_in_two_component_fap_metadata(self):
         # FAP manifests encode major/minor only: 3.0.1 would still appear as 3.0.
-        self.assertIn('fap_version="3.1.0"', (APP / "application.fam").read_text())
+        self.assertIn('fap_version="3.2.0"', (APP / "application.fam").read_text())
 
     def test_specter_is_in_paired_packages_and_ci(self):
         from tools.tumoflip import validate_release as release

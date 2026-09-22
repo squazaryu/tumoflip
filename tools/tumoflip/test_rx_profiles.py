@@ -161,12 +161,16 @@ static bool flipper_format_rewind(FlipperFormat*f){(void)f;return true;}
 static void flipper_format_free(FlipperFormat*f){(void)f;allocations--;}
 static bool subghz_setting_load_custom_preset(SubGhzSetting*s,const char*n,FlipperFormat*f){(void)n;(void)f;s->added=load_ok;return load_ok;}
 ''' + source + r'''
-int main(void){SubGhzSetting s={0};assert(SUBGHZ_RX_PROFILE_COUNT==8);
- assert(!subghz_rx_profile_get(0));assert(!subghz_rx_profile_get(8));assert(!subghz_rx_profile_get(255));
+int main(void){SubGhzSetting s={0};assert(SUBGHZ_RX_PROFILE_COUNT==9);
+ assert(!subghz_rx_profile_get(0));assert(!subghz_rx_profile_get(9));assert(!subghz_rx_profile_get(255));
+ assert(subghz_rx_profile_get(7)->frequency==433920000);
+ assert(subghz_rx_profile_get(8)->frequency==315000000);
+ assert(!strcmp(subghz_rx_profile_get(7)->preset,subghz_rx_profile_get(8)->preset));
+ assert(subghz_rx_profile_preset_index(&s,8)==2);assert(s.added&&!allocations);
  assert(subghz_rx_profiles_init(&s));assert(s.added&&!allocations);
  for(unsigned i=1;i<SUBGHZ_RX_PROFILE_COUNT;i++){const SubGhzRxProfile*p=subghz_rx_profile_get(i);assert(p&&p->frequency>=300000000&&p->frequency<=500000000);assert(subghz_rx_profile_preset_index(&s,i)>=0);}
  assert(subghz_rx_profiles_init(&s));assert(!allocations);
- collision=true;assert(!subghz_rx_profiles_init(&s));collision=false;
+ collision=true;assert(!subghz_rx_profiles_init(&s));assert(subghz_rx_profile_preset_index(&s,8)==-1);collision=false;
  s.added=false;write_ok=false;assert(!subghz_rx_profiles_init(&s));assert(!s.added&&!allocations);
  write_ok=true;load_ok=false;assert(!subghz_rx_profiles_init(&s));assert(!s.added&&!allocations);
  return 0;}
