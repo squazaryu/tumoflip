@@ -8,7 +8,7 @@
     {
       "appId": "specter",
       "localSourcePath": "applications_user/specter",
-      "implementationCommit": "095d0ef2e08d3c135bffebc940a08f139c8bffaf",
+      "implementationCommit": "113dca1600f0bb23cb7034b21485e336e581d160",
       "upstreamRepository": "https://github.com/xMasterX/all-the-plugins.git",
       "upstreamRef": "release-source",
       "upstreamCommit": "8970b6ba0e48a9c63b4bfaf07ca121f5b08e5b34"
