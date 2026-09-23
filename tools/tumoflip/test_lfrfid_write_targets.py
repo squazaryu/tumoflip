@@ -113,7 +113,7 @@ class LfRfidWriteTargetTests(unittest.TestCase):
 
     def test_api_minor_bump_exports_only_the_new_scalar_surface(self) -> None:
         api = source("targets/f7/api_symbols.csv")
-        self.assertEqual(api.splitlines()[1], "Version,+,88.13,,")
+        self.assertEqual(api.splitlines()[1], "Version,+,88.14,,")
         for symbol in (
             "lfrfid_worker_set_write_targets",
             "lfrfid_write_targets_default",
