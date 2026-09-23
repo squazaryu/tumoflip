@@ -6,7 +6,11 @@
 #include <lib/subghz/subghz_keystore.h>
 #include <lib/subghz/subghz_file_encoder_worker.h>
 #include <lib/subghz/protocols/protocol_items.h>
+#include <lib/subghz/protocols/faac_slh.h>
+#include <lib/subghz/protocols/keeloq_common.h>
 #include <lib/subghz/protocols/kia_v1.h>
+#include <lib/subghz/environment.h>
+#include <gui/modules/loading.h>
 #include <flipper_format/flipper_format_i.h>
 #include <lib/subghz/devices/devices.h>
 #include <lib/subghz/devices/cc1101_configs.h>
@@ -396,6 +400,142 @@ MU_TEST(subghz_decoder_faac_slh_test) {
         subghz_decoder_test(
             EXT_PATH("unit_tests/subghz/faac_slh_raw.sub"), SUBGHZ_PROTOCOL_FAAC_SLH_NAME),
         "Test decoder " SUBGHZ_PROTOCOL_FAAC_SLH_NAME " error\r\n");
+}
+
+static void subghz_test_add_faac_learning_key(
+    SubGhzKeystore* keystore,
+    const char* name,
+    uint64_t key) {
+    SubGhzKey* entry = SubGhzKeyArray_push_raw(subghz_keystore_get_data(keystore));
+    entry->name = furi_string_alloc_set(name);
+    entry->key = key;
+    entry->type = KEELOQ_LEARNING_FAAC;
+}
+
+static uint64_t subghz_test_faac_slh_frame(
+    uint32_t seed,
+    uint64_t manufacturer_key,
+    uint32_t counter) {
+    const uint32_t fixed = 0x12345678;
+    uint8_t nibbles[8];
+    for(size_t i = 0; i < COUNT_OF(nibbles); i++) {
+        const uint8_t shift = (uint8_t)((COUNT_OF(nibbles) - i - 1) * 4);
+        nibbles[i] = (uint8_t)((fixed >> shift) & 0xF);
+    }
+
+    const uint32_t plain = (uint32_t)nibbles[6] << 28 | (uint32_t)nibbles[7] << 24 |
+                           (uint32_t)nibbles[5] << 20 | (counter & 0xFFFFF);
+    const uint64_t learning_key =
+        subghz_protocol_keeloq_common_faac_learning(seed, manufacturer_key);
+    const uint32_t hop = subghz_protocol_keeloq_common_encrypt(plain, learning_key);
+    return (uint64_t)fixed << 32 | hop;
+}
+
+static FlipperFormat* subghz_test_faac_slh_file(
+    uint64_t frame,
+    uint32_t seed,
+    const char* manufacturer) {
+    const uint32_t bit_count = 64;
+    uint8_t key_data[sizeof(frame)] = {0};
+    uint8_t seed_data[sizeof(seed)] = {0};
+
+    for(size_t i = 0; i < sizeof(key_data); i++) {
+        key_data[sizeof(key_data) - i - 1] = (uint8_t)(frame >> (i * 8));
+    }
+    for(size_t i = 0; i < sizeof(seed_data); i++) {
+        seed_data[sizeof(seed_data) - i - 1] = (uint8_t)(seed >> (i * 8));
+    }
+
+    FlipperFormat* file = flipper_format_string_alloc();
+    if(!flipper_format_write_uint32(file, "Bit", &bit_count, 1) ||
+       !flipper_format_write_hex(file, "Key", key_data, sizeof(key_data)) ||
+       !flipper_format_write_hex(file, "Seed", seed_data, sizeof(seed_data)) ||
+       (manufacturer &&
+        !flipper_format_write_string_cstr(file, "Manufacture", manufacturer))) {
+        flipper_format_free(file);
+        return NULL;
+    }
+
+    return file;
+}
+
+MU_TEST(subghz_decoder_faac_slh_manufacturer_metadata_test) {
+    const uint64_t faac_test_key = 0x0123456789ABCDEF;
+    const uint64_t genius_test_key = 0xFEDCBA9876543210;
+    const uint32_t test_seed = 0x89ABCDEF;
+    const uint32_t test_counter = 0x12344;
+
+    SubGhzEnvironment* environment = subghz_environment_alloc();
+    SubGhzKeystore* keystore = subghz_environment_get_keystore(environment);
+    subghz_test_add_faac_learning_key(keystore, "FAAC_SLH", faac_test_key);
+    subghz_test_add_faac_learning_key(keystore, "Genius", genius_test_key);
+
+    void* decoder = subghz_protocol_faac_slh_decoder.alloc(environment);
+    FuriString* output = furi_string_alloc();
+    FlipperFormat* input = subghz_test_faac_slh_file(
+        subghz_test_faac_slh_frame(test_seed, genius_test_key, test_counter),
+        test_seed,
+        "Genius");
+    mu_check(input != NULL);
+    mu_assert_int_eq(
+        SubGhzProtocolStatusOk,
+        subghz_protocol_faac_slh_decoder.deserialize(decoder, input));
+
+    subghz_protocol_faac_slh_decoder.get_string(decoder, output);
+    mu_check(furi_string_search_str(output, "Genius") != FURI_STRING_FAILURE);
+    mu_check(furi_string_search_str(output, "Cnt:12344") != FURI_STRING_FAILURE);
+
+    FlipperFormat* saved = flipper_format_string_alloc();
+    FuriString* saved_manufacturer = furi_string_alloc();
+    SubGhzRadioPreset preset = {
+        .name = furi_string_alloc_set("AM650"),
+        .frequency = 433920000,
+    };
+    mu_assert_int_eq(
+        SubGhzProtocolStatusOk,
+        subghz_protocol_faac_slh_decoder.serialize(decoder, saved, &preset));
+    mu_check(flipper_format_rewind(saved));
+    mu_check(flipper_format_read_string(saved, "Manufacture", saved_manufacturer));
+    mu_assert_string_eq("Genius", furi_string_get_cstr(saved_manufacturer));
+
+    FlipperFormat* legacy_input = subghz_test_faac_slh_file(
+        subghz_test_faac_slh_frame(test_seed, faac_test_key, test_counter), test_seed, NULL);
+    mu_check(legacy_input != NULL);
+    mu_assert_int_eq(
+        SubGhzProtocolStatusOk,
+        subghz_protocol_faac_slh_decoder.deserialize(decoder, legacy_input));
+    furi_string_reset(output);
+    subghz_protocol_faac_slh_decoder.get_string(decoder, output);
+    mu_check(furi_string_search_str(output, "Genius") == FURI_STRING_FAILURE);
+    mu_check(furi_string_search_str(output, "Cnt:12344") != FURI_STRING_FAILURE);
+
+    FlipperFormat* legacy_saved = flipper_format_string_alloc();
+    mu_assert_int_eq(
+        SubGhzProtocolStatusOk,
+        subghz_protocol_faac_slh_decoder.serialize(decoder, legacy_saved, &preset));
+    mu_check(flipper_format_rewind(legacy_saved));
+    mu_check(!flipper_format_read_string(legacy_saved, "Manufacture", saved_manufacturer));
+
+    furi_string_free(preset.name);
+    furi_string_free(saved_manufacturer);
+    flipper_format_free(legacy_saved);
+    flipper_format_free(legacy_input);
+    flipper_format_free(saved);
+    furi_string_free(output);
+    flipper_format_free(input);
+    subghz_protocol_faac_slh_decoder.free(decoder);
+    subghz_environment_free(environment);
+}
+
+MU_TEST(subghz_loading_label_api_export_test) {
+    Loading* loading = loading_alloc();
+    mu_check(loading != NULL);
+
+    loading_set_text(loading, "Testing public loading label");
+    loading_set_progress(loading, 0.5f);
+    loading_reset_progress(loading);
+
+    loading_free(loading);
 }
 
 MU_TEST(subghz_decoder_gate_tx_test) {
@@ -968,6 +1108,8 @@ MU_TEST_SUITE(subghz) {
     MU_RUN_TEST(subghz_decoder_came_test);
     MU_RUN_TEST(subghz_decoder_came_twee_test);
     MU_RUN_TEST(subghz_decoder_faac_slh_test);
+    MU_RUN_TEST(subghz_decoder_faac_slh_manufacturer_metadata_test);
+    MU_RUN_TEST(subghz_loading_label_api_export_test);
     MU_RUN_TEST(subghz_decoder_gate_tx_test);
     MU_RUN_TEST(subghz_decoder_hormann_hsm_test);
     MU_RUN_TEST(subghz_decoder_ido_test);
