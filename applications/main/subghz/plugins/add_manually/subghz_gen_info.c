@@ -445,6 +445,17 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.bits = 42,
             .data.te = 0};
         break;
+    case SetTypeNordIce_433:
+        gen_info = (GenInfo){
+            .type = GenData,
+            .mod = "AM650",
+            .freq = 433920000,
+            // Default to physical button 4; the encoder adds the paired-frame flag itself.
+            .data.name = SUBGHZ_PROTOCOL_NORD_ICE_NAME,
+            .data.key = (key & 0x1FFFF81FF) | 0x2400,
+            .data.bits = 33,
+            .data.te = 0};
+        break;
     case SetTypeReversRB2_433:
         gen_info = (GenInfo){
             .type = GenData,

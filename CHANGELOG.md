@@ -1,3 +1,9 @@
+## Tumoflip Dev 009-010
+- Sub-GHz: accept PSA AM frames only at 80 or 88 decoded bits, keeping the 8 alignment bits out of the payload; this avoids claiming continuous Fiat V1 frames as PSA. Add FM modulation support to the existing Fiat V1 implementations in ProtoPirate and RollJam. Toyota remains enabled; Renault V1 is not included because Tumoflip has no matching decoder.
+- Sub-GHz: update Nord ICE to normalize the paired frames, emulate the complete pair, map the four buttons, and support Add Manually at 433.92 MHz AM650.
+- NFC: show CUID-dictionary scan progress on the shared Loading view while keeping plain and labeled loading state independent.
+- F7 API stays at 88.13; no FW Packages API refresh is required. Physical-device acceptance is still needed for PSA/Fiat captures, Nord ICE, and a large CUID dictionary.
+
 ## Tumoflip Dev 009-008
 - Sub-GHz: load Frequency Analyzer view/worker and Add Manually from checked feature FALs; retain notebook, preset handoff, radio ownership and creation behavior. Stop worker/callbacks before unmapping.
 - Loader: expose structured launch diagnostics, distinguish fragmented/insufficient RAM, add stack preflight and bound manifest reads. F7 API advances additively to 88.13.

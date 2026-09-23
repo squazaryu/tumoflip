@@ -30,6 +30,7 @@ static const SubGhzBlockConst subghz_protocol_psa_const = {
 #define PSA_MAX_BITS 0x79
 #define PSA_KEY1_BITS 0x40
 #define PSA_KEY2_BITS 0x50
+#define PSA_AM_ALIGNMENT_BITS 8
 
 #define TEA_DELTA 0x9E3779B9U
 #define TEA_ROUNDS 32
@@ -1014,11 +1015,14 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
         uint32_t te_tol = te_s / 2;
         uint32_t midpoint = (te_s + te_l) / 2;
 
-        // End marker check: HIGH pulse beyond long range at 80 bits
-        if(level && instance->decode_count_bit == PSA_KEY2_BITS && duration > midpoint) {
+        // AM frames contain 80 data bits, optionally followed by 8 alignment bits. A pulse
+        // beyond the Manchester long range is a frame boundary only at one of those lengths.
+        if(level && instance->decode_count_bit >= PSA_KEY2_BITS && duration > te_l + te_tol) {
             uint32_t end_expected = te_s * 4;
             uint32_t end_diff = psa_abs_diff(duration, end_expected);
-            if(end_diff <= te_s * 2) {
+            if((instance->decode_count_bit == PSA_KEY2_BITS ||
+                instance->decode_count_bit == PSA_KEY2_BITS + PSA_AM_ALIGNMENT_BITS) &&
+               end_diff <= te_s * 2) {
                 instance->validation_field = (uint16_t)(instance->decode_data_low & 0xFFFF);
                 instance->key2_low = instance->decode_data_low;
                 instance->key2_high = instance->decode_data_high;
@@ -1059,6 +1063,15 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
                 instance->state = new_state;
                 return;
             }
+
+            // A long pulse at another bit count is a malformed or foreign frame. Clear the
+            // partial state so the next signal is not decoded from the middle of this one.
+            instance->decode_data_low = 0;
+            instance->decode_data_high = 0;
+            instance->decode_count_bit = 0;
+            new_state = PSADecoderState0;
+            instance->state = new_state;
+            return;
         }
 
         // Manchester decode: process BOTH high and low pulses (unlike original AM path)
@@ -1103,6 +1116,24 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
                     instance->decode_data_low = 0;
                     instance->decode_data_high = 0;
                 }
+            }
+        } else {
+            bool ignored_bit = false;
+            if(manchester_advance(
+                   instance->manchester_state,
+                   (ManchesterEvent)manchester_input,
+                   &instance->manchester_state,
+                   &ignored_bit)) {
+                if(instance->decode_count_bit >=
+                   PSA_KEY2_BITS + PSA_AM_ALIGNMENT_BITS) {
+                    instance->decode_data_low = 0;
+                    instance->decode_data_high = 0;
+                    instance->decode_count_bit = 0;
+                    new_state = PSADecoderState0;
+                    instance->state = new_state;
+                    return;
+                }
+                instance->decode_count_bit++;
             }
         }
         break;

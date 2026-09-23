@@ -3,6 +3,7 @@
 #include "nfc/nfc_app_i.h"
 #include "../nfc_protocol_support_gui_common.h"
 #include <bit_lib/bit_lib.h>
+#include <stdint.h>
 #include <dolphin/dolphin.h>
 #include <nfc/protocols/mf_classic/mf_classic_listener.h>
 #include "loader/loader.h"
@@ -253,7 +254,8 @@ static void mf_classic_scene_dict_attack_prepare_view(NfcApp* instance) {
                 KeysDictModeOpenExisting,
                 sizeof(MfClassicKey) + 1);
 
-            if(keys_dict_get_total_keys(dict) == 0) {
+            const size_t total_keys = keys_dict_get_total_keys(dict);
+            if(total_keys == 0) {
                 keys_dict_free(dict);
                 state = DictAttackStateUserDictInProgress;
                 break;
@@ -265,8 +267,18 @@ static void mf_classic_scene_dict_attack_prepare_view(NfcApp* instance) {
 
             // Scan dictionary once to populate the key-index bitmap.
             const size_t cuid_key_size = sizeof(MfClassicKey) + 1;
+            size_t processed_keys = 0;
+            uint32_t last_progress_percent = UINT32_MAX;
             uint8_t key_with_idx[cuid_key_size];
             while(keys_dict_get_next_key(dict, key_with_idx, cuid_key_size)) {
+                processed_keys++;
+                const uint32_t progress_percent =
+                    (uint32_t)(((uint64_t)processed_keys * 100U) / total_keys);
+                if(progress_percent != last_progress_percent) {
+                    nfc_set_loading_label_progress(instance, progress_percent / 100.0f);
+                    last_progress_percent = progress_percent;
+                }
+
                 uint8_t key_idx = key_with_idx[0];
                 // Set bit for this key index
                 instance->nfc_dict_context.cuid_key_indices_bitmap[key_idx / 8] |=
