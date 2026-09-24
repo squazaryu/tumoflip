@@ -1,7 +1,11 @@
-## Next Dev candidate (unpublished)
-- Sub-GHz: expose Genius SLH-compatible remotes as separate 433/868 MHz Add Manually aliases of the existing FAAC SLH implementation. They use the FAAC SLH keystore entry and tag newly created files as `Manufacture: Genius`; legacy untagged captures retain the FAAC default. Unknown explicit manufacturers fail closed instead of silently transmitting with the FAAC key.
-- F7 API advances from 88.13 to 88.14 and exports Loading text/progress/reset helpers for FAPs. Existing NFC CUID progress remains unchanged.
-- FW Packages candidate: ESP Flasher 1.14 bundles Momentum Marauder 1.14.3 images for S2/S3/WROOM. Tumoflip's C5 image and explicit quick-flash address map are retained. The independent package catalog still needs its matching Dev revision after firmware acceptance.
+## Tumoflip Dev 009-012 candidate (unpublished)
+- Sub-GHz: add `KL: KEY 433MHz` to Add Manually using the existing KeeLoq generator and KEY keystore entry.
+- ARF Renault review: do not copy the `Renault V1` FM flag; that ARF decoder is absent here. The local Renault/Dacia protocol is a different AM implementation. Keep Toyota enabled.
+- Capture Inspector 1.1: compare stored `.sub`/`.psf` fields across two or three files and export a series report with stable, changed, and missing values plus original paths. Source captures remain read-only; RAW timing analysis stays in TumoSpectrum.
+- TumoSpectrum 3.2: surface preset/protocol differences in capture comparison and reports. Waveforms with differing configuration are no longer classified as “Likely same”; existing bounded RAW-series inference and its retained source captures remain the regression evidence.
+- Sub-GHz: expose Genius SLH-compatible remotes as separate 433/868 MHz Add Manually aliases of the existing FAAC SLH implementation. They use the FAAC SLH keystore entry and tag new files `Manufacture: Genius`; legacy untagged captures retain the FAAC default. Unknown explicit manufacturers fail closed.
+- F7 API 88.14 exports Loading text/progress/reset helpers for FAPs. Existing NFC CUID progress remains unchanged.
+- ESP Flasher 1.14 bundles Momentum Marauder 1.14.3 images for S2/S3/WROOM; the C5 image and explicit Quick Flash address map are retained. The separate FW Packages catalog still needs a matching Dev revision after firmware acceptance.
 
 ## Tumoflip Dev 009-010
 - Sub-GHz: accept PSA AM frames only at 80 or 88 decoded bits, keeping the 8 alignment bits out of the payload; this avoids claiming continuous Fiat V1 frames as PSA. Add FM modulation support to the existing Fiat V1 implementations in ProtoPirate and RollJam. Toyota remains enabled; Renault V1 is not included because Tumoflip has no matching decoder.
