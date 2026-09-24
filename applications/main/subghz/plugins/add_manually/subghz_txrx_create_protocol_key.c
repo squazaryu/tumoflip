@@ -240,6 +240,11 @@ bool subghz_txrx_gen_faac_slh_protocol(
         bool tmp_allow_zero_seed = true;
         flipper_format_write_hex(txrx->fff_data, "Seed", seed_data, sizeof(uint32_t));
         flipper_format_write_bool(txrx->fff_data, "AllowZeroSeed", &tmp_allow_zero_seed, 1);
+        if(manufacture_name && (manufacture_name[0] != '\0') &&
+           !flipper_format_write_string_cstr(txrx->fff_data, "Manufacture", manufacture_name)) {
+            FURI_LOG_E(TAG, "Unable to add Manufacture");
+            res = false;
+        }
     }
 
     subghz_transmitter_free(transmitter);
