@@ -170,6 +170,7 @@ static const SubGhzKeeloqGenerationPreset subghz_keeloq_generation_presets[] = {
     [48] = SUBGHZ_KEELOQ_PRESET(KEELOQ_MASK_16, KEELOQ_PREFIX_FAAC, KEELOQ_FREQUENCY_868_350, KEELOQ_MODULATION_AM650, 0x02, 0x03, "FAAC_RC,XT"),
     [49] = SUBGHZ_KEELOQ_PRESET(KEELOQ_MASK_16, KEELOQ_PREFIX_NONE, KEELOQ_FREQUENCY_433_920, KEELOQ_MODULATION_AM650, 0x04, 0x03, "Normstahl"),
     [50] = SUBGHZ_KEELOQ_PRESET(KEELOQ_MASK_20, KEELOQ_PREFIX_NONE, KEELOQ_FREQUENCY_433_920, KEELOQ_MODULATION_AM650, 0x02, 0x03, "HCS101"),
+    [51] = SUBGHZ_KEELOQ_PRESET(KEELOQ_MASK_28, KEELOQ_PREFIX_NONE, KEELOQ_FREQUENCY_433_920, KEELOQ_MODULATION_AM650, 0x01, 0x03, "KEY"),
 };
 
 static const uint8_t subghz_keeloq_preset_by_type[SetTypeMAX] = {
@@ -181,6 +182,7 @@ static const uint8_t subghz_keeloq_preset_by_type[SetTypeMAX] = {
     [SetTypeAllmatic868] = 6,
     [SetTypeCenturion433] = 7,
     [SetTypeMonarch433] = 8,
+    [SetTypeKEY433] = 52,
     [SetTypeJollyMotors433] = 9,
     [SetTypeElmesElectronic] = 10,
     [SetTypeANMotorsAT4] = 11,
