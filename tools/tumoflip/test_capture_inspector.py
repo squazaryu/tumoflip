@@ -112,6 +112,80 @@ int main(void) {
             result = subprocess.run([str(path / "test")], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_native_three_capture_series_reports_stable_and_changing_fields(self):
+        program = r'''
+#include "capture_model.h"
+#include <assert.h>
+#include <string.h>
+
+static CiParseStatus parse(CiSnapshot* snapshot, const char* text) {
+    ci_snapshot_reset(snapshot);
+    for(size_t index = 0U; index < strlen(text); index += 7U) {
+        const size_t left = strlen(text) - index;
+        const size_t chunk = left < 7U ? left : 7U;
+        ci_snapshot_feed(snapshot, text + index, chunk);
+    }
+    return ci_snapshot_finish(snapshot);
+}
+
+int main(void) {
+    static const char* const captures[] = {
+        "Filetype: Flipper SubGhz Key File\nVersion: 1\nFrequency: 433920000\n"
+        "Preset: AM650\nProtocol: KEY\nBit: 64\nKey: A1\nCounter: 10\nNote: own remote\n",
+        "Filetype: Flipper SubGhz Key File\nVersion: 1\nFrequency: 433920000\n"
+        "Preset: AM650\nProtocol: KEY\nBit: 64\nKey: A2\nCounter: 11\nNote: own remote\n",
+        "Filetype: Flipper SubGhz Key File\nVersion: 1\nFrequency: 868350000\n"
+        "Preset: FM476\nProtocol: Other\nBit: 64\nKey: A3\nCounter: 12\nButton: Lock\n",
+    };
+    CiSnapshot snapshots[CI_SERIES_MAX] = {0};
+    for(size_t sample = 0U; sample < CI_SERIES_MAX; sample++)
+        assert(parse(&snapshots[sample], captures[sample]) == CiParseOk);
+
+    assert(ci_series_diff_count(snapshots, CI_SERIES_MAX) == 10U);
+    CiSeriesRow row;
+    assert(ci_series_diff_row(snapshots, CI_SERIES_MAX, 0U, &row));
+    assert(!row.changed && strcmp(row.key, "Filetype") == 0);
+    assert(ci_series_diff_row(snapshots, CI_SERIES_MAX, 2U, &row));
+    assert(row.changed && strcmp(row.key, "Frequency") == 0);
+    assert(row.samples[0] && row.samples[1] && row.samples[2]);
+    assert(ci_series_diff_row(snapshots, CI_SERIES_MAX, 6U, &row));
+    assert(row.changed && strcmp(row.key, "Key") == 0);
+    assert(ci_series_diff_row(snapshots, CI_SERIES_MAX, 8U, &row));
+    assert(row.changed && strcmp(row.key, "Note") == 0 && row.samples[2] == NULL);
+    assert(ci_series_diff_row(snapshots, CI_SERIES_MAX, 9U, &row));
+    assert(row.changed && strcmp(row.key, "Button") == 0 && row.samples[0] == NULL);
+    assert(!ci_series_diff_row(snapshots, CI_SERIES_MAX, 10U, &row));
+    assert(ci_series_diff_count(snapshots, CI_SERIES_MAX + 1U) == 0U);
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            source = path / "series_test.c"
+            binary = path / "series_test"
+            source.write_text(program, encoding="utf-8")
+            result = subprocess.run(
+                [
+                    "clang",
+                    "-std=c11",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    "-fsanitize=address,undefined",
+                    "-I",
+                    str(APP),
+                    str(source),
+                    str(APP / "capture_model.c"),
+                    "-o",
+                    str(binary),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            result = subprocess.run([str(binary)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_entry_points_and_package_only_boundary(self):
         fam = APP / "application.fam"
         self.assertTrue(fam.exists(), "Inspector package is missing")

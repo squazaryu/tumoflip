@@ -381,6 +381,8 @@ class TumoSpectrumTest(unittest.TestCase):
                 first.status = TumoSpectrumStatusOk;
                 first.type = TumoSpectrumCaptureSubGhzRaw;
                 first.frequency_hz = 433920000U;
+                strcpy(first.preset, "AM650");
+                strcpy(first.protocol, "RAW");
                 const int32_t values[] = {
                     400, -400, 1200, -1200, 400, -8000,
                     400, -400, 1200, -1200, 400, -8000,
@@ -398,6 +400,16 @@ class TumoSpectrumTest(unittest.TestCase):
                 assert(comparison.compatible);
                 assert(comparison.likely_same);
                 assert(comparison.overall_similarity == 100U);
+                assert(!comparison.preset_changed);
+                assert(!comparison.protocol_changed);
+
+                strcpy(second.preset, "FM476");
+                strcpy(second.protocol, "Candidate A");
+                comparison = tumospectrum_compare(&first, &second);
+                assert(comparison.compatible);
+                assert(comparison.preset_changed);
+                assert(comparison.protocol_changed);
+                assert(!comparison.likely_same);
 
                 second.type = TumoSpectrumCaptureInfraredRaw;
                 comparison = tumospectrum_compare(&first, &second);
@@ -411,7 +423,7 @@ class TumoSpectrumTest(unittest.TestCase):
             source = tmp_path / "analysis_test.c"
             binary = tmp_path / "analysis_test"
             source.write_text(harness, encoding="utf-8")
-            subprocess.run(
+            result = subprocess.run(
                 [
                     "clang",
                     "-std=c11",
@@ -425,10 +437,11 @@ class TumoSpectrumTest(unittest.TestCase):
                     "-o",
                     str(binary),
                 ],
-                check=True,
+                check=False,
                 capture_output=True,
                 text=True,
             )
+            self.assertEqual(result.returncode, 0, result.stderr)
             subprocess.run([str(binary)], check=True, capture_output=True, text=True)
 
     def test_inference_core_executes_on_host(self) -> None:
