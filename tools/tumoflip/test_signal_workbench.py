@@ -6,6 +6,11 @@ import textwrap
 import unittest
 from pathlib import Path
 
+from .validate_release import (
+    PACKAGE_RELEASE_OVERLAY_FILES,
+    PACKAGE_RELEASE_OVERLAY_GROUPS,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = REPO_ROOT / "applications_user/signal_workbench"
@@ -374,6 +379,11 @@ class TumoSpectrumTest(unittest.TestCase):
         for text in (self.cockpit, self.acceptance, self.validator):
             self.assertIn("signal_workbench.fap", text)
         self.assertIn('"apps/Module One/Signals/signal_workbench.fap"', self.validator)
+
+    def test_updated_fap_can_be_released_through_module_one_packages(self) -> None:
+        package_file = "apps/Module One/Signals/signal_workbench.fap"
+        self.assertIn(package_file, PACKAGE_RELEASE_OVERLAY_FILES)
+        self.assertEqual(PACKAGE_RELEASE_OVERLAY_GROUPS[package_file], "module_one")
 
     def test_analysis_core_executes_on_host(self) -> None:
         harness = textwrap.dedent(
