@@ -141,6 +141,7 @@ WEATHER_EDITOR_PACKAGE_FILE = "apps/Sub-GHz/weather_editor.fap"
 LFRFID_HITAGS_PACKAGE_FILE = "apps_data/lfrfid/plugins/lfrfid_hitags.fal"
 PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE = "apps_data/arf_subghz_full/packages/protopirate_to_subghz.fap"
 CAPTURE_INSPECTOR_PACKAGE_FILE = "apps_data/arf_subghz_full/packages/capture_inspector.fap"
+SIGNAL_WORKBENCH_PACKAGE_FILE = "apps/Module One/Signals/signal_workbench.fap"
 SPECTER_PACKAGE_FILE = "apps/NFC/specter.fap"
 BLE_REMOTE_PACKAGE_FILE = "apps/Bluetooth/hid_ble.fap"
 DEVICE_LIBRARY_PACKAGE_FILE = "apps/Tools/device_library.fap"
@@ -188,6 +189,7 @@ PACKAGE_RELEASE_OVERLAY_FILES = frozenset(
     {
         *PACKAGE_ONLY_PACKAGE_FILES,
         "apps/ARF Tools/subghz_raw_edit.fap",
+        SIGNAL_WORKBENCH_PACKAGE_FILE,
         MORSE_PLAYER_PACKAGE_FILE,
         *TOTP_CLI_PLUGIN_PACKAGE_FILES,
     }
@@ -208,6 +210,7 @@ PACKAGE_ONLY_PACKAGE_GROUPS = {
 PACKAGE_RELEASE_OVERLAY_GROUPS = {
     **PACKAGE_ONLY_PACKAGE_GROUPS,
     "apps/ARF Tools/subghz_raw_edit.fap": "arf",
+    SIGNAL_WORKBENCH_PACKAGE_FILE: "module_one",
     MORSE_PLAYER_PACKAGE_FILE: "base",
     **{relative: "base" for relative in TOTP_CLI_PLUGIN_PACKAGE_FILES},
 }
