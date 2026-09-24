@@ -28,6 +28,12 @@ class ArfConverterPackagesTests(unittest.TestCase):
             self.assertNotIn("fap_renault_seed_bf", source)
             self.assertNotIn("fap_protocol_renault_v1", source)
 
+    def test_arf_renault_v1_modulation_does_not_leak_to_different_local_protocol(self):
+        renault_v0 = (ROOT / "lib/subghz/protocols/renault.c").read_text()
+        registry = (ROOT / "lib/subghz/protocols/protocol_items.c").read_text()
+        self.assertNotIn("SubGhzProtocolFlag_FM", renault_v0)
+        self.assertIn("&subghz_protocol_toyota", registry)
+
     def test_converter_is_package_only_and_reachable_from_hub(self):
         manifest = (APP / "application.fam").read_text()
         self.assertIn("fap_package_only=True", manifest)

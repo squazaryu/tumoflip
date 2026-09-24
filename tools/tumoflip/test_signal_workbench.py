@@ -6,6 +6,11 @@ import textwrap
 import unittest
 from pathlib import Path
 
+from .validate_release import (
+    PACKAGE_RELEASE_OVERLAY_FILES,
+    PACKAGE_RELEASE_OVERLAY_GROUPS,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = REPO_ROOT / "applications_user/signal_workbench"
@@ -66,8 +71,8 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_app_migrates_in_place_without_duplicate_fap(self) -> None:
         self.assertIn('appid="signal_workbench"', self.manifest)
         self.assertIn('name="TumoSpectrum"', self.manifest)
-        self.assertIn('fap_version="3.1.0"', self.manifest)
-        self.assertIn('"TumoSpectrum 3.1"', self.source)
+        self.assertIn('fap_version="3.2.0"', self.manifest)
+        self.assertIn('"TumoSpectrum 3.2"', self.source)
         self.assertIn('fap_category="Module One/Signals"', self.manifest)
         self.assertIn(
             'fap_dist_path="apps/Module One/Signals/signal_workbench.fap"', self.manifest
@@ -100,6 +105,8 @@ class TumoSpectrumTest(unittest.TestCase):
             "gap_threshold_us",
             "histogram_similarity",
             "overall_similarity",
+            "preset_changed",
+            "protocol_changed",
             "tumospectrum_types_compatible",
         ):
             self.assertIn(required, self.analysis)
@@ -139,6 +146,7 @@ class TumoSpectrumTest(unittest.TestCase):
             'elements_button_center(canvas, capture->status == TumoSpectrumStatusOk ? "Actions" : "Menu")',
             'elements_button_right(canvas, compare_page ? "Compare" : "Next")',
             'tumospectrum_compare_capture(app);',
+            '"Configuration differs"',
             'return tumospectrum_type_has_timings(capture->type) ? 4U : 1U;',
             "dialog_file_browser_show",
             "I_sub1_10px",
@@ -353,6 +361,9 @@ class TumoSpectrumTest(unittest.TestCase):
             '"fields\\\":[',
             '"counter\\\":{',
             '"checksum\\\":{',
+            r'\"preset_changed\":%s',
+            r'\"protocol_changed\":%s',
+            'Signal similarity: %u%%',
             "TUMOSPECTRUM_NOTEBOOK_CSV",
             "tumospectrum_write_file",
             "storage_common_rename",
@@ -369,6 +380,11 @@ class TumoSpectrumTest(unittest.TestCase):
             self.assertIn("signal_workbench.fap", text)
         self.assertIn('"apps/Module One/Signals/signal_workbench.fap"', self.validator)
 
+    def test_updated_fap_can_be_released_through_module_one_packages(self) -> None:
+        package_file = "apps/Module One/Signals/signal_workbench.fap"
+        self.assertIn(package_file, PACKAGE_RELEASE_OVERLAY_FILES)
+        self.assertEqual(PACKAGE_RELEASE_OVERLAY_GROUPS[package_file], "module_one")
+
     def test_analysis_core_executes_on_host(self) -> None:
         harness = textwrap.dedent(
             """
@@ -381,6 +397,8 @@ class TumoSpectrumTest(unittest.TestCase):
                 first.status = TumoSpectrumStatusOk;
                 first.type = TumoSpectrumCaptureSubGhzRaw;
                 first.frequency_hz = 433920000U;
+                strcpy(first.preset, "AM650");
+                strcpy(first.protocol, "RAW");
                 const int32_t values[] = {
                     400, -400, 1200, -1200, 400, -8000,
                     400, -400, 1200, -1200, 400, -8000,
@@ -398,6 +416,16 @@ class TumoSpectrumTest(unittest.TestCase):
                 assert(comparison.compatible);
                 assert(comparison.likely_same);
                 assert(comparison.overall_similarity == 100U);
+                assert(!comparison.preset_changed);
+                assert(!comparison.protocol_changed);
+
+                strcpy(second.preset, "FM476");
+                strcpy(second.protocol, "Candidate A");
+                comparison = tumospectrum_compare(&first, &second);
+                assert(comparison.compatible);
+                assert(comparison.preset_changed);
+                assert(comparison.protocol_changed);
+                assert(!comparison.likely_same);
 
                 second.type = TumoSpectrumCaptureInfraredRaw;
                 comparison = tumospectrum_compare(&first, &second);
@@ -411,7 +439,7 @@ class TumoSpectrumTest(unittest.TestCase):
             source = tmp_path / "analysis_test.c"
             binary = tmp_path / "analysis_test"
             source.write_text(harness, encoding="utf-8")
-            subprocess.run(
+            result = subprocess.run(
                 [
                     "clang",
                     "-std=c11",
@@ -425,10 +453,11 @@ class TumoSpectrumTest(unittest.TestCase):
                     "-o",
                     str(binary),
                 ],
-                check=True,
+                check=False,
                 capture_output=True,
                 text=True,
             )
+            self.assertEqual(result.returncode, 0, result.stderr)
             subprocess.run([str(binary)], check=True, capture_output=True, text=True)
 
     def test_inference_core_executes_on_host(self) -> None:

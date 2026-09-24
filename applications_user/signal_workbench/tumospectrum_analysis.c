@@ -151,14 +151,16 @@ static bool tumospectrum_types_compatible(
     return (first == second) && tumospectrum_type_has_timings(first);
 }
 
-TumoSpectrumComparison tumospectrum_compare(
-    const TumoSpectrumCapture* first,
-    const TumoSpectrumCapture* second) {
+TumoSpectrumComparison
+    tumospectrum_compare(const TumoSpectrumCapture* first, const TumoSpectrumCapture* second) {
     TumoSpectrumComparison comparison = {0};
     comparison.compatible = first && second && first->status == TumoSpectrumStatusOk &&
                             second->status == TumoSpectrumStatusOk &&
                             tumospectrum_types_compatible(first->type, second->type);
     if(!comparison.compatible) return comparison;
+
+    comparison.preset_changed = strcmp(first->preset, second->preset) != 0;
+    comparison.protocol_changed = strcmp(first->protocol, second->protocol) != 0;
 
     const int64_t frequency_delta = (int64_t)second->frequency_hz - first->frequency_hz;
     comparison.frequency_delta_hz = frequency_delta > INT32_MAX ? INT32_MAX :
@@ -177,8 +179,8 @@ TumoSpectrumComparison tumospectrum_compare(
 
     uint32_t histogram_difference = 0U;
     for(size_t index = 0U; index < TUMOSPECTRUM_HISTOGRAM_BUCKETS; index++) {
-        const int difference = (int)first->analysis.histogram[index] -
-                               (int)second->analysis.histogram[index];
+        const int difference =
+            (int)first->analysis.histogram[index] - (int)second->analysis.histogram[index];
         histogram_difference += (uint32_t)abs(difference);
     }
     const uint32_t average_difference = histogram_difference / TUMOSPECTRUM_HISTOGRAM_BUCKETS;
@@ -197,9 +199,9 @@ TumoSpectrumComparison tumospectrum_compare(
                                              (uint32_t)(-comparison.duration_delta_percent) :
                                              (uint32_t)comparison.duration_delta_percent;
     const uint32_t duration_score = duration_difference >= 100U ? 0U : 100U - duration_difference;
-    comparison.overall_similarity = (uint8_t)((comparison.histogram_similarity * 2U +
-                                               frequency_score + duration_score) /
-                                              4U);
-    comparison.likely_same = comparison.overall_similarity >= 75U;
+    comparison.overall_similarity =
+        (uint8_t)((comparison.histogram_similarity * 2U + frequency_score + duration_score) / 4U);
+    comparison.likely_same = comparison.overall_similarity >= 75U && !comparison.preset_changed &&
+                             !comparison.protocol_changed;
     return comparison;
 }

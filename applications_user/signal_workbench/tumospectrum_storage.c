@@ -435,10 +435,13 @@ static void tumospectrum_build_json(
         furi_string_cat_printf(
             output,
             ",\"comparison\":{\"compatible\":true,\"likely_same\":%s,"
+            "\"preset_changed\":%s,\"protocol_changed\":%s,"
             "\"frequency_delta_hz\":%ld,\"pulse_delta\":%ld,"
             "\"duration_delta_percent\":%ld,\"histogram_similarity\":%u,"
             "\"overall_similarity\":%u}",
             comparison->likely_same ? "true" : "false",
+            comparison->preset_changed ? "true" : "false",
+            comparison->protocol_changed ? "true" : "false",
             (long)comparison->frequency_delta_hz,
             (long)comparison->pulse_delta,
             (long)comparison->duration_delta_percent,
@@ -485,12 +488,15 @@ void tumospectrum_storage_build_text(
     if(compared && comparison && comparison->compatible) {
         furi_string_cat_printf(
             output,
-            "\nComparison: %s\nSecond: %s\nSimilarity: %u%%\nHistogram: %u%%\n"
+            "\nComparison: %s\nSecond: %s\nSignal similarity: %u%%\nHistogram: %u%%\n"
+            "Preset changed: %s\nProtocol changed: %s\n"
             "Frequency delta: %ld Hz\nPulse delta: %ld\nDuration delta: %ld%%\n",
             comparison->likely_same ? "likely same" : "different",
             compared->name,
             comparison->overall_similarity,
             comparison->histogram_similarity,
+            comparison->preset_changed ? "yes" : "no",
+            comparison->protocol_changed ? "yes" : "no",
             (long)comparison->frequency_delta_hz,
             (long)comparison->pulse_delta,
             (long)comparison->duration_delta_percent);

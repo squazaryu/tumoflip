@@ -137,7 +137,7 @@ class InfraredUniversalSaveTest(unittest.TestCase):
 
     def test_internal_library_symbols_do_not_change_public_api_version(self) -> None:
         api = source(API)
-        self.assertEqual(api.splitlines()[1], "Version,+,88.13,,")
+        self.assertEqual(api.splitlines()[1], "Version,+,88.14,,")
         self.assertIn(
             "Function,-,infrared_brute_force_get_current_record_name", api
         )

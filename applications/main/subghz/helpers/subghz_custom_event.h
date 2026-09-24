@@ -72,6 +72,8 @@ typedef enum {
 typedef enum {
     SetTypeFaacSLH_868,
     SetTypeFaacSLH_433,
+    SetTypeGeniusSLH_433,
+    SetTypeGeniusSLH_868,
     SetTypeBFTMitto,
     SetTypeErreka433,
     SetTypeSomfyTelis,
@@ -95,6 +97,7 @@ typedef enum {
     SetTypeAllmatic868,
     SetTypeCenturion433,
     SetTypeMonarch433,
+    SetTypeKEY433,
     SetTypeJollyMotors433,
     SetTypeMotorline433,
     SetTypeSommer_FM_434,

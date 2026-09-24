@@ -18,7 +18,7 @@ class SubGhzWardrivingTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertEqual(api_symbols.splitlines()[1], "Version,+,88.13,,")
+        self.assertEqual(api_symbols.splitlines()[1], "Version,+,88.14,,")
         self.assertIn('appid="subghz_wardriving"', manifest)
         self.assertIn('targets=["f7"]', manifest)
         self.assertIn('fap_category="Sub-GHz"', manifest)

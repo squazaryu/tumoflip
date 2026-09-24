@@ -40,6 +40,7 @@ struct SubGhzProtocolDecoderFaacSLH {
 
     SubGhzKeystore* keystore;
     const char* manufacture_name;
+    FuriString* manufacture_from_file;
 };
 SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderFaacSLH);
 
@@ -51,6 +52,7 @@ struct SubGhzProtocolEncoderFaacSLH {
 
     SubGhzKeystore* keystore;
     const char* manufacture_name;
+    FuriString* manufacture_from_file;
 };
 SUBGHZ_ASSERT_ENCODER_GENERIC_LAYOUT(SubGhzProtocolEncoderFaacSLH);
 
@@ -61,9 +63,12 @@ typedef enum {
     FaacSLHDecoderStepCheckDuration,
 } FaacSLHDecoderStep;
 
+static void subghz_protocol_decoder_faac_slh_free(void* context);
+static void subghz_protocol_encoder_faac_slh_free(void* context);
+
 const SubGhzProtocolDecoder subghz_protocol_faac_slh_decoder = {
     .alloc = subghz_protocol_decoder_faac_slh_alloc,
-    .free = subghz_protocol_decoder_common_free,
+    .free = subghz_protocol_decoder_faac_slh_free,
 
     .feed = subghz_protocol_decoder_faac_slh_feed,
     .reset = subghz_protocol_decoder_common_reset,
@@ -76,7 +81,7 @@ const SubGhzProtocolDecoder subghz_protocol_faac_slh_decoder = {
 
 const SubGhzProtocolEncoder subghz_protocol_faac_slh_encoder = {
     .alloc = subghz_protocol_encoder_faac_slh_alloc,
-    .free = subghz_protocol_encoder_common_free,
+    .free = subghz_protocol_encoder_faac_slh_free,
 
     .deserialize = subghz_protocol_encoder_faac_slh_deserialize,
     .stop = subghz_protocol_encoder_common_stop,
@@ -100,16 +105,62 @@ const SubGhzProtocol subghz_protocol_faac_slh = {
  * @param keystore Pointer to a SubGhzKeystore* instance
  * @param manufacture_name
  */
-static void subghz_protocol_faac_slh_check_remote_controller(
+static bool subghz_protocol_faac_slh_check_remote_controller(
     SubGhzBlockGeneric* instance,
     SubGhzKeystore* keystore,
-    const char** manufacture_name);
+    const char** manufacture_name,
+    const char* manufacture_from_file);
+
+/**
+ * Return the KeeLoq learning key named by a FAAC SLH .sub file.
+ * Legacy files omit Manufacture and continue to use FAAC_SLH. An explicit
+ * manufacturer must match the local keystore; never silently reinterpret an
+ * unknown brand as FAAC.
+ */
+static bool subghz_protocol_faac_slh_get_key(
+    SubGhzKeystore* keystore,
+    const char* wanted,
+    const char** manufacture_name,
+    uint64_t* manufacturer_key) {
+    furi_assert(keystore);
+    furi_assert(manufacture_name);
+    furi_assert(manufacturer_key);
+
+    *manufacture_name = NULL;
+    if(!wanted || (*wanted == '\0') || (strcmp(wanted, "Genius") == 0)) {
+        // Genius SLH remotes are compatible with the FAAC SLH key family.
+        wanted = "FAAC_SLH";
+    }
+
+    for
+        M_EACH(manufacture_code, *subghz_keystore_get_data(keystore), SubGhzKeyArray_t) {
+            if(manufacture_code->type != KEELOQ_LEARNING_FAAC) continue;
+
+            const char* name = furi_string_get_cstr(manufacture_code->name);
+            if(strcmp(name, wanted) == 0) {
+                *manufacture_name = name;
+                *manufacturer_key = manufacture_code->key;
+                return true;
+            }
+        }
+
+    *manufacturer_key = 0;
+    return false;
+}
 
 void* subghz_protocol_encoder_faac_slh_alloc(SubGhzEnvironment* environment) {
     SubGhzProtocolEncoderFaacSLH* instance = subghz_protocol_encoder_common_alloc(
         sizeof(SubGhzProtocolEncoderFaacSLH), &subghz_protocol_faac_slh, 3, 256);
     instance->keystore = subghz_environment_get_keystore(environment);
+    instance->manufacture_from_file = furi_string_alloc();
     return instance;
+}
+
+static void subghz_protocol_encoder_faac_slh_free(void* context) {
+    furi_assert(context);
+    SubGhzProtocolEncoderFaacSLH* instance = context;
+    furi_string_free(instance->manufacture_from_file);
+    subghz_protocol_encoder_common_free(context);
 }
 
 static bool subghz_protocol_faac_slh_encrypt(SubGhzProtocolEncoderFaacSLH* instance) {
@@ -131,19 +182,22 @@ static bool subghz_protocol_faac_slh_encrypt(SubGhzProtocolEncoderFaacSLH* insta
         decrypt = fixx[2] << 28 | fixx[3] << 24 | fixx[4] << 20 |
                   (instance->generic.cnt & 0xFFFFF);
     }
-    for
-        M_EACH(manufacture_code, *subghz_keystore_get_data(instance->keystore), SubGhzKeyArray_t) {
-            if(strcmp(furi_string_get_cstr(manufacture_code->name), "FAAC_SLH") == 0) {
-                //FAAC Learning
-                man = subghz_protocol_keeloq_common_faac_learning(
-                    instance->generic.seed, manufacture_code->key);
-                hop = subghz_protocol_keeloq_common_encrypt(decrypt, man);
-                break;
-            }
-        }
-    if(hop) {
-        instance->generic.data = (uint64_t)fix << 32 | hop;
+    const char* used_manufacture = NULL;
+    uint64_t manufacturer_key = 0;
+    if(!subghz_protocol_faac_slh_get_key(
+           instance->keystore, instance->manufacture_name, &used_manufacture, &manufacturer_key)) {
+        FURI_LOG_E(
+            TAG,
+            "No KeeLoq learning key for %s",
+            instance->manufacture_name ? instance->manufacture_name : "FAAC_SLH");
+        return false;
     }
+
+    instance->manufacture_name = used_manufacture;
+    //FAAC Learning
+    man = subghz_protocol_keeloq_common_faac_learning(instance->generic.seed, manufacturer_key);
+    hop = subghz_protocol_keeloq_common_encrypt(decrypt, man);
+    instance->generic.data = (uint64_t)fix << 32 | hop;
     return true;
 }
 
@@ -322,12 +376,12 @@ bool subghz_protocol_faac_slh_create_data(
 /**
  * Generating an upload from data.
  * @param instance Pointer to a SubGhzProtocolEncoderFaacSLH instance
- * @return true Always; this encoder has no failure path
+ * @return true if the upload was generated successfully
  */
 static bool subghz_protocol_encoder_faac_slh_get_upload(SubGhzProtocolEncoderFaacSLH* instance) {
     furi_assert(instance);
 
-    subghz_protocol_faac_slh_gen_data(instance);
+    if(!subghz_protocol_faac_slh_gen_data(instance)) return false;
     size_t index = 0;
     size_t size_upload = 2 + (instance->generic.data_count_bit * 2);
     if(size_upload > instance->encoder.size_upload) {
@@ -391,14 +445,36 @@ SubGhzProtocolStatus
         instance->generic.seed = seed_data[0] << 24 | seed_data[1] << 16 | seed_data[2] << 8 |
                                  seed_data[3];
 
-        subghz_protocol_faac_slh_check_remote_controller(
-            &instance->generic, instance->keystore, &instance->manufacture_name);
+        if(!flipper_format_rewind(flipper_format)) {
+            FURI_LOG_E(TAG, "Rewind error");
+            break;
+        }
+        if(!flipper_format_read_string(
+               flipper_format, "Manufacture", instance->manufacture_from_file)) {
+            furi_string_reset(instance->manufacture_from_file);
+        }
+        if(!flipper_format_rewind(flipper_format)) {
+            FURI_LOG_E(TAG, "Rewind error");
+            break;
+        }
+
+        if(!subghz_protocol_faac_slh_check_remote_controller(
+               &instance->generic,
+               instance->keystore,
+               &instance->manufacture_name,
+               furi_string_get_cstr(instance->manufacture_from_file))) {
+            FURI_LOG_E(TAG, "Manufacturer key is not available");
+            break;
+        }
 
         // Optional value
         flipper_format_read_uint32(
             flipper_format, "Repeat", (uint32_t*)&instance->encoder.repeat, 1);
 
-        subghz_protocol_encoder_faac_slh_get_upload(instance);
+        if(!subghz_protocol_encoder_faac_slh_get_upload(instance)) {
+            res = SubGhzProtocolStatusErrorEncoderGetUpload;
+            break;
+        }
 
         if(!flipper_format_rewind(flipper_format)) {
             FURI_LOG_E(TAG, "Rewind error");
@@ -426,7 +502,15 @@ void* subghz_protocol_decoder_faac_slh_alloc(SubGhzEnvironment* environment) {
     SubGhzProtocolDecoderFaacSLH* instance = subghz_protocol_decoder_common_alloc(
         sizeof(SubGhzProtocolDecoderFaacSLH), &subghz_protocol_faac_slh);
     instance->keystore = subghz_environment_get_keystore(environment);
+    instance->manufacture_from_file = furi_string_alloc();
     return instance;
+}
+
+static void subghz_protocol_decoder_faac_slh_free(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderFaacSLH* instance = context;
+    furi_string_free(instance->manufacture_from_file);
+    subghz_protocol_decoder_common_free(context);
 }
 
 void subghz_protocol_decoder_faac_slh_feed(void* context, bool level, uint32_t duration) {
@@ -507,14 +591,14 @@ void subghz_protocol_decoder_faac_slh_feed(void* context, bool level, uint32_t d
  * @param keystore Pointer to a SubGhzKeystore* instance
  * @param manifacture_name Manufacturer name
  */
-static void subghz_protocol_faac_slh_check_remote_controller(
+static bool subghz_protocol_faac_slh_check_remote_controller(
     SubGhzBlockGeneric* instance,
     SubGhzKeystore* keystore,
-    const char** manufacture_name) {
+    const char** manufacture_name,
+    const char* manufacture_from_file) {
     uint32_t code_fix = instance->data >> 32;
     uint32_t code_hop = instance->data & 0xFFFFFFFF;
     uint32_t decrypt = 0;
-    uint64_t man;
 
     // TODO: Stupid bypass for custom button, remake later
     if(subghz_custom_btn_get_original() == 0) {
@@ -557,8 +641,10 @@ static void subghz_protocol_faac_slh_check_remote_controller(
         instance->data_2 = (uint64_t)dec_prg_1 << 32 | dec_prg_2;
         instance->cnt = data_prg[1];
 
-        *manufacture_name = "FAAC_SLH";
-        return;
+        *manufacture_name = (manufacture_from_file && (*manufacture_from_file != '\0')) ?
+                                manufacture_from_file :
+                                "FAAC_SLH";
+        return true;
     } else {
         if(code_fix != 0x0) {
             temp_fix_backup = code_fix;
@@ -569,22 +655,25 @@ static void subghz_protocol_faac_slh_check_remote_controller(
         faac_prog_mode = false;
     }
 
-    for
-        M_EACH(manufacture_code, *subghz_keystore_get_data(keystore), SubGhzKeyArray_t) {
-            if(strcmp(furi_string_get_cstr(manufacture_code->name), "FAAC_SLH") == 0) {
-                // FAAC Learning
-                man = subghz_protocol_keeloq_common_faac_learning(
-                    instance->seed, manufacture_code->key);
-                decrypt = subghz_protocol_keeloq_common_decrypt(code_hop, man);
-                *manufacture_name = furi_string_get_cstr(manufacture_code->name);
-                break;
-            }
-        }
+    uint64_t manufacturer_key = 0;
+    if(!subghz_protocol_faac_slh_get_key(
+           keystore, manufacture_from_file, manufacture_name, &manufacturer_key)) {
+        instance->cnt = 0;
+        *manufacture_name = (manufacture_from_file && (*manufacture_from_file != '\0')) ?
+                                manufacture_from_file :
+                                "FAAC_SLH";
+        return false;
+    }
+
+    const uint64_t learning_key =
+        subghz_protocol_keeloq_common_faac_learning(instance->seed, manufacturer_key);
+    decrypt = subghz_protocol_keeloq_common_decrypt(code_hop, learning_key);
     instance->cnt = decrypt & 0xFFFFF;
     // Backup counter in case when we need to use programming mode
     if(code_fix != 0x0) {
         temp_counter_backup = instance->cnt;
     }
+    return true;
 }
 
 SubGhzProtocolStatus subghz_protocol_decoder_faac_slh_serialize(
@@ -613,8 +702,20 @@ SubGhzProtocolStatus subghz_protocol_decoder_faac_slh_serialize(
     instance->generic.seed = seed_data[0] << 24 | seed_data[1] << 16 | seed_data[2] << 8 |
                              seed_data[3];
 
-    subghz_protocol_faac_slh_check_remote_controller(
-        &instance->generic, instance->keystore, &instance->manufacture_name);
+    (void)subghz_protocol_faac_slh_check_remote_controller(
+        &instance->generic,
+        instance->keystore,
+        &instance->manufacture_name,
+        furi_string_get_cstr(instance->manufacture_from_file));
+
+    // An explicitly tagged file may be re-saved with the same manufacturer.
+    // Don't infer one for legacy captures after clearing the decoded seed above.
+    if((res == SubGhzProtocolStatusOk) && !furi_string_empty(instance->manufacture_from_file) &&
+       !flipper_format_write_string_cstr(
+           flipper_format, "Manufacture", furi_string_get_cstr(instance->manufacture_from_file))) {
+        FURI_LOG_E(TAG, "Unable to add Manufacture");
+        res = SubGhzProtocolStatusError;
+    }
 
     return res;
 }
@@ -657,6 +758,15 @@ SubGhzProtocolStatus
             FURI_LOG_E(TAG, "Rewind error");
             break;
         }
+        if(!flipper_format_read_string(
+               flipper_format, "Manufacture", instance->manufacture_from_file)) {
+            furi_string_reset(instance->manufacture_from_file);
+        }
+
+        if(!flipper_format_rewind(flipper_format)) {
+            FURI_LOG_E(TAG, "Rewind error");
+            break;
+        }
         res = SubGhzProtocolStatusOk;
     } while(false);
 
@@ -666,10 +776,36 @@ SubGhzProtocolStatus
 void subghz_protocol_decoder_faac_slh_get_string(void* context, FuriString* output) {
     furi_assert(context);
     SubGhzProtocolDecoderFaacSLH* instance = context;
-    subghz_protocol_faac_slh_check_remote_controller(
-        &instance->generic, instance->keystore, &instance->manufacture_name);
+    if(!subghz_protocol_faac_slh_check_remote_controller(
+           &instance->generic,
+           instance->keystore,
+           &instance->manufacture_name,
+           furi_string_get_cstr(instance->manufacture_from_file))) {
+        const char* manufacturer = furi_string_empty(instance->manufacture_from_file) ?
+                                       "FAAC SLH" :
+                                       furi_string_get_cstr(instance->manufacture_from_file);
+        furi_string_cat_printf(
+            output,
+            "%s %dbit\r\n"
+            "Key:%08lX%08lX\r\n"
+            "Seed:%08lX\r\n"
+            "Manufacturer key unavailable",
+            manufacturer,
+            instance->generic.data_count_bit,
+            (uint32_t)(instance->generic.data >> 32),
+            (uint32_t)instance->generic.data,
+            instance->generic.seed);
+        return;
+    }
     uint32_t code_fix = instance->generic.data >> 32;
     uint32_t code_hop = instance->generic.data & 0xFFFFFFFF;
+
+    const char* display_name = instance->generic.protocol_name;
+    if(!furi_string_empty(instance->manufacture_from_file)) {
+        display_name = furi_string_get_cstr(instance->manufacture_from_file);
+    } else if(instance->manufacture_name && (strcmp(instance->manufacture_name, "FAAC_SLH") != 0)) {
+        display_name = instance->manufacture_name;
+    }
 
     if(faac_prog_mode == true) {
         furi_string_cat_printf(
@@ -679,7 +815,7 @@ void subghz_protocol_decoder_faac_slh_get_string(void* context, FuriString* outp
             "Ke:%lX%08lX\r\n"
             "Kd:%lX%08lX\r\n"
             "Seed:%08lX mCnt:%02X",
-            instance->generic.protocol_name,
+            display_name,
             instance->generic.data_count_bit,
             (uint32_t)(instance->generic.data >> 32),
             (uint32_t)instance->generic.data,
@@ -700,7 +836,7 @@ void subghz_protocol_decoder_faac_slh_get_string(void* context, FuriString* outp
             "Fix:%08lX\r\n"
             "Hop:%08lX    Btn:%X\r\n"
             "Sn:%07lX Sd:Unknown",
-            instance->generic.protocol_name,
+            display_name,
             instance->generic.data_count_bit,
             (uint32_t)(instance->generic.data >> 32),
             (uint32_t)instance->generic.data,
@@ -726,7 +862,7 @@ void subghz_protocol_decoder_faac_slh_get_string(void* context, FuriString* outp
             "Fix:%08lX    Cnt:%05lX\r\n"
             "Hop:%08lX    Btn:%X\r\n"
             "Sn:%07lX Sd:%08lX",
-            instance->generic.protocol_name,
+            display_name,
             instance->generic.data_count_bit,
             (uint32_t)(instance->generic.data >> 32),
             (uint32_t)instance->generic.data,

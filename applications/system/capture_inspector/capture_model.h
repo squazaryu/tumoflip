@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define CI_FIELD_CAP 24U
+#define CI_SERIES_MAX 3U
 #define CI_KEY_CAP   32U
 #define CI_VALUE_CAP 160U
 #define CI_LINE_CAP  (CI_KEY_CAP + CI_VALUE_CAP + 4U)
@@ -47,6 +48,13 @@ typedef struct {
     CiDiffKind kind;
 } CiDiffRow;
 
+typedef struct {
+    const char* key;
+    const CiField* samples[CI_SERIES_MAX];
+    size_t occurrence;
+    bool changed;
+} CiSeriesRow;
+
 void ci_snapshot_reset(CiSnapshot* snapshot);
 CiParseStatus ci_snapshot_feed(CiSnapshot* snapshot, const void* bytes, size_t size);
 CiParseStatus ci_snapshot_finish(CiSnapshot* snapshot);
@@ -54,3 +62,10 @@ const CiField* ci_snapshot_find(const CiSnapshot* snapshot, const char* key, siz
 const char* ci_parse_status_text(CiParseStatus status);
 size_t ci_diff_count(const CiSnapshot* a, const CiSnapshot* b);
 bool ci_diff_row(const CiSnapshot* a, const CiSnapshot* b, size_t index, CiDiffRow* row);
+size_t ci_series_diff_count(const CiSnapshot* snapshots, size_t sample_count);
+bool ci_series_diff_row(
+    const CiSnapshot* snapshots,
+    size_t sample_count,
+    size_t index,
+    CiSeriesRow* row);
+bool ci_capture_paths_are_distinct(const char* const* paths, size_t sample_count);

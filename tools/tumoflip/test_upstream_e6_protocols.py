@@ -101,7 +101,7 @@ class UpstreamE6ProtocolsTest(unittest.TestCase):
         self.assertIn('entry_point="nice_o_code_app"', nice_manifest)
         self.assertIn("Nice O-Code", self.read("applications/system/nice_o_code/nice_o_code.c"))
         self.assertIn("Security+ PIN", self.read("applications/system/secplus_pin/secplus_pin.c"))
-        self.assertEqual(api.splitlines()[1], "Version,+,88.13,,")
+        self.assertEqual(api.splitlines()[1], "Version,+,88.14,,")
         for symbol in (
             "subghz_protocol_nice_o_mask",
             "subghz_protocol_nice_o_get_parcel",
@@ -128,6 +128,20 @@ class UpstreamE6ProtocolsTest(unittest.TestCase):
         for label in ("16-JCM Gen2", "17-Stagnoli", "18-Telcoma hi", "19-Telcoma lo"):
             self.assertIn(label, source)
         self.assertIn("COUNT_OF(kl_type_options)", source)
+
+    def test_key_manually_creates_a_keeloq_capture(self) -> None:
+        events = self.read("applications/main/subghz/helpers/subghz_custom_event.h")
+        menu = self.read("applications/main/subghz/plugins/add_manually/subghz_scene_set_type.c")
+        generator = self.read("applications/main/subghz/plugins/add_manually/subghz_gen_info.c")
+
+        self.assertIn("SetTypeKEY433", events)
+        self.assertIn('[SetTypeKEY433] = "KL: KEY 433MHz"', menu)
+        self.assertIn("[SetTypeKEY433] = 52", generator)
+        self.assertIn(
+            '[51] = SUBGHZ_KEELOQ_PRESET(KEELOQ_MASK_28, KEELOQ_PREFIX_NONE, '
+            'KEELOQ_FREQUENCY_433_920, KEELOQ_MODULATION_AM650, 0x01, 0x03, "KEY")',
+            generator,
+        )
 
 
 if __name__ == "__main__":

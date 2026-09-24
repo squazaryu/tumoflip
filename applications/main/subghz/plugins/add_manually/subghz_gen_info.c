@@ -170,6 +170,7 @@ static const SubGhzKeeloqGenerationPreset subghz_keeloq_generation_presets[] = {
     [48] = SUBGHZ_KEELOQ_PRESET(KEELOQ_MASK_16, KEELOQ_PREFIX_FAAC, KEELOQ_FREQUENCY_868_350, KEELOQ_MODULATION_AM650, 0x02, 0x03, "FAAC_RC,XT"),
     [49] = SUBGHZ_KEELOQ_PRESET(KEELOQ_MASK_16, KEELOQ_PREFIX_NONE, KEELOQ_FREQUENCY_433_920, KEELOQ_MODULATION_AM650, 0x04, 0x03, "Normstahl"),
     [50] = SUBGHZ_KEELOQ_PRESET(KEELOQ_MASK_20, KEELOQ_PREFIX_NONE, KEELOQ_FREQUENCY_433_920, KEELOQ_MODULATION_AM650, 0x02, 0x03, "HCS101"),
+    [51] = SUBGHZ_KEELOQ_PRESET(KEELOQ_MASK_28, KEELOQ_PREFIX_NONE, KEELOQ_FREQUENCY_433_920, KEELOQ_MODULATION_AM650, 0x01, 0x03, "KEY"),
 };
 
 static const uint8_t subghz_keeloq_preset_by_type[SetTypeMAX] = {
@@ -181,6 +182,7 @@ static const uint8_t subghz_keeloq_preset_by_type[SetTypeMAX] = {
     [SetTypeAllmatic868] = 6,
     [SetTypeCenturion433] = 7,
     [SetTypeMonarch433] = 8,
+    [SetTypeKEY433] = 52,
     [SetTypeJollyMotors433] = 9,
     [SetTypeElmesElectronic] = 10,
     [SetTypeANMotorsAT4] = 11,
@@ -519,6 +521,28 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .faac_slh.cnt = 0x02,
             .faac_slh.seed = (uint32_t)key,
             .faac_slh.manuf = "FAAC_SLH"};
+        break;
+    case SetTypeGeniusSLH_433:
+        gen_info = (GenInfo){
+            .type = GenFaacSLH,
+            .mod = "AM650",
+            .freq = 433920000,
+            .faac_slh.serial = ((key & 0x00FFFFF0) | 0xA0000006) >> 4,
+            .faac_slh.btn = 0x06,
+            .faac_slh.cnt = 0x02,
+            .faac_slh.seed = (uint32_t)key,
+            .faac_slh.manuf = "Genius"};
+        break;
+    case SetTypeGeniusSLH_868:
+        gen_info = (GenInfo){
+            .type = GenFaacSLH,
+            .mod = "AM650",
+            .freq = 868350000,
+            .faac_slh.serial = ((key & 0x00FFFFF0) | 0xA0000006) >> 4,
+            .faac_slh.btn = 0x06,
+            .faac_slh.cnt = 0x02,
+            .faac_slh.seed = (uint32_t)key,
+            .faac_slh.manuf = "Genius"};
         break;
     case SetTypeCameAtomo433:
         gen_info = (GenInfo){

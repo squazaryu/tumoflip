@@ -172,3 +172,87 @@ bool ci_diff_row(const CiSnapshot* a, const CiSnapshot* b, size_t index, CiDiffR
     }
     return false;
 }
+
+static bool ci_series_ready(const CiSnapshot* snapshots, size_t sample_count) {
+    if(!snapshots || sample_count < 2U || sample_count > CI_SERIES_MAX) return false;
+    for(size_t sample = 0U; sample < sample_count; sample++) {
+        if(!snapshots[sample].finished || snapshots[sample].status != CiParseOk) return false;
+    }
+    return true;
+}
+
+static bool ci_series_seen_before(
+    const CiSnapshot* snapshots,
+    size_t sample,
+    const char* key,
+    size_t occurrence) {
+    for(size_t previous = 0U; previous < sample; previous++) {
+        if(ci_snapshot_find(&snapshots[previous], key, occurrence)) return true;
+    }
+    return false;
+}
+
+size_t ci_series_diff_count(const CiSnapshot* snapshots, size_t sample_count) {
+    if(!ci_series_ready(snapshots, sample_count)) return 0U;
+
+    size_t count = 0U;
+    for(size_t sample = 0U; sample < sample_count; sample++) {
+        for(size_t field = 0U; field < snapshots[sample].count; field++) {
+            const size_t occurrence = ci_occurrence(&snapshots[sample], field);
+            if(!ci_series_seen_before(
+                   snapshots, sample, snapshots[sample].fields[field].key, occurrence)) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+bool ci_series_diff_row(
+    const CiSnapshot* snapshots,
+    size_t sample_count,
+    size_t index,
+    CiSeriesRow* row) {
+    if(!ci_series_ready(snapshots, sample_count) || !row) return false;
+
+    memset(row, 0, sizeof(*row));
+    for(size_t sample = 0U; sample < sample_count; sample++) {
+        for(size_t field = 0U; field < snapshots[sample].count; field++) {
+            const CiField* candidate = &snapshots[sample].fields[field];
+            const size_t occurrence = ci_occurrence(&snapshots[sample], field);
+            if(ci_series_seen_before(snapshots, sample, candidate->key, occurrence)) continue;
+            if(index > 0U) {
+                index--;
+                continue;
+            }
+
+            row->key = candidate->key;
+            row->occurrence = occurrence;
+            const CiField* first = NULL;
+            for(size_t source = 0U; source < sample_count; source++) {
+                row->samples[source] = ci_snapshot_find(&snapshots[source], row->key, occurrence);
+                const CiField* value = row->samples[source];
+                if(!value) {
+                    row->changed = true;
+                } else if(!first) {
+                    first = value;
+                } else if(strcmp(first->value, value->value) != 0) {
+                    row->changed = true;
+                }
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ci_capture_paths_are_distinct(const char* const* paths, size_t sample_count) {
+    if(!paths || sample_count < 2U || sample_count > CI_SERIES_MAX) return false;
+    for(size_t sample = 0U; sample < sample_count; sample++) {
+        if(!paths[sample] || !paths[sample][0]) return false;
+        for(size_t previous = 0U; previous < sample; previous++) {
+            if(strcmp(paths[sample], paths[previous]) == 0) return false;
+        }
+    }
+    return true;
+}

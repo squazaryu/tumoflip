@@ -262,3 +262,11 @@ App(
     entry_point="get_api",
     requires=["unit_tests"],
 )
+
+App(
+    appid="test_loading_api",
+    sources=["tests/common/*.c", "tests/loading/*.c"],
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="get_api",
+    requires=["unit_tests"],
+)
