@@ -347,12 +347,16 @@ static void tumospectrum_draw_comparison(Canvas* canvas, const TumoSpectrumApp* 
         canvas_draw_str(canvas, 2, 41, "Select second RAW");
         return;
     }
-    snprintf(
-        line,
-        sizeof(line),
-        "%s  Similarity %u%%",
-        app->comparison.likely_same ? "Likely same" : "Different",
-        app->comparison.overall_similarity);
+    if(app->comparison.preset_changed || app->comparison.protocol_changed) {
+        snprintf(line, sizeof(line), "Configuration differs");
+    } else {
+        snprintf(
+            line,
+            sizeof(line),
+            "%s  Signal %u%%",
+            app->comparison.likely_same ? "Likely same" : "Different",
+            app->comparison.overall_similarity);
+    }
     canvas_draw_str(canvas, 2, 25, line);
     snprintf(
         line,
@@ -361,12 +365,21 @@ static void tumospectrum_draw_comparison(Canvas* canvas, const TumoSpectrumApp* 
         app->comparison.histogram_similarity,
         (long)app->comparison.frequency_delta_hz);
     canvas_draw_str(canvas, 2, 36, line);
-    snprintf(
-        line,
-        sizeof(line),
-        "dPulse %+ld  dTime %+ld%%",
-        (long)app->comparison.pulse_delta,
-        (long)app->comparison.duration_delta_percent);
+    if(app->comparison.preset_changed || app->comparison.protocol_changed) {
+        const char* config_label = app->comparison.preset_changed &&
+                                           app->comparison.protocol_changed ?
+                                       "Preset + protocol differ" :
+                                   app->comparison.preset_changed ? "Preset differs" :
+                                                                    "Protocol differs";
+        snprintf(line, sizeof(line), "%s", config_label);
+    } else {
+        snprintf(
+            line,
+            sizeof(line),
+            "dPulse %+ld  dTime %+ld%%",
+            (long)app->comparison.pulse_delta,
+            (long)app->comparison.duration_delta_percent);
+    }
     canvas_draw_str(canvas, 2, 47, line);
 }
 
@@ -2002,7 +2015,7 @@ static void tumospectrum_menu_callback(void* context, uint32_t index) {
     case TumoSpectrumMenuAbout:
         tumospectrum_show_text(
             app,
-            "TumoSpectrum 3.1",
+            "TumoSpectrum 3.2",
             "Autonomous receive-only Band Map, Smart Capture, profile building and multi-capture signal research workspace.\n\n"
             "Band Map: Left/Right tunes, Up changes band, Down selects radio. Long Up zooms, long Down snaps to peak and long OK holds the scan.\n\n"
             "Protocol Profiles performs bounded receive-only decoding on Flipper and logs changed observations to SD.\n\n"

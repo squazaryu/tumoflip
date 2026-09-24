@@ -66,8 +66,8 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_app_migrates_in_place_without_duplicate_fap(self) -> None:
         self.assertIn('appid="signal_workbench"', self.manifest)
         self.assertIn('name="TumoSpectrum"', self.manifest)
-        self.assertIn('fap_version="3.1.0"', self.manifest)
-        self.assertIn('"TumoSpectrum 3.1"', self.source)
+        self.assertIn('fap_version="3.2.0"', self.manifest)
+        self.assertIn('"TumoSpectrum 3.2"', self.source)
         self.assertIn('fap_category="Module One/Signals"', self.manifest)
         self.assertIn(
             'fap_dist_path="apps/Module One/Signals/signal_workbench.fap"', self.manifest
@@ -100,6 +100,8 @@ class TumoSpectrumTest(unittest.TestCase):
             "gap_threshold_us",
             "histogram_similarity",
             "overall_similarity",
+            "preset_changed",
+            "protocol_changed",
             "tumospectrum_types_compatible",
         ):
             self.assertIn(required, self.analysis)
@@ -139,6 +141,7 @@ class TumoSpectrumTest(unittest.TestCase):
             'elements_button_center(canvas, capture->status == TumoSpectrumStatusOk ? "Actions" : "Menu")',
             'elements_button_right(canvas, compare_page ? "Compare" : "Next")',
             'tumospectrum_compare_capture(app);',
+            '"Configuration differs"',
             'return tumospectrum_type_has_timings(capture->type) ? 4U : 1U;',
             "dialog_file_browser_show",
             "I_sub1_10px",
@@ -353,6 +356,9 @@ class TumoSpectrumTest(unittest.TestCase):
             '"fields\\\":[',
             '"counter\\\":{',
             '"checksum\\\":{',
+            r'\"preset_changed\":%s',
+            r'\"protocol_changed\":%s',
+            'Signal similarity: %u%%',
             "TUMOSPECTRUM_NOTEBOOK_CSV",
             "tumospectrum_write_file",
             "storage_common_rename",

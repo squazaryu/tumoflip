@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define TUMOSPECTRUM_APP_VERSION       "3.1.0"
+#define TUMOSPECTRUM_APP_VERSION       "3.2.0"
 #define TUMOSPECTRUM_PATH_SIZE         192U
 #define TUMOSPECTRUM_LABEL_SIZE        48U
 #define TUMOSPECTRUM_NOTE_SIZE         96U
@@ -71,6 +71,8 @@ typedef struct {
 typedef struct {
     bool compatible;
     bool likely_same;
+    bool preset_changed;
+    bool protocol_changed;
     int32_t frequency_delta_hz;
     int32_t pulse_delta;
     int32_t duration_delta_percent;

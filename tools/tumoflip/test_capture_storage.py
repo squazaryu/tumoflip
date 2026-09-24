@@ -68,6 +68,7 @@ int main(void){
     def test_export_keeps_cleanup_failure_visible_after_cancel(self):
         app_source = (APP / "capture_inspector.c").read_text()
         body = function(app_source, "static bool ci_write_string(")
+        body += function(app_source, "static bool ci_series_paths_are_distinct(")
         body += function(app_source, "static void ci_export_report(")
         run_c(r'''
 #include <assert.h>
@@ -84,6 +85,8 @@ static void furi_string_free(FuriString* s){free(s);}
 static const char* furi_string_get_cstr(FuriString* s){return s->value;}
 static void furi_string_set(FuriString* s,const char* v){snprintf(s->value,sizeof(s->value),"%s",v);}
 static void furi_string_printf(FuriString* s,const char* f,...){va_list ap;va_start(ap,f);vsnprintf(s->value,sizeof(s->value),f,ap);va_end(ap);}
+static void furi_string_cat(FuriString* s,const char* v){size_t n=strlen(s->value);snprintf(s->value+n,sizeof(s->value)-n,"%s",v);}
+static void furi_string_cat_printf(FuriString* s,const char* f,...){size_t n=strlen(s->value);va_list ap;va_start(ap,f);vsnprintf(s->value+n,sizeof(s->value)-n,f,ap);va_end(ap);}
 typedef int Storage;
 typedef struct {bool open;} File;
 typedef int FS_Error;
@@ -107,10 +110,11 @@ static bool storage_file_close(File* f){f->open=false;return mode!=4;}
 static FS_Error storage_common_remove(Storage* s,const char* p){(void)s;assert(strstr(p,"compare_"));removes++;if(mode==6)return FSE_INTERNAL;exists=false;return FSE_OK;}
 static bool ci_cancelled(void* c){(void)c;return (mode==5||mode==6)&&writes>=2;}
 ''' + source("capture_model.h") + source("capture_model.c") + r'''
-typedef struct {Storage* storage;FuriString* result;FuriString* paths[2];CiSnapshot captures[2];} CiApp;
+typedef struct {Storage* storage;FuriString* result;FuriString* paths[CI_SERIES_MAX];CiSnapshot captures[CI_SERIES_MAX];bool ready[CI_SERIES_MAX];} CiApp;
 ''' + body + r'''
 int main(void){
- CiApp* a=calloc(1,sizeof(*a));a->result=furi_string_alloc();a->paths[0]=furi_string_alloc();a->paths[1]=furi_string_alloc();
+ CiApp* a=calloc(1,sizeof(*a));a->result=furi_string_alloc();a->paths[0]=furi_string_alloc();a->paths[1]=furi_string_alloc();a->paths[2]=furi_string_alloc();
+ furi_string_set(a->paths[0],"/ext/a.sub");furi_string_set(a->paths[1],"/ext/b.sub");
  for(int i=0;i<2;i++){a->captures[i].finished=true;a->captures[i].count=1;strcpy(a->captures[i].fields[0].key,"Key");strcpy(a->captures[i].fields[0].value,"stored");}
  for(mode=0;mode<=6;mode++){
   allocs=writes=removes=0;exists=false;ci_export_report(a);assert(!allocs);
@@ -119,7 +123,7 @@ int main(void){
   else assert(!exists);
   for(int i=0;i<2;i++)assert(!strcmp(a->captures[i].fields[0].value,"stored"));
  }
- furi_string_free(a->result);furi_string_free(a->paths[0]);furi_string_free(a->paths[1]);free(a);return 0;
+ furi_string_free(a->result);furi_string_free(a->paths[0]);furi_string_free(a->paths[1]);furi_string_free(a->paths[2]);free(a);return 0;
 }
 ''')
 

@@ -142,6 +142,13 @@ int main(void) {
         assert(parse(&snapshots[sample], captures[sample]) == CiParseOk);
 
     assert(ci_series_diff_count(snapshots, CI_SERIES_MAX) == 10U);
+    const char* const distinct_paths[] = {"/ext/a.sub", "/ext/b.sub", "/ext/c.sub"};
+    const char* const duplicate_paths[] = {"/ext/a.sub", "/ext/b.sub", "/ext/a.sub"};
+    const char* const empty_path[] = {"/ext/a.sub", ""};
+    assert(ci_capture_paths_are_distinct(distinct_paths, CI_SERIES_MAX));
+    assert(!ci_capture_paths_are_distinct(duplicate_paths, CI_SERIES_MAX));
+    assert(!ci_capture_paths_are_distinct(empty_path, 2U));
+    assert(!ci_capture_paths_are_distinct(distinct_paths, CI_SERIES_MAX + 1U));
     CiSeriesRow row;
     assert(ci_series_diff_row(snapshots, CI_SERIES_MAX, 0U, &row));
     assert(!row.changed && strcmp(row.key, "Filetype") == 0);
@@ -192,6 +199,7 @@ int main(void) {
         source = fam.read_text()
         self.assertIn("fap_package_only=True", source)
         self.assertIn('appid="capture_inspector"', source)
+        self.assertIn('fap_version="1.1"', source)
         hub = (ROOT / "applications_user/arf_subghz_full/arf_subghz_hub.c").read_text()
         saved = (ROOT / "applications/main/subghz/scenes/subghz_scene_saved_menu.c").read_text()
         self.assertIn("capture_inspector.fap", hub)
@@ -201,6 +209,24 @@ int main(void) {
         self.assertIn(target, PACKAGE_ONLY_PACKAGE_FILES)
         self.assertEqual(PACKAGE_ONLY_PACKAGE_GROUPS[target], "arf")
         self.assertIn('loader_enqueue_launch(loader, "Sub-GHz", NULL', saved)
+
+    def test_three_file_series_ui_and_export_use_stored_read_only_values(self):
+        source = (APP / "capture_inspector.c").read_text()
+        model = (APP / "capture_model.c").read_text()
+        for required in (
+            '"Open file C"',
+            '"Inspect C"',
+            '"Compare series"',
+            "ci_series_diff_count(app->captures",
+            "ci_series_diff_row(app->captures",
+            "ci_series_paths_are_distinct",
+            "Open different files for each sample.",
+            '"Capture Inspector series report v2',
+            "RAW timings: use TumoSpectrum.",
+        ):
+            self.assertIn(required, source)
+        for required in ("CI_SERIES_MAX", "ci_series_seen_before"):
+            self.assertIn(required, model + source)
 
     def test_no_radio_or_source_write_path(self):
         storage = (APP / "capture_storage.c").read_text()

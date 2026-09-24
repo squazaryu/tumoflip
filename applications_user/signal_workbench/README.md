@@ -53,6 +53,10 @@ Install profiles in `/ext/apps_data/signal_workbench/profiles/`, then open
 Broker v2, decodes on the Flipper, and writes changed observations to
 `/ext/apps_data/signal_workbench/protocol_observations.csv`.
 
+`Compare Capture` also reports when the stored preset or protocol differs. Signal similarity describes
+waveform shape; a pair with a different preset or protocol is never labeled “Likely same”. The JSON and
+text reports retain both source paths and exact preset/protocol labels for regression review.
+
 Existing profiles from `/ext/apps_data/protocol_compiler/profiles/` are copied
 to the canonical directory on first launch. The legacy source is not deleted.
 
