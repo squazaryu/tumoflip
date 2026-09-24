@@ -129,22 +129,19 @@ class UpstreamE6ProtocolsTest(unittest.TestCase):
             self.assertIn(label, source)
         self.assertIn("COUNT_OF(kl_type_options)", source)
 
-    def test_key_manually_creates_a_keyeloq_capture(self) -> None:
+    def test_key_manually_creates_a_keeloq_capture(self) -> None:
         events = self.read("applications/main/subghz/helpers/subghz_custom_event.h")
         menu = self.read("applications/main/subghz/plugins/add_manually/subghz_scene_set_type.c")
         generator = self.read("applications/main/subghz/plugins/add_manually/subghz_gen_info.c")
 
         self.assertIn("SetTypeKEY433", events)
         self.assertIn('[SetTypeKEY433] = "KL: KEY 433MHz"', menu)
-        key_case = generator.split("case SetTypeKEY433:", 1)[1].split("break;", 1)[0]
-        for expected in (
-            ".type = GenKeeloq",
-            '.mod = "AM650"',
-            ".freq = 433920000",
-            ".keeloq.serial = (key & 0x0FFFFFFF)",
-            '.keeloq.manuf = "KEY"',
-        ):
-            self.assertIn(expected, key_case)
+        self.assertIn("[SetTypeKEY433] = 52", generator)
+        self.assertIn(
+            '[51] = SUBGHZ_KEELOQ_PRESET(KEELOQ_MASK_28, KEELOQ_PREFIX_NONE, '
+            'KEELOQ_FREQUENCY_433_920, KEELOQ_MODULATION_AM650, 0x01, 0x03, "KEY")',
+            generator,
+        )
 
 
 if __name__ == "__main__":
