@@ -175,7 +175,7 @@ jobs:
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
             updater_package fap_esp_flasher fap_quac fap_subghz_wardriving \
-            fap_nearby_files fap_nice_o_code fap_secplus_pin fap_weather_editor \
+            fap_nearby_files fap_hotels_parser fap_nice_o_code fap_secplus_pin fap_weather_editor \
             fap_lfrfid_hitags \
             fap_protopirate_to_subghz fap_capture_inspector fap_specter fap_hid_ble fap_hid_usb \
             fap_device_library fap_file_history fap_signal_workbench
