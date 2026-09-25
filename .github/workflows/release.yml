@@ -118,7 +118,7 @@ jobs:
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt -j2 COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
             updater_package fap_esp_flasher fap_quac fap_subghz_wardriving \
-            fap_nearby_files fap_nice_o_code fap_secplus_pin fap_weather_editor \
+            fap_nearby_files fap_hotels_parser fap_nice_o_code fap_secplus_pin fap_weather_editor \
             fap_lfrfid_hitags \
             fap_protopirate_to_subghz fap_capture_inspector fap_specter fap_hid_ble fap_hid_usb \
             fap_device_library fap_file_history fap_signal_workbench
@@ -144,6 +144,7 @@ jobs:
             tools/tumoflip/test_desktop_settings_strings.py \
             tools/tumoflip/test_mf_desfire_zero_key_count.py \
             tools/tumoflip/test_nfc_key_dictionary_import.py \
+            tools/tumoflip/test_nfc_hotel_parser.py \
             tools/tumoflip/test_tumokey.py \
             tools/tumoflip/test_dependency_pins.py \
             tools/tumoflip/test_file_browser_momentum.py \
