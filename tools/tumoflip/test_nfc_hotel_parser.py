@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_FAM = REPO_ROOT / "applications/main/nfc/application.fam"
 HOTEL_PARSER = REPO_ROOT / "applications/main/nfc/plugins/supported_cards/hotels.c"
 SAFLOK_PARSER = REPO_ROOT / "applications/main/nfc/plugins/supported_cards/saflok.c"
+MIFARE_DICTIONARY = REPO_ROOT / "applications/main/nfc/resources/nfc/assets/mf_classic_dict.nfc"
 
 
 def function_body(source: str, signature: str) -> str:
@@ -37,6 +38,7 @@ class NfcHotelParserTest(unittest.TestCase):
         cls.app_config = APP_FAM.read_text(encoding="utf-8")
         cls.hotel_source = HOTEL_PARSER.read_text(encoding="utf-8") if HOTEL_PARSER.exists() else ""
         cls.saflok_source = SAFLOK_PARSER.read_text(encoding="utf-8")
+        cls.dictionary = MIFARE_DICTIONARY.read_text(encoding="utf-8")
         cls.parse = function_body(cls.hotel_source, "static bool hotels_parse(")
         cls.key_match = function_body(cls.hotel_source, "static bool hotels_key_matches(")
 
@@ -59,14 +61,21 @@ class NfcHotelParserTest(unittest.TestCase):
         self.assertIn("MfClassicTypeNum", self.parse)
         self.assertIn("mf_classic_get_total_sectors_num", self.parse)
         self.assertIn("NfcProtocolMfClassic", self.parse)
-        self.assertIn("mf_classic_is_key_found", self.key_match)
-        self.assertIn("mf_classic_get_key", self.key_match)
+        self.assertIn("mf_classic_is_key_found(data, sector, key_type)", self.key_match)
+        self.assertIn("mf_classic_get_key(data, sector, key_type)", self.key_match)
         self.assertIn("memcmp", self.key_match)
 
-        for sector, key_type in ((1, "MfClassicKeyTypeA"), (2, "MfClassicKeyTypeB")):
-            mask_check = self.key_match.index(f"mf_classic_is_key_found(data, {sector}, {key_type})")
-            key_read = self.key_match.index(f"mf_classic_get_key(data, {sector}, {key_type})")
-            self.assertLess(mask_check, key_read)
+        mask_check = self.key_match.index("mf_classic_is_key_found(data, sector, key_type)")
+        key_read = self.key_match.index("mf_classic_get_key(data, sector, key_type)")
+        self.assertLess(mask_check, key_read)
+        self.assertIn("hotels_key_matches(data, 1, MfClassicKeyTypeA, onity_key)", self.parse)
+        self.assertIn("hotels_key_matches(data, 2, MfClassicKeyTypeB, vingcard_key)", self.parse)
+
+    def test_parser_uses_the_existing_mifare_dictionary_keys(self) -> None:
+        self.assertIn("0x8A, 0x19, 0xD4, 0x0C, 0xF2, 0xB5", self.hotel_source)
+        self.assertIn("0x00, 0x00, 0x01, 0x4B, 0x5C, 0x31", self.hotel_source)
+        self.assertIn("8A19D40CF2B5", self.dictionary)
+        self.assertIn("0000014B5C31", self.dictionary)
 
     def test_unknown_cards_are_rejected_and_overlapping_matches_are_not_hidden(self) -> None:
         self.assertIn("if(!onity && !vingcard)", self.parse)
