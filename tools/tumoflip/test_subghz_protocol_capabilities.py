@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import re
 import unittest
 from pathlib import Path
 
@@ -14,8 +15,24 @@ STANDARD_PROTOCOL_LIST = (
     REPO_ROOT / "applications/main/subghz/scenes/subghz_scene_protocol_list.c"
 )
 ARF_TXRX = REPO_ROOT / "applications_user/arf_subghz_full/helpers/subghz_txrx.c"
+STANDARD_APP = REPO_ROOT / "applications/main/subghz/subghz_i.c"
+ARF_APP = REPO_ROOT / "applications_user/arf_subghz_full/subghz_i.c"
 ARF_STATUS = REPO_ROOT / "applications_user/arf_tools/arf_tools.c"
 ARF_STATUS_MANIFEST = REPO_ROOT / "applications_user/arf_tools/application.fam"
+
+
+def c_function_body(source: str, signature: str) -> str:
+    start = source.index(signature)
+    opening_brace = source.index("{", start)
+    depth = 0
+    for index in range(opening_brace, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start : index + 1]
+    raise AssertionError(f"unterminated function: {signature}")
 
 
 class SubGhzProtocolCapabilitiesTest(unittest.TestCase):
@@ -25,6 +42,8 @@ class SubGhzProtocolCapabilitiesTest(unittest.TestCase):
         cls.standard_txrx = STANDARD_TXRX.read_text(encoding="utf-8")
         cls.standard_protocol_list = STANDARD_PROTOCOL_LIST.read_text(encoding="utf-8")
         cls.arf_txrx = ARF_TXRX.read_text(encoding="utf-8")
+        cls.standard_app = STANDARD_APP.read_text(encoding="utf-8")
+        cls.arf_app = ARF_APP.read_text(encoding="utf-8")
         cls.arf_status = ARF_STATUS.read_text(encoding="utf-8")
         cls.arf_status_manifest = ARF_STATUS_MANIFEST.read_text(encoding="utf-8")
 
@@ -88,6 +107,34 @@ class SubGhzProtocolCapabilitiesTest(unittest.TestCase):
             self.assertLess(validation, radio_begin)
             self.assertLess(validation, radio_tx)
             self.assertIn("SubGhzTxRxStartTxStateErrorCapability", source)
+
+    def test_saved_record_short_preset_is_not_normalized_as_a_long_name_again(self) -> None:
+        for app_source, txrx_source in (
+            (self.standard_app, self.standard_txrx),
+            (self.arf_app, self.arf_txrx),
+        ):
+            loader = c_function_body(app_source, "bool subghz_key_load(")
+            tx_start = c_function_body(
+                txrx_source, "SubGhzTxRxStartTxState subghz_txrx_tx_start("
+            )
+
+            self.assertIn('"Preset"', loader)
+            self.assertIn("subghz_txrx_get_preset_name", loader)
+            self.assertIn("subghz_txrx_set_preset", loader)
+            self.assertRegex(
+                tx_start,
+                re.compile(
+                    r"subghz_radio_broker_preset_from_short_name\(\s*"
+                    r"furi_string_get_cstr\(preset->name\)\s*\)"
+                ),
+            )
+            self.assertNotRegex(
+                tx_start,
+                re.compile(
+                    r"subghz_txrx_get_preset_name\(\s*instance,\s*"
+                    r"furi_string_get_cstr\(preset->name\)"
+                ),
+            )
 
     def test_reference_gate_protocols_keep_expected_capability_flags(self) -> None:
         expectations = {
