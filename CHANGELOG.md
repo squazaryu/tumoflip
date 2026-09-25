@@ -1,4 +1,8 @@
-## Tumoflip Dev 009-012 candidate (unpublished)
+## Tumoflip Dev 009-013
+- NFC: add a parse-only supported-card FAL that identifies possible Onity or VingCard systems from keys already found in a saved MIFARE Classic read. It does not add a card read/auth/write flow; the existing detailed Saflok parser remains in use.
+- F7 public API remains 88.14; the NFC supported-card plugin ABI is unchanged.
+
+## Tumoflip Dev 009-012
 - Sub-GHz: add `KL: KEY 433MHz` to Add Manually using the existing KeeLoq generator and KEY keystore entry.
 - ARF Renault review: do not copy the `Renault V1` FM flag; that ARF decoder is absent here. The local Renault/Dacia protocol is a different AM implementation. Keep Toyota enabled.
 - Capture Inspector 1.1: compare stored `.sub`/`.psf` fields across two or three files and export a series report with stable, changed, and missing values plus original paths. Source captures remain read-only; RAW timing analysis stays in TumoSpectrum.

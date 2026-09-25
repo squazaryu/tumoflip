@@ -193,7 +193,7 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-009-012` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-009-013` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
@@ -218,15 +218,15 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-009-012.tgz
+flipper-z-f7-update-t-dev-009-013.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: development source `88.14`; published Dev `009-010` is `88.13`;
-  immutable stable `v1.0.8` remains `88.7`. The next firmware release must be
-  paired with a package catalog built for its API. API numbers are local to this fork.
+- Firmware API: Dev `t-dev-009-013` uses `88.14`; immutable stable `v1.0.8` remains `88.7`.
+  Each release manifest records its compatible package API. API numbers are
+  local to this fork.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or
   rebuilt from the matching FW Packages catalog.
 - The JS Runner is an application (`js_app.fap`); it is not required by the
