@@ -1,3 +1,7 @@
+## Tumoflip Dev 009-014
+- Sub-GHz: restore TX validation for saved recordings in Standard Sub-GHz and ARF. Saved preset names are already normalized on load; TX validation now uses that short preset directly instead of converting it a second time and passing an empty modulation to the radio broker.
+- No frequency/protocol capability restrictions were relaxed and no F7 API change is required. Playback on hardware still needs acceptance.
+
 ## Tumoflip Dev 009-013
 - NFC: add a parse-only supported-card FAL that identifies possible Onity or VingCard systems from keys already found in a saved MIFARE Classic read. It does not add a card read/auth/write flow; the existing detailed Saflok parser remains in use.
 - F7 public API remains 88.14; the NFC supported-card plugin ABI is unchanged.
