@@ -97,6 +97,10 @@ jobs:
         shell: bash
         run: python3 tools/tumoflip/test_nfc_key_dictionary_import.py
 
+      - name: Validate passive NFC hotel parser
+        shell: bash
+        run: python3 tools/tumoflip/test_nfc_hotel_parser.py
+
       - name: Validate TumoKey host dependency pins
         shell: bash
         run: |
