@@ -425,12 +425,11 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
         if(instance->transmitter) {
             const SubGhzProtocolEncoderBase* encoder =
                 subghz_transmitter_get_protocol_instance(instance->transmitter);
-            const char* preset_short =
-                subghz_txrx_get_preset_name(instance, furi_string_get_cstr(preset->name));
             instance->last_validation = subghz_radio_broker_validate_protocol(
                 encoder ? encoder->protocol : NULL,
                 preset->frequency,
-                subghz_radio_broker_preset_from_short_name(preset_short),
+                subghz_radio_broker_preset_from_short_name(
+                    furi_string_get_cstr(preset->name)),
                 subghz_txrx_broker_device(instance),
                 true);
 
