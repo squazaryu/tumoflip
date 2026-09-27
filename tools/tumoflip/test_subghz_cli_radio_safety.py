@@ -212,6 +212,25 @@ int main(void) {
                     if reset_at >= 0:
                         self.assertLess(begin_at, reset_at)
 
+                tx_from_file = c_function_body(
+                    source, "void subghz_cli_command_tx_from_file("
+                )
+                failure_at = tx_from_file.index(
+                    "if(!subghz_cli_command_device_begin(device"
+                )
+                failure_cleanup = tx_from_file[
+                    failure_at : tx_from_file.index("\n        }", failure_at) + 10
+                ]
+                self.assertIn("subghz_cli_radio_device_power_off()", failure_cleanup)
+                self.assertIn("break;", failure_cleanup)
+
+                chat = c_function_body(source, "static void subghz_cli_command_chat(")
+                self.assertIn("if(device == NULL)", chat)
+                self.assertLess(
+                    chat.index("if(device == NULL)"),
+                    chat.index("subghz_devices_is_frequency_valid(device, frequency)"),
+                )
+
                 for signature in (
                     "void subghz_cli_command_tx(",
                     "void subghz_cli_command_rx(",
