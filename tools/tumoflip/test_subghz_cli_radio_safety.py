@@ -62,6 +62,9 @@ static unsigned power_off_calls;
 static unsigned direct_hal_power_calls;
 static unsigned direct_hal_off_calls;
 static unsigned null_connect_calls;
+static unsigned device_begin_calls;
+static unsigned device_end_calls;
+static bool device_begin_success = true;
 
 Power* furi_record_open(const char* name) {
     return strcmp(name, RECORD_POWER) == 0 ? &power_service : NULL;
@@ -92,8 +95,15 @@ bool subghz_devices_is_connect(const SubGhzDevice* device) {
     }
     return device->connected;
 }
-bool subghz_devices_begin(const SubGhzDevice* device) { return device->begin_ok; }
-void subghz_devices_end(const SubGhzDevice* device) { (void)device; }
+bool subghz_devices_begin(const SubGhzDevice* device) {
+    (void)device;
+    device_begin_calls++;
+    return device_begin_success;
+}
+void subghz_devices_end(const SubGhzDevice* device) {
+    (void)device;
+    device_end_calls++;
+}
 """
 
         for path, source in self.sources.items():
@@ -104,6 +114,7 @@ void subghz_devices_end(const SubGhzDevice* device) { (void)device; }
                         "static void subghz_cli_radio_device_power_on(",
                         "static void subghz_cli_radio_device_power_off(",
                         "static const SubGhzDevice* subghz_cli_command_get_device(",
+                        "static bool subghz_cli_command_device_begin(",
                     )
                 )
                 main = r"""
@@ -130,6 +141,13 @@ int main(void) {
     selected_index = 1;
     selected = subghz_cli_command_get_device(&selected_index);
     if(selected != &external_device || selected_index != 1) return 7;
+
+    device_begin_success = false;
+    if(subghz_cli_command_device_begin(&external_device, 1)) return 8;
+    if(device_begin_calls != 1 || device_end_calls != 1) return 9;
+    device_begin_success = true;
+    if(!subghz_cli_command_device_begin(&external_device, 1)) return 10;
+    if(device_begin_calls != 2 || device_end_calls != 1) return 11;
     return 0;
 }
 """
@@ -221,8 +239,13 @@ int main(void) {
                 failure_cleanup = tx_from_file[
                     failure_at : tx_from_file.index("\n        }", failure_at) + 10
                 ]
-                self.assertIn("subghz_cli_radio_device_power_off()", failure_cleanup)
                 self.assertIn("break;", failure_cleanup)
+                self.assertIn("bool device_started = false;", tx_from_file)
+                self.assertIn("device_started = true;", tx_from_file)
+                self.assertIn("if(device_started)", tx_from_file)
+                common_cleanup = tx_from_file[tx_from_file.index("} while(false);") :]
+                self.assertIn("subghz_devices_end(device)", common_cleanup)
+                self.assertIn("subghz_cli_radio_device_power_off()", common_cleanup)
 
                 chat = c_function_body(source, "static void subghz_cli_command_chat(")
                 self.assertIn("if(device == NULL)", chat)

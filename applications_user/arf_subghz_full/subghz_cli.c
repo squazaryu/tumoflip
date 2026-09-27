@@ -5,6 +5,7 @@
 
 #include <applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h>
 #include <cli/cli_main_commands.h>
+#include <power/power_service/power.h>
 #include <subghz_radio_broker/subghz_radio_broker.h>
 #include <toolbox/cli/cli_ansi.h>
 
@@ -36,26 +37,19 @@
 // Rx RAW        | only internal module
 // Chat          | both
 
-#define TAG "SubGhzCli"
+#define TAG                              "SubGhzCli"
 #define SUBGHZ_CLI_RADIO_ACQUIRE_TIMEOUT 1000U
 
 static void subghz_cli_radio_device_power_on(void) {
-    uint8_t attempts = 5;
-    while(--attempts > 0) {
-        if(furi_hal_power_enable_otg()) break;
-    }
-    if(attempts == 0) {
-        if(furi_hal_power_get_usb_voltage() < 4.5f) {
-            FURI_LOG_E(
-                "TAG",
-                "Error power otg enable. BQ2589 check otg fault = %d",
-                furi_hal_power_check_otg_fault() ? 1 : 0);
-        }
-    }
+    Power* power = furi_record_open(RECORD_POWER);
+    power_enable_otg(power, true);
+    furi_record_close(RECORD_POWER);
 }
 
 static void subghz_cli_radio_device_power_off(void) {
-    if(furi_hal_power_is_otg_enabled()) furi_hal_power_disable_otg();
+    Power* power = furi_record_open(RECORD_POWER);
+    power_enable_otg(power, false);
+    furi_record_close(RECORD_POWER);
 }
 
 static bool subghz_cli_radio_acquire(
@@ -183,11 +177,25 @@ static const SubGhzDevice* subghz_cli_command_get_device(uint32_t* device_ind) {
     case 1:
         subghz_cli_radio_device_power_on();
         device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_EXT_NAME);
+        if(device == NULL) {
+            FURI_LOG_E(TAG, "No %s driver loaded", SUBGHZ_DEVICE_CC1101_EXT_NAME);
+            printf(
+                "Device %s driver is missing, falling back to the internal radio\r\n",
+                SUBGHZ_DEVICE_CC1101_EXT_NAME);
+            subghz_cli_radio_device_power_off();
+            device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
+            *device_ind = 0;
+        }
         break;
 
     default:
         device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
         break;
+    }
+    if(device == NULL) {
+        FURI_LOG_E(TAG, "No Sub-GHz radio driver loaded");
+        subghz_cli_radio_device_power_off();
+        return NULL;
     }
     //check if the device is connected
     if(!subghz_devices_is_connect(device)) {
@@ -196,6 +204,19 @@ static const SubGhzDevice* subghz_cli_command_get_device(uint32_t* device_ind) {
         *device_ind = 0;
     }
     return device;
+}
+
+static bool subghz_cli_command_device_begin(const SubGhzDevice* device, uint32_t device_ind) {
+    if(device == NULL) {
+        printf("Device %lu driver is unavailable\r\n", (unsigned long)device_ind);
+        return false;
+    }
+    if(subghz_devices_begin(device)) {
+        return true;
+    }
+    printf("Device %lu failed to start\r\n", (unsigned long)device_ind);
+    subghz_devices_end(device);
+    return false;
 }
 
 void subghz_cli_command_tx(PipeSide* pipe, FuriString* args, void* context) {
@@ -224,9 +245,20 @@ void subghz_cli_command_tx(PipeSide* pipe, FuriString* args, void* context) {
     }
     subghz_devices_init();
     const SubGhzDevice* device = subghz_cli_command_get_device(&device_ind);
+    if(device == NULL) {
+        printf("Sub-GHz radio device is unavailable\r\n");
+        subghz_devices_deinit();
+        subghz_cli_radio_device_power_off();
+        return;
+    }
     if(!subghz_devices_is_frequency_valid(device, frequency)) {
         printf(
             "Frequency must be in " SUBGHZ_FREQUENCY_RANGE_STR " range, not %lu\r\n", frequency);
+        subghz_devices_deinit();
+        subghz_cli_radio_device_power_off();
+        return;
+    }
+    if(!subghz_cli_command_device_begin(device, device_ind)) {
         subghz_devices_deinit();
         subghz_cli_radio_device_power_off();
         return;
@@ -261,7 +293,6 @@ void subghz_cli_command_tx(PipeSide* pipe, FuriString* args, void* context) {
     SubGhzTransmitter* transmitter = subghz_transmitter_alloc_init(environment, "Princeton");
     subghz_transmitter_deserialize(transmitter, flipper_format);
 
-    subghz_devices_begin(device);
     subghz_devices_reset(device);
     subghz_devices_load_preset(device, FuriHalSubGhzPresetOok650Async, NULL);
     frequency = subghz_devices_set_frequency(device, frequency);
@@ -346,9 +377,20 @@ void subghz_cli_command_rx(PipeSide* pipe, FuriString* args, void* context) {
     }
     subghz_devices_init();
     const SubGhzDevice* device = subghz_cli_command_get_device(&device_ind);
+    if(device == NULL) {
+        printf("Sub-GHz radio device is unavailable\r\n");
+        subghz_devices_deinit();
+        subghz_cli_radio_device_power_off();
+        return;
+    }
     if(!subghz_devices_is_frequency_valid(device, frequency)) {
         printf(
             "Frequency must be in " SUBGHZ_FREQUENCY_RANGE_STR " range, not %lu\r\n", frequency);
+        subghz_devices_deinit();
+        subghz_cli_radio_device_power_off();
+        return;
+    }
+    if(!subghz_cli_command_device_begin(device, device_ind)) {
         subghz_devices_deinit();
         subghz_cli_radio_device_power_off();
         return;
@@ -366,7 +408,6 @@ void subghz_cli_command_rx(PipeSide* pipe, FuriString* args, void* context) {
     subghz_receiver_set_rx_callback(receiver, subghz_cli_command_rx_callback, instance);
 
     // Configure radio
-    subghz_devices_begin(device);
     subghz_devices_reset(device);
     subghz_devices_load_preset(device, FuriHalSubGhzPresetOok650Async, NULL);
     frequency = subghz_devices_set_frequency(device, frequency);
@@ -619,6 +660,7 @@ void subghz_cli_command_tx_from_file(PipeSide* pipe, FuriString* args, void* con
     temp_str = furi_string_alloc();
     uint32_t temp_data32;
     bool check_file = false;
+    bool device_started = false;
     const SubGhzDevice* device = NULL;
 
     uint32_t frequency = 0;
@@ -696,7 +738,10 @@ void subghz_cli_command_tx_from_file(PipeSide* pipe, FuriString* args, void* con
             break;
         }
 
-        subghz_devices_begin(device);
+        if(!subghz_cli_command_device_begin(device, device_ind)) {
+            break;
+        }
+        device_started = true;
         subghz_devices_reset(device);
 
         if(!strcmp(furi_string_get_cstr(temp_str), "FuriHalSubGhzPresetCustom")) {
@@ -784,9 +829,8 @@ void subghz_cli_command_tx_from_file(PipeSide* pipe, FuriString* args, void* con
         if(is_init_protocol) {
             check_file = true;
         } else {
-            subghz_devices_sleep(device);
-            subghz_devices_end(device);
-            subghz_transmitter_free(transmitter);
+            if(transmitter != NULL) subghz_transmitter_free(transmitter);
+            transmitter = NULL;
         }
 
     } while(false);
@@ -829,14 +873,22 @@ void subghz_cli_command_tx_from_file(PipeSide* pipe, FuriString* args, void* con
         } while(!cli_is_pipe_broken_or_is_etx_next_char(pipe) &&
                 (repeat && !strcmp(furi_string_get_cstr(temp_str), "RAW")));
 
-        subghz_devices_sleep(device);
-        subghz_devices_end(device);
-        subghz_cli_radio_device_power_off();
-
+        if(device_started) {
+            subghz_devices_sleep(device);
+            subghz_devices_end(device);
+            device_started = false;
+        }
         furi_hal_power_suppress_charge_exit();
 
         subghz_transmitter_free(transmitter);
+        transmitter = NULL;
     }
+    if(transmitter != NULL) subghz_transmitter_free(transmitter);
+    if(device_started) {
+        subghz_devices_sleep(device);
+        subghz_devices_end(device);
+    }
+    subghz_cli_radio_device_power_off();
     flipper_format_free(fff_data_raw);
     furi_string_free(file_name);
     furi_string_free(temp_str);
@@ -970,6 +1022,12 @@ static void subghz_cli_command_chat(PipeSide* pipe, FuriString* args) {
     }
     subghz_devices_init();
     const SubGhzDevice* device = subghz_cli_command_get_device(&device_ind);
+    if(device == NULL) {
+        printf("Sub-GHz radio device is unavailable\r\n");
+        subghz_devices_deinit();
+        subghz_cli_radio_device_power_off();
+        return;
+    }
     if(!subghz_devices_is_frequency_valid(device, frequency)) {
         printf(
             "Frequency must be in " SUBGHZ_FREQUENCY_RANGE_STR " range, not %lu\r\n", frequency);
