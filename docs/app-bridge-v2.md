@@ -39,9 +39,9 @@ The system app ID is `runtime`.
 - `capabilities` returns `runtime/capabilities` with a semicolon-separated
   `key=value` payload. Runtime v2 keeps backward-compatible keys
   `runtime=1`, `fab=2`, and `session=3`, and advertises `status=2`,
-  `trace=1`, `twin=1`, `pkg=1`, `radio=2`, `sd=1`, `fabric=1`, `time=1`, plus compact feature
+  `trace=1`, `twin=1`, `pkg=1`, `radio=2`, `sd=1`, `fabric=1`, `time=1`, `crash=1`, plus compact feature
   flags in `feat`, currently `pkg`, `radio`, `trace`, `twin`, and
-  `transfer`, `fabric`, `time`, `gps`, and `net`.
+  `transfer`, `fabric`, `time`, `gps`, `net`, and `crash`.
 - `status` returns `runtime/status` with compact schema v2 fields:
   `schema`, `fw`, `commit`, `dirty`, `origin`, `api`, `target`, `transfer`,
   `sd`, `pkg`, `sid`, `bo`, `radio`, and `owner`. `sd=1` means the SD card is
@@ -67,6 +67,13 @@ The system app ID is `runtime`.
   The snapshot is bounded to one FAB2 response frame and is intended for
   Companion diagnostics, not full persistent logging. Example:
   `schema=1;depth=8;count=2;drop=0|r,s,o|t,s,o`.
+- `crash_report` returns `runtime/crash_report` with either
+  `schema=1;status=none` or a bounded record such as
+  `schema=1;status=ok;kind=null_pointer;app=subghz;seq=1;build=ABCD1234`.
+  `app` is a sanitized prefix of at most twelve characters. The record survives
+  the existing fault popup and contains no arguments, NFC data, or RF payloads.
+  `crash_ack` explicitly clears the record and returns `ok`; reading it does not.
+  USB CLI offers the same report through `tumocrash show` and `tumocrash clear`.
 - `twin` returns `runtime/twin` with the compact Device Twin schema v1 for the
   current Flipper state. Fields are `fw` firmware version, `cm` commit, `dy`
   dirty flag, `sd` SD readiness, `pkg` package-state presence, `bat` battery
