@@ -6,10 +6,16 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from .validate_release import (
-    PACKAGE_RELEASE_OVERLAY_FILES,
-    PACKAGE_RELEASE_OVERLAY_GROUPS,
-)
+if __package__:
+    from .validate_release import (
+        PACKAGE_RELEASE_OVERLAY_FILES,
+        PACKAGE_RELEASE_OVERLAY_GROUPS,
+    )
+else:
+    from validate_release import (
+        PACKAGE_RELEASE_OVERLAY_FILES,
+        PACKAGE_RELEASE_OVERLAY_GROUPS,
+    )
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
