@@ -38,8 +38,12 @@ HARNESS = r"""
 #include "furi_hal_rtc.h"
 
 static uint32_t registers[20];
+static int last_written_register = -1;
 uint32_t furi_hal_rtc_get_register(FuriHalRtcRegister reg) { return registers[reg]; }
-void furi_hal_rtc_set_register(FuriHalRtcRegister reg, uint32_t value) { registers[reg] = value; }
+void furi_hal_rtc_set_register(FuriHalRtcRegister reg, uint32_t value) {
+    registers[reg] = value;
+    last_written_register = reg;
+}
 
 #include "lib/tumoflip_crash_journal/crash_journal.h"
 
@@ -54,6 +58,7 @@ int main(void) {
 
     tumoflip_crash_journal_set_active_app("garage_door_remote", "abcdef12");
     tumoflip_crash_journal_record(TumoflipCrashKindNullPointer, "abcdef12");
+    assert(last_written_register == FuriHalRtcRegisterTumoflipCrashMarker);
     assert(tumoflip_crash_journal_read(&report));
     assert(report.kind == TumoflipCrashKindNullPointer);
     assert(report.sequence == 1);
@@ -72,6 +77,12 @@ int main(void) {
     assert(strcmp(report.app_id, "nfc") == 0);
     registers[FuriHalRtcRegisterTumoflipCrashChecksum] ^= 1;
     assert(!tumoflip_crash_journal_read(&report));
+
+    tumoflip_crash_journal_ack();
+    tumoflip_crash_journal_set_active_app("private-name", "deadbeef");
+    tumoflip_crash_journal_record(TumoflipCrashKindWatchdog, "abcdef12");
+    assert(tumoflip_crash_journal_read(&report));
+    assert(report.app_id[0] == '\0');
 
     assert(tumoflip_crash_journal_classify("NULL pointer dereference") ==
            TumoflipCrashKindNullPointer);

@@ -7,6 +7,8 @@
 #include <furi_hal_debug.h>
 #include <furi_hal_bt.h>
 #include <furi_hal_interrupt.h>
+#include <tumoflip_crash_journal/crash_journal.h>
+#include <toolbox/version.h>
 #include <stdio.h>
 
 #include <FreeRTOS.h>
@@ -172,6 +174,9 @@ FURI_NORETURN void __furi_crash_implementation(void) {
         RESTORE_REGISTERS_AND_HALT_MCU(debug);
 #ifdef FURI_NDEBUG
     } else {
+        tumoflip_crash_journal_record(
+            tumoflip_crash_journal_classify(__furi_check_message),
+            version_get_githash(NULL));
         uint32_t ptr = (uint32_t)__furi_check_message;
         if(ptr < FLASH_BASE || ptr > (FLASH_BASE + FLASH_SIZE)) {
             ptr = (uint32_t) "Check serial logs";
