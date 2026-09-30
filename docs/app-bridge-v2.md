@@ -67,6 +67,16 @@ The system app ID is `runtime`.
   The snapshot is bounded to one FAB2 response frame and is intended for
   Companion diagnostics, not full persistent logging. Example:
   `schema=1;depth=8;count=2;drop=0|r,s,o|t,s,o`.
+- `crash_report` returns `runtime/crash_report` with either
+  `schema=1;status=none` or a bounded record such as
+  `schema=1;status=ok;kind=null_pointer;app=subghz;seq=1;build=ABCD1234`.
+  `app` is a sanitized prefix of at most twelve characters. The record survives
+  the existing fault popup and contains no arguments, NFC data, or RF payloads.
+  `crash_ack` explicitly clears the record and returns `ok`; reading it does not.
+  USB CLI offers the same report through `tumocrash show` and `tumocrash clear`.
+  Clients may make a best-effort single-frame request when opening diagnostics;
+  older firmware responds with `badcmd`. The capabilities response remains within
+  its existing 160-byte limit.
 - `twin` returns `runtime/twin` with the compact Device Twin schema v1 for the
   current Flipper state. Fields are `fw` firmware version, `cm` commit, `dy`
   dirty flag, `sd` SD readiness, `pkg` package-state presence, `bat` battery

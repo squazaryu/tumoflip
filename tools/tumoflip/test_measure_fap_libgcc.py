@@ -5,7 +5,10 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from .measure_fap_libgcc import build_report, parse_nm_output
+if __package__:
+    from .measure_fap_libgcc import build_report, parse_nm_output
+else:
+    from measure_fap_libgcc import build_report, parse_nm_output
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

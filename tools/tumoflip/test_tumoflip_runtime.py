@@ -28,6 +28,8 @@ class TumoflipRuntimeTest(unittest.TestCase):
                 "status",
                 "loader_diag",
                 "trace",
+                "crash_report",
+                "crash_ack",
                 "twin",
                 "transfer_begin",
                 "transfer_progress",
@@ -71,6 +73,9 @@ class TumoflipRuntimeTest(unittest.TestCase):
         )
         self.assertIn('strcmp(command, "trace") == 0', runtime)
         self.assertIn("tumoflip_runtime_make_trace_payload(runtime, payload, sizeof(payload))", runtime)
+        self.assertIn('strcmp(command, "crash_report") == 0', runtime)
+        self.assertIn('strcmp(command, "crash_ack") == 0', runtime)
+        self.assertIn("tumocrash show", bridge_docs)
         self.assertIn('strcmp(command, "twin") == 0', runtime)
         self.assertIn("tumoflip_runtime_make_twin_payload(runtime, payload, sizeof(payload))", runtime)
 

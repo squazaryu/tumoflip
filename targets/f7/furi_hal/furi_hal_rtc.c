@@ -11,6 +11,8 @@
 #include <stm32wbxx_ll_utils.h>
 
 #include <furi.h>
+#include <tumoflip_crash_journal/crash_journal.h>
+#include <toolbox/version.h>
 
 #define TAG "FuriHalRtc"
 
@@ -20,6 +22,8 @@
 
 #define FURI_HAL_RTC_HEADER_MAGIC   0x10F1
 #define FURI_HAL_RTC_HEADER_VERSION 0
+
+_Static_assert(FuriHalRtcRegisterMAX <= RTC_BKP_NUMBER, "RTC crash journal exceeds backup registers");
 
 typedef struct {
     uint16_t magic;
@@ -209,6 +213,12 @@ void furi_hal_rtc_init(void) {
     RTC_InitStruct.AsynchPrescaler = 127;
     RTC_InitStruct.SynchPrescaler = 255;
     LL_RTC_Init(RTC, &RTC_InitStruct);
+
+    if(LL_RCC_IsActiveFlag_IWDGRST() || LL_RCC_IsActiveFlag_WWDGRST()) {
+        tumoflip_crash_journal_record(TumoflipCrashKindWatchdog, version_get_githash(NULL));
+    }
+    tumoflip_crash_journal_clear_active_app();
+    LL_RCC_ClearResetFlags();
 
     furi_log_set_level(furi_hal_rtc_get_log_level());
     furi_hal_serial_control_set_logging_config(

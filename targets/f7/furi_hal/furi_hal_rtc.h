@@ -52,6 +52,19 @@ typedef enum {
     FuriHalRtcRegisterUpdateFolderFSIndex,
     FuriHalRtcRegisterPinValue, /**< Encoded value of the currently set PIN */
 
+    /* Tumoflip's bounded last-crash record. Existing register indices stay fixed. */
+    FuriHalRtcRegisterTumoflipCrashMarker,
+    FuriHalRtcRegisterTumoflipCrashMeta,
+    FuriHalRtcRegisterTumoflipCrashCommit,
+    FuriHalRtcRegisterTumoflipCrashApp0,
+    FuriHalRtcRegisterTumoflipCrashApp1,
+    FuriHalRtcRegisterTumoflipCrashApp2,
+    FuriHalRtcRegisterTumoflipCrashChecksum,
+    FuriHalRtcRegisterTumoflipActiveApp0,
+    FuriHalRtcRegisterTumoflipActiveApp1,
+    FuriHalRtcRegisterTumoflipActiveApp2,
+    FuriHalRtcRegisterTumoflipActiveCommit,
+
     FuriHalRtcRegisterMAX, /**< Service value, do not use */
 } FuriHalRtcRegister;
 

@@ -10,6 +10,8 @@
 #include <toolbox/path.h>
 #include <flipper_application/flipper_application.h>
 #include <loader/firmware_api/firmware_api.h>
+#include <tumoflip_crash_journal/crash_journal.h>
+#include <toolbox/version.h>
 
 #define TAG "Loader"
 
@@ -392,6 +394,7 @@ static void
 
     if(thread_state == FuriThreadStateStopped) {
         Loader* loader = context;
+        tumoflip_crash_journal_clear_active_app();
 
         LoaderMessage message;
         message.type = LoaderMessageTypeAppClosed;
@@ -488,6 +491,7 @@ static void loader_start_internal_app(
     loader->app.thread =
         furi_thread_alloc_ex(app->name, app->stack_size, app->app, loader->app.args);
     furi_thread_set_appid(loader->app.thread, app->appid);
+    tumoflip_crash_journal_set_active_app(app->appid, version_get_githash(NULL));
 
     loader_start_app_thread(loader, app->flags);
 }
@@ -692,6 +696,8 @@ static LoaderMessageLoaderStatusResult loader_start_external_app(
         FuriString* app_name = furi_string_alloc();
         path_extract_filename_no_ext(path, app_name);
         furi_thread_set_appid(loader->app.thread, furi_string_get_cstr(app_name));
+        tumoflip_crash_journal_set_active_app(
+            furi_string_get_cstr(app_name), version_get_githash(NULL));
         furi_string_free(app_name);
 
         /* This flag is set by the debugger - to break on app start */
