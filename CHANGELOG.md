@@ -1,3 +1,7 @@
+## Tumoflip Dev 009-015
+- Runtime: retain one redacted last-crash record across reboot and expose it through `tumocrash` and the FAB2 Runtime App Bridge. The record contains only a fault class, sanitized app-id prefix, sequence, and build prefix; clearing is explicit.
+- F7 public API remains 88.14. No FW Packages API rebuild is needed. Physical fault and watchdog acceptance is still pending; this is a Dev build for testing, not a stable promotion.
+
 ## Tumoflip Dev 009-014
 - Sub-GHz: restore TX validation for saved recordings in Standard Sub-GHz and ARF. Saved preset names are already normalized on load; TX validation now uses that short preset directly instead of converting it a second time and passing an empty modulation to the radio broker.
 - No frequency/protocol capability restrictions were relaxed and no F7 API change is required. Playback on hardware still needs acceptance.
