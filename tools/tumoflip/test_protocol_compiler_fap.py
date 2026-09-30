@@ -3,6 +3,7 @@
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -127,7 +128,7 @@ class ProtocolProfilesIntegrationTest(unittest.TestCase):
     def test_demo_artifacts_are_deterministic_and_validate(self) -> None:
         subprocess.run(
             [
-                str(REPO_ROOT / "toolchain/arm64-darwin/bin/python3"),
+                sys.executable,
                 "tools/tumoflip/generate_protocol_demo.py",
                 "--check",
             ],
@@ -136,7 +137,7 @@ class ProtocolProfilesIntegrationTest(unittest.TestCase):
         )
         result = subprocess.run(
             [
-                str(REPO_ROOT / "toolchain/arm64-darwin/bin/python3"),
+                sys.executable,
                 "tools/tumoflip/protocol_compiler.py",
                 "validate",
                 "--profile",
