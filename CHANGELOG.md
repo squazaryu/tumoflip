@@ -1,3 +1,7 @@
+## Tumoflip Dev 009-016
+- NFC/iButton/SD: bound nested NDEF records and DESFire access-right data, reject unknown iButton protocol IDs, and fail TAR extraction on read errors or partial writes.
+- RPC: reject caller-supplied reserved app-context arguments and validate callback contexts against live sessions. F7 API remains 88.14; existing LF RFID enum IDs and FW Packages compatibility are unchanged.
+
 ## Tumoflip Dev 009-015
 - Runtime: retain one redacted last-crash record across reboot and expose it through `tumocrash` and the FAB2 Runtime App Bridge. The record contains only a fault class, sanitized app-id prefix, sequence, and build prefix; clearing is explicit.
 - F7 public API remains 88.14. No FW Packages API rebuild is needed. Physical fault and watchdog acceptance is still pending; this is a Dev build for testing, not a stable promotion.
