@@ -75,6 +75,6 @@ const char* survey_verdict_advice(SurveyVerdict v) {
         return "Let it run longer";
     case SurveyVerdictClean:
     default:
-        return "No field detected";
+        return "Nothing above floor";
     }
 }

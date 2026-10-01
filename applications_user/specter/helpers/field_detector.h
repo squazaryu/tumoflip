@@ -43,6 +43,11 @@ typedef struct {
      * Site Survey concludes about a room. */
     uint8_t peak_ref;
 
+    /* Proximity and feedback always use the canonical scale. Raw duty is only
+     * a display preference and must not make a nearby reader look weak. */
+    uint8_t strength_ref;
+    bool saturated_ref;
+
     /* Where "this is a reader" begins, on the same 0..100 scale the meter is
      * drawn on, so the dial can mark it. Presence is `duty > threshold`, so
      * threshold+1 is the first duty that actually counts as one. */

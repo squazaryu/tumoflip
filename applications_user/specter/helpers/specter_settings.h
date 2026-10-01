@@ -21,6 +21,7 @@ typedef struct {
     bool stealth; // screen + LED dark: sweep without advertising that you are
     bool logging; // append findings to the SD logbook
     bool meter_raw; // show unscaled carrier duty instead of a full-scale meter
+    bool intro; // show the skippable startup animation
 } SpecterSettings;
 
 void specter_settings_set_defaults(SpecterSettings* s);
@@ -39,6 +40,7 @@ uint8_t specter_settings_full_scale(const SpecterSettings* s);
  * The same physical measurement reads 100% on Boost and 31% on Raw, so a
  * logged percentage without this is not a figure anyone can compare later. */
 const char* specter_settings_meter_tag(const SpecterSettings* s);
+const char* specter_settings_meter_label(uint8_t index);
 
 const char* specter_settings_sensitivity_label(uint8_t index);
 const char* specter_settings_survey_label(uint8_t index);

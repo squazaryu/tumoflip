@@ -40,6 +40,13 @@ def support():
 
 
 FIXTURES = {
+    "splash": r"""
+ SplashModel m={.anim=0};
+ splash_view_draw(&c,&m);save(&c,argv[1],"splash-listening");
+ m.anim=4;canvas_clear(&c);splash_view_draw(&c,&m);save(&c,argv[1],"splash-contact");
+ m.anim=11;canvas_clear(&c);splash_view_draw(&c,&m);save(&c,argv[1],"splash-nameplate");
+ m.anim=22;canvas_clear(&c);splash_view_draw(&c,&m);save(&c,argv[1],"splash-finished");
+""",
     "survey": r"""
  SurveyModel m={.total_ms=30000,.elapsed_ms=1000};
  survey_view_draw(&c,&m);save(&c,argv[1],"survey-running");
@@ -64,12 +71,16 @@ FIXTURES = {
  m.error=true;canvas_clear(&c);fingerprint_view_draw(&c,&m);save(&c,argv[1],"fingerprint-error");
 """,
     "sweep": r"""
- SweepModel m={.armed=true,.present=true,.strength=100,.peak=100,
+ SweepModel m={.armed=true,.present=true,.strength=100,.strength_ref=100,
+ .saturated_ref=true,.peak=100,
  .threshold_shown=30,.calibrating=true,.calib_progress=50,.anim=2};
  strcpy(m.sens,"Medium");
  sweep_view_draw(&c,&m);save(&c,argv[1],"sweep-calibration");
  m.calibrating=false;canvas_clear(&c);sweep_view_draw(&c,&m);save(&c,argv[1],"sweep-reader");
- m.present=false;m.strength=0;canvas_clear(&c);sweep_view_draw(&c,&m);save(&c,argv[1],"sweep-empty");
+ m.strength=30;m.strength_ref=100;m.saturated=false;m.saturated_ref=true;
+ canvas_clear(&c);sweep_view_draw(&c,&m);save(&c,argv[1],"sweep-duty-reader");
+ m.present=false;m.strength=0;m.strength_ref=0;m.saturated_ref=false;
+ canvas_clear(&c);sweep_view_draw(&c,&m);save(&c,argv[1],"sweep-empty");
  m.error=true;canvas_clear(&c);sweep_view_draw(&c,&m);save(&c,argv[1],"sweep-error");
 """,
     "watch": r"""

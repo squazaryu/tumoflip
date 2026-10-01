@@ -8,13 +8,25 @@
 
 #define SETTINGS_PATH    APP_DATA_PATH("specter.conf")
 #define SETTINGS_MAGIC   0x5Cu
-/* Bumped in 2.3 when the Meter setting was added. saved_struct validates size
- * as well as version, so an older file is simply ignored and the defaults come
- * back - a one-time reset of preferences rather than a garbled struct. */
-#define SETTINGS_VERSION 2u
+/* Keep the exact v2 layout so adding Intro does not erase existing preferences. */
+#define SETTINGS_VERSION    3u
+#define SETTINGS_VERSION_V2 2u
+
+typedef struct {
+    uint8_t sensitivity_index;
+    uint8_t custom_threshold;
+    uint8_t survey_index;
+    uint8_t sound;
+    uint8_t vibro;
+    uint8_t led;
+    uint8_t stealth;
+    uint8_t logging;
+    uint8_t meter_raw;
+} SpecterSettingsV2;
 
 static const char* const sens_labels[SPECTER_SENS_COUNT] = {"High", "Medium", "Low", "Custom"};
 static const uint8_t sens_thresh[SPECTER_SENS_COUNT] = {0, 8, 20, 0}; // Custom uses its own
+static const char* const meter_labels[2] = {"0-100", "Duty %"};
 
 static const char* const survey_labels[SPECTER_SURVEY_COUNT] = {"30s", "60s", "2min"};
 static const uint32_t survey_seconds[SPECTER_SURVEY_COUNT] = {30, 60, 120};
@@ -30,11 +42,16 @@ void specter_settings_set_defaults(SpecterSettings* s) {
     s->stealth = false;
     s->logging = true;
     s->meter_raw = false; // full-scale meter by default; see field_scale.h
+    s->intro = true;
+}
+
+const char* specter_settings_meter_label(uint8_t index) {
+    return meter_labels[index & 1u];
 }
 
 const char* specter_settings_meter_tag(const SpecterSettings* s) {
     furi_assert(s);
-    return s->meter_raw ? "raw" : "boost";
+    return specter_settings_meter_label(s->meter_raw ? 1u : 0u);
 }
 
 uint8_t specter_settings_full_scale(const SpecterSettings* s) {
@@ -60,6 +77,7 @@ static void specter_settings_sanitise(SpecterSettings* s) {
     s->stealth = !!s->stealth;
     s->logging = !!s->logging;
     s->meter_raw = !!s->meter_raw;
+    s->intro = !!s->intro;
 }
 
 void specter_settings_load(SpecterSettings* s) {
@@ -71,6 +89,21 @@ void specter_settings_load(SpecterSettings* s) {
            SETTINGS_PATH, &loaded, sizeof(loaded), SETTINGS_MAGIC, SETTINGS_VERSION)) {
         specter_settings_sanitise(&loaded);
         *s = loaded;
+        return;
+    }
+
+    SpecterSettingsV2 old = {0};
+    if(saved_struct_load(SETTINGS_PATH, &old, sizeof(old), SETTINGS_MAGIC, SETTINGS_VERSION_V2)) {
+        s->sensitivity_index = old.sensitivity_index;
+        s->custom_threshold = old.custom_threshold;
+        s->survey_index = old.survey_index;
+        s->sound = old.sound != 0;
+        s->vibro = old.vibro != 0;
+        s->led = old.led != 0;
+        s->stealth = old.stealth != 0;
+        s->logging = old.logging != 0;
+        s->meter_raw = old.meter_raw != 0;
+        specter_settings_sanitise(s);
     }
 }
 
