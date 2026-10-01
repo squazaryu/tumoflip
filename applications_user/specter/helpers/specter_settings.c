@@ -5,6 +5,7 @@
 #include <furi.h>
 #include <saved_struct.h>
 #include <storage/storage.h>
+#include <string.h>
 
 #define SETTINGS_PATH    APP_DATA_PATH("specter.conf")
 #define SETTINGS_MAGIC   0x5Cu
@@ -66,18 +67,18 @@ static void specter_settings_sanitise(SpecterSettings* s) {
     if(s->survey_index >= SPECTER_SURVEY_COUNT) s->survey_index = 1;
     if(s->custom_threshold > 90) s->custom_threshold = 90;
 
-    /* saved_struct checks a magic, a version and a size - it does not and
-     * cannot check that the bytes make sense. A _Bool holding anything other
-     * than 0 or 1 is undefined behaviour the moment it is read, so a hand-edited
-     * or corrupted file could put the app somewhere the language has no answer
-     * for. Force them back to a real boolean. */
-    s->sound = !!s->sound;
-    s->vibro = !!s->vibro;
-    s->led = !!s->led;
-    s->stealth = !!s->stealth;
-    s->logging = !!s->logging;
-    s->meter_raw = !!s->meter_raw;
-    s->intro = !!s->intro;
+    /* saved_struct verifies magic/version/size, not each Boolean byte. Reading
+     * a _Bool with an invalid representation is undefined behaviour: inspect
+     * its object bytes before assigning a normalized value. */
+    bool* const flags[] = {
+        &s->sound, &s->vibro, &s->led, &s->stealth, &s->logging, &s->meter_raw, &s->intro};
+    for(size_t i = 0; i < sizeof(flags) / sizeof(flags[0]); ++i) {
+        unsigned char raw[sizeof(bool)];
+        memcpy(raw, flags[i], sizeof(raw));
+        bool enabled = false;
+        for(size_t j = 0; j < sizeof(raw); ++j) enabled |= raw[j] != 0;
+        *flags[i] = enabled;
+    }
 }
 
 void specter_settings_load(SpecterSettings* s) {
