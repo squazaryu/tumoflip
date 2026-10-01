@@ -3,6 +3,7 @@
 Host fixtures exercise view states; they do not simulate the NFC detector.
 """
 import argparse
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -93,6 +94,74 @@ FIXTURES = {
 }
 
 
+def render_settings(output: Path) -> None:
+    """Render the standard firmware VariableItemList with Specter's current rows."""
+    production = gui.build_source(None, skip_text_input=True)
+    production = production[:production.index("int main(int argc,char** argv)")]
+    driver = r'''
+static void specter_settings_frame(
+    Canvas* canvas, const char* directory, const char* name,
+    const char** labels, const char** values, int selected, int window) {
+    VariableItemListModel model={0};
+    VariableItemArray_init(model.items);
+    model.position=selected;
+    model.window_position=window;
+    for(int i=0;i<10;i++) {
+        VariableItem item={
+            .label=labels[i],
+            .current_value_text=furi_string_alloc_set(values[i]),
+            .values_count=i==9?1:2,
+        };
+        VariableItemArray_push_back(model.items,item);
+    }
+    canvas_clear(canvas);
+    variable_item_list_draw_callback(canvas,&model);
+    save(canvas,directory,name);
+    for(int i=0;i<10;i++) {
+        furi_string_free(VariableItemArray_get(model.items,i)->current_value_text);
+    }
+    VariableItemArray_clear(model.items);
+}
+int main(int argc,char** argv) {
+    assert(argc==2);
+    Canvas canvas={0};static uint8_t buffer[1024];
+    static const u8x8_display_info_t info={
+        .tile_width=16,.tile_height=8,.pixel_width=128,.pixel_height=64};
+    canvas.fb.u8x8.display_info=&info;
+    u8g2_SetupBuffer(&canvas.fb,buffer,8,u8g2_ll_hvline_vertical_top_lsb,U8G2_R0);
+    canvas_set_font(&canvas,FontSecondary);
+    canvas_set_color(&canvas,ColorBlack);
+    const char* labels[]={"Sensitivity","Survey time","Sound","Vibrate","LED",
+        "Stealth","Save findings","Meter scale","Intro","Clear logbook..."};
+    const char* values[]={"Medium","60s","ON","ON","ON","OFF","ON","Duty %",
+        "ON","0B"};
+    specter_settings_frame(&canvas,argv[1],"settings-top",labels,values,0,0);
+    specter_settings_frame(&canvas,argv[1],"settings-meter",labels,values,7,5);
+    specter_settings_frame(&canvas,argv[1],"settings-bottom",labels,values,9,6);
+    return 0;
+}
+'''
+    with tempfile.TemporaryDirectory(prefix="specter-settings-native-") as directory:
+        temporary = Path(directory)
+        source = temporary / "settings.c"
+        source.write_text(production + "\n" + driver, encoding="utf-8")
+        library = [p for p in (ROOT / "lib/u8g2").glob("*.c") if p.name != "u8g2_glue.c"]
+        gc = "-Wl,-dead_strip" if sys.platform == "darwin" else "-Wl,--gc-sections"
+        executable = temporary / "settings"
+        subprocess.run(
+            ["cc", "-std=c11", "-D_DEFAULT_SOURCE", "-O1", "-g", "-w",
+             "-fsanitize=address,undefined", "-ffunction-sections", gc,
+             "-I", str(ROOT / "lib/u8g2"), "-I", str(ROOT / "lib/mlib"),
+             str(source), *map(str, library), "-lm", "-o", str(executable)],
+            check=True,
+        )
+        subprocess.run(
+            [str(executable), str(output.resolve())],
+            check=True,
+            env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"},
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
@@ -124,6 +193,7 @@ int main(int argc,char** argv) {
                             "-I", str(ROOT / "lib/u8g2"), "-I", str(ROOT / "lib/mlib"),
                             str(source), *map(str, library + helpers), "-lm", "-o", str(tmp / "render")], check=True)
             subprocess.run([str(tmp / "render"), str(args.output.resolve())], check=True)
+    render_settings(args.output)
     frames = sorted(args.output.glob("*.pgm"))
     sheet = Image.new("RGB", (4 * 404, ((len(frames) + 3) // 4) * 224), "#eeeeee")
     draw = ImageDraw.Draw(sheet)
