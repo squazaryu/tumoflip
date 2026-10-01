@@ -77,12 +77,20 @@ typedef struct {
 } SpecterSettingsV2;
 ''' + r'''
 static SpecterSettingsV2 saved_old;
+static unsigned char saved_current[sizeof(SpecterSettings)];
+static uint8_t saved_version=SETTINGS_VERSION_V2;
 static bool saved_struct_load(const char* path, void* out, size_t bytes,
                               uint8_t magic, uint8_t version) {
     (void)path;
     assert(magic == SETTINGS_MAGIC);
-    if(version != SETTINGS_VERSION_V2 || bytes != sizeof(saved_old)) return false;
-    memcpy(out, &saved_old, bytes);
+    if(version != saved_version) return false;
+    if(version == SETTINGS_VERSION_V2) {
+        if(bytes != sizeof(saved_old)) return false;
+        memcpy(out, &saved_old, bytes);
+    } else {
+        if(bytes != sizeof(saved_current)) return false;
+        memcpy(out, saved_current, bytes);
+    }
     return true;
 }
 ''' + function(settings, "void specter_settings_set_defaults(") + "\n" + function(
@@ -106,6 +114,14 @@ int main(void) {
     assert(current.sound && !current.vibro && current.led);
     assert(current.stealth && !current.logging && current.meter_raw);
     assert(current.intro);
+
+    saved_version=SETTINGS_VERSION;
+    memset(saved_current,0,sizeof(saved_current));
+    saved_current[offsetof(SpecterSettings,sound)]=0xFF;
+    saved_current[offsetof(SpecterSettings,intro)]=0xFE;
+    SpecterSettings corrupted={0};
+    specter_settings_load(&corrupted);
+    assert(corrupted.sound && corrupted.intro);
     return 0;
 }
 '''
@@ -115,7 +131,8 @@ int main(void) {
             source.write_text(program, encoding="utf-8")
             compile_result = subprocess.run(
                 [compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
-                 "-fsanitize=undefined", "-I", str(ROOT),
+                 "-fsanitize=undefined", "-fno-sanitize-recover=undefined",
+                 "-I", str(ROOT),
                  str(source), "-o", str(executable)],
                 capture_output=True,
                 text=True,
