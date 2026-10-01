@@ -150,6 +150,17 @@ int main(void) {
         self.assertTrue('fap_version="3.3.0"' in manifest, "package version not advanced")
         self.assertIn("079474ba10c54fc7f9e23d4f896a2982dda0a64e", provenance)
 
+    def test_settings_preview_uses_the_firmware_variable_item_drawer(self) -> None:
+        renderer = (ROOT / "tools/tumoflip/render_specter_native.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertTrue("gui.build_source" in renderer, "missing production GUI fixture")
+        self.assertTrue(
+            "variable_item_list_draw_callback" in renderer,
+            "Settings must use the firmware drawer",
+        )
+        self.assertTrue('"settings-bottom"' in renderer, "Settings tail not rendered")
+
 
 if __name__ == "__main__":
     unittest.main()
