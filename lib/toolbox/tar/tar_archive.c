@@ -316,7 +316,11 @@ static bool archive_extract_current_file(TarArchive* archive, const char* dst_pa
 
         while(!mtar_eof_data(tar)) {
             int32_t readcnt = mtar_read_data(tar, readbuf, FILE_BLOCK_SIZE);
-            if(!readcnt || !storage_file_write(out_file, readbuf, readcnt)) {
+            if(readcnt <= 0 || (size_t)readcnt > FILE_BLOCK_SIZE) {
+                success = false;
+                break;
+            }
+            if(storage_file_write(out_file, readbuf, (size_t)readcnt) != (size_t)readcnt) {
                 success = false;
                 break;
             }
