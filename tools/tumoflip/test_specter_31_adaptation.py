@@ -68,12 +68,12 @@ typedef struct {
     uint8_t sensitivity_index;
     uint8_t custom_threshold;
     uint8_t survey_index;
-    bool sound;
-    bool vibro;
-    bool led;
-    bool stealth;
-    bool logging;
-    bool meter_raw;
+    uint8_t sound;
+    uint8_t vibro;
+    uint8_t led;
+    uint8_t stealth;
+    uint8_t logging;
+    uint8_t meter_raw;
 } SpecterSettingsV2;
 ''' + r'''
 static SpecterSettingsV2 saved_old;
@@ -92,7 +92,7 @@ int main(void) {
     saved_old.sensitivity_index = 3;
     saved_old.custom_threshold = 17;
     saved_old.survey_index = 2;
-    saved_old.sound = false;
+    saved_old.sound = 0xFF;
     saved_old.vibro = false;
     saved_old.led = true;
     saved_old.stealth = true;
@@ -103,7 +103,7 @@ int main(void) {
     assert(current.sensitivity_index == 3);
     assert(current.custom_threshold == 17);
     assert(current.survey_index == 2);
-    assert(!current.sound && !current.vibro && current.led);
+    assert(current.sound && !current.vibro && current.led);
     assert(current.stealth && !current.logging && current.meter_raw);
     assert(current.intro);
     return 0;
@@ -114,7 +114,8 @@ int main(void) {
             executable = Path(directory) / "settings_migration"
             source.write_text(program, encoding="utf-8")
             compile_result = subprocess.run(
-                [compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-I", str(ROOT),
+                [compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
+                 "-fsanitize=undefined", "-I", str(ROOT),
                  str(source), "-o", str(executable)],
                 capture_output=True,
                 text=True,
