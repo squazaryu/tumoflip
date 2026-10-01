@@ -78,8 +78,10 @@ int main(void) {
     if(!rpc_app_args_forbid_context("RPC 1234ABCD")) return 3;
     if(!rpc_app_args_forbid_context("RPC\t1234ABCD")) return 4;
     if(!rpc_app_args_forbid_context("RPC\n1234ABCD")) return 5;
-    if(rpc_app_args_forbid_context("RPCX")) return 6;
-    if(rpc_app_args_forbid_context("ordinary RPC 1234")) return 7;
+    if(!rpc_app_args_forbid_context("RPC1234ABCD")) return 6;
+    if(!rpc_app_args_forbid_context("RPC+1234")) return 7;
+    if(!rpc_app_args_forbid_context("RPCX")) return 8;
+    if(rpc_app_args_forbid_context("ordinary RPC 1234")) return 9;
     return 0;
 }
 '''
