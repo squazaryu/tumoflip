@@ -86,15 +86,19 @@ class UpstreamInputHardeningTests(unittest.TestCase):
             "short writes must not report a successful extraction",
         )
 
-    def test_indala224_does_not_renumber_existing_protocols(self) -> None:
+    def test_public_lfrfid_ids_do_not_change_silently_at_api_88_14(self) -> None:
+        api = source("targets/f7/api_symbols.csv")
+        self.assertEqual(api.splitlines()[1], "Version,+,88.14,,")
         text = source("lib/lfrfid/protocols/lfrfid_protocols.h")
         match = re.search(r"typedef enum \{(.*?)\} LFRFIDProtocol;", text, re.DOTALL)
         self.assertIsNotNone(match)
         protocol_ids = re.findall(r"\bLFRFIDProtocol\w+\b", match.group(1))
 
-        self.assertEqual(protocol_ids.index("LFRFIDProtocolIOProxXSF"), 7)
-        self.assertEqual(protocol_ids.index("LFRFIDProtocolNoralsy"), 23)
-        self.assertEqual(protocol_ids.index("LFRFIDProtocolIndala224"), 24)
+        # Dev 009-015 already exported these values. Moving Indala224 to the
+        # end requires a coordinated API bump and FW Packages rebuild.
+        self.assertEqual(protocol_ids.index("LFRFIDProtocolIndala224"), 7)
+        self.assertEqual(protocol_ids.index("LFRFIDProtocolIOProxXSF"), 8)
+        self.assertEqual(protocol_ids.index("LFRFIDProtocolNoralsy"), 24)
 
 
 if __name__ == "__main__":
