@@ -55,6 +55,15 @@ class UpstreamInputHardeningTests(unittest.TestCase):
         self.assertLess(guard, body.index("ibutton_key_set_protocol_id(key, id)"))
         self.assertLess(guard, body.index("GET_PROTOCOL_GROUP(id)"))
 
+    def test_ibutton_group_lookup_rejects_negative_ids(self) -> None:
+        text = source("lib/ibutton/ibutton_protocols.c")
+        body = function_body(text, "static void ibutton_protocols_get_group_by_id(")
+        self.assertTrue(
+            "furi_check(local_id >= 0);" in body,
+            "negative protocol IDs must not index a group",
+        )
+        self.assertLess(body.index("furi_check(local_id >= 0);"), body.index("for("))
+
     def test_desfire_access_rights_fit_the_destination_before_reading(self) -> None:
         text = source("lib/nfc/protocols/mf_desfire/mf_desfire_i.c")
         body = function_body(text, "bool mf_desfire_file_settings_load(")
@@ -72,6 +81,10 @@ class UpstreamInputHardeningTests(unittest.TestCase):
 
         self.assertTrue("readcnt <= 0" in body, "negative TAR reads must fail")
         self.assertLess(body.index("readcnt <= 0"), body.index("storage_file_write(out_file"))
+        self.assertTrue(
+            "storage_file_write(out_file, readbuf, (size_t)readcnt) != (size_t)readcnt" in body,
+            "short writes must not report a successful extraction",
+        )
 
     def test_indala224_does_not_renumber_existing_protocols(self) -> None:
         text = source("lib/lfrfid/protocols/lfrfid_protocols.h")
