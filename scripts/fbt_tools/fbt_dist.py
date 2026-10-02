@@ -115,10 +115,12 @@ def DistCommand(env, name, source, **kw):
     )
     env.Pseudo(target)
     env.Alias(name, command)
+    env.Append(DIST_COMMANDS=[(name, target, command)])
     return command
 
 
 def generate(env):
+    env.SetDefault(DIST_COMMANDS=[])
     if not env["VERBOSE"]:
         env.SetDefault(
             COPROCOMSTR="\tCOPRO\t${TARGET}",

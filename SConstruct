@@ -193,6 +193,16 @@ Depends(
     fap_dist,
     list(app_artifact.validator for app_artifact in external_app_list),
 )
+# Distribution clears this flavor's output directory. Copy apps only after the
+# selected dist commands; unselected commands must not become build dependencies.
+Requires(
+    fap_dist,
+    [
+        command
+        for name, target, command in distenv["DIST_COMMANDS"]
+        if name in BUILD_TARGETS or target in BUILD_TARGETS
+    ],
+)
 Alias("fap_dist", fap_dist)
 
 # Copy all faps to device
