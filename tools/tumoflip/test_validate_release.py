@@ -107,14 +107,14 @@ def make_dfuse(elements: list[tuple[int, bytes]]) -> bytes:
 
 class ValidateReleaseTest(unittest.TestCase):
     def test_protocol_pack_inventory_covers_active_arf_registry(self) -> None:
-        self.assertEqual(len(PROTOCOL_PACKS), 31)
+        self.assertEqual(len(PROTOCOL_PACKS), 32)
+        self.assertIn("protocol_renault_v1.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_ford_v3.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_gm_rolling.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_kia_v7.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_star_line.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_superrollo.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_toyota_lexus.fal", PROTOCOL_PACKS)
-        self.assertNotIn("protocol_renault_v1.fal", PROTOCOL_PACKS)
 
     def test_visible_arf_tools_inventory(self) -> None:
         self.assertEqual(
