@@ -1,3 +1,8 @@
+## Tumoflip Dev 009-017
+- Fiat V2: report all capture-format write failures and preserve the previously loaded frame when a saved capture is invalid. ProtoPirate FAP version advances to 3.2.1.
+- Sub-GHz: add receive-only Renault V1 to the Europe Protocol Pack with bounded Manchester decoding, header/length/XOR validation, duplicate filtering, complete saved payloads and legacy Key_2 compatibility. ARF Status 0.4.1 tracks the new protocol plugin.
+- F7 API remains 88.14; FW Packages Dev 023 remains compatible. No encoder, key-recovery feature, saved-file migration or recording cleanup is added. Physical reception and save/open acceptance remain pending.
+
 ## Tumoflip Dev 009-016
 - NFC/iButton/SD: bound nested NDEF records and DESFire access-right data, reject unknown iButton protocol IDs, and fail TAR extraction on read errors or partial writes.
 - RPC: reject caller-supplied reserved app-context arguments and validate callback contexts against live sessions. F7 API remains 88.14; existing LF RFID enum IDs and FW Packages compatibility are unchanged.
