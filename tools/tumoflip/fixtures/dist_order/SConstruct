@@ -1,0 +1,68 @@
+"""Exercise production dist declarations with real SCons and tiny fake artifacts."""
+
+import ast
+import importlib.util
+import os
+from pathlib import Path
+import sys
+import time
+from types import SimpleNamespace
+
+from SCons.Script import (Alias, COMMAND_LINE_TARGETS, Depends, Environment, Requires)
+
+
+root = Path(os.environ["TUMOFLIP_DIST_TEST_ROOT"])
+fixture = root / "tools/tumoflip/fixtures/dist_order"
+spec = importlib.util.spec_from_file_location("fbt_dist", root / "scripts/fbt_tools/fbt_dist.py")
+tool = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(tool)
+env = Environment(
+    tools=[], VERBOSE=True, TARGET_HW=7, DEBUG=False, COMPACT=True,
+    PYTHON3=sys.executable, DIST_SCRIPT=str(fixture / "fake_dist.py"),
+    DIST_PROJECTS="f7-firmware-C", DIST_SUFFIX="test", ENV=os.environ.copy(),
+)
+tool.generate(env)
+
+
+def firmware(target, source, env):
+    time.sleep(0.3)  # Make the pre-fix late wipe deterministic under -j2.
+    Path(str(target[0])).write_bytes(b"firmware fixture")
+    return 0
+
+
+def validate(target, source, env):
+    if os.environ.get("TUMOFLIP_DIST_TEST_FAIL_VALIDATOR") == "1":
+        print("FIXTURE VALIDATOR FAILED")
+        return 1
+    Path(str(target[0])).write_bytes(b"validated")
+    return 0
+
+
+fw = env.Command("build/firmware.bin", [], firmware)
+commands = [
+    env.DistCommand(name, fw, DIST_EXTRA=f"--kind {name}")
+    for name in ("fw_dist", "updater_package", "updater_minpackage")
+]
+env.Default(commands[0])
+
+app = env.Command("build/app.fap", [], lambda target, source, env: Path(str(target[0])).write_bytes(b"FAP fixture") and 0)
+debug = env.Command("build/app.elf", [], lambda target, source, env: Path(str(target[0])).write_bytes(b"ELF fixture") and 0)
+check = env.Command("build/app.checked", app, validate)
+artifacts = [] if os.environ.get("TUMOFLIP_DIST_TEST_EMPTY") == "1" else [
+    SimpleNamespace(debug=debug, compact=app, validator=check, dist_entries=[("", "apps/Tools/app.fap")])
+]
+
+source = (root / "SConstruct").read_text()
+nodes = ast.parse(source).body
+start = next(i for i, node in enumerate(nodes) if isinstance(node, ast.Assign)
+             and any(isinstance(target, ast.Name) and target.id == "fap_dist" for target in node.targets))
+end = next(i for i in range(start, len(nodes)) if isinstance(nodes[i], ast.Expr)
+           and isinstance(nodes[i].value, ast.Call) and isinstance(nodes[i].value.func, ast.Name)
+           and nodes[i].value.func.id == "Alias" and isinstance(nodes[i].value.args[0], ast.Constant)
+           and nodes[i].value.args[0].value == "fap_dist")
+program = ast.Module(body=nodes[start:end + 1], type_ignores=[])
+exec(compile(program, str(root / "SConstruct"), "exec"), {
+    "distenv": env, "dist_dir": env.Dir("dist/f7-C"), "external_app_list": artifacts,
+    "Depends": Depends, "Requires": Requires, "Alias": Alias,
+    "BUILD_TARGETS": COMMAND_LINE_TARGETS,
+})
