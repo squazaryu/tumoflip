@@ -16,17 +16,19 @@ TARGET = "apps_data/arf_subghz_full/packages/protopirate_to_subghz.fap"
 
 
 class ArfConverterPackagesTests(unittest.TestCase):
-    def test_unrequested_additions_are_not_shipped(self):
+    def test_recovery_actions_are_not_shipped(self):
         self.assertFalse((ROOT / "applications/system/renault_seed_bf/application.fam").exists())
-        for filename in ("renault_v1.c", "renault_v1.h", "renault_v1_plugin.c",
-                         "fiat_v1.c", "fiat_v1.h", "hitag2_seed.c", "hitag2_seed.h"):
+        for filename in ("fiat_v1.c", "fiat_v1.h", "hitag2_seed.c", "hitag2_seed.h"):
             self.assertFalse((ROOT / "applications_user/subghz_protocols" / filename).exists())
-        self.assertNotIn("protocol_renault_v1.fal", PROTOCOL_PACKS)
+        self.assertIn("protocol_renault_v1.fal", PROTOCOL_PACKS)
+        receive = (ROOT / "lib/subghz/protocols/renault_v1.c").read_text()
+        self.assertIn(".encoder = NULL", receive)
+        self.assertNotIn("SubGhzProtocolFlag_Send", receive)
+        self.assertNotIn("hitag2_brute_force", receive)
         self.assertNotIn("renault_seed_bf.fap", package_extapp_exports())
         for workflow in ("pr-build.yml", "release.yml"):
             source = (ROOT / ".github/workflows" / workflow).read_text()
             self.assertNotIn("fap_renault_seed_bf", source)
-            self.assertNotIn("fap_protocol_renault_v1", source)
 
     def test_arf_renault_v1_modulation_does_not_leak_to_different_local_protocol(self):
         renault_v0 = (ROOT / "lib/subghz/protocols/renault.c").read_text()

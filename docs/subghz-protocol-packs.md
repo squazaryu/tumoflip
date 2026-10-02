@@ -46,14 +46,14 @@ registries and do not automatically inherit these packs.
 
 ## Runtime groups
 
-Flipper RAM cannot safely map all 30 packs and allocate every decoder at the
+Flipper RAM cannot safely map all 32 packs and allocate every decoder at the
 same time. The Receiver configuration therefore exposes one active group:
 
 - `Core`: no external packs;
 - `Legacy`: VAG, Kia v0-v2, and Mitsubishi v0;
 - `Kia`: all Kia packs;
 - `Ford`: Ford v0-v3;
-- `Europe`: Fiat Marelli, Land Rover, Porsche, PSA, and VAG;
+- `Europe`: Fiat Marelli, Renault V1 (receive-only), Land Rover, Porsche, PSA, and VAG;
 - `Asia/US`: Chrysler, Mazda, Mitsubishi, and Subaru;
 - `Alarm`: Scher-Khan, Sheriff CFM, and StarLine;
 - `Shuka Auto`: decode-only GM Rolling, Honda/Acura, Hyundai New, Nissan,

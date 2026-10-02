@@ -93,7 +93,7 @@ class ArfSubGhzFullTest(unittest.TestCase):
             REPO_ROOT / "applications_user/protopirate/protocols/kia_v1.c"
         ).read_text(encoding="utf-8")
 
-        self.assertIn('fap_version="3.2"', manifest)
+        self.assertIn('fap_version="3.2.1"', manifest)
         self.assertIn('_ENABLE_EMULATE = ProtoPirateDefineEnabled', manifest)
         self.assertIn('if not _ENABLE_EMULATE:', manifest)
         self.assertIn('if _ENABLE_EMULATE:', manifest)

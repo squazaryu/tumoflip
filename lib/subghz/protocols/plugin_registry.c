@@ -43,6 +43,7 @@ static const SubGhzProtocolPackEntry subghz_protocol_pack_entries[] = {
     {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupAsiaUs),
      "protocol_mitsubishi_v0.fal"},
     {PACK_GROUP(SubGhzProtocolPackGroupEurope), "protocol_fiat_marelli.fal"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "protocol_renault_v1.fal"},
     {PACK_GROUP(SubGhzProtocolPackGroupEurope), "protocol_land_rover_v0.fal"},
     {PACK_GROUP(SubGhzProtocolPackGroupEurope), "protocol_porsche_cayenne.fal"},
     {PACK_GROUP(SubGhzProtocolPackGroupEurope), "protocol_psa.fal"},

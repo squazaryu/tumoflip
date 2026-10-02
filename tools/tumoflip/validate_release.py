@@ -61,6 +61,7 @@ PROTOCOL_PACKS = {
     "protocol_porsche_cayenne.fal",
     "protocol_psa.fal",
     "protocol_renault.fal",
+    "protocol_renault_v1.fal",
     "protocol_scher_khan.fal",
     "protocol_sheriff_cfm.fal",
     "protocol_star_line.fal",
