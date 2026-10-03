@@ -45,12 +45,14 @@ int main(void) {
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 typedef int FuriHalSpiBusHandle;
 enum {SubGhzStateIdle,SubGhzDeviceCC1101ExtStateIdle=0,CC1101StateIDLE};
 static const FuriHalSpiBusHandle furi_hal_spi_bus_handle_subghz=0;
 static struct {int state;} furi_hal_subghz={0};
-static struct {int state;const FuriHalSpiBusHandle*spi_bus_handle;} external_device={0,&furi_hal_spi_bus_handle_subghz};
-#define subghz_device_cc1101_ext (&external_device)
+typedef struct {int state;const FuriHalSpiBusHandle*spi_bus_handle;} ExternalDevice;
+static ExternalDevice external_device={0,&furi_hal_spi_bus_handle_subghz};
+static ExternalDevice* subghz_device_cc1101_ext=&external_device;
 static bool allowed,calibrated;
 static uint8_t current_channel;
 static unsigned acquired,released;
@@ -78,6 +80,12 @@ int main(void) {
   calibrated=true;
   assert(setters[i](13)&&current_channel==13&&acquired==3&&released==3);
  }
+ acquired=released=0;
+ subghz_device_cc1101_ext=NULL;
+ assert(!subghz_device_cc1101_ext_set_channel(13)&&acquired==0&&released==0);
+ subghz_device_cc1101_ext=&external_device;
+ external_device.state=1;
+ assert(!subghz_device_cc1101_ext_set_channel(13)&&acquired==0&&released==0);
  return 0;
 }
 ''')
