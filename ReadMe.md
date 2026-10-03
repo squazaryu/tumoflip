@@ -66,7 +66,7 @@ control. This table is a practical orientation, not a benchmark.
 | 🧭 | **Desktop** | Custom Wii, Wii Vertical, DSi, and Vertical layouts; Module One and ARF Tools folders; favorites for apps, scripts, and folders. |
 | 📱 | **Companion** | BLE App Bridge, RTC sync, package and firmware transfer activity, device verification, and iOS-first workflows. |
 | 🧩 | **Packages** | Separate Base, ARF, Module One, and Protocol Packs catalogs with content-addressed manifests and independent releases. Nearby Files is delivered as a Base package. |
-| 🛠️ | **Developer** | Dev API 88.14, JS Runner as an FAP, SDK archives, release validation, acceptance telemetry, and reproducible build metadata. |
+| 🛠️ | **Developer** | Dev source API 88.15, JS Runner as an FAP, SDK archives, release validation, acceptance telemetry, and reproducible build metadata. |
 
 ## Architecture at a glance
 
@@ -193,11 +193,14 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-009-017` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-009-018` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
+
+Dev source `t-dev-009-018` is an unpublished candidate. The latest published Dev
+at this preparation stage remains `t-dev-009-017`; new UI/hardware acceptance is separate.
 
 ## Install
 
@@ -218,7 +221,7 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-009-017.tgz
+flipper-z-f7-update-t-dev-009-018.tgz
 ```
 
 ## Compatibility notes

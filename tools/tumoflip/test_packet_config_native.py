@@ -7,6 +7,35 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class PacketConfigNativeTests(unittest.TestCase):
+    def test_worker_copies_custom_preset_and_refuses_live_reconfiguration(self):
+        source = (ROOT / "lib/subghz/subghz_tx_rx_worker.c").read_text()
+        code = function(source, "bool subghz_tx_rx_worker_set_packet_preset(")
+        code += function(source, "bool subghz_tx_rx_worker_set_packet_channel(")
+        run_c('#include <assert.h>\n#include <string.h>\n'
+              + f'#include "{ROOT}/lib/subghz/packet_config.c"\n' + r'''
+typedef enum {FuriHalSubGhzPresetGFSK9_99KbAsync=7,FuriHalSubGhzPresetCustom=8} FuriHalSubGhzPreset;
+typedef struct {bool thread_started;FuriHalSubGhzPreset preset;uint8_t preset_data[256];
+ size_t preset_size;uint8_t channel;} SubGhzTxRxWorker;
+''' + code + r'''
+int main(void) {
+ SubGhzTxRxWorker w={0};uint8_t bytes[]={2,6,8,5,0,0,0x12,0,0,0,0,0,0,0};
+ assert(subghz_tx_rx_worker_set_packet_preset(&w,FuriHalSubGhzPresetCustom,bytes,sizeof(bytes)));
+ bytes[1]=99;assert(w.preset_data[1]==6&&w.preset_size==sizeof(bytes));
+ assert(!subghz_tx_rx_worker_set_packet_preset(&w,FuriHalSubGhzPresetCustom,bytes,1));
+ assert(w.preset_data[1]==6);
+ assert(subghz_tx_rx_worker_set_packet_channel(&w,255)&&w.channel==255);
+ w.thread_started=true;
+ assert(!subghz_tx_rx_worker_set_packet_channel(&w,1)&&w.channel==255);
+ assert(!subghz_tx_rx_worker_set_packet_preset(&w,FuriHalSubGhzPresetGFSK9_99KbAsync,NULL,0));
+ w.thread_started=false;
+ assert(subghz_tx_rx_worker_set_packet_preset(&w,FuriHalSubGhzPresetGFSK9_99KbAsync,NULL,0));
+ assert(!w.preset_size);
+ assert(!subghz_tx_rx_worker_set_packet_preset(&w,0,NULL,0));
+ assert(!subghz_tx_rx_worker_set_packet_channel(NULL,1));
+ return 0;
+}
+''')
+
     def test_real_channel_adapters_validate_and_rollback_without_crashing(self):
         internal = (ROOT / "targets/f7/furi_hal/furi_hal_subghz.c").read_text()
         external = (ROOT / "applications/drivers/subghz/cc1101_ext/cc1101_ext.c").read_text()

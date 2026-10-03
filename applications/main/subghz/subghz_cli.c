@@ -1116,10 +1116,16 @@ static void subghz_cli_command_chat(
                 printf("\r\n");
                 furi_string_push_back(input, '\r');
                 furi_string_push_back(input, '\n');
+                uint32_t write_deadline = furi_get_tick() + furi_ms_to_ticks(2000);
                 while(!subghz_chat_worker_write(
                     subghz_chat,
                     (uint8_t*)furi_string_get_cstr(input),
                     strlen(furi_string_get_cstr(input)))) {
+                    if((int32_t)(furi_get_tick() - write_deadline) >= 0) {
+                        printf("Radio write stopped or timed out\r\n");
+                        exit = true;
+                        break;
+                    }
                     furi_delay_ms(10);
                 }
 
