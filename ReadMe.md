@@ -199,8 +199,9 @@ Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
 
-Dev source `t-dev-009-018` is an unpublished candidate. The latest published Dev
-at this preparation stage remains `t-dev-009-017`; new UI/hardware acceptance is separate.
+For Dev `t-dev-009-018` / API 88.15, install the paired **FW Packages Dev 024**
+after the firmware update. Publication and hardware acceptance are separate;
+use the release page for availability and the hardware checklist for testing.
 
 ## Install
 

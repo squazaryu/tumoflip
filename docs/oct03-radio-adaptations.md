@@ -1,6 +1,6 @@
-# October 3 candidate — passive analysis and packet infrastructure
+# Dev 009-018 — passive analysis and packet infrastructure
 
-Source candidate 009-018; not a published release or hardware acceptance.
+Source version 009-018. Build/publication records and hardware acceptance are separate.
 
 - Casi-Rusco: selectively adapt Unleashed #1163 head 5163d948. Exhaustive tests
   compare raw fields with the independent reader rule, not only local round trips.
@@ -24,7 +24,7 @@ Local F7 API is 88.15, not upstream API parity. Checked/copying interfaces use
 different names from incompatible upstream void/borrowed-pointer signatures.
 Radio-device plugin ABI **1003** is deliberately distinct from upstream 3 and
 our old 2. Install the paired external driver; foreign/stale descriptors are
-rejected. FW Packages need a full paired rebuild for this candidate.
+rejected. Install the fully rebuilt paired FW Packages Dev 024 after this firmware.
 
 No user captures, dictionaries or settings are migrated/deleted by these changes.
 Existing dual-use apps are not expanded; automotive brute-force additions and
