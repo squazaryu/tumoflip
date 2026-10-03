@@ -8,7 +8,7 @@
 
 [![Stable release](https://img.shields.io/github/v/release/squazaryu/tumoflip?label=stable&color=brightgreen)](https://github.com/squazaryu/tumoflip/releases/latest)
 [![Release workflow](https://img.shields.io/github/actions/workflow/status/squazaryu/tumoflip/release.yml?branch=main&label=build)](https://github.com/squazaryu/tumoflip/actions/workflows/release.yml)
-![Firmware API](https://img.shields.io/badge/Dev%20source%20API-88.14-8b5cf6)
+![Firmware API](https://img.shields.io/badge/Dev%20source%20API-88.15-8b5cf6)
 ![Target](https://img.shields.io/badge/Target-Flipper%20Zero%20F7-f97316)
 [![License](https://img.shields.io/badge/License-GPLv3-2563eb)](LICENSE)
 

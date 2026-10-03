@@ -11,6 +11,12 @@ typedef void (*SubGhzTxRxWorkerCallbackHaveRead)(void* context);
 
 typedef struct SubGhzTxRxWorker SubGhzTxRxWorker;
 
+/** Configure before start. Custom register data is validated and copied (max 256 bytes).
+ * Only variable-length CRC packets are supported. No borrowed-buffer lifetime. */
+bool subghz_tx_rx_worker_set_preset(
+    SubGhzTxRxWorker* instance, FuriHalSubGhzPreset preset, const uint8_t* data, size_t size);
+bool subghz_tx_rx_worker_set_channel(SubGhzTxRxWorker* instance, uint8_t channel);
+
 typedef enum {
     SubGhzTxRxWorkerStatusIDLE,
     SubGhzTxRxWorkerStatusTx,
