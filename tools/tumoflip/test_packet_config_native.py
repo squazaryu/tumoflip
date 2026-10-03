@@ -1,12 +1,34 @@
 """Bounded CC1101 packet configuration and channel arithmetic."""
 from pathlib import Path
 import unittest
-from tools.tumoflip.test_hotplug_assets import run_c
+from tools.tumoflip.test_hotplug_assets import run_c, function
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class PacketConfigNativeTests(unittest.TestCase):
+    def test_rejected_frequency_never_starts_thread(self):
+        source = (ROOT / "lib/subghz/subghz_tx_rx_worker.c").read_text()
+        run_c(r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stdbool.h>
+typedef int SubGhzDevice;
+typedef struct {bool worker_running;void *stream_tx,*stream_rx,*thread;uint32_t frequency;const SubGhzDevice* device;} SubGhzTxRxWorker;
+#define furi_check assert
+static unsigned threads;
+void furi_stream_buffer_reset(void* p) {(void)p;}
+bool furi_hal_subghz_is_tx_allowed(uint32_t f) {(void)f;return false;}
+void furi_thread_start(void* p) {(void)p;threads++;}
+''' + function(source, "bool subghz_tx_rx_worker_start(") + r'''
+int main(void) {
+    SubGhzTxRxWorker w={0};SubGhzDevice d=0;
+    assert(!subghz_tx_rx_worker_start(&w,&d,100));
+    assert(threads==0 && !w.worker_running);
+    return 0;
+}
+''')
+
     def test_bounded_packet_preset_and_channel_frequency(self):
         run_c('#include <assert.h>\n#include <string.h>\n'
               + f'#include "{ROOT}/lib/subghz/packet_config.c"\n' + r'''
