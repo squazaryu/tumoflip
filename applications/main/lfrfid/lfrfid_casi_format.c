@@ -3,15 +3,9 @@
 #include <bit_lib/bit_lib.h>
 
 // The 40 EM4100 data bits: two zero bits, the 19-bit credential, then a 19-bit card
-// field. The card number the access system prints is that field as is when its top bit
-// is clear and the field less LFRFID_CASI_CARD_OFFSET when it is set. No public layout:
-// this one fits eleven badges from two sites, three of them public (https://redd.it/12v4oi4,
-// raw bits next to printed ids), and the Proxmark3 Casi-Rusco trace. Where the offset
-// starts is the one part not observed - no sample falls between cards 173xxx and 286xxx,
-// so the split is put where the card numbers stay continuous. The frame carries no parity,
-// so only the credential range keeps other EM4100 cards from reading as a badge; it holds
-// them to 0.4% of all ids, though a card whose id starts 0x12 or 0x13 matches about half
-// the time.
+// field. Readers use the field unchanged below 2^18 and subtract the offset above
+// that boundary (Unleashed #1158/#1163 reader evidence). There is no refused gap.
+// No parity: the credential range alone limits accidental EM4100 matches (~0.5%).
 #define CASI_DATA_SIZE           (5)
 #define CASI_CREDENTIAL_POSITION (2)
 #define CASI_CARD_POSITION       (21)
@@ -29,13 +23,7 @@ static bool lfrfid_casi_format_decode(const uint8_t* data, uint32_t* credential,
 
     const uint32_t card_field =
         bit_lib_get_bits_32(data, CASI_CARD_POSITION, LFRFID_CASI_FIELD_SIZE);
-    if(card_field >= CASI_CARD_FIELD_HIGH) {
-        *card = card_field - LFRFID_CASI_CARD_OFFSET;
-    } else if(card_field < CASI_CARD_FIELD_HIGH - LFRFID_CASI_CARD_OFFSET) {
-        *card = card_field;
-    } else {
-        return false;
-    }
+    *card = card_field >= CASI_CARD_FIELD_HIGH ? card_field - LFRFID_CASI_CARD_OFFSET : card_field;
 
     return true;
 }
@@ -47,7 +35,7 @@ void lfrfid_casi_format_encode(uint32_t credential, uint32_t card, uint8_t* data
     furi_check(card <= LFRFID_CASI_CARD_MAX);
 
     uint32_t card_field = card;
-    if(card >= CASI_CARD_FIELD_HIGH - LFRFID_CASI_CARD_OFFSET) {
+    if(card >= CASI_CARD_FIELD_HIGH) {
         card_field += LFRFID_CASI_CARD_OFFSET;
     }
 
