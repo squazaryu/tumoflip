@@ -6,7 +6,7 @@
 static inline const char* wifi_marauder_console_stop_command(const char* command) {
     if(command && (!strcmp(command, "recon status") || !strcmp(command, "recon stop") ||
                    !strcmp(command, "protocolinfo") || !strcmp(command, "backupstatus") ||
-                   !strcmp(command, "backupspiffs"))) return NULL;
+                   !strcmp(command, "backupspiffs") || !strcmp(command, "remoteid list"))) return NULL;
     return command && (!strcmp(command, "recon wifi") || !strcmp(command, "recon ble")) ?
                "recon stop\n" :
                "stopscan\n";
