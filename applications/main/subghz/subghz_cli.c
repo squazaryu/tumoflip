@@ -1003,7 +1003,8 @@ static void subghz_cli_command_encrypt_raw(PipeSide* pipe, FuriString* args) {
     furi_string_free(source);
 }
 
-static void subghz_cli_command_chat(PipeSide* pipe, FuriString* args) {
+static void subghz_cli_command_chat(
+    PipeSide* pipe, FuriString* args, SubGhzRadioBroker* broker, const SubGhzRadioBrokerLease* lease) {
     uint32_t frequency = 433920000;
     uint32_t device_ind = 0; // 0 - CC1101_INT, 1 - CC1101_EXT
 
@@ -1049,13 +1050,13 @@ static void subghz_cli_command_chat(PipeSide* pipe, FuriString* args) {
 
     SubGhzChatWorker* subghz_chat = subghz_chat_worker_alloc(pipe);
 
-    if(!subghz_chat_worker_start(subghz_chat, device, frequency)) {
+    if(!subghz_chat_worker_set_radio_lease(subghz_chat, broker, lease) ||
+       !subghz_chat_worker_start(subghz_chat, device, frequency)) {
         printf("Startup error SubGhzChatWorker\r\n");
 
-        if(subghz_chat_worker_is_running(subghz_chat)) {
-            subghz_chat_worker_stop(subghz_chat);
-            subghz_chat_worker_free(subghz_chat);
-        }
+        subghz_chat_worker_free(subghz_chat);
+        subghz_devices_deinit();
+        subghz_cli_radio_device_power_off();
         return;
     }
 
@@ -1219,7 +1220,7 @@ static void execute(PipeSide* pipe, FuriString* args, void* context) {
 
         if(furi_string_cmp_str(cmd, "chat") == 0) {
             if(subghz_cli_radio_acquire(&radio_broker, &radio_lease)) {
-                subghz_cli_command_chat(pipe, args);
+                subghz_cli_command_chat(pipe, args, radio_broker, &radio_lease);
             }
             break;
         }

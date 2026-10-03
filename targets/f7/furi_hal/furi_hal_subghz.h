@@ -192,8 +192,8 @@ void furi_hal_subghz_set_rolling_counter_mult(int32_t mult);
 uint32_t furi_hal_subghz_set_frequency(uint32_t value);
 
 /** Packet channel access; caller must own the radio and leave asynchronous modes. */
-bool furi_hal_subghz_set_channel(uint8_t channel);
-bool furi_hal_subghz_get_channel(uint8_t* channel);
+bool furi_hal_subghz_set_channel_checked(uint8_t channel);
+bool furi_hal_subghz_get_channel_checked(uint8_t* channel);
 
 /** Set path
  *

@@ -2,6 +2,7 @@
 
 #include <furi_hal.h>
 #include <devices/devices.h>
+#include <applications/services/subghz_radio_broker/subghz_radio_broker.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,9 +14,14 @@ typedef struct SubGhzTxRxWorker SubGhzTxRxWorker;
 
 /** Configure before start. Custom register data is validated and copied (max 256 bytes).
  * Only variable-length CRC packets are supported. No borrowed-buffer lifetime. */
-bool subghz_tx_rx_worker_set_preset(
+bool subghz_tx_rx_worker_set_packet_preset(
     SubGhzTxRxWorker* instance, FuriHalSubGhzPreset preset, const uint8_t* data, size_t size);
-bool subghz_tx_rx_worker_set_channel(SubGhzTxRxWorker* instance, uint8_t channel);
+bool subghz_tx_rx_worker_set_packet_channel(SubGhzTxRxWorker* instance, uint8_t channel);
+
+/** Borrow a fresh acquired lease. The caller keeps its record/lease until stop/free.
+ * Cleanup never releases the caller's lease or closes the caller's record. */
+bool subghz_tx_rx_worker_set_radio_lease(
+    SubGhzTxRxWorker* instance, SubGhzRadioBroker* broker, const SubGhzRadioBrokerLease* lease);
 
 typedef enum {
     SubGhzTxRxWorkerStatusIDLE,

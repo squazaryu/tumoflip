@@ -20,7 +20,10 @@ struct SubGhzTxRxWorker {
 
     volatile bool worker_running;
     bool thread_started;
+    FuriSemaphore* startup_ready;
+    volatile bool startup_ok;
     bool device_begun;
+    bool borrowed_lease;
     SubGhzRadioBroker* broker;
     SubGhzRadioBrokerLease lease;
     FuriHalSubGhzPreset preset;
@@ -151,20 +154,33 @@ static void subghz_tx_rx_worker_release(SubGhzTxRxWorker* instance) {
         instance->device_begun = false;
     }
     if(instance->broker) {
-        if(instance->lease.token) subghz_radio_broker_release(instance->broker, &instance->lease);
-        furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
+        if(instance->borrowed_lease) {
+            subghz_radio_broker_set_state(instance->broker, &instance->lease, SubGhzRadioBrokerStateAcquired);
+        } else {
+            if(instance->lease.token) subghz_radio_broker_release(instance->broker, &instance->lease);
+            furi_record_close(RECORD_SUBGHZ_RADIO_BROKER);
+        }
         instance->broker = NULL;
+        instance->lease.token = 0;
+        instance->borrowed_lease = false;
     }
 }
 
 static bool subghz_tx_rx_worker_prepare(
     SubGhzTxRxWorker* instance, const SubGhzDevice* device, uint32_t frequency) {
-    instance->broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
-    if(!instance->broker) return false;
-    if(!subghz_radio_broker_acquire(
-           instance->broker, "packet-worker", furi_ms_to_ticks(500), &instance->lease)) {
-        subghz_tx_rx_worker_release(instance);
-        return false;
+    if(instance->borrowed_lease) {
+        if(!subghz_radio_broker_set_state(instance->broker, &instance->lease, SubGhzRadioBrokerStateProbing)) {
+            subghz_tx_rx_worker_release(instance);
+            return false;
+        }
+    } else {
+        instance->broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
+        if(!instance->broker) return false;
+        if(!subghz_radio_broker_acquire(
+               instance->broker, "packet-worker", furi_ms_to_ticks(500), &instance->lease)) {
+            subghz_tx_rx_worker_release(instance);
+            return false;
+        }
     }
     instance->device = device;
     if(device->interconnect->begin && !subghz_devices_begin(device)) {
@@ -183,7 +199,7 @@ static bool subghz_tx_rx_worker_prepare(
     subghz_devices_load_preset(device, instance->preset,
                               instance->preset_size ? instance->preset_data : NULL);
     if(!subghz_devices_set_frequency(device, frequency) ||
-       !subghz_devices_set_channel(device, instance->channel)) {
+       !subghz_devices_set_channel_checked(device, instance->channel)) {
         subghz_tx_rx_worker_release(instance);
         return false;
     }
@@ -198,6 +214,10 @@ static int32_t subghz_tx_rx_worker_thread(void* context) {
     SubGhzTxRxWorker* instance = context;
     furi_check(instance->device);
     FURI_LOG_I(TAG, "Worker start");
+    // Own and release the normal broker lease on the same worker thread.
+    instance->startup_ok = subghz_tx_rx_worker_prepare(instance, instance->device, instance->frequency);
+    furi_semaphore_release(instance->startup_ready);
+    if(!instance->startup_ok) { instance->worker_running = false; return 0; }
 
     // The low-level FIFO reader can return up to 64 bytes, even for a bad length.
     uint8_t data[64] = {0};
@@ -270,6 +290,7 @@ SubGhzTxRxWorker* subghz_tx_rx_worker_alloc(void) {
         furi_stream_buffer_alloc(sizeof(uint8_t) * SUBGHZ_TXRX_WORKER_BUF_SIZE, sizeof(uint8_t));
     instance->stream_rx =
         furi_stream_buffer_alloc(sizeof(uint8_t) * SUBGHZ_TXRX_WORKER_BUF_SIZE, sizeof(uint8_t));
+    instance->startup_ready = furi_semaphore_alloc(1, 0);
 
     instance->status = SubGhzTxRxWorkerStatusIDLE;
     instance->preset = FuriHalSubGhzPresetGFSK9_99KbAsync;
@@ -280,9 +301,11 @@ SubGhzTxRxWorker* subghz_tx_rx_worker_alloc(void) {
 void subghz_tx_rx_worker_free(SubGhzTxRxWorker* instance) {
     furi_check(instance);
     if(instance->thread_started) subghz_tx_rx_worker_stop(instance);
+    if(instance->broker) subghz_tx_rx_worker_release(instance);
     furi_stream_buffer_free(instance->stream_tx);
     furi_stream_buffer_free(instance->stream_rx);
     furi_thread_free(instance->thread);
+    furi_semaphore_free(instance->startup_ready);
 
     free(instance);
 }
@@ -297,15 +320,25 @@ bool subghz_tx_rx_worker_start(
     furi_stream_buffer_reset(instance->stream_tx);
     furi_stream_buffer_reset(instance->stream_rx);
 
-    if(!subghz_tx_rx_worker_prepare(instance, device, frequency)) return false;
+    instance->device = device;
+    instance->frequency = frequency;
+    instance->startup_ok = false;
+    // A timed-out prior startup may have signalled after the caller stopped waiting.
+    furi_semaphore_acquire(instance->startup_ready, 0);
     instance->worker_running = true;
     instance->thread_started = true;
     furi_thread_start(instance->thread);
-
+    bool ready = furi_semaphore_acquire(instance->startup_ready, furi_ms_to_ticks(1500)) == FuriStatusOk;
+    if(!ready || !instance->startup_ok) {
+        instance->worker_running = false;
+        furi_thread_join(instance->thread);
+        instance->thread_started = false;
+        return false;
+    }
     return true;
 }
 
-bool subghz_tx_rx_worker_set_preset(
+bool subghz_tx_rx_worker_set_packet_preset(
     SubGhzTxRxWorker* instance, FuriHalSubGhzPreset preset, const uint8_t* data, size_t size) {
     if(!instance || instance->thread_started) return false;
     if(preset == FuriHalSubGhzPresetCustom) {
@@ -317,9 +350,23 @@ bool subghz_tx_rx_worker_set_preset(
     return true;
 }
 
-bool subghz_tx_rx_worker_set_channel(SubGhzTxRxWorker* instance, uint8_t channel) {
+bool subghz_tx_rx_worker_set_packet_channel(SubGhzTxRxWorker* instance, uint8_t channel) {
     if(!instance || instance->thread_started) return false;
     instance->channel = channel;
+    return true;
+}
+
+bool subghz_tx_rx_worker_set_radio_lease(
+    SubGhzTxRxWorker* instance, SubGhzRadioBroker* broker, const SubGhzRadioBrokerLease* lease) {
+    if(!instance || instance->thread_started || instance->broker || !broker || !lease || !lease->token)
+        return false;
+    SubGhzRadioBrokerStatusV2 status;
+    subghz_radio_broker_get_status_v2(broker, &status);
+    if(!status.base.busy || status.state != SubGhzRadioBrokerStateAcquired) return false;
+    if(!subghz_radio_broker_set_state(broker, lease, SubGhzRadioBrokerStateAcquired)) return false;
+    instance->broker = broker;
+    instance->lease = *lease;
+    instance->borrowed_lease = true;
     return true;
 }
 

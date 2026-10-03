@@ -12,7 +12,7 @@
 #include <flipper_application/flipper_application.h>
 
 #define SUBGHZ_RADIO_DEVICE_PLUGIN_APP_ID      "subghz_radio_device"
-#define SUBGHZ_RADIO_DEVICE_PLUGIN_API_VERSION 3
+#define SUBGHZ_RADIO_DEVICE_PLUGIN_API_VERSION 1003
 #define SUBGHZ_RADIO_DEVICE_PLUGIN_FAL_PREFIX  "radio_device_"
 
 typedef struct SubGhzDeviceRegistry SubGhzDeviceRegistry;

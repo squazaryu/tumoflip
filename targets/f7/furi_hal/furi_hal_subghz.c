@@ -429,7 +429,7 @@ uint32_t furi_hal_subghz_set_frequency(uint32_t value) {
     return real_frequency;
 }
 
-bool furi_hal_subghz_set_channel(uint8_t channel) {
+bool furi_hal_subghz_set_channel_checked(uint8_t channel) {
     if(furi_hal_subghz.state != SubGhzStateIdle) return false;
     furi_hal_spi_acquire(&furi_hal_spi_bus_handle_subghz);
     uint32_t frequency = cc1101_get_channel_frequency(&furi_hal_spi_bus_handle_subghz, channel);
@@ -450,7 +450,7 @@ bool furi_hal_subghz_set_channel(uint8_t channel) {
     return ok;
 }
 
-bool furi_hal_subghz_get_channel(uint8_t* channel) {
+bool furi_hal_subghz_get_channel_checked(uint8_t* channel) {
     if(!channel || furi_hal_subghz.state != SubGhzStateIdle) return false;
     furi_hal_spi_acquire(&furi_hal_spi_bus_handle_subghz);
     *channel = cc1101_get_channel(&furi_hal_spi_bus_handle_subghz);
