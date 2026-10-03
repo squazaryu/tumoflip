@@ -26,7 +26,7 @@ int main(void) {
     uint8_t oversized[257]={0};assert(!subghz_packet_preset_is_valid(oversized,sizeof(oversized)));
     assert(subghz_packet_channel_frequency(0x10b071,0,0,0)==433919830);
     assert(subghz_packet_channel_frequency(0x10b071,0,0,1)==433945220);
-    assert(subghz_packet_channel_frequency(0x10b071,255,3,255)==444259032);
+    assert(subghz_packet_channel_frequency(0x10b071,255,3,255)==537311248);
     assert(subghz_packet_channel_frequency(0x1000000,0,0,0)==0); // invalid 24-bit word
     return 0;
 }
