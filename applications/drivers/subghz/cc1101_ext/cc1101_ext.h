@@ -159,6 +159,9 @@ bool subghz_device_cc1101_ext_is_frequency_valid(uint32_t value);
  */
 uint32_t subghz_device_cc1101_ext_set_frequency(uint32_t value);
 
+bool subghz_device_cc1101_ext_set_channel(uint8_t channel);
+bool subghz_device_cc1101_ext_get_channel(uint8_t* channel);
+
 /* High Level API */
 
 /** Signal Timings Capture callback */

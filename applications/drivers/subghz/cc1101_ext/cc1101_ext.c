@@ -570,6 +570,35 @@ uint32_t subghz_device_cc1101_ext_set_frequency(uint32_t value) {
     return real_frequency;
 }
 
+bool subghz_device_cc1101_ext_set_channel(uint8_t channel) {
+    if(!subghz_device_cc1101_ext ||
+       subghz_device_cc1101_ext->state != SubGhzDeviceCC1101ExtStateIdle) return false;
+    const FuriHalSpiBusHandle* spi = subghz_device_cc1101_ext->spi_bus_handle;
+    furi_hal_spi_acquire(spi);
+    uint32_t frequency = cc1101_get_channel_frequency(spi, channel);
+    bool ok = subghz_device_cc1101_ext_is_frequency_valid(frequency) &&
+              subghz_device_cc1101_ext_is_tx_allowed(frequency);
+    if(ok) {
+        uint8_t old = cc1101_get_channel(spi);
+        cc1101_switch_to_idle(spi);
+        cc1101_set_channel(spi, channel);
+        cc1101_calibrate(spi);
+        ok = cc1101_wait_status_state(spi, CC1101StateIDLE, 10000);
+        if(!ok) { cc1101_switch_to_idle(spi); cc1101_set_channel(spi, old); }
+    }
+    furi_hal_spi_release(spi);
+    return ok;
+}
+
+bool subghz_device_cc1101_ext_get_channel(uint8_t* channel) {
+    if(!channel || !subghz_device_cc1101_ext ||
+       subghz_device_cc1101_ext->state != SubGhzDeviceCC1101ExtStateIdle) return false;
+    furi_hal_spi_acquire(subghz_device_cc1101_ext->spi_bus_handle);
+    *channel = cc1101_get_channel(subghz_device_cc1101_ext->spi_bus_handle);
+    furi_hal_spi_release(subghz_device_cc1101_ext->spi_bus_handle);
+    return true;
+}
+
 static bool subghz_device_cc1101_ext_start_debug(void) {
     bool ret = false;
     if(subghz_device_cc1101_ext->async_mirror_pin != NULL) {

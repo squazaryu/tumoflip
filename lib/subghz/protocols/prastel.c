@@ -18,8 +18,10 @@
  * where they belong - those are static.
  *
  * Payload layout, 7 bytes taken from (data << 2), MSB first:
- *   p[0..1]  fixed / high nibble of the serial
- *   p[2..3]  serial
+ *   p[0]     outside the 42 bit frame, always zero
+ *   p[1]     serial bits 12..15 in its high nibble
+ *   p[2]     serial bits 8..11 and 20; bits 4..6 are fixed
+ *   p[3]     serial bits 0..7
  *   p[4]     serial nibble | button index
  *   p[5..6]  counter, little endian, plus a parity bit
  */
@@ -228,8 +230,9 @@ static void subghz_protocol_prastel_remote_controller(SubGhzBlockGeneric* instan
     subghz_protocol_prastel_unpack(instance->data, p);
     subghz_protocol_prastel_unscramble(p);
 
-    instance->serial = ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 8) | p[3] |
-                       (((uint32_t)p[4] << 12) & 0xF0000);
+    instance->serial = (((uint32_t)p[1] & 0xF0) << 8) | p[3] |
+                       (((uint32_t)p[4] << 12) & 0xF0000) | (((uint32_t)p[2] & 0x0F) << 8) |
+                       (((uint32_t)p[2] & 0x80) << 13);
     uint8_t idx = (uint8_t)((p[4] & 0x0F) - 7);
     instance->btn = (idx <= 7) ? btn_map[idx] : 0;
     instance->cnt = (uint16_t)(p[5] | (p[6] << 8));
@@ -404,8 +407,9 @@ void subghz_protocol_decoder_prastel_feed(void* context, bool level, uint32_t du
     SubGhzProtocolDecoderPrastel* instance = context;
     switch(instance->decoder.parser_step) {
     case PrastelDecoderStepReset:
-        if((!level) && (DURATION_DIFF(duration, subghz_protocol_prastel_const.te_short * 56) <
-                        subghz_protocol_prastel_const.te_delta * 63)) {
+        // The first frame follows a ~4.8 ms gap; later frames use ~24 ms.
+        if((!level) && (duration > subghz_protocol_prastel_const.te_short * 12) &&
+           (duration < subghz_protocol_prastel_const.te_short * 86)) {
             instance->decoder.parser_step = PrastelDecoderStepFoundStartBit;
         }
         break;

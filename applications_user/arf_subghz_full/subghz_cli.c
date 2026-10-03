@@ -1003,7 +1003,8 @@ static void subghz_cli_command_encrypt_raw(PipeSide* pipe, FuriString* args) {
     furi_string_free(source);
 }
 
-static void subghz_cli_command_chat(PipeSide* pipe, FuriString* args) {
+static void subghz_cli_command_chat(
+    PipeSide* pipe, FuriString* args, SubGhzRadioBroker* broker, const SubGhzRadioBrokerLease* lease) {
     uint32_t frequency = 433920000;
     uint32_t device_ind = 0; // 0 - CC1101_INT, 1 - CC1101_EXT
 
@@ -1049,13 +1050,13 @@ static void subghz_cli_command_chat(PipeSide* pipe, FuriString* args) {
 
     SubGhzChatWorker* subghz_chat = subghz_chat_worker_alloc(pipe);
 
-    if(!subghz_chat_worker_start(subghz_chat, device, frequency)) {
+    if(!subghz_chat_worker_set_radio_lease(subghz_chat, broker, lease) ||
+       !subghz_chat_worker_start(subghz_chat, device, frequency)) {
         printf("Startup error SubGhzChatWorker\r\n");
 
-        if(subghz_chat_worker_is_running(subghz_chat)) {
-            subghz_chat_worker_stop(subghz_chat);
-            subghz_chat_worker_free(subghz_chat);
-        }
+        subghz_chat_worker_free(subghz_chat);
+        subghz_devices_deinit();
+        subghz_cli_radio_device_power_off();
         return;
     }
 
@@ -1115,10 +1116,16 @@ static void subghz_cli_command_chat(PipeSide* pipe, FuriString* args) {
                 printf("\r\n");
                 furi_string_push_back(input, '\r');
                 furi_string_push_back(input, '\n');
+                uint32_t write_deadline = furi_get_tick() + furi_ms_to_ticks(2000);
                 while(!subghz_chat_worker_write(
                     subghz_chat,
                     (uint8_t*)furi_string_get_cstr(input),
                     strlen(furi_string_get_cstr(input)))) {
+                    if((int32_t)(furi_get_tick() - write_deadline) >= 0) {
+                        printf("Radio write stopped or timed out\r\n");
+                        exit = true;
+                        break;
+                    }
                     furi_delay_ms(10);
                 }
 
@@ -1219,7 +1226,7 @@ static void execute(PipeSide* pipe, FuriString* args, void* context) {
 
         if(furi_string_cmp_str(cmd, "chat") == 0) {
             if(subghz_cli_radio_acquire(&radio_broker, &radio_lease)) {
-                subghz_cli_command_chat(pipe, args);
+                subghz_cli_command_chat(pipe, args, radio_broker, &radio_lease);
             }
             break;
         }

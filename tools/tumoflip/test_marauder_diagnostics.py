@@ -49,14 +49,16 @@ enum{NO_TIP,SHOW_STOPSCAN_TIP};
 ''' + table + '\n#define NUM_MENU_ITEMS ' + count + r'''
 int main(void){
  assert(sizeof(items)/sizeof(items[0])==NUM_MENU_ITEMS);
- bool recon=false,protocol=false;
+ bool recon=false,protocol=false,remote=false,track=false;
  for(unsigned i=0;i<NUM_MENU_ITEMS;i++){
    const WifiMarauderItem*row=&items[i];assert(row->item_string&&row->num_options_menu>0&&row->num_options_menu<=MAX_OPTIONS);
    for(int j=0;j<row->num_options_menu;j++){assert(row->options_menu[j]&&row->actual_commands[j]);assert(!strchr(row->actual_commands[j],'\n'));assert(strlen(row->actual_commands[j])<512);}
    if(!strcmp(row->item_string,"Recon")){recon=true;assert(!strcmp(row->actual_commands[3],"recon stop"));}
    if(!strcmp(row->item_string,"Protocol Info")){protocol=true;assert(!strcmp(row->actual_commands[0],"protocolinfo"));}
+   if(!strcmp(row->item_string,"Remote ID")){remote=true;assert(!strcmp(row->actual_commands[0],"remoteid scan"));assert(!strcmp(row->actual_commands[1],"remoteid list"));assert(row->needs_keyboard==NO_ARGS);}
+   if(!strcmp(row->item_string,"Remote ID target")){track=true;assert(!strcmp(row->actual_commands[0],"remoteid track"));assert(row->needs_keyboard==INPUT_ARGS);}
  }
- assert(recon&&protocol);assert(!strcmp(items[NUM_MENU_ITEMS-2].item_string,"Scripts"));
+ assert(recon&&protocol&&remote&&track);assert(!strcmp(items[NUM_MENU_ITEMS-2].item_string,"Scripts"));
  assert(!strcmp(items[NUM_MENU_ITEMS-1].item_string,"Save to flipper sdcard"));return 0;}
 ''')
 
@@ -68,6 +70,8 @@ int main(void){
  assert(!wifi_marauder_console_can_mark_poi(NULL));
  assert(wifi_marauder_console_stop_command("protocolinfo")==NULL);
  assert(wifi_marauder_console_stop_command("backupspiffs")==NULL);
+ assert(wifi_marauder_console_stop_command("remoteid list")==NULL);
+ assert(!strcmp(wifi_marauder_console_stop_command("remoteid scan"),"stopscan\n"));
  assert(!strcmp(wifi_marauder_console_stop_command("recon wifi"),"recon stop\n"));
  assert(!strcmp(wifi_marauder_console_stop_command("recon ble"),"recon stop\n"));
  assert(!strcmp(wifi_marauder_console_stop_command("nmea"),"stopscan\n"));

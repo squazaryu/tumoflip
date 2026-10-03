@@ -41,9 +41,9 @@ class ProtectedAppUpdateTests(unittest.TestCase):
             / "applications_user/esp32_wifi_marauder/scenes/wifi_marauder_scene_console_output.c"
         ).read_text()
 
-        self.assertIn("fap_version=(7, 13)", manifest)
+        self.assertIn("fap_version=(7, 14)", manifest)
         self.assertIn('WIFI_MARAUDER_APP_VERSION "v0.7.13-tumo"', header)
-        self.assertIn("#define NUM_MENU_ITEMS (36)", internal)
+        self.assertIn("#define NUM_MENU_ITEMS (38)", internal)
         self.assertIn('"Airtag"', menu)
         self.assertIn('{"spoof", "sound"}', menu)
         self.assertIn('{"spoofat -t", "findmy -t"}', menu)

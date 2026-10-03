@@ -65,6 +65,9 @@ void wifi_marauder_scene_text_input_on_enter(void* context) {
     } else if(0 == strncmp("findmy -t", app->selected_tx_string, strlen("findmy -t"))) {
         wifi_text_input_set_header_text(text_input, "Enter FindMy device index");
         device_index_command = "findmy -t";
+    } else if(0 == strcmp("remoteid track", app->selected_tx_string)) {
+        wifi_text_input_set_header_text(text_input, "Own Remote ID index");
+        device_index_command = "remoteid track";
     } else {
         wifi_text_input_set_header_text(text_input, "Add command arguments");
     }

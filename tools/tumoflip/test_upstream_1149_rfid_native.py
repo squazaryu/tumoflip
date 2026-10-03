@@ -13,6 +13,58 @@ def c_source(relative):
 
 
 class RfidManualNativeTests(unittest.TestCase):
+    def test_casi_decoder_matches_independent_reader_field_rule(self):
+        run_c(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#define furi_check assert
+#define furi_crash(...) abort()
+typedef int FuriString;
+void furi_string_cat_printf(FuriString* s,const char* f,...) {(void)s;(void)f;}
+''' + c_source("lib/bit_lib/bit_lib.h") + c_source("lib/bit_lib/bit_lib.c")
+        + c_source("applications/main/lfrfid/lfrfid_casi_format.h")
+        + c_source("applications/main/lfrfid/lfrfid_casi_format.c") + r'''
+int main(void) {
+    /* Reader evidence in upstream #1158: the raw field, not a local encoder,
+       is the oracle. Exhaustively include the formerly refused interval. */
+    for(uint32_t field=0;field<(1u<<19);field++) {
+        uint8_t data[5]={0};uint32_t credential=0,card=0;
+        bit_lib_num_to_bytes_be(((uint64_t)150000<<19)|field,5,data);
+        assert(lfrfid_casi_format_decode(data,&credential,&card));
+        assert(credential==150000);
+        assert(card==(field>=262144 ? field-66606 : field));
+    }
+    return 0;
+}
+''')
+
+    def test_casi_encoder_changes_offset_only_at_card_262144(self):
+        run_c(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#define furi_check assert
+#define furi_crash(...) abort()
+typedef int FuriString;
+void furi_string_cat_printf(FuriString* s,const char* f,...) {(void)s;(void)f;}
+''' + c_source("lib/bit_lib/bit_lib.h") + c_source("lib/bit_lib/bit_lib.c")
+        + c_source("applications/main/lfrfid/lfrfid_casi_format.h")
+        + c_source("applications/main/lfrfid/lfrfid_casi_format.c") + r'''
+int main(void) {
+    for(uint32_t card=0;card<=LFRFID_CASI_CARD_MAX;card++) {
+        uint8_t data[5];lfrfid_casi_format_encode(150000,card,data);
+        uint32_t field=bit_lib_get_bits_32(data,21,19);
+        assert(field==(card>=262144 ? card+66606 : card));
+    }
+    return 0;
+}
+''')
+
     def test_all_formats_roundtrip_boundaries_and_reject_parity_damage(self):
         run_c(r'''
 #include <assert.h>

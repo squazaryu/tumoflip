@@ -57,7 +57,7 @@ static void subghz_chat_worker_update_rx_event_chat(void* context) {
 }
 
 SubGhzChatWorker* subghz_chat_worker_alloc(PipeSide* pipe) {
-    SubGhzChatWorker* instance = malloc(sizeof(SubGhzChatWorker));
+    SubGhzChatWorker* instance = calloc(1, sizeof(SubGhzChatWorker));
 
     instance->pipe = pipe;
 
@@ -76,6 +76,11 @@ void subghz_chat_worker_free(SubGhzChatWorker* instance) {
     furi_thread_free(instance->thread);
 
     free(instance);
+}
+
+bool subghz_chat_worker_set_radio_lease(
+    SubGhzChatWorker* worker, SubGhzRadioBroker* broker, const SubGhzRadioBrokerLease* lease) {
+    return subghz_tx_rx_worker_set_radio_lease(worker->subghz_txrx, broker, lease);
 }
 
 bool subghz_chat_worker_start(
