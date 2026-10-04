@@ -58,6 +58,7 @@
 #include "jarolift.h"
 #include "superrollo.h"
 #include "ditec_gol4.h"
+#include "doorbell32.h"
 #include "keyfinder.h"
 #include "keyfinder2.h"
 #include "nord_ice.h"

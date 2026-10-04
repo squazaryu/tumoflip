@@ -36,6 +36,7 @@ That list is only for default SubGHz app, apps like *Weather Station* have their
 - Doitrand `AM650` (37 bits, Dynamic)
 - Elplast/P-11B/3BK/E.C.A `433MHz` `AM650` (18 bits, Static)
 - FAAC SLH `433.92MHz, 868.35MHz` `AM650` (64 bits, Dynamic) (+ Genius KILO TX2/4 JLC, other Genius models)
+- Doorbell32 `433.92MHz` `AM650` (32 bits, Static) (unbranded doorbells; Princeton style 1:3 PWM but 32 bits and a 14*Te guard)
 - Gate TX `433.92MHz` `AM650` (64 bits, Static)
 - Hormann `868MHz` `AM650` (44 bits, Static)
 - HCS101 `AM650` (64 bits, Simple Dynamic, KeeLoq-like)
