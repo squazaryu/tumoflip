@@ -49,8 +49,13 @@ typedef struct MfDesfirePoller {
  NfcGenericEvent general_event;
  NfcGenericCallback callback; void* context;
 } MfDesfirePoller;
-static void* host_malloc(size_t n){void* p=calloc(1,n);
- if(n==sizeof(MfDesfirePoller))memset(p,0xa5,n);return p;}
+static void* host_malloc(size_t n) {
+ void* p=calloc(1,n);
+ if(n==sizeof(MfDesfirePoller)) {
+  memset(p,0xa5,n);
+ }
+ return p;
+}
 enum {MF_DESFIRE_BUF_SIZE=64,MF_DESFIRE_RESULT_BUF_SIZE=512};
 #define furi_check assert
 #define malloc host_malloc
