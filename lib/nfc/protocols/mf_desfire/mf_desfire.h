@@ -44,6 +44,7 @@ typedef enum {
     MfDesfireTypeEV3,
 
     MfDesfireTypeUnknown,
+    MfDesfireTypeLight,
     MfDesfireTypeNum,
 } MfDesfireType;
 
@@ -167,6 +168,7 @@ typedef enum {
     MfDesfireErrorTimeout,
     MfDesfireErrorAuthentication,
     MfDesfireErrorCommandNotSupported,
+    MfDesfireErrorRejected,
 } MfDesfireError;
 
 typedef struct {

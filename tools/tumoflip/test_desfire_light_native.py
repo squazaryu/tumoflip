@@ -52,6 +52,7 @@ typedef struct MfDesfirePoller {
 static void* host_malloc(size_t n){void* p=calloc(1,n);
  if(n==sizeof(MfDesfirePoller))memset(p,0xa5,n);return p;}
 enum {MF_DESFIRE_BUF_SIZE=64,MF_DESFIRE_RESULT_BUF_SIZE=512};
+#define furi_check assert
 #define malloc host_malloc
 static MfDesfireData payload;
 MfDesfireData* mf_desfire_alloc(void){return &payload;}
@@ -233,6 +234,10 @@ int main(void){
             "lib/nfc/protocols/mf_desfire/mf_desfire_poller.c",
             "static NfcCommand mf_desfire_poller_handler_read_master_key_version(",
         )
+        source += "\n" + production(
+            "lib/nfc/protocols/mf_desfire/mf_desfire_poller_i.c",
+            "bool mf_desfire_error_is_refusal(",
+        )
         run_c(r'''
 #include <assert.h>
 #include <stdbool.h>
@@ -255,9 +260,12 @@ typedef struct {MfDesfireKeySettings master_key_settings;SimpleArray* master_key
  MfDesfireData;
 typedef struct {MfDesfirePollerState state;MfDesfireError error;MfDesfireData* data;
  void* iso14443_4a_poller;} MfDesfirePoller;
+bool mf_desfire_error_is_refusal(MfDesfireError error);
 static unsigned halt_count;
 #define FURI_LOG_D(...) ((void)0)
 #define FURI_LOG_E(...) ((void)0)
+#define FURI_LOG_W(...) ((void)0)
+#define TAG "test"
  #define furi_check(x) assert(x)
 static MfDesfireError mf_desfire_poller_read_key_settings(MfDesfirePoller* p,
  MfDesfireKeySettings* data){(void)p;(void)data;return MfDesfireErrorRejected;}
@@ -300,7 +308,8 @@ typedef struct {MfDesfirePollerEventType type;MfDesfirePollerEventData* data;}
 typedef struct {int protocol;void* event_data;void* instance;} NfcGenericEvent;
 typedef int (*NfcGenericCallback)(NfcGenericEvent,void*);
 typedef struct {MfDesfirePollerEvent mf_desfire_event;NfcGenericEvent general_event;
- NfcGenericCallback callback;void* context;void* iso14443_4a_poller;} MfDesfirePoller;
+ NfcGenericCallback callback;void* context;void* iso14443_4a_poller;MfDesfireError error;}
+ MfDesfirePoller;
 static int callback_event_error=-1;
 #define FURI_LOG_D(...) ((void)0)
 #define furi_check(x) assert(x)
@@ -348,8 +357,10 @@ typedef enum {MfDesfireErrorNone,MfDesfireErrorNotPresent,MfDesfireErrorProtocol
 typedef enum {Iso14443_4aErrorNone,Iso14443_4aErrorNotPresent,Iso14443_4aErrorTimeout,
       Iso14443_4aErrorProtocol} Iso14443_4aError;
 enum {NXP_NATIVE_COMMAND_STATUS_OPERATION_OK=0,NXP_NATIVE_COMMAND_STATUS_AUTHENTICATION_ERROR=0xae,
-      NXP_NATIVE_COMMAND_STATUS_ILLEGAL_COMMAND_CODE=0x1c};
-enum {NxpNativeCommandModePlain,NxpNativeCommandModeIsoWrapped,NxpNativeCommandModeMAX};
+      NXP_NATIVE_COMMAND_STATUS_ILLEGAL_COMMAND_CODE=0x1c,
+      NXP_NATIVE_COMMAND_STATUS_LENGTH_ERROR=0x7e};
+typedef enum {NxpNativeCommandModePlain,NxpNativeCommandModeIsoWrapped,NxpNativeCommandModeMAX}
+    NxpNativeCommandMode;
 typedef int MfDesfireVersion;
 typedef struct {unsigned command_mode;} MfDesfirePoller;
 bool mf_desfire_error_is_refusal(MfDesfireError error);
@@ -365,7 +376,8 @@ MfDesfireError mf_desfire_poller_read_version(MfDesfirePoller* p,MfDesfireVersio
 }
 ''' + source + r'''
 int main(void) {
-    assert(mf_desfire_process_status_code(0x1c)==MfDesfireErrorRejected);
+    assert(mf_desfire_process_status_code(0x1c)==MfDesfireErrorCommandNotSupported);
+    assert(mf_desfire_process_status_code(0x7e)==MfDesfireErrorProtocol);
     assert(mf_desfire_process_status_code(0xae)==MfDesfireErrorAuthentication);
     assert(mf_desfire_process_status_code(0)==MfDesfireErrorNone);
     assert(mf_desfire_error_is_refusal(MfDesfireErrorRejected));

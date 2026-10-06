@@ -4,6 +4,11 @@
 
 #include <nfc/helpers/nxp_native_command.h>
 
+// GetVersion hardware type; only the low nibble selects the product family.
+#define MF_DESFIRE_HW_TYPE_MASK    (0x0FU)
+#define MF_DESFIRE_HW_TYPE_DESFIRE (0x01U)
+#define MF_DESFIRE_HW_TYPE_LIGHT   (0x08U)
+
 #define MF_DESFIRE_FFF_PICC_PREFIX "PICC"
 #define MF_DESFIRE_FFF_APP_PREFIX  "Application"
 
