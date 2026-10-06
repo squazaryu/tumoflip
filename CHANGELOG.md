@@ -1,3 +1,9 @@
+## Tumoflip Dev 009-019
+- NFC: passively identify and read DESFire Light cards. Retry GetVersion in the other command mode only after a deterministic card refusal; transport and malformed-frame errors still fail. Refused optional fields no longer abort the read, stale key counts are cleared before saving, and successful events clear prior optional-field errors.
+- Sub-GHz: add static KeyFinder2 and Doorbell32 decoders/encoders at 433 MHz AM. They are classified as Sensors and remain covered by the existing Ignore Sensors receiver setting.
+- Build: ignore only unbuilt stale `.fal` dependencies inside the embedded-plugin staging tree; regular assets and unrelated `plugins/` paths remain tracked.
+- F7 API remains 88.15; FW Packages Dev 024 remains compatible. Hardware acceptance is still pending.
+
 ## Tumoflip Dev 009-017
 - Fiat V2: report all capture-format write failures and preserve the previously loaded frame when a saved capture is invalid. ProtoPirate FAP version advances to 3.2.1.
 - Sub-GHz: add receive-only Renault V1 to the Europe Protocol Pack with bounded Manchester decoding, header/length/XOR validation, duplicate filtering, complete saved payloads and legacy Key_2 compatibility. ARF Status 0.4.1 tracks the new protocol plugin.

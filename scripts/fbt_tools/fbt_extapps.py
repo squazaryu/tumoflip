@@ -19,6 +19,27 @@ _FAP_META_SECTION = ".fapmeta"
 _FAP_FILEASSETS_SECTION = ".fapassets"
 
 
+def _filter_stale_embedded_plugin_assets(nodes, plugin_assets_dir):
+    """Drop only stale, unbuilt FALs from this host app's generated plugin staging tree."""
+    plugin_root = pathlib.Path(plugin_assets_dir)
+    filtered = []
+
+    for node in nodes:
+        path = pathlib.Path(node.abspath)
+        try:
+            path.relative_to(plugin_root)
+        except ValueError:
+            filtered.append(node)
+            continue
+
+        if path.suffix == ".fal" and not node.has_builder():
+            continue
+
+        filtered.append(node)
+
+    return filtered
+
+
 @dataclass
 class FlipperExternalAppInfo:
     app: FlipperApplication
@@ -265,6 +286,9 @@ class AppBuilder:
         # Add dependencies on file assets
         for assets_dir in self.app._assets_dirs:
             glob_res = self.app_env.GlobRecursive("*", assets_dir)
+            if self.app.embeds_plugins:
+                plugin_assets_dir = self.app_work_dir.Dir("assets").Dir("plugins").abspath
+                glob_res = _filter_stale_embedded_plugin_assets(glob_res, plugin_assets_dir)
             self.app_env.Depends(
                 app_artifacts.compact,
                 (*glob_res, assets_dir),

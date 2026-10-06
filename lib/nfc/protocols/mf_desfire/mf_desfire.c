@@ -35,6 +35,7 @@ static const char* mf_desfire_type_strings[] = {
     [MfDesfireTypeEV2XL] = "EV2 XL",
     [MfDesfireTypeEV3] = "EV3",
     [MfDesfireTypeUnknown] = "UNK",
+    [MfDesfireTypeLight] = "Light",
 };
 
 static const char* mf_desfire_size_strings[] = {
@@ -91,6 +92,7 @@ void mf_desfire_reset(MfDesfireData* data) {
 
     memset(&data->version, 0, sizeof(MfDesfireVersion));
     memset(&data->free_memory, 0, sizeof(MfDesfireFreeMemory));
+    memset(&data->master_key_settings, 0, sizeof(MfDesfireKeySettings));
 
     simple_array_reset(data->master_key_versions);
     simple_array_reset(data->application_ids);
@@ -278,6 +280,11 @@ bool mf_desfire_is_equal(const MfDesfireData* data, const MfDesfireData* other) 
 static MfDesfireType mf_desfire_get_type_from_version(const MfDesfireVersion* const version) {
     MfDesfireType type = MfDesfireTypeUnknown;
 
+    // DESFire Light reports hw_type 0x08 and hw_major 0x30, which is not an EV generation.
+    if((version->hw_type & MF_DESFIRE_HW_TYPE_MASK) == MF_DESFIRE_HW_TYPE_LIGHT) {
+        return MfDesfireTypeLight;
+    }
+
     switch(version->hw_major) {
     case MF_DESFIRE_HW_MAJOR_TYPE_EV1:
         type = MfDesfireTypeEV1;
@@ -336,6 +343,14 @@ const char* mf_desfire_get_device_name(const MfDesfireData* data, NfcDeviceNameT
 
     if(type == MfDesfireTypeUnknown) {
         furi_string_printf(data->device_name, "Unknown %s", MF_DESFIRE_PROTOCOL_NAME);
+    } else if(type == MfDesfireTypeLight) {
+        if(name_type == NfcDeviceNameTypeFull) {
+            furi_string_printf(
+                data->device_name, "%s %s", MF_DESFIRE_PROTOCOL_NAME,
+                mf_desfire_type_strings[type]);
+        } else {
+            furi_string_set_str(data->device_name, mf_desfire_type_strings[type]);
+        }
     } else if(name_type == NfcDeviceNameTypeFull) {
         furi_string_printf(
             data->device_name,
