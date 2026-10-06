@@ -146,6 +146,7 @@ jobs:
             tools/tumoflip/test_menu_stream_orientation.py \
             tools/tumoflip/test_desktop_settings_strings.py \
             tools/tumoflip/test_mf_desfire_zero_key_count.py \
+            tools/tumoflip/test_desfire_light_native.py \
             tools/tumoflip/test_nfc_key_dictionary_import.py \
             tools/tumoflip/test_nfc_hotel_parser.py \
             tools/tumoflip/test_tumokey.py \
@@ -172,6 +173,8 @@ jobs:
             tools/tumoflip/test_wardriving_lazy_rx.py \
             tools/tumoflip/test_upstream_power_plugin_scan.py \
             tools/tumoflip/test_upstream_e6_protocols.py \
+            tools/tumoflip/test_subghz_sensor_protocols.py \
+            tools/tumoflip/test_embedded_plugin_stale_assets.py \
             tools/tumoflip/test_nearby_files.py \
             tools/tumoflip/test_subghz_raw_profiles.py \
             tools/tumoflip/test_update_splash.py \
