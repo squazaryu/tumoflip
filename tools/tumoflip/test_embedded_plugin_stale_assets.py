@@ -99,7 +99,14 @@ class EmbeddedPluginAssetTests(unittest.TestCase):
 
     def test_tarball_filter_skips_finder_sidecars(self):
         import tarfile
-        from flipper.assets.tarball import tar_sanitizer_filter
+        is_macos_junk = production_functions(
+            "scripts/flipper/utils/__init__.py", ["is_macos_junk"]
+        )["is_macos_junk"]
+        tar_sanitizer_filter = production_functions(
+            "scripts/flipper/assets/tarball.py",
+            ["tar_sanitizer_filter"],
+            {"tarfile": tarfile, "is_macos_junk": is_macos_junk},
+        )["tar_sanitizer_filter"]
 
         self.assertIsNone(tar_sanitizer_filter(tarfile.TarInfo(".DS_Store")))
         self.assertIsNone(tar_sanitizer_filter(tarfile.TarInfo("folder/._image.png")))
