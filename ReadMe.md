@@ -193,15 +193,16 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-009-018` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-009-019` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
 
-For Dev `t-dev-009-018` / API 88.15, install the paired **FW Packages Dev 024**
-after the firmware update. Publication and hardware acceptance are separate;
-use the release page for availability and the hardware checklist for testing.
+For Dev `t-dev-009-019` / API 88.15, **FW Packages Dev 024 remains compatible**;
+this firmware update does not require a package-catalog refresh. Publication
+and hardware acceptance are separate; use the release page for availability
+and the hardware checklist for testing.
 
 ## Install
 
@@ -222,13 +223,13 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-009-018.tgz
+flipper-z-f7-update-t-dev-009-019.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: Dev `t-dev-009-013` uses `88.14`; immutable stable `v1.0.8` remains `88.7`.
+- Firmware API: Dev `t-dev-009-019` uses `88.15`; immutable stable `v1.0.8` remains `88.7`.
   Each release manifest records its compatible package API. API numbers are
   local to this fork.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or
