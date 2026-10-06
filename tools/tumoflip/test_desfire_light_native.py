@@ -89,11 +89,11 @@ int main(void) {
             "MfDesfireError mf_desfire_process_status_code(",
         )
         source += "\n" + production(
-            "lib/nfc/protocols/mf_desfire/mf_desfire_poller_i.h",
+            "lib/nfc/protocols/mf_desfire/mf_desfire_poller.c",
             "static inline bool mf_desfire_error_is_refusal(",
         )
         source += "\n" + production(
-            "lib/nfc/protocols/mf_desfire/mf_desfire_poller_i.c",
+            "lib/nfc/protocols/mf_desfire/mf_desfire_poller.c",
             "static MfDesfireError mf_desfire_poller_read_version_any_mode(",
         )
         run_c(r'''
