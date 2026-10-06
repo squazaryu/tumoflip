@@ -17,7 +17,7 @@ class SpeakerDebugLinkageTests(unittest.TestCase):
 
         self.assertRegex(
             manifest,
-            r"sources\s*=\s*\[[^\]]*\.\./\.\./lib/toolbox/note_frequency\.c",
+            r"sources\s*=\s*\[[^\]]*speaker_debug\.c[^\]]*\.\./\.\./lib/toolbox/note_frequency\.c",
         )
         self.assertNotIn("Function,+,note_frequency_from_semitone,", api)
 
