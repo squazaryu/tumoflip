@@ -26,7 +26,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("sync_readme_version.py", workflow)
         self.assertIn("heatshrink2==0.13.0", workflow)
         self.assertIn("./fbt -j2 COMPACT=1 DEBUG=0", workflow)
-        self.assertIn("updater_package fap_esp_flasher", workflow)
+        self.assertIn("updater_package fap_speaker_debug fap_esp_flasher", workflow)
         self.assertIn("fap_lfrfid_hitags", workflow)
         self.assertIn("test_lfrfid_bplm", workflow)
         self.assertIn("test_lto_build", workflow)
@@ -81,8 +81,17 @@ class ReleaseWorkflowTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("updater_package fap_esp_flasher", workflow)
+        self.assertIn("updater_package fap_speaker_debug fap_esp_flasher", workflow)
         self.assertIn("fap_nearby_files", workflow)
+
+    def test_speaker_debug_private_dependency_is_tested_and_built(self) -> None:
+        for name in ("pr-build.yml", "release.yml"):
+            workflow = (REPO_ROOT / ".github/workflows" / name).read_text(
+                encoding="utf-8"
+            )
+            with self.subTest(workflow=name):
+                self.assertIn("fap_speaker_debug", workflow)
+                self.assertIn("test_speaker_debug_linkage", workflow)
 
     def test_subghz_architecture_is_documented_as_core_first(self) -> None:
         doc = (REPO_ROOT / "docs/subghz-architecture.md").read_text(
