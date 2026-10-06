@@ -2,6 +2,11 @@ import datetime
 import hashlib
 
 
+def is_macos_junk(name: str) -> bool:
+    """Return whether a directory entry is Finder metadata, not an app asset."""
+    return name == ".DS_Store" or name.startswith("._")
+
+
 def timestamp():
     return int(datetime.datetime.now().timestamp())
 

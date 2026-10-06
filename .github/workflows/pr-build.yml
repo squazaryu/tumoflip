@@ -152,9 +152,9 @@ jobs:
         shell: bash
         run: python3 tools/tumoflip/test_upstream_e6_protocols.py
 
-      - name: Validate built-in sensor protocols and embedded FAL dependencies
+      - name: Validate sensor protocols, embedded FALs, and Speaker Debug linkage
         shell: bash
-        run: python3 -m unittest tools.tumoflip.test_subghz_sensor_protocols tools.tumoflip.test_embedded_plugin_stale_assets
+        run: python3 -m unittest tools.tumoflip.test_subghz_sensor_protocols tools.tumoflip.test_embedded_plugin_stale_assets tools.tumoflip.test_speaker_debug_linkage
 
       - name: Validate Weather Editor and Kia file compatibility
         run: |
@@ -185,7 +185,7 @@ jobs:
         run: |
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
-            updater_package fap_esp_flasher fap_quac fap_subghz_wardriving \
+            updater_package fap_speaker_debug fap_esp_flasher fap_quac fap_subghz_wardriving \
             fap_nearby_files fap_hotels_parser fap_nice_o_code fap_secplus_pin fap_weather_editor \
             fap_lfrfid_hitags \
             fap_protopirate_to_subghz fap_capture_inspector fap_specter fap_hid_ble fap_hid_usb \

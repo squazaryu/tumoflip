@@ -5,6 +5,11 @@ from SCons.Action import Action
 from SCons.Builder import Builder
 from SCons.Errors import StopError
 from SCons.Node.FS import Dir, File
+from flipper.utils import is_macos_junk
+
+
+def _ignore_macos_junk(_directory, names):
+    return [name for name in names if is_macos_junk(name)]
 
 
 def __generate_resources_dist_entries(env):
@@ -86,7 +91,7 @@ def _resources_dist_action(target, source, env):
             os.makedirs(os.path.dirname(target.path), exist_ok=True)
             shutil.copy(src.path, target.path)
         elif isinstance(src, Dir):
-            shutil.copytree(src.path, target.path)
+            shutil.copytree(src.path, target.path, ignore=_ignore_macos_junk)
         else:
             raise StopError(f"Unsupported dist entry type: {type(src)}")
 
