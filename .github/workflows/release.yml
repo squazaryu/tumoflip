@@ -149,6 +149,8 @@ jobs:
             tools/tumoflip/test_desfire_light_native.py \
             tools/tumoflip/test_nfc_key_dictionary_import.py \
             tools/tumoflip/test_nfc_hotel_parser.py \
+            tools/tumoflip/test_felica_standard.py \
+            tools/tumoflip/test_texkom_support.py \
             tools/tumoflip/test_tumokey.py \
             tools/tumoflip/test_dependency_pins.py \
             tools/tumoflip/test_file_browser_momentum.py \

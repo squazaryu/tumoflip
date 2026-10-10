@@ -98,6 +98,62 @@ class FelicaStandardTest(unittest.TestCase):
         self.assertIn("felica_standard_v2", nfc_tests)
         self.assertIn("felica_standard_read", nfc_tests)
 
+    def test_v4_separates_system_and_root_area_key_versions(self) -> None:
+        fixture_dir = (
+            REPO_ROOT
+            / "applications/debug/unit_tests/resources/unit_tests/nfc"
+        )
+        v4 = (fixture_dir / "Felica_Standard_with_keys.nfc").read_text()
+        v3 = (fixture_dir / "Felica_Standard_v3.nfc").read_text()
+        self.assertIn("Data format version: 4", v4, "fixture must use v4 semantics")
+        self.assertIn(
+            "System 00: 0003 | Key version 0001 |",
+            v4,
+            "v4 fixture keeps the actual system key version",
+        )
+        self.assertIn(
+            "Area 000: | Code 0000 | End FFFE | Services #000-#001 | Key version 0002 |",
+            v4,
+            "root area key version must remain distinct from the system key version",
+        )
+        self.assertIn("Data format version: 3", v3, "legacy fixture must remain v3")
+
+        felica = source("lib/nfc/protocols/felica/felica.c")
+        self.assertTrue(
+            "felica_data_format_version = 4" in felica,
+            "save path must write the new format version",
+        )
+        self.assertTrue(
+            "has_system_key_version = data_format_version >= 4" in felica,
+            "v3 system key version must not be trusted",
+        )
+        self.assertTrue(
+            "system->key_version = stored_key_version" in felica,
+            "v4 load must preserve the separately stored system key version",
+        )
+
+    def test_system_key_request_is_a_late_nonfatal_pass(self) -> None:
+        poller = source("lib/nfc/protocols/felica/felica_poller.c")
+        self.assertTrue(
+            "FelicaPollerStateReadSystemKeyVersions" in poller,
+            "system-node queries must be deferred until all standard data is read",
+        )
+        self.assertIn("FELICA_SYSTEM_NODE_CODE", poller)
+        system_key_handler = poller[
+            poller.index("NfcCommand felica_poller_state_handler_read_system_key_versions") :
+        ]
+        self.assertTrue(
+            "system->key_version = FELICA_KEY_VERSION_UNKNOWN" in system_key_handler,
+            "an unsupported system-node query must not fail the saved read",
+        )
+        read_blocks = poller[
+            poller.index("NfcCommand felica_poller_state_handler_read_standard_blocks") :
+        ]
+        self.assertTrue(
+            "instance->state = FelicaPollerStateReadSystemKeyVersions" in read_blocks,
+            "the optional query must follow standard-block collection",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
