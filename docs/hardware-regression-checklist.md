@@ -245,6 +245,20 @@ are legally allowed to test.
 - Read a MIFARE Ultralight/NTAG card with PWD/PACK data and confirm the read
   success screen displays the values.
 - Read a Bambu Lab filament spool tag and confirm parser output.
+- With your own Texkom fobs (TK13, TK15, TK17, and MMBIT), confirm NFC Read
+  reports the detected type, UID, and checksum state. Save each read, reopen it,
+  and confirm it still emulates. Test emulation only against your own compatible
+  reader; do not write to or alter a physical fob.
+- Open Add Manually and confirm TK13, TK17, and MMBIT generate a frame with a
+  valid checksum and random UID. TK15 should not be offered as a separate
+  generator because it shares TK13 frame data and differs only in timing.
+- On your own FeliCa Standard card where available, confirm the system key
+  version is independent from the key version of Area 0000. Save and reopen the
+  dump. Load a legacy format-v3 dump and confirm its system key version is
+  Unknown while area and service key versions remain intact.
+- If a FeliCa card does not answer the optional system-node version request,
+  confirm the read still completes with the already-read services, areas, and
+  public blocks preserved.
 - Exit NFC and reopen it without lag, crash, or stuck storage activity.
 
 ### Sleep/Wake And Repeated Launch

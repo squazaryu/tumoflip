@@ -157,6 +157,9 @@ class MfUltralightAesTest(unittest.TestCase):
             [
                 "NfcDataGeneratorTypeMfUltralightC",
                 "NfcDataGeneratorTypeMfUltralightAES",
+                "NfcDataGeneratorTypeTexkomTk13",
+                "NfcDataGeneratorTypeTexkomTk17",
+                "NfcDataGeneratorTypeTexkomMmbit",
                 "NfcDataGeneratorTypeNum",
             ],
         )

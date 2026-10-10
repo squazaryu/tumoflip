@@ -88,7 +88,7 @@ class UpstreamInputHardeningTests(unittest.TestCase):
 
     def test_public_lfrfid_ids_do_not_change_silently_at_api_88_14(self) -> None:
         api = source("targets/f7/api_symbols.csv")
-        self.assertEqual(api.splitlines()[1], "Version,+,88.15,,")
+        self.assertEqual(api.splitlines()[1], "Version,+,88.17,,")
         text = source("lib/lfrfid/protocols/lfrfid_protocols.h")
         match = re.search(r"typedef enum \{(.*?)\} LFRFIDProtocol;", text, re.DOTALL)
         self.assertIsNotNone(match)
