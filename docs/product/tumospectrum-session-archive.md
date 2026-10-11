@@ -1,6 +1,6 @@
 # TumoSpectrum Session Archive — capability contract
 
-**Status:** merged to `dev` in PR #545; Dev 009-023 release preparation is in progress. Device acceptance remains pending.
+**Status:** merged to `dev` in PR #545; the Dev 009-023 updater/package build and validator passed. Publication and device acceptance remain pending.
 
 ## CAPABILITY
 
@@ -63,4 +63,4 @@ Let a Flipper owner browse and reopen prior TumoSpectrum capture-set analyses in
 
 ## HANDOFF
 
-Host tests, the TumoSpectrum FAP build, the PR clean F7 build, and Build & Analyze pass. The exact Dev 009-023 updater/package validation, on-device file-browser/layout review, SD failure injection, and physical-device acceptance remain outstanding. The release is a Dev candidate; it must not be promoted to stable until the hardware checklist is completed.
+Host tests, the TumoSpectrum FAP build, PR Build & Analyze, and the exact Dev 009-023 updater/package validator pass. Updater validation reported a 4096-byte physical C2 gap, 4480-byte section gap, 4171-byte DFU container gap, and a 120057-byte updater. On-device file-browser/layout review, SD failure injection, and physical-device acceptance remain outstanding. This is a Dev candidate, not a stable promotion.
