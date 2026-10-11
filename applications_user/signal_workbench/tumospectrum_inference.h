@@ -1,6 +1,7 @@
 #pragma once
 
 #include "tumospectrum_types.h"
+#include "tumospectrum_archive_model.h"
 #include "sensor_fit.h"
 
 #define TUMOSPECTRUM_SET_MIN_SAMPLES  3U
@@ -90,6 +91,8 @@ typedef struct {
     char control_label[TUMOSPECTRUM_SET_LABEL_SIZE];
     TumoSpectrumCaptureType type;
     TumoSpectrumCapture samples[TUMOSPECTRUM_SET_MAX_SAMPLES];
+    TumoSpectrumArchiveSource sources[TUMOSPECTRUM_SET_MAX_SAMPLES];
+    char created_at[32];
     size_t sample_count;
     TumoSpectrumInference inference;
     bool inferred;

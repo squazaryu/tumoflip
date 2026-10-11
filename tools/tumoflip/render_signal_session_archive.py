@@ -100,7 +100,7 @@ int main(int argc,char** argv) {
  menu(&c,argv[1],"01-main-menu","TumoSpectrum",main_menu,13,7,6);
  const char* sets_menu[]={"Latest set","Browse archive","About saved sets"};
  menu(&c,argv[1],"02-capture-sets","Capture Sets",sets_menu,3,1,0);
- const char* sessions[]={"Garage 4/4 OK 10/11","Gate B 3/4 CHG 10/09","Weather 4/4 OK 10/08","IR Remote 4/4 OK 10/02","Meter 3/3 OK 09/29"};
+ const char* sessions[]={"Garage_Gate_20261011","GateB_Press_20261009","Weather_Sensor_20261008","IR_Remote_20261002","Meter_20260929"};
  menu(&c,argv[1],"03-archive-top","Saved sets",sessions,5,0,0);
  menu(&c,argv[1],"04-archive-scroll","Saved sets",sessions,5,4,2);
  archive_set_actions(&c,argv[1]);

@@ -30,7 +30,9 @@ BAND_MAP_SOURCE = APP_DIR / "tumospectrum_band_map.c"
 BAND_MAP_HEADER = APP_DIR / "tumospectrum_band_map.h"
 BAND_SESSION_SOURCE = APP_DIR / "tumospectrum_band_session.c"
 STORAGE_SOURCE = APP_DIR / "tumospectrum_storage.c"
+STORAGE_HEADER = APP_DIR / "tumospectrum_storage.h"
 ARCHIVE_MODEL_SOURCE = APP_DIR / "tumospectrum_archive_model.c"
+ARCHIVE_MODEL_HEADER = APP_DIR / "tumospectrum_archive_model.h"
 APP_MANIFEST = APP_DIR / "application.fam"
 SUBGHZ_SOURCE = REPO_ROOT / "applications/main/subghz/subghz.c"
 INFRARED_SOURCE = REPO_ROOT / "applications/main/infrared/infrared_app.c"
@@ -60,6 +62,9 @@ class TumoSpectrumTest(unittest.TestCase):
         cls.band_map_header = BAND_MAP_HEADER.read_text(encoding="utf-8")
         cls.band_session = BAND_SESSION_SOURCE.read_text(encoding="utf-8")
         cls.storage = STORAGE_SOURCE.read_text(encoding="utf-8")
+        cls.storage_header = STORAGE_HEADER.read_text(encoding="utf-8")
+        cls.archive_model = ARCHIVE_MODEL_SOURCE.read_text(encoding="utf-8")
+        cls.archive_model_header = ARCHIVE_MODEL_HEADER.read_text(encoding="utf-8")
         cls.manifest = APP_MANIFEST.read_text(encoding="utf-8")
         cls.subghz = SUBGHZ_SOURCE.read_text(encoding="utf-8")
         cls.infrared = INFRARED_SOURCE.read_text(encoding="utf-8")
@@ -78,8 +83,8 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_app_migrates_in_place_without_duplicate_fap(self) -> None:
         self.assertIn('appid="signal_workbench"', self.manifest)
         self.assertIn('name="TumoSpectrum"', self.manifest)
-        self.assertIn('fap_version="3.2.0"', self.manifest)
-        self.assertIn('"TumoSpectrum 3.2"', self.source)
+        self.assertIn('fap_version="3.3.0"', self.manifest)
+        self.assertIn('"TumoSpectrum 3.3"', self.source)
         self.assertIn('fap_category="Module One/Signals"', self.manifest)
         self.assertIn(
             'fap_dist_path="apps/Module One/Signals/signal_workbench.fap"', self.manifest
@@ -169,6 +174,12 @@ class TumoSpectrumTest(unittest.TestCase):
             "TumoSpectrumReplayStaticLike",
             "TUMOSPECTRUM_LATEST_SET_ARG",
             "TUMOSPECTRUM_PROFILES_ARG",
+            "TumoSpectrumMenuCaptureSets",
+            "TumoSpectrumCaptureSetsBrowse",
+            "tumospectrum_storage_load_set",
+            "tumospectrum_storage_check_set_sources",
+            "view_dispatcher_show_loading",
+            "furi_thread_alloc_ex(\"TumoArchive\"",
             'elements_button_center(canvas, listening ? "Stop" : "Start")',
             '"Demo" : "Delete"',
             "protocol_profile_package_delete",
@@ -178,14 +189,23 @@ class TumoSpectrumTest(unittest.TestCase):
             self.assertIn(required, self.source)
 
     def test_capture_set_archive_supports_legacy_and_source_statuses(self) -> None:
-        combined = self.source + self.storage
+        combined = self.source + self.storage + self.storage_header + self.archive_model
         for required in (
             "tumospectrum_storage_load_set",
             "tumospectrum_archive_source_status",
+            "tumospectrum_capture_set_fingerprint_source",
+            "tumospectrum_storage_hash_source",
+            "tumospectrum_storage_check_set_sources",
+            "tumospectrum_archive_path_valid",
+            "tumospectrum_archive_paths_unique",
+            "tumospectrum_storage_export_set_report",
+            "tumospectrum_write_new_file",
             "TUMOSPECTRUM_CAPTURE_SET_VERSION 3U",
             '"Source SHA256 1"',
             '"Source size 1"',
-            '"Source files: unverified"',
+            "version != 1U && version != 2U && version != TUMOSPECTRUM_CAPTURE_SET_VERSION",
+            '"Sources: unverified"',
+            "capture_set->sources[index].status = TumoSpectrumArchiveSourceUnverified",
         ):
             self.assertIn(required, combined)
 
@@ -434,7 +454,7 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_reports_have_json_notebook_and_fab2_contract(self) -> None:
         for required in (
             '"schema\\\":1',
-            '"schema\\\":2',
+            '"schema\\\":3',
             '"app\\\":\\\"TumoSpectrum',
             '"kind\\\":\\\"capture_set',
             '"bitstream\\\":{',

@@ -14,6 +14,13 @@ typedef enum {
     TumoSpectrumArchiveSourceReadError,
 } TumoSpectrumArchiveSourceStatus;
 
+typedef struct {
+    bool fingerprinted;
+    uint32_t size;
+    uint8_t sha256[TUMOSPECTRUM_ARCHIVE_DIGEST_SIZE];
+    TumoSpectrumArchiveSourceStatus status;
+} TumoSpectrumArchiveSource;
+
 TumoSpectrumArchiveSourceStatus tumospectrum_archive_source_status(
     bool fingerprinted,
     bool source_exists,
