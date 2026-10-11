@@ -1,3 +1,7 @@
+## Unreleased
+- Sub-GHz: Add Manually supports Nice O-Code at 433.92 MHz. Advanced entry asks for the 16-bit installer code and stores it in the `.sub` file; the reserved plain FloR-S value and a missing rainbow table fail closed. Existing FloR-S and Nice One generation remain unchanged.
+- F7 API: add a dedicated Nice O-Code file-generation symbol; API advances to 88.18.
+
 ## Tumoflip Dev 009-019
 - NFC: passively identify and read DESFire Light cards. Retry GetVersion in the other command mode only after a deterministic card refusal; transport and malformed-frame errors still fail. Refused optional fields no longer abort the read, stale key counts are cleared before saving, and successful events clear prior optional-field errors.
 - Sub-GHz: add static KeyFinder2 and Doorbell32 decoders/encoders at 433 MHz AM. They are classified as Sensors and remain covered by the existing Ignore Sensors receiver setting.

@@ -202,6 +202,36 @@ bool subghz_txrx_gen_nice_flor_s_protocol(
     return res;
 }
 
+bool subghz_txrx_gen_nice_o_code_protocol(
+    void* context,
+    const char* preset_name,
+    uint32_t frequency,
+    uint32_t serial,
+    uint8_t btn,
+    uint16_t cnt,
+    uint16_t ic) {
+    SubGhzTxRx* txrx = context;
+    bool res = false;
+
+    SubGhzTransmitter* transmitter =
+        subghz_transmitter_alloc_init(txrx->environment, SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME);
+    subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
+
+    if(transmitter && subghz_protocol_nice_o_create_data(
+                          subghz_transmitter_get_protocol_instance(transmitter),
+                          txrx->fff_data,
+                          serial,
+                          btn,
+                          cnt,
+                          ic,
+                          txrx->preset)) {
+        res = true;
+    }
+
+    subghz_transmitter_free(transmitter);
+    return res;
+}
+
 bool subghz_txrx_gen_faac_slh_protocol(
     void* context,
     const char* preset_name,

@@ -269,6 +269,10 @@ bool subghz_scene_set_counter_on_event(void* context, SceneManagerEvent event) {
                     subghz->gen_info->ditec_gol4.cnt);
                 break;
             case GenNiceFlorS:
+                if(subghz->gen_info->nice_flor_s.o_code) {
+                    scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSetSeed);
+                    return true;
+                }
                 generated_protocol = subghz_txrx_gen_nice_flor_s_protocol(
                     subghz->txrx,
                     subghz->gen_info->mod,

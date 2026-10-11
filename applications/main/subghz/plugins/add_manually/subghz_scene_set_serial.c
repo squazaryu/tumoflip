@@ -159,6 +159,12 @@ bool subghz_scene_set_serial_on_event(void* context, SceneManagerEvent event) {
             case GenNiceFlorS:
                 subghz->gen_info->nice_flor_s.serial =
                     __bswap32(subghz->gen_info->nice_flor_s.serial);
+                if(subghz->gen_info->nice_flor_s.o_code &&
+                   subghz->gen_info->nice_flor_s.serial > 0x0FFFFFFFu) {
+                    furi_string_set(subghz->error_str, "Serial exceeds 28-bit Nice O-Code range.");
+                    scene_manager_next_scene(subghz->scene_manager, SubGhzSceneShowError);
+                    return true;
+                }
                 break;
             case GenSecPlus2:
                 subghz->gen_info->sec_plus_2.serial =

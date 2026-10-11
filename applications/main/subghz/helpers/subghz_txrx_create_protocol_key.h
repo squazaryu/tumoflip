@@ -82,6 +82,15 @@ bool subghz_txrx_gen_nice_flor_s_protocol(
     uint16_t cnt,
     bool nice_one);
 
+bool subghz_txrx_gen_nice_o_code_protocol(
+    void* context,
+    const char* preset_name,
+    uint32_t frequency,
+    uint32_t serial,
+    uint8_t btn,
+    uint16_t cnt,
+    uint16_t ic);
+
 bool subghz_txrx_gen_faac_slh_protocol(
     void* context,
     const char* preset_name,

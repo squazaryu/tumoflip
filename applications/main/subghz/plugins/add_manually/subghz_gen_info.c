@@ -228,6 +228,11 @@ static const uint8_t subghz_keeloq_preset_by_type[SetTypeMAX] = {
     [SetTypeHCS101_433_92] = 51,
 };
 
+static uint16_t subghz_gen_info_random_nice_o_code_ic(void) {
+    const uint16_t ic = (uint16_t)rand();
+    return ic == UINT16_MAX ? 0 : ic;
+}
+
 static bool subghz_gen_info_fill_keeloq(GenInfo* gen_info, SetType type, uint64_t key) {
     if(type >= SetTypeMAX) return false;
 
@@ -662,7 +667,8 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .nice_flor_s.serial = key & 0x0FFFFFFF,
             .nice_flor_s.btn = 0x01,
             .nice_flor_s.cnt = 0x03,
-            .nice_flor_s.nice_one = false};
+            .nice_flor_s.nice_one = false,
+            .nice_flor_s.o_code = false};
         break;
     case SetTypeNiceOne_433_92:
         gen_info = (GenInfo){
@@ -672,7 +678,20 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .nice_flor_s.serial = key & 0x0FFFFFFF,
             .nice_flor_s.btn = 0x01,
             .nice_flor_s.cnt = 0x03,
-            .nice_flor_s.nice_one = true};
+            .nice_flor_s.nice_one = true,
+            .nice_flor_s.o_code = false};
+        break;
+    case SetTypeNiceOCode_433_92:
+        gen_info = (GenInfo){
+            .type = GenNiceFlorS,
+            .mod = "AM650",
+            .freq = 433920000,
+            .nice_flor_s.serial = key & 0x0FFFFFFF,
+            .nice_flor_s.btn = 0x01,
+            .nice_flor_s.cnt = 0x03,
+            .nice_flor_s.ic = subghz_gen_info_random_nice_o_code_ic(),
+            .nice_flor_s.nice_one = false,
+            .nice_flor_s.o_code = true};
         break;
     case SetTypeSecPlus_v1_315_00:
         gen_info = (GenInfo){.type = GenSecPlus1, .mod = "AM650", .freq = 315000000};
