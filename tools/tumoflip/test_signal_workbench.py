@@ -30,6 +30,7 @@ BAND_MAP_SOURCE = APP_DIR / "tumospectrum_band_map.c"
 BAND_MAP_HEADER = APP_DIR / "tumospectrum_band_map.h"
 BAND_SESSION_SOURCE = APP_DIR / "tumospectrum_band_session.c"
 STORAGE_SOURCE = APP_DIR / "tumospectrum_storage.c"
+ARCHIVE_MODEL_SOURCE = APP_DIR / "tumospectrum_archive_model.c"
 APP_MANIFEST = APP_DIR / "application.fam"
 SUBGHZ_SOURCE = REPO_ROOT / "applications/main/subghz/subghz.c"
 INFRARED_SOURCE = REPO_ROOT / "applications/main/infrared/infrared_app.c"
@@ -143,7 +144,8 @@ class TumoSpectrumTest(unittest.TestCase):
             '"Open Saved Infrared"',
             '"New Sub-GHz Set"',
             '"New Infrared Set"',
-            '"Latest Capture Set"',
+            '"Capture Sets"',
+            '"Browse archive"',
             '"Open TumoScope"',
             '"Protocol Profiles"',
             '"Compare Capture"',
@@ -174,6 +176,78 @@ class TumoSpectrumTest(unittest.TestCase):
             'if(!tumospectrum_protocol_has_demo(package)) elements_button_right(canvas, "Delete")',
         ):
             self.assertIn(required, self.source)
+
+    def test_capture_set_archive_supports_legacy_and_source_statuses(self) -> None:
+        combined = self.source + self.storage
+        for required in (
+            "tumospectrum_storage_load_set",
+            "tumospectrum_archive_source_status",
+            "TUMOSPECTRUM_CAPTURE_SET_VERSION 3U",
+            '"Source SHA256 1"',
+            '"Source size 1"',
+            '"Source files: unverified"',
+        ):
+            self.assertIn(required, combined)
+
+    def test_archive_source_status_model_executes_on_host(self) -> None:
+        harness = textwrap.dedent(
+            """
+            #include "tumospectrum_archive_model.h"
+            #include <assert.h>
+            #include <stdint.h>
+
+            int main(void) {
+                uint8_t expected[TUMOSPECTRUM_ARCHIVE_DIGEST_SIZE] = {0};
+                uint8_t actual[TUMOSPECTRUM_ARCHIVE_DIGEST_SIZE] = {0};
+                expected[0] = actual[0] = 0xA5U;
+                assert(tumospectrum_archive_source_status(
+                           false, true, true, 10U, 10U, NULL, NULL) ==
+                       TumoSpectrumArchiveSourceUnverified);
+                assert(tumospectrum_archive_source_status(
+                           true, false, false, 10U, 0U, expected, NULL) ==
+                       TumoSpectrumArchiveSourceMissing);
+                assert(tumospectrum_archive_source_status(
+                           true, true, false, 10U, 10U, expected, NULL) ==
+                       TumoSpectrumArchiveSourceReadError);
+                assert(tumospectrum_archive_source_status(
+                           true, true, true, 10U, 10U, expected, actual) ==
+                       TumoSpectrumArchiveSourceUnchanged);
+                assert(tumospectrum_archive_source_status(
+                           true, true, true, 10U, 11U, expected, actual) ==
+                       TumoSpectrumArchiveSourceChanged);
+                actual[1] = 0x01U;
+                assert(tumospectrum_archive_source_status(
+                           true, true, true, 10U, 10U, expected, actual) ==
+                       TumoSpectrumArchiveSourceChanged);
+                return 0;
+            }
+            """
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source = tmp_path / "archive_model_test.c"
+            binary = tmp_path / "archive_model_test"
+            source.write_text(harness, encoding="utf-8")
+            result = subprocess.run(
+                [
+                    "clang",
+                    "-std=c11",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    "-I",
+                    str(APP_DIR),
+                    str(source),
+                    str(ARCHIVE_MODEL_SOURCE),
+                    "-o",
+                    str(binary),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            subprocess.run([str(binary)], check=True, capture_output=True, text=True)
 
     def test_profile_delete_is_bounded_and_demo_is_protected(self) -> None:
         profile_storage = (
