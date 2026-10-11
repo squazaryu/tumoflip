@@ -1,3 +1,6 @@
+## Unreleased
+- TumoSpectrum 3.3: browse timestamped capture-set analyses, reopen saved snapshots, and verify source files by SHA-256. Legacy schema 1/2 sets remain readable but are explicitly marked unverified. Source captures are read-only and exports use new filenames.
+
 ## Tumoflip Dev 009-022
 - Sub-GHz: Add Manually supports Nice O-Code at 433.92 MHz. Advanced entry asks for the 16-bit installer code and stores it in the `.sub` file; the reserved plain FloR-S value and a missing rainbow table fail closed. Existing FloR-S and Nice One generation remain unchanged.
 - F7 API: add a dedicated Nice O-Code file-generation symbol; API advances to 88.18.
