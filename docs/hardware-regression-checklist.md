@@ -102,6 +102,22 @@ are legally allowed to test.
   the CC1101 enters transmit mode.
 - Exit Sub-GHz and reopen it three times without a radio lock or crash.
 
+### Nice O-Code Add Manually (Dev 009-022)
+
+- Use only a Nice O-Code system you own or are authorized to test.
+- In Standard Sub-GHz -> Add Manually -> Advanced, enter a 28-bit serial,
+  button, counter, and the known 16-bit installer code.
+- Confirm IC `FFFF` is rejected as the plain FloR-S marker, and invalid serial or
+  button widths are rejected with a specific error.
+- Save the generated signal, reopen it, and confirm the file contains the `IC`
+  field and decodes as Nice O-Code.
+- Cancel during IC entry and confirm no incomplete signal is saved.
+- Generate and reopen ordinary FloR-S and Nice One samples; confirm they still
+  use the existing path and are not tagged as O-Code.
+- On your own receiver, use its normal enrollment procedure before checking that
+  the generated signal behaves as intended. This build does not add the separate
+  Nice O-Code recovery app's New-remote action.
+
 ### External CC1101 And Module One
 
 - Connect Module One or another supported external CC1101 module.
