@@ -73,6 +73,13 @@ class NiceOCodeAddManuallyTest(unittest.TestCase):
         self.assertIn("subghz_protocol_nice_flor_s_create_data", wrapper)
         self.assertIn("subghz_protocol_nice_o_create_data", wrapper)
 
+    def test_advanced_generator_rejects_values_outside_protocol_widths(self) -> None:
+        serial = self.read("applications/main/subghz/plugins/add_manually/subghz_scene_set_serial.c")
+        button = self.read("applications/main/subghz/plugins/add_manually/subghz_scene_set_button.c")
+
+        self.assertIn('"Serial exceeds 28-bit Nice O-Code range."', serial)
+        self.assertIn('"Button must fit in 4 bits for Nice O-Code."', button)
+
 
 if __name__ == "__main__":
     unittest.main()
