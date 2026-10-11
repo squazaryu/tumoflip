@@ -26,6 +26,14 @@ void subghz_scene_set_seed_on_enter(void* context) {
         byte_ptr = (uint8_t*)&subghz->gen_info->keeloq_seed.seed;
         byte_count = sizeof(subghz->gen_info->keeloq_seed.seed);
         break;
+    case GenNiceFlorS:
+        if(!subghz->gen_info->nice_flor_s.o_code) {
+            subghz_scene_show_unsupported(subghz);
+            return;
+        }
+        byte_ptr = (uint8_t*)&subghz->gen_info->nice_flor_s.ic;
+        byte_count = sizeof(subghz->gen_info->nice_flor_s.ic);
+        break;
     // Not needed for these types
     case GenKeeloq:
     case GenAlutechAt4n:
@@ -36,7 +44,6 @@ void subghz_scene_set_seed_on_enter(void* context) {
     case GenJarolift:
     case GenSuperrollo:
     case GenDitecGOL4:
-    case GenNiceFlorS:
     case GenSecPlus2:
     case GenPhoenixV2:
     case GenData:
@@ -50,11 +57,17 @@ void subghz_scene_set_seed_on_enter(void* context) {
     furi_assert(byte_ptr);
     furi_assert(byte_count > 0);
 
-    *((uint32_t*)byte_ptr) = __bswap32(*((uint32_t*)byte_ptr)); // Convert
+    if(byte_count == sizeof(uint16_t)) {
+        *((uint16_t*)byte_ptr) = __bswap16(*((uint16_t*)byte_ptr));
+    } else {
+        *((uint32_t*)byte_ptr) = __bswap32(*((uint32_t*)byte_ptr));
+    }
 
     // Setup view
     ByteInput* byte_input = subghz->byte_input;
-    byte_input_set_header_text(byte_input, "Enter SEED in hex");
+    byte_input_set_header_text(
+        byte_input,
+        subghz->gen_info->type == GenNiceFlorS ? "Enter IC in hex" : "Enter SEED in hex");
     byte_input_set_result_callback(
         byte_input, subghz_scene_set_seed_byte_input_callback, NULL, subghz, byte_ptr, byte_count);
     view_dispatcher_switch_to_view(subghz->view_dispatcher, SubGhzViewIdByteInput);
@@ -91,6 +104,22 @@ bool subghz_scene_set_seed_on_event(void* context, SceneManagerEvent event) {
                     subghz->gen_info->keeloq_seed.seed,
                     subghz->gen_info->keeloq_seed.manuf);
                 break;
+            case GenNiceFlorS:
+                subghz->gen_info->nice_flor_s.ic = __bswap16(subghz->gen_info->nice_flor_s.ic);
+                if(subghz->gen_info->nice_flor_s.ic == UINT16_MAX) {
+                    furi_string_set(subghz->error_str, "IC FFFF is reserved\nfor plain FloR-S.");
+                    scene_manager_next_scene(subghz->scene_manager, SubGhzSceneShowError);
+                    return true;
+                }
+                generated_protocol = subghz_txrx_gen_nice_o_code_protocol(
+                    subghz->txrx,
+                    subghz->gen_info->mod,
+                    subghz->gen_info->freq,
+                    subghz->gen_info->nice_flor_s.serial,
+                    subghz->gen_info->nice_flor_s.btn,
+                    subghz->gen_info->nice_flor_s.cnt,
+                    subghz->gen_info->nice_flor_s.ic);
+                break;
             // Not needed for these types
             case GenKeeloq:
             case GenAlutechAt4n:
@@ -101,7 +130,6 @@ bool subghz_scene_set_seed_on_event(void* context, SceneManagerEvent event) {
             case GenJarolift:
             case GenSuperrollo:
             case GenDitecGOL4:
-            case GenNiceFlorS:
             case GenSecPlus2:
             case GenPhoenixV2:
             case GenData:

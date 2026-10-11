@@ -81,6 +81,7 @@ static const char* submenu_names[SetTypeMAX] = {
     [SetTypeNiceSmilo_433_92] = "KL: Nice Smilo 433MHz",
     [SetTypeNiceFlorS_433_92] = "Nice FloR-S 433MHz",
     [SetTypeNiceOne_433_92] = "Nice One 433MHz",
+    [SetTypeNiceOCode_433_92] = "Nice O-Code 433MHz",
     [SetTypeNiceFlo12bit] = "Nice Flo 12bit 433MHz",
     [SetTypeNiceFlo24bit] = "Nice Flo 24bit 433MHz",
     [SetTypeCAME12bit] = "CAME 12bit 433MHz",
@@ -267,14 +268,25 @@ bool subghz_scene_set_type_generate_protocol_from_infos(SubGhz* subghz) {
             gen_info.ditec_gol4.cnt);
         break;
     case GenNiceFlorS:
-        generated_protocol = subghz_txrx_gen_nice_flor_s_protocol(
-            subghz->txrx,
-            gen_info.mod,
-            gen_info.freq,
-            gen_info.nice_flor_s.serial,
-            gen_info.nice_flor_s.btn,
-            gen_info.nice_flor_s.cnt,
-            gen_info.nice_flor_s.nice_one);
+        if(gen_info.nice_flor_s.o_code) {
+            generated_protocol = subghz_txrx_gen_nice_o_code_protocol(
+                subghz->txrx,
+                gen_info.mod,
+                gen_info.freq,
+                gen_info.nice_flor_s.serial,
+                gen_info.nice_flor_s.btn,
+                gen_info.nice_flor_s.cnt,
+                gen_info.nice_flor_s.ic);
+        } else {
+            generated_protocol = subghz_txrx_gen_nice_flor_s_protocol(
+                subghz->txrx,
+                gen_info.mod,
+                gen_info.freq,
+                gen_info.nice_flor_s.serial,
+                gen_info.nice_flor_s.btn,
+                gen_info.nice_flor_s.cnt,
+                gen_info.nice_flor_s.nice_one);
+        }
         break;
     case GenSecPlus1:
         generated_protocol =

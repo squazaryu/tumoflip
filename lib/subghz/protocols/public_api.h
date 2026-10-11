@@ -177,6 +177,29 @@ bool subghz_protocol_nice_flor_s_create_data(
     bool nice_one);
 
 /**
+ * Create one Nice O-Code file frame for a known installer code.
+ * The installer code is stored in the file as the `IC` field so the decoder can
+ * distinguish O-Code from plain FloR-S. The receiver may still require the
+ * remote to be enrolled through its normal pairing procedure.
+ * @param context Pointer to a SubGhzProtocolEncoderNiceFlorS instance
+ * @param flipper_format Pointer to a FlipperFormat instance
+ * @param serial 28-bit serial number
+ * @param btn 4-bit button number
+ * @param cnt 16-bit counter
+ * @param ic 16-bit installer code (0xFFFF is reserved for plain FloR-S)
+ * @param preset Modulation, SubGhzRadioPreset
+ * @return true On success, false if input is invalid or the rainbow table is missing
+ */
+bool subghz_protocol_nice_o_create_data(
+    void* context,
+    FlipperFormat* flipper_format,
+    uint32_t serial,
+    uint8_t btn,
+    uint16_t cnt,
+    uint16_t ic,
+    SubGhzRadioPreset* preset);
+
+/**
  * Key generation from simple data.
  * @param context Pointer to a SubGhzProtocolEncoderSomfyTelis instance
  * @param flipper_format Pointer to a FlipperFormat instance

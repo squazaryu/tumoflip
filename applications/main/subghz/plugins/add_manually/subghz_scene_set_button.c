@@ -100,6 +100,13 @@ bool subghz_scene_set_button_on_event(void* context, SceneManagerEvent event) {
 
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == SubGhzCustomEventByteInputDone) {
+            if(subghz->gen_info->type == GenNiceFlorS && subghz->gen_info->nice_flor_s.o_code &&
+               subghz->gen_info->nice_flor_s.btn > 0x0Fu) {
+                furi_string_set(subghz->error_str, "Button must fit in 4 bits for Nice O-Code.");
+                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneShowError);
+                return true;
+            }
+
             switch(subghz->gen_info->type) {
             case GenFaacSLH:
             case GenKeeloq:
