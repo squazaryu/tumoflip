@@ -1,6 +1,6 @@
 # TumoSpectrum Session Archive — capability contract
 
-**Status:** local implementation candidate; no release or device acceptance yet.
+**Status:** merged to `dev` in PR #545; Dev 009-023 release preparation is in progress. Device acceptance remains pending.
 
 ## CAPABILITY
 
@@ -63,4 +63,4 @@ Let a Flipper owner browse and reopen prior TumoSpectrum capture-set analyses in
 
 ## HANDOFF
 
-Host tests and the TumoSpectrum FAP build pass. The full F7 firmware bundle, exact size deltas, on-device file-browser/layout review, SD failure injection, and physical-device acceptance remain outstanding. No publication is authorized by this implementation.
+Host tests, the TumoSpectrum FAP build, the PR clean F7 build, and Build & Analyze pass. The exact Dev 009-023 updater/package validation, on-device file-browser/layout review, SD failure injection, and physical-device acceptance remain outstanding. The release is a Dev candidate; it must not be promoted to stable until the hardware checklist is completed.

@@ -1,6 +1,6 @@
 # Hardware Regression Checklist
 
-Checklist version: 2
+Checklist version: 3
 
 Use this checklist for tumoflip release candidates before marking a release as
 hardware-validated. CI can build firmware, validate packages, run unit tests,
@@ -20,7 +20,7 @@ hardware cases as unverified.
 ```text
 Hardware validation
 - status: not run | partial | passed | failed
-- checklist version: 2
+- checklist version: 3
 - firmware version:
 - release tag:
 - firmware commit:
@@ -255,6 +255,29 @@ are legally allowed to test.
   changing the BLE owner. Unplug/replug USB and confirm Mac reconnects. Quit the
   Mac app and confirm qFlipper can immediately reopen the serial connection.
 - Disconnect and reconnect without rebooting the Flipper.
+
+### TumoSpectrum Capture Sets (Dev 009-023)
+
+- Back up `/ext/apps_data/signal_workbench/` and use copies of your own `.sub`
+  or `.ir` captures for the checks below.
+- Open `Apps -> Module One -> Signals -> TumoSpectrum -> Capture Sets`; confirm
+  `Latest set` remains available and `Browse archive` lists saved timestamped
+  sets without hiding older timestamp-only entries.
+- Open a saved set and confirm its saved analysis is readable. Run `Check
+  source files`; unchanged inputs must show `Unchanged`. Missing or modified
+  *copies* must be identified as `Missing` or `Changed`, without altering the
+  capture or replacing the saved analysis.
+- Open a legacy schema-1/2 set; confirm it remains readable and is explicitly
+  `Unverified` when its source exists. Do not treat path/size equality as proof
+  that its source is unchanged.
+- Export the set report twice. Each export must have a distinct name and the
+  first report must remain unchanged.
+- Start source verification on a large test file and press Back; confirm the
+  operation cancels before any archive write, the UI returns cleanly, and a
+  subsequent check succeeds.
+- Confirm opening, browsing, checking, and exporting an archive does not start
+  radio transmission, delete/rename source captures, or change Standard
+  Sub-GHz and Read RAW settings.
 
 ### NFC
 

@@ -122,10 +122,11 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("CI must not mark hardware-only checks as passed", workflow)
         self.assertIn("docs/hardware-regression-checklist.md", workflow)
 
-        self.assertIn("Checklist version: 2", doc)
+        self.assertIn("Checklist version: 3", doc)
         self.assertIn("Do not mark a hardware-only item as passed", doc)
         self.assertIn("Install And Identity", doc)
         self.assertIn("System Sub-GHz Internal CC1101", doc)
+        self.assertIn("TumoSpectrum Capture Sets (Dev 009-023)", doc)
         self.assertIn("External CC1101 And Module One", doc)
         self.assertIn("Protocol Packs", doc)
         self.assertIn("BLE App Bridge And Runtime", doc)
