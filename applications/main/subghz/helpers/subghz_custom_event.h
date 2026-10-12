@@ -174,5 +174,8 @@ typedef enum {
     SetTypeSecPlus_v2_390_00,
     SetTypeSecPlus_v2_433_00,
 
+    // Append new selections to preserve the IDs shared with loadable scenes.
+    SetTypeErreka868,
+
     SetTypeMAX,
 } SetType;

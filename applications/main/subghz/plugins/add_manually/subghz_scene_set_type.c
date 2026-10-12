@@ -18,6 +18,7 @@ static const char* submenu_names[SetTypeMAX] = {
     [SetTypeGeniusSLH_868] = "Genius SLH 868MHz",
     [SetTypeBFTMitto] = "BFT Mitto 433MHz",
     [SetTypeErreka433] = "Erreka 433MHz",
+    [SetTypeErreka868] = "Erreka 868MHz",
     [SetTypeSomfyTelis] = "Somfy Telis 433MHz",
     [SetTypeSomfyKeytis] = "Somfy Keytis 433MHz",
     [SetTypeANMotorsAT4] = "AN-Motors AT4 433MHz",
@@ -121,8 +122,17 @@ void subghz_scene_set_type_on_enter(void* context) {
     SubGhz* subghz = context;
 
     for(SetType i = 0; i < SetTypeMAX; i++) {
+        if(i == SetTypeErreka868) continue;
         submenu_add_item(
             subghz->submenu, submenu_names[i], i, subghz_scene_set_type_submenu_callback, subghz);
+        if(i == SetTypeErreka433) {
+            submenu_add_item(
+                subghz->submenu,
+                submenu_names[SetTypeErreka868],
+                SetTypeErreka868,
+                subghz_scene_set_type_submenu_callback,
+                subghz);
+        }
     }
 
     submenu_set_selected_item(

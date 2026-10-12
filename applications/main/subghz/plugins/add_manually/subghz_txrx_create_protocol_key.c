@@ -160,9 +160,8 @@ bool subghz_txrx_gen_keeloq_seed_protocol(
             seed_data[sizeof(uint32_t) - i - 1] = (seed >> i * 8) & 0xFF;
         }
 
-        flipper_format_write_hex(txrx->fff_data, "Seed", seed_data, sizeof(uint32_t));
-
-        flipper_format_write_string_cstr(txrx->fff_data, "Manufacture", manufacture_name);
+        res = flipper_format_write_hex(txrx->fff_data, "Seed", seed_data, sizeof(uint32_t)) &&
+              flipper_format_write_string_cstr(txrx->fff_data, "Manufacture", manufacture_name);
     }
 
     subghz_transmitter_free(transmitter);
