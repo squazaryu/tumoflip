@@ -1561,8 +1561,9 @@ SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(
     subghz_protocol_keeloq_check_remote_controller(
         &instance->generic, instance->keystore, &instance->manufacture_name);
 
-    // Monarch keeps its discriminator in seed, so it has to be saved like the BFT seed
+    // Preserve the Erreka seed and Monarch discriminator when saving a loaded capture.
     if((strcmp(instance->manufacture_name, "BFT") == 0) ||
+       (strcmp(instance->manufacture_name, "Erreka") == 0) ||
        (strcmp(instance->manufacture_name, "Monarch") == 0)) {
         uint8_t seed_data[sizeof(uint32_t)] = {0};
         for(size_t i = 0; i < sizeof(uint32_t); i++) {

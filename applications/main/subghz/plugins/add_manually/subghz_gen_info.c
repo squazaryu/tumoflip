@@ -577,10 +577,11 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq_seed.manuf = "BFT"};
         break;
     case SetTypeErreka433:
+    case SetTypeErreka868:
         gen_info = (GenInfo){
             .type = GenKeeloqSeed,
             .mod = "AM650",
-            .freq = 433920000,
+            .freq = type == SetTypeErreka868 ? 868350000 : 433920000,
             .keeloq_seed.serial = key & 0x000FFFFF,
             .keeloq_seed.btn = 0x02,
             .keeloq_seed.cnt = 0x02,
