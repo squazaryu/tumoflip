@@ -67,6 +67,16 @@ int main(int argc,char** argv){
   memcpy(data,baseline,sizeof(data));data[corrupt_at[i]]=0;
   assert(arf_elf_metadata_read(read_at,NULL,sizeof(data),&out)!=ArfElfOk);
  }
+ // C++ section names can exceed the old 64-byte temporary name buffer.
+ // Only an exact, NUL-terminated .fapmeta name identifies the manifest.
+ memcpy(data,baseline,sizeof(data));
+ put32(104+16,200);put32(104+20,112);put32(144,101);
+ memset(data+200,'x',112);data[300]=0;memcpy(data+301,".fapmeta",9);
+ assert(arf_elf_metadata_read(read_at,NULL,sizeof(data),&out)==ArfElfOk);
+ data[309]='x';
+ assert(arf_elf_metadata_read(read_at,NULL,sizeof(data),&out)==ArfElfInvalid);
+ data[309]=0;put32(104+20,109);
+ assert(arf_elf_metadata_read(read_at,NULL,sizeof(data),&out)==ArfElfInvalid);
  if(argc>1){FILE* f=fopen(argv[1],"rb");assert(f);fseek(f,0,SEEK_END);long n=ftell(f);
   assert(arf_elf_metadata_read(file_read,f,n,&out)==ArfElfOk);assert(out.target==7&&out.api_major==88);fclose(f);}
  return 0;
