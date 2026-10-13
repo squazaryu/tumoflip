@@ -103,7 +103,7 @@ jobs:
 
       - name: Validate FeliCa system key versions and Texkom NFC
         shell: bash
-        run: python3 -m unittest tools.tumoflip.test_felica_standard tools.tumoflip.test_texkom_support
+        run: python3 -m unittest tools.tumoflip.test_felica_standard tools.tumoflip.test_felica_commands_native tools.tumoflip.test_texkom_support
 
       - name: Validate DESFire Light reads
         shell: bash

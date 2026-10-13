@@ -18,6 +18,20 @@ extern "C" {
 #define FELICA_POLLER_CMD_POLLING_RESP_CODE (0x01U)
 
 typedef enum {
+    FelicaPollerCommandClassVariable, /**< e.g. Request Service, Search Service Code */
+    FelicaPollerCommandClassFixed, /**< e.g. Request Response */
+    FelicaPollerCommandClassMutualAuth,
+    FelicaPollerCommandClassRead,
+    FelicaPollerCommandClassWrite,
+    FelicaPollerCommandClassOther,
+} FelicaPollerCommandClass;
+
+uint32_t felica_poller_get_fwt(
+    const FelicaPoller* instance,
+    FelicaPollerCommandClass command_class,
+    uint8_t units);
+
+typedef enum {
     FelicaPollerStateIdle,
     FelicaPollerStateActivated,
     FelicaPollerStateListSystem,

@@ -38,8 +38,6 @@ def standard_request_is_valid(frame: bytes, write: bool) -> bool:
         item_size = 2 if frame[offset] & 0x80 else 3
         if offset + item_size > len(frame):
             return False
-        if item_size == 3 and frame[offset + 2] != 0:
-            return False
         offset += item_size
 
     payload_size = block_count * FELICA_BLOCK_SIZE if write else 0
@@ -68,11 +66,14 @@ class FelicaStandardTest(unittest.TestCase):
         self.assertFalse(standard_request_is_valid(read[:-1], False))
         self.assertFalse(standard_request_is_valid(write[:-1], True))
 
-    def test_unsupported_wide_block_number_is_rejected(self) -> None:
+    def test_extended_block_number_is_supported_without_accepting_truncation(self) -> None:
         frame = bytearray(make_standard_request(False, block_count=1))
         frame[-2:] = bytes((0x00, 0x01, 0x01))
         frame[0] = len(frame)
-        self.assertFalse(standard_request_is_valid(bytes(frame), False))
+        self.assertTrue(standard_request_is_valid(bytes(frame), False))
+        truncated = frame[:-1]
+        truncated[0] = len(truncated)
+        self.assertFalse(standard_request_is_valid(bytes(truncated), False))
 
     def test_listener_validates_before_dispatch(self) -> None:
         listener = source("lib/nfc/protocols/felica/felica_listener.c")
