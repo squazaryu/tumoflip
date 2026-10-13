@@ -49,12 +49,17 @@ ArfElfStatus arf_elf_metadata_read(
         // NOBITS occupies RAM, not bytes in the ELF file.
         if(arf_u32(section + 4) != 8 && !arf_range(offset, size, file_size)) return ArfElfInvalid;
         if(name_offset >= strings_size) return ArfElfInvalid;
-        char name[64];
+        // Ancillary C++ section names may be arbitrarily long. Read only the
+        // exact manifest name including its terminator; no other name matters
+        // to this metadata probe, and the loader still validates the ELF.
+        static const char metadata_section[] = ".fapmeta";
+        char name[sizeof(metadata_section)];
         size_t length = strings_size - name_offset;
         if(length > sizeof(name)) length = sizeof(name);
         if(!read(context, strings + name_offset, name, length)) return ArfElfIoError;
-        if(!memchr(name, 0, length)) return ArfElfInvalid;
-        if(strcmp(name, ".fapmeta")) continue;
+        if(length != sizeof(metadata_section) ||
+           memcmp(name, metadata_section, sizeof(metadata_section)))
+            continue;
         if(found || size != 85 || arf_u32(section + 4) != 1) return ArfElfInvalid;
         uint8_t manifest[85];
         if(!read(context, offset, manifest, sizeof(manifest))) return ArfElfIoError;
