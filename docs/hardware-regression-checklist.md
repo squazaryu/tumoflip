@@ -102,6 +102,16 @@ are legally allowed to test.
   the CC1101 enters transmit mode.
 - Exit Sub-GHz and reopen it three times without a radio lock or crash.
 
+### Erreka Add Manually (Dev 009-024)
+
+- On a disposable test file, confirm Erreka offers both 433.92 MHz and
+  868.35 MHz with AM650. Save and reopen each choice; verify frequency, preset,
+  seed and serial remain unchanged.
+- Test generated-file behavior only on your own compatible Erreka receiver;
+  check the selected frequency against its hardware and local radio rules.
+- With a safe test setup, confirm a failed save reports an error instead of
+  reporting success. Never remove the SD card during a write to user data.
+
 ### Nice O-Code Add Manually (Dev 009-022)
 
 - Use only a Nice O-Code system you own or are authorized to test.
@@ -298,6 +308,12 @@ are legally allowed to test.
 - If a FeliCa card does not answer the optional system-node version request,
   confirm the read still completes with the already-read services, areas, and
   public blocks preserved.
+- With your own Standard and Lite-S cards/dumps, read, save and reopen, then
+  emulate repeatedly. Confirm the saved PMm and system codes do not change
+  after emulation; Standard must not advertise systems absent from its dump.
+- On your own compatible reader, confirm emulation keeps receiving after a
+  rejected or unsupported request and selects a saved system addressed by its
+  IDm. Unsupported extended block addresses must not access a low-byte alias.
 - Exit NFC and reopen it without lag, crash, or stuck storage activity.
 
 ### Sleep/Wake And Repeated Launch
