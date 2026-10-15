@@ -9,6 +9,7 @@
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX_DATA_SIZE 8
 enum {PB_Main_storage_read_request_tag,PB_Main_storage_read_response_tag,PB_CommandStatus_OK=0,PB_CommandStatus_ERROR_STORAGE_INTERNAL=83,FSAM_READ,FSOM_OPEN_EXISTING};
+typedef int PB_CommandStatus;
 typedef struct {uint16_t size;uint8_t bytes[];} Bytes;
 #define PB_BYTES_ARRAY_T_ALLOCSIZE(n) (sizeof(Bytes)+(n))
 typedef struct {uint32_t command_id;int which_content,command_status;bool has_next;union {
@@ -27,6 +28,7 @@ static uint32_t file_size;
 void* checked_malloc(size_t n){void* p=calloc(1,n);assert(p);allocations++;return p;}
 void checked_free(void* p){if(p){allocations--;free(p);}}
 #define malloc checked_malloc
+#define calloc(n,s) checked_malloc((n)*(s))
 #define free checked_free
 void rpc_system_storage_reset_state(RpcStorageSystem* s,RpcSession* session,bool v){(void)s;(void)session;(void)v;}
 File* storage_file_alloc(void* api){(void)api;file.position=0;return &file;}
@@ -41,14 +43,15 @@ uint16_t storage_file_read(File* f,uint8_t* bytes,size_t n){
 void storage_file_close(File* f){assert(f==&file);closes++;}
 void storage_file_free(File* f){assert(f==&file);}
 int rpc_system_storage_get_file_error(File* f){assert(f==&file);return PB_CommandStatus_ERROR_STORAGE_INTERNAL;}
-static const int PB_Main_fields=0;
+static const int fields=0;
+#define PB_Main_fields (&fields)
 void pb_release(const void* fields,PB_Main* p){(void)fields;free(p->content.storage_read_response.file.data);p->content.storage_read_response.file.data=NULL;}
 void rpc_send_and_release(RpcSession* s,PB_Main* p){
     (void)s;assert(p->command_id==42 && p->command_status==PB_CommandStatus_OK);
     assert(p->content.storage_read_response.ranged && p->content.storage_read_response.has_file);
     Bytes* b=p->content.storage_read_response.file.data;assert(output_size+b->size<=sizeof(output));
     memcpy(output+output_size,b->bytes,b->size);output_size+=b->size;messages++;
-    pb_release(&PB_Main_fields,p);
+    pb_release(PB_Main_fields,p);
 }
 void rpc_send_and_release_empty(RpcSession* s,uint32_t id,int status){(void)s;assert(id==42 && status!=PB_CommandStatus_OK);errors++;}
 /* @PRODUCTION@ */

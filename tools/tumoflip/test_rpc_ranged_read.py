@@ -21,7 +21,7 @@ class RpcRangedReadTests(unittest.TestCase):
         self.assertIn("uint32 offset = 2;", schema)
         self.assertIn("uint32 size = 3;", schema)
         self.assertIn("bool ranged = 2;", schema)
-        for field in ("    uint32 offset = 2;\n", "    uint32 size = 3;\n", "    bool ranged = 2;\n"):
+        for field in ("    uint32 offset = 2;\n    uint32 size = 3;\n", "    bool ranged = 2;\n"):
             schema = schema.replace(field, "")
         self.assertEqual(schema, (ROOT / "assets/protobuf/storage.proto").read_text())
         self.assertEqual({p.name for p in root.glob("*.proto")}, {"storage.proto"})
