@@ -11,6 +11,33 @@ APP = ROOT / "applications_user/tumo_rx_link"
 
 
 class RxLinkTests(unittest.TestCase):
+    def test_long_back_exits_without_repeating_other_actions(self):
+        from tools.tumoflip.test_hotplug_assets import function
+        from tools.tumoflip.test_nfc_completion_equality import native
+        source = (APP / "tumo_rx_link.c").read_text()
+        signature = "static bool rx_link_actionable_input("
+        production = function(source, signature) if signature in source else ""
+        native(r'''
+#include <stdbool.h>
+#include <assert.h>
+enum {InputTypePress,InputTypeRelease,InputTypeShort,InputTypeLong,InputTypeRepeat};
+enum {InputKeyUp,InputKeyDown,InputKeyLeft,InputKeyRight,InputKeyOk,InputKeyBack};
+typedef struct {int key,type;} InputEvent;
+static bool rx_link_actionable_input(const InputEvent* event);
+''' + production + r'''
+int main(void) {
+    for(int key=InputKeyUp;key<=InputKeyBack;key++) {
+        for(int type=InputTypePress;type<=InputTypeRepeat;type++) {
+            InputEvent event={key,type};
+            assert(rx_link_actionable_input(&event)==
+                   (type==InputTypeShort || (key==InputKeyBack && type==InputTypeLong)));
+        }
+    }
+    return 0;
+}
+''')
+        self.assertIn("rx_link_actionable_input(&event)", source)
+
     def test_frontend_poll_and_teardown_on_disconnect(self):
         from tools.tumoflip.test_hotplug_assets import function
         source = (APP / "tumo_rx_link.c").read_text()
