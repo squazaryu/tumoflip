@@ -124,6 +124,7 @@ int main(void) {
 enum { SubGhzRadioDeviceTypeInternal, SubGhzRadioDeviceTypeExternalCC1101, SubGhzRadioDeviceTypeAuto };
 enum { SubGhzTxRxStateIDLE, SubGhzTxRxStateSleep, SubGhzTxRxStateRx, SubGhzTxRxStateTx };
 enum { SubGhzProtocolFlag_RAW = 8 };
+#define FURI_LOG_E(...) ((void)0)
 typedef struct { const char* name; uint32_t frequency; } Preset;
 typedef struct { int radio_device_type, preferred_radio_device_type, txrx_state;
  uint32_t radio_device_probe_tick; int receiver_filter;
@@ -139,7 +140,8 @@ static void subghz_txrx_radio_device_fallback_internal(SubGhzTxRx* s) {
 }
 static void subghz_txrx_receiver_reset(SubGhzTxRx* s) { (void)s; resets++; }
 static const char* furi_string_get_cstr(const char* s) { return s; }
-static void* subghz_setting_get_preset_data_by_name(void* s,const char* n) { (void)n; return s; }
+static uint8_t preset_bytes;
+static void* subghz_setting_get_preset_data_by_name(void* s,const char* n) { (void)s;(void)n;return &preset_bytes; }
 static void subghz_txrx_begin(SubGhzTxRx* s,void* p) { (void)s;(void)p; assert(!running); }
 static void subghz_txrx_rx(SubGhzTxRx* s,uint32_t f) { assert(f==433920000);resumes++;running=true;s->txrx_state=SubGhzTxRxStateRx; }
 static uint32_t furi_get_tick(void) { return tick; }

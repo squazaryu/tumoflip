@@ -256,7 +256,7 @@ class QuacLifecycleTest(unittest.TestCase):
         self.run_cases("start", ("success",))
 
     def test_backend_parser_failures(self):
-        self.run_cases("start", ("rewind", "protocol", "repeat", "preset", "frequency"))
+        self.run_cases("start", ("rewind", "protocol", "repeat", "preset", "preset-missing", "frequency"))
 
     def test_safety_patch_identity_and_ci_gates(self):
         self.assertIn('fap_version="0.11.0"', (QUAC / "application.fam").read_text())

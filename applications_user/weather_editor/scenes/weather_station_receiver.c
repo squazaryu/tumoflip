@@ -159,12 +159,14 @@ void weather_station_scene_receiver_on_enter(void* context) {
         ws_rx_end(app);
     };
     if((app->txrx->txrx_state == WSTxRxStateIDLE) || (app->txrx->txrx_state == WSTxRxStateSleep)) {
-        ws_begin(
-            app,
-            subghz_setting_get_preset_data_by_name(
-                app->setting, furi_string_get_cstr(app->txrx->preset->name)));
-
-        ws_rx(app, app->txrx->preset->frequency);
+        uint8_t* preset_data = subghz_setting_get_preset_data_by_name(
+            app->setting, furi_string_get_cstr(app->txrx->preset->name));
+        if(preset_data) {
+            ws_begin(app, preset_data);
+            ws_rx(app, app->txrx->preset->frequency);
+        } else {
+            FURI_LOG_E(TAG, "Unknown preset; radio remains stopped");
+        }
     }
 
     ws_view_receiver_set_idx_menu(app->ws_receiver, app->txrx->idx_menu_chosen);

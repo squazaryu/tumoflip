@@ -437,12 +437,12 @@ bool subghz_txrx_gen_secplus_v2_protocol(
     furi_assert(instance);
 
     bool ret = false;
-    instance->transmitter =
+    SubGhzTransmitter* transmitter =
         subghz_transmitter_alloc_init(instance->environment, SUBGHZ_PROTOCOL_SECPLUS_V2_NAME);
     subghz_txrx_set_preset(instance, name_preset, frequency, NULL, 0);
-    if(instance->transmitter) {
+    if(transmitter) {
         subghz_protocol_secplus_v2_create_data(
-            subghz_transmitter_get_protocol_instance(instance->transmitter),
+            subghz_transmitter_get_protocol_instance(transmitter),
             instance->fff_data,
             serial,
             btn,
@@ -450,6 +450,7 @@ bool subghz_txrx_gen_secplus_v2_protocol(
             instance->preset);
         ret = true;
     }
+    subghz_transmitter_free(transmitter);
     return ret;
 }
 
