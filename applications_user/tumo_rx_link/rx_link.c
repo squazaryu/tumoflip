@@ -177,3 +177,36 @@ bool rx_link_snapshot_decode(const RxLinkFrame* f, uint32_t session, RxLinkSnaps
     *snapshot = s;
     return true;
 }
+
+void rx_link_client_begin(RxLinkClient* client, uint32_t session, uint32_t now_ms) {
+    memset(client, 0, sizeof(*client));
+    client->waiting = session != 0;
+    client->session = session;
+    client->last_seen_ms = now_ms;
+}
+
+void rx_link_client_stop(RxLinkClient* client) {
+    client->waiting = client->connected = false;
+    client->session = 0;
+}
+
+unsigned rx_link_client_accept(RxLinkClient* client, const RxLinkFrame* frame, uint32_t now_ms) {
+    if(client->waiting && frame->type == RxLinkReady && frame->length == 9 &&
+       !memcmp(frame->data, "RXA1", 4) && rx_link_read32(frame->data + 4) == client->session &&
+       frame->data[8] == 1) {
+        client->waiting = false;
+        client->connected = true;
+        client->last_seen_ms = now_ms;
+        return RxLinkClientReady;
+    }
+    if(client->connected && rx_link_snapshot_decode(frame, client->session, &client->snapshot)) {
+        client->last_seen_ms = now_ms;
+        return RxLinkClientSnapshot;
+    }
+    return RxLinkClientIgnored;
+}
+
+bool rx_link_client_expired(const RxLinkClient* client, uint32_t now_ms) {
+    return (client->waiting || client->connected) &&
+           (uint32_t)(now_ms - client->last_seen_ms) >= (client->waiting ? 5000U : 2000U);
+}
