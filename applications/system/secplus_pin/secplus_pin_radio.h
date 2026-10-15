@@ -31,4 +31,8 @@ typedef enum {
 } SecPlusPinTxStatus;
 
 /** Transmit one signal described by `fff` (an in-memory flipper format). */
-SecPlusPinTxStatus secplus_pin_radio_tx(const SecPlusPinPreset* preset, FlipperFormat* fff);
+SecPlusPinTxStatus secplus_pin_radio_tx(
+    const SecPlusPinPreset* preset,
+    FlipperFormat* fff,
+    bool allow_external,
+    bool* external_used);

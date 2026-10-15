@@ -32,6 +32,7 @@
 #include <lib/subghz/devices/devices.h>
 #include <lib/subghz/devices/cc1101_int/cc1101_int_interconnect.h>
 #include <flipper_format/flipper_format.h>
+#include "../subghz_app_radio.h"
 
 #define TAG              "NiceOCode"
 #define NICE_O_FOLDER    "/ext/subghz"
@@ -72,6 +73,8 @@ typedef struct {
     SubGhzReceiver* receiver;
     SubGhzWorker* worker;
     const SubGhzDevice* device;
+    SubGhzAppRadio radio;
+    uint8_t radio_indicator; // Auto / Int / Ext, protected by mutex for drawing.
     volatile bool rx_active;
     uint64_t keys[NICE_O_MAX_KEYS];
     uint8_t key_count;
@@ -103,6 +106,11 @@ static void nice_o_draw_callback(Canvas* canvas, void* ctx) {
 
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 2, 10, "Nice O-Code");
+    canvas_set_font(canvas, FontSecondary);
+    const char* radio_label = app->radio_indicator == 2 ? "Ext" :
+                              app->radio_indicator == 1 ? "Int" :
+                                                          "Auto";
+    canvas_draw_str_aligned(canvas, 126, 9, AlignRight, AlignBottom, radio_label);
     canvas_draw_line(canvas, 0, 13, 128, 13);
     canvas_set_font(canvas, FontSecondary);
 
@@ -234,6 +242,7 @@ static void
     NiceOCode* app = ctx;
 
     if(strcmp(base->protocol->name, SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME) != 0) return;
+    if(!subghz_protocol_decoder_nice_flor_s_is_o_code_no_ic(base)) return;
 
     // pull the raw key out through the public serializer instead of poking at internals
     uint64_t key = 0;
@@ -270,6 +279,12 @@ static void
 }
 
 static bool nice_o_rx_start(NiceOCode* app) {
+    if(app->rx_active) return true;
+    if(!subghz_app_radio_acquire(&app->radio, "Nice O-Code", NICE_O_FREQUENCY)) return false;
+    app->device = app->radio.device;
+    furi_mutex_acquire(app->mutex, FuriWaitForever);
+    app->radio_indicator = app->radio.external ? 2 : 1;
+    furi_mutex_release(app->mutex);
     app->environment = subghz_environment_alloc();
     subghz_environment_set_protocol_registry(app->environment, (void*)&subghz_protocol_registry);
     subghz_environment_set_nice_flor_s_rainbow_table_file_name(app->environment, NICE_O_KEYSTORE);
@@ -285,11 +300,6 @@ static bool nice_o_rx_start(NiceOCode* app) {
         app->receiver, SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME);
     if(nice) subghz_protocol_decoder_nice_flor_s_set_skip_o_code(nice, false);
 
-    subghz_devices_init();
-    app->device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
-    if(!app->device) return false;
-
-    subghz_devices_begin(app->device);
     subghz_devices_reset(app->device);
     subghz_devices_load_preset(app->device, FuriHalSubGhzPresetOok650Async, NULL);
     subghz_devices_set_frequency(app->device, NICE_O_FREQUENCY);
@@ -307,22 +317,22 @@ static bool nice_o_rx_start(NiceOCode* app) {
 }
 
 static void nice_o_rx_stop(NiceOCode* app) {
-    if(!app->rx_active) return;
+    if(app->rx_active) subghz_devices_stop_async_rx(app->device);
     if(app->worker && subghz_worker_is_running(app->worker)) subghz_worker_stop(app->worker);
-    subghz_devices_stop_async_rx(app->device);
-    subghz_devices_idle(app->device);
-    subghz_devices_sleep(app->device);
-    subghz_devices_end(app->device);
-    subghz_devices_deinit();
     if(app->worker) {
         subghz_worker_free(app->worker);
         app->worker = NULL;
     }
-    subghz_receiver_free(app->receiver);
-    subghz_environment_free(app->environment);
+    if(app->receiver) subghz_receiver_free(app->receiver);
+    if(app->environment) subghz_environment_free(app->environment);
     app->receiver = NULL;
     app->environment = NULL;
     app->rx_active = false;
+    subghz_app_radio_release(&app->radio);
+    app->device = NULL;
+    furi_mutex_acquire(app->mutex, FuriWaitForever);
+    app->radio_indicator = 0;
+    furi_mutex_release(app->mutex);
 }
 
 /* -------------------------------------------------------------------- solve */
@@ -522,6 +532,13 @@ int32_t nice_o_code_app(void* p) {
     bool running = true;
     InputEvent event;
     while(running) {
+        if(app->rx_active && !subghz_app_radio_is_connected(&app->radio)) {
+            nice_o_rx_stop(app);
+            furi_mutex_acquire(app->mutex, FuriWaitForever);
+            furi_string_set(app->status, "Radio disconnected");
+            app->scene = NiceOSceneMenu;
+            furi_mutex_release(app->mutex);
+        }
         /* the sweep runs a chunk at a time here rather than in one blocking call, so
          * the progress bar keeps moving and Back still cancels */
         furi_mutex_acquire(app->mutex, FuriWaitForever);

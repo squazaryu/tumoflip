@@ -21,6 +21,7 @@ class SubGhzAppRadioTests(unittest.TestCase):
             self.assertNotIn("furi_hal_power_disable_otg", source)
         for app in ("nice_o_code", "secplus_pin"):
             self.assertIn('"subghz_radio_broker"', (ROOT / f"applications/system/{app}/application.fam").read_text())
+        self.assertIn("!app->sweeping", (ROOT / "applications/system/secplus_pin/secplus_pin.c").read_text())
 
     def test_lease_power_and_failure_cleanup(self):
         path = ROOT / "applications/system/subghz_app_radio.h"

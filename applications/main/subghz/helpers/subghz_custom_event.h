@@ -176,6 +176,7 @@ typedef enum {
 
     // Append new selections to preserve the IDs shared with loadable scenes.
     SetTypeErreka868,
+    SetTypeHomeGate433,
 
     SetTypeMAX,
 } SetType;

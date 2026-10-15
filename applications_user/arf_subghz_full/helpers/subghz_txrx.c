@@ -3,6 +3,8 @@
 #include <math.h>
 #include <furi_hal_subghz.h>
 #include <lib/subghz/protocols/protocol_items.h>
+#include <lib/subghz/protocols/public_api.h>
+#include <lib/subghz/protocols/nice_flor_s.h>
 #include <applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h>
 #include <lib/subghz/devices/cc1101_int/cc1101_int_interconnect.h>
 #include "subghz_preset_delta.h"
@@ -11,6 +13,12 @@
 #include <lib/subghz/subghz_preset_modulation.h>
 
 #define TAG "SubGhzTxRx"
+
+static void subghz_txrx_clear_nice_press(SubGhzReceiver* receiver) {
+    SubGhzProtocolDecoderBase* nice =
+        subghz_receiver_search_decoder_base_by_name(receiver, SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME);
+    if(nice) subghz_protocol_decoder_nice_flor_s_set_skip_o_code(nice, false);
+}
 
 #define SUBGHZ_PROTOCOL_PLUGIN_PATH EXT_PATH("apps_data/subghz/plugins")
 
@@ -984,6 +992,10 @@ bool subghz_txrx_protocol_is_serializable(SubGhzTxRx* instance) {
 bool subghz_txrx_protocol_is_transmittable(SubGhzTxRx* instance, bool check_type) {
     furi_assert(instance);
     const SubGhzProtocol* protocol = instance->decoder_result->protocol;
+    if(!protocol->encoder) return false;
+    if(protocol == &subghz_protocol_nice_flor_s &&
+       !subghz_protocol_decoder_nice_flor_s_can_transmit(instance->decoder_result))
+        return false;
     if(check_type) {
         return ((protocol->flag & SubGhzProtocolFlag_Send) == SubGhzProtocolFlag_Send) &&
                protocol->encoder->deserialize && protocol->type == SubGhzProtocolTypeStatic;
@@ -1227,6 +1239,7 @@ void subghz_txrx_reset_dynamic_and_custom_btns(SubGhzTxRx* instance) {
 void subghz_txrx_receiver_reset(SubGhzTxRx* instance) {
     furi_assert(instance);
     subghz_receiver_reset(instance->receiver);
+    subghz_txrx_clear_nice_press(instance->receiver);
 }
 
 SubGhzReceiver* subghz_txrx_get_receiver(SubGhzTxRx* instance) {
