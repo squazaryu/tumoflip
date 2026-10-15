@@ -32,17 +32,19 @@ void app_main(void) {
         uint8_t bytes[256];
         const int received = uart_read_bytes(UART_NUM_0, bytes, sizeof(bytes), pdMS_TO_TICKS(20));
         const uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
-        if((uint32_t)(now - last_byte) > 100) parser.used = parser.expected = 0;
+        if((uint32_t)(now - last_byte) > 100 && parser.used) {
+            parser.used = parser.expected = 0;
+            if(backend.active && backend.snapshot.rejected_batches < UINT32_MAX) {
+                backend.snapshot.rejected_batches++;
+            }
+        }
         if(received > 0) last_byte = now;
         if(backend.active && (uint32_t)(now - last_request) > 2000) backend.active = false;
         for(int i = 0; i < received; i++) {
-            RxLinkFrame frame, reply;
-            if(!rx_link_feed(&parser, bytes[i], &frame)) continue;
-            bool respond = rx_link_backend_handle(&backend, &frame, &reply);
-            if(respond || (backend.active && frame.type == RxLinkEdges && frame.length >= 4 &&
-                           rx_link_read32(frame.data) == backend.session))
-                last_request = now;
-            if(respond) {
+            RxLinkFrame reply;
+            unsigned event = rx_link_backend_feed(&backend, &parser, bytes[i], &reply);
+            if(event != RxLinkBackendIgnored) last_request = now;
+            if(event == RxLinkBackendReply) {
                 uint8_t wire[RX_LINK_FRAME_MAX];
                 size_t length = rx_link_encode(&reply, wire, sizeof(wire));
                 if(length) uart_write_bytes(UART_NUM_0, wire, length);

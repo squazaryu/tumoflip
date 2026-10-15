@@ -160,6 +160,29 @@ bool rx_link_backend_handle(RxLinkBackend* b, const RxLinkFrame* f, RxLinkFrame*
     return false;
 }
 
+unsigned
+    rx_link_backend_feed(RxLinkBackend* b, RxLinkParser* parser, uint8_t byte, RxLinkFrame* reply) {
+    RxLinkFrame frame;
+    const uint32_t previous_errors = parser->errors;
+    const bool complete = rx_link_feed(parser, byte, &frame);
+    if(b->active && parser->errors != previous_errors) {
+        b->snapshot.rejected_batches = rx_link_add_saturated(b->snapshot.rejected_batches, 1);
+    }
+    if(!complete) return RxLinkBackendIgnored;
+    const bool was_active = b->active;
+    const uint32_t previous_session = b->session;
+    const bool matching =
+        b->active && frame.length >= 4 && rx_link_read32(frame.data) == b->session &&
+        (frame.type == RxLinkEdges || frame.type == RxLinkQuery || frame.type == RxLinkStop);
+    if(rx_link_backend_handle(b, &frame, reply)) {
+        if(reply->type == RxLinkReady && (!was_active || previous_session != b->session)) {
+            parser->errors = 0;
+        }
+        return RxLinkBackendReply;
+    }
+    return matching ? RxLinkBackendActivity : RxLinkBackendIgnored;
+}
+
 bool rx_link_snapshot_decode(const RxLinkFrame* f, uint32_t session, RxLinkSnapshot* snapshot) {
     if(f->type != RxLinkStats || f->length != RX_LINK_STATS_SIZE ||
        rx_link_read32(f->data) != session)

@@ -11,6 +11,21 @@ APP = ROOT / "applications_user/tumo_rx_link"
 
 
 class RxLinkTests(unittest.TestCase):
+    def test_actual_esp32_loop_reports_partial_frames_and_expires_sessions(self):
+        from tools.tumoflip.test_hotplug_assets import function
+        source = (ROOT / "tools/tumoflip/esp32_rx_link/main/main.c").read_text()
+        fixture = (ROOT / "tools/tumoflip/fixtures/rx_link_esp32.c").read_text()
+        with tempfile.TemporaryDirectory(prefix="rx-link-esp32-loop-") as directory:
+            root = Path(directory)
+            (root / "test.c").write_text(fixture.replace("/* PRODUCTION */", function(source, "void app_main(")))
+            built = subprocess.run([
+                "cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O1", "-g",
+                "-fsanitize=address,undefined", "-I", str(APP), str(root / "test.c"),
+                str(APP / "rx_link.c"), "-o", str(root / "test")], capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            ran = subprocess.run([str(root / "test")], capture_output=True, text=True)
+            self.assertEqual(ran.returncode, 0, ran.stderr)
+
     def test_long_back_exits_without_repeating_other_actions(self):
         from tools.tumoflip.test_hotplug_assets import function
         from tools.tumoflip.test_nfc_completion_equality import native
