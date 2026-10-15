@@ -1,4 +1,39 @@
 #include "common.h"
+#include "public_api.h"
+#include "beninca_arc.h"
+#include "came_atomo.h"
+#include "nice_flor_s.h"
+
+bool subghz_protocol_decoder_get_press_identity(
+    SubGhzProtocolDecoderBase* decoder,
+    uint32_t* identity) {
+    furi_assert(decoder);
+    furi_assert(identity);
+    const SubGhzProtocol* protocol = decoder->protocol;
+    if(protocol != &subghz_protocol_came_atomo && protocol != &subghz_protocol_beninca_arc &&
+       protocol != &subghz_protocol_nice_flor_s)
+        return false;
+    const SubGhzBlockGeneric* generic = &((SubGhzProtocolDecoderCommon*)decoder)->generic;
+    memset(identity, 0, SUBGHZ_PRESS_IDENTITY_WORDS * sizeof(uint32_t));
+    if(protocol == &subghz_protocol_nice_flor_s ||
+       (protocol == &subghz_protocol_beninca_arc && generic->seed != 0xAA55)) {
+        identity[0] = (uint32_t)generic->data;
+        identity[1] = (uint32_t)(generic->data >> 32);
+        identity[4] = generic->data_count_bit;
+        if(protocol == &subghz_protocol_nice_flor_s && generic->data_count_bit != 112) {
+            // Keep the button and encrypted body, ignoring only the parcel nibble.
+            identity[1] &= 0xF0FFFu;
+        } else {
+            identity[2] = (uint32_t)generic->data_2;
+            identity[3] = (uint32_t)(generic->data_2 >> 32);
+        }
+    } else {
+        identity[0] = generic->serial;
+        identity[1] = generic->cnt;
+        identity[2] = generic->btn;
+    }
+    return true;
+}
 
 void subghz_protocol_encoder_common_free(void* context) {
     furi_assert(context);
@@ -47,6 +82,16 @@ uint8_t subghz_protocol_decoder_common_get_hash_data(void* context) {
     SubGhzProtocolDecoderCommon* instance = context;
     return subghz_protocol_blocks_get_hash_data(
         &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
+}
+
+uint8_t subghz_protocol_decoder_common_get_hash_data_serial(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderCommon* instance = context;
+    /* The mini counter inside each parcel changes while the button is held; the serial
+     * and press counter do not, and still separate one remote from another. */
+    uint32_t id = instance->generic.serial ^ instance->generic.cnt ^
+                  ((uint32_t)instance->generic.btn << 24);
+    return (uint8_t)((id * 2654435761u) >> 24);
 }
 
 SubGhzProtocolStatus subghz_protocol_decoder_common_serialize(

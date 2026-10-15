@@ -1,6 +1,9 @@
 #pragma once
 
+#define SUBGHZ_PRESS_IDENTITY_WORDS 5
+
 #include "../types.h"
+#include "base.h"
 
 #define SUBGHZ_PROTOCOL_PUBLIC_API_H
 
@@ -324,6 +327,20 @@ bool subghz_protocol_secplus_v1_check_fixed(uint32_t fixed);
 void subghz_protocol_nice_o_mask(uint8_t n, uint32_t* mask_32, uint16_t* mask_16);
 uint8_t subghz_protocol_nice_o_get_parcel(uint64_t data);
 void subghz_protocol_decoder_nice_flor_s_set_skip_o_code(void* context, bool skip);
+
+/** Return true for a received O-Code frame without a known installer code. */
+bool subghz_protocol_decoder_nice_flor_s_is_o_code_no_ic(void* context);
+
+/** Only supported short frames with known IC (where required) can be encoded. */
+bool subghz_protocol_decoder_nice_flor_s_can_transmit(void* context);
+
+/** Fill five words of exact press identity for supported rotating-parcel decoders.
+ * Call after get_hash_data, which extracts the decoded fields. No allocation or I/O.
+ * Returns false for other protocol layouts; never cast arbitrary plugin decoders.
+ */
+bool subghz_protocol_decoder_get_press_identity(
+    SubGhzProtocolDecoderBase* decoder,
+    uint32_t* identity);
 #define SUBGHZ_NO_NICE_FLOR_S_RAINBOW_TABLE 0
 uint64_t subghz_protocol_nice_flor_s_decrypt_ic(
     uint64_t data,

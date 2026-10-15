@@ -1,6 +1,8 @@
 #include "subghz_txrx_i.h" // IWYU pragma: keep
 
 #include <lib/subghz/protocols/protocol_items.h>
+#include <lib/subghz/protocols/public_api.h>
+#include <lib/subghz/protocols/nice_flor_s.h>
 #include <applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h>
 #include <lib/subghz/devices/cc1101_int/cc1101_int_interconnect.h>
 #include <lib/subghz/blocks/custom_btn.h>
@@ -10,6 +12,12 @@
 #include <lib/subghz/subghz_worker_i.h>
 
 #define TAG "SubGhzTxRx"
+
+static void subghz_txrx_clear_nice_press(SubGhzReceiver* receiver) {
+    SubGhzProtocolDecoderBase* nice =
+        subghz_receiver_search_decoder_base_by_name(receiver, SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME);
+    if(nice) subghz_protocol_decoder_nice_flor_s_set_skip_o_code(nice, false);
+}
 
 #define SUBGHZ_HOPPER_DWELL_TICKS        2U
 #define SUBGHZ_HOPPER_RELEASE_TICKS      4U
@@ -36,6 +44,7 @@ static void subghz_txrx_worker_overrun_callback(void* context) {
     SubGhzTxRxReceiverContext* receiver_context = context;
     furi_check(receiver_context);
     subghz_receiver_reset(receiver_context->receiver);
+    subghz_txrx_clear_nice_press(receiver_context->receiver);
 }
 
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
@@ -595,11 +604,10 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
             } else if(
                 subghz_transmitter_deserialize(instance->transmitter, flipper_format) ==
                 SubGhzProtocolStatusOk) {
-                if(strcmp(furi_string_get_cstr(preset->name), "") != 0) {
-                    subghz_txrx_begin(
-                        instance,
-                        subghz_setting_get_preset_data_by_name(
-                            instance->setting, furi_string_get_cstr(preset->name)));
+                uint8_t* preset_data = subghz_setting_get_preset_data_by_name(
+                    instance->setting, furi_string_get_cstr(preset->name));
+                if(preset_data) {
+                    subghz_txrx_begin(instance, preset_data);
                     if(preset->frequency) {
                         if(!subghz_txrx_tx(instance, preset->frequency)) {
                             FURI_LOG_E(TAG, "Only Rx");
@@ -694,10 +702,13 @@ void subghz_txrx_rx_start(SubGhzTxRx* instance) {
     subghz_txrx_stop(instance);
     // Start a fresh asynchronous session only after every decoder is reset.
     subghz_txrx_receiver_reset(instance);
-    subghz_txrx_begin(
-        instance,
-        subghz_setting_get_preset_data_by_name(
-            subghz_txrx_get_setting(instance), furi_string_get_cstr(instance->preset->name)));
+    uint8_t* preset_data = subghz_setting_get_preset_data_by_name(
+        subghz_txrx_get_setting(instance), furi_string_get_cstr(instance->preset->name));
+    if(!preset_data) {
+        FURI_LOG_E(TAG, "Unknown preset; radio remains stopped");
+        return;
+    }
+    subghz_txrx_begin(instance, preset_data);
     subghz_txrx_rx(instance, instance->preset->frequency);
 }
 
@@ -831,7 +842,7 @@ void subghz_txrx_hopper_update(
         subghz_txrx_rx_end(instance);
     }
     if(instance->txrx_state == SubGhzTxRxStateIDLE) {
-        subghz_receiver_reset(instance->receiver);
+        subghz_txrx_receiver_reset(instance);
         if(hop_preset) {
             size_t preset_index = configured_preset_count > 0 ?
                                       subghz_setting_get_hopper_preset_index(
@@ -989,6 +1000,10 @@ bool subghz_txrx_protocol_is_serializable(SubGhzTxRx* instance) {
 bool subghz_txrx_protocol_is_transmittable(SubGhzTxRx* instance, bool check_type) {
     furi_assert(instance);
     const SubGhzProtocol* protocol = instance->decoder_result->protocol;
+    if(!protocol->encoder) return false;
+    if(protocol == &subghz_protocol_nice_flor_s &&
+       !subghz_protocol_decoder_nice_flor_s_can_transmit(instance->decoder_result))
+        return false;
     if(check_type) {
         return ((protocol->flag & SubGhzProtocolFlag_Send) == SubGhzProtocolFlag_Send) &&
                protocol->encoder->deserialize && protocol->type == SubGhzProtocolTypeStatic;
@@ -1151,10 +1166,13 @@ bool subghz_txrx_radio_device_poll_active(SubGhzTxRx* instance) {
         if(instance->receiver_filter != SubGhzProtocolFlag_RAW) {
             subghz_txrx_receiver_reset(instance);
         }
-        subghz_txrx_begin(
-            instance,
-            subghz_setting_get_preset_data_by_name(
-                instance->setting, furi_string_get_cstr(instance->preset->name)));
+        uint8_t* preset_data = subghz_setting_get_preset_data_by_name(
+            instance->setting, furi_string_get_cstr(instance->preset->name));
+        if(!preset_data) {
+            FURI_LOG_E(TAG, "Unknown preset; radio remains stopped");
+            return true;
+        }
+        subghz_txrx_begin(instance, preset_data);
         subghz_txrx_rx(instance, instance->preset->frequency);
     }
     return true;
@@ -1288,8 +1306,10 @@ void subghz_txrx_receiver_reset(SubGhzTxRx* instance) {
     furi_assert(instance);
 
     subghz_receiver_reset(instance->receiver);
+    subghz_txrx_clear_nice_press(instance->receiver);
     if(instance->diversity_receiver) {
         subghz_receiver_reset(instance->diversity_receiver);
+        subghz_txrx_clear_nice_press(instance->diversity_receiver);
     }
 }
 

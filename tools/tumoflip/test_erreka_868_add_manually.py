@@ -65,6 +65,12 @@ int main(void) {
     const uint32_t keys[] = {0, 1, 0xFFFFF, 0x100000, 0x12345678, 0x7FFFFFFF};
     for(size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
         sample_key = keys[i];
+        GenInfo home = {0};
+        subghz_scene_set_type_fill_generation_infos(&home, SetTypeHomeGate433);
+        assert(home.type == GenKeeloq && home.freq == 433920000);
+        assert(strcmp(home.mod, "AM650") == 0 && strcmp(home.keeloq.manuf, "HomeGate") == 0);
+        assert(home.keeloq.serial == (keys[i] & 0x0FFFFFFF));
+        assert(home.keeloq.btn == 2 && home.keeloq.cnt == 3);
         GenInfo low = {0}, high = {0};
         subghz_scene_set_type_fill_generation_infos(&low, SetTypeErreka433);
         subghz_scene_set_type_fill_generation_infos(&high, SetTypeErreka868);
@@ -101,6 +107,7 @@ _Static_assert(SetTypeSomfyTelis == 6, "Existing downstream selection IDs change
 _Static_assert(SetTypeNiceOCode_433_92 == 68, "Existing Nice O-Code ID changed");
 _Static_assert(SetTypeSecPlus_v2_433_00 == 100, "Existing final selection ID changed");
 _Static_assert(SetTypeErreka868 == 101, "New selection must be appended");
+_Static_assert(SetTypeHomeGate433 == 102, "HomeGate must not shift existing selections");
 typedef struct { const char* names[SetTypeMAX]; uint32_t ids[SetTypeMAX];
                  size_t count; uint32_t selected; } Submenu;
 typedef struct { Submenu* submenu; void* scene_manager; void* view_dispatcher; } SubGhz;

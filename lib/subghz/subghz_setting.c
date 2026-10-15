@@ -394,6 +394,7 @@ const char* subghz_setting_get_preset_name(SubGhzSetting* instance, size_t idx) 
 
 int subghz_setting_get_inx_preset_by_name(SubGhzSetting* instance, const char* preset_name) {
     furi_check(instance);
+    if(!preset_name || !preset_name[0]) return -1;
     size_t idx = 0;
     for
         M_EACH(item, instance->preset->data, SubGhzSettingCustomPresetItemArray_t) {
@@ -465,8 +466,10 @@ size_t subghz_setting_get_preset_data_size(SubGhzSetting* instance, size_t idx) 
 
 uint8_t* subghz_setting_get_preset_data_by_name(SubGhzSetting* instance, const char* preset_name) {
     furi_check(instance);
-    SubGhzSettingCustomPresetItem* item = SubGhzSettingCustomPresetItemArray_get(
-        instance->preset->data, subghz_setting_get_inx_preset_by_name(instance, preset_name));
+    const int index = subghz_setting_get_inx_preset_by_name(instance, preset_name);
+    if(index < 0) return NULL;
+    SubGhzSettingCustomPresetItem* item =
+        SubGhzSettingCustomPresetItemArray_get(instance->preset->data, (size_t)index);
     return item->custom_preset_data;
 }
 

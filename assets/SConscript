@@ -17,7 +17,12 @@ assetsenv.Alias("icons", icons)
 
 # Protobuf .proto -> .c + .h
 proto_src = assetsenv.Glob("protobuf/*.proto", source=True)
+proto_src = [
+    assetsenv.File("protobuf_overrides/storage.proto") if node.name == "storage.proto" else node
+    for node in proto_src
+]
 proto_options = assetsenv.Glob("protobuf/*.options", source=True)
+proto_options += assetsenv.Glob("protobuf_overrides/*.options", source=True)
 proto = assetsenv.ProtoBuilder(assetsenv["ASSETS_WORK_DIR"], proto_src)
 assetsenv.Depends(proto, proto_options)
 # Precious(proto)

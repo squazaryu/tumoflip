@@ -47,6 +47,8 @@ typedef enum {
 
 static uint8_t came_atomo_counter_mode = 0;
 
+static uint8_t subghz_protocol_decoder_came_atomo_get_hash_data(void* context);
+
 const SubGhzProtocolDecoder subghz_protocol_came_atomo_decoder = {
     .alloc = subghz_protocol_decoder_came_atomo_alloc,
     .free = subghz_protocol_decoder_common_free,
@@ -54,7 +56,7 @@ const SubGhzProtocolDecoder subghz_protocol_came_atomo_decoder = {
     .feed = subghz_protocol_decoder_came_atomo_feed,
     .reset = subghz_protocol_decoder_came_atomo_reset,
 
-    .get_hash_data = subghz_protocol_decoder_common_get_hash_data,
+    .get_hash_data = subghz_protocol_decoder_came_atomo_get_hash_data,
     .serialize = subghz_protocol_decoder_common_serialize,
     .deserialize = subghz_protocol_decoder_came_atomo_deserialize,
     .get_string = subghz_protocol_decoder_came_atomo_get_string,
@@ -79,7 +81,16 @@ const SubGhzProtocol subghz_protocol_came_atomo = {
     .encoder = &subghz_protocol_came_atomo_encoder,
 };
 
-static void subghz_protocol_came_atomo_remote_controller(SubGhzBlockGeneric* instance);
+static uint64_t subghz_protocol_came_atomo_remote_controller(SubGhzBlockGeneric* instance);
+
+/* The mini counter rotates for as long as the button is held, so every parcel of one
+ * press is a different frame. Decode first and hash the serial instead. */
+static uint8_t subghz_protocol_decoder_came_atomo_get_hash_data(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderCameAtomo* instance = context;
+    subghz_protocol_came_atomo_remote_controller(&instance->generic);
+    return subghz_protocol_decoder_common_get_hash_data_serial(context);
+}
 
 /**
  * Defines the button value for the current btn_id
@@ -153,8 +164,8 @@ bool subghz_protocol_came_atomo_create_data(
     pack[7] = (instance->generic.data_2 & 0xFF);
 
     atomo_encrypt(pack);
-    uint32_t hi = pack[0] << 24 | pack[1] << 16 | pack[2] << 8 | pack[3];
-    uint32_t lo = pack[4] << 24 | pack[5] << 16 | pack[6] << 8 | pack[7];
+    uint32_t hi = (uint32_t)pack[0] << 24 | pack[1] << 16 | pack[2] << 8 | pack[3];
+    uint32_t lo = (uint32_t)pack[4] << 24 | pack[5] << 16 | pack[6] << 8 | pack[7];
     instance->generic.data = (uint64_t)hi << 32 | lo;
 
     instance->generic.data ^= 0xFFFFFFFFFFFFFFFF;
@@ -535,7 +546,9 @@ void subghz_protocol_decoder_came_atomo_feed(void* context, bool level, uint32_t
  * @param instance Pointer to a SubGhzBlockGeneric* instance
  * @param file_name Full path to rainbow table the file
  */
-static void subghz_protocol_came_atomo_remote_controller(SubGhzBlockGeneric* instance) {
+/* Returns the inverted and shifted frame the fields were read out of, which is what the
+ * key is shown as. generic.data itself is left alone so this can run more than once. */
+static uint64_t subghz_protocol_came_atomo_remote_controller(SubGhzBlockGeneric* instance) {
     /*
     * ***SkorP ver.***
     * 0x1fafef3ed0f7d9ef
@@ -600,18 +613,17 @@ static void subghz_protocol_came_atomo_remote_controller(SubGhzBlockGeneric* ins
     *        0x0 - Last zero nibble
     * */
 
-    instance->data ^= 0xFFFFFFFFFFFFFFFF;
-    instance->data <<= 4;
+    const uint64_t data = (instance->data ^ 0xFFFFFFFFFFFFFFFF) << 4;
 
     uint8_t pack[8] = {};
-    pack[0] = (instance->data >> 56);
-    pack[1] = ((instance->data >> 48) & 0xFF);
-    pack[2] = ((instance->data >> 40) & 0xFF);
-    pack[3] = ((instance->data >> 32) & 0xFF);
-    pack[4] = ((instance->data >> 24) & 0xFF);
-    pack[5] = ((instance->data >> 16) & 0xFF);
-    pack[6] = ((instance->data >> 8) & 0xFF);
-    pack[7] = (instance->data & 0xFF);
+    pack[0] = (data >> 56);
+    pack[1] = ((data >> 48) & 0xFF);
+    pack[2] = ((data >> 40) & 0xFF);
+    pack[3] = ((data >> 32) & 0xFF);
+    pack[4] = ((data >> 24) & 0xFF);
+    pack[5] = ((data >> 16) & 0xFF);
+    pack[6] = ((data >> 8) & 0xFF);
+    pack[7] = (data & 0xFF);
 
     atomo_decrypt(pack);
 
@@ -643,6 +655,7 @@ static void subghz_protocol_came_atomo_remote_controller(SubGhzBlockGeneric* ins
         subghz_custom_btn_set_original(instance->btn);
     }
     subghz_custom_btn_set_max(4);
+    return data;
 }
 
 void atomo_encrypt(uint8_t* buff) {
@@ -687,113 +700,16 @@ void atomo_decrypt(uint8_t* buff) {
 }
 
 static uint8_t subghz_protocol_came_atomo_get_btn_code(void) {
-    uint8_t custom_btn_id = subghz_custom_btn_get();
-    uint8_t original_btn_code = subghz_custom_btn_get_original();
-    uint8_t btn = original_btn_code;
-
-    // Set custom button
-    if((custom_btn_id == SUBGHZ_CUSTOM_BTN_OK) && (original_btn_code != 0)) {
-        // Restore original button code
-        btn = original_btn_code;
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_UP) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x2;
-            break;
-        case 0x2:
-            btn = 0x1;
-            break;
-        case 0x3:
-            btn = 0x1;
-            break;
-        case 0x4:
-            btn = 0x1;
-            break;
-        case 0x5:
-            btn = 0x1;
-            break;
-        case 0x6:
-            btn = 0x1;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_DOWN) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x3;
-            break;
-        case 0x2:
-            btn = 0x3;
-            break;
-        case 0x3:
-            btn = 0x2;
-            break;
-        case 0x4:
-            btn = 0x2;
-            break;
-        case 0x5:
-            btn = 0x2;
-            break;
-        case 0x6:
-            btn = 0x2;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_LEFT) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x4;
-            break;
-        case 0x2:
-            btn = 0x4;
-            break;
-        case 0x3:
-            btn = 0x4;
-            break;
-        case 0x4:
-            btn = 0x3;
-            break;
-        case 0x5:
-            btn = 0x4;
-            break;
-        case 0x6:
-            btn = 0x4;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_RIGHT) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x5;
-            break;
-        case 0x2:
-            btn = 0x5;
-            break;
-        case 0x3:
-            btn = 0x5;
-            break;
-        case 0x4:
-            btn = 0x5;
-            break;
-        case 0x5:
-            btn = 0x6;
-            break;
-        case 0x6:
-            btn = 0x5;
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    return btn;
+    // Original, Up, Down, Left, Right. Unknown values remain unchanged.
+    static const uint8_t rows[][5] = {
+        {0x01, 0x02, 0x03, 0x04, 0x05},
+        {0x02, 0x01, 0x03, 0x04, 0x05},
+        {0x03, 0x01, 0x02, 0x04, 0x05},
+        {0x04, 0x01, 0x02, 0x03, 0x05},
+        {0x05, 0x01, 0x02, 0x04, 0x06},
+        {0x06, 0x01, 0x02, 0x04, 0x05},
+    };
+    return subghz_custom_btn_lookup(rows, sizeof(rows) / sizeof(rows[0]));
 }
 
 SubGhzProtocolStatus
@@ -831,9 +747,9 @@ SubGhzProtocolStatus
 void subghz_protocol_decoder_came_atomo_get_string(void* context, FuriString* output) {
     furi_assert(context);
     SubGhzProtocolDecoderCameAtomo* instance = context;
-    subghz_protocol_came_atomo_remote_controller(&instance->generic);
-    uint32_t code_found_hi = instance->generic.data >> 32;
-    uint32_t code_found_lo = instance->generic.data & 0x00000000ffffffff;
+    const uint64_t data = subghz_protocol_came_atomo_remote_controller(&instance->generic);
+    uint32_t code_found_hi = data >> 32;
+    uint32_t code_found_lo = data & 0x00000000ffffffff;
 
     // push protocol data to global variable
     subghz_block_generic_global.cnt_is_available = true;

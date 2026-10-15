@@ -85,11 +85,13 @@ class UpstreamE6ProtocolsTest(unittest.TestCase):
         ):
             self.assertIn(required, header + source + keeloq)
         self.assertIn("Encryption: 1", keystore)
-        self.assertIn("IV: 54 65 72 72 61 69 6E 21 20 50 75 6C 6C 20 55 70", keystore)
-        self.assertEqual(len(keystore.splitlines()), 128)
+        # Reviewed encrypted supplemental store from immutable Unleashed 094.
+        # The primary and user stores are not replaced.
+        self.assertIn("IV: 47 65 74 41 77 61 79 46 72 6F 6D 48 65 72 65 21", keystore)
+        self.assertEqual(len(keystore.splitlines()), 129)
         self.assertEqual(
             hashlib.sha256(keystore.encode()).hexdigest(),
-            "8dbc0959233af4411cf4fa10e0ce09208c30a5b272d48fd5a6189f54dba0372e",
+            "a2f5bb2294671c7e73cefe4a20d011e86d6a9aaa609582f0431ecae9a76cea68",
         )
 
     def test_new_apps_and_api_contract_are_present(self) -> None:
@@ -101,7 +103,7 @@ class UpstreamE6ProtocolsTest(unittest.TestCase):
         self.assertIn('entry_point="nice_o_code_app"', nice_manifest)
         self.assertIn("Nice O-Code", self.read("applications/system/nice_o_code/nice_o_code.c"))
         self.assertIn("Security+ PIN", self.read("applications/system/secplus_pin/secplus_pin.c"))
-        self.assertEqual(api.splitlines()[1], "Version,+,88.19,,")
+        self.assertEqual(api.splitlines()[1], "Version,+,88.20,,")
         for symbol in (
             "subghz_protocol_nice_o_mask",
             "subghz_protocol_nice_o_get_parcel",

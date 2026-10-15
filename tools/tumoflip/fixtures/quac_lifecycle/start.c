@@ -84,7 +84,8 @@ static SubGhzProtocolStatus subghz_transmitter_deserialize(void* t, FlipperForma
     return is("deserialize") ? SubGhzProtocolStatusError : SubGhzProtocolStatusOk;
 }
 static void* subghz_setting_get_preset_data_by_name(void* s, const char* n) {
-    return s;
+    static uint8_t preset_bytes;
+    return !n || !n[0] || is("preset-missing") ? NULL : &preset_bytes;
 }
 static void subghz_txrx_begin(SubGhzTxRx* t, void* data) {
     t->txrx_state = SubGhzTxRxStateIDLE;

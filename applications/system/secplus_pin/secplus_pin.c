@@ -58,6 +58,7 @@ typedef struct {
     uint8_t digit; // 0 = most significant
     bool sweeping;
     bool tx_busy;
+    bool last_tx_external;
     uint16_t sweep_from;
 } SecPlusPin;
 
@@ -260,7 +261,9 @@ static SecPlusPinTxStatus secplus_pin_transmit(SecPlusPin* app) {
             break;
         snprintf(pin_str, sizeof(pin_str), "%04u", app->pin);
         if(!flipper_format_write_string_cstr(fff, "Pin", pin_str)) break;
-        status = secplus_pin_radio_tx(&app->preset, fff);
+        // Extend explicit user sends only; legacy automatic sweeps keep their
+        // original internal-radio scope instead of gaining an external TX path.
+        status = secplus_pin_radio_tx(&app->preset, fff, !app->sweeping, &app->last_tx_external);
 
         /* The encoder advances the counter and writes both halves back. Keeping them
          * makes every attempt carry a fresh counter, the way a real keypad does; reusing
@@ -440,7 +443,11 @@ int32_t secplus_pin_app(void* p) {
                         SecPlusPinTxStatus sent = secplus_pin_transmit(app);
                         furi_mutex_acquire(app->mutex, FuriWaitForever);
                         if(sent == SecPlusPinTxOk) {
-                            furi_string_printf(app->status, "Sent %04u", app->pin);
+                            furi_string_printf(
+                                app->status,
+                                "Sent %04u (%s)",
+                                app->pin,
+                                app->last_tx_external ? "Ext" : "Int");
                         } else if(sent == SecPlusPinTxNotAllowed) {
                             furi_string_printf(
                                 app->status, "%luMHz TX blocked", app->preset.frequency / 1000000);

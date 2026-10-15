@@ -169,6 +169,9 @@ void subghz_protocol_decoder_common_reset(void* context);
  */
 uint8_t subghz_protocol_decoder_common_get_hash_data(void* context);
 
+/** Fingerprint decoded serial/counter/button for rotating-parcel protocols. */
+uint8_t subghz_protocol_decoder_common_get_hash_data_serial(void* context);
+
 /**
  * Serialize decoder data.
  * @param context Pointer to a decoder instance
