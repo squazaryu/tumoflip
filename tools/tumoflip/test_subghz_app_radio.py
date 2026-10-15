@@ -9,6 +9,19 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SubGhzAppRadioTests(unittest.TestCase):
+    def test_clients_use_the_shared_lease_and_disconnect_checks(self):
+        nice = (ROOT / "applications/system/nice_o_code/nice_o_code.c").read_text()
+        pin = (ROOT / "applications/system/secplus_pin/secplus_pin_radio.c").read_text()
+        for source in (nice, pin):
+            self.assertIn('"../subghz_app_radio.h"', source)
+            self.assertIn("subghz_app_radio_acquire(", source)
+            self.assertIn("subghz_app_radio_release(", source)
+            self.assertIn("subghz_app_radio_is_connected(", source)
+            self.assertNotIn("furi_hal_power_enable_otg", source)
+            self.assertNotIn("furi_hal_power_disable_otg", source)
+        for app in ("nice_o_code", "secplus_pin"):
+            self.assertIn('"subghz_radio_broker"', (ROOT / f"applications/system/{app}/application.fam").read_text())
+
     def test_lease_power_and_failure_cleanup(self):
         path = ROOT / "applications/system/subghz_app_radio.h"
         header = path.read_text() if path.exists() else ""
@@ -51,6 +64,7 @@ typedef struct {const SubGhzDevice* device;bool external;} SubGhzAppRadio;
 static bool subghz_app_radio_acquire(SubGhzAppRadio*,const char*,uint32_t);
 static void subghz_app_radio_release(SubGhzAppRadio*);
 static bool subghz_app_radio_is_connected(const SubGhzAppRadio*);
+static bool subghz_app_radio_acquire_internal(SubGhzAppRadio*,const char*,uint32_t);
 #endif
 int main(void){
     SubGhzAppRadio r={0};busy=true;
@@ -68,6 +82,9 @@ int main(void){
     begin_fail=false;frequency_bad=true;assert(!subghz_app_radio_acquire(&r,"test",1));assert(!busy && begun==ended);
     frequency_bad=false;power_fail=true;assert(subghz_app_radio_acquire(&r,"test",433920000));assert(r.device==&internal);
     subghz_app_radio_release(&r);assert(!busy && opened==closed && init==deinit && begun==ended);
+    power_fail=false;ext_present=true;
+    assert(subghz_app_radio_acquire_internal(&r,"legacy",433920000));assert(r.device==&internal && !r.external);
+    subghz_app_radio_release(&r);assert(!busy && begun==ended);
     return 0;
 }
 ''')
