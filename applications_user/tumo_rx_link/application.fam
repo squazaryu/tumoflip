@@ -9,6 +9,7 @@ App(
     fap_category="Module One/Signals",
     fap_dist_path="apps/Module One/Signals/tumo_rx_link.fap",
     fap_version="0.1.0",
+    fap_icon="../signal_workbench/icon.png",
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip",
     fap_description="Experimental receive-only pulse statistics with a paired Module One ESP32 backend.",
