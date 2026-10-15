@@ -234,6 +234,11 @@ static void rx_link_input(InputEvent* event, void* context) {
     furi_message_queue_put(app->input, event, 0);
 }
 
+static bool rx_link_actionable_input(const InputEvent* event) {
+    return event->type == InputTypeShort ||
+           (event->key == InputKeyBack && event->type == InputTypeLong);
+}
+
 int32_t tumo_rx_link_app(void* context) {
     UNUSED(context);
     RxLinkApp* app = calloc(1, sizeof(*app));
@@ -254,7 +259,7 @@ int32_t tumo_rx_link_app(void* context) {
     while(running) {
         InputEvent event;
         if(furi_message_queue_get(app->input, &event, 10) == FuriStatusOk &&
-           event.type == InputTypeShort) {
+           rx_link_actionable_input(&event)) {
             if(event.key == InputKeyBack) {
                 running = false;
                 break;
