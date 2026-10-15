@@ -45,8 +45,8 @@ toolchain/current/bin/python3 -m tools.tumoflip.render_rx_link /tmp/rx-link-prev
 FBT_NO_SYNC=1 ./fbt COMPACT=1 DEBUG=0 -j2 fap_tumo_rx_link
 ```
 
-The shared parser/session/statistics implementation measured 99.5% line and
-85.12% branch coverage. Those figures do not describe hardware acceptance or
+The shared parser/session/statistics implementation measured 100% line and
+88.78% branch coverage. Those figures do not describe hardware acceptance or
 the entire firmware. The first candidate retains a full physical 4096-byte
 flash reserve, to be rechecked on the exact release commit.
 
