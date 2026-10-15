@@ -278,6 +278,14 @@ static void
     furi_mutex_release(app->mutex);
 }
 
+static void nice_o_receiver_overrun(void* context) {
+    SubGhzReceiver* receiver = context;
+    subghz_receiver_reset(receiver);
+    SubGhzProtocolDecoderBase* nice = subghz_receiver_search_decoder_base_by_name(
+        receiver, SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME);
+    if(nice) subghz_protocol_decoder_nice_flor_s_set_skip_o_code(nice, false);
+}
+
 static bool nice_o_rx_start(NiceOCode* app) {
     if(app->rx_active) return true;
     if(!subghz_app_radio_acquire(&app->radio, "Nice O-Code", NICE_O_FREQUENCY)) return false;
@@ -304,8 +312,7 @@ static bool nice_o_rx_start(NiceOCode* app) {
     subghz_devices_load_preset(app->device, FuriHalSubGhzPresetOok650Async, NULL);
     subghz_devices_set_frequency(app->device, NICE_O_FREQUENCY);
     app->worker = subghz_worker_alloc();
-    subghz_worker_set_overrun_callback(
-        app->worker, (SubGhzWorkerOverrunCallback)subghz_receiver_reset);
+    subghz_worker_set_overrun_callback(app->worker, nice_o_receiver_overrun);
     subghz_worker_set_pair_callback(app->worker, (SubGhzWorkerPairCallback)subghz_receiver_decode);
     subghz_worker_set_context(app->worker, app->receiver);
 

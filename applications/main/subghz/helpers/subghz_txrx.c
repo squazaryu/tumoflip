@@ -44,6 +44,7 @@ static void subghz_txrx_worker_overrun_callback(void* context) {
     SubGhzTxRxReceiverContext* receiver_context = context;
     furi_check(receiver_context);
     subghz_receiver_reset(receiver_context->receiver);
+    subghz_txrx_clear_nice_press(receiver_context->receiver);
 }
 
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
@@ -841,7 +842,7 @@ void subghz_txrx_hopper_update(
         subghz_txrx_rx_end(instance);
     }
     if(instance->txrx_state == SubGhzTxRxStateIDLE) {
-        subghz_receiver_reset(instance->receiver);
+        subghz_txrx_receiver_reset(instance);
         if(hop_preset) {
             size_t preset_index = configured_preset_count > 0 ?
                                       subghz_setting_get_hopper_preset_index(

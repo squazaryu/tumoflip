@@ -35,6 +35,7 @@ static void subghz_txrx_worker_overrun_callback(void* context) {
     SubGhzTxRx* instance = context;
     furi_check(instance);
     subghz_receiver_reset(instance->receiver);
+    subghz_txrx_clear_nice_press(instance->receiver);
 }
 
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
@@ -654,7 +655,7 @@ void subghz_txrx_hopper_update(SubGhzTxRx* instance, float stay_threshold) {
         subghz_txrx_rx_end(instance);
     }
     if(instance->txrx_state == SubGhzTxRxStateIDLE) {
-        subghz_receiver_reset(instance->receiver);
+        subghz_txrx_receiver_reset(instance);
         instance->preset->frequency =
             subghz_setting_get_hopper_frequency(instance->setting, instance->hopper_idx_frequency);
         subghz_txrx_rx(instance, instance->preset->frequency);
@@ -849,7 +850,7 @@ void subghz_txrx_combined_hopper_update(SubGhzTxRx* instance, float stay_thresho
         subghz_txrx_rx_end(instance);
     }
     if(instance->txrx_state == SubGhzTxRxStateIDLE) {
-        subghz_receiver_reset(instance->receiver);
+        subghz_txrx_receiver_reset(instance);
         const char* old_preset_name = furi_string_get_cstr(instance->preset->name);
         const char* preset_name =
             subghz_setting_get_preset_name(instance->setting, actual_preset_idx);

@@ -1,4 +1,6 @@
 #include "../weather_station_app_i.h"
+
+#define TAG "WeatherRX"
 #include <storage/storage.h>
 #include "../views/weather_station_receiver.h"
 #include "../weather_editor_radio.h"

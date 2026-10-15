@@ -70,6 +70,13 @@ upstream protobuf fork's unrelated GPS/Network messages:
 
 ## Acceptance remaining
 
+The initial real ARM build adds 1680 bytes relative to Dev 009-024 and has
+2448 bytes of section headroom, with no C1/C2 address overlap but no completely
+unused 4096-byte page. A scoped `-Oz` experiment on the Sub-GHz library did not
+recover meaningful space and was not retained; HAL/loader flags stay unchanged.
+The explicit 4096-byte release-reserve gate remains a publication decision, not
+something inferred from green unit tests. No gate is silently lowered here.
+
 Host fixtures cover invalid presets, generator ownership, synthetic Nice frames,
 legacy files/RX-only transmission, collisions, broker cleanup and RPC failures.
 CI runs them; actual F7/FAP builds, release validation and physical acceptance
