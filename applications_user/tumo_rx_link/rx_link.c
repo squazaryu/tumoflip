@@ -7,7 +7,8 @@ uint32_t rx_link_read32(const uint8_t* p) {
 }
 
 void rx_link_write32(uint8_t* p, uint32_t value) {
-    for(unsigned i = 0; i < 4; i++) p[i] = (uint8_t)(value >> (8 * i));
+    for(unsigned i = 0; i < 4; i++)
+        p[i] = (uint8_t)(value >> (8 * i));
 }
 
 static uint16_t rx_link_crc(const uint8_t* p, size_t length) {
@@ -80,14 +81,23 @@ static void rx_link_stats_reply(RxLinkBackend* b, RxLinkFrame* reply) {
     RxLinkSnapshot* s = &b->snapshot;
     s->mean = s->count ? (uint32_t)(b->duration_sum / s->count) : 0;
     s->high_permille = b->duration_sum ? (uint32_t)(b->high_sum * 1000 / b->duration_sum) : 0;
-    const uint32_t values[] = {b->session, s->count, s->minimum, s->maximum, s->mean,
-                              s->high_permille, s->dropped_edges, s->lost_batches,
-                              s->rejected_batches};
+    const uint32_t values[] = {
+        b->session,
+        s->count,
+        s->minimum,
+        s->maximum,
+        s->mean,
+        s->high_permille,
+        s->dropped_edges,
+        s->lost_batches,
+        s->rejected_batches};
     reply->type = RxLinkStats;
     reply->sequence = b->expected_sequence;
     reply->length = RX_LINK_STATS_SIZE;
-    for(size_t i = 0; i < 9; i++) rx_link_write32(reply->data + 4 * i, values[i]);
-    for(size_t i = 0; i < RX_LINK_BINS; i++) rx_link_write32(reply->data + 36 + 4 * i, s->bins[i]);
+    for(size_t i = 0; i < 9; i++)
+        rx_link_write32(reply->data + 4 * i, values[i]);
+    for(size_t i = 0; i < RX_LINK_BINS; i++)
+        rx_link_write32(reply->data + 36 + 4 * i, s->bins[i]);
 }
 
 bool rx_link_backend_handle(RxLinkBackend* b, const RxLinkFrame* f, RxLinkFrame* reply) {
@@ -142,7 +152,8 @@ bool rx_link_backend_handle(RxLinkBackend* b, const RxLinkFrame* f, RxLinkFrame*
         b->duration_sum += duration;
         if(edge & 0x80000000u) b->high_sum += duration;
         unsigned bin = 0;
-        for(uint32_t value = duration; value > 1 && bin < RX_LINK_BINS - 1; value >>= 1) bin++;
+        for(uint32_t value = duration; value > 1 && bin < RX_LINK_BINS - 1; value >>= 1)
+            bin++;
         s->bins[bin]++;
         s->count++;
     }
@@ -163,8 +174,8 @@ bool rx_link_snapshot_decode(const RxLinkFrame* f, uint32_t session, RxLinkSnaps
         .lost_batches = rx_link_read32(f->data + 28),
         .rejected_batches = rx_link_read32(f->data + 32),
     };
-    if(s.count > RX_LINK_SAMPLE_LIMIT || s.maximum > RX_LINK_DURATION_MAX ||
-       s.minimum > s.mean || s.mean > s.maximum || s.high_permille > 1000 ||
+    if(s.count > RX_LINK_SAMPLE_LIMIT || s.maximum > RX_LINK_DURATION_MAX || s.minimum > s.mean ||
+       s.mean > s.maximum || s.high_permille > 1000 ||
        (!s.count && (s.minimum || s.maximum || s.mean || s.high_permille)) ||
        (s.count && !s.minimum))
         return false;

@@ -11,6 +11,25 @@ APP = ROOT / "applications_user/tumo_rx_link"
 
 
 class RxLinkTests(unittest.TestCase):
+    def test_frontend_poll_and_teardown_on_disconnect(self):
+        from tools.tumoflip.test_hotplug_assets import function
+        source = (APP / "tumo_rx_link.c").read_text()
+        fixture = (ROOT / "tools/tumoflip/fixtures/rx_link_frontend.c").read_text()
+        production = "\n".join(function(source, signature) for signature in (
+            "static void rx_link_stop_io(", "static void rx_link_fail(",
+            "static void rx_link_poll(",
+        ))
+        with tempfile.TemporaryDirectory(prefix="rx-link-lifecycle-") as directory:
+            root = Path(directory)
+            (root / "test.c").write_text(fixture.replace("/* PRODUCTION */", production))
+            built = subprocess.run([
+                "cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O1", "-g",
+                "-fsanitize=address,undefined", "-I", str(APP), str(root / "test.c"),
+                str(APP / "rx_link.c"), "-o", str(root / "test")], capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            ran = subprocess.run([str(root / "test")], capture_output=True, text=True)
+            self.assertEqual(ran.returncode, 0, ran.stderr)
+
     def test_backend_archive_rejects_wrong_chip_layout_and_commit(self):
         from tools.tumoflip.esp32_rx_link.package_backend import package
         with tempfile.TemporaryDirectory(prefix="rx-backend-package-") as directory:

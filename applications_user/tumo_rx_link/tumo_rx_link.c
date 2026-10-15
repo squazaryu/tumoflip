@@ -273,8 +273,8 @@ int32_t tumo_rx_link_app(void* context) {
                     app->state.modulation ^= 1;
                 app->state.phase = RxUiIdle;
             } else if(app->state.phase == RxUiLive || app->state.phase == RxUiStopped) {
-                if(event.key == InputKeyRight) app->state.page = (app->state.page + 1) % 3;
-                if(event.key == InputKeyLeft) app->state.page = (app->state.page + 2) % 3;
+                if(event.key == InputKeyRight) app->state.page = (app->state.page + 1) % 4;
+                if(event.key == InputKeyLeft) app->state.page = (app->state.page + 3) % 4;
             }
         }
         rx_link_poll(app, furi_get_tick());

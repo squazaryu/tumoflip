@@ -42,13 +42,16 @@ int main(int argc,char** argv) {
  c.fb.u8x8.display_info=&info;u8g2_SetupBuffer(&c.fb,buf,8,u8g2_ll_hvline_vertical_top_lsb,U8G2_R0);
  RxLinkViewModel m={.frequency=1};
  rx_link_draw(&c,&m);save(&c,argv[1],"01-idle");
+ m.frequency=2;m.modulation=1;rx_link_draw(&c,&m);save(&c,argv[1],"01b-idle-fm");m.frequency=1;m.modulation=0;
  m.phase=RxUiWaiting;rx_link_draw(&c,&m);save(&c,argv[1],"02-waiting");
- m.phase=RxUiLive;m.snapshot=(RxLinkSnapshot){.count=10000,.minimum=120,.mean=480,.maximum=960,.high_permille=500};
+ m.phase=RxUiLive;rx_link_draw(&c,&m);save(&c,argv[1],"02b-empty");
+ m.snapshot=(RxLinkSnapshot){.count=10000,.minimum=120,.mean=480,.maximum=960,.high_permille=500};
  m.snapshot.bins[6]=500;m.snapshot.bins[7]=3000;m.snapshot.bins[8]=2000;m.snapshot.bins[9]=4000;m.snapshot.bins[10]=500;
  rx_link_draw(&c,&m);save(&c,argv[1],"03-histogram");
  m.page=1;rx_link_draw(&c,&m);save(&c,argv[1],"04-timings");
  m.page=2;m.local_drops=UINT32_MAX;m.snapshot.lost_batches=UINT32_MAX;m.snapshot.rejected_batches=UINT32_MAX;m.uart_errors=UINT32_MAX;
  rx_link_draw(&c,&m);save(&c,argv[1],"05-loss-limits");
+ m.page=3;rx_link_draw(&c,&m);save(&c,argv[1],"05b-link-errors");
  m.phase=RxUiStopped;rx_link_draw(&c,&m);save(&c,argv[1],"06-stopped");
  for(unsigned error=RxErrorUart;error<=RxErrorRadioLost;error++) {
   char name[32];snprintf(name,sizeof(name),"%02u-error-%u",error+6,error);
@@ -77,8 +80,8 @@ def main():
         subprocess.run([str(root / "render"), str(args.output.resolve())], check=True,
                        env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
     frames = sorted(args.output.glob("*.pgm"))
-    assert len(frames) == 12
-    sheet = Image.new("RGB", (3 * 404, 4 * 232), "#ececec")
+    assert len(frames) == 15
+    sheet = Image.new("RGB", (3 * 404, 5 * 232), "#ececec")
     draw = ImageDraw.Draw(sheet)
     for i, path in enumerate(frames):
         with Image.open(path) as image:

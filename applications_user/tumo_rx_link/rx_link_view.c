@@ -73,18 +73,20 @@ void rx_link_draw(Canvas* canvas, const RxLinkViewModel* m) {
             snprintf(line, sizeof(line), "Mean %lu us", (unsigned long)m->snapshot.mean);
             canvas_draw_str(canvas, 2, 49, line);
         } else if(m->page == 1) {
-            rx_link_row(canvas, 22, "Samples", m->snapshot.count);
-            rx_link_row(canvas, 31, "Min us", m->snapshot.minimum);
-            rx_link_row(canvas, 40, "Max us", m->snapshot.maximum);
-            rx_link_row(canvas, 49, "High /1000", m->snapshot.high_permille);
+            rx_link_row(canvas, 24, "Samples", m->snapshot.count);
+            rx_link_row(canvas, 36, "Min us", m->snapshot.minimum);
+            rx_link_row(canvas, 48, "Max us", m->snapshot.maximum);
+        } else if(m->page == 2) {
+            rx_link_row(canvas, 24, "Dropped edges", m->local_drops);
+            rx_link_row(canvas, 36, "Lost batches", m->snapshot.lost_batches);
+            rx_link_row(canvas, 48, "Rejected", m->snapshot.rejected_batches);
         } else {
-            rx_link_row(canvas, 22, "Dropped edges", m->local_drops);
-            rx_link_row(canvas, 31, "Lost batches", m->snapshot.lost_batches);
-            rx_link_row(canvas, 40, "Rejected", m->snapshot.rejected_batches);
-            rx_link_row(canvas, 49, "UART errors", m->uart_errors);
+            rx_link_row(canvas, 24, "High /1000", m->snapshot.high_permille);
+            rx_link_row(canvas, 36, "UART errors", m->uart_errors);
+            rx_link_row(canvas, 48, "Sample limit", RX_LINK_SAMPLE_LIMIT);
         }
         char page[8];
-        snprintf(page, sizeof(page), "%u/3", m->page + 1);
+        snprintf(page, sizeof(page), "%u/4", m->page + 1);
         canvas_draw_str_aligned(canvas, 126, 63, AlignRight, AlignBottom, page);
         elements_button_center(canvas, m->phase == RxUiLive ? "Stop" : "Restart");
     }

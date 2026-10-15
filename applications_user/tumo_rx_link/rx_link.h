@@ -5,13 +5,13 @@
 #include <stdint.h>
 
 /* Private, versioned UART contract. No RF transmit or credential commands. */
-#define RX_LINK_PAYLOAD_MAX 128U
-#define RX_LINK_FRAME_MAX (RX_LINK_PAYLOAD_MAX + 9U)
-#define RX_LINK_BINS 16U
+#define RX_LINK_PAYLOAD_MAX  128U
+#define RX_LINK_FRAME_MAX    (RX_LINK_PAYLOAD_MAX + 9U)
+#define RX_LINK_BINS         16U
 #define RX_LINK_SAMPLE_LIMIT 1000000U
 #define RX_LINK_DURATION_MAX 1000000U
-#define RX_LINK_STATS_SIZE 100U
-#define RX_LINK_BAUD 230400U
+#define RX_LINK_STATS_SIZE   100U
+#define RX_LINK_BAUD         230400U
 
 enum {
     RxLinkHello = 1,
@@ -72,7 +72,11 @@ typedef struct {
     RxLinkSnapshot snapshot;
 } RxLinkClient;
 
-enum {RxLinkClientIgnored, RxLinkClientReady, RxLinkClientSnapshot};
+enum {
+    RxLinkClientIgnored,
+    RxLinkClientReady,
+    RxLinkClientSnapshot
+};
 void rx_link_client_begin(RxLinkClient* client, uint32_t session, uint32_t now_ms);
 void rx_link_client_stop(RxLinkClient* client);
 unsigned rx_link_client_accept(RxLinkClient* client, const RxLinkFrame* frame, uint32_t now_ms);
