@@ -73,9 +73,14 @@ int main(void) {
             self.assertEqual(ran.returncode, 0, ran.stderr)
 
     def test_backend_archive_rejects_wrong_chip_layout_and_commit(self):
-        from tools.tumoflip.esp32_rx_link.package_backend import package
+        from tools.tumoflip.esp32_rx_link.package_backend import package as build_package
         with tempfile.TemporaryDirectory(prefix="rx-backend-package-") as directory:
             root = Path(directory)
+            sdk = root / "sdk"
+            sdk.mkdir()
+            (sdk / "LICENSE").write_text("SDK test notice")
+            def package(root, commit):
+                return build_package(root, commit, sdk)
             build = root / "build"
             (build / "bootloader").mkdir(parents=True)
             (build / "partition_table").mkdir()
