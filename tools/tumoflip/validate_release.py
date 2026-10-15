@@ -108,6 +108,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Diagnostics/runtime_trace_viewer.fap",
     "apps/Module One/Field/field_logger.fap",
     "apps/Module One/Signals/signal_workbench.fap",
+    "apps/Module One/Signals/tumo_rx_link.fap",
     "apps/Module One/Signals/tumoscope.fap",
     "apps/Module One/Network/tumonet_gateway.fap",
     "apps/Module One/Sub-GHz/tumonet_bench.fap",

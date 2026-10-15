@@ -1,0 +1,43 @@
+name: Module One passive RX backend
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "applications_user/tumo_rx_link/**"
+      - "tools/tumoflip/esp32_rx_link/**"
+      - "tools/tumoflip/test_rx_link.py"
+      - "tools/tumoflip/fixtures/rx_link_test.c"
+      - ".github/workflows/module-one-rx-link.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  esp32-backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    container:
+      image: espressif/idf:v5.3.2@sha256:5b8f58d9d9caa45b689a31a0b6a0cc53b84594e0ba5fdd8d28eeef7d6123242a
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Test shared parser, statistics and session gate
+        shell: bash
+        run: python3 -m unittest tools.tumoflip.test_rx_link
+      - name: Build Module One ESP32 only
+        shell: bash
+        working-directory: tools/tumoflip/esp32_rx_link
+        run: |
+          set -euo pipefail
+          source /opt/esp/idf/export.sh
+          idf.py set-target esp32
+          cmake --build build --parallel 2
+          python3 package_backend.py --source-commit "$GITHUB_SHA"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: module-one-rx-link-backend
+          path: tools/tumoflip/esp32_rx_link/build/tumo-rx-link-module-one-0.1.0.zip
+          if-no-files-found: error
+          retention-days: 1

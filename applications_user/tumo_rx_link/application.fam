@@ -1,0 +1,15 @@
+App(
+    appid="tumo_rx_link",
+    name="Tumo RX Link",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="tumo_rx_link_app",
+    requires=["gui", "subghz_radio_broker", "expansion"],
+    stack_size=4 * 1024,
+    fap_category="Module One/Signals",
+    fap_dist_path="apps/Module One/Signals/tumo_rx_link.fap",
+    fap_version="0.1.0",
+    fap_author="squazaryu/tumoflip",
+    fap_weburl="https://github.com/squazaryu/tumoflip",
+    fap_description="Experimental receive-only pulse statistics with a paired Module One ESP32 backend.",
+)
