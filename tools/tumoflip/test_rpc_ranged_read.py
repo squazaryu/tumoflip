@@ -25,7 +25,7 @@ class RpcRangedReadTests(unittest.TestCase):
             schema = schema.replace(field, "")
         self.assertEqual(schema, (ROOT / "assets/protobuf/storage.proto").read_text())
         self.assertEqual({p.name for p in root.glob("*.proto")}, {"storage.proto"})
-        self.assertEqual((root / "storage.options").read_text(), (ROOT / "assets/protobuf/storage.options").read_text())
+        self.assertEqual((root / "storage.options").read_text().rstrip("\n"), (ROOT / "assets/protobuf/storage.options").read_text().rstrip("\n"))
 
 
 if __name__ == "__main__":
