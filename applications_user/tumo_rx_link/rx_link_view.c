@@ -85,7 +85,7 @@ void rx_link_draw(Canvas* canvas, const RxLinkViewModel* m) {
         }
         char page[8];
         snprintf(page, sizeof(page), "%u/3", m->page + 1);
-        canvas_draw_str(canvas, 111, 63, page);
+        canvas_draw_str_aligned(canvas, 126, 63, AlignRight, AlignBottom, page);
         elements_button_center(canvas, m->phase == RxUiLive ? "Stop" : "Restart");
     }
 }

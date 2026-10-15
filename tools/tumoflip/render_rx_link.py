@@ -17,12 +17,13 @@ def build_source():
     source = native.build_source(None).split("static int changes;", 1)[0]
     source += r'''
 static void rx_preview_str(Canvas* c,int32_t x,int32_t y,const char* text) {
- assert(y<=49 || (x==111 && y==63));
+ assert(y<=49);
+ if(x<0 || x+canvas_string_width(c,text)>128) fprintf(stderr,"Clipped text at %d,%d: %s (%d px)\n",x,y,text,(int)canvas_string_width(c,text));
  assert(x>=0 && x+canvas_string_width(c,text)<=128);
  canvas_draw_str(c,x,y,text);
 }
 static void rx_preview_aligned(Canvas* c,int32_t x,int32_t y,Align horizontal,Align vertical,const char* text) {
- assert(y<=49);
+ assert(y<=49 || (x==126 && y==63 && horizontal==AlignRight));
  int width=canvas_string_width(c,text);
  int left=horizontal==AlignRight?x-width:horizontal==AlignCenter?x-width/2:x;
  assert(left>=0 && left+width<=128);
