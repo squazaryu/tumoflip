@@ -24,6 +24,9 @@ def package(root, source_commit):
         image = files[name]
         if len(image) < 24 or image[0] != 0xE9 or image[12:14] != b"\x00\x00":
             raise ValueError("image is not for classic ESP32")
+    # ESP-IDF app descriptor starts after the image and first segment headers.
+    if files["tumo_rx_link_module_one.bin"][48:80].split(b"\0", 1)[0] != b"0.1.0":
+        raise ValueError("ESP application version differs from package version")
     metadata = {
         "kind": "experimental-tumo-rx-link", "version": "0.1.0",
         "board": "module-one-v6.1", "chip": "esp32", "source_commit": source_commit,
