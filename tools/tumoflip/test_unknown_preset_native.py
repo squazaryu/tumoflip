@@ -9,6 +9,36 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class UnknownPresetTests(unittest.TestCase):
+    def test_weather_lab_does_not_reuse_an_old_preset(self):
+        source = (ROOT / "applications_user/weather_editor/weather_lab.c").read_text()
+        native(r'''
+#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <assert.h>
+#define FURI_LOG_E(...) ((void)0)
+#define subghz_receiver_set_rx_callback(...) ((void)0)
+enum {WSTxRxStateIDLE,WSTxRxStateRx};
+typedef struct {const char* name;uint32_t frequency;} Preset;
+typedef struct {void* receiver;Preset* preset;int txrx_state;} TxRx;
+typedef struct {TxRx* txrx;void* setting;} WeatherStationApp;
+static bool missing;static uint8_t data;static int starts;
+static bool weather_station_ensure_radio_core(WeatherStationApp* a){(void)a;return true;}
+static const char* furi_string_get_cstr(const char* s){return s;}
+static uint8_t* subghz_setting_get_preset_data_by_name(void* s,const char* n){(void)s;(void)n;return missing?NULL:&data;}
+static void ws_rx_end(WeatherStationApp* a){a->txrx->txrx_state=WSTxRxStateIDLE;}
+static void ws_begin(WeatherStationApp* a,uint8_t* d){(void)a;assert(d);}
+static void ws_rx(WeatherStationApp* a,uint32_t f){(void)f;a->txrx->txrx_state=WSTxRxStateRx;starts++;}
+''' + function(source, "bool weather_lab_start_rx(") + r'''
+int main(void){
+    Preset p={.name="bad",.frequency=433920000};TxRx t={.preset=&p,.receiver=&p};WeatherStationApp a={.txrx=&t};
+    missing=true;assert(!weather_lab_start_rx(&a));assert(!starts);
+    missing=false;assert(weather_lab_start_rx(&a));assert(starts==1);
+    missing=true;assert(!weather_lab_start_rx(&a));assert(t.txrx_state==WSTxRxStateIDLE && starts==1);
+    return 0;
+}
+''')
+
     def test_rx_lookup_failure_never_starts_a_radio(self):
         paths = (
             "applications/main/subghz/helpers/subghz_txrx.c",
@@ -31,12 +61,14 @@ class UnknownPresetTests(unittest.TestCase):
 #define FURI_LOG_E(...) ((void)0)
 typedef struct {const char* name;uint32_t frequency;} Preset;
 typedef struct {Preset* preset;void* setting;} SubGhzTxRx;
+typedef SubGhzTxRx SubGhzWarDrivingTxRx;
 static bool missing;
 static unsigned begins,starts;
 static uint8_t data;
 static const char* furi_string_get_cstr(const char* s){return s;}
 static void subghz_txrx_stop(SubGhzTxRx* s){(void)s;}
 __attribute__((unused)) static void subghz_txrx_receiver_reset(SubGhzTxRx* s){(void)s;}
+__attribute__((unused)) static void subghz_wardriving_txrx_rx_pipeline_alloc(SubGhzTxRx* s){(void)s;}
 static void* subghz_txrx_get_setting(SubGhzTxRx* s){return s->setting;}
 static uint8_t* subghz_setting_get_preset_data_by_name(void* s,const char* n){(void)s;(void)n;return missing?NULL:&data;}
 static void subghz_txrx_begin(SubGhzTxRx* s,uint8_t* d){(void)s;assert(d);begins++;}
