@@ -32,9 +32,9 @@ void rx_link_draw(Canvas* canvas, const RxLinkViewModel* m) {
         canvas_draw_str(canvas, 2, 38, "Up/Down:");
         canvas_draw_str_aligned(
             canvas, 126, 38, AlignRight, AlignBottom, frequencies[m->frequency % 3]);
-        canvas_draw_str(canvas, 2, 50, "Left/Right:");
+        canvas_draw_str(canvas, 2, 48, "Left/Right:");
         canvas_draw_str_aligned(
-            canvas, 126, 50, AlignRight, AlignBottom, modulations[m->modulation % 2]);
+            canvas, 126, 48, AlignRight, AlignBottom, modulations[m->modulation % 2]);
         elements_button_center(canvas, "Start");
     } else if(m->phase == RxUiWaiting) {
         canvas_draw_str(canvas, 2, 28, "Checking ESP32 firmware");
@@ -65,23 +65,23 @@ void rx_link_draw(Canvas* canvas, const RxLinkViewModel* m) {
             uint32_t peak = 1;
             for(unsigned i = 0; i < RX_LINK_BINS; i++)
                 if(m->snapshot.bins[i] > peak) peak = m->snapshot.bins[i];
-            canvas_draw_line(canvas, 7, 44, 119, 44);
+            canvas_draw_line(canvas, 7, 40, 119, 40);
             for(unsigned i = 0; i < RX_LINK_BINS; i++) {
-                unsigned height = (unsigned)(((uint64_t)m->snapshot.bins[i] * 16) / peak);
-                if(height) canvas_draw_box(canvas, 8 + i * 7, 44 - height, 5, height);
+                unsigned height = (unsigned)(((uint64_t)m->snapshot.bins[i] * 13) / peak);
+                if(height) canvas_draw_box(canvas, 8 + i * 7, 40 - height, 5, height);
             }
             snprintf(line, sizeof(line), "Mean %lu us", (unsigned long)m->snapshot.mean);
-            canvas_draw_str(canvas, 2, 54, line);
+            canvas_draw_str(canvas, 2, 49, line);
         } else if(m->page == 1) {
-            rx_link_row(canvas, 24, "Samples", m->snapshot.count);
-            rx_link_row(canvas, 34, "Min us", m->snapshot.minimum);
-            rx_link_row(canvas, 44, "Max us", m->snapshot.maximum);
-            rx_link_row(canvas, 54, "High /1000", m->snapshot.high_permille);
+            rx_link_row(canvas, 22, "Samples", m->snapshot.count);
+            rx_link_row(canvas, 31, "Min us", m->snapshot.minimum);
+            rx_link_row(canvas, 40, "Max us", m->snapshot.maximum);
+            rx_link_row(canvas, 49, "High /1000", m->snapshot.high_permille);
         } else {
-            rx_link_row(canvas, 24, "Dropped edges", m->local_drops);
-            rx_link_row(canvas, 34, "Lost batches", m->snapshot.lost_batches);
-            rx_link_row(canvas, 44, "Rejected", m->snapshot.rejected_batches);
-            rx_link_row(canvas, 54, "UART errors", m->uart_errors);
+            rx_link_row(canvas, 22, "Dropped edges", m->local_drops);
+            rx_link_row(canvas, 31, "Lost batches", m->snapshot.lost_batches);
+            rx_link_row(canvas, 40, "Rejected", m->snapshot.rejected_batches);
+            rx_link_row(canvas, 49, "UART errors", m->uart_errors);
         }
         char page[8];
         snprintf(page, sizeof(page), "%u/3", m->page + 1);
