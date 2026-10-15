@@ -97,6 +97,12 @@ int main(void) {
                 package(root, "a" * 40)
             args["extra_esptool_args"]["chip"] = "esp32"
             config.write_text(json.dumps(args))
+            with self.assertRaises(ValueError):
+                package(root, "a" * 40)  # Missing/mismatched ESP app version.
+            application = bytearray(80)
+            application[0] = 0xE9
+            application[48:54] = b"0.1.0\0"
+            (build / "tumo_rx_link_module_one.bin").write_bytes(application)
             package(root, "a" * 40)
             archive = build / "tumo-rx-link-module-one-0.1.0.zip"
             first = archive.read_bytes()
