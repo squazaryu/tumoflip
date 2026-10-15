@@ -47,7 +47,7 @@ Open `Module One / Signals / Tumo RX Link`, select one of 315/433.92/868.35 MHz
 and AM650/FM238, then Start. The Flipper requires the matching board/version and
 fresh-session acknowledgement before starting receive DMA. An ordinary Marauder
 firmware times out without starting capture. Back always exits; OK stops/restarts.
-Left/Right switches between histogram, timing details and loss diagnostics.
+Left/Right switches between histogram, timing details, loss and UART diagnostics.
 
 - Statistics are RAM-only; exiting discards them, with no capture files altered.
 - Histogram bins are floor(log2(duration in microseconds)), with the last bin

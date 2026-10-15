@@ -2,12 +2,20 @@ name: Module One passive RX backend
 
 on:
   workflow_dispatch:
+  push:
+    branches: [dev]
+    paths:
+      - "applications_user/tumo_rx_link/**"
+      - "tools/tumoflip/esp32_rx_link/**"
+      - "tools/tumoflip/test_rx_link.py"
+      - "tools/tumoflip/fixtures/rx_link*.c"
+      - ".github/workflows/module-one-rx-link.yml"
   pull_request:
     paths:
       - "applications_user/tumo_rx_link/**"
       - "tools/tumoflip/esp32_rx_link/**"
       - "tools/tumoflip/test_rx_link.py"
-      - "tools/tumoflip/fixtures/rx_link_test.c"
+      - "tools/tumoflip/fixtures/rx_link*.c"
       - ".github/workflows/module-one-rx-link.yml"
 
 permissions:
