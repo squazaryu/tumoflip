@@ -113,7 +113,8 @@ int main(void) {
                 self.assertFalse(metadata["hardware_accepted"])
                 self.assertTrue(metadata["replaces_marauder"])
                 self.assertEqual(metadata["board"], "module-one-v6.1")
-                self.assertEqual(len(z.namelist()), 5)
+                self.assertIn("licenses/tumoflip-LICENSE", z.namelist())
+                self.assertIn("licenses/esp-idf/LICENSE", z.namelist())
             (build / "tumo_rx_link_module_one.bin").write_bytes(b"bad image")
             with self.assertRaises(ValueError):
                 package(root, "a" * 40)
