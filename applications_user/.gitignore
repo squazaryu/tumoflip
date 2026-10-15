@@ -59,6 +59,8 @@
 !nfc_ccid_bridge/**
 !tumofabric_node/
 !tumofabric_node/**
+!tumo_rx_link/
+!tumo_rx_link/**
 !tumonet_gateway/
 !tumonet_gateway/**
 !subghz_wardriving/
