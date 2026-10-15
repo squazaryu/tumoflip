@@ -73,9 +73,14 @@ int main(void) {
             self.assertEqual(ran.returncode, 0, ran.stderr)
 
     def test_backend_archive_rejects_wrong_chip_layout_and_commit(self):
-        from tools.tumoflip.esp32_rx_link.package_backend import package
+        from tools.tumoflip.esp32_rx_link.package_backend import package as build_package
         with tempfile.TemporaryDirectory(prefix="rx-backend-package-") as directory:
             root = Path(directory)
+            sdk = root / "sdk"
+            sdk.mkdir()
+            (sdk / "LICENSE").write_text("SDK test notice")
+            def package(root, commit):
+                return build_package(root, commit, sdk)
             build = root / "build"
             (build / "bootloader").mkdir(parents=True)
             (build / "partition_table").mkdir()
@@ -97,6 +102,12 @@ int main(void) {
                 package(root, "a" * 40)
             args["extra_esptool_args"]["chip"] = "esp32"
             config.write_text(json.dumps(args))
+            with self.assertRaises(ValueError):
+                package(root, "a" * 40)  # Missing/mismatched ESP app version.
+            application = bytearray(80)
+            application[0] = 0xE9
+            application[48:54] = b"0.1.0\0"
+            (build / "tumo_rx_link_module_one.bin").write_bytes(application)
             package(root, "a" * 40)
             archive = build / "tumo-rx-link-module-one-0.1.0.zip"
             first = archive.read_bytes()
@@ -107,7 +118,8 @@ int main(void) {
                 self.assertFalse(metadata["hardware_accepted"])
                 self.assertTrue(metadata["replaces_marauder"])
                 self.assertEqual(metadata["board"], "module-one-v6.1")
-                self.assertEqual(len(z.namelist()), 5)
+                self.assertIn("licenses/tumoflip-LICENSE", z.namelist())
+                self.assertIn("licenses/esp-idf/LICENSE", z.namelist())
             (build / "tumo_rx_link_module_one.bin").write_bytes(b"bad image")
             with self.assertRaises(ValueError):
                 package(root, "a" * 40)

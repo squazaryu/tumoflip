@@ -2,12 +2,13 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import zipfile
 
 
-def package(root, source_commit):
+def package(root, source_commit, sdk_root=None):
     if not re.fullmatch(r"[0-9a-f]{40}", source_commit):
         raise ValueError("full source commit required")
     build = root / "build"
@@ -24,6 +25,9 @@ def package(root, source_commit):
         image = files[name]
         if len(image) < 24 or image[0] != 0xE9 or image[12:14] != b"\x00\x00":
             raise ValueError("image is not for classic ESP32")
+    # ESP-IDF app descriptor starts after the image and first segment headers.
+    if files["tumo_rx_link_module_one.bin"][48:80].split(b"\0", 1)[0] != b"0.1.0":
+        raise ValueError("ESP application version differs from package version")
     metadata = {
         "kind": "experimental-tumo-rx-link", "version": "0.1.0",
         "board": "module-one-v6.1", "chip": "esp32", "source_commit": source_commit,
@@ -35,6 +39,21 @@ def package(root, source_commit):
     }
     files["rx-link-build.json"] = (json.dumps(metadata, indent=2) + "\n").encode()
     files["README.md"] = (root / "README.md").read_bytes()
+    files["licenses/tumoflip-LICENSE"] = (Path(__file__).resolve().parents[3] / "LICENSE").read_bytes()
+    sdk = Path(sdk_root or os.environ.get("IDF_PATH", "/nonexistent")).resolve()
+    if not (sdk / "LICENSE").is_file():
+        raise ValueError("ESP-IDF license tree is required")
+    suffixes = {"", ".txt", ".md", ".rst", ".lib", ".lesser", ".gpl", ".bsd", ".mit"}
+    for notice in sorted(sdk.rglob("*")):
+        if ".git" in notice.parts or not notice.is_file():
+            continue
+        if not notice.name.upper().startswith(("LICENSE", "LICENCE", "COPYING", "NOTICE")):
+            continue
+        if notice.suffix.lower() not in suffixes or not notice.resolve().is_relative_to(sdk):
+            continue
+        if notice.stat().st_size > 1024 * 1024:
+            raise ValueError("unexpected oversized SDK notice")
+        files["licenses/esp-idf/" + notice.relative_to(sdk).as_posix()] = notice.read_bytes()
     target = build / "tumo-rx-link-module-one-0.1.0.zip"
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for name, payload in sorted(files.items()):
