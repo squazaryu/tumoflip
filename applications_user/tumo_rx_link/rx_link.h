@@ -63,3 +63,17 @@ size_t rx_link_encode(const RxLinkFrame* frame, uint8_t* output, size_t capacity
 bool rx_link_feed(RxLinkParser* parser, uint8_t byte, RxLinkFrame* frame);
 bool rx_link_backend_handle(RxLinkBackend* backend, const RxLinkFrame* frame, RxLinkFrame* reply);
 bool rx_link_snapshot_decode(const RxLinkFrame* frame, uint32_t session, RxLinkSnapshot* snapshot);
+
+typedef struct {
+    bool waiting;
+    bool connected;
+    uint32_t session;
+    uint32_t last_seen_ms;
+    RxLinkSnapshot snapshot;
+} RxLinkClient;
+
+enum {RxLinkClientIgnored, RxLinkClientReady, RxLinkClientSnapshot};
+void rx_link_client_begin(RxLinkClient* client, uint32_t session, uint32_t now_ms);
+void rx_link_client_stop(RxLinkClient* client);
+unsigned rx_link_client_accept(RxLinkClient* client, const RxLinkFrame* frame, uint32_t now_ms);
+bool rx_link_client_expired(const RxLinkClient* client, uint32_t now_ms);

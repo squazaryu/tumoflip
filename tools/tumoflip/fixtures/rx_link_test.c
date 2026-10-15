@@ -102,4 +102,32 @@ static void backend(void) {
     assert(!rx_link_backend_handle(&b,&f,&reply));assert(b.session==456);
 }
 
-int main(void) {wire();backend();return 0;}
+static void client(void) {
+    RxLinkClient c={0}; RxLinkBackend b={0}; RxLinkFrame f={.type=RxLinkHello,.length=8},reply;
+    memcpy(f.data,"RXA1",4);rx_link_write32(f.data+4,42);
+    assert(rx_link_backend_handle(&b,&f,&reply));
+    assert(rx_link_client_accept(&c,&reply,0)==RxLinkClientIgnored);
+    rx_link_client_begin(&c,42,UINT32_MAX-100);
+    assert(c.waiting && !c.connected);
+    assert(!rx_link_client_expired(&c,100));
+    assert(rx_link_client_expired(&c,5000));
+    reply.data[8]=2; // A different board must not enable the radio.
+    assert(rx_link_client_accept(&c,&reply,0)==RxLinkClientIgnored);
+    reply.data[8]=1;rx_link_write32(reply.data+4,99);
+    assert(rx_link_client_accept(&c,&reply,0)==RxLinkClientIgnored);
+    rx_link_write32(reply.data+4,42);
+    assert(rx_link_client_accept(&c,&reply,200)==RxLinkClientReady);
+    assert(c.connected && !c.waiting);
+    assert(rx_link_client_accept(&c,&reply,1500)==RxLinkClientIgnored);
+    assert(rx_link_client_expired(&c,2200));
+    f.type=RxLinkQuery;f.length=4;rx_link_write32(f.data,42);
+    assert(rx_link_backend_handle(&b,&f,&reply));
+    assert(rx_link_client_accept(&c,&reply,2100)==RxLinkClientSnapshot);
+    assert(!rx_link_client_expired(&c,2200));
+    rx_link_client_stop(&c);
+    assert(!c.connected && !c.waiting && !rx_link_client_expired(&c,999999));
+    assert(rx_link_client_accept(&c,&reply,2200)==RxLinkClientIgnored);
+    rx_link_client_begin(&c,0,0);assert(!c.waiting && !c.connected);
+}
+
+int main(void) {wire();backend();client();return 0;}
