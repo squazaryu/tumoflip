@@ -10,6 +10,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class Unleashed094DecoderTests(unittest.TestCase):
+    def test_nice_held_frames_are_cleared_on_hops_and_overruns(self):
+        for app in ("applications/main/subghz", "applications_user/arf_subghz_full"):
+            source = (ROOT / app / "helpers/subghz_txrx.c").read_text()
+            overrun = function(source, "static void subghz_txrx_worker_overrun_callback(")
+            self.assertIn("subghz_txrx_clear_nice_press(", overrun)
+            hopper = function(source, "void subghz_txrx_hopper_update(")
+            self.assertIn("subghz_txrx_receiver_reset(instance)", hopper)
+
     def test_nice_unknown_code_roundtrip_and_transmit_guard(self):
         source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
         structs = []
