@@ -146,7 +146,15 @@ static void hid_hal_mouse_move(Hid* h,int8_t x,int8_t y) {
                     run_c(fixture.replace("static uint32_t furi_ms_to_ticks", "__attribute__((unused)) static uint32_t furi_ms_to_ticks").replace("static void furi_timer_flush", "__attribute__((unused)) static void furi_timer_flush"))
 
     def test_secplus_generation_frees_scratch_and_preserves_live_tx(self):
-        text = source("applications/main/subghz/plugins/add_manually/subghz_txrx_create_protocol_key.c")
+        for path in (
+            "applications/main/subghz/plugins/add_manually/subghz_txrx_create_protocol_key.c",
+            "applications_user/arf_subghz_full/helpers/subghz_txrx_create_protocol_key.c",
+        ):
+            with self.subTest(path=path):
+                self.check_secplus_generation(path)
+
+    def check_secplus_generation(self, path):
+        text = source(path)
         run_c(PRELUDE + r"""
 typedef int SubGhzTransmitter;
 typedef struct {SubGhzTransmitter* transmitter;void* environment;void* fff_data;void* preset;} SubGhzTxRx;
