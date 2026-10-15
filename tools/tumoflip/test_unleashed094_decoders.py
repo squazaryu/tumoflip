@@ -10,6 +10,20 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class Unleashed094DecoderTests(unittest.TestCase):
+    def test_nice_unknown_code_roundtrip_and_transmit_guard(self):
+        source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
+        structs = []
+        for name in ("Decoder", "Encoder"):
+            start = source.index(f"struct SubGhzProtocol{name}NiceFlorS {{")
+            structs.append(source[start:source.index("\n};", start) + 3])
+        production = "\n".join(function(source, signature) for signature in (
+            "SubGhzProtocolStatus subghz_protocol_decoder_nice_flor_s_serialize(",
+            "SubGhzProtocolStatus\n    subghz_protocol_decoder_nice_flor_s_deserialize(",
+            "SubGhzProtocolStatus\n    subghz_protocol_encoder_nice_flor_s_deserialize(",
+        ))
+        fixture = (ROOT / "tools/tumoflip/fixtures/unleashed094/nice_format.c").read_text()
+        native(fixture.replace("/* @STRUCTS@ */", "\n".join(structs)).replace("/* @PRODUCTION@ */", production))
+
     def test_press_identity_avoids_hash_collisions(self):
         common = (ROOT / "lib/subghz/protocols/common.c").read_text()
         history = (ROOT / "applications/main/subghz/subghz_history.c").read_text()
@@ -27,6 +41,7 @@ typedef struct {int id;} SubGhzProtocol;
 static const SubGhzProtocol subghz_protocol_came_atomo={1},subghz_protocol_beninca_arc={2},subghz_protocol_nice_flor_s={3},other={4};
 typedef struct {const SubGhzProtocol* protocol;} SubGhzProtocolDecoderBase;
 typedef struct {uint64_t data,data_2;uint32_t serial,cnt,seed;uint16_t data_count_bit;uint8_t btn;} Generic;
+typedef Generic SubGhzBlockGeneric;
 typedef struct {SubGhzProtocolDecoderBase base;Generic generic;} SubGhzProtocolDecoderCommon;
 typedef struct {uint32_t frequency;} SubGhzRadioPreset;
 typedef struct {uint32_t last_update_air_time;uint8_t code_last_hash_data;bool code_last_hash_data_set;
