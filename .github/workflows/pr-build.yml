@@ -208,7 +208,7 @@ jobs:
         run: toolchain/x86_64-linux/bin/python3 -m unittest tools.tumoflip.test_dist_order
 
       - name: Validate Unleashed 094 radio and storage contracts
-        run: python3 -m unittest tools.tumoflip.test_unknown_preset_native tools.tumoflip.test_unleashed094_decoders tools.tumoflip.test_subghz_app_radio tools.tumoflip.test_rpc_ranged_read tools.tumoflip.test_erreka_868_add_manually
+        run: python3 -m unittest tools.tumoflip.test_unknown_preset_native tools.tumoflip.test_unleashed094_decoders tools.tumoflip.test_subghz_app_radio tools.tumoflip.test_rpc_ranged_read tools.tumoflip.test_erreka_868_add_manually tools.tumoflip.test_subghz_compact_buttons
 
       - name: Validate passive protocol and bounded packet adaptations
         run: toolchain/x86_64-linux/bin/python3 -m unittest tools.tumoflip.test_upstream_1149_rfid_native tools.tumoflip.test_prastel_rx_native tools.tumoflip.test_packet_config_native tools.tumoflip.test_marauder_diagnostics

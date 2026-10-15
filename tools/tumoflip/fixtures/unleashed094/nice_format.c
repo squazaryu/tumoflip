@@ -32,7 +32,10 @@ bool flipper_format_update_uint32(FlipperFormat* f,const char* key,const uint32_
 bool flipper_format_read_hex(FlipperFormat* f,const char* key,uint8_t* value,size_t n){
     if(!strcmp(key,"IC")){assert(n==2);if(!f->has_ic)return false;value[0]=f->ic>>8;value[1]=f->ic;return true;}
     assert(!strcmp(key,"Data2") && n==8);if(!f->has_tail)return false;
-    for(size_t i=0;i<8;i++)value[7-i]=(uint8_t)(f->tail>>(i*8));return true;
+    for(size_t i = 0; i < 8; i++) {
+        value[7 - i] = (uint8_t)(f->tail >> (i * 8));
+    }
+    return true;
 }
 bool flipper_format_insert_or_update_hex(FlipperFormat* f,const char* key,const uint8_t* value,size_t n){
     if(f->fail_write)return false;

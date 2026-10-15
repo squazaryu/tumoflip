@@ -74,8 +74,15 @@ The initial real ARM build adds 1680 bytes relative to Dev 009-024 and has
 2448 bytes of section headroom, with no C1/C2 address overlap but no completely
 unused 4096-byte page. A scoped `-Oz` experiment on the Sub-GHz library did not
 recover meaningful space and was not retained; HAL/loader flags stay unchanged.
-The explicit 4096-byte release-reserve gate remains a publication decision, not
-something inferred from green unit tests. No gate is silently lowered here.
+The owner requires restoration of the full 4096-byte reserve before publication.
+The release gate is unchanged. Compact private button lookup tables and one-byte
+label IDs replace repeated switches/pointers, without removing protocols, exports
+or button actions. Golden results from `523c93741b8259a3abb642e8aed1738f6915900a`
+cover all 256 original codes × 256 directions for each of 11 protocols, plus
+all 35 protocol label sets and fallback behavior. The first compact ARM build
+ends at `0x080D5E68` in both ELF and flashed DfuSe ranges: 4504 section bytes,
+4096 physical bytes after erase-page rounding. Recheck the final release ref;
+these measurements alone do not authorize publication.
 
 Host fixtures cover invalid presets, generator ownership, synthetic Nice frames,
 legacy files/RX-only transmission, collisions, broker cleanup and RPC failures.

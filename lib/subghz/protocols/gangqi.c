@@ -80,71 +80,14 @@ void* subghz_protocol_encoder_gangqi_alloc(SubGhzEnvironment* environment) {
 
 // Get custom button code
 static uint8_t subghz_protocol_gangqi_get_btn_code(void) {
-    uint8_t custom_btn_id = subghz_custom_btn_get();
-    uint8_t original_btn_code = subghz_custom_btn_get_original();
-    uint8_t btn = original_btn_code;
-
-    // Set custom button
-    if((custom_btn_id == SUBGHZ_CUSTOM_BTN_OK) && (original_btn_code != 0)) {
-        // Restore original button code
-        btn = original_btn_code;
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_UP) {
-        switch(original_btn_code) {
-        case 0xD:
-            btn = 0xE;
-            break;
-        case 0xE:
-            btn = 0xD;
-            break;
-        case 0xB:
-            btn = 0xD;
-            break;
-        case 0x7:
-            btn = 0xD;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_DOWN) {
-        switch(original_btn_code) {
-        case 0xD:
-            btn = 0xB;
-            break;
-        case 0xE:
-            btn = 0xB;
-            break;
-        case 0xB:
-            btn = 0xE;
-            break;
-        case 0x7:
-            btn = 0xE;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_LEFT) {
-        switch(original_btn_code) {
-        case 0xD:
-            btn = 0x7;
-            break;
-        case 0xE:
-            btn = 0x7;
-            break;
-        case 0xB:
-            btn = 0x7;
-            break;
-        case 0x7:
-            btn = 0xB;
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    return btn;
+    // Original, Up, Down, Left, Right. Unknown values remain unchanged.
+    static const uint8_t rows[][5] = {
+        {0x07, 0x0D, 0x0E, 0x0B, 0x07},
+        {0x0B, 0x0D, 0x0E, 0x07, 0x0B},
+        {0x0D, 0x0E, 0x0B, 0x07, 0x0D},
+        {0x0E, 0x0D, 0x0B, 0x07, 0x0E},
+    };
+    return subghz_custom_btn_lookup(rows, sizeof(rows) / sizeof(rows[0]));
 }
 
 /**

@@ -100,140 +100,19 @@ void* subghz_protocol_encoder_princeton_alloc(SubGhzEnvironment* environment) {
 
 // Get custom button code
 static uint8_t subghz_protocol_princeton_get_btn_code(void) {
-    uint8_t custom_btn_id = subghz_custom_btn_get();
-    uint8_t original_btn_code = subghz_custom_btn_get_original();
-    uint8_t btn = original_btn_code;
-
-    // Set custom button
-    if((custom_btn_id == SUBGHZ_CUSTOM_BTN_OK) && (original_btn_code != 0)) {
-        // Restore original button code
-        btn = original_btn_code;
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_UP) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x2;
-            break;
-        case 0x2:
-            btn = 0x1;
-            break;
-        case 0x4:
-            btn = 0x2;
-            break;
-        case 0x8:
-            btn = 0x2;
-            break;
-        case 0xF:
-            btn = 0x2;
-            break;
-        // Second encoding type
-        case 0x30:
-            btn = 0xC0;
-            break;
-        case 0xC0:
-            btn = 0x30;
-            break;
-        case 0xF3:
-            btn = 0xC0;
-            break;
-        case 0xFC:
-            btn = 0xC0;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_DOWN) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x4;
-            break;
-        case 0x2:
-            btn = 0x4;
-            break;
-        case 0x4:
-            btn = 0x1;
-            break;
-        case 0x8:
-            btn = 0x1;
-            break;
-        case 0xF:
-            btn = 0x1;
-            break;
-        // Second encoding type
-        case 0x30:
-            btn = 0xF3;
-            break;
-        case 0xC0:
-            btn = 0xF3;
-            break;
-        case 0xF3:
-            btn = 0x30;
-            break;
-        case 0xFC:
-            btn = 0xF3;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_LEFT) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x8;
-            break;
-        case 0x2:
-            btn = 0x8;
-            break;
-        case 0x4:
-            btn = 0x8;
-            break;
-        case 0x8:
-            btn = 0x4;
-            break;
-        case 0xF:
-            btn = 0x4;
-            break;
-        // Second encoding type
-        case 0x30:
-            btn = 0xFC;
-            break;
-        case 0xC0:
-            btn = 0xFC;
-            break;
-        case 0xF3:
-            btn = 0xFC;
-            break;
-        case 0xFC:
-            btn = 0x30;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_RIGHT) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0xF;
-            break;
-        case 0x2:
-            btn = 0xF;
-            break;
-        case 0x4:
-            btn = 0xF;
-            break;
-        case 0x8:
-            btn = 0xF;
-            break;
-        case 0xF:
-            btn = 0x8;
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    return btn;
+    // Original, Up, Down, Left, Right. Unknown values remain unchanged.
+    static const uint8_t rows[][5] = {
+        {0x01, 0x02, 0x04, 0x08, 0x0F},
+        {0x02, 0x01, 0x04, 0x08, 0x0F},
+        {0x04, 0x02, 0x01, 0x08, 0x0F},
+        {0x08, 0x02, 0x01, 0x04, 0x0F},
+        {0x0F, 0x02, 0x01, 0x04, 0x08},
+        {0x30, 0xC0, 0xF3, 0xFC, 0x30},
+        {0xC0, 0x30, 0xF3, 0xFC, 0xC0},
+        {0xF3, 0xC0, 0x30, 0xFC, 0xF3},
+        {0xFC, 0xC0, 0xF3, 0x30, 0xFC},
+    };
+    return subghz_custom_btn_lookup(rows, sizeof(rows) / sizeof(rows[0]));
 }
 
 /**

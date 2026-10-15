@@ -15,6 +15,11 @@ void subghz_custom_btn_set_prog_mode(ProgMode prog_mode);
 
 ProgMode subghz_custom_btn_get_prog_mode(void);
 
+/** Private mapping rows: original code, Up, Down, Left, Right.
+ * Unknown codes/directions preserve the original; zero is a valid code.
+ */
+uint8_t subghz_custom_btn_lookup(const uint8_t (*rows)[5], size_t count);
+
 typedef struct {
     uint8_t custom_btn_id;
     uint8_t protocol_code;
