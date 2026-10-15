@@ -167,9 +167,44 @@ static void client(void) {
     assert(!c.waiting && !c.connected);
 }
 
+static unsigned deliver(RxLinkBackend* b, RxLinkParser* p, RxLinkFrame* f, bool corrupt, RxLinkFrame* reply) {
+    uint8_t wire[RX_LINK_FRAME_MAX];
+    size_t length = rx_link_encode(f, wire, sizeof(wire));
+    if(corrupt) wire[length - 1] ^= 1;
+    unsigned result = 0;
+    for(size_t i = 0; i < length; i++) result = rx_link_backend_feed(b, p, wire[i], reply);
+    return result;
+}
+
+static void forward_errors(void) {
+    RxLinkBackend b = {0}; RxLinkParser p = {0};
+    RxLinkFrame f = {.type=RxLinkHello,.length=8}, reply;
+    memcpy(f.data,"RXA1",4); rx_link_write32(f.data+4,1);
+    assert(deliver(&b,&p,&f,true,&reply)==RxLinkBackendIgnored);
+    assert(b.snapshot.rejected_batches==0);
+    assert(deliver(&b,&p,&f,false,&reply)==RxLinkBackendReply);
+    assert(p.errors==0 && b.active);
+    f.type=RxLinkEdges;f.length=12;
+    rx_link_write32(f.data,1);rx_link_write32(f.data+4,0);rx_link_write32(f.data+8,100);
+    assert(deliver(&b,&p,&f,true,&reply)==RxLinkBackendIgnored);
+    assert(b.snapshot.rejected_batches>0 && !b.snapshot.count);
+    assert(deliver(&b,&p,&f,false,&reply)==RxLinkBackendActivity);
+    f.type=RxLinkQuery;f.length=4;
+    assert(deliver(&b,&p,&f,false,&reply)==RxLinkBackendReply);
+    RxLinkSnapshot snapshot;
+    assert(rx_link_snapshot_decode(&reply,1,&snapshot));
+    assert(snapshot.rejected_batches>0 && snapshot.count==1);
+    rx_link_write32(f.data,2);
+    assert(deliver(&b,&p,&f,false,&reply)==RxLinkBackendIgnored);
+    f.type=RxLinkHello;f.length=8;memcpy(f.data,"RXA1",4);rx_link_write32(f.data+4,2);
+    assert(deliver(&b,&p,&f,false,&reply)==RxLinkBackendReply);
+    assert(!p.errors && !b.snapshot.rejected_batches);
+}
+
 int main(void) {
     wire();
     backend();
     client();
+    forward_errors();
     return 0;
 }

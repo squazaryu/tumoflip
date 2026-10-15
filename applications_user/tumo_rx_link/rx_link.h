@@ -62,6 +62,8 @@ void rx_link_write32(uint8_t* bytes, uint32_t value);
 size_t rx_link_encode(const RxLinkFrame* frame, uint8_t* output, size_t capacity);
 bool rx_link_feed(RxLinkParser* parser, uint8_t byte, RxLinkFrame* frame);
 bool rx_link_backend_handle(RxLinkBackend* backend, const RxLinkFrame* frame, RxLinkFrame* reply);
+enum {RxLinkBackendIgnored, RxLinkBackendActivity, RxLinkBackendReply};
+unsigned rx_link_backend_feed(RxLinkBackend* backend, RxLinkParser* parser, uint8_t byte, RxLinkFrame* reply);
 bool rx_link_snapshot_decode(const RxLinkFrame* frame, uint32_t session, RxLinkSnapshot* snapshot);
 
 typedef struct {
