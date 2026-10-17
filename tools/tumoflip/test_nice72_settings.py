@@ -153,6 +153,16 @@ int main(void){
         host = GDR / "helpers/protopirate_settings_host.c"
         self.assertTrue(host.exists(), "settings codec must leave the resident FAP")
 
+    def test_rx_only_protopirate_gets_the_same_lifetime_adaptation(self):
+        app = ROOT / "applications_user/protopirate"
+        manifest = (app / "application.fam").read_text()
+        self.assertIn('appid="protopirate_settings_plugin"', manifest)
+        self.assertTrue((app / "helpers/protopirate_settings_host.c").exists())
+        scene = (app / "scenes/protopirate_scene_receiver_config.c").read_text()
+        exit_scene = function(scene, "void protopirate_scene_receiver_config_on_exit(")
+        self.assertIn("view_dispatcher_remove_view", exit_scene)
+        self.assertIn("app->variable_item_list = NULL", exit_scene)
+
 
 if __name__ == "__main__":
     unittest.main()
