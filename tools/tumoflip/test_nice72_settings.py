@@ -68,7 +68,11 @@ int main(void){
 ''')
 
     def test_native_settings_plugin_failures_do_not_save_defaults(self):
-        source = (GDR / "helpers/protopirate_settings_host.c").read_text()
+        for app in (GDR, ROOT / "applications_user/protopirate"):
+            self.check_settings_host(app)
+
+    def check_settings_host(self, app):
+        source = (app / "helpers/protopirate_settings_host.c").read_text()
         native(r'''
 #include <assert.h>
 #include <stdint.h>
@@ -79,15 +83,18 @@ int main(void){
 #define APP_ASSETS_PATH(x) x
 #define GDR_SETTINGS_PLUGIN_ID "gdr_settings"
 #define GDR_SETTINGS_PLUGIN_VERSION 1
+#define PP_SETTINGS_PLUGIN_ID "pp_settings"
+#define PP_SETTINGS_PLUGIN_VERSION 1
 typedef struct {uint32_t frequency,dual_freq_a,dual_freq_b,shield_freq;uint8_t dual_preset_a,dual_preset_b,shield_tx_offset_index;} ProtoPirateSettings;
-typedef struct {size_t settings_size;void (*load)(ProtoPirateSettings*);void (*save)(ProtoPirateSettings*);} ProtoPirateSettingsPlugin;
+typedef struct {size_t settings_size;void (*load)(ProtoPirateSettings*);void (*save)(ProtoPirateSettings*,...);} ProtoPirateSettingsPlugin;
 typedef int PluginManager;
 static bool settings_loaded;
 static int mode, frees, loads, saves, live;
 enum {PluginManagerErrorNone};
 static void* firmware_api_interface;
 void load(ProtoPirateSettings* s){s->frequency=315000000;loads++;}
-void save(ProtoPirateSettings* s){assert(s->frequency==315000000);saves++;}
+void save(ProtoPirateSettings* s,...){assert(s->frequency==315000000);saves++;}
+static void* __attribute__((unused)) protopirate_storage_commit_temp_file;
 PluginManager* plugin_manager_alloc(const char* id,int v,void* api){(void)id;(void)v;(void)api;if(mode==1)return NULL;assert(!live);live=1;return &live;}
 int plugin_manager_load_single(PluginManager* m,const char* path){(void)m;(void)path;return mode==2?1:0;}
 void plugin_manager_free(PluginManager* m){assert(m && live);live=0;frees++;}
@@ -125,7 +132,11 @@ int main(void){
         self.assertNotIn("uint32_t bits = 52;", function(source, "static bool nice_o_save("))
 
     def test_configuration_view_detaches_before_free_and_is_idempotent(self):
-        source = (GDR / "scenes/protopirate_scene_receiver_config.c").read_text()
+        for app in (GDR, ROOT / "applications_user/protopirate"):
+            self.check_configuration_view(app)
+
+    def check_configuration_view(self, app):
+        source = (app / "scenes/protopirate_scene_receiver_config.c").read_text()
         native(r'''
 #include <assert.h>
 #include <stddef.h>

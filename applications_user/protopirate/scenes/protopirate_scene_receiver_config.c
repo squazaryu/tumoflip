@@ -381,6 +381,10 @@ bool protopirate_scene_receiver_config_on_event(void* context, SceneManagerEvent
 
 void protopirate_scene_receiver_config_on_exit(void* context) {
     ProtoPirateApp* app = context;
-    variable_item_list_set_selected_item(app->variable_item_list, 0);
-    variable_item_list_reset(app->variable_item_list);
+    if(app->variable_item_list) {
+        view_dispatcher_switch_to_view(app->view_dispatcher, ProtoPirateViewSubmenu);
+        view_dispatcher_remove_view(app->view_dispatcher, ProtoPirateViewVariableItemList);
+        variable_item_list_free(app->variable_item_list);
+        app->variable_item_list = NULL;
+    }
 }
