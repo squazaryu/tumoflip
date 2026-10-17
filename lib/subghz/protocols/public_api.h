@@ -193,6 +193,16 @@ bool subghz_protocol_nice_flor_s_create_data(
  * @param preset Modulation, SubGhzRadioPreset
  * @return true On success, false if input is invalid or the rainbow table is missing
  */
+/** Create the 72-bit O-Code / Nice One variant with the same known IC. */
+bool subghz_protocol_nice_o_one_create_data(
+    void* context,
+    FlipperFormat* flipper_format,
+    uint32_t serial,
+    uint8_t btn,
+    uint16_t cnt,
+    uint16_t ic,
+    SubGhzRadioPreset* preset);
+
 bool subghz_protocol_nice_o_create_data(
     void* context,
     FlipperFormat* flipper_format,

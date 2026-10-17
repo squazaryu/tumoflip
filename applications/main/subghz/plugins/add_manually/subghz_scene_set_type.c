@@ -84,6 +84,7 @@ static const char* submenu_names[SetTypeMAX] = {
     [SetTypeNiceFlorS_433_92] = "Nice FloR-S 433MHz",
     [SetTypeNiceOne_433_92] = "Nice One 433MHz",
     [SetTypeNiceOCode_433_92] = "Nice O-Code 433MHz",
+    [SetTypeNiceOCodeOne_433_92] = "Nice O-Code One 433MHz",
     [SetTypeNiceFlo12bit] = "Nice Flo 12bit 433MHz",
     [SetTypeNiceFlo24bit] = "Nice Flo 24bit 433MHz",
     [SetTypeCAME12bit] = "CAME 12bit 433MHz",
@@ -287,7 +288,8 @@ bool subghz_scene_set_type_generate_protocol_from_infos(SubGhz* subghz) {
                 gen_info.nice_flor_s.serial,
                 gen_info.nice_flor_s.btn,
                 gen_info.nice_flor_s.cnt,
-                gen_info.nice_flor_s.ic);
+                gen_info.nice_flor_s.ic,
+                gen_info.nice_flor_s.nice_one);
         } else {
             generated_protocol = subghz_txrx_gen_nice_flor_s_protocol(
                 subghz->txrx,

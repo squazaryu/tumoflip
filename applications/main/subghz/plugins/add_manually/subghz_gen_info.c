@@ -685,6 +685,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .nice_flor_s.o_code = false};
         break;
     case SetTypeNiceOCode_433_92:
+    case SetTypeNiceOCodeOne_433_92:
         gen_info = (GenInfo){
             .type = GenNiceFlorS,
             .mod = "AM650",
@@ -693,7 +694,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .nice_flor_s.btn = 0x01,
             .nice_flor_s.cnt = 0x03,
             .nice_flor_s.ic = subghz_gen_info_random_nice_o_code_ic(),
-            .nice_flor_s.nice_one = false,
+            .nice_flor_s.nice_one = type == SetTypeNiceOCodeOne_433_92,
             .nice_flor_s.o_code = true};
         break;
     case SetTypeSecPlus_v1_315_00:

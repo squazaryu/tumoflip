@@ -25,6 +25,7 @@
 #include <lib/subghz/receiver.h>
 #include <lib/subghz/subghz_worker.h>
 #include <lib/subghz/environment.h>
+#include <lib/subghz/transmitter.h>
 #include <lib/subghz/protocols/protocol_items.h>
 #include <lib/subghz/protocols/nice_flor_s.h>
 #include <lib/subghz/protocols/public_api.h>
@@ -78,6 +79,7 @@ typedef struct {
     volatile bool rx_active;
     uint64_t keys[NICE_O_MAX_KEYS];
     uint8_t key_count;
+    uint16_t key_bits;
     uint32_t packets;
 
     // sweep, run in chunks from the main loop so the UI never freezes
@@ -254,7 +256,11 @@ static void
         .data_size = 0,
     };
     uint8_t key_data[8] = {0};
+    uint32_t bits = 0;
     if((subghz_protocol_decoder_base_serialize(base, fff, &preset) == SubGhzProtocolStatusOk) &&
+       flipper_format_rewind(fff) &&
+       flipper_format_read_uint32(fff, "Bit", &bits, 1) &&
+       (bits == 52 || bits == 72 || bits == 112) &&
        flipper_format_rewind(fff) &&
        flipper_format_read_hex(fff, "Key", key_data, sizeof(key_data))) {
         for(size_t i = 0; i < sizeof(key_data); i++) {
@@ -268,6 +274,7 @@ static void
     furi_mutex_acquire(app->mutex, FuriWaitForever);
     app->packets++;
     if((app->key_count < NICE_O_MAX_KEYS) && nice_o_key_adds_info(app, key)) {
+        if(bits > 52) app->key_bits = 72;
         app->keys[app->key_count++] = key;
         furi_string_printf(
             app->status, "Press %u: %010llX", app->key_count, key & 0xFFFFFFFFFFULL);
@@ -486,25 +493,30 @@ static bool nice_o_save(NiceOCode* app) {
     bool ok = false;
     do {
         if(!flipper_format_file_open_always(fff, furi_string_get_cstr(path))) break;
-        if(!flipper_format_write_header_cstr(fff, "Flipper SubGhz Key File", 1)) break;
-        uint32_t freq = NICE_O_FREQUENCY;
-        if(!flipper_format_write_uint32(fff, "Frequency", &freq, 1)) break;
-        if(!flipper_format_write_string_cstr(fff, "Preset", "FuriHalSubGhzPresetOok650Async"))
+        /* Rebuild a valid parcel, including the Nice One tail when captured.
+         * 112-bit frames remain receive-only; export is the supported 72-bit form. */
+        SubGhzEnvironment* environment = subghz_environment_alloc();
+        subghz_environment_set_protocol_registry(environment, (void*)&subghz_protocol_registry);
+        subghz_environment_set_nice_flor_s_rainbow_table_file_name(environment, NICE_O_KEYSTORE);
+        SubGhzTransmitter* tx =
+            subghz_transmitter_alloc_init(environment, SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME);
+        if(!tx) {
+            subghz_environment_free(environment);
             break;
-        if(!flipper_format_write_string_cstr(fff, "Protocol", SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME))
-            break;
-        uint32_t bits = 52;
-        if(!flipper_format_write_uint32(fff, "Bit", &bits, 1)) break;
-
-        uint8_t key_data[8];
-        for(size_t i = 0; i < 8; i++) {
-            key_data[7 - i] = (app->keys[0] >> (i * 8)) & 0xFF;
         }
-        if(!flipper_format_write_hex(fff, "Key", key_data, sizeof(key_data))) break;
-
-        uint8_t ic_data[2] = {(uint8_t)(app->ic >> 8), (uint8_t)app->ic};
-        if(!flipper_format_write_hex(fff, "IC", ic_data, sizeof(ic_data))) break;
-        ok = true;
+        uint64_t decoded = subghz_protocol_nice_flor_s_decrypt_ic(
+            app->keys[0], (uint16_t)(app->ic ^ app->mask_16[0]), NICE_O_KEYSTORE);
+        SubGhzRadioPreset preset = {
+            .name = furi_string_alloc_set("AM650"), .frequency = NICE_O_FREQUENCY};
+        bool (*create)(void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, uint16_t, SubGhzRadioPreset*) =
+            app->key_bits == 72 ? subghz_protocol_nice_o_one_create_data :
+                                 subghz_protocol_nice_o_create_data;
+        ok = create(
+            subghz_transmitter_get_protocol_instance(tx), fff, app->serial,
+            (app->keys[0] >> 48) & 0xF, (uint16_t)decoded, app->ic, &preset);
+        furi_string_free(preset.name);
+        subghz_transmitter_free(tx);
+        subghz_environment_free(environment);
     } while(false);
 
     flipper_format_free(fff);
@@ -574,6 +586,7 @@ int32_t nice_o_code_app(void* p) {
                             running = false;
                         } else {
                             app->key_count = 0;
+                            app->key_bits = 52;
                             app->packets = 0;
                             app->solved = false;
                             furi_string_set(app->status, "Listening 433.92");

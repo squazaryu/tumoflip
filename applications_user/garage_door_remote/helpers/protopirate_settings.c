@@ -1,5 +1,6 @@
 // helpers/protopirate_settings.c
 #include "protopirate_settings.h"
+#include "protopirate_settings_plugin.h"
 #include <storage/storage.h>
 #include <flipper_format/flipper_format.h>
 #include <furi.h>
@@ -261,4 +262,20 @@ void protopirate_settings_save(ProtoPirateSettings* settings) {
 
     flipper_format_free(ff);
     furi_record_close(RECORD_STORAGE);
+}
+
+static const ProtoPirateSettingsPlugin settings_plugin = {
+    .settings_size = sizeof(ProtoPirateSettings),
+    .load = protopirate_settings_load,
+    .save = protopirate_settings_save,
+};
+
+static const FlipperAppPluginDescriptor settings_plugin_descriptor = {
+    .appid = GDR_SETTINGS_PLUGIN_ID,
+    .ep_api_version = GDR_SETTINGS_PLUGIN_VERSION,
+    .entry_point = &settings_plugin,
+};
+
+const FlipperAppPluginDescriptor* protopirate_settings_plugin_ep(void) {
+    return &settings_plugin_descriptor;
 }
