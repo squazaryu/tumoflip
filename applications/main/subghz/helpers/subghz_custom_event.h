@@ -178,5 +178,6 @@ typedef enum {
     SetTypeErreka868,
     SetTypeHomeGate433,
 
+    SetTypeNiceOCodeOne_433_92,
     SetTypeMAX,
 } SetType;

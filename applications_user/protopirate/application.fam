@@ -20,6 +20,7 @@ _MAIN_APP_SOURCES = [
     "!protocols/plugins",
     "!scenes/plugins",
     "!protocols",
+    "!protopirate_settings.c",
     "!protopirate_emulate_plugin.c",
     "!protopirate_psa_bf_plugin.c",
     "protocols/protocol_items.c",
@@ -47,7 +48,7 @@ App(
     requires=["gui", "subghz_radio_broker"],
     stack_size=8 * 1024,
     fap_description="Decode car key fob signals from Sub-GHz",
-    fap_version="3.2.1",
+    fap_version="3.2.2",
     fap_icon="images/protopirate_10px.png",
     fap_category="ARF Tools",
     fap_dist_path="apps_data/arf_subghz_full/modules/{filename}",
@@ -58,6 +59,16 @@ App(
 )
 
 # --- RX protocol plugins ---
+
+App(
+    appid="protopirate_settings_plugin",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="protopirate_settings_plugin_ep",
+    requires=["proto_pirate"],
+    cdefines=["PROTOPIRATE_PROTOCOL_RX_ONLY=1"],
+    sources=["helpers/protopirate_settings.c"],
+    fal_embedded=True,
+)
 
 App(
     appid="protopirate_am_plugin",

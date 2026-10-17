@@ -60,7 +60,7 @@ class TexkomSupportTest(unittest.TestCase):
             rows = list(csv.DictReader(stream))
 
         version = next(row["name"] for row in rows if row["entry"] == "Version")
-        self.assertEqual(version, "88.20")
+        self.assertEqual(version, "88.21")
         public_symbols = {
             row["name"] for row in rows if row["entry"] in {"Header", "Function"}
         }

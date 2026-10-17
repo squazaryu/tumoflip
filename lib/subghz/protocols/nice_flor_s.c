@@ -750,7 +750,7 @@ bool subghz_protocol_nice_flor_s_create_data(
         for(size_t i = 0; i < 7; i++) {
             add_data[i] = (instance->generic.data >> (48 - i * 8)) & 0xFF;
         }
-        subghz_protocol_nice_one_get_data(add_data, 0, 0);
+        subghz_protocol_nice_one_get_data(add_data, 3, 0);
         instance->generic.data_2 = 0;
         for(size_t j = 7; j < 10; j++) {
             instance->generic.data_2 <<= 8;
@@ -764,14 +764,15 @@ bool subghz_protocol_nice_flor_s_create_data(
     return res == SubGhzProtocolStatusOk;
 }
 
-bool subghz_protocol_nice_o_create_data(
+static bool subghz_protocol_nice_o_create_data_bits(
     void* context,
     FlipperFormat* flipper_format,
     uint32_t serial,
     uint8_t btn,
     uint16_t cnt,
     uint16_t ic,
-    SubGhzRadioPreset* preset) {
+    SubGhzRadioPreset* preset,
+    bool nice_one) {
     furi_assert(context);
     furi_assert(flipper_format);
     furi_assert(preset);
@@ -779,7 +780,7 @@ bool subghz_protocol_nice_o_create_data(
     SubGhzProtocolEncoderNiceFlorS* instance = context;
     instance->generic.serial = serial;
     instance->generic.cnt = cnt;
-    instance->generic.data_count_bit = 52;
+    instance->generic.data_count_bit = nice_one ? NICE_ONE_COUNT_BIT : 52;
     instance->generic.data_2 = 0;
     instance->ic = ic;
     instance->o_code = true;
@@ -795,6 +796,17 @@ bool subghz_protocol_nice_o_create_data(
         return false;
     }
 
+    if(nice_one) {
+        uint8_t add_data[10] = {0};
+        for(size_t i = 0; i < 7; i++) {
+            add_data[i] = (instance->generic.data >> (48 - i * 8)) & 0xFF;
+        }
+        subghz_protocol_nice_one_get_data(add_data, 3, 0);
+        for(size_t i = 7; i < 10; i++) {
+            instance->generic.data_2 = (instance->generic.data_2 << 8) | add_data[i];
+        }
+    }
+
     SubGhzProtocolStatus result =
         subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
     if(result == SubGhzProtocolStatusOk) {
@@ -807,6 +819,30 @@ bool subghz_protocol_nice_o_create_data(
     }
 
     return result == SubGhzProtocolStatusOk;
+}
+
+bool subghz_protocol_nice_o_create_data(
+    void* context,
+    FlipperFormat* flipper_format,
+    uint32_t serial,
+    uint8_t btn,
+    uint16_t cnt,
+    uint16_t ic,
+    SubGhzRadioPreset* preset) {
+    return subghz_protocol_nice_o_create_data_bits(
+        context, flipper_format, serial, btn, cnt, ic, preset, false);
+}
+
+bool subghz_protocol_nice_o_one_create_data(
+    void* context,
+    FlipperFormat* flipper_format,
+    uint32_t serial,
+    uint8_t btn,
+    uint16_t cnt,
+    uint16_t ic,
+    SubGhzRadioPreset* preset) {
+    return subghz_protocol_nice_o_create_data_bits(
+        context, flipper_format, serial, btn, cnt, ic, preset, true);
 }
 
 void* subghz_protocol_decoder_nice_flor_s_alloc(SubGhzEnvironment* environment) {
@@ -1317,6 +1353,16 @@ void subghz_protocol_decoder_nice_flor_s_get_string(void* context, FuriString* o
             NICE_O_NAME,
             instance->generic.data_count_bit,
             instance->generic.data);
+    } else if(instance->o_code) {
+        furi_string_cat_printf(
+            output, "%s %db\r\nK:%013llX", NICE_O_NAME,
+            instance->generic.data_count_bit, instance->generic.data);
+        if(instance->generic.data_count_bit == NICE_ONE_COUNT_BIT) {
+            furi_string_cat_printf(output, "%05llX", instance->generic.data_2);
+        }
+        furi_string_cat_printf(
+            output, "\r\nSn:%05lX IC:%04X\r\nCnt:%04lX Btn:%02X\r\n",
+            instance->generic.serial, instance->ic, instance->generic.cnt, instance->generic.btn);
     } else if(instance->generic.data_count_bit == NICE_ONE_COUNT_BIT) {
         furi_string_cat_printf(
             output,
@@ -1329,20 +1375,6 @@ void subghz_protocol_decoder_nice_flor_s_get_string(void* context, FuriString* o
             instance->generic.data,
             instance->generic.data_2,
             instance->generic.serial,
-            instance->generic.cnt,
-            instance->generic.btn);
-    } else if(instance->o_code) {
-        furi_string_cat_printf(
-            output,
-            "%s %dbit\r\n"
-            "Key:0x%013llX\r\n"
-            "Sn:%05lX IC:%04X\r\n"
-            "Cnt:%04lX Btn:%02X\r\n",
-            NICE_O_NAME,
-            instance->generic.data_count_bit,
-            instance->generic.data,
-            instance->generic.serial,
-            instance->ic,
             instance->generic.cnt,
             instance->generic.btn);
     } else {

@@ -208,7 +208,8 @@ bool subghz_txrx_gen_nice_o_code_protocol(
     uint32_t serial,
     uint8_t btn,
     uint16_t cnt,
-    uint16_t ic) {
+    uint16_t ic,
+    bool nice_one) {
     SubGhzTxRx* txrx = context;
     bool res = false;
 
@@ -216,7 +217,9 @@ bool subghz_txrx_gen_nice_o_code_protocol(
         subghz_transmitter_alloc_init(txrx->environment, SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME);
     subghz_txrx_set_preset(txrx, preset_name, frequency, NULL, 0);
 
-    if(transmitter && subghz_protocol_nice_o_create_data(
+    bool (*create)(void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, uint16_t, SubGhzRadioPreset*) =
+        nice_one ? subghz_protocol_nice_o_one_create_data : subghz_protocol_nice_o_create_data;
+    if(transmitter && create(
                           subghz_transmitter_get_protocol_instance(transmitter),
                           txrx->fff_data,
                           serial,

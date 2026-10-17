@@ -118,7 +118,8 @@ bool subghz_scene_set_seed_on_event(void* context, SceneManagerEvent event) {
                     subghz->gen_info->nice_flor_s.serial,
                     subghz->gen_info->nice_flor_s.btn,
                     subghz->gen_info->nice_flor_s.cnt,
-                    subghz->gen_info->nice_flor_s.ic);
+                    subghz->gen_info->nice_flor_s.ic,
+                    subghz->gen_info->nice_flor_s.nice_one);
                 break;
             // Not needed for these types
             case GenKeeloq:
