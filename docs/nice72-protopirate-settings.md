@@ -35,6 +35,11 @@ Sources reviewed on 2026-10-17:
 
 ## Verification and delivery boundary
 
+Local host run: **1140 tests passed**. Native fixture line coverage measured
+with LLVM: view lifetime 90%, generator 96.99%, settings host 100% (including
+fixture stubs; these figures are not whole-firmware or hardware coverage).
+Matching application versions: Nice O-Code **1.2**, Garage Door Remote **2.8**.
+
 Native tests use synthetic data and mocked storage/plugin/GUI boundaries, with
 ASan/UBSan. The encryption primitive is substituted in the new framing test;
 it tests framing/CRC/input and write-error handling, not hardware RF acceptance.

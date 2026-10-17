@@ -1355,7 +1355,7 @@ void subghz_protocol_decoder_nice_flor_s_get_string(void* context, FuriString* o
             instance->generic.data);
     } else if(instance->o_code) {
         furi_string_cat_printf(
-            output, "%s %db\r\nKey:%013llX", NICE_O_NAME,
+            output, "%s %db\r\nK:%013llX", NICE_O_NAME,
             instance->generic.data_count_bit, instance->generic.data);
         if(instance->generic.data_count_bit == NICE_ONE_COUNT_BIT) {
             furi_string_cat_printf(output, "%05llX", instance->generic.data_2);
