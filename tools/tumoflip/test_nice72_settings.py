@@ -10,6 +10,12 @@ GDR = ROOT / "applications_user/garage_door_remote"
 
 
 class Nice72SettingsTests(unittest.TestCase):
+    def test_failed_export_never_publishes_a_partial_signal(self):
+        source = (ROOT / "applications/system/nice_o_code/nice_o_code.c").read_text()
+        self.assertIn("static bool nice_o_commit_save(", source)
+        save = function(source, "static bool nice_o_save(")
+        self.assertIn("flipper_format_file_open_new", save)
+        self.assertNotIn("flipper_format_file_open_always", save)
     def test_native_52_and_72_generators_validate_and_serialize_tail(self):
         source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
         signatures = (
