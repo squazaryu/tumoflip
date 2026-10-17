@@ -18,10 +18,11 @@ Sources reviewed on 2026-10-17:
   supported 52/72-bit frame using the captured counter/button and resolved serial.
   A received 112-bit frame is exported as supported 72-bit, not transmitted as
   112-bit. Original capture deserialization and unknown-IC TX guards remain.
-- In our Garage Door Remote FAP, move the settings codec into an embedded FAL
+- In our Garage Door Remote and RX-only ProtoPirate FAPs, move each settings codec into an embedded FAL
   loaded only for load/save, then released immediately. Keep the existing file
   format and paths, defaults, dual-RX/shield values and radio-broker architecture.
   Missing/wrong plugins leave defaults in RAM and inhibit saving those defaults.
+  RX-only ProtoPirate retains the host's existing backup/rollback commit callback.
 - Detach the receiver settings view before releasing it on exit. Re-entry uses
   the existing lazy allocator. Null/failed allocation exits are safe.
 
@@ -38,7 +39,8 @@ Sources reviewed on 2026-10-17:
 Local host run: **1140 tests passed**. Native fixture line coverage measured
 with LLVM: view lifetime 90%, generator 96.99%, settings host 100% (including
 fixture stubs; these figures are not whole-firmware or hardware coverage).
-Matching application versions: Nice O-Code **1.2**, Garage Door Remote **2.8**.
+Matching application versions: Nice O-Code **1.2**, Garage Door Remote **2.8**,
+RX-only ProtoPirate **3.2.2** (local adaptation identity, not upstream 4.1 parity).
 
 Native tests use synthetic data and mocked storage/plugin/GUI boundaries, with
 ASan/UBSan. The encryption primitive is substituted in the new framing test;
