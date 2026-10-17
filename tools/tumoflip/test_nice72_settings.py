@@ -16,6 +16,26 @@ class Nice72SettingsTests(unittest.TestCase):
         save = function(source, "static bool nice_o_save(")
         self.assertIn("flipper_format_file_open_new", save)
         self.assertNotIn("flipper_format_file_open_always", save)
+        native(r'''
+#include <assert.h>
+#include <stdbool.h>
+typedef int Storage;
+static int removes;
+bool storage_simply_remove(Storage* s,const char* path){(void)s;(void)path;removes++;return true;}
+''' + function(source, "static bool nice_o_commit_save(") + r'''
+int main(void){
+ Storage s=0;
+ assert(!nice_o_commit_save(&s,"existing",false,false) && !removes);
+ assert(!nice_o_commit_save(&s,"existing",false,true) && !removes);
+ assert(nice_o_commit_save(&s,"new",true,true) && !removes);
+ assert(!nice_o_commit_save(&s,"new",true,false) && removes==1);
+ return 0;
+}
+''')
+
+    def test_rx_only_codec_is_excluded_by_the_actual_recursive_source_glob(self):
+        manifest = (ROOT / "applications_user/protopirate/application.fam").read_text()
+        self.assertIn('"!protopirate_settings.c"', manifest)
     def test_native_52_and_72_generators_validate_and_serialize_tail(self):
         source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
         signatures = (
