@@ -20,7 +20,7 @@ _MAIN_APP_SOURCES = [
     "!protocols/plugins",
     "!scenes/plugins",
     "!protocols",
-    "!helpers/protopirate_settings.c",
+    "!protopirate_settings.c",
     "!protopirate_emulate_plugin.c",
     "!protopirate_psa_bf_plugin.c",
     "protocols/protocol_items.c",

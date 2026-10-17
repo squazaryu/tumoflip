@@ -478,6 +478,15 @@ static void nice_o_set_status(NiceOCode* app, const char* text) {
     furi_mutex_release(app->mutex);
 }
 
+static bool nice_o_commit_save(
+    Storage* storage, const char* final, bool created, bool ok) {
+    if(!created) return false;
+    /* Only a file exclusively created by this operation may be removed. Never
+     * use storage_common_rename here: it replaces an existing destination. */
+    if(!ok) storage_simply_remove(storage, final);
+    return ok;
+}
+
 static bool nice_o_save(NiceOCode* app) {
     char name[NICE_O_NAME_LEN];
     name_generator_make_random_prefixed(name, sizeof(name), "NiceO");
@@ -491,8 +500,10 @@ static bool nice_o_save(NiceOCode* app) {
 
     FlipperFormat* fff = flipper_format_file_alloc(app->storage);
     bool ok = false;
+    bool created = false;
     do {
-        if(!flipper_format_file_open_always(fff, furi_string_get_cstr(path))) break;
+        created = flipper_format_file_open_new(fff, furi_string_get_cstr(path));
+        if(!created) break;
         /* Rebuild a valid parcel, including the Nice One tail when captured.
          * 112-bit frames remain receive-only; export is the supported 72-bit form. */
         SubGhzEnvironment* environment = subghz_environment_alloc();
@@ -519,7 +530,10 @@ static bool nice_o_save(NiceOCode* app) {
         subghz_environment_free(environment);
     } while(false);
 
+    if(created && !flipper_format_file_close(fff)) ok = false;
     flipper_format_free(fff);
+    ok = nice_o_commit_save(
+        app->storage, furi_string_get_cstr(path), created, ok);
     char msg[NICE_O_NAME_LEN + 16];
     snprintf(msg, sizeof(msg), ok ? "Saved %s%s" : "Save failed: %s%s", name, NICE_O_EXT);
     nice_o_set_status(app, msg);
