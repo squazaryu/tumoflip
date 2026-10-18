@@ -141,7 +141,7 @@ static void nice_o_draw_callback(Canvas* canvas, void* ctx) {
             canvas_draw_str(canvas, 4, 26 + i * 12, items[i]);
             canvas_set_color(canvas, ColorBlack);
         }
-        elements_frame(canvas, 0, 41, 128, 23);
+        elements_frame(canvas, 0, 41, 127, 22);
         canvas_draw_str(canvas, 4, 51, "Press the button 4+ times,");
         canvas_draw_str(canvas, 4, 62, "do not hold. 433.92 AM650");
         break;
@@ -164,7 +164,7 @@ static void nice_o_draw_callback(Canvas* canvas, void* ctx) {
                                                            (float)have / NICE_O_MIN_KEYS;
         elements_progress_bar(canvas, 2, 28, 124, progress);
 
-        elements_frame(canvas, 0, 40, 128, 13);
+        elements_frame(canvas, 0, 40, 127, 11);
         canvas_draw_str(canvas, 4, 49, furi_string_get_cstr(app->status));
 
         if(app->scene == NiceOSceneCapture && app->key_count >= NICE_O_MIN_KEYS) {
@@ -185,7 +185,7 @@ static void nice_o_draw_callback(Canvas* canvas, void* ctx) {
 
     default:
         if(app->solved) {
-            elements_frame(canvas, 0, 17, 128, (app->certificate_known || app->certificate_conflict) ? 36 : 30);
+            elements_frame(canvas, 0, 17, 127, (app->certificate_known || app->certificate_conflict) ? 34 : 30);
             canvas_set_font(canvas, FontPrimary);
             snprintf(buf, sizeof(buf), "IC  %04X", app->ic);
             canvas_draw_str(canvas, 6, 29, buf);
@@ -194,9 +194,9 @@ static void nice_o_draw_callback(Canvas* canvas, void* ctx) {
             canvas_draw_str(canvas, 6, 40, buf);
             if(app->certificate_known) {
                 snprintf(buf, sizeof(buf), "Cert(CRC) %06lX", app->certificate);
-                canvas_draw_str(canvas, 6, 50, buf);
+                canvas_draw_str(canvas, 6, 49, buf);
             } else if(app->certificate_conflict) {
-                canvas_draw_str(canvas, 6, 50, "Cert: conflict");
+                canvas_draw_str(canvas, 6, 49, "Cert: conflict");
             }
             elements_button_center(canvas, "Save");
         } else {
