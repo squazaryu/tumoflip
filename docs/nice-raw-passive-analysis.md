@@ -44,6 +44,8 @@ path traversal and repeated-start checks fail closed.
   CRCs before exposing a24-bit value. Zero is a valid value, not an unknown
   sentinel. The packet must belong to the accepted capture; conflicting values
   are hidden and reported as a conflict.
+  A valid certificate is shown even without a recovered installer code or four
+  distinct presses; it is a passive result, not a successful IC-recovery claim.
 - `Cert(CRC)` means structural CRC agreement, **not authenticated ownership or
   permission to enroll a transmitter**. Single-bit corruption tests cover all
   112 bits of synthetic frames; no real receiver acceptance is inferred.
@@ -56,7 +58,7 @@ path traversal and repeated-start checks fail closed.
 
 - New native tests: framing/CRC, bounded RAW lifecycle, actual decoder worker
   read mode, deferred-launch ordering, missing resources and failed restoration.
-- UI renderer uses actual draw code and firmware fonts for12 states, checks text
+- UI renderer uses actual draw code and firmware fonts for14 states, checks text
   widths/frame bounds/footer clearance and runs with ASan/UBSan.
 - Native fixture coverage:465/494 lines (**94.13%**, includes mocks; not whole-
   firmware or hardware coverage).

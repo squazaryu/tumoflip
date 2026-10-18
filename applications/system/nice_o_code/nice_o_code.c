@@ -201,6 +201,19 @@ static void nice_o_draw_callback(Canvas* canvas, void* ctx) {
                 canvas_draw_str(canvas, 6, 49, "Cert: conflict");
             }
             elements_button_center(canvas, "Save");
+        } else if(app->certificate_known || app->certificate_conflict) {
+            /* Certificate decoding does not depend on IC recovery or four presses. */
+            elements_frame(canvas, 0, 17, 127, 34);
+            canvas_set_font(canvas, FontPrimary);
+            canvas_draw_str(canvas, 6, 29, "Certificate");
+            canvas_set_font(canvas, FontSecondary);
+            if(app->certificate_known) {
+                snprintf(buf, sizeof(buf), "Cert(CRC) %06lX", app->certificate);
+                canvas_draw_str(canvas, 6, 40, buf);
+            } else {
+                canvas_draw_str(canvas, 6, 40, "Conflicting values");
+            }
+            canvas_draw_str(canvas, 6, 49, "IC not recovered");
         } else {
             elements_multiline_text_aligned(
                 canvas, 64, 32, AlignCenter, AlignCenter, furi_string_get_cstr(app->status));
