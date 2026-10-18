@@ -30,7 +30,7 @@ typedef enum {NiceOSceneMenu,NiceOSceneCapture,NiceOSceneRaw,NiceOSceneSolve,Nic
 typedef struct {
  void* mutex;NiceOScene scene;uint8_t radio_indicator,menu_index,key_count,raw_progress;
  unsigned long packets,sweep_ic,serial,certificate;unsigned ic;
- bool solved,certificate_known,certificate_conflict;FuriString* status;
+ bool solved,certificate_known,certificate_conflict,offline;FuriString* status;
 } NiceOCode;
 static void preview_str(Canvas* c,int32_t x,int32_t y,const char* text){
  int w=canvas_string_width(c,text);
@@ -58,15 +58,15 @@ int main(int argc,char** argv){
  nice_o_draw_callback(&c,&a);save(&c,argv[1],"02-live");
  a.key_count=16;a.packets=0xffffffffUL;furi_string_set(a.status,"Same press, ignored");
  nice_o_draw_callback(&c,&a);save(&c,argv[1],"03-max-counts");
- a.scene=NiceOSceneRaw;a.raw_progress=0;a.key_count=0;a.packets=0;
+ a.scene=NiceOSceneRaw;a.offline=true;a.raw_progress=0;a.key_count=0;a.packets=0;
  furi_string_set(a.status,"Reading RAW file");nice_o_draw_callback(&c,&a);save(&c,argv[1],"04-raw-start");
  a.raw_progress=99;a.key_count=16;a.packets=0xffffffffUL;
  furi_string_set(a.status,"Same press, ignored");nice_o_draw_callback(&c,&a);save(&c,argv[1],"05-raw-reading");
  a.scene=NiceOSceneSolve;a.sweep_ic=65535;
  nice_o_draw_callback(&c,&a);save(&c,argv[1],"06-solving");
- a.scene=NiceOSceneResult;a.solved=true;a.ic=0xabcd;a.serial=0xfffffff;
+ a.scene=NiceOSceneResult;a.offline=false;a.solved=true;a.ic=0xabcd;a.serial=0xfffffff;
  nice_o_draw_callback(&c,&a);save(&c,argv[1],"07-result");
- a.certificate_known=true;a.certificate=0;
+ a.offline=true;a.certificate_known=true;a.certificate=0;
  nice_o_draw_callback(&c,&a);save(&c,argv[1],"08-zero-certificate");
  a.certificate=0xabcdef;
  nice_o_draw_callback(&c,&a);save(&c,argv[1],"09-certificate");

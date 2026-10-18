@@ -94,6 +94,7 @@ typedef struct {
     uint32_t certificate;
     bool certificate_known;
     bool certificate_conflict;
+    bool offline;
 
     // sweep, run in chunks from the main loop so the UI never freezes
     uint32_t mask_32[NICE_O_MAX_KEYS];
@@ -118,11 +119,12 @@ static void nice_o_draw_callback(Canvas* canvas, void* ctx) {
     char buf[48];
     furi_mutex_acquire(app->mutex, FuriWaitForever);
     canvas_clear(canvas);
+    canvas_set_color(canvas, ColorBlack);
 
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 2, 10, "Nice O-Code");
     canvas_set_font(canvas, FontSecondary);
-    const char* radio_label = app->scene == NiceOSceneRaw ? "RAW" :
+    const char* radio_label = app->offline ? "RAW" :
                               app->radio_indicator == 2 ? "Ext" :
                               app->radio_indicator == 1 ? "Int" :
                                                           "Auto";
@@ -688,6 +690,7 @@ int32_t nice_o_code_app(void* p) {
     app->frequency = NICE_O_FREQUENCY;
 
     if(p && *(const char*)p) {
+        app->offline = true;
         if(nice_o_raw_begin(app, p)) {
             app->scene = NiceOSceneRaw;
             furi_string_set(app->status, "Reading RAW file");
@@ -759,6 +762,7 @@ int32_t nice_o_code_app(void* p) {
                             app->certificate_known = false;
                             app->certificate_conflict = false;
                             app->frequency = NICE_O_FREQUENCY;
+                            app->offline = false;
                             furi_string_set(app->status, "Listening 433.92");
                             app->scene = NiceOSceneCapture;
                             furi_mutex_release(app->mutex);
@@ -798,6 +802,7 @@ int32_t nice_o_code_app(void* p) {
                         furi_mutex_release(app->mutex);
                         nice_o_raw_end(app);
                         furi_mutex_acquire(app->mutex, FuriWaitForever);
+                        app->offline = false;
                         app->scene = NiceOSceneMenu;
                     }
                     break;
@@ -812,6 +817,7 @@ int32_t nice_o_code_app(void* p) {
 
                 case NiceOSceneResult:
                     if((event.key == InputKeyBack) || (event.key == InputKeyLeft)) {
+                        app->offline = false;
                         app->scene = NiceOSceneMenu;
                     } else if((event.key == InputKeyOk) && app->solved) {
                         furi_mutex_release(app->mutex);

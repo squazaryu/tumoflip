@@ -9,6 +9,72 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class NiceRawPassiveTests(unittest.TestCase):
+    def test_production_encoder_sends_16_bounded_parcels_with_correct_flags(self):
+        source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
+        native(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
+#define furi_assert assert
+#define FURI_LOG_D(...) ((void)0)
+#define FURI_LOG_E(...) ((void)0)
+#define NICE_ONE_COUNT_BIT 72
+#define bit_read(x,n) (((x)>>(n))&1)
+typedef struct {bool level;uint32_t duration;} LevelDuration;
+typedef struct {uint64_t data,data_2;uint32_t serial,cnt;uint16_t data_count_bit;uint8_t btn;} Generic;
+typedef struct {Generic generic;struct {size_t size_upload;LevelDuration* upload;} encoder;bool o_code;uint16_t ic;} SubGhzProtocolEncoderNiceFlorS;
+static struct {bool cnt_need_override;} subghz_block_generic_global;
+static bool bypass;
+static uint8_t nice_flors_counter_mode;
+static const struct {uint32_t te_short,te_long;} subghz_protocol_nice_flor_s_const={500,1000};
+uint8_t subghz_custom_btn_get_original(void){return 1;}
+void subghz_custom_btn_set_original(uint8_t b){(void)b;}
+static uint8_t subghz_protocol_nice_flor_s_get_btn_code(void){return 1;}
+bool subghz_block_generic_global_button_override_get(uint8_t* b){(void)b;return false;}
+bool subghz_block_generic_global_counter_override_get(uint32_t* c){(void)c;return false;}
+int32_t furi_hal_subghz_get_rolling_counter_mult(void){return 1;}
+uint64_t subghz_protocol_nice_flor_s_encrypt(uint64_t p,const char* f){(void)f;return p&0xfffffffffffULL;}
+uint64_t subghz_protocol_nice_flor_s_encrypt_ic(uint64_t p,uint16_t ic,const char* f){(void)ic;return subghz_protocol_nice_flor_s_encrypt(p,f);}
+void subghz_protocol_nice_o_mask(uint8_t p,uint32_t* m,uint16_t* n){(void)p;*m=0;*n=0;}
+LevelDuration level_duration_make(bool l,uint32_t t){return(LevelDuration){l,t};}
+bool subghz_protocol_blocks_get_bit_array(uint8_t* p,unsigned n){return(p[n/8]>>(7-n%8))&1;}
+''' + "\n".join(function(source, s) for s in (
+            "static uint32_t subghz_protocol_nice_one_crc(",
+            "static void subghz_protocol_nice_one_get_data(uint8_t* p, uint8_t num_parcel, uint8_t hold_bit) {",
+            "static void subghz_protocol_encoder_nice_flor_s_get_upload(",
+        )) + r'''
+int main(void){
+ const uint8_t k[16]={0x8f,0x8e,0x8d,0x8c,0x84,0x85,0x86,0x87,0x8f,0x8c,0x89,0x8d,0x8c,0x8d,0x8e,0x8f};
+ struct {LevelDuration samples[4096];uint64_t guard;} buffer={.guard=0x123456789abcdefULL};
+ for(unsigned o=0;o<2;o++)for(unsigned long_frame=0;long_frame<2;long_frame++){
+  SubGhzProtocolEncoderNiceFlorS e={.generic={.serial=123,.cnt=42,.btn=1,.data_count_bit=long_frame?72:52},.encoder={4096,buffer.samples},.o_code=o,.ic=0xabcd};
+  subghz_protocol_encoder_nice_flor_s_get_upload(&e,1,"synthetic");
+  assert(e.encoder.size_upload==(long_frame?148:108)*16&&buffer.guard==0x123456789abcdefULL);
+  for(unsigned parcel=0;parcel<16;parcel++){
+   const unsigned at=parcel*(long_frame?148:108);
+   assert(!buffer.samples[at].level&&buffer.samples[at].duration==18500);
+   uint8_t p[10]={0};uint64_t body=0;uint32_t tail=0;
+   for(unsigned n=0;n<(long_frame?72:52);n++){
+    LevelDuration hi=buffer.samples[at+3+n*2],lo=buffer.samples[at+4+n*2];
+    assert(hi.level&&!lo.level&&hi.duration+lo.duration==1500);
+    unsigned bit=hi.duration==1000;
+    if(n<52)body=body*2+bit;else tail=tail*2+bit;
+   }
+   assert((((body>>48)^(body>>44))&15)==(15^parcel));
+   if(long_frame){
+    for(unsigned n=0;n<7;n++)p[n]=body>>(48-n*8);
+    p[7]=tail>>12;p[8]=tail>>4;p[9]=tail<<4;
+    assert(p[7]==(o?k[parcel]:(parcel^(parcel<4?0x8f:0x80))));
+    assert((((p[8]>>4)^p[7])&3)==(o?(parcel>=14):(parcel!=0)));
+    assert(((p[8]&15)<<4|(p[9]>>4))==subghz_protocol_nice_one_crc(p));
+   }
+  }
+ }
+ return 0;
+}
+''')
+
     def test_standard_handoff_restores_pack_and_checks_installation_first(self):
         saved = (ROOT / "applications/main/subghz/scenes/subghz_scene_saved_menu.c").read_text()
         more = (ROOT / "applications/main/subghz/scenes/subghz_scene_more_raw.c").read_text()
