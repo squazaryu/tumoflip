@@ -9,6 +9,45 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class NiceRawPassiveTests(unittest.TestCase):
+    def test_standard_handoff_restores_pack_and_checks_installation_first(self):
+        saved = (ROOT / "applications/main/subghz/scenes/subghz_scene_saved_menu.c").read_text()
+        more = (ROOT / "applications/main/subghz/scenes/subghz_scene_more_raw.c").read_text()
+        native(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+#define RECORD_STORAGE "storage"
+#define RECORD_LOADER "loader"
+#define EXT_PATH(p) "/ext/" p
+enum {LoaderDeferredLaunchFlagGui};
+typedef int Storage;typedef int Loader;typedef const char FuriString;
+typedef struct {void *dialogs,*scene_manager,*view_dispatcher;FuriString* file_path;} SubGhz;
+static bool restore=true,installed=true,stopped;
+static unsigned phase,queued,errors;
+const char* furi_string_get_cstr(FuriString* s){return s;}
+void* furi_record_open(const char* r){static int record;(void)r;return &record;}
+void furi_record_close(const char* r){(void)r;}
+bool storage_file_exists(Storage* s,const char* p){assert(s&&strstr(p,"nice_o_code.fap"));return installed;}
+void dialog_message_show_storage_error(void* d,const char* s){(void)d;assert(s);errors++;}
+bool subghz_scene_decode_raw_cleanup(SubGhz* s){assert(s&&phase==0);phase=1;return restore;}
+void loader_clear_launch_queue(Loader* l){assert(l&&phase==1&&!queued);}
+void loader_enqueue_launch(Loader* l,const char* target,const char* args,int flags){assert(l&&flags==LoaderDeferredLaunchFlagGui&&phase==1);
+ if(queued==0){assert(!strcmp(target,"/ext/apps/Sub-GHz/nice_o_code.fap"));assert(!strcmp(args,"/ext/subghz/own sample.sub"));}
+ else{assert(queued==1&&!strcmp(target,"Sub-GHz")&&!args);}queued++;}
+void scene_manager_stop(void* m){(void)m;assert(queued==2);stopped=true;}
+void view_dispatcher_stop(void* m){(void)m;assert(stopped);}
+''' + function(saved, "bool subghz_launch_saved_analyzer(") + "\n" +
+            function(more, "static bool subghz_scene_more_raw_analyze_nice(") + r'''
+int main(void){
+ SubGhz app={.file_path="/ext/subghz/own sample.sub"};
+ restore=false;assert(subghz_scene_more_raw_analyze_nice(&app));assert(errors==1&&!queued&&!stopped);
+ phase=0;errors=0;restore=true;installed=false;assert(subghz_scene_more_raw_analyze_nice(&app));assert(errors==1&&!queued&&!stopped);
+ phase=0;errors=0;installed=true;assert(subghz_scene_more_raw_analyze_nice(&app));assert(!errors&&queued==2&&stopped);
+ return 0;
+}
+''')
+
     def test_certificate_crc_marker_and_every_single_bit_corruption(self):
         header = (ROOT / "applications/system/nice_o_code/nice_o_certificate.h").as_posix()
         native('#include "' + header + '"\n' + r'''
