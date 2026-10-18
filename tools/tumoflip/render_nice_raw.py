@@ -32,7 +32,9 @@ typedef struct {
  unsigned long packets,sweep_ic,serial,certificate;unsigned ic;
  bool solved,certificate_known,certificate_conflict,offline;FuriString* status;
 } NiceOCode;
+static unsigned certificates_drawn;
 static void preview_str(Canvas* c,int32_t x,int32_t y,const char* text){
+ if(!strncmp(text,"Cert(CRC)",9))certificates_drawn++;
  int w=canvas_string_width(c,text);
  if(x<0||x+w>128||y>63)fprintf(stderr,"Clipped: %s at %d,%d width %d\n",text,x,y,w);
  assert(x>=0&&x+w<=128&&y<=63);canvas_draw_str(c,x,y,text);
@@ -75,6 +77,10 @@ int main(int argc,char** argv){
  a.solved=false;a.certificate_conflict=false;furi_string_set(a.status,"Invalid RAW file");
  nice_o_draw_callback(&c,&a);save(&c,argv[1],"11-invalid-file");
  furi_string_set(a.status,"No RAW samples");nice_o_draw_callback(&c,&a);save(&c,argv[1],"12-no-samples");
+ a.certificate_known=true;a.certificate=0xabcdef;certificates_drawn=0;
+ nice_o_draw_callback(&c,&a);assert(certificates_drawn==1);save(&c,argv[1],"13-passive-no-ic");
+ a.certificate_known=false;a.certificate_conflict=true;
+ nice_o_draw_callback(&c,&a);save(&c,argv[1],"14-passive-conflict");
  furi_string_free(a.status);return 0;
 }
 '''
@@ -98,8 +104,8 @@ def main():
         subprocess.run([str(root / "render"), str(args.output.resolve())], check=True,
                        env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
     frames = sorted(args.output.glob("*.pgm"))
-    assert len(frames) == 12
-    sheet = Image.new("RGB", (1212, 928), "#ececec")
+    assert len(frames) == 14
+    sheet = Image.new("RGB", (1212, 1160), "#ececec")
     draw = ImageDraw.Draw(sheet)
     for i, path in enumerate(frames):
         with Image.open(path) as frame:
