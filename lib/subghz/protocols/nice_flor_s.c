@@ -258,16 +258,13 @@ static void subghz_protocol_encoder_nice_flor_s_get_upload(
     uint64_t enc_part = subghz_protocol_nice_flor_s_encrypt(decrypt, file_name);
 
     for(int i = 0; i < 16; i++) {
-        static const uint64_t loops[16] = {
-            0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xA, 0xB, 0xC, 0xD, 0xE, 0xF};
-
         uint8_t byte;
 
         if(o_code) {
             // both the serial mask and the cipher key change with the parcel index
             uint32_t mask_32 = 0;
             uint16_t mask_16 = 0;
-            subghz_protocol_nice_o_mask((uint8_t)loops[i], &mask_32, &mask_16);
+            subghz_protocol_nice_o_mask((uint8_t)i, &mask_32, &mask_16);
             uint64_t plain =
                 ((uint64_t)((instance->generic.serial ^ mask_32) & 0x0FFFFFFFu) << 16) |
                 instance->generic.cnt;
@@ -275,7 +272,7 @@ static void subghz_protocol_encoder_nice_flor_s_get_upload(
                 plain, (uint16_t)(instance->ic ^ mask_16), file_name);
         }
 
-        byte = btn << 4 | (0xF ^ btn ^ loops[i]);
+        byte = btn << 4 | (0xF ^ btn ^ i);
         instance->generic.data = (uint64_t)byte << 44 | enc_part;
 
         //Send header
@@ -308,7 +305,8 @@ static void subghz_protocol_encoder_nice_flor_s_get_upload(
             for(size_t i = 0; i < 7; i++) {
                 add_data[i] = (instance->generic.data >> (48 - i * 8)) & 0xFF;
             }
-            subghz_protocol_nice_one_get_data(add_data, loops[i], loops[i]);
+            const uint8_t flags = o_code ? (4U | (i >= 14)) : (i != 0);
+            subghz_protocol_nice_one_get_data(add_data, i, flags);
             instance->generic.data_2 = 0;
             for(size_t j = 7; j < 10; j++) {
                 instance->generic.data_2 <<= 8;
@@ -468,6 +466,11 @@ static uint32_t subghz_protocol_nice_one_crc(uint8_t* p) {
  * @param hold_bit  0 - the button was only pressed, 1 - the button was held down
  */
 static void subghz_protocol_nice_one_get_data(uint8_t* p, uint8_t num_parcel, uint8_t hold_bit) {
+    /* O-Code differs from plain Nice One on parcels 8..B. Only the low release
+     * bit reaches the wire; bit2 selects this framing variant, not enrollment. */
+    static const uint8_t nice_o_k[16] = {
+        0x8F, 0x8E, 0x8D, 0x8C, 0x84, 0x85, 0x86, 0x87,
+        0x8F, 0x8C, 0x89, 0x8D, 0x8C, 0x8D, 0x8E, 0x8F};
     uint8_t k = 0;
     uint8_t crc = 0;
     p[1] = (p[1] & 0x0f) | ((0x0f ^ (p[0] & 0x0F) ^ num_parcel) << 4);
@@ -477,14 +480,9 @@ static void subghz_protocol_nice_one_get_data(uint8_t* p, uint8_t num_parcel, ui
         k = 0x80;
     }
 
-    if(!hold_bit) {
-        hold_bit = 0;
-    } else {
-        hold_bit = 0x10;
-    }
-    k = num_parcel ^ k;
+    k = (hold_bit & 4U) ? nice_o_k[num_parcel & 0xF] : num_parcel ^ k;
     p[7] = k;
-    p[8] = hold_bit ^ (k << 4);
+    p[8] = ((hold_bit & 1U) << 4) ^ (k << 4);
 
     crc = subghz_protocol_nice_one_crc(p);
 
@@ -801,7 +799,7 @@ static bool subghz_protocol_nice_o_create_data_bits(
         for(size_t i = 0; i < 7; i++) {
             add_data[i] = (instance->generic.data >> (48 - i * 8)) & 0xFF;
         }
-        subghz_protocol_nice_one_get_data(add_data, 3, 0);
+        subghz_protocol_nice_one_get_data(add_data, 3, 4);
         for(size_t i = 7; i < 10; i++) {
             instance->generic.data_2 = (instance->generic.data_2 << 8) | add_data[i];
         }

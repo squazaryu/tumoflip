@@ -5,6 +5,7 @@ enum SubmenuIndex {
     SubmenuIndexDecode,
     SubmenuIndexEdit,
     SubmenuIndexDelete,
+    SubmenuIndexNiceAnalysis,
 };
 
 void subghz_scene_more_raw_submenu_callback(void* context, uint32_t index) {
@@ -30,6 +31,10 @@ void subghz_scene_more_raw_on_enter(void* context) {
         subghz);
 
     submenu_add_item(
+        subghz->submenu, "Nice O-Code", SubmenuIndexNiceAnalysis,
+        subghz_scene_more_raw_submenu_callback, subghz);
+
+    submenu_add_item(
         subghz->submenu,
         "Rename",
         SubmenuIndexEdit,
@@ -53,6 +58,16 @@ bool subghz_scene_more_raw_on_event(void* context, SceneManagerEvent event) {
     SubGhz* subghz = context;
 
     if(event.type == SceneManagerEventTypeCustom) {
+        if(event.event == SubmenuIndexNiceAnalysis && subghz_file_available(subghz)) {
+            /* Finish the Standard RAW session and restore its pack before another
+             * app runs. Loader copies the path and launches only after teardown. */
+            if(!subghz_scene_decode_raw_cleanup(subghz)) {
+                dialog_message_show_storage_error(subghz->dialogs, "Protocol pack\nrestore failed.");
+                return true;
+            }
+            return subghz_launch_saved_analyzer(
+                subghz, EXT_PATH("apps/Sub-GHz/nice_o_code.fap"));
+        }
         if(event.event == SubmenuIndexDelete) {
             if(subghz_file_available(subghz)) {
                 scene_manager_set_scene_state(
