@@ -117,8 +117,8 @@ void furi_mutex_release(void* m){(void)m;}
 ''' + reader + "\n" + production + r'''
 int main(void){
  NiceOCode a={0};
- const char* bad[]={NULL,"x","/int/a.sub","/ext/subghz/../bad.sub","/ext/subghz/a.nfc"};
- for(unsigned n=0;n<5;n++)assert(!nice_o_raw_begin(&a,bad[n])&&!objects);
+ const char* bad[]={NULL,"x","/int/a.sub","/ext/subghz/../bad.sub","/ext/subghz/a.nfc","/ext/subghz/..\\bad.sub"};
+ for(unsigned n=0;n<6;n++)assert(!nice_o_raw_begin(&a,bad[n])&&!objects);
  char huge[300];memset(huge,'a',299);huge[299]=0;assert(!nice_o_raw_begin(&a,huge)&&!objects);
  const char* good="/ext/subghz/own sample.sub";
  open_ok=false;assert(!nice_o_raw_begin(&a,good)&&!objects);open_ok=true;
@@ -126,6 +126,7 @@ int main(void){
  protocol_ok=false;assert(!nice_o_raw_begin(&a,good)&&!objects);protocol_ok=true;
  start_ok=false;assert(!nice_o_raw_begin(&a,good)&&!objects);start_ok=true;
  assert(nice_o_raw_begin(&a,good)&&objects==4);
+ assert(!nice_o_raw_begin(&a,good)&&objects==4);
  assert(nice_o_raw_next(&a)&&!feeds&&!a.raw_samples);
  a.raw_worker->remaining=1000;assert(nice_o_raw_next(&a));
  assert(feeds==400&&a.raw_samples==400&&a.raw_progress==99);

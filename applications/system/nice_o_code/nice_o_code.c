@@ -411,9 +411,10 @@ static void nice_o_raw_end(NiceOCode* app) {
 }
 
 static bool nice_o_raw_begin(NiceOCode* app, const char* path) {
+    if(app->raw_worker || app->receiver || app->environment) return false;
     const size_t length = path ? strlen(path) : 0;
     if(length < 4 || length > 255 || strncmp(path, "/ext/subghz/", 12) ||
-       strstr(path, "/../") || strcmp(path + length - 4, ".sub"))
+       strstr(path, "/../") || strchr(path, '\\') || strcmp(path + length - 4, ".sub"))
         return false;
     /* Check file type before starting the asynchronous reader. */
     FlipperFormat* ff = flipper_format_file_alloc(app->storage);

@@ -54,19 +54,22 @@ void subghz_scene_more_raw_on_enter(void* context) {
     view_dispatcher_switch_to_view(subghz->view_dispatcher, SubGhzViewIdMenu);
 }
 
+static bool subghz_scene_more_raw_analyze_nice(SubGhz* subghz) {
+    /* Restore before scheduling; no radio or worker can survive the handoff. */
+    if(!subghz_scene_decode_raw_cleanup(subghz)) {
+        dialog_message_show_storage_error(subghz->dialogs, "Protocol pack\nrestore failed.");
+        return true;
+    }
+    return subghz_launch_saved_analyzer(
+        subghz, EXT_PATH("apps/Sub-GHz/nice_o_code.fap"));
+}
+
 bool subghz_scene_more_raw_on_event(void* context, SceneManagerEvent event) {
     SubGhz* subghz = context;
 
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == SubmenuIndexNiceAnalysis && subghz_file_available(subghz)) {
-            /* Finish the Standard RAW session and restore its pack before another
-             * app runs. Loader copies the path and launches only after teardown. */
-            if(!subghz_scene_decode_raw_cleanup(subghz)) {
-                dialog_message_show_storage_error(subghz->dialogs, "Protocol pack\nrestore failed.");
-                return true;
-            }
-            return subghz_launch_saved_analyzer(
-                subghz, EXT_PATH("apps/Sub-GHz/nice_o_code.fap"));
+            return subghz_scene_more_raw_analyze_nice(subghz);
         }
         if(event.event == SubmenuIndexDelete) {
             if(subghz_file_available(subghz)) {
