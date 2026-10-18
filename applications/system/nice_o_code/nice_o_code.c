@@ -304,7 +304,7 @@ static void
     if(key == 0) return;
 
     furi_mutex_acquire(app->mutex, FuriWaitForever);
-    app->packets++;
+    if(app->packets < UINT32_MAX) app->packets++;
     bool related = false;
     for(size_t i = 0; i < app->key_count; i++) related |= app->keys[i] == key;
     if((app->key_count < NICE_O_MAX_KEYS) && nice_o_key_adds_info(app, key)) {
@@ -458,14 +458,15 @@ static bool nice_o_raw_next(NiceOCode* app) {
             subghz_receiver_reset(app->receiver);
             continue;
         }
-        app->raw_samples++;
+        if(app->raw_samples < UINT32_MAX) app->raw_samples++;
         subghz_receiver_decode(app->receiver, level, duration);
     }
     /* Once a sample has arrived the worker has opened a nonempty stream. */
     if(app->raw_samples) {
         subghz_file_encoder_worker_get_text_progress(app->raw_worker, app->raw_progress_text);
         furi_mutex_acquire(app->mutex, FuriWaitForever);
-        app->raw_progress = MIN(strtoul(furi_string_get_cstr(app->raw_progress_text), NULL, 10), 100UL);
+        /* Buffered-reader progress is advisory. Only EOF advances the scene. */
+        app->raw_progress = MIN(strtoul(furi_string_get_cstr(app->raw_progress_text), NULL, 10), 99UL);
         furi_mutex_release(app->mutex);
     }
     return true;
@@ -685,13 +686,6 @@ int32_t nice_o_code_app(void* p) {
     app->scene = NiceOSceneMenu;
     app->frequency = NICE_O_FREQUENCY;
 
-    app->view_port = view_port_alloc();
-    view_port_draw_callback_set(app->view_port, nice_o_draw_callback, app);
-    view_port_input_callback_set(app->view_port, nice_o_input_callback, app->queue);
-    app->gui = furi_record_open(RECORD_GUI);
-    gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
-
-    bool running = true;
     if(p && *(const char*)p) {
         if(nice_o_raw_begin(app, p)) {
             app->scene = NiceOSceneRaw;
@@ -701,12 +695,25 @@ int32_t nice_o_code_app(void* p) {
             furi_string_set(app->status, "Invalid RAW file");
         }
     }
+
+    app->view_port = view_port_alloc();
+    view_port_draw_callback_set(app->view_port, nice_o_draw_callback, app);
+    view_port_input_callback_set(app->view_port, nice_o_input_callback, app->queue);
+    app->gui = furi_record_open(RECORD_GUI);
+    gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
+
+    bool running = true;
     InputEvent event;
     while(running) {
         if(app->scene == NiceOSceneRaw && !nice_o_raw_next(app)) {
             nice_o_raw_end(app);
             furi_mutex_acquire(app->mutex, FuriWaitForever);
-            app->scene = nice_o_solve_begin(app) ? NiceOSceneSolve : NiceOSceneResult;
+            if(!app->raw_samples) {
+                furi_string_set(app->status, "No RAW samples");
+                app->scene = NiceOSceneResult;
+            } else {
+                app->scene = nice_o_solve_begin(app) ? NiceOSceneSolve : NiceOSceneResult;
+            }
             furi_mutex_release(app->mutex);
         }
         if(app->rx_active && !subghz_app_radio_is_connected(&app->radio)) {

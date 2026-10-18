@@ -74,6 +74,7 @@ typedef struct {unsigned kind,duration;bool level;} LevelDuration;
 typedef struct {void *storage,*environment,*receiver,*mutex;SubGhzFileEncoderWorker* raw_worker;FuriString* raw_progress_text;uint32_t frequency,raw_samples;uint8_t raw_progress;uint16_t key_bits;} NiceOCode;
 static bool open_ok=true,header_ok=true,protocol_ok=true,start_ok=true;
 static unsigned objects,feeds,resets,stops;
+static uint32_t next_duration=500;
 static int subghz_protocol_registry;
 FuriString* furi_string_alloc(void){objects++;return calloc(1,sizeof(FuriString));}
 void furi_string_free(FuriString* s){assert(s&&objects);objects--;free(s);}
@@ -105,7 +106,7 @@ bool subghz_file_encoder_worker_is_running(SubGhzFileEncoderWorker* w){return w-
 void subghz_file_encoder_worker_stop(SubGhzFileEncoderWorker* w){assert(w->running);w->running=false;stops++;}
 void subghz_file_encoder_worker_free(SubGhzFileEncoderWorker* w){assert(!w->running);objects--;free(w);}
 void subghz_file_encoder_worker_get_text_progress(SubGhzFileEncoderWorker* w,FuriString* s){assert(w->running);strcpy(s->data,"125%");}
-LevelDuration subghz_file_encoder_worker_get_level_duration(SubGhzFileEncoderWorker* w){if(w->end)return(LevelDuration){.kind=2};if(!w->remaining)return(LevelDuration){.kind=1};w->remaining--;return(LevelDuration){.level=true,.duration=500};}
+LevelDuration subghz_file_encoder_worker_get_level_duration(SubGhzFileEncoderWorker* w){if(w->end)return(LevelDuration){.kind=2};if(!w->remaining)return(LevelDuration){.kind=1};w->remaining--;return(LevelDuration){.level=true,.duration=next_duration};}
 bool level_duration_is_reset(LevelDuration d){return d.kind==2;}
 bool level_duration_is_wait(LevelDuration d){return d.kind==1;}
 uint32_t level_duration_get_duration(LevelDuration d){return d.duration;}
@@ -127,7 +128,10 @@ int main(void){
  assert(nice_o_raw_begin(&a,good)&&objects==4);
  assert(nice_o_raw_next(&a)&&!feeds&&!a.raw_samples);
  a.raw_worker->remaining=1000;assert(nice_o_raw_next(&a));
- assert(feeds==400&&a.raw_samples==400&&a.raw_progress==100);
+ assert(feeds==400&&a.raw_samples==400&&a.raw_progress==99);
+ next_duration=1000001;a.raw_worker->remaining=2;assert(nice_o_raw_next(&a));
+ assert(resets==2&&feeds==400);
+ next_duration=0;a.raw_worker->remaining=1;assert(nice_o_raw_next(&a));assert(resets==3);
  a.raw_worker->end=true;assert(!nice_o_raw_next(&a));
  nice_o_raw_end(&a);assert(!objects&&stops==1&&!a.raw_worker&&!a.receiver&&!a.environment);
  nice_o_raw_end(&a);assert(!objects&&stops==1);
