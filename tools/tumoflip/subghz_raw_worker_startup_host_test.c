@@ -6,6 +6,7 @@
 
 #include <flipper_format/flipper_format.h>
 #include <lib/subghz/subghz_file_encoder_worker.h>
+#include <toolbox/stream/file_stream.h>
 
 struct FuriThread {
     pthread_t thread;
@@ -51,6 +52,7 @@ static pthread_mutex_t storage_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t storage_condition = PTHREAD_COND_INITIALIZER;
 static unsigned open_handles;
 static unsigned open_count;
+static unsigned read_only_open_count;
 static unsigned fail_open_number;
 static unsigned async_tx_checks;
 static bool async_tx_complete;
@@ -260,6 +262,12 @@ bool flipper_format_file_open_existing(FlipperFormat* format, const char* path) 
     return true;
 }
 
+bool file_stream_open(Stream* stream, const char* path, int access, int mode) {
+    assert(access == FSAM_READ && mode == FSOM_OPEN_EXISTING);
+    read_only_open_count++;
+    return flipper_format_file_open_existing((FlipperFormat*)stream, path);
+}
+
 bool flipper_format_read_string(FlipperFormat* format, const char* key, FuriString* value) {
     UNUSED(format);
     UNUSED(key);
@@ -354,6 +362,7 @@ static void worker_end_callback(void* context) {
 static void reset_fake_storage(void) {
     assert(open_handles == 0U);
     open_count = 0;
+    read_only_open_count = 0;
     fail_open_number = 0;
     async_tx_checks = 0;
     async_tx_complete = false;
@@ -507,7 +516,25 @@ static int test_unknown_radio_is_rejected_immediately(void) {
     return 0;
 }
 
+static int test_decode_uses_read_only_file_mode(void) {
+    reset_fake_storage();
+    SubGhzFileEncoderWorker* worker = subghz_file_encoder_worker_alloc();
+    assert(subghz_file_encoder_worker_start(worker, "/ext/subghz/own.sub", NULL));
+    bool ended = false;
+    const uint64_t deadline = monotonic_milliseconds() + 500;
+    while(monotonic_milliseconds() < deadline) {
+        LevelDuration sample = subghz_file_encoder_worker_get_level_duration(worker);
+        if(sample.reset) { ended = true; break; }
+        furi_delay_ms(1);
+    }
+    subghz_file_encoder_worker_stop(worker);
+    subghz_file_encoder_worker_free(worker);
+    assert(ended && read_only_open_count == 1 && open_handles == 0 && async_tx_checks == 0);
+    return 0;
+}
+
 int main(void) {
+    if(test_decode_uses_read_only_file_mode()) return 1;
     if(test_open_handle_is_released_after_async_start() != 0) return 1;
     if(test_hard_reopen_failure_is_terminal() != 0) return 1;
     if(test_unknown_radio_is_rejected_immediately() != 0) return 1;
