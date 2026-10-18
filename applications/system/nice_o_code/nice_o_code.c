@@ -33,6 +33,10 @@
 #include <lib/subghz/devices/devices.h>
 #include <lib/subghz/devices/cc1101_int/cc1101_int_interconnect.h>
 #include <flipper_format/flipper_format.h>
+#include <flipper_format/flipper_format_i.h>
+#include <toolbox/stream/file_stream.h>
+#include <lib/subghz/subghz_raw_decode.h>
+#include "nice_o_certificate.h"
 #include "../subghz_app_radio.h"
 
 #define TAG              "NiceOCode"
@@ -52,6 +56,7 @@
 typedef enum {
     NiceOSceneMenu,
     NiceOSceneCapture,
+    NiceOSceneRaw,
     NiceOSceneSolve,
     NiceOSceneResult,
 } NiceOScene;
@@ -81,6 +86,15 @@ typedef struct {
     uint8_t key_count;
     uint16_t key_bits;
     uint32_t packets;
+    SubGhzFileEncoderWorker* raw_worker;
+    uint32_t raw_samples;
+    uint8_t raw_progress;
+    FuriString* raw_progress_text;
+    uint32_t frequency;
+    uint32_t certificate;
+    bool certificate_known;
+    bool certificate_conflict;
+    bool offline;
 
     // sweep, run in chunks from the main loop so the UI never freezes
     uint32_t mask_32[NICE_O_MAX_KEYS];
@@ -105,11 +119,13 @@ static void nice_o_draw_callback(Canvas* canvas, void* ctx) {
     char buf[48];
     furi_mutex_acquire(app->mutex, FuriWaitForever);
     canvas_clear(canvas);
+    canvas_set_color(canvas, ColorBlack);
 
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 2, 10, "Nice O-Code");
     canvas_set_font(canvas, FontSecondary);
-    const char* radio_label = app->radio_indicator == 2 ? "Ext" :
+    const char* radio_label = app->offline ? "RAW" :
+                              app->radio_indicator == 2 ? "Ext" :
                               app->radio_indicator == 1 ? "Int" :
                                                           "Auto";
     canvas_draw_str_aligned(canvas, 126, 9, AlignRight, AlignBottom, radio_label);
@@ -127,30 +143,33 @@ static void nice_o_draw_callback(Canvas* canvas, void* ctx) {
             canvas_draw_str(canvas, 4, 26 + i * 12, items[i]);
             canvas_set_color(canvas, ColorBlack);
         }
-        elements_frame(canvas, 0, 41, 128, 23);
+        elements_frame(canvas, 0, 41, 127, 22);
         canvas_draw_str(canvas, 4, 51, "Press the button 4+ times,");
         canvas_draw_str(canvas, 4, 62, "do not hold. 433.92 AM650");
         break;
     }
 
+    case NiceOSceneRaw:
     case NiceOSceneCapture: {
         snprintf(
             buf,
             sizeof(buf),
-            "Presses %u/%u   %lupkt",
+            "%u/%u %lupkt",
             app->key_count,
             NICE_O_MIN_KEYS,
-            app->packets);
+            MIN(app->packets, 999999UL));
         canvas_draw_str(canvas, 2, 24, buf);
 
         /* fills as the capture approaches the four packets the sweep needs */
         const uint8_t have = MIN(app->key_count, (uint8_t)NICE_O_MIN_KEYS);
-        elements_progress_bar(canvas, 2, 28, 124, (float)have / (float)NICE_O_MIN_KEYS);
+        const float progress = app->scene == NiceOSceneRaw ? (float)app->raw_progress / 100.0f :
+                                                           (float)have / NICE_O_MIN_KEYS;
+        elements_progress_bar(canvas, 2, 28, 124, progress);
 
-        elements_frame(canvas, 0, 40, 128, 13);
+        elements_frame(canvas, 0, 40, 127, 11);
         canvas_draw_str(canvas, 4, 49, furi_string_get_cstr(app->status));
 
-        if(app->key_count >= NICE_O_MIN_KEYS) {
+        if(app->scene == NiceOSceneCapture && app->key_count >= NICE_O_MIN_KEYS) {
             elements_button_center(canvas, "Solve");
         }
         elements_button_left(canvas, "Back");
@@ -168,14 +187,33 @@ static void nice_o_draw_callback(Canvas* canvas, void* ctx) {
 
     default:
         if(app->solved) {
-            elements_frame(canvas, 0, 17, 128, 30);
+            elements_frame(canvas, 0, 17, 127, (app->certificate_known || app->certificate_conflict) ? 34 : 30);
             canvas_set_font(canvas, FontPrimary);
             snprintf(buf, sizeof(buf), "IC  %04X", app->ic);
-            canvas_draw_str(canvas, 6, 30, buf);
+            canvas_draw_str(canvas, 6, 29, buf);
             canvas_set_font(canvas, FontSecondary);
             snprintf(buf, sizeof(buf), "Serial  %07lX", app->serial);
-            canvas_draw_str(canvas, 6, 42, buf);
+            canvas_draw_str(canvas, 6, 40, buf);
+            if(app->certificate_known) {
+                snprintf(buf, sizeof(buf), "Cert(CRC) %06lX", app->certificate);
+                canvas_draw_str(canvas, 6, 49, buf);
+            } else if(app->certificate_conflict) {
+                canvas_draw_str(canvas, 6, 49, "Cert: conflict");
+            }
             elements_button_center(canvas, "Save");
+        } else if(app->certificate_known || app->certificate_conflict) {
+            /* Certificate decoding does not depend on IC recovery or four presses. */
+            elements_frame(canvas, 0, 17, 127, 34);
+            canvas_set_font(canvas, FontPrimary);
+            canvas_draw_str(canvas, 6, 29, "Certificate");
+            canvas_set_font(canvas, FontSecondary);
+            if(app->certificate_known) {
+                snprintf(buf, sizeof(buf), "Cert(CRC) %06lX", app->certificate);
+                canvas_draw_str(canvas, 6, 40, buf);
+            } else {
+                canvas_draw_str(canvas, 6, 40, "Conflicting values");
+            }
+            canvas_draw_str(canvas, 6, 49, "IC not recovered");
         } else {
             elements_multiline_text_aligned(
                 canvas, 64, 32, AlignCenter, AlignCenter, furi_string_get_cstr(app->status));
@@ -251,11 +289,14 @@ static void
     FlipperFormat* fff = flipper_format_string_alloc();
     SubGhzRadioPreset preset = {
         .name = furi_string_alloc_set("FuriHalSubGhzPresetOok650Async"),
-        .frequency = NICE_O_FREQUENCY,
+        .frequency = app->frequency,
         .data = NULL,
         .data_size = 0,
     };
     uint8_t key_data[8] = {0};
+    uint8_t tail_data[8] = {0};
+    uint32_t certificate = 0;
+    bool certificate_valid = false;
     uint32_t bits = 0;
     if((subghz_protocol_decoder_base_serialize(base, fff, &preset) == SubGhzProtocolStatusOk) &&
        flipper_format_rewind(fff) &&
@@ -266,14 +307,23 @@ static void
         for(size_t i = 0; i < sizeof(key_data); i++) {
             key = (key << 8) | key_data[i];
         }
+        if(bits == 112 && flipper_format_rewind(fff) &&
+           flipper_format_read_hex(fff, "Data2", tail_data, sizeof(tail_data))) {
+            uint64_t tail = 0;
+            for(size_t i = 0; i < sizeof(tail_data); i++) tail = (tail << 8) | tail_data[i];
+            certificate_valid = nice_o_certificate_decode(key, tail, &certificate);
+        }
     }
     furi_string_free(preset.name);
     flipper_format_free(fff);
     if(key == 0) return;
 
     furi_mutex_acquire(app->mutex, FuriWaitForever);
-    app->packets++;
+    if(app->packets < UINT32_MAX) app->packets++;
+    bool related = false;
+    for(size_t i = 0; i < app->key_count; i++) related |= app->keys[i] == key;
     if((app->key_count < NICE_O_MAX_KEYS) && nice_o_key_adds_info(app, key)) {
+        related = true;
         if(bits > 52) app->key_bits = 72;
         app->keys[app->key_count++] = key;
         furi_string_printf(
@@ -281,6 +331,15 @@ static void
         notification_message(app->notifications, &sequence_blink_green_10);
     } else {
         furi_string_printf(app->status, "Same press, ignored");
+    }
+    if(related && certificate_valid && !app->certificate_conflict) {
+        if(app->certificate_known && app->certificate != certificate) {
+            app->certificate_conflict = true;
+            app->certificate_known = false;
+        } else {
+            app->certificate = certificate;
+            app->certificate_known = true;
+        }
     }
     furi_mutex_release(app->mutex);
 }
@@ -347,6 +406,86 @@ static void nice_o_rx_stop(NiceOCode* app) {
     furi_mutex_acquire(app->mutex, FuriWaitForever);
     app->radio_indicator = 0;
     furi_mutex_release(app->mutex);
+}
+
+/* Uses the same bounded sample reader as Standard Auto Decode, with no radio.
+ * The source file is never opened for creation or modified by this path. */
+static void nice_o_raw_end(NiceOCode* app) {
+    if(app->raw_worker) {
+        if(subghz_file_encoder_worker_is_running(app->raw_worker))
+            subghz_file_encoder_worker_stop(app->raw_worker);
+        subghz_file_encoder_worker_free(app->raw_worker);
+        app->raw_worker = NULL;
+    }
+    if(app->receiver) subghz_receiver_free(app->receiver);
+    if(app->environment) subghz_environment_free(app->environment);
+    app->receiver = NULL;
+    app->environment = NULL;
+    if(app->raw_progress_text) furi_string_free(app->raw_progress_text);
+    app->raw_progress_text = NULL;
+}
+
+static bool nice_o_raw_begin(NiceOCode* app, const char* path) {
+    if(app->raw_worker || app->receiver || app->environment) return false;
+    const size_t length = path ? strlen(path) : 0;
+    if(length < 4 || length > 255 || strncmp(path, "/ext/subghz/", 12) ||
+       strstr(path, "/../") || strchr(path, '\\') || strcmp(path + length - 4, ".sub"))
+        return false;
+    /* Check file type before starting the asynchronous reader. */
+    FlipperFormat* ff = flipper_format_file_alloc(app->storage);
+    FuriString* text = furi_string_alloc();
+    uint32_t version = 0;
+    const bool valid = file_stream_open(
+                           flipper_format_get_raw_stream(ff), path, FSAM_READ, FSOM_OPEN_EXISTING) &&
+                       flipper_format_read_header(ff, text, &version) && version == 1 &&
+                       furi_string_equal_str(text, SUBGHZ_RAW_FILE_TYPE) &&
+                       flipper_format_read_string(ff, "Protocol", text) &&
+                       furi_string_equal_str(text, "RAW") && flipper_format_rewind(ff) &&
+                       flipper_format_read_uint32(ff, "Frequency", &app->frequency, 1) &&
+                       furi_hal_subghz_is_frequency_valid(app->frequency);
+    furi_string_free(text);
+    flipper_format_free(ff);
+    if(!valid) return false;
+    app->environment = subghz_environment_alloc();
+    subghz_environment_set_protocol_registry(app->environment, (void*)&subghz_protocol_registry);
+    subghz_environment_set_nice_flor_s_rainbow_table_file_name(app->environment, NICE_O_KEYSTORE);
+    app->receiver = subghz_receiver_alloc_init(app->environment);
+    subghz_receiver_set_filter(app->receiver, SubGhzProtocolFlag_Decodable);
+    subghz_receiver_set_rx_callback(app->receiver, nice_o_rx_callback, app);
+    app->raw_worker = subghz_file_encoder_worker_alloc();
+    app->raw_progress_text = furi_string_alloc();
+    if(!subghz_file_encoder_worker_start(app->raw_worker, path, NULL)) {
+        nice_o_raw_end(app);
+        return false;
+    }
+    app->key_bits = 52;
+    return true;
+}
+
+static bool nice_o_raw_next(NiceOCode* app) {
+    for(unsigned i = 0; i < 400; i++) {
+        bool level = false;
+        uint32_t duration = 0;
+        const SubGhzRawDecodeResult result =
+            subghz_raw_decode_sample(app->raw_worker, &level, &duration);
+        if(result == SubGhzRawDecodeEnd) return false;
+        if(result == SubGhzRawDecodeWait) break;
+        if(result == SubGhzRawDecodeGap) {
+            subghz_receiver_reset(app->receiver);
+            continue;
+        }
+        if(app->raw_samples < UINT32_MAX) app->raw_samples++;
+        subghz_receiver_decode(app->receiver, level, duration);
+    }
+    /* Once a sample has arrived the worker has opened a nonempty stream. */
+    if(app->raw_samples) {
+        subghz_file_encoder_worker_get_text_progress(app->raw_worker, app->raw_progress_text);
+        furi_mutex_acquire(app->mutex, FuriWaitForever);
+        /* Buffered-reader progress is advisory. Only EOF advances the scene. */
+        app->raw_progress = MIN(strtoul(furi_string_get_cstr(app->raw_progress_text), NULL, 10), 99UL);
+        furi_mutex_release(app->mutex);
+    }
+    return true;
 }
 
 /* -------------------------------------------------------------------- solve */
@@ -518,13 +657,20 @@ static bool nice_o_save(NiceOCode* app) {
         uint64_t decoded = subghz_protocol_nice_flor_s_decrypt_ic(
             app->keys[0], (uint16_t)(app->ic ^ app->mask_16[0]), NICE_O_KEYSTORE);
         SubGhzRadioPreset preset = {
-            .name = furi_string_alloc_set("AM650"), .frequency = NICE_O_FREQUENCY};
+            .name = furi_string_alloc_set("AM650"), .frequency = app->frequency};
         bool (*create)(void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, uint16_t, SubGhzRadioPreset*) =
             app->key_bits == 72 ? subghz_protocol_nice_o_one_create_data :
                                  subghz_protocol_nice_o_create_data;
         ok = create(
             subghz_transmitter_get_protocol_instance(tx), fff, app->serial,
             (app->keys[0] >> 48) & 0xF, (uint16_t)decoded, app->ic, &preset);
+        /* Analysis-only metadata: deliberately not the upstream enrollment keys. */
+        if(ok && app->certificate_known) {
+            uint8_t certificate[3] = {
+                app->certificate >> 16, app->certificate >> 8, app->certificate};
+            ok = flipper_format_rewind(fff) &&
+                 flipper_format_insert_or_update_hex(fff, "Analysis_Cert", certificate, 3);
+        }
         furi_string_free(preset.name);
         subghz_transmitter_free(tx);
         subghz_environment_free(environment);
@@ -544,7 +690,6 @@ static bool nice_o_save(NiceOCode* app) {
 /* ---------------------------------------------------------------------- main */
 
 int32_t nice_o_code_app(void* p) {
-    UNUSED(p);
 
     NiceOCode* app = malloc(sizeof(NiceOCode));
     memset(app, 0, sizeof(NiceOCode));
@@ -555,6 +700,18 @@ int32_t nice_o_code_app(void* p) {
     app->notifications = furi_record_open(RECORD_NOTIFICATION);
     app->status = furi_string_alloc_set("Idle");
     app->scene = NiceOSceneMenu;
+    app->frequency = NICE_O_FREQUENCY;
+
+    if(p && *(const char*)p) {
+        app->offline = true;
+        if(nice_o_raw_begin(app, p)) {
+            app->scene = NiceOSceneRaw;
+            furi_string_set(app->status, "Reading RAW file");
+        } else {
+            app->scene = NiceOSceneResult;
+            furi_string_set(app->status, "Invalid RAW file");
+        }
+    }
 
     app->view_port = view_port_alloc();
     view_port_draw_callback_set(app->view_port, nice_o_draw_callback, app);
@@ -565,6 +722,17 @@ int32_t nice_o_code_app(void* p) {
     bool running = true;
     InputEvent event;
     while(running) {
+        if(app->scene == NiceOSceneRaw && !nice_o_raw_next(app)) {
+            nice_o_raw_end(app);
+            furi_mutex_acquire(app->mutex, FuriWaitForever);
+            if(!app->raw_samples) {
+                furi_string_set(app->status, "No RAW samples");
+                app->scene = NiceOSceneResult;
+            } else {
+                app->scene = nice_o_solve_begin(app) ? NiceOSceneSolve : NiceOSceneResult;
+            }
+            furi_mutex_release(app->mutex);
+        }
         if(app->rx_active && !subghz_app_radio_is_connected(&app->radio)) {
             nice_o_rx_stop(app);
             furi_mutex_acquire(app->mutex, FuriWaitForever);
@@ -587,7 +755,8 @@ int32_t nice_o_code_app(void* p) {
         furi_mutex_release(app->mutex);
         if(solving) view_port_update(app->view_port);
 
-        if(furi_message_queue_get(app->queue, &event, solving ? 0 : 200) == FuriStatusOk) {
+        const uint32_t timeout = solving ? 0 : app->scene == NiceOSceneRaw ? 1 : 200;
+        if(furi_message_queue_get(app->queue, &event, timeout) == FuriStatusOk) {
             if(event.type == InputTypeShort) {
                 furi_mutex_acquire(app->mutex, FuriWaitForever);
                 switch(app->scene) {
@@ -603,6 +772,10 @@ int32_t nice_o_code_app(void* p) {
                             app->key_bits = 52;
                             app->packets = 0;
                             app->solved = false;
+                            app->certificate_known = false;
+                            app->certificate_conflict = false;
+                            app->frequency = NICE_O_FREQUENCY;
+                            app->offline = false;
                             furi_string_set(app->status, "Listening 433.92");
                             app->scene = NiceOSceneCapture;
                             furi_mutex_release(app->mutex);
@@ -637,6 +810,16 @@ int32_t nice_o_code_app(void* p) {
                     }
                     break;
 
+                case NiceOSceneRaw:
+                    if(event.key == InputKeyBack || event.key == InputKeyLeft) {
+                        furi_mutex_release(app->mutex);
+                        nice_o_raw_end(app);
+                        furi_mutex_acquire(app->mutex, FuriWaitForever);
+                        app->offline = false;
+                        app->scene = NiceOSceneMenu;
+                    }
+                    break;
+
                 case NiceOSceneSolve:
                     if((event.key == InputKeyBack) || (event.key == InputKeyLeft)) {
                         furi_string_set(app->status, "Cancelled");
@@ -647,6 +830,7 @@ int32_t nice_o_code_app(void* p) {
 
                 case NiceOSceneResult:
                     if((event.key == InputKeyBack) || (event.key == InputKeyLeft)) {
+                        app->offline = false;
                         app->scene = NiceOSceneMenu;
                     } else if((event.key == InputKeyOk) && app->solved) {
                         furi_mutex_release(app->mutex);
@@ -664,6 +848,7 @@ int32_t nice_o_code_app(void* p) {
     }
 
     nice_o_rx_stop(app);
+    nice_o_raw_end(app);
     gui_remove_view_port(app->gui, app->view_port);
     view_port_free(app->view_port);
     furi_record_close(RECORD_GUI);

@@ -1,6 +1,7 @@
 #include "../subghz_i.h"
 
 #include <stdlib.h>
+#include <lib/subghz/subghz_raw_decode.h>
 
 #define TAG "SubGhzDecodeRaw"
 
@@ -268,19 +269,19 @@ static bool subghz_scene_decode_raw_start_next_pack(SubGhz* subghz) {
 bool subghz_scene_decode_raw_next(SubGhz* subghz) {
     if(subghz->decode_raw_file_worker_encoder == NULL) return false;
 
-    LevelDuration level_duration;
     for(uint32_t read = SAMPLES_TO_READ_PER_TICK; read > 0; --read) {
-        level_duration =
-            subghz_file_encoder_worker_get_level_duration(subghz->decode_raw_file_worker_encoder);
-        if(!level_duration_is_reset(level_duration)) {
-            if(level_duration_is_wait(level_duration)) {
+        bool level = false;
+        uint32_t duration = 0;
+        const SubGhzRawDecodeResult result = subghz_raw_decode_sample(
+            subghz->decode_raw_file_worker_encoder, &level, &duration);
+        if(result != SubGhzRawDecodeEnd) {
+            if(result == SubGhzRawDecodeWait) {
                 FURI_LOG_W(TAG, "LD tells wait!");
                 return true;
             }
-            bool level = level_duration_get_level(level_duration);
-            uint32_t duration = level_duration_get_duration(level_duration);
-            if(duration > 1000000) {
+            if(result == SubGhzRawDecodeGap) {
                 FURI_LOG_E(TAG, "LD came with overflow: %ld", duration);
+                subghz_txrx_receiver_reset(subghz->txrx);
                 return true;
             }
             subghz_txrx_decode(subghz->txrx, level, duration);
