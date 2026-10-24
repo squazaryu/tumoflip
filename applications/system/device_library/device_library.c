@@ -1,4 +1,5 @@
 #include "card_store.h"
+#include "wallet_launch.h"
 #include <toolbox/file_history.h>
 #include <gui/gui.h>
 #include <gui/modules/submenu.h>
@@ -19,6 +20,10 @@ typedef enum {
     PageMain,
     PageCards,
     PageCard,
+    PageManage,
+    PagePins,
+    PageRemovePins,
+    PageConfirmUnpin,
     PageLink,
     PageHistory,
     PageSources,
@@ -47,6 +52,12 @@ enum {
     KeepEditing,
     Discard,
     MarkChecked,
+    OpenPins,
+    EditObject,
+    RenameAction,
+    TogglePin,
+    RemovePins,
+    ConfirmUnpin,
     NextCards = 30,
     PreviousCards,
     NextHistories,
@@ -54,7 +65,9 @@ enum {
     CardBase = 100,
     LinkBase = 200,
     SourceBase = 300,
-    VersionBase = 400
+    VersionBase = 400,
+    PinBase = 500,
+    PinRemoveBase = 600
 };
 typedef struct {
     Storage* storage;
@@ -69,11 +82,14 @@ typedef struct {
     FuriString* path;
     LibraryPage page, back;
     DeviceCard card;
+    LibraryPins pins;
     char names[32][32];
     char (*sources)[256];
     uint32_t count, edit, link;
     uint32_t card_offset, history_offset;
+    uint32_t pin_edit;
     bool dirty;
+    bool pins_ready;
     char edit_buffer[128];
     FileHistoryRecord records[4];
     PluginManager* history_manager;
@@ -135,35 +151,71 @@ static void library_cards(Library* app) {
     if(app->card_offset) library_item(app, "< Previous page", PreviousCards);
     if(more) library_item(app, "Next page >", NextCards);
 }
+static void library_pinned(Library* app, bool remove) {
+    if(!app->pins_ready) {
+        library_item(app, "Pins: read error", 0);
+        return;
+    }
+    for(unsigned i = 0; i < app->pins.count; i++)
+        library_item(app, app->pins.names[i], (remove ? PinRemoveBase : PinBase) + i);
+    if(!app->pins.count) library_item(app, "No pinned objects", 0);
+    if(!remove && app->pins.count) library_item(app, "Remove a pin...", RemovePins);
+}
 static void library_show(Library* app, LibraryPage page) {
     app->page = page;
     submenu_reset(app->menu);
     if(page == PageMain) {
         submenu_set_header(app->menu, "Device Library");
-        library_item(app, "New device card", NewCard);
-        library_item(app, "Open device card", OpenCards);
+        library_item(app, "Pinned objects", OpenPins);
+        library_item(app, "All objects", OpenCards);
+        library_item(app, "New object", NewCard);
         library_item(app, "File History", History);
         library_item(app, "About / limits", About);
     } else if(page == PageCards) {
-        submenu_set_header(app->menu, "Device Cards");
+        submenu_set_header(app->menu, "All objects");
         library_cards(app);
+    } else if(page == PagePins || page == PageRemovePins) {
+        submenu_set_header(app->menu, page == PagePins ? "Pinned objects" : "Remove a pin");
+        library_pinned(app, page == PageRemovePins);
+    } else if(page == PageConfirmUnpin) {
+        submenu_set_header(app->menu, "Keep object files");
+        library_item(app, app->pins.names[app->pin_edit], 0);
+        library_item(app, "Remove pin only", ConfirmUnpin);
+        library_item(app, "Keep pin", KeepEditing);
     } else if(page == PageCard) {
-        submenu_set_header(app->menu, "Device Card");
-        // Row labels fit by pixel width; arbitrary submenu headers do not.
+        submenu_set_header(app->menu, "Object actions");
+        library_item(app, app->card.name, Details);
+        for(unsigned i = 0; i < app->card.link_count; i++) {
+            char label[48];
+            if(library_action_label(&app->card, i, label, sizeof(label)))
+                library_item(app, label, LinkBase + i);
+        }
+        if(!app->card.link_count) library_item(app, "Add first action", AddLink);
+        if(app->dirty) library_item(app, "Save changes *", SaveCard);
+        library_item(app, "Edit object...", EditObject);
+    } else if(page == PageManage) {
+        submenu_set_header(app->menu, "Edit object");
         library_item(app, app->card.name, Details);
         library_item(app, "Edit notes", Note);
         library_item(app, "Edit tags", Tags);
         library_item(app, "Mark checked", MarkChecked);
-        library_item(app, "Add file link", AddLink);
+        library_item(app, "Add file action", AddLink);
         library_item(app, app->dirty ? "Save changes *" : "Save card", SaveCard);
+        library_item(
+            app,
+            app->pins_ready && library_pins_contains(&app->pins, app->card.name) ? "Unpin object" :
+                                                                                   "Pin object",
+            TogglePin);
         for(unsigned i = 0; i < app->card.link_count; i++) {
-            const char* name = strrchr(app->card.links[i], '/');
-            library_item(app, name ? name + 1 : app->card.links[i], LinkBase + i);
+            char label[48];
+            if(library_action_label(&app->card, i, label, sizeof(label)))
+                library_item(app, label, LinkBase + i);
         }
     } else if(page == PageLink) {
-        submenu_set_header(app->menu, "Linked file");
+        submenu_set_header(app->menu, "File action");
         library_item(app, "Show path / status", Details);
-        library_item(app, "Open in standard app", OpenLink);
+        library_item(app, "Open action", OpenLink);
+        library_item(app, "Rename action", RenameAction);
         library_item(app, "Remove link only", RemoveLink);
     } else if(page == PageHistory) {
         submenu_set_header(app->menu, "File History");
@@ -219,25 +271,28 @@ static void library_edit(Library* app, unsigned kind) {
     app->page = PageInput;
     strlcpy(
         app->edit_buffer,
-        kind == Note ? app->card.notes :
-        kind == Tags ? app->card.tags :
-                       "",
+        kind == Note         ? app->card.notes :
+        kind == Tags         ? app->card.tags :
+        kind == RenameAction ? app->card.labels[app->link] :
+                               "",
         sizeof(app->edit_buffer));
     text_input_reset(app->input);
     text_input_set_minimum_length(app->input, kind == NewCard ? 1 : 0);
     text_input_set_header_text(
         app->input,
-        kind == NewCard ? "Device name" :
-        kind == Note    ? "Device notes" :
-                          "Tags: space separated");
+        kind == NewCard      ? "Device name" :
+        kind == Note         ? "Device notes" :
+        kind == RenameAction ? "Action label (optional)" :
+                               "Tags: space separated");
     text_input_set_result_callback(
         app->input,
         library_input_done,
         app,
         app->edit_buffer,
-        kind == NewCard ? 25 :
-        kind == Tags    ? 64 :
-                          128,
+        kind == NewCard      ? 25 :
+        kind == Tags         ? 64 :
+        kind == RenameAction ? 32 :
+                               128,
         false);
     view_dispatcher_switch_to_view(app->dispatcher, LibraryInputView);
 }
@@ -249,17 +304,145 @@ static bool library_select_file(Library* app, const char* extensions) {
     return dialog_file_browser_show(app->dialogs, app->path, app->path, &options) &&
            library_path_valid(furi_string_get_cstr(app->path));
 }
+static void library_open_link(Library* app) {
+    LibraryPage back = app->page;
+    if(app->link >= app->card.link_count) return;
+    const char* path = app->card.links[app->link];
+    LibraryFileKind kind = library_file_kind(path);
+    const char* target = library_launch_target(kind);
+    if(app->dirty)
+        library_message(app, "Save card changes\nbefore opening a file.", back);
+    else if(!target)
+        library_message(
+            app, "Reference-only file.\nOpen it in its own app.\nNo script is executed.", back);
+    else if(!storage_file_exists(app->storage, path))
+        library_message(app, "Linked file is missing.", back);
+    else if(!library_native_inspect_ready(app->storage, kind))
+        library_message(
+            app,
+            "Update native apps.\nInstall matching\nfirmware resources.\nNo action started.",
+            back);
+    else {
+        loader_clear_launch_queue(app->loader);
+        const bool inspect = kind == LibraryFileNfc || kind == LibraryFileRfid ||
+                             kind == LibraryFileIbutton;
+        FuriString* argument = furi_string_alloc_printf("%s%s", inspect ? "inspect:" : "", path);
+        loader_enqueue_launch(
+            app->loader, target, furi_string_get_cstr(argument), LoaderDeferredLaunchFlagGui);
+        furi_string_free(argument);
+        view_dispatcher_stop(app->dispatcher);
+    }
+}
+
+static void library_set_pin(Library* app, const char* name, bool pinned, LibraryPage back) {
+    if(app->dirty) {
+        library_message(app, "Save object first.\nPin list unchanged.", back);
+        return;
+    }
+    LibraryPins* next = malloc(sizeof(*next));
+    bool ok = library_name_valid(name) && library_pins_load(app->storage, next);
+    if(ok && library_pins_contains(next, name) != pinned)
+        ok = library_pins_toggle(next, name) && library_pins_save(app->storage, next);
+    if(ok) {
+        app->pins = *next;
+        app->pins_ready = true;
+    }
+    free(next);
+    if(ok)
+        library_show(app, back);
+    else
+        library_message(
+            app, "Pin not saved.\nCheck SD / 16-pin limit.\nPrevious list retained.", back);
+}
+
+static bool library_event_allowed(const Library* app, uint32_t event) {
+    switch(event) {
+    case NewCard:
+    case OpenCards:
+    case OpenPins:
+    case History:
+        return app->page == PageMain;
+    case NextCards:
+    case PreviousCards:
+        return app->page == PageCards;
+    case EditObject:
+        return app->page == PageCard;
+    case Note:
+    case Tags:
+    case MarkChecked:
+    case TogglePin:
+        return app->page == PageManage;
+    case AddLink:
+    case SaveCard:
+        return app->page == PageCard || app->page == PageManage;
+    case OpenLink:
+    case RemoveLink:
+    case RenameAction:
+        return app->page == PageLink && app->link < app->card.link_count;
+    case Details:
+        return app->page == PageCard || app->page == PageManage || app->page == PageVersions ||
+               (app->page == PageLink && app->link < app->card.link_count);
+    case NameDone:
+        return app->page == PageInput;
+    case RemovePins:
+        return app->page == PagePins && app->pins_ready;
+    case ConfirmUnpin:
+        return app->page == PageConfirmUnpin && app->pins_ready && app->pin_edit < app->pins.count;
+    case KeepEditing:
+        return app->page == PageDiscard || app->page == PageConfirmUnpin;
+    case Discard:
+        return app->page == PageDiscard;
+    case About:
+        return app->page == PageMain || app->page == PageHistory;
+    case EnableHistory:
+    case DisableHistory:
+    case SelectHistory:
+    case Snapshot:
+        return app->page == PageHistory;
+    case NextHistories:
+    case PreviousHistories:
+        return app->page == PageSources;
+    default:
+        if(event >= CardBase && event < CardBase + app->count) return app->page == PageCards;
+        if(event >= LinkBase && event < LinkBase + app->card.link_count)
+            return app->page == PageCard || app->page == PageManage;
+        if(event >= SourceBase && event < SourceBase + app->count)
+            return app->page == PageSources && app->sources;
+        if(event >= VersionBase && event < VersionBase + LIBRARY_SLOTS)
+            return app->page == PageVersions;
+        if(event >= PinBase && event < PinBase + app->pins.count)
+            return app->page == PagePins && app->pins_ready;
+        if(event >= PinRemoveBase && event < PinRemoveBase + app->pins.count)
+            return app->page == PageRemovePins && app->pins_ready;
+        return false;
+    }
+}
+
 static bool library_event(void* context, uint32_t event) {
     Library* app = context;
-    if(event == NameDone && app->page != PageInput) return true;
-    if((event == OpenLink || event == RemoveLink) && app->page != PageLink) return true;
-    if((event == Note || event == Tags || event == AddLink || event == SaveCard ||
-        event == MarkChecked) &&
-       app->page != PageCard)
-        return true;
+    if(!library_event_allowed(app, event)) return true;
     if(event == NewCard)
         library_edit(app, NewCard);
-    else if(event == OpenCards) {
+    else if(event == OpenPins && app->page == PageMain) {
+        app->pins_ready = library_pins_load(app->storage, &app->pins);
+        library_show(app, PagePins);
+    } else if(event == RemovePins && app->page == PagePins) {
+        library_show(app, PageRemovePins);
+    } else if(
+        event >= PinRemoveBase && event < PinRemoveBase + app->pins.count &&
+        app->page == PageRemovePins) {
+        app->pin_edit = event - PinRemoveBase;
+        library_show(app, PageConfirmUnpin);
+    } else if(
+        event == ConfirmUnpin && app->page == PageConfirmUnpin &&
+        app->pin_edit < app->pins.count) {
+        library_set_pin(app, app->pins.names[app->pin_edit], false, PagePins);
+    } else if(event == TogglePin && app->page == PageManage) {
+        library_set_pin(
+            app, app->card.name, !library_pins_contains(&app->pins, app->card.name), PageManage);
+    } else if(event == EditObject && app->page == PageCard) {
+        library_show(app, PageManage);
+    } else if(event == OpenCards) {
         app->card_offset = 0;
         library_show(app, PageCards);
     } else if(event == NextCards || event == PreviousCards) {
@@ -269,13 +452,18 @@ static bool library_event(void* context, uint32_t event) {
         library_show(app, PageCards);
     } else if(event == History)
         library_show(app, PageHistory);
-    else if(event >= CardBase && event < CardBase + app->count && app->page == PageCards) {
-        if(library_card_load(app->storage, app->names[event - CardBase], &app->card)) {
+    else if(
+        (event >= CardBase && event < CardBase + app->count && app->page == PageCards) ||
+        (event >= PinBase && event < PinBase + app->pins.count && app->page == PagePins)) {
+        LibraryPage back = app->page;
+        const char* name = app->page == PagePins ? app->pins.names[event - PinBase] :
+                                                   app->names[event - CardBase];
+        if(library_card_load(app->storage, name, &app->card)) {
             app->dirty = false;
             library_show(app, PageCard);
         } else
-            library_message(app, "Card unreadable.\nNo valid revision found.", PageCards);
-    } else if(event == Note || event == Tags)
+            library_message(app, "Card unreadable.\nNo valid revision found.", back);
+    } else if(event == Note || event == Tags || event == RenameAction)
         library_edit(app, event);
     else if(event == NameDone) {
         if(app->edit == NewCard) {
@@ -293,25 +481,33 @@ static bool library_event(void* context, uint32_t event) {
             }
             memset(&app->card, 0, sizeof(app->card));
             strlcpy(app->card.name, app->edit_buffer, sizeof(app->card.name));
-        } else if(app->edit == Note)
+        } else if(app->edit == RenameAction)
+            strlcpy(app->card.labels[app->link], app->edit_buffer, sizeof(app->card.labels[0]));
+        else if(app->edit == Note)
             strlcpy(app->card.notes, app->edit_buffer, sizeof(app->card.notes));
         else
             strlcpy(app->card.tags, app->edit_buffer, sizeof(app->card.tags));
         app->dirty = true;
-        library_show(app, PageCard);
+        library_show(
+            app,
+            app->edit == RenameAction ? PageLink :
+            app->edit == NewCard      ? PageCard :
+                                        PageManage);
     } else if(event == AddLink) {
+        LibraryPage back = app->page;
         if(app->card.link_count >= LIBRARY_LINKS)
-            library_message(app, "Eight links per card.\nRemove a link first.", PageCard);
+            library_message(app, "Eight links per card.\nRemove a link first.", back);
         else if(library_select_file(app, NULL)) {
             const char* path = furi_string_get_cstr(app->path);
             bool duplicate = false;
             for(unsigned i = 0; i < app->card.link_count; i++)
                 if(!strcmp(path, app->card.links[i])) duplicate = true;
             if(!duplicate) {
+                memset(app->card.labels[app->card.link_count], 0, sizeof(app->card.labels[0]));
                 strlcpy(app->card.links[app->card.link_count++], path, 256);
                 app->dirty = true;
             }
-            library_show(app, PageCard);
+            library_show(app, back);
         }
     } else if(event == MarkChecked) {
         DateTime now;
@@ -327,7 +523,7 @@ static bool library_event(void* context, uint32_t event) {
             now.minute);
         app->dirty = true;
         library_message(
-            app, "Marked by you.\nSave card to keep date.\nNot an automatic test.", PageCard);
+            app, "Marked by you.\nSave card to keep date.\nNot an automatic test.", PageManage);
     } else if(event == SaveCard) {
         bool ok = library_card_save(app->storage, &app->card);
         if(ok) app->dirty = false;
@@ -336,18 +532,17 @@ static bool library_event(void* context, uint32_t event) {
             ok ? "Card saved.\nLinked files unchanged." :
                  "Save failed.\nPrevious revision retained.",
             PageCard);
-    } else if(event >= LinkBase && event < LinkBase + app->card.link_count && app->page == PageCard) {
+    } else if(
+        event >= LinkBase && event < LinkBase + app->card.link_count &&
+        (app->page == PageCard || app->page == PageManage)) {
         app->link = event - LinkBase;
-        library_show(app, PageLink);
+        if(app->page == PageCard)
+            library_open_link(app);
+        else
+            library_show(app, PageLink);
     } else if(event == RemoveLink && app->link < app->card.link_count) {
-        if(app->link + 1 < app->card.link_count)
-            memmove(
-                app->card.links[app->link],
-                app->card.links[app->link + 1],
-                (app->card.link_count - app->link - 1) * 256);
-        memset(app->card.links[--app->card.link_count], 0, 256);
-        app->dirty = true;
-        library_show(app, PageCard);
+        if(library_remove_link(&app->card, app->link)) app->dirty = true;
+        library_show(app, PageManage);
     } else if(event == Details) {
         LibraryPage back = app->page;
         if(back == PageVersions)
@@ -370,30 +565,7 @@ static bool library_event(void* context, uint32_t event) {
                 app->card.checked_at[0] ? app->card.checked_at : "Not marked");
         library_message(app, furi_string_get_cstr(app->text), back);
     } else if(event == OpenLink) {
-        const char* path = app->card.links[app->link];
-        const char* ext = strrchr(path, '.');
-        const char* target = NULL;
-        if(ext && !strcmp(ext, ".sub")) target = "Sub-GHz";
-        if(ext && !strcmp(ext, ".ir")) target = "Infrared";
-        if(ext && !strcmp(ext, ".nfc")) target = "NFC";
-        if(app->dirty)
-            library_message(app, "Save card changes\nbefore opening a file.", PageLink);
-        else if(!target)
-            library_message(
-                app,
-                "Reference-only file.\nOpen it in its own app.\nNo script is executed.",
-                PageLink);
-        else if(!storage_file_exists(app->storage, path))
-            library_message(app, "Linked file is missing.", PageLink);
-        else {
-            loader_clear_launch_queue(app->loader);
-            FuriString* argument =
-                furi_string_alloc_printf("%s%s", !strcmp(target, "NFC") ? "inspect:" : "", path);
-            loader_enqueue_launch(
-                app->loader, target, furi_string_get_cstr(argument), LoaderDeferredLaunchFlagGui);
-            furi_string_free(argument);
-            view_dispatcher_stop(app->dispatcher);
-        }
+        library_open_link(app);
     } else if(event == EnableHistory || event == DisableHistory) {
         if(event == EnableHistory && !file_history_core_available()) {
             library_message(
@@ -487,14 +659,14 @@ static bool library_event(void* context, uint32_t event) {
             PageVersions);
         furi_string_free(dest);
     } else if(event == KeepEditing)
-        library_show(app, PageCard);
+        library_show(app, app->page == PageConfirmUnpin ? PagePins : PageCard);
     else if(event == Discard) {
         app->dirty = false;
         library_show(app, PageMain);
     } else if(event == About)
         library_message(
             app,
-            "Device Library\n\nCards link existing files. Removing a link never deletes its file.\n\nHistory is opt-in for native SUB / IR / NFC saves. Three prior versions per file, 2 MiB each. Third-party writers and deletions are not intercepted.\n\nRestore always creates a separate copy. Backups may contain private NFC or remote data; they stay on your SD.\n\n32 cards / history sources per list. No automatic radio actions.",
+            "Device Library 1.1\n\nObjects link existing files: 8 named actions per object, 16 pinned objects. Removing a link or pin never deletes its file.\n\nNFC / RFID / iButton open a saved-file menu, not emulation. SUB / IR keep their native file flow. Unknown formats are references only.\n\nOld cards load without rewriting. Saving uses the new card format; older Device Library versions cannot read new revisions.\n\nHistory is opt-in for native SUB / IR / NFC saves. Three prior versions per file, 2 MiB each. Third-party writers and deletions are not intercepted.\n\nRestore creates a separate copy. Backups may contain private data; they stay on your SD. Lists use 32 entries per page.",
             app->page);
     return true;
 }
@@ -507,11 +679,19 @@ static bool library_back(void* context) {
     if(app->page == PageText)
         library_show(app, app->back);
     else if(app->page == PageInput)
-        library_show(app, app->edit == NewCard ? PageMain : PageCard);
+        library_show(
+            app,
+            app->edit == NewCard      ? PageMain :
+            app->edit == RenameAction ? PageLink :
+                                        PageManage);
     else if(app->page == PageCard && app->dirty)
         library_show(app, PageDiscard);
-    else if(app->page == PageLink || app->page == PageDiscard)
+    else if(app->page == PageManage || app->page == PageDiscard)
         library_show(app, PageCard);
+    else if(app->page == PageLink)
+        library_show(app, PageManage);
+    else if(app->page == PageRemovePins || app->page == PageConfirmUnpin)
+        library_show(app, PagePins);
     else if(app->page == PageVersions || app->page == PageSources)
         library_show(app, PageHistory);
     else
@@ -531,6 +711,7 @@ int32_t device_library_app(void* context) {
     app->input = text_input_alloc();
     app->text = furi_string_alloc();
     app->path = furi_string_alloc();
+    app->pins_ready = library_pins_load(app->storage, &app->pins);
     view_dispatcher_set_event_callback_context(app->dispatcher, app);
     view_dispatcher_set_custom_event_callback(app->dispatcher, library_event);
     view_dispatcher_set_navigation_event_callback(app->dispatcher, library_back);

@@ -663,7 +663,8 @@ static bool nice_o_save(NiceOCode* app) {
                                  subghz_protocol_nice_o_create_data;
         ok = create(
             subghz_transmitter_get_protocol_instance(tx), fff, app->serial,
-            (app->keys[0] >> 48) & 0xF, (uint16_t)decoded, app->ic, &preset);
+            (app->keys[0] >> 48) & 0xF, subghz_protocol_nice_o_cnt_swap((uint16_t)decoded),
+            app->ic, &preset);
         /* Analysis-only metadata: deliberately not the upstream enrollment keys. */
         if(ok && app->certificate_known) {
             uint8_t certificate[3] = {

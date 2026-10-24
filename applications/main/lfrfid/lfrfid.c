@@ -1,4 +1,5 @@
 #include "lfrfid_i.h"
+#include "../saved_file_inspect.h"
 #include <dolphin/dolphin.h>
 
 #define TAG                              "LfRfidApp"
@@ -303,12 +304,15 @@ int32_t lfrfid_app(void* p) {
             scene_manager_next_scene(app->scene_manager, LfRfidSceneRpc);
             dolphin_deed(DolphinDeedRfidEmulate);
         } else {
-            furi_string_set(app->file_path, args);
-            if(lfrfid_load_key_data(app, app->file_path, true)) {
+            bool inspect = false;
+            const char* path = saved_file_inspect_path(args, &inspect);
+            if(path) furi_string_set(app->file_path, path);
+            if(path && lfrfid_load_key_data(app, app->file_path, true)) {
                 view_dispatcher_attach_to_gui(
                     app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
-                scene_manager_next_scene(app->scene_manager, LfRfidSceneEmulate);
-                dolphin_deed(DolphinDeedRfidEmulate);
+                scene_manager_next_scene(
+                    app->scene_manager, inspect ? LfRfidSceneSavedKeyMenu : LfRfidSceneEmulate);
+                if(!inspect) dolphin_deed(DolphinDeedRfidEmulate);
             } else {
                 view_dispatcher_stop(app->view_dispatcher);
             }

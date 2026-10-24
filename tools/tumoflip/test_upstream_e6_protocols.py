@@ -33,7 +33,7 @@ class UpstreamE6ProtocolsTest(unittest.TestCase):
             self.assertIn(required, source + api)
         self.assertRegex(source, re.compile(r"NICE_O_MIN_SAMPLES\s+4"))
         self.assertIn("static char nice_flor_s_table_path[64]", source)
-        self.assertIn("flipper_format_read_hex(flipper_format, \"IC\"", source)
+        self.assertRegex(source, r'flipper_format_read_hex\(\w+,\s*"IC"')
 
     def test_security_plus_keypad_has_bounded_86_bit_path_and_pin(self) -> None:
         source = self.read("lib/subghz/protocols/secplus_v2.c")

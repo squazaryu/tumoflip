@@ -8,10 +8,14 @@ from tools.tumoflip.test_nfc_completion_equality import native
 ROOT = Path(__file__).resolve().parents[2]
 
 
-class NiceRawPassiveTests(unittest.TestCase):
-    def test_production_encoder_sends_16_bounded_parcels_with_correct_flags(self):
-        source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
-        native(r'''
+def nice_counter_source():
+    source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
+    return function((ROOT / "lib/subghz/protocols/public_api.h").read_text(), "static inline uint16_t subghz_protocol_nice_o_cnt_swap(") + "\n" + function(source, "static uint16_t nice_o_counter_value(uint16_t count) {")
+
+
+def nice_encoder_source():
+    source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
+    return r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -39,11 +43,17 @@ uint64_t subghz_protocol_nice_flor_s_encrypt_ic(uint64_t p,uint16_t ic,const cha
 void subghz_protocol_nice_o_mask(uint8_t p,uint32_t* m,uint16_t* n){(void)p;*m=0;*n=0;}
 LevelDuration level_duration_make(bool l,uint32_t t){return(LevelDuration){l,t};}
 bool subghz_protocol_blocks_get_bit_array(uint8_t* p,unsigned n){return(p[n/8]>>(7-n%8))&1;}
-''' + "\n".join(function(source, s) for s in (
+''' + nice_counter_source() + "\n".join(function(source, s) for s in (
+            "static uint16_t nice_flor_s_counter_next(",
             "static uint32_t subghz_protocol_nice_one_crc(",
             "static void subghz_protocol_nice_one_get_data(uint8_t* p, uint8_t num_parcel, uint8_t hold_bit) {",
             "static void subghz_protocol_encoder_nice_flor_s_get_upload(",
-        )) + r'''
+        ))
+
+
+class NiceRawPassiveTests(unittest.TestCase):
+    def test_production_encoder_sends_16_bounded_parcels_with_correct_flags(self):
+        native(nice_encoder_source() + r'''
 int main(void){
  const uint8_t k[16]={0x8f,0x8e,0x8d,0x8c,0x84,0x85,0x86,0x87,0x8f,0x8c,0x89,0x8d,0x8c,0x8d,0x8e,0x8f};
  struct {LevelDuration samples[4096];uint64_t guard;} buffer={.guard=0x123456789abcdefULL};

@@ -334,6 +334,11 @@ void subghz_protocol_decoder_bin_raw_data_input_rssi(
 bool subghz_protocol_secplus_v1_check_fixed(uint32_t fixed);
 
 /** Nice O-Code helpers used by the installer-code recovery app. */
+/* Source-only SDK helper: same mapping in either direction; no binary export. */
+static inline uint16_t subghz_protocol_nice_o_cnt_swap(uint16_t count) {
+    const uint16_t bits = count & 0x2492U;
+    return count ^ (uint16_t)((bits << 1) | ((bits ^ 0x2492U) >> 1));
+}
 void subghz_protocol_nice_o_mask(uint8_t n, uint32_t* mask_32, uint16_t* mask_16);
 uint8_t subghz_protocol_nice_o_get_parcel(uint64_t data);
 void subghz_protocol_decoder_nice_flor_s_set_skip_o_code(void* context, bool skip);

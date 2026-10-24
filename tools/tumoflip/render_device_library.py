@@ -25,7 +25,7 @@ def build_source():
     source += r'''
 typedef struct{uint32_t generation,size;}FileHistoryRecord;
 typedef struct{bool(*list)(void*,const char*,FileHistoryRecord*);}HistoryApi;
-typedef struct{SubmenuModel*menu;DeviceCard card;bool dirty;unsigned card_offset;void*storage;void*dispatcher;FuriString*path;const HistoryApi*history;FileHistoryRecord records[4];int page;}Library;
+typedef struct{SubmenuModel*menu;DeviceCard card;LibraryPins pins;bool dirty,pins_ready;unsigned card_offset,link,pin_edit;void*storage;void*dispatcher;FuriString*path;const HistoryApi*history;FileHistoryRecord records[4];int page;}Library;
 static const char*output_dir;static Canvas*screen;static int history_state;
 static bool history_core=true;
 static bool file_history_core_available(void){return history_core;}
@@ -47,7 +47,8 @@ enum{TumoSpectrumViewSensorMenu,SensorValue,SensorAnalyze=20,SensorExport,Sensor
 typedef struct{SubmenuModel*sensor_menu;int32_t sensor_values[4];uint8_t sensor_entered;void*view_dispatcher;SensorFitResult sensor_result;}TumoSpectrumApp;
 static void tumospectrum_sensor_action(void*c,uint32_t e){(void)c;(void)e;}
 '''
-    source += gui.function((ROOT / "applications/system/device_library/library_model.c").read_text(), "int library_newest_slot(")
+    source += re.sub(r"^#include.*\n", "\n", (ROOT / "applications/system/device_library/library_model.c").read_text(), flags=re.M)
+    source += gui.function(app, "static void library_pinned(")
     source += gui.function(app, "static void library_show(")
     source += gui.function(workbench, "static void tumospectrum_sensor_menu(")
     source += gui.function(workbench, "static void tumospectrum_sensor_results_menu(")
@@ -60,10 +61,10 @@ int main(int argc,char**argv){assert(argc==2);Canvas c={0};screen=&c;output_dir=
  c.fb.u8x8.display_info=&info;u8g2_SetupBuffer(&c.fb,buf,8,u8g2_ll_hvline_vertical_top_lsb,U8G2_R0);canvas_set_color(&c,ColorBlack);
  SubmenuModel menu_model={0};SubmenuItemArray_init(menu_model.items);menu_model.header=furi_string_alloc();
  HistoryApi api={list_versions};Library app={.menu=&menu_model,.history=&api,.path=furi_string_alloc_set("/ext/subghz/Weather.sub"),.dirty=true};
- strcpy(app.card.name,"Weather station");app.card.link_count=2;strcpy(app.card.links[0],"/ext/subghz/Weather.sub");strcpy(app.card.links[1],"/ext/subghz/profiles/Outdoor.subprofile");
+ strcpy(app.card.name,"Weather station");app.card.link_count=2;strcpy(app.card.links[0],"/ext/subghz/Weather.sub");strcpy(app.card.links[1],"/ext/nfc/Pass.nfc");strcpy(app.card.labels[0],"Sensor signal");strcpy(app.card.labels[1],"Entry pass");
  library_show(&app,PageMain);render_menu(&c,argv[1],"01-library",app.menu,0,0);
  library_show(&app,PageCards);render_menu(&c,argv[1],"02-cards",app.menu,0,0);
- library_show(&app,PageCard);render_menu(&c,argv[1],"03-card",app.menu,0,0);render_menu(&c,argv[1],"04-card-bottom",app.menu,5,5);
+ library_show(&app,PageCard);render_menu(&c,argv[1],"03-card",app.menu,1,0);render_menu(&c,argv[1],"04-card-bottom",app.menu,4,1);
  strcpy(app.card.name,"WWWWWWWWWWWWWWWWWWWWWWWW");library_show(&app,PageCard);render_menu(&c,argv[1],"05-card-long",app.menu,0,0);
  library_show(&app,PageLink);render_menu(&c,argv[1],"06-link",app.menu,0,0);
  history_state=FSE_NOT_EXIST;library_show(&app,PageHistory);render_menu(&c,argv[1],"07-history-off",app.menu,0,0);
@@ -92,6 +93,29 @@ int main(int argc,char**argv){assert(argc==2);Canvas c={0};screen=&c;output_dir=
  spectrum.sensor_result.candidates[1]=candidate;tumospectrum_sensor_results_menu(&spectrum);render_menu(&c,argv[1],"28-hypothesis-list",&sm,0,0);
  text_page(&c,argv[1],"26-no-fit","No matching hypothesis.\nNeed distinct training\nvalues or another encoding.",0);
  text_page(&c,argv[1],"27-incomplete","Need four short, complete\nRAW files from one sensor,\nsame frequency / preset,\nand four measured values.\nNo hypothesis generated.",0);
+ strcpy(app.card.name,"Office");app.dirty=false;app.pins_ready=true;app.pins.count=2;strcpy(app.pins.names[0],"Office");strcpy(app.pins.names[1],"Garage");
+ library_show(&app,PagePins);render_menu(&c,argv[1],"30-pinned",app.menu,0,0);
+ library_show(&app,PageManage);render_menu(&c,argv[1],"31-edit-object",app.menu,1,0);render_menu(&c,argv[1],"32-edit-actions",app.menu,7,5);
+ library_show(&app,PageRemovePins);render_menu(&c,argv[1],"33-remove-pin",app.menu,0,0);
+ library_show(&app,PageConfirmUnpin);render_menu(&c,argv[1],"34-confirm-unpin",app.menu,2,0);
+ app.pins.count=0;library_show(&app,PagePins);render_menu(&c,argv[1],"35-no-pins",app.menu,0,0);
+ app.pins_ready=false;library_show(&app,PagePins);render_menu(&c,argv[1],"36-pins-read-error",app.menu,0,0);
+ app.pins_ready=true;app.pins.count=16;for(unsigned i=0;i<16;i++)snprintf(app.pins.names[i],32,"Object %02u",i+1);
+ library_show(&app,PagePins);render_menu(&c,argv[1],"37-pins-bottom",app.menu,16,13);
+ app.card.link_count=8;for(unsigned i=0;i<8;i++){snprintf(app.card.links[i],256,"/ext/nfc/Very_long_original_capture_%u.nfc",i);snprintf(app.card.labels[i],32,"WWWWWWWWWWWWWWWWWWWWWWWWWWWWW%u",i);}
+ library_show(&app,PageCard);render_menu(&c,argv[1],"38-long-actions",app.menu,1,0);render_menu(&c,argv[1],"39-last-action",app.menu,9,6);
+ memset(app.card.labels,0,sizeof(app.card.labels));library_show(&app,PageCard);render_menu(&c,argv[1],"40-filename-fallback",app.menu,1,0);
+ app.card.link_count=0;app.dirty=true;library_show(&app,PageCard);render_menu(&c,argv[1],"41-empty-object",app.menu,1,0);
+ char label[32]="Entry pass";TextInputModel alias={.header="Action label (optional)",.text_buffer=label,.text_buffer_size=sizeof(label),.minimum_length=0,.cursor_pos=10};
+ canvas_set_font(&c,FontSecondary);text_input_view_draw_callback(&c,&alias);save(&c,argv[1],"42-action-name");
+ strcpy(label,"WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW");alias.cursor_pos=31;canvas_set_font(&c,FontSecondary);text_input_view_draw_callback(&c,&alias);save(&c,argv[1],"43-action-name-long");
+ text_page(&c,argv[1],"44-driver-error","Update native apps.\nInstall matching\nfirmware resources.\nNo action started.",0);
+ text_page(&c,argv[1],"45-dirty-action","Save card changes\nbefore opening a file.",0);
+ text_page(&c,argv[1],"46-missing-file","Linked file is missing.",0);
+ text_page(&c,argv[1],"47-pin-save-error","Pin not saved.\nCheck SD / 16-pin limit.\nPrevious list retained.",0);
+ text_page(&c,argv[1],"48-reference-only","Reference-only file.\nOpen it in its own app.\nNo script is executed.",0);
+ text_page(&c,argv[1],"49-object-read-error","Card unreadable.\nNo valid revision found.",0);
+ text_page(&c,argv[1],"50-linked-path","/ext/nfc/Very_long_original_capture_0.nfc\n\nFile available",0);
  return 0;}
 '''
     return source
@@ -111,7 +135,7 @@ def main():
         frame=Image.open(path);frame.resize((768,384),Image.Resampling.NEAREST).save(path.with_suffix(".png"));x,y=i%3*404+10,i//3*224+24
         sheet.paste(frame.resize((384,192),Image.Resampling.NEAREST).convert("RGB"),(x,y));draw.text((x,y-19),path.stem,fill="black")
     sheet.save(args.output/"all-screens.png")
-    selected=["03-card","06-link","08-history-on","10-versions","28-hypothesis-list","24-match"]
+    selected=["30-pinned","03-card","31-edit-object","06-link","42-action-name","34-confirm-unpin"]
     overview=Image.new("RGB",(808,3*224),"#ececec");draw=ImageDraw.Draw(overview)
     for i,name in enumerate(selected):
         frame=Image.open(args.output/(name+".pgm"));x,y=i%2*404+10,i//2*224+24

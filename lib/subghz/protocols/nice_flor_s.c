@@ -182,6 +182,40 @@ static uint8_t subghz_protocol_nice_flor_s_get_btn_code(void);
  * @param instance Pointer to a SubGhzProtocolEncoderNiceFlorS instance
  * @return true On success
  */
+// Three resident call sites share this tiny permutation. The SDK helper stays
+// source-only; no public export or ABI bump is needed.
+static uint16_t nice_o_counter_value(uint16_t count) __attribute__((noinline));
+static uint16_t nice_o_counter_value(uint16_t count) {
+    return subghz_protocol_nice_o_cnt_swap(count);
+}
+
+static uint16_t nice_flor_s_counter_next(uint32_t* plain, bool o_code) {
+    const int32_t step = furi_hal_subghz_get_rolling_counter_mult();
+    const bool normal = (nice_flors_counter_mode == 0 || bypass) &&
+                        (step != -0x7FFFFFFF || bypass);
+    if(normal) {
+        bypass = false;
+        if(!subghz_block_generic_global_counter_override_get(plain)) {
+            *plain += step;
+            if(*plain > 0xFFFFU) *plain = 0;
+        }
+    } else {
+        // Plain representations of wire 0 / FFFF. The adjacent literal state
+        // differs only in bit zero, for both plain and O-Code counters.
+        const uint16_t zero = o_code ? 0x1249 : 0x0000;
+        const uint16_t last = o_code ? 0xB6DB : 0xFFFF;
+        if(nice_flors_counter_mode == 0)
+            *plain = *plain == last ? zero :
+                     *plain == zero ? (zero ^ 1U) :
+                     *plain == (last ^ 1U) ? last : (last ^ 1U);
+        else if(nice_flors_counter_mode == 1)
+            *plain = *plain == (last ^ 1U) ? (zero ^ 1U) : (last ^ 1U);
+        else
+            *plain = *plain == zero ? (zero ^ 1U) : zero;
+    }
+    return o_code ? nice_o_counter_value(*plain) : *plain;
+}
+
 static void subghz_protocol_encoder_nice_flor_s_get_upload(
     SubGhzProtocolEncoderNiceFlorS* instance,
     uint8_t btn,
@@ -213,47 +247,8 @@ static void subghz_protocol_encoder_nice_flor_s_get_upload(
     // if we change counter/button in SignalSettings menu then we must bypass counter_modes, just gen and save signal file.
     if(subghz_block_generic_global.cnt_need_override) bypass = true;
 
-    if(nice_flors_counter_mode == 0 || bypass) {
-        // Check for OFEX (overflow experimental) mode
-        if(furi_hal_subghz_get_rolling_counter_mult() != -0x7FFFFFFF || bypass) {
-            bypass = false;
-            // standart counter mode. PULL data from subghz_block_generic_global variables
-            if(!subghz_block_generic_global_counter_override_get(&instance->generic.cnt)) {
-                // if counter_override_get return FALSE then counter was not changed and we increase counter by standart mult value
-                if((instance->generic.cnt + furi_hal_subghz_get_rolling_counter_mult()) > 0xFFFF) {
-                    instance->generic.cnt = 0;
-                } else {
-                    instance->generic.cnt += furi_hal_subghz_get_rolling_counter_mult();
-                }
-            }
-        } else {
-            if((instance->generic.cnt + 0x1) > 0xFFFF) {
-                instance->generic.cnt = 0;
-            } else if(instance->generic.cnt >= 0x1 && instance->generic.cnt != 0xFFFE) {
-                instance->generic.cnt = 0xFFFE;
-            } else {
-                instance->generic.cnt++;
-            }
-        }
-    } else if(nice_flors_counter_mode == 1) {
-        // Mode 1 (floxi2r)
-        // 0001 / FFFE
-        if(instance->generic.cnt == 0xFFFE) {
-            instance->generic.cnt = 0x0001;
-        } else {
-            instance->generic.cnt = 0xFFFE;
-        }
-    } else {
-        // Mode 2 (ox2)
-        // 0x0000 / 0x0001
-        if(instance->generic.cnt >= 0x0001) {
-            instance->generic.cnt = 0;
-        } else {
-            instance->generic.cnt++;
-        }
-    }
-
     const bool o_code = instance->o_code;
+    const uint16_t air_count = nice_flor_s_counter_next(&instance->generic.cnt, o_code);
     uint64_t decrypt = ((uint64_t)instance->generic.serial << 16) | instance->generic.cnt;
     uint64_t enc_part = subghz_protocol_nice_flor_s_encrypt(decrypt, file_name);
 
@@ -262,12 +257,12 @@ static void subghz_protocol_encoder_nice_flor_s_get_upload(
 
         if(o_code) {
             // both the serial mask and the cipher key change with the parcel index
-            uint32_t mask_32 = 0;
-            uint16_t mask_16 = 0;
+            uint32_t mask_32;
+            uint16_t mask_16;
             subghz_protocol_nice_o_mask((uint8_t)i, &mask_32, &mask_16);
             uint64_t plain =
                 ((uint64_t)((instance->generic.serial ^ mask_32) & 0x0FFFFFFFu) << 16) |
-                instance->generic.cnt;
+                air_count;
             enc_part = subghz_protocol_nice_flor_s_encrypt_ic(
                 plain, (uint16_t)(instance->ic ^ mask_16), file_name);
         }
@@ -339,6 +334,26 @@ static void subghz_protocol_encoder_nice_flor_s_get_upload(
     instance->encoder.size_upload = index;
 }
 
+static bool nice_flor_s_read_modes(FlipperFormat* format, uint16_t* ic, bool* o_code)
+    __attribute__((noinline));
+static bool nice_flor_s_read_modes(FlipperFormat* format, uint16_t* ic, bool* o_code) {
+    if(!flipper_format_rewind(format)) {
+        FURI_LOG_E(TAG, "Rewind error");
+        return false;
+    }
+    uint32_t mode;
+    if(flipper_format_read_uint32(format, "CounterMode", &mode, 1))
+        nice_flors_counter_mode = (uint8_t)mode;
+    if(!flipper_format_rewind(format)) {
+        FURI_LOG_E(TAG, "Rewind error");
+        return false;
+    }
+    uint8_t data[2];
+    *o_code = flipper_format_read_hex(format, "IC", data, sizeof(data));
+    *ic = *o_code ? (uint16_t)((uint16_t)data[0] << 8 | data[1]) : (uint16_t)NICE_FLOR_S_IC_PLAIN;
+    return true;
+}
+
 SubGhzProtocolStatus
     subghz_protocol_encoder_nice_flor_s_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_assert(context);
@@ -368,29 +383,7 @@ SubGhzProtocolStatus
             flipper_format, "Repeat", (uint32_t*)&instance->encoder.repeat, 1);
         // flipper_format_read_uint32(
         // flipper_format, "Data", (uint32_t*)&instance->generic.data_2, 1);
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            break;
-        }
-
-        uint32_t tmp_counter_mode;
-        if(flipper_format_read_uint32(flipper_format, "CounterMode", &tmp_counter_mode, 1)) {
-            nice_flors_counter_mode = (uint8_t)tmp_counter_mode;
-        } else {
-        }
-
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            break;
-        }
-        uint8_t ic_data[2] = {0xFF, 0xFF};
-        if(flipper_format_read_hex(flipper_format, "IC", ic_data, sizeof(ic_data))) {
-            instance->ic = (uint16_t)ic_data[0] << 8 | ic_data[1];
-            instance->o_code = true;
-        } else {
-            instance->ic = NICE_FLOR_S_IC_PLAIN;
-            instance->o_code = false;
-        }
+        if(!nice_flor_s_read_modes(flipper_format, &instance->ic, &instance->o_code)) break;
 
         subghz_protocol_nice_flor_s_remote_controller(
             &instance->generic,
@@ -431,6 +424,7 @@ SubGhzProtocolStatus
 
     return res;
 }
+
 
 /**
  * Read bytes from rainbow table
@@ -678,15 +672,15 @@ static bool subghz_protocol_nice_o_decrypt(
     uint32_t* serial,
     uint16_t* cnt,
     uint8_t* btn) {
-    uint32_t mask_32 = 0;
-    uint16_t mask_16 = 0;
+    uint32_t mask_32;
+    uint16_t mask_16;
     subghz_protocol_nice_o_mask(subghz_protocol_nice_o_get_parcel(data), &mask_32, &mask_16);
 
     uint64_t decrypted =
         subghz_protocol_nice_flor_s_decrypt_ic(data, (uint16_t)(ic ^ mask_16), file_name);
     if(decrypted == SUBGHZ_NO_NICE_FLOR_S_RAINBOW_TABLE) return false;
 
-    if(cnt) *cnt = (uint16_t)decrypted;
+    if(cnt) *cnt = nice_o_counter_value((uint16_t)decrypted);
     if(serial) *serial = (uint32_t)((decrypted >> 16) ^ mask_32) & 0x0FFFFFFFu;
     if(btn) *btn = (uint8_t)((data >> 48) & 0x0Fu);
     return true;
@@ -704,11 +698,12 @@ static bool subghz_protocol_nice_o_make_data(
         return false;
     }
 
-    uint32_t mask_32 = 0;
-    uint16_t mask_16 = 0;
+    uint32_t mask_32;
+    uint16_t mask_16;
     subghz_protocol_nice_o_mask(parcel, &mask_32, &mask_16);
 
-    const uint64_t plain = ((uint64_t)((serial ^ mask_32) & 0x0FFFFFFFu) << 16) | cnt;
+    const uint64_t plain = ((uint64_t)((serial ^ mask_32) & 0x0FFFFFFFu) << 16) |
+                           nice_o_counter_value(cnt);
     const uint64_t encrypted =
         subghz_protocol_nice_flor_s_encrypt_ic(plain, (uint16_t)(ic ^ mask_16), file_name);
     if(encrypted == SUBGHZ_NO_NICE_FLOR_S_RAINBOW_TABLE) return false;
@@ -1255,29 +1250,9 @@ SubGhzProtocolStatus
                 break;
             }
         }
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            break;
-        }
-
-        uint32_t tmp_counter_mode;
-        if(flipper_format_read_uint32(flipper_format, "CounterMode", &tmp_counter_mode, 1)) {
-            nice_flors_counter_mode = (uint8_t)tmp_counter_mode;
-        } else {
-        }
-
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            break;
-        }
-        uint8_t ic_data[2] = {0xFF, 0xFF};
-        if(flipper_format_read_hex(flipper_format, "IC", ic_data, sizeof(ic_data))) {
-            instance->ic = (uint16_t)ic_data[0] << 8 | ic_data[1];
-            instance->o_code = true;
-        } else {
-            instance->ic = NICE_FLOR_S_IC_PLAIN;
-            instance->o_code = false;
-        }
+        bool o_code;
+        if(!nice_flor_s_read_modes(flipper_format, &instance->ic, &o_code)) break;
+        instance->o_code = o_code;
         /* The IC field marks a frame as O-Code; FFFF in it means the code is unknown,
          * which is what a received frame is stored with. */
         // Explicit legacy IC=FFFF is valid. Only an explicit unknown marker (or

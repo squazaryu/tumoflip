@@ -1,4 +1,4 @@
-#include "arf_elf_metadata.h"
+#include "fap_metadata.h"
 #include <string.h>
 
 static uint16_t arf_u16(const uint8_t* bytes) {

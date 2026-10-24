@@ -25,6 +25,7 @@ class Unleashed094DecoderTests(unittest.TestCase):
             start = source.index(f"struct SubGhzProtocol{name}NiceFlorS {{")
             structs.append(source[start:source.index("\n};", start) + 3])
         production = "\n".join(function(source, signature) for signature in (
+            "static bool nice_flor_s_read_modes(",
             "SubGhzProtocolStatus subghz_protocol_decoder_nice_flor_s_serialize(",
             "SubGhzProtocolStatus\n    subghz_protocol_decoder_nice_flor_s_deserialize(",
             "SubGhzProtocolStatus\n    subghz_protocol_encoder_nice_flor_s_deserialize(",
