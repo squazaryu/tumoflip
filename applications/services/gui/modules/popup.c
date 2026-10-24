@@ -30,7 +30,35 @@ typedef struct {
     TextElement header;
     TextElement text;
     IconElement icon;
+    uint8_t text_width;
 } PopupModel;
+
+static FuriString* popup_fit_text(Canvas* canvas, const char* text, uint8_t width) {
+    FuriString* result = furi_string_alloc();
+    FuriString* line = furi_string_alloc();
+    const size_t dots_width = canvas_string_width(canvas, "...");
+    for(const char* start = text;;) {
+        const char* end = strchr(start, '\n');
+        furi_string_set_strn(line, start, end ? (size_t)(end - start) : strlen(start));
+        if(canvas_string_width(canvas, furi_string_get_cstr(line)) > width) {
+            while(!furi_string_empty(line) &&
+                  canvas_string_width(canvas, furi_string_get_cstr(line)) + dots_width > width) {
+                size_t size = furi_string_size(line) - 1;
+                const char* value = furi_string_get_cstr(line);
+                while(size && ((uint8_t)value[size] & 0xC0) == 0x80) size--;
+                furi_string_left(line, size);
+            }
+            if(dots_width <= width) furi_string_cat_str(line, "...");
+            else furi_string_reset(line);
+        }
+        furi_string_cat_str(result, furi_string_get_cstr(line));
+        if(!end) break;
+        furi_string_push_back(result, '\n');
+        start = end + 1;
+    }
+    furi_string_free(line);
+    return result;
+}
 
 static void popup_view_draw_callback(Canvas* canvas, void* _model) {
     PopupModel* model = _model;
@@ -58,13 +86,17 @@ static void popup_view_draw_callback(Canvas* canvas, void* _model) {
     // Draw text
     if(model->text.text != NULL) {
         canvas_set_font(canvas, FontSecondary);
+        FuriString* fitted = model->text_width ?
+                                 popup_fit_text(canvas, model->text.text, model->text_width) :
+                                 NULL;
         elements_multiline_text_aligned(
             canvas,
             model->text.x,
             model->text.y,
             model->text.horizontal,
             model->text.vertical,
-            model->text.text);
+            fitted ? furi_string_get_cstr(fitted) : model->text.text);
+        if(fitted) furi_string_free(fitted);
     }
 }
 
@@ -136,6 +168,7 @@ Popup* popup_alloc(void) {
             model->text.y = 0;
             model->text.horizontal = AlignLeft;
             model->text.vertical = AlignBottom;
+            model->text_width = 0;
 
             model->icon.x = 0;
             model->icon.y = 0;
@@ -243,6 +276,15 @@ void popup_disable_timeout(Popup* popup) {
     popup->timer_enabled = false;
 }
 
+void popup_set_text_width(Popup* popup, uint8_t width) {
+    furi_check(popup);
+    with_view_model(
+        popup->view,
+        PopupModel * model,
+        { model->text_width = width > 128 ? 128 : width; },
+        true);
+}
+
 void popup_reset(Popup* popup) {
     furi_check(popup);
 
@@ -253,6 +295,7 @@ void popup_reset(Popup* popup) {
             memset(&model->header, 0, sizeof(model->header));
             memset(&model->text, 0, sizeof(model->text));
             memset(&model->icon, 0, sizeof(model->icon));
+            model->text_width = 0;
         },
         false);
     popup->callback = NULL;

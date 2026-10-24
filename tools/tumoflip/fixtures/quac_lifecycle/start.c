@@ -110,6 +110,7 @@ static void subghz_transmitter_free(void* t) {
         free(t);
     }
 }
+static void subghz_transmitter_stop(void* t) { assert(t); }
 static void subghz_txrx_idle(SubGhzTxRx* t) {
     t->txrx_state = SubGhzTxRxStateIDLE;
 }
@@ -126,7 +127,7 @@ int main(int argc, char** argv) {
     SubGhzTxRx txrx = {.preset = &preset, .txrx_state = SubGhzTxRxStateSleep};
     FlipperFormat data = 0;
     SubGhzTxRxStartTxState result = subghz_txrx_tx_start(&txrx, &data);
-    bool valid = is("success");
+    bool valid = is("success") || is("repeat"); // No synthetic Repeat=200 update any more.
     REQUIRE((result == SubGhzTxRxStartTxStateOk) == valid);
     REQUIRE(broker_async == (valid ? 1U : 0U));
     REQUIRE(async_calls == (valid || is("async-failure") ? 1U : 0U));
@@ -134,6 +135,6 @@ int main(int argc, char** argv) {
     REQUIRE(saves == 0 && strings == 0);
     if(valid) subghz_transmitter_free(txrx.transmitter);
     REQUIRE(
-        frees == (is("no-encoder") || is("rewind") || is("protocol") || is("repeat") ? 0U : 1U));
+        frees == (is("no-encoder") || is("rewind") || is("protocol") ? 0U : 1U));
     return 0;
 }

@@ -63,7 +63,7 @@ class QuacLifecycleTest(unittest.TestCase):
             "subghz": (
                 "actions/action_subghz.c",
                 (
-                    "action_subghz_raw_end_callback",
+                    "quac_action_wait_tx",
                     "action_subghz_tx",
                 ),
             ),
@@ -259,7 +259,7 @@ class QuacLifecycleTest(unittest.TestCase):
         self.run_cases("start", ("rewind", "protocol", "repeat", "preset", "preset-missing", "frequency"))
 
     def test_safety_patch_identity_and_ci_gates(self):
-        self.assertIn('fap_version="0.12.0"', (QUAC / "application.fam").read_text())
+        self.assertIn('fap_version="0.12.1"', (QUAC / "application.fam").read_text())
         for workflow in ("pr-build.yml", "release.yml"):
             text = (ROOT / ".github/workflows" / workflow).read_text()
             self.assertTrue(

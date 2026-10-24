@@ -109,6 +109,10 @@ void subghz_txrx_rx_start(SubGhzTxRx* instance);
  */
 void subghz_txrx_stop(SubGhzTxRx* instance);
 
+bool subghz_txrx_tx_is_complete(SubGhzTxRx* instance);
+
+void subghz_txrx_reset_dynamic_and_custom_btns(SubGhzTxRx* instance);
+
 /**
  * Set sleep mode CC1101
  * 

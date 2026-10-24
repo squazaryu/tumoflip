@@ -15,10 +15,11 @@ class QuacDurationTest(unittest.TestCase):
         self.assertGreaterEqual(playlist.count("quac_duration_parse("), 5)
         self.assertNotIn("furi_delay_ms(pause_length)", playlist)
 
-    def test_raw_wait_has_cancellation_and_keeps_callback_alive_until_stop(self):
+    def test_raw_wait_has_cancellation_without_late_completion_callbacks(self):
         source = (QUAC / "actions/action_subghz.c").read_text()
-        self.assertIn("quac_action_wait_complete(context)", source)
-        self.assertIn("quac_action_wait_run(wait, FuriWaitForever)", source)
+        self.assertIn("quac_action_wait_run(wait, 5)", source)
+        self.assertIn("subghz_txrx_tx_is_complete(txrx)", source)
+        self.assertNotIn("subghz_txrx_set_raw_file_encoder_worker_callback_end(", source)
         self.assertGreater(source.index("quac_action_wait_free(wait)"), source.index("subghz_txrx_stop(txrx)"))
 
     def test_strict_duration_boundaries(self):

@@ -49,11 +49,17 @@ class HotplugAssetsTests(unittest.TestCase):
 enum { ColorBlack,FontPrimary,FontSecondary };
 typedef struct { const char* text;int x,y,horizontal,vertical; } TextElement;
 typedef struct { int x,y;void* icon; } IconElement;
-typedef struct { TextElement header,text;IconElement icon; } PopupModel;
+typedef struct { TextElement header,text;IconElement icon;uint8_t text_width; } PopupModel;
 typedef struct { void* view;void* callback;void* context;bool timer_enabled;int timer_period_in_ms; } Popup;
 typedef struct { Popup* popup;void* widget;void* notifications; } NfcApp;
 typedef int Canvas;
 static int icons,texts,widget_resets,sequence_reset_green;
+// Bounded rendering has its own native-font fixture; this regression exercises
+// the legacy width-zero reuse path after reset, not font measurement.
+typedef const char FuriString;
+static FuriString* popup_fit_text(Canvas* c,const char* t,uint8_t w){(void)c;(void)w;return t;}
+static const char* furi_string_get_cstr(FuriString* s){return s;}
+static void furi_string_free(FuriString* s){(void)s;}
 static void canvas_clear(Canvas* c) { (void)c; }
 static void canvas_set_color(Canvas* c,int v) { (void)c;(void)v; }
 static void canvas_set_font(Canvas* c,int v) { (void)c;(void)v; }
@@ -65,12 +71,12 @@ static void widget_reset(void* w) { (void)w;widget_resets++; }
 static void notification_message_block(void* n,void* s) { (void)n;(void)s; }
 """ + production + r"""
 int main(void) {
- PopupModel m={.header={.text="Parsing"},.icon={12,23,(void*)1}};
+ PopupModel m={.header={.text="Parsing"},.icon={12,23,(void*)1},.text_width=64};
  Popup p={.view=&m,.callback=(void*)1,.context=(void*)1,.timer_enabled=true,.timer_period_in_ms=100};
  NfcApp app={.popup=&p};Canvas c=0;
  popup_view_draw_callback(&c,&m);assert(icons==1);
  nfc_protocol_support_scene_read_success_on_exit(&app);
- assert(widget_resets==1 && !p.callback && !p.context && !p.timer_enabled);
+ assert(widget_resets==1 && !p.callback && !p.context && !p.timer_enabled && m.text_width==0);
  m.header.text="Keys Saved";m.text.text="New keys: 2\nAlready known: 3";
  icons=texts=0;popup_view_draw_callback(&c,&m);assert(icons==0 && texts==2);
  m.header.text="Field is on";icons=0;popup_view_draw_callback(&c,&m);assert(icons==0);

@@ -142,6 +142,11 @@ jobs:
           python3 tools/tumoflip/test_subghz_raw_worker_startup.py
           python3 tools/tumoflip/test_analyzer_notification_ownership.py
 
+      - name: Validate safe storage, RFID timing and Remote frame completion
+        run: |
+          python3 -m pip install --user Pillow heatshrink2==0.13.0
+          python3 -m unittest tools.tumoflip.test_fatfs_fragmentation tools.tumoflip.test_lfrfid_write_fill tools.tumoflip.test_fdx_b_134 tools.tumoflip.test_rfid_ui_updates tools.tumoflip.test_subremote_lifecycle tools.tumoflip.test_quac_hold
+
       - name: Validate Wardriving lazy RX lifecycle
         shell: bash
         run: |
