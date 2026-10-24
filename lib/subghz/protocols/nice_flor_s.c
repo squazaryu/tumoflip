@@ -189,28 +189,30 @@ static uint16_t nice_flor_s_counter_next(uint32_t* plain, bool o_code) {
     const int32_t step = furi_hal_subghz_get_rolling_counter_mult();
     const bool normal = (nice_flors_counter_mode == 0 || bypass) &&
                         (step != -0x7FFFFFFF || bypass);
-    uint32_t count = *plain;
-    if(o_code && !normal) count = subghz_protocol_nice_o_cnt_swap(count);
     if(normal) {
         bypass = false;
-        if(!subghz_block_generic_global_counter_override_get(&count)) {
-            count += step;
-            if(count > 0xFFFFU) count = 0;
+        if(!subghz_block_generic_global_counter_override_get(plain)) {
+            *plain += step;
+            if(*plain > 0xFFFFU) *plain = 0;
         }
-    } else if(nice_flors_counter_mode == 0) {
-        if(count == 0xFFFFU)
-            count = 0;
-        else if(count && count != 0xFFFEU)
-            count = 0xFFFEU;
-        else
-            count++;
-    } else if(nice_flors_counter_mode == 1) {
-        count = count == 0xFFFEU ? 1 : 0xFFFEU;
     } else {
-        count = count ? 0 : 1;
+        // Plain representations of the four literal wire states 0,1,FFFE,FFFF.
+        // A tiny table avoids two run-time permutations and preserves all modes.
+        static const uint16_t states[2][4] = {
+            {0x0000, 0x0001, 0xFFFE, 0xFFFF},
+            {0x1249, 0x1248, 0xB6DA, 0xB6DB},
+        };
+        const uint16_t* state = states[o_code];
+        if(nice_flors_counter_mode == 0)
+            *plain = *plain == state[3] ? state[0] :
+                     *plain == state[0] ? state[1] :
+                     *plain == state[2] ? state[3] : state[2];
+        else if(nice_flors_counter_mode == 1)
+            *plain = *plain == state[2] ? state[1] : state[2];
+        else
+            *plain = *plain == state[0] ? state[1] : state[0];
     }
-    *plain = o_code && !normal ? subghz_protocol_nice_o_cnt_swap(count) : count;
-    return o_code && normal ? subghz_protocol_nice_o_cnt_swap(count) : count;
+    return o_code ? subghz_protocol_nice_o_cnt_swap(*plain) : *plain;
 }
 
 static void subghz_protocol_encoder_nice_flor_s_get_upload(
