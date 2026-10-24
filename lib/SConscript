@@ -49,6 +49,7 @@ libs = env.BuildModules(
         "usb_mass_storage",
         "tumoflip_device_services",
         "signal_file",
+        "fap_metadata",
     ],
 )
 

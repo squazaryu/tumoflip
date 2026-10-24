@@ -87,7 +87,7 @@ int main(int argc,char** argv){
             (work / "test.c").write_text(fixture)
             result = subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
                 "-fsanitize=address,undefined", "-I", str(APP), str(work / "test.c"),
-                str(APP / "arf_elf_metadata.c"), "-o", str(work / "test")], text=True, capture_output=True)
+                str(ROOT / "lib/fap_metadata/fap_metadata.c"), "-o", str(work / "test")], text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             result = subprocess.run([str(work / "test")], text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)

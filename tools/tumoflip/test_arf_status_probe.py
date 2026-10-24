@@ -10,7 +10,8 @@ APP = ROOT / "applications_user/arf_tools"
 class ArfStatusProbeTests(unittest.TestCase):
     def test_manifest_only_probe_and_explicit_unknown_integrity(self):
         def strip(name):
-            return "\n".join(line for line in (APP / name).read_text().splitlines()
+            path = ROOT / "lib/fap_metadata/fap_metadata.h" if name == "arf_elf_metadata.h" else APP / name
+            return "\n".join(line for line in path.read_text().splitlines()
                              if not line.startswith(("#include", "#pragma")))
         source = strip("arf_file_probe.c")
         self.assertNotIn("flipper_application_preload", source)
