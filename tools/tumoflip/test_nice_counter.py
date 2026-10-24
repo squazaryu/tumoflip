@@ -1,5 +1,6 @@
 """Plain O-Code counters at existing cipher boundaries; no radio or key search."""
 from pathlib import Path
+import os
 import unittest
 from tools.tumoflip.test_hotplug_assets import function
 from tools.tumoflip.test_nfc_completion_equality import native
@@ -9,12 +10,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def counter_header():
     header = ROOT / "lib/subghz/protocols/nice_o_counter.h"
-    return header.read_text() if header.exists() else ""
+    return header.read_text().replace("#pragma once", "") if header.exists() else ""
 
 
 class NiceCounterTests(unittest.TestCase):
     def test_actual_decoder_and_generator_use_plain_counts_and_preserve_old_keys(self):
-        source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
+        source = Path(os.environ.get("TUMO_NICE_SOURCE", ROOT / "lib/subghz/protocols/nice_flor_s.c")).read_text()
         native(r'''
 #include <assert.h>
 #include <stdint.h>
@@ -37,7 +38,7 @@ static uint16_t oracle(uint16_t count){
 int main(void){
  uint16_t count=0;uint32_t serial=0;uint8_t button=0;
  // Existing saved Key bytes must be read as-is, not rewritten or double-converted.
- const uint64_t saved=0x2d0123450006ULL;
+ const uint64_t saved=0x2d012345124eULL;
  assert(subghz_protocol_nice_o_decrypt(saved,0x1234,"fixture",&serial,&count,&button));
  assert(count==2); // Raw +1 used to move this counter by the wrong number of presses.
  for(uint32_t n=0;n<=65535;n++){
