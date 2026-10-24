@@ -92,6 +92,9 @@ bool library_pins_save(Storage* storage, const LibraryPins* pins) {
         e->generation = newest < 0 ? 1 : gen[newest] + 1;
         e->pins = *pins;
         if(!mbedtls_sha256((const uint8_t*)e, offsetof(PinEnvelope, checksum), e->checksum, 0)) {
+            const uint32_t generation = e->generation;
+            uint8_t expected[sizeof(e->checksum)];
+            memcpy(expected, e->checksum, sizeof(expected));
             FuriString* path = furi_string_alloc_printf(LIBRARY_PIN_DIR "/%u.pins", slot);
             FS_Error removed = storage_common_remove(storage, furi_string_get_cstr(path));
             if(removed == FSE_OK || removed == FSE_NOT_EXIST) {
@@ -102,7 +105,9 @@ bool library_pins_save(Storage* storage, const LibraryPins* pins) {
                      storage_file_sync(file);
                 if(created) ok = storage_file_close(file) && ok;
                 storage_file_free(file);
-                if(ok) ok = pins_read(storage, slot, e) == PinValid;
+                if(ok)
+                    ok = pins_read(storage, slot, e) == PinValid && e->generation == generation &&
+                         !memcmp(expected, e->checksum, sizeof(expected));
                 if(!ok && created) storage_common_remove(storage, furi_string_get_cstr(path));
             }
             furi_string_free(path);

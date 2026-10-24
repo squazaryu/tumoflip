@@ -125,6 +125,9 @@ bool library_card_save(Storage* storage, const DeviceCard* card) {
         e->card = *card;
         if(mbedtls_sha256((const uint8_t*)e, offsetof(CardEnvelope, checksum), e->checksum, 0))
             break;
+        const uint32_t generation = e->generation;
+        uint8_t expected[sizeof(e->checksum)];
+        memcpy(expected, e->checksum, sizeof(expected));
         furi_string_printf(path, LIBRARY_CARDS "/%s/%u.card", card->name, slot);
         FS_Error removed = storage_common_remove(storage, furi_string_get_cstr(path));
         if(removed != FSE_OK && removed != FSE_NOT_EXIST) break;
@@ -135,7 +138,9 @@ bool library_card_save(Storage* storage, const DeviceCard* card) {
              storage_file_sync(file);
         if(created) ok = storage_file_close(file) && ok;
         storage_file_free(file);
-        if(ok) ok = card_read(storage, card->name, slot, e);
+        if(ok)
+            ok = card_read(storage, card->name, slot, e) && e->generation == generation &&
+                 !memcmp(expected, e->checksum, sizeof(expected));
         if(!ok && created) storage_common_remove(storage, furi_string_get_cstr(path));
     } while(false);
     free(e);
