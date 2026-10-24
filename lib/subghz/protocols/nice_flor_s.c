@@ -1,5 +1,6 @@
 #include "nice_flor_s.h"
 #include "public_api.h"
+#include "nice_o_counter.h"
 
 #include "../blocks/const.h"
 #include "../blocks/decoder.h"
@@ -213,6 +214,14 @@ static void subghz_protocol_encoder_nice_flor_s_get_upload(
     // if we change counter/button in SignalSettings menu then we must bypass counter_modes, just gen and save signal file.
     if(subghz_block_generic_global.cnt_need_override) bypass = true;
 
+    // Special modes pin literal on-air values. Preserve those semantics while
+    // keeping the shared/editor counter plain between calls.
+    const bool cnt_literal =
+        instance->o_code &&
+        !((nice_flors_counter_mode == 0 || bypass) &&
+          (furi_hal_subghz_get_rolling_counter_mult() != -0x7FFFFFFF || bypass));
+    if(cnt_literal) instance->generic.cnt = subghz_protocol_nice_o_cnt_swap(instance->generic.cnt);
+
     if(nice_flors_counter_mode == 0 || bypass) {
         // Check for OFEX (overflow experimental) mode
         if(furi_hal_subghz_get_rolling_counter_mult() != -0x7FFFFFFF || bypass) {
@@ -253,7 +262,11 @@ static void subghz_protocol_encoder_nice_flor_s_get_upload(
         }
     }
 
+    if(cnt_literal) instance->generic.cnt = subghz_protocol_nice_o_cnt_swap(instance->generic.cnt);
+
     const bool o_code = instance->o_code;
+    const uint16_t air_count = o_code ? subghz_protocol_nice_o_cnt_swap(instance->generic.cnt) :
+                                       (uint16_t)instance->generic.cnt;
     uint64_t decrypt = ((uint64_t)instance->generic.serial << 16) | instance->generic.cnt;
     uint64_t enc_part = subghz_protocol_nice_flor_s_encrypt(decrypt, file_name);
 
@@ -267,7 +280,7 @@ static void subghz_protocol_encoder_nice_flor_s_get_upload(
             subghz_protocol_nice_o_mask((uint8_t)i, &mask_32, &mask_16);
             uint64_t plain =
                 ((uint64_t)((instance->generic.serial ^ mask_32) & 0x0FFFFFFFu) << 16) |
-                instance->generic.cnt;
+                air_count;
             enc_part = subghz_protocol_nice_flor_s_encrypt_ic(
                 plain, (uint16_t)(instance->ic ^ mask_16), file_name);
         }
@@ -686,7 +699,7 @@ static bool subghz_protocol_nice_o_decrypt(
         subghz_protocol_nice_flor_s_decrypt_ic(data, (uint16_t)(ic ^ mask_16), file_name);
     if(decrypted == SUBGHZ_NO_NICE_FLOR_S_RAINBOW_TABLE) return false;
 
-    if(cnt) *cnt = (uint16_t)decrypted;
+    if(cnt) *cnt = subghz_protocol_nice_o_cnt_swap((uint16_t)decrypted);
     if(serial) *serial = (uint32_t)((decrypted >> 16) ^ mask_32) & 0x0FFFFFFFu;
     if(btn) *btn = (uint8_t)((data >> 48) & 0x0Fu);
     return true;
@@ -708,7 +721,8 @@ static bool subghz_protocol_nice_o_make_data(
     uint16_t mask_16 = 0;
     subghz_protocol_nice_o_mask(parcel, &mask_32, &mask_16);
 
-    const uint64_t plain = ((uint64_t)((serial ^ mask_32) & 0x0FFFFFFFu) << 16) | cnt;
+    const uint64_t plain = ((uint64_t)((serial ^ mask_32) & 0x0FFFFFFFu) << 16) |
+                           subghz_protocol_nice_o_cnt_swap(cnt);
     const uint64_t encrypted =
         subghz_protocol_nice_flor_s_encrypt_ic(plain, (uint16_t)(ic ^ mask_16), file_name);
     if(encrypted == SUBGHZ_NO_NICE_FLOR_S_RAINBOW_TABLE) return false;

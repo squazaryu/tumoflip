@@ -29,6 +29,7 @@
 #include <lib/subghz/protocols/protocol_items.h>
 #include <lib/subghz/protocols/nice_flor_s.h>
 #include <lib/subghz/protocols/public_api.h>
+#include <lib/subghz/protocols/nice_o_counter.h>
 #include <lib/subghz/blocks/generic.h>
 #include <lib/subghz/devices/devices.h>
 #include <lib/subghz/devices/cc1101_int/cc1101_int_interconnect.h>
@@ -663,7 +664,8 @@ static bool nice_o_save(NiceOCode* app) {
                                  subghz_protocol_nice_o_create_data;
         ok = create(
             subghz_transmitter_get_protocol_instance(tx), fff, app->serial,
-            (app->keys[0] >> 48) & 0xF, (uint16_t)decoded, app->ic, &preset);
+            (app->keys[0] >> 48) & 0xF, subghz_protocol_nice_o_cnt_swap((uint16_t)decoded),
+            app->ic, &preset);
         /* Analysis-only metadata: deliberately not the upstream enrollment keys. */
         if(ok && app->certificate_known) {
             uint8_t certificate[3] = {
