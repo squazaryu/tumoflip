@@ -15,7 +15,7 @@ class WalletMenuTests(unittest.TestCase):
         model = "\n".join(re.sub(r"^#(?:include|pragma).*\n", "", (APP / name).read_text(), flags=re.M)
                           for name in ("library_model.h", "library_model.c"))
         enums = source[source.index("enum {"):source.index("typedef struct {")]
-        pinned = function(source, "static void library_pinned(") if "static void library_pinned(" in source else "static void library_pinned(Library*a,bool b){(void)a;(void)b;}"
+        pinned = function(source, "static void library_pinned(") if "static void library_pinned(" in source else "static void __attribute__((unused)) library_pinned(Library*a,bool b){(void)a;(void)b;}"
         native(r'''
 #include <assert.h>
 #include <stdint.h>
@@ -40,7 +40,7 @@ static bool library_history_load(Library*a){(void)a;return false;}
 static bool file_history_core_available(void){return false;}
 static int storage_common_stat(void*s,const char*p,void*i){(void)s;(void)p;(void)i;return FSE_NOT_EXIST;}
 static void view_dispatcher_switch_to_view(void*d,unsigned id){(void)d;(void)id;}
-''' + pinned + "\n" + function(source, "static void library_show(") + r'''
+''' + pinned + "\n" + function(source, "static void library_show(Library* app, LibraryPage page) {") + r'''
 int main(void){
  Submenu m={0};Library a={.menu=&m,.card={.name="Garage",.link_count=2}};
  strcpy(a.card.links[0],"/ext/nfc/Pass.nfc");strcpy(a.card.links[1],"/ext/lfrfid/Entry.rfid");strcpy(a.card.labels[0],"Pass");strcpy(a.card.labels[1],"Entry");
