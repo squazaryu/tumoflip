@@ -1,4 +1,5 @@
 #include "../lfrfid_i.h"
+#include <toolbox/path.h>
 
 // Set once a warning popup (cannot-write / still-trying) is shown, so later write-progress
 // events stop overwriting its message and layout.
@@ -30,21 +31,24 @@ static void lfrfid_write_callback(LFRFIDWorkerWriteResult result, void* context)
     view_dispatcher_send_custom_event(app->view_dispatcher, event);
 }
 
-// Compose the "Writing" popup text: "[<proto>]\n<source>", with "\n(<target>)" appended while a
+// Compose the "Writing" popup text: "<proto>\n<source>", with "\n(<target>)" appended while a
 // specific chip is being attempted. <source> is the file name, or "Unsaved Tag" when there is no
 // file (mid-attempt with no file, only the protocol and target are shown - no source line).
 static void lfrfid_scene_write_set_status(LfRfid* app, const char* target) {
     const char* proto = protocol_dict_get_name(app->dict, app->protocol_id);
     const char* file = furi_string_empty(app->file_name) ? NULL :
                                                            furi_string_get_cstr(app->file_name);
+    // The secondary LCD font has no full Unicode coverage. Keep the real path
+    // untouched and show a readable fallback rather than invisible glyphs.
+    if(file && !path_contains_only_ascii(file)) file = "Saved Tag";
     if(file && target) {
-        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "[%s]\n%s\n(%s)", proto, file, target);
+        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "%s\n%s\n(%s)", proto, file, target);
     } else if(file) {
-        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "[%s]\n%s", proto, file);
+        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "%s\n%s", proto, file);
     } else if(target) {
-        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "[%s]\n(%s)", proto, target);
+        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "%s\n(%s)", proto, target);
     } else {
-        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "[%s]\nUnsaved Tag", proto);
+        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "%s\nUnsaved Tag", proto);
     }
     popup_set_text(app->popup, app->text_store, 94, 14, AlignCenter, AlignTop);
 }

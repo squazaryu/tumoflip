@@ -54,6 +54,7 @@ static void popup_set_icon(Popup* p,uint8_t x,uint8_t y,const Icon* i){((PopupMo
 typedef struct {void* dict;int protocol_id;FuriString* file_name;char text_store[128];Popup* popup;} LfRfid;
 static const char* protocol_dict_get_name(void* dict,int protocol){(void)protocol;return dict;}
 '''
+    code += native.function((ROOT / "lib/toolbox/path.c").read_text(), "bool path_contains_only_ascii(") + "\n"
     code += native.function(write, "static void lfrfid_scene_write_set_status(") + "\n"
     code += (ROOT / "applications/main/lfrfid/views/lfrfid_view_read.h").read_text().replace("#pragma once", "").replace("#include <gui/view.h>", "")
     code += "typedef struct {IconAnimation* icon;LfRfidReadViewMode read_mode;} LfRfidReadViewModel;\n"
