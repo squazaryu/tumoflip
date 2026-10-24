@@ -9,6 +9,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def counter_header():
+    # A baseline source predates this private header. Do not introduce an unused
+    # new helper into that reproducer: its failure must be the old counter value.
+    if os.environ.get("TUMO_NICE_SOURCE"):
+        return ""
     header = ROOT / "lib/subghz/protocols/nice_o_counter.h"
     return header.read_text().replace("#pragma once", "") if header.exists() else ""
 
