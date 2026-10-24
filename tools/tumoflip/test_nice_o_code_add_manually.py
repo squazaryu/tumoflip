@@ -60,7 +60,7 @@ class NiceOCodeAddManuallyTest(unittest.TestCase):
         self.assertRegex(protocol, re.compile(r"subghz_protocol_nice_o_create_data\([\s\S]+?\n}"))
         self.assertIn('flipper_format_insert_or_update_hex(flipper_format, "IC"', protocol)
         self.assertIn("SUBGHZ_NO_NICE_FLOR_S_RAINBOW_TABLE", protocol)
-        self.assertEqual(symbols.splitlines()[1], "Version,+,88.21,,")
+        self.assertEqual(symbols.splitlines()[1], "Version,+,88.22,,")
         self.assertIn("subghz_protocol_nice_o_create_data", symbols)
         self.assertIn("SUBGHZ_FEATURE_PLUGIN_API_VERSION 1003", plugin_api)
 
