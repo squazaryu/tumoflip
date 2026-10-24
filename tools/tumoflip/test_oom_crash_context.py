@@ -7,17 +7,6 @@ from tools.tumoflip.test_crash_journal import RTC_STUB, HARNESS
 from tools.tumoflip.test_subremote_lifecycle import function
 
 ROOT = Path(__file__).resolve().parents[2]
-EXTRA_REGISTERS = """
-    FuriHalRtcRegisterTumoflipOOMMarker,
-    FuriHalRtcRegisterTumoflipOOMRequested,
-    FuriHalRtcRegisterTumoflipOOMFree,
-    FuriHalRtcRegisterTumoflipOOMLargest,
-    FuriHalRtcRegisterTumoflipOOMTicks,
-    FuriHalRtcRegisterTumoflipOOMThread0,
-    FuriHalRtcRegisterTumoflipOOMThread1,
-    FuriHalRtcRegisterTumoflipOOMThread2,
-    FuriHalRtcRegisterTumoflipOOMChecksum,
-"""
 STUB = RTC_STUB
 PREAMBLE = HARNESS[:HARNESS.index("int main(void)")]
 
@@ -54,15 +43,14 @@ int main(void){
  tumoflip_runtime_format_crash(output,sizeof(output));
  assert(!strcmp(output,"schema=1;status=none"));
  TumoflipOOMContext context={.requested=UINT32_MAX,.free_heap=UINT32_MAX,
-  .largest_block=UINT32_MAX,.tick_ms=UINT32_MAX,.thread="BtSrv1234567"};
- tumoflip_crash_journal_record(TumoflipCrashKindOutOfMemory,"abcdef12");
- tumoflip_crash_journal_attach_oom(&context);
+  .largest_block=UINT32_MAX,.uptime_s=0x0fffffff,.thread="BtSrv123"};
+ tumoflip_crash_journal_record_oom("abcdef12",&context);
  tumoflip_runtime_format_crash(output,sizeof(output));
  // Existing Companion accepts only the old kind vocabulary, but ignores optional fields.
  assert(strstr(output,"kind=other;")&&strstr(output,"reason=oom;"));
- assert(strstr(output,"thread=BtSrv1234567;")&&strstr(output,"req=4294967295;"));
+ assert(strstr(output,"thread=BtSrv123;")&&strstr(output,"req=4294967295;"));
  assert(strstr(output,"free=4294967295;")&&strstr(output,"largest=4294967295;"));
- assert(strstr(output,"tick_ms=4294967295"));
+ assert(strstr(output,"uptime_s=268435455"));
  assert(strlen(output)<sizeof(output)&&strlen(output)<=209);
  for(unsigned size=0;size<192;size++){
   unsigned char buffer[194];memset(buffer,0xA5,sizeof(buffer));
@@ -70,12 +58,15 @@ int main(void){
   assert(buffer[0]==0xA5&&buffer[size+1]==0xA5);
   if(size){assert(memchr(&buffer[1],0,size));
    const char* s=(const char*)&buffer[1];
-   if(strstr(s,"reason="))assert(strstr(s,"tick_ms=4294967295"));
+   if(strstr(s,"thread="))assert(strstr(s,"uptime_s=268435455"));
   }
  }
  tumoflip_crash_journal_record(TumoflipCrashKindNullPointer,"abcdef12");
  tumoflip_runtime_format_crash(output,sizeof(output));
  assert(strstr(output,"kind=null_pointer;")&&!strstr(output,"reason="));
+ tumoflip_crash_journal_record(TumoflipCrashKindOutOfMemory,"abcdef12");
+ tumoflip_runtime_format_crash(output,sizeof(output));
+ assert(strstr(output,"reason=oom")&&!strstr(output,"req="));
  return 0;
 }
 ''')
@@ -85,6 +76,7 @@ int main(void){
                            "__furi_crash_oom")
         native(PREAMBLE + r'''
 #include <setjmp.h>
+#define configTICK_RATE_HZ 1000
 static jmp_buf failed;
 static bool irq_disabled;
 static TumoflipOOMContext __furi_oom_context;
@@ -98,11 +90,10 @@ static const char* pcTaskGetName(void* p){assert(!p);return "BtSrv;payload";}
 int main(void){
  if(!setjmp(failed))__furi_crash_oom(123456);
  assert(__furi_oom_context.requested==123456&&__furi_oom_context.free_heap==114672);
- assert(__furi_oom_context.largest_block==113448&&__furi_oom_context.tick_ms==UINT32_MAX);
- tumoflip_crash_journal_record(TumoflipCrashKindOutOfMemory,"abcdef12");
- tumoflip_crash_journal_attach_oom(&__furi_oom_context);
+ assert(__furi_oom_context.largest_block==113448&&__furi_oom_context.uptime_s==UINT32_MAX/1000);
+ tumoflip_crash_journal_record_oom("abcdef12",&__furi_oom_context);
  TumoflipCrashReport report;assert(tumoflip_crash_journal_read(&report));
- assert(report.has_oom_context&&!strcmp(report.oom.thread,"BtSrv_payloa"));return 0;
+ assert(report.has_oom_context&&!strcmp(report.oom.thread,"BtSrv_pa"));return 0;
 }
 ''')
 
@@ -121,32 +112,33 @@ int main(void){
 int main(void){
  TumoflipCrashReport report;
  TumoflipOOMContext context={.requested=UINT32_MAX,.free_heap=114672,.largest_block=113448,
-                            .tick_ms=UINT32_MAX,.thread="BtSrv;payloa"};
+                            .uptime_s=0x0fffffff,.thread="BtSrv;pa"};
  // A legacy record remains readable with no invented allocation context.
  tumoflip_crash_journal_record(TumoflipCrashKindOther,"8aaa6856");
  assert(tumoflip_crash_journal_read(&report)&&!report.has_oom_context);
  tumoflip_crash_journal_set_active_app("owned-app","ddfbeb36");
- tumoflip_crash_journal_record(TumoflipCrashKindOutOfMemory,"ddfbeb36");
- tumoflip_crash_journal_attach_oom(&context);
+ tumoflip_crash_journal_record_oom("ddfbeb36",&context);
  assert(tumoflip_crash_journal_read(&report));
  assert(report.kind==TumoflipCrashKindOutOfMemory&&report.has_oom_context);
  assert(report.sequence==2&&!strcmp(report.app_id,"owned-app"));
  assert(report.oom.requested==UINT32_MAX&&report.oom.free_heap==114672);
- assert(report.oom.largest_block==113448&&report.oom.tick_ms==UINT32_MAX);
- assert(!strcmp(report.oom.thread,"BtSrv_payloa"));
+ assert(report.oom.largest_block==113448&&report.oom.uptime_s==0x0fffffff);
+ assert(!strcmp(report.oom.thread,"BtSrv_pa"));
  // Closing the popup/app must not erase the previous failure snapshot.
  tumoflip_crash_journal_clear_active_app();
  assert(tumoflip_crash_journal_read(&report)&&report.has_oom_context);
- for(unsigned reg=FuriHalRtcRegisterTumoflipOOMRequested;
-     reg<=FuriHalRtcRegisterTumoflipOOMChecksum;reg++){
+ tumoflip_crash_journal_set_active_app("new-app","ddfbeb36");
+ assert(tumoflip_crash_journal_read(&report)&&report.has_oom_context);
+ assert(!strcmp(report.app_id,"owned-app"));
+ for(unsigned reg=FuriHalRtcRegisterTumoflipCrashMeta;reg<20;reg++){
   registers[reg]^=1;
-  assert(tumoflip_crash_journal_read(&report)&&!report.has_oom_context);
+  assert(!tumoflip_crash_journal_read(&report));
   registers[reg]^=1;
  }
  // A later legacy/non-OOM crash cannot inherit stale OOM details.
  tumoflip_crash_journal_record(TumoflipCrashKindWatchdog,"ddfbeb36");
  assert(tumoflip_crash_journal_read(&report)&&!report.has_oom_context);
- tumoflip_crash_journal_attach_oom(NULL);
+ tumoflip_crash_journal_record_oom("ddfbeb36",NULL);
  assert(tumoflip_crash_journal_read(&report)&&!report.has_oom_context);
  tumoflip_crash_journal_ack();assert(!tumoflip_crash_journal_read(&report));
  return 0;

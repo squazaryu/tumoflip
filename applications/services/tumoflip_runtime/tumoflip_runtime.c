@@ -95,19 +95,34 @@ static void tumoflip_runtime_cli_print_snapshot(TumoflipRuntime* runtime) {
 }
 
 static void tumoflip_runtime_format_crash(char* output, size_t output_size) {
+    if(!output || !output_size) return;
     TumoflipCrashReport report;
     if(!tumoflip_crash_journal_read(&report)) {
         snprintf(output, output_size, "schema=1;status=none");
         return;
     }
-    snprintf(
+    int used = snprintf(
         output,
         output_size,
-        "schema=1;status=ok;kind=%s;app=%s;seq=%u;build=%08lX",
-        tumoflip_crash_journal_kind_name(report.kind),
+        "schema=1;status=ok;kind=%s;app=%s;seq=%u;build=%08lX%s",
+        report.kind == TumoflipCrashKindOutOfMemory ? "other" :
+                                                    tumoflip_crash_journal_kind_name(report.kind),
         report.app_id[0] ? report.app_id : "unknown",
         (unsigned)report.sequence,
-        (unsigned long)report.commit);
+        (unsigned long)report.commit,
+        report.kind == TumoflipCrashKindOutOfMemory ? ";reason=oom" : "");
+    if(used < 0 || (size_t)used >= output_size) {
+        output[0] = '\0';
+    } else if(report.has_oom_context) {
+        // Schema 1 clients accept `other` and ignore these optional fields.
+        int extra = snprintf(
+            output + used, output_size - used,
+            ";thread=%s;req=%lu;free=%lu;largest=%lu;uptime_s=%lu",
+            report.oom.thread[0] ? report.oom.thread : "unknown",
+            (unsigned long)report.oom.requested, (unsigned long)report.oom.free_heap,
+            (unsigned long)report.oom.largest_block, (unsigned long)report.oom.uptime_s);
+        if(extra < 0 || (size_t)extra >= output_size - used) output[used] = '\0';
+    }
 }
 
 static void tumoflip_runtime_crash_cli(PipeSide* pipe, FuriString* args, void* context) {
@@ -118,7 +133,7 @@ static void tumoflip_runtime_crash_cli(PipeSide* pipe, FuriString* args, void* c
     if(args_length(args) != 0U) {
         printf("CRASH schema=1;status=error;error=args\r\n");
     } else if(!has_verb || furi_string_cmp_str(verb, "show") == 0) {
-        char report[128];
+        char report[192];
         tumoflip_runtime_format_crash(report, sizeof(report));
         printf("CRASH %s\r\n", report);
     } else if(furi_string_cmp_str(verb, "clear") == 0) {
@@ -545,7 +560,7 @@ static void
         tumoflip_runtime_make_trace_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "trace", payload, false);
     } else if(strcmp(command, "crash_report") == 0) {
-        char report[128];
+        char report[192];
         tumoflip_runtime_format_crash(report, sizeof(report));
         tumoflip_runtime_reply(runtime, event->request_id, "crash_report", report, false);
     } else if(strcmp(command, "crash_ack") == 0) {
