@@ -13,7 +13,9 @@ FIXTURES = ROOT / "tools/tumoflip/fixtures"
 
 def storage_native(program):
     sources = [APP / "library_model.h", APP / "library_model.c", APP / "card_store.h",
-               APP / "card_store.c", APP / "pin_store.c"]
+               APP / "card_store.c", APP / "pin_store.c",
+               ROOT / "lib/fap_metadata/fap_metadata.h", ROOT / "lib/fap_metadata/fap_metadata.c",
+               APP / "wallet_launch.c"]
     body = '#include "library_io_stubs.h"\n'
     for source in sources:
         if source.exists():
@@ -37,6 +39,37 @@ def storage_native(program):
 
 
 class FieldWalletTests(unittest.TestCase):
+    def test_native_inspect_requires_the_matching_driver_without_executing_it(self):
+        storage_native(r'''
+bool library_native_inspect_ready(Storage*,LibraryFileKind);
+static uint8_t elf[512];
+static void p16(unsigned at,uint16_t n){elf[at]=n;elf[at+1]=n>>8;}
+static void p32(unsigned at,uint32_t n){p16(at,n);p16(at+2,n>>16);}
+static void app_file(Storage*s,const char*path,const char*name,uint32_t version,unsigned api,unsigned target){
+ memset(elf,0,sizeof(elf));memcpy(elf,"\177ELF\1\1\1",7);p16(16,1);p16(18,40);p32(20,1);p32(32,64);p16(40,52);p16(46,40);p16(48,3);p16(50,1);
+ p32(108,3);p32(120,256);p32(124,32);p32(144,1);p32(148,1);p32(160,320);p32(164,85);memcpy(elf+256,"\0.fapmeta\0",10);
+ p32(320,0x52474448);p32(324,1);p16(328,22);p16(330,api);p16(332,target);p32(336,version);memcpy(elf+340,name,strlen(name)+1);
+ storage_common_remove(s,path);File*f=storage_file_alloc(s);assert(storage_file_open(f,path,FSAM_WRITE,FSOM_CREATE_NEW));assert(storage_file_write(f,elf,sizeof(elf))==sizeof(elf));assert(storage_file_close(f));storage_file_free(f);
+}
+int main(int argc,char**argv){
+ assert(argc==2);Storage s={0};snprintf(s.root,sizeof(s.root),"%s",argv[1]);
+ assert(storage_simply_mkdir(&s,"/ext/apps"));assert(storage_simply_mkdir(&s,"/ext/apps/RFID"));assert(storage_simply_mkdir(&s,"/ext/apps/iButton"));
+ assert(!library_native_inspect_ready(&s,LibraryFileReference));assert(library_native_inspect_ready(&s,LibraryFileNfc));
+ assert(!library_native_inspect_ready(&s,LibraryFileRfid));
+ const char*rf="/ext/apps/RFID/lfrfid.fap";
+ app_file(&s,rf,"125 kHz RFID",0x10000,88,7);assert(!library_native_inspect_ready(&s,LibraryFileRfid));
+ app_file(&s,rf,"125 kHz RFID",0x10001,88,7);assert(library_native_inspect_ready(&s,LibraryFileRfid));
+ read_budget=1;assert(!library_native_inspect_ready(&s,LibraryFileRfid));read_budget=-1;
+ close_failure=true;assert(!library_native_inspect_ready(&s,LibraryFileRfid));close_failure=false;
+ app_file(&s,rf,"Wrong app",0x10001,88,7);assert(!library_native_inspect_ready(&s,LibraryFileRfid));
+ app_file(&s,rf,"125 kHz RFID",0x10001,88,8);assert(!library_native_inspect_ready(&s,LibraryFileRfid));
+ app_file(&s,rf,"125 kHz RFID",0x10001,87,7);assert(!library_native_inspect_ready(&s,LibraryFileRfid));
+ app_file(&s,"/ext/apps/iButton/ibutton.fap","iButton",0x10001,88,7);assert(library_native_inspect_ready(&s,LibraryFileIbutton));
+ sd_failure=true;assert(!library_native_inspect_ready(&s,LibraryFileIbutton));sd_failure=false;
+ return 0;
+}
+''')
+
     def test_labels_routes_pins_and_remove_never_rewrite_source_paths(self):
         storage_native(r'''
 int main(void){
