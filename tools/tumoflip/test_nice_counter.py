@@ -4,7 +4,7 @@ import os
 import unittest
 from tools.tumoflip.test_hotplug_assets import function
 from tools.tumoflip.test_nfc_completion_equality import native
-from tools.tumoflip.test_nice_raw_passive import nice_encoder_source
+from tools.tumoflip.test_nice_raw_passive import nice_encoder_source, nice_counter_source
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -14,11 +14,36 @@ def counter_header():
     # new helper into that reproducer: its failure must be the old counter value.
     if os.environ.get("TUMO_NICE_SOURCE"):
         return ""
-    header = (ROOT / "lib/subghz/protocols/public_api.h").read_text()
-    return function(header, "static inline uint16_t subghz_protocol_nice_o_cnt_swap(")
+    return nice_counter_source()
 
 
 class NiceCounterTests(unittest.TestCase):
+    def test_shared_optional_metadata_reader_preserves_legacy_and_error_semantics(self):
+        source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
+        native(r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+#define FURI_LOG_E(...) ((void)0)
+#define NICE_FLOR_S_IC_PLAIN 0xffff
+typedef struct{unsigned rewinds,fail_at;bool mode,has_ic;uint32_t value;uint16_t ic;}FlipperFormat;
+static uint8_t nice_flors_counter_mode;
+static bool flipper_format_rewind(FlipperFormat*f){return ++f->rewinds!=f->fail_at;}
+static bool flipper_format_read_uint32(FlipperFormat*f,const char*k,uint32_t*v,unsigned n){assert(!strcmp(k,"CounterMode")&&n==1);if(!f->mode)return false;*v=f->value;return true;}
+static bool flipper_format_read_hex(FlipperFormat*f,const char*k,uint8_t*v,unsigned n){assert(!strcmp(k,"IC")&&n==2);if(!f->has_ic)return false;v[0]=f->ic>>8;v[1]=f->ic;return true;}
+''' + function(source, "static bool nice_flor_s_read_modes(") + r'''
+int main(void){
+ uint16_t ic=0;bool o=true;FlipperFormat f={0};nice_flors_counter_mode=2;
+ assert(nice_flor_s_read_modes(&f,&ic,&o)&&ic==0xffff&&!o&&nice_flors_counter_mode==2&&f.rewinds==2);
+ f=(FlipperFormat){.mode=true,.value=257,.has_ic=true,.ic=0x1234};assert(nice_flor_s_read_modes(&f,&ic,&o)&&ic==0x1234&&o&&nice_flors_counter_mode==1);
+ f=(FlipperFormat){.has_ic=true,.ic=0xffff};assert(nice_flor_s_read_modes(&f,&ic,&o)&&ic==0xffff&&o);
+ for(unsigned at=1;at<=2;at++){f=(FlipperFormat){.fail_at=at};ic=42;o=true;assert(!nice_flor_s_read_modes(&f,&ic,&o)&&ic==42&&o);}
+ return 0;
+}
+''')
+
     def test_encoder_preserves_plain_variants_override_and_literal_modes(self):
         body = nice_encoder_source()
         body = body.replace("static uint8_t nice_flors_counter_mode;", "static uint8_t nice_flors_counter_mode;static int32_t mult=1;static bool overridden;static uint32_t override_count;")
