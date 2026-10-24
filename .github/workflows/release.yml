@@ -204,7 +204,9 @@ jobs:
           toolchain/x86_64-linux/bin/python3 tools/tumoflip/validate_subghz_feature_imports.py --nm toolchain/x86_64-linux/bin/arm-none-eabi-nm
 
       - name: Validate safe storage, RFID timing and Remote frame completion
-        run: python3 -m unittest tools.tumoflip.test_fatfs_fragmentation tools.tumoflip.test_lfrfid_write_fill tools.tumoflip.test_fdx_b_134 tools.tumoflip.test_rfid_ui_updates tools.tumoflip.test_subremote_lifecycle tools.tumoflip.test_quac_hold
+        run: |
+          python3 -m unittest tools.tumoflip.test_fatfs_fragmentation tools.tumoflip.test_lfrfid_write_fill tools.tumoflip.test_fdx_b_134 tools.tumoflip.test_rfid_ui_updates tools.tumoflip.test_subremote_lifecycle tools.tumoflip.test_quac_hold
+          python3 -m unittest tools.tumoflip.test_crash_journal tools.tumoflip.test_oom_crash_context
 
       - name: Validate real SCons distribution ordering
         run: toolchain/x86_64-linux/bin/python3 -m unittest tools.tumoflip.test_dist_order

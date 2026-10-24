@@ -86,6 +86,7 @@ static void __furi_print_register_info(void) {
 }
 
 static void __furi_print_stack_info(void) {
+    if(!xTaskGetCurrentTaskHandle()) return;
     furi_log_puts("\r\n\tstack watermark: ");
     __furi_put_uint32_as_text(uxTaskGetStackHighWaterMark(NULL) * 4);
 }
@@ -127,7 +128,7 @@ static void __furi_print_name(bool isr) {
         }
         furi_log_puts("] ");
     } else {
-        const char* name = pcTaskGetName(NULL);
+        const char* name = xTaskGetCurrentTaskHandle() ? pcTaskGetName(NULL) : NULL;
         if(name == NULL) {
             furi_log_puts("[main] ");
         } else {
@@ -146,7 +147,7 @@ FURI_NORETURN void __furi_crash_oom(size_t requested) {
     __furi_oom_context.free_heap = stats.xAvailableHeapSpaceInBytes;
     __furi_oom_context.largest_block = stats.xSizeOfLargestFreeBlockInBytes;
     __furi_oom_context.uptime_s = xTaskGetTickCount() / configTICK_RATE_HZ;
-    const char* name = pcTaskGetName(NULL);
+    const char* name = xTaskGetCurrentTaskHandle() ? pcTaskGetName(NULL) : NULL;
     strncpy(__furi_oom_context.thread, name ? name : "main", TUMOFLIP_CRASH_JOURNAL_THREAD_LENGTH);
     furi_crash("out of memory");
 }

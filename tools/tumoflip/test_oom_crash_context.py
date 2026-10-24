@@ -1,5 +1,8 @@
 """Native RTC OOM records, legacy-wire compatibility and crash-path ownership."""
 from pathlib import Path
+import json
+import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -19,18 +22,74 @@ def native(code, portable_fallback=False):
         result = subprocess.run([
             "cc", "-std=c11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
             "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
+            *(["-fprofile-instr-generate", "-fcoverage-mapping"] if os.environ.get("TUMO_OOM_COVERAGE_DIR") else []),
             *(["-U__BYTE_ORDER__", "-D__BYTE_ORDER__=__ORDER_BIG_ENDIAN__"] if portable_fallback else []),
             "-I", str(work), "-I", str(ROOT), "-I", str(ROOT / "lib"),
             str(work / "test.c"), str(ROOT / "furi/core/crash_journal.c"), "-o", str(work / "test"),
         ], capture_output=True, text=True)
         if result.returncode:
             raise AssertionError(result.stderr)
-        result = subprocess.run([str(work / "test")], capture_output=True, text=True)
+        result = subprocess.run([str(work / "test")], capture_output=True, text=True,
+                                env=dict(os.environ, LLVM_PROFILE_FILE=str(work / "test.profraw")))
         if result.returncode:
             raise AssertionError(result.stdout + result.stderr)
+        if directory := os.environ.get("TUMO_OOM_COVERAGE_DIR"):
+            target = Path(directory); target.mkdir(parents=True, exist_ok=True)
+            number = len(list(target.glob("*.profraw")))
+            shutil.copy2(work / "test.profraw", target / f"test-{number}.profraw")
+            shutil.copy2(work / "test", target / "last-test")
 
 
 class OomCrashContextTests(unittest.TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        if directory := os.environ.get("TUMO_OOM_COVERAGE_DIR"):
+            target = Path(directory)
+            subprocess.run(["xcrun", "llvm-profdata", "merge", "-sparse", *map(str, target.glob("*.profraw")),
+                            "-o", str(target / "total.profdata")], check=True, capture_output=True)
+            report = json.loads(subprocess.check_output([
+                "xcrun", "llvm-cov", "export", str(target / "last-test"),
+                "-instr-profile=" + str(target / "total.profdata"), "-summary-only"], text=True))
+            matched = [file for file in report["data"][0]["files"]
+                       if Path(file["filename"]) == ROOT / "furi/core/crash_journal.c"]
+            assert len(matched)==1
+            summary = {key: round(matched[0]["summary"][key]["percent"],2) for key in ("lines","regions")}
+            print("crash_journal production coverage:", summary)
+            assert min(summary.values())>=80, "Crash journal coverage below 80%"
+
+    def test_packed_heap_boundaries_and_all_legacy_kinds(self):
+        native(PREAMBLE + r'''
+int main(void){
+ static const uint32_t values[]={0,1,65535,65536,131071,187264,262142,262143,UINT32_MAX};
+ TumoflipCrashReport report;
+ for(unsigned i=0;i<sizeof(values)/sizeof(values[0]);i++)
+  for(unsigned j=0;j<sizeof(values)/sizeof(values[0]);j++){
+   TumoflipOOMContext context={.requested=123,.free_heap=values[i],.largest_block=values[j],.uptime_s=UINT32_MAX};
+   tumoflip_crash_journal_record_oom("abcdef12",&context);
+   assert(tumoflip_crash_journal_read(&report)&&report.has_oom_context);
+   assert(report.oom.free_heap==(values[i]>=262143?UINT32_MAX:values[i]));
+   assert(report.oom.largest_block==(values[j]>=262143?UINT32_MAX:values[j]));
+   assert(report.oom.uptime_s==0x0fffffff&&!report.oom.thread[0]);
+  }
+ const char* messages[]={"HardFault","NULL pointer dereference","MemManage 1","BusFault","UsageFault","StackOverflow","MPU fault 1"};
+ for(unsigned i=0;i<sizeof(messages)/sizeof(messages[0]);i++){
+  TumoflipCrashKind kind=tumoflip_crash_journal_classify(messages[i]);
+  assert(kind!=TumoflipCrashKindOther);assert(strcmp(tumoflip_crash_journal_kind_name(kind),"none"));
+ }
+ for(unsigned kind=0;kind<=8;kind++)assert(tumoflip_crash_journal_kind_name((TumoflipCrashKind)kind));
+ tumoflip_crash_journal_record(TumoflipCrashKindNone,NULL);
+ tumoflip_crash_journal_record((TumoflipCrashKind)255,"bad");
+ assert(!tumoflip_crash_journal_read(NULL));
+ const char* hashes[]={NULL,"","123","abcdef1","ABcdeF12","bad!bad!","00000000"};
+ for(unsigned i=0;i<sizeof(hashes)/sizeof(hashes[0]);i++){
+  tumoflip_crash_journal_set_active_app(NULL,hashes[i]);
+  tumoflip_crash_journal_record(TumoflipCrashKindOther,hashes[i]);
+  assert(tumoflip_crash_journal_read(&report)&&!report.app_id[0]);
+ }
+ return 0;
+}
+''')
+
     def test_name_bytes_match_legacy_little_endian_register_format(self):
         code = PREAMBLE + r'''
 int main(void){
@@ -123,11 +182,13 @@ int main(void){
 #define configTICK_RATE_HZ 1000
 static jmp_buf failed;
 static bool irq_disabled;
+static bool task_ready=true;
 static TumoflipOOMContext __furi_oom_context;
 typedef struct{size_t xAvailableHeapSpaceInBytes,xSizeOfLargestFreeBlockInBytes;}HeapStats_t;
 static void __disable_irq(void){irq_disabled=true;}
 static void vPortGetHeapStats(HeapStats_t* s){assert(irq_disabled);s->xAvailableHeapSpaceInBytes=114672;s->xSizeOfLargestFreeBlockInBytes=113448;}
 static uint32_t xTaskGetTickCount(void){return UINT32_MAX;}
+static void* xTaskGetCurrentTaskHandle(void){return task_ready?(void*)1:NULL;}
 static const char* pcTaskGetName(void* p){assert(!p);return "BtSrv;payload";}
 #define furi_crash(message) do{assert(!strcmp(message,"out of memory"));longjmp(failed,1);}while(0)
 ''' + capture + r'''
@@ -137,7 +198,10 @@ int main(void){
  assert(__furi_oom_context.largest_block==113448&&__furi_oom_context.uptime_s==UINT32_MAX/1000);
  tumoflip_crash_journal_record_oom("abcdef12",&__furi_oom_context);
  TumoflipCrashReport report;assert(tumoflip_crash_journal_read(&report));
- assert(report.has_oom_context&&!strcmp(report.oom.thread,"BtSrv_pa"));return 0;
+ assert(report.has_oom_context&&!strcmp(report.oom.thread,"BtSrv_pa"));
+ task_ready=false;
+ if(!setjmp(failed))__furi_crash_oom(65536);
+ assert(__furi_oom_context.requested==65536&&!strcmp(__furi_oom_context.thread,"main"));return 0;
 }
 ''')
 

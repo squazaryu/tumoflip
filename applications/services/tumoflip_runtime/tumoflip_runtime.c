@@ -24,7 +24,7 @@
 #define TUMOFLIP_RUNTIME_FABRIC_MAX         160U
 #define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX  24U
 #define TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
-#define TUMOFLIP_RUNTIME_CAPABILITIES                                       \
+#define TUMOFLIP_RUNTIME_CAPABILITIES                                            \
     "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;pkg=1;radio=2;sd=1;ld=1;" \
     "fabric=1;time=1;gps=1;net=1;feat=pkg,radio,trace,twin,transfer,fabric,time,gps,net"
 
@@ -105,8 +105,9 @@ static void tumoflip_runtime_format_crash(char* output, size_t output_size) {
         output,
         output_size,
         "schema=1;status=ok;kind=%s;app=%s;seq=%u;build=%08lX%s",
-        report.kind == TumoflipCrashKindOutOfMemory ? "other" :
-                                                    tumoflip_crash_journal_kind_name(report.kind),
+        report.kind == TumoflipCrashKindOutOfMemory ?
+            "other" :
+            tumoflip_crash_journal_kind_name(report.kind),
         report.app_id[0] ? report.app_id : "unknown",
         (unsigned)report.sequence,
         (unsigned long)report.commit,
@@ -116,11 +117,14 @@ static void tumoflip_runtime_format_crash(char* output, size_t output_size) {
     } else if(report.has_oom_context) {
         // Schema 1 clients accept `other` and ignore these optional fields.
         int extra = snprintf(
-            output + used, output_size - used,
+            output + used,
+            output_size - used,
             ";thread=%s;req=%lu;free=%lu;largest=%lu;uptime_s=%lu",
             report.oom.thread[0] ? report.oom.thread : "unknown",
-            (unsigned long)report.oom.requested, (unsigned long)report.oom.free_heap,
-            (unsigned long)report.oom.largest_block, (unsigned long)report.oom.uptime_s);
+            (unsigned long)report.oom.requested,
+            (unsigned long)report.oom.free_heap,
+            (unsigned long)report.oom.largest_block,
+            (unsigned long)report.oom.uptime_s);
         if(extra < 0 || (size_t)extra >= output_size - used) output[used] = '\0';
     }
 }
@@ -551,8 +555,8 @@ static void
         Loader* loader = furi_record_open(RECORD_LOADER);
         FuriString* diagnostic = furi_string_alloc();
         loader_get_last_diagnostic(loader, diagnostic);
-        tumoflip_runtime_reply(runtime, event->request_id, "loader_diag",
-                               furi_string_get_cstr(diagnostic), false);
+        tumoflip_runtime_reply(
+            runtime, event->request_id, "loader_diag", furi_string_get_cstr(diagnostic), false);
         furi_string_free(diagnostic);
         furi_record_close(RECORD_LOADER);
     } else if(strcmp(command, "trace") == 0) {
