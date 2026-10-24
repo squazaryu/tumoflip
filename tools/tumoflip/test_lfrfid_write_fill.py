@@ -87,7 +87,7 @@ int main(void){
         with tempfile.TemporaryDirectory(prefix="rfid-writer-equivalence-") as directory:
             work = Path(directory)
             (work / "test.c").write_text(body)
-            compiled = subprocess.run(["cc", "-std=c11", "-O1", "-g", "-fsanitize=address,undefined",
+            compiled = subprocess.run(["cc", "-std=c11", "-O1", "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
                                        str(work / "test.c"), "-o", str(work / "test")],
                                       capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)

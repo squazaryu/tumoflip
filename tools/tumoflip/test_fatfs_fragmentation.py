@@ -13,7 +13,7 @@ class FatFsFragmentationTests(unittest.TestCase):
             work = Path(directory)
             # Actual target configuration, codecs and ff.c; no host filesystem hooks.
             (work / "ffconf.h").write_bytes((ROOT / "targets/f7/fatfs/ffconf.h").read_bytes())
-            command = ["cc", "-std=c11", "-O1", "-g", "-fsanitize=address,undefined",
+            command = ["cc", "-std=c11", "-O1", "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
                        "-ftrivial-auto-var-init=pattern", "-I", str(work),
                        "-I", str(ROOT / "lib/fatfs"),
                        str(ROOT / "lib/fatfs/ff.c"), str(ROOT / "lib/fatfs/option/unicode.c"),
