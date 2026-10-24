@@ -11,7 +11,7 @@ STUB = RTC_STUB
 PREAMBLE = HARNESS[:HARNESS.index("int main(void)")]
 
 
-def native(code):
+def native(code, portable_fallback=False):
     with tempfile.TemporaryDirectory(prefix="oom-crash-test-") as directory:
         work = Path(directory)
         (work / "furi_hal_rtc.h").write_text(STUB)
@@ -19,6 +19,7 @@ def native(code):
         result = subprocess.run([
             "cc", "-std=c11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
             "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
+            *(["-U__BYTE_ORDER__", "-D__BYTE_ORDER__=__ORDER_BIG_ENDIAN__"] if portable_fallback else []),
             "-I", str(work), "-I", str(ROOT), "-I", str(ROOT / "lib"),
             str(work / "test.c"), str(ROOT / "furi/core/crash_journal.c"), "-o", str(work / "test"),
         ], capture_output=True, text=True)
@@ -30,6 +31,26 @@ def native(code):
 
 
 class OomCrashContextTests(unittest.TestCase):
+    def test_name_bytes_match_legacy_little_endian_register_format(self):
+        code = PREAMBLE + r'''
+int main(void){
+ tumoflip_crash_journal_set_active_app("ABCDEFGHIJKL","abcdef12");
+ tumoflip_crash_journal_record(TumoflipCrashKindOther,"abcdef12");
+ assert(registers[FuriHalRtcRegisterTumoflipCrashApp0]==0x44434241);
+ assert(registers[FuriHalRtcRegisterTumoflipCrashApp1]==0x48474645);
+ assert(registers[FuriHalRtcRegisterTumoflipCrashApp2]==0x4c4b4a49);
+ TumoflipCrashReport report;assert(tumoflip_crash_journal_read(&report));
+ assert(!strcmp(report.app_id,"ABCDEFGHIJKL"));
+ TumoflipOOMContext context={.requested=12345,.thread="BtSrv123"};
+ tumoflip_crash_journal_record_oom("abcdef12",&context);
+ assert(registers[FuriHalRtcRegisterTumoflipOOMThread0]==0x72537442);
+ assert(registers[FuriHalRtcRegisterTumoflipOOMThread1]==0x33323176);
+ assert(tumoflip_crash_journal_read(&report)&&!strcmp(report.oom.thread,"BtSrv123"));return 0;
+}
+'''
+        native(code)
+        native(code, portable_fallback=True)
+
     def test_torn_writes_preserve_system_registers_and_never_validate_partial_record(self):
         native(PREAMBLE + r'''
 int main(void){

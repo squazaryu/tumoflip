@@ -37,9 +37,22 @@ static CRASH_NOINLINE void tumoflip_crash_pack_name(
     if(name) {
         for(size_t i = 0; i < length && name[i]; ++i) {
             char c = tumoflip_crash_journal_app_char(name[i]) ? name[i] : '_';
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+            ((uint8_t*)words)[i] = (uint8_t)c;
+#else
             words[i / 4U] |= (uint32_t)(uint8_t)c << ((i % 4U) * 8U);
+#endif
         }
     }
+}
+
+static inline void tumoflip_crash_unpack_name(char* output, const uint32_t* words, size_t length) {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    memcpy(output, words, length);
+#else
+    for(size_t i = 0; i < length; ++i)
+        output[i] = (char)(words[i / 4U] >> ((i % 4U) * 8U));
+#endif
 }
 
 void tumoflip_crash_journal_set_active_app(
@@ -94,8 +107,7 @@ bool tumoflip_crash_journal_read(TumoflipCrashReport* report) {
     report->kind = (TumoflipCrashKind)(data[0] >> 24U);
     report->sequence = (uint16_t)data[0];
     report->commit = data[1];
-    for(size_t i = 0; i < TUMOFLIP_CRASH_JOURNAL_APP_LENGTH; ++i)
-        report->app_id[i] = (char)(data[2U + i / 4U] >> ((i % 4U) * 8U));
+    tumoflip_crash_unpack_name(report->app_id, &data[2], TUMOFLIP_CRASH_JOURNAL_APP_LENGTH);
     if(extended) {
         report->has_oom_context = true;
         report->oom.requested = data[5];
@@ -104,8 +116,7 @@ bool tumoflip_crash_journal_read(TumoflipCrashReport* report) {
         report->oom.free_heap = available == TUMOFLIP_CRASH_HEAP_MASK ? UINT32_MAX : available;
         report->oom.largest_block = largest == TUMOFLIP_CRASH_HEAP_MASK ? UINT32_MAX : largest;
         report->oom.uptime_s = data[7] >> 4U;
-        for(size_t i = 0; i < TUMOFLIP_CRASH_JOURNAL_THREAD_LENGTH; ++i)
-            report->oom.thread[i] = (char)(data[8U + i / 4U] >> ((i % 4U) * 8U));
+        tumoflip_crash_unpack_name(report->oom.thread, &data[8], TUMOFLIP_CRASH_JOURNAL_THREAD_LENGTH);
     }
     return true;
 }
