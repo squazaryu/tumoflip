@@ -20,6 +20,7 @@ class WalletMenuTests(unittest.TestCase):
 ''' + enums + r'''
 typedef struct{unsigned link_count;}DeviceCard;
 typedef struct{unsigned count;}LibraryPins;
+#define LIBRARY_SLOTS 4
 typedef struct{LibraryPage page;DeviceCard card;LibraryPins pins;unsigned count,link,pin_edit;bool dirty,pins_ready;void*sources;}Library;
 ''' + function(source, "static bool library_event_allowed(") + r'''
 int main(void){

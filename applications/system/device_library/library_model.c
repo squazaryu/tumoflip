@@ -75,12 +75,18 @@ LibraryFileKind library_file_kind(const char* path) {
 
 const char* library_launch_target(LibraryFileKind kind) {
     switch(kind) {
-    case LibraryFileSub: return "Sub-GHz";
-    case LibraryFileIr: return "Infrared";
-    case LibraryFileNfc: return "NFC";
-    case LibraryFileRfid: return "125 kHz RFID";
-    case LibraryFileIbutton: return "iButton";
-    default: return NULL;
+    case LibraryFileSub:
+        return "Sub-GHz";
+    case LibraryFileIr:
+        return "Infrared";
+    case LibraryFileNfc:
+        return "NFC";
+    case LibraryFileRfid:
+        return "125 kHz RFID";
+    case LibraryFileIbutton:
+        return "iButton";
+    default:
+        return NULL;
     }
 }
 
@@ -91,7 +97,8 @@ bool library_action_label(const DeviceCard* card, unsigned index, char* output, 
     size_t length = strlen(text);
     if(length >= size) {
         length = size - 1;
-        while(length && ((unsigned char)text[length] & 0xC0) == 0x80) length--;
+        while(length && ((unsigned char)text[length] & 0xC0) == 0x80)
+            length--;
     }
     memcpy(output, text, length);
     output[length] = 0;
@@ -113,7 +120,9 @@ bool library_remove_link(DeviceCard* card, unsigned index) {
 bool library_pins_valid(const LibraryPins* pins) {
     if(!pins || pins->count > LIBRARY_PINS) return false;
     for(unsigned i = 0; i < pins->count; i++) {
-        if(!memchr(pins->names[i], 0, sizeof(pins->names[i])) || !library_name_valid(pins->names[i])) return false;
+        if(!memchr(pins->names[i], 0, sizeof(pins->names[i])) ||
+           !library_name_valid(pins->names[i]))
+            return false;
         for(unsigned j = 0; j < i; j++)
             if(!strcmp(pins->names[i], pins->names[j])) return false;
     }
@@ -131,7 +140,8 @@ bool library_pins_toggle(LibraryPins* pins, const char* name) {
     if(!library_pins_valid(pins) || !library_name_valid(name)) return false;
     for(unsigned i = 0; i < pins->count; i++) {
         if(strcmp(pins->names[i], name)) continue;
-        for(unsigned j = i; j + 1 < pins->count; j++) memcpy(pins->names[j], pins->names[j + 1], sizeof(pins->names[j]));
+        for(unsigned j = i; j + 1 < pins->count; j++)
+            memcpy(pins->names[j], pins->names[j + 1], sizeof(pins->names[j]));
         memset(pins->names[--pins->count], 0, sizeof(pins->names[0]));
         return true;
     }

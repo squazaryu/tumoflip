@@ -4,7 +4,7 @@
 #include <stdint.h>
 #define LIBRARY_LINKS 8U
 #define LIBRARY_SLOTS 4U
-#define LIBRARY_PINS 16U
+#define LIBRARY_PINS  16U
 typedef struct {
     char name[32];
     char notes[128];
@@ -19,8 +19,12 @@ typedef struct {
     char names[LIBRARY_PINS][32];
 } LibraryPins;
 typedef enum {
-    LibraryFileReference, LibraryFileSub, LibraryFileIr, LibraryFileNfc,
-    LibraryFileRfid, LibraryFileIbutton,
+    LibraryFileReference,
+    LibraryFileSub,
+    LibraryFileIr,
+    LibraryFileNfc,
+    LibraryFileRfid,
+    LibraryFileIbutton,
 } LibraryFileKind;
 bool library_name_valid(const char* name);
 bool library_path_valid(const char* path);

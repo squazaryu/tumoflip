@@ -17,12 +17,18 @@ typedef struct {
     DeviceCard card;
     uint8_t checksum[32];
 } CardEnvelope;
-#define CARD_MAGIC 0x32434454U
+#define CARD_MAGIC        0x32434454U
 #define CARD_MAGIC_LEGACY 0x31434454U
 _Static_assert(sizeof(LegacyDeviceCard) == 2300, "Deployed card layout changed");
-typedef enum { CardAbsent, CardInvalid, CardValid, CardIoError } CardRead;
+typedef enum {
+    CardAbsent,
+    CardInvalid,
+    CardValid,
+    CardIoError
+} CardRead;
 
-static CardRead card_read_status(Storage* storage, const char* name, unsigned slot, CardEnvelope* out) {
+static CardRead
+    card_read_status(Storage* storage, const char* name, unsigned slot, CardEnvelope* out) {
     FuriString* path = furi_string_alloc_printf(LIBRARY_CARDS "/%s/%u.card", name, slot);
     FileInfo info;
     FS_Error stat = storage_common_stat(storage, furi_string_get_cstr(path), &info);
@@ -30,10 +36,17 @@ static CardRead card_read_status(Storage* storage, const char* name, unsigned sl
     if(stat == FSE_OK) {
         result = CardInvalid;
         if(info.size == sizeof(CardEnvelope) || info.size == sizeof(LegacyCardEnvelope)) {
-            union { CardEnvelope current; LegacyCardEnvelope old; }* data = malloc(sizeof(*data));
+            union {
+                CardEnvelope current;
+                LegacyCardEnvelope old;
+            }* data = malloc(sizeof(*data));
             File* file = storage_file_alloc(storage);
-            bool ok = storage_file_open(file, furi_string_get_cstr(path), FSAM_READ, FSOM_OPEN_EXISTING);
-            if(ok) { ok = storage_file_read(file, data, info.size) == info.size; ok = storage_file_close(file) && ok; }
+            bool ok =
+                storage_file_open(file, furi_string_get_cstr(path), FSAM_READ, FSOM_OPEN_EXISTING);
+            if(ok) {
+                ok = storage_file_read(file, data, info.size) == info.size;
+                ok = storage_file_close(file) && ok;
+            }
             storage_file_free(file);
             result = CardIoError;
             if(ok) {
@@ -41,16 +54,20 @@ static CardRead card_read_status(Storage* storage, const char* name, unsigned sl
                 const size_t count = info.size - sizeof(hash);
                 const uint8_t* expected = (const uint8_t*)data + count;
                 result = CardInvalid;
-                if(!mbedtls_sha256((const uint8_t*)data, count, hash, 0) && !memcmp(hash, expected, 32)) {
+                if(!mbedtls_sha256((const uint8_t*)data, count, hash, 0) &&
+                   !memcmp(hash, expected, 32)) {
                     memset(out, 0, sizeof(*out));
-                    if(info.size == sizeof(LegacyCardEnvelope) && data->old.magic == CARD_MAGIC_LEGACY) {
+                    if(info.size == sizeof(LegacyCardEnvelope) &&
+                       data->old.magic == CARD_MAGIC_LEGACY) {
                         memcpy(&out->card, &data->old.card, sizeof(data->old.card));
                         out->generation = data->old.generation;
                         out->magic = CARD_MAGIC;
                     } else if(info.size == sizeof(CardEnvelope) && data->current.magic == CARD_MAGIC) {
                         *out = data->current;
                     }
-                    if(out->magic == CARD_MAGIC && out->generation && library_card_valid(&out->card) && !strcmp(name, out->card.name)) result = CardValid;
+                    if(out->magic == CARD_MAGIC && out->generation &&
+                       library_card_valid(&out->card) && !strcmp(name, out->card.name))
+                        result = CardValid;
                 }
             }
             free(data);
@@ -69,7 +86,10 @@ bool library_card_load(Storage* storage, const char* name, DeviceCard* card) {
     bool ok = true;
     for(unsigned i = 0; i < LIBRARY_SLOTS; i++) {
         CardRead status = card_read_status(storage, name, i, e);
-        if(status == CardIoError) { ok = false; break; }
+        if(status == CardIoError) {
+            ok = false;
+            break;
+        }
         if(status == CardValid && e->generation > best) {
             *card = e->card;
             best = e->generation;
@@ -79,7 +99,8 @@ bool library_card_load(Storage* storage, const char* name, DeviceCard* card) {
     return ok && best != 0 && storage_sd_status(storage) == FSE_OK;
 }
 bool library_card_save(Storage* storage, const DeviceCard* card) {
-    if(!library_card_valid(card) || storage_sd_status(storage) != FSE_OK || !storage_simply_mkdir(storage, LIBRARY_ROOT) ||
+    if(!library_card_valid(card) || storage_sd_status(storage) != FSE_OK ||
+       !storage_simply_mkdir(storage, LIBRARY_ROOT) ||
        !storage_simply_mkdir(storage, LIBRARY_CARDS))
         return false;
     FuriString* path = furi_string_alloc_printf(LIBRARY_CARDS "/%s", card->name);
