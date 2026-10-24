@@ -65,6 +65,7 @@ static void exercise(unsigned carrier,int skew,bool corrupt){
   protocol_fdx_b_decoder_feed(&rx.value,false,100+i%350);
  }
  for(unsigned period=190;period<570;period++){
+  protocol_fdx_b_decoder_start(&rx.value);
   uint32_t high=INT32_MAX-16u;
   protocol_fdx_b_decoder_feed(&rx.value,true,high);
   protocol_fdx_b_decoder_feed(&rx.value,false,UINT32_MAX-high+1u+period);
