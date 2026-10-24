@@ -40,7 +40,7 @@ static bool library_history_load(Library*a){(void)a;return false;}
 static bool file_history_core_available(void){return false;}
 static int storage_common_stat(void*s,const char*p,void*i){(void)s;(void)p;(void)i;return FSE_NOT_EXIST;}
 static void view_dispatcher_switch_to_view(void*d,unsigned id){(void)d;(void)id;}
-''' + pinned + "\n" + function(source, "static void library_show(Library* app, LibraryPage page) {") + r'''
+''' + pinned + "\n" + function(source, "static void library_show(Library* app, LibraryPage page) {").replace("%lu", "%u") + r'''
 int main(void){
  Submenu m={0};Library a={.menu=&m,.card={.name="Garage",.link_count=2}};
  strcpy(a.card.links[0],"/ext/nfc/Pass.nfc");strcpy(a.card.links[1],"/ext/lfrfid/Entry.rfid");strcpy(a.card.labels[0],"Pass");strcpy(a.card.labels[1],"Entry");
