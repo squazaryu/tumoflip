@@ -96,14 +96,10 @@ static CRASH_NOINLINE bool tumoflip_crash_journal_read_base(uint32_t data[10], b
     uint32_t marker = furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipCrashMarker);
     if(marker != TUMOFLIP_CRASH_JOURNAL_MAGIC && marker != TUMOFLIP_CRASH_OOM_MAGIC) return false;
     *extended = marker == TUMOFLIP_CRASH_OOM_MAGIC;
-    for(size_t i = 0; i < 5; ++i)
+    /* Both formats fit the same physical region; legacy checksums ignore words 5..9. */
+    for(size_t i = 0; i < 10; ++i)
         data[i] = furi_hal_rtc_get_register(
-            (FuriHalRtcRegister)(FuriHalRtcRegisterTumoflipCrashMeta + i));
-    if(*extended) {
-        for(size_t i = 5; i < 10; ++i)
-            data[i] = furi_hal_rtc_get_register(
-                (FuriHalRtcRegister)(FuriHalRtcRegisterTumoflipOOMRequested + i - 5));
-    }
+            (FuriHalRtcRegister)(FuriHalRtcRegisterTumoflipCrashMeta + i + (i >= 5U)));
     uint32_t kind = data[0] >> 24U;
     return kind > TumoflipCrashKindNone && kind <= TumoflipCrashKindOutOfMemory &&
            (!*extended || kind == TumoflipCrashKindOutOfMemory) && (uint16_t)data[0] != 0 &&
@@ -166,12 +162,9 @@ static CRASH_NOINLINE void tumoflip_crash_journal_record_full(
         tumoflip_crash_pack_name(&data[8], context->thread, TUMOFLIP_CRASH_JOURNAL_THREAD_LENGTH);
     }
     furi_hal_rtc_set_register(FuriHalRtcRegisterTumoflipCrashMarker, 0);
-    for(size_t i = 0; i < 5; ++i)
+    for(size_t i = 0; i < 10; ++i)
         furi_hal_rtc_set_register(
-            (FuriHalRtcRegister)(FuriHalRtcRegisterTumoflipCrashMeta + i), data[i]);
-    for(size_t i = 5; i < 10; ++i)
-        furi_hal_rtc_set_register(
-            (FuriHalRtcRegister)(FuriHalRtcRegisterTumoflipOOMRequested + i - 5), data[i]);
+            (FuriHalRtcRegister)(FuriHalRtcRegisterTumoflipCrashMeta + i + (i >= 5U)), data[i]);
     furi_hal_rtc_set_register(
         FuriHalRtcRegisterTumoflipCrashChecksum, tumoflip_crash_checksum(data, extended));
     furi_hal_rtc_set_register(
