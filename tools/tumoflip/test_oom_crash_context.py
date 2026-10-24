@@ -19,7 +19,8 @@ def native(code):
         result = subprocess.run([
             "cc", "-std=c11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
             "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
-            "-I", str(work), "-I", str(ROOT), str(work / "test.c"), "-o", str(work / "test"),
+            "-I", str(work), "-I", str(ROOT), "-I", str(ROOT / "lib"),
+            str(work / "test.c"), str(ROOT / "furi/core/crash_journal.c"), "-o", str(work / "test"),
         ], capture_output=True, text=True)
         if result.returncode:
             raise AssertionError(result.stderr)
@@ -29,6 +30,28 @@ def native(code):
 
 
 class OomCrashContextTests(unittest.TestCase):
+    def test_torn_writes_preserve_system_registers_and_never_validate_partial_record(self):
+        native(PREAMBLE + r'''
+int main(void){
+ TumoflipOOMContext context={.requested=65536,.free_heap=187200,.largest_block=65528,
+  .uptime_s=430000,.thread="DesktopS"};
+ for(unsigned cut=0;cut<=13;cut++){
+  memset(registers,0,sizeof(registers));
+  for(unsigned reg=0;reg<8;reg++)registers[reg]=0xBEEF0000u+reg;
+  writes_allowed=cut;
+  tumoflip_crash_journal_record_oom("abcdef12",&context);
+  writes_allowed=-1;
+  for(unsigned reg=0;reg<8;reg++)assert(registers[reg]==0xBEEF0000u+reg);
+  TumoflipCrashReport report;
+  bool valid=tumoflip_crash_journal_read(&report);
+  assert(valid==(cut>=13));
+  if(valid){assert(report.has_oom_context&&report.oom.free_heap==187200);
+    assert(report.oom.largest_block==65528&&report.oom.uptime_s==430000);}
+ }
+ return 0;
+}
+''')
+
     def test_uses_only_the_twenty_physical_backup_registers(self):
         native(PREAMBLE + r'''
 _Static_assert(FuriHalRtcRegisterMAX<=20,"Hardware has only 20 backup registers");

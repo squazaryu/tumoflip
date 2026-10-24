@@ -31,10 +31,12 @@ HARNESS = r"""
 
 static uint32_t registers[20];
 static int last_written_register = -1;
-uint32_t tumoflip_crash_active_words[4];
+static int writes_allowed = -1;
 uint32_t furi_hal_rtc_get_register(FuriHalRtcRegister reg) { assert((unsigned)reg<20);return registers[reg]; }
 void furi_hal_rtc_set_register(FuriHalRtcRegister reg, uint32_t value) {
     assert((unsigned)reg<20);
+    if(writes_allowed == 0) return;
+    if(writes_allowed > 0) --writes_allowed;
     registers[reg] = value;
     last_written_register = reg;
 }
@@ -97,7 +99,8 @@ class CrashJournalTests(unittest.TestCase):
             binary = root / "test_crash_journal"
             command = [
                 "cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
-                "-I", str(root), "-I", str(ROOT), str(source), "-o", str(binary),
+                "-I", str(root), "-I", str(ROOT), "-I", str(ROOT / "lib"),
+                str(source), str(ROOT / "furi/core/crash_journal.c"), "-o", str(binary),
             ]
             compiled = subprocess.run(command, capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)

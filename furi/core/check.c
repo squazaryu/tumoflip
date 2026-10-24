@@ -20,7 +20,6 @@
 PLACE_IN_SECTION("MB_MEM2") const char* __furi_check_message = NULL;
 PLACE_IN_SECTION("MB_MEM2") uint32_t __furi_check_registers[13] = {0};
 static TumoflipOOMContext __furi_oom_context;
-uint32_t tumoflip_crash_active_words[4];
 
 /** Load r12 value to __furi_check_message and store registers to __furi_check_registers */
 #define GET_MESSAGE_AND_STORE_REGISTERS()               \
