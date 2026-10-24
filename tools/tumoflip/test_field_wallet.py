@@ -76,7 +76,7 @@ typedef struct {uint32_t magic,generation;OldCard card;uint8_t checksum[32];} Ol
 static void blob(Storage*s,const char*p,const void*b,size_t n){File*f=storage_file_alloc(s);assert(storage_file_open(f,p,FSAM_WRITE,FSOM_CREATE_NEW));assert(storage_file_write(f,b,n)==n&&storage_file_sync(f)&&storage_file_close(f));storage_file_free(f);}
 int main(int argc,char**argv){
  assert(argc==2);Storage s={0};snprintf(s.root,sizeof(s.root),"%s",argv[1]);
- assert(storage_simply_mkdir(&s,LIBRARY_ROOT));assert(storage_simply_mkdir(&s,LIBRARY_CARDS));assert(storage_simply_mkdir(&s,LIBRARY_CARDS "/Garage"));
+ assert(storage_simply_mkdir(&s,"/ext/apps_data"));assert(storage_simply_mkdir(&s,LIBRARY_ROOT));assert(storage_simply_mkdir(&s,LIBRARY_CARDS));assert(storage_simply_mkdir(&s,LIBRARY_CARDS "/Garage"));
  OldEnvelope old={.magic=0x31434454,.generation=7,.card={.name="Garage",.notes="Original",.link_count=1}};
  strcpy(old.card.links[0],"/ext/nfc/Pass.nfc");assert(!mbedtls_sha256((const uint8_t*)&old,offsetof(OldEnvelope,checksum),old.checksum,0));
  blob(&s,LIBRARY_CARDS "/Garage/0.card",&old,sizeof(old));

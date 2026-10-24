@@ -3,5 +3,8 @@
 #include <storage/storage.h>
 #define LIBRARY_ROOT  EXT_PATH("apps_data/device_library")
 #define LIBRARY_CARDS LIBRARY_ROOT "/cards"
+#define LIBRARY_PIN_DIR LIBRARY_ROOT "/pins"
 bool library_card_load(Storage* storage, const char* name, DeviceCard* card);
 bool library_card_save(Storage* storage, const DeviceCard* card);
+bool library_pins_load(Storage* storage, LibraryPins* pins);
+bool library_pins_save(Storage* storage, const LibraryPins* pins);

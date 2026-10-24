@@ -35,7 +35,8 @@ bool library_card_valid(const DeviceCard* card) {
         return false;
     for(unsigned i = 0; i < card->link_count; i++) {
         if(!memchr(card->links[i], 0, sizeof(card->links[i])) ||
-           !library_path_valid(card->links[i]))
+           !library_path_valid(card->links[i]) ||
+           !library_text_valid(card->labels[i], sizeof(card->labels[i])))
             return false;
         for(unsigned j = 0; j < i; j++)
             if(!strcmp(card->links[i], card->links[j])) return false;
@@ -53,4 +54,88 @@ unsigned library_write_slot(const uint32_t gen[LIBRARY_SLOTS]) {
     for(unsigned i = 0; i < LIBRARY_SLOTS; i++)
         if(gen[i] < gen[slot]) slot = i;
     return slot;
+}
+
+LibraryFileKind library_file_kind(const char* path) {
+    if(!library_path_valid(path)) return LibraryFileReference;
+    const char* ext = strrchr(path, '.');
+    if(!ext) return LibraryFileReference;
+    const char* extensions[] = {".sub", ".ir", ".nfc", ".rfid", ".ibtn"};
+    for(unsigned i = 0; i < 5; i++) {
+        unsigned n = 0;
+        for(; ext[n] && extensions[i][n]; n++) {
+            char c = ext[n];
+            if(c >= 'A' && c <= 'Z') c += 'a' - 'A';
+            if(c != extensions[i][n]) break;
+        }
+        if(!ext[n] && !extensions[i][n]) return (LibraryFileKind)(LibraryFileSub + i);
+    }
+    return LibraryFileReference;
+}
+
+const char* library_launch_target(LibraryFileKind kind) {
+    switch(kind) {
+    case LibraryFileSub: return "Sub-GHz";
+    case LibraryFileIr: return "Infrared";
+    case LibraryFileNfc: return "NFC";
+    case LibraryFileRfid: return "125 kHz RFID";
+    case LibraryFileIbutton: return "iButton";
+    default: return NULL;
+    }
+}
+
+bool library_action_label(const DeviceCard* card, unsigned index, char* output, size_t size) {
+    if(!output || size < 2 || !library_card_valid(card) || index >= card->link_count) return false;
+    const char* text = card->labels[index];
+    if(!*text) text = strrchr(card->links[index], '/') + 1;
+    size_t length = strlen(text);
+    if(length >= size) {
+        length = size - 1;
+        while(length && ((unsigned char)text[length] & 0xC0) == 0x80) length--;
+    }
+    memcpy(output, text, length);
+    output[length] = 0;
+    return true;
+}
+
+bool library_remove_link(DeviceCard* card, unsigned index) {
+    if(!library_card_valid(card) || index >= card->link_count) return false;
+    for(unsigned i = index; i + 1 < card->link_count; i++) {
+        memcpy(card->links[i], card->links[i + 1], sizeof(card->links[i]));
+        memcpy(card->labels[i], card->labels[i + 1], sizeof(card->labels[i]));
+    }
+    card->link_count--;
+    memset(card->links[card->link_count], 0, sizeof(card->links[0]));
+    memset(card->labels[card->link_count], 0, sizeof(card->labels[0]));
+    return true;
+}
+
+bool library_pins_valid(const LibraryPins* pins) {
+    if(!pins || pins->count > LIBRARY_PINS) return false;
+    for(unsigned i = 0; i < pins->count; i++) {
+        if(!memchr(pins->names[i], 0, sizeof(pins->names[i])) || !library_name_valid(pins->names[i])) return false;
+        for(unsigned j = 0; j < i; j++)
+            if(!strcmp(pins->names[i], pins->names[j])) return false;
+    }
+    return true;
+}
+
+bool library_pins_contains(const LibraryPins* pins, const char* name) {
+    if(!library_pins_valid(pins) || !library_name_valid(name)) return false;
+    for(unsigned i = 0; i < pins->count; i++)
+        if(!strcmp(pins->names[i], name)) return true;
+    return false;
+}
+
+bool library_pins_toggle(LibraryPins* pins, const char* name) {
+    if(!library_pins_valid(pins) || !library_name_valid(name)) return false;
+    for(unsigned i = 0; i < pins->count; i++) {
+        if(strcmp(pins->names[i], name)) continue;
+        for(unsigned j = i; j + 1 < pins->count; j++) memcpy(pins->names[j], pins->names[j + 1], sizeof(pins->names[j]));
+        memset(pins->names[--pins->count], 0, sizeof(pins->names[0]));
+        return true;
+    }
+    if(pins->count == LIBRARY_PINS) return false;
+    strcpy(pins->names[pins->count++], name);
+    return true;
 }
