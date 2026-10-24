@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class WalletInspectTests(unittest.TestCase):
     def test_real_entries_keep_rpc_and_legacy_launch_but_inspect_safely(self):
-        header = ROOT / "lib/toolbox/inspect_file_launch.h"
+        header = ROOT / "applications/main/saved_file_inspect.h"
         helper = header.read_text().replace("#pragma once", "") if header.exists() else ""
         lf = (ROOT / "applications/main/lfrfid/lfrfid.c").read_text()
         ib = (ROOT / "applications/main/ibutton/ibutton.c").read_text()

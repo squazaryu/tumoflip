@@ -4,6 +4,7 @@ App(
     apptype=FlipperAppType.MENUEXTERNAL,
     targets=["f7"],
     entry_point="ibutton_app",
+    fap_version="1.1",
     # Settings pages ship as a separate .fal - keep their sources out of the app image.
     sources=["*.c*", "!plugins"],
     icon="A_iButton_14",
