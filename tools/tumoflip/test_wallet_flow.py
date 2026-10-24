@@ -37,7 +37,11 @@ static void dialog_file_browser_set_basic_options(DialogsFileBrowserOptions*o,co
 static bool dialog_file_browser_show(DialogsApp*d,FuriString*p,FuriString*q,DialogsFileBrowserOptions*o){(void)d;(void)q;(void)o;furi_string_set(p,selected_path);return true;}
 static bool storage_file_exists(Storage*s,const char*p){return storage_common_stat(s,p,NULL)==FSE_OK;}
 static void loader_clear_launch_queue(Loader*l){(void)l;}
-static void loader_enqueue_launch(Loader*l,const char*a,const char*p,int f){(void)l;(void)f;launches++;snprintf(launched_app,sizeof(launched_app),"%s",a);snprintf(launched_path,sizeof(launched_path),"%s",p);}
+static void loader_enqueue_launch(Loader*l,const char*a,const char*p,int f){
+ (void)l;(void)f;size_t na=strlen(a),np=strlen(p);
+ assert(na<sizeof(launched_app)&&np<sizeof(launched_path));
+ memcpy(launched_app,a,na+1);memcpy(launched_path,p,np+1);launches++;
+}
 static void furi_hal_rtc_get_datetime(DateTime*d){*d=(DateTime){2026,10,24,23,0};}
 ''' + history + ui.replace("%lu", "%u") + r'''
 int main(int argc,char**argv){
