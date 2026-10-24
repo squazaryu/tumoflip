@@ -18,8 +18,8 @@ EXTRA_REGISTERS = """
     FuriHalRtcRegisterTumoflipOOMThread2,
     FuriHalRtcRegisterTumoflipOOMChecksum,
 """
-STUB = RTC_STUB if "FuriHalRtcRegisterTumoflipOOMMarker" in RTC_STUB else RTC_STUB.replace("    FuriHalRtcRegisterTumoflipActiveCommit,", "    FuriHalRtcRegisterTumoflipActiveCommit," + EXTRA_REGISTERS)
-PREAMBLE = HARNESS[:HARNESS.index("int main(void)")].replace("registers[20]", "registers[32]")
+STUB = RTC_STUB
+PREAMBLE = HARNESS[:HARNESS.index("int main(void)")]
 
 
 def native(code):
@@ -40,6 +40,11 @@ def native(code):
 
 
 class OomCrashContextTests(unittest.TestCase):
+    def test_uses_only_the_twenty_physical_backup_registers(self):
+        native(PREAMBLE + r'''
+_Static_assert(FuriHalRtcRegisterMAX<=20,"Hardware has only 20 backup registers");
+int main(void){return 0;}
+''')
     def test_wire_report_preserves_old_client_kind_and_complete_optional_details(self):
         formatter = function((ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c").read_text(),
                              "tumoflip_runtime_format_crash")
