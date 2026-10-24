@@ -439,10 +439,7 @@ static bool library_event(void* context, uint32_t event) {
         library_set_pin(app, app->pins.names[app->pin_edit], false, PagePins);
     } else if(event == TogglePin && app->page == PageManage) {
         library_set_pin(
-            app,
-            app->card.name,
-            !library_pins_contains(&app->pins, app->card.name),
-            PageManage);
+            app, app->card.name, !library_pins_contains(&app->pins, app->card.name), PageManage);
     } else if(event == EditObject && app->page == PageCard) {
         library_show(app, PageManage);
     } else if(event == OpenCards) {
