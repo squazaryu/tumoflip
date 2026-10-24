@@ -40,6 +40,67 @@ def native(code):
 
 
 class OomCrashContextTests(unittest.TestCase):
+    def test_wire_report_preserves_old_client_kind_and_complete_optional_details(self):
+        formatter = function((ROOT / "applications/services/tumoflip_runtime/tumoflip_runtime.c").read_text(),
+                             "tumoflip_runtime_format_crash")
+        native(PREAMBLE + "\n#include <stdio.h>\n" + formatter + r'''
+int main(void){
+ char output[192];
+ tumoflip_runtime_format_crash(output,sizeof(output));
+ assert(!strcmp(output,"schema=1;status=none"));
+ TumoflipOOMContext context={.requested=UINT32_MAX,.free_heap=UINT32_MAX,
+  .largest_block=UINT32_MAX,.tick_ms=UINT32_MAX,.thread="BtSrv1234567"};
+ tumoflip_crash_journal_record(TumoflipCrashKindOutOfMemory,"abcdef12");
+ tumoflip_crash_journal_attach_oom(&context);
+ tumoflip_runtime_format_crash(output,sizeof(output));
+ // Existing Companion accepts only the old kind vocabulary, but ignores optional fields.
+ assert(strstr(output,"kind=other;")&&strstr(output,"reason=oom;"));
+ assert(strstr(output,"thread=BtSrv1234567;")&&strstr(output,"req=4294967295;"));
+ assert(strstr(output,"free=4294967295;")&&strstr(output,"largest=4294967295;"));
+ assert(strstr(output,"tick_ms=4294967295"));
+ assert(strlen(output)<sizeof(output)&&strlen(output)<=209);
+ for(unsigned size=0;size<192;size++){
+  unsigned char buffer[194];memset(buffer,0xA5,sizeof(buffer));
+  tumoflip_runtime_format_crash((char*)&buffer[1],size);
+  assert(buffer[0]==0xA5&&buffer[size+1]==0xA5);
+  if(size){assert(memchr(&buffer[1],0,size));
+   const char* s=(const char*)&buffer[1];
+   if(strstr(s,"reason="))assert(strstr(s,"tick_ms=4294967295"));
+  }
+ }
+ tumoflip_crash_journal_record(TumoflipCrashKindNullPointer,"abcdef12");
+ tumoflip_runtime_format_crash(output,sizeof(output));
+ assert(strstr(output,"kind=null_pointer;")&&!strstr(output,"reason="));
+ return 0;
+}
+''')
+
+    def test_actual_oom_capture_uses_no_allocator_and_freezes_snapshot(self):
+        capture = function((ROOT / "furi/core/check.c").read_text().replace("FURI_NORETURN ", ""),
+                           "__furi_crash_oom")
+        native(PREAMBLE + r'''
+#include <setjmp.h>
+static jmp_buf failed;
+static bool irq_disabled;
+static TumoflipOOMContext __furi_oom_context;
+typedef struct{size_t xAvailableHeapSpaceInBytes,xSizeOfLargestFreeBlockInBytes;}HeapStats_t;
+static void __disable_irq(void){irq_disabled=true;}
+static void vPortGetHeapStats(HeapStats_t* s){assert(irq_disabled);s->xAvailableHeapSpaceInBytes=114672;s->xSizeOfLargestFreeBlockInBytes=113448;}
+static uint32_t xTaskGetTickCount(void){return UINT32_MAX;}
+static const char* pcTaskGetName(void* p){assert(!p);return "BtSrv;payload";}
+#define furi_crash(message) do{assert(!strcmp(message,"out of memory"));longjmp(failed,1);}while(0)
+''' + capture + r'''
+int main(void){
+ if(!setjmp(failed))__furi_crash_oom(123456);
+ assert(__furi_oom_context.requested==123456&&__furi_oom_context.free_heap==114672);
+ assert(__furi_oom_context.largest_block==113448&&__furi_oom_context.tick_ms==UINT32_MAX);
+ tumoflip_crash_journal_record(TumoflipCrashKindOutOfMemory,"abcdef12");
+ tumoflip_crash_journal_attach_oom(&__furi_oom_context);
+ TumoflipCrashReport report;assert(tumoflip_crash_journal_read(&report));
+ assert(report.has_oom_context&&!strcmp(report.oom.thread,"BtSrv_payloa"));return 0;
+}
+''')
+
     def test_out_of_memory_is_not_generic_other(self):
         native(PREAMBLE + r'''
 int main(void){
