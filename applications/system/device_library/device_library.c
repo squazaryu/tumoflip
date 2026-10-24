@@ -334,14 +334,15 @@ static void library_open_link(Library* app) {
     }
 }
 
-static void library_toggle_pin(Library* app, const char* name, LibraryPage back) {
+static void library_set_pin(Library* app, const char* name, bool pinned, LibraryPage back) {
     if(app->dirty) {
         library_message(app, "Save object first.\nPin list unchanged.", back);
         return;
     }
     LibraryPins* next = malloc(sizeof(*next));
-    bool ok = library_pins_load(app->storage, next) && library_pins_toggle(next, name) &&
-              library_pins_save(app->storage, next);
+    bool ok = library_name_valid(name) && library_pins_load(app->storage, next);
+    if(ok && library_pins_contains(next, name) != pinned)
+        ok = library_pins_toggle(next, name) && library_pins_save(app->storage, next);
     if(ok) {
         app->pins = *next;
         app->pins_ready = true;
@@ -435,9 +436,13 @@ static bool library_event(void* context, uint32_t event) {
     } else if(
         event == ConfirmUnpin && app->page == PageConfirmUnpin &&
         app->pin_edit < app->pins.count) {
-        library_toggle_pin(app, app->pins.names[app->pin_edit], PagePins);
+        library_set_pin(app, app->pins.names[app->pin_edit], false, PagePins);
     } else if(event == TogglePin && app->page == PageManage) {
-        library_toggle_pin(app, app->card.name, PageManage);
+        library_set_pin(
+            app,
+            app->card.name,
+            !library_pins_contains(&app->pins, app->card.name),
+            PageManage);
     } else if(event == EditObject && app->page == PageCard) {
         library_show(app, PageManage);
     } else if(event == OpenCards) {
