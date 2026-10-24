@@ -8,6 +8,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReleaseWorkflowTest(unittest.TestCase):
+    def test_pr_firmware_build_uses_bounded_parallelism(self) -> None:
+        workflow = (REPO_ROOT / ".github/workflows/pr-build.yml").read_text()
+        self.assertIn("./fbt -j2 COMPACT=1 DEBUG=0", workflow)
+
     def test_all_package_producers_build_device_library_and_history(self) -> None:
         for name in ("pr-build.yml", "release.yml"):
             workflow = (REPO_ROOT / ".github/workflows" / name).read_text()
