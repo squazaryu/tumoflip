@@ -1,7 +1,9 @@
 """Bounded field-wallet model, legacy cards, pins and explicit native launch."""
 from pathlib import Path
+import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -19,13 +21,14 @@ def storage_native(program):
     body = '#include "library_io_stubs.h"\n'
     for source in sources:
         if source.exists():
-            body += re.sub(r"^#(?:include|pragma).*\n", "", source.read_text(), flags=re.M) + "\n"
-    body += program
+            body += '#line 1 "' + source.as_posix() + '"\n'
+            body += re.sub(r"^#(?:include|pragma).*\n", "\n", source.read_text(), flags=re.M) + "\n"
+    body += '#line 1 "wallet-fixture.c"\n' + program
     with tempfile.TemporaryDirectory(prefix="field-wallet-test-") as folder:
         work = Path(folder)
         (work / "sd").mkdir()
         (work / "test.c").write_text(body)
-        flags = ["-fprofile-instr-generate", "-fcoverage-mapping"] if os.environ.get("TUMO_WALLET_COVERAGE") else []
+        flags = ["-fprofile-instr-generate", "-fcoverage-mapping"] if os.environ.get("TUMO_WALLET_COVERAGE_DIR") else []
         result = subprocess.run(["cc", "-std=c11", "-D_DEFAULT_SOURCE", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
             "-Wno-unused-function", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", *flags,
             '-DMBEDTLS_CONFIG_FILE="library_crypto_config.h"', "-I", str(FIXTURES), "-I", str(ROOT / "lib/mbedtls/include"),
@@ -33,22 +36,66 @@ def storage_native(program):
             str(ROOT / "lib/mbedtls/library/platform_util.c"), "-o", str(work / "test")], capture_output=True, text=True)
         if result.returncode:
             raise AssertionError(result.stderr)
-        result = subprocess.run([str(work / "test"), str(work / "sd")], capture_output=True, text=True)
+        result = subprocess.run([str(work / "test"), str(work / "sd")], capture_output=True, text=True,
+                                env=dict(os.environ, LLVM_PROFILE_FILE=str(work / "test.profraw")))
         if result.returncode:
             raise AssertionError(result.stderr)
+        if directory := os.environ.get("TUMO_WALLET_COVERAGE_DIR"):
+            target = Path(directory); target.mkdir(parents=True, exist_ok=True)
+            number = len(list(target.glob("*.profraw")))
+            shutil.copy2(work / "test.profraw", target / f"test-{number}.profraw")
+            shutil.copy2(work / "test", target / "last-test")
 
 
 class FieldWalletTests(unittest.TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        if directory := os.environ.get("TUMO_WALLET_COVERAGE_DIR"):
+            target = Path(directory)
+            subprocess.run(["xcrun", "llvm-profdata", "merge", "-sparse", *map(str, target.glob("*.profraw")),
+                            "-o", str(target / "total.profdata")], check=True, capture_output=True)
+            report = json.loads(subprocess.check_output(["xcrun", "llvm-cov", "export", str(target / "last-test"),
+                               "-instr-profile=" + str(target / "total.profdata")], text=True))
+            (target / "coverage.json").write_text(json.dumps(report))
+            # Clang maps #line-assembled native fixtures to their physical C file.
+            # Select exact production function definitions, not fixture/stub lines.
+            production = "\n".join((APP / name).read_text() for name in
+                                   ("library_model.c", "card_store.c", "pin_store.c", "wallet_launch.c"))
+            functions = [f for f in report["data"][0]["functions"] if re.search(
+                r"\b" + re.escape(f["name"].rsplit(":", 1)[-1]) + r"\s*\([^;{}]*\)\s*\{", production)]
+            assert len(functions) >= 19, "Missing wallet production coverage mapping"
+            regions = [r for f in functions for r in f["regions"] if r[7] == 0]
+            measured = set()
+            for f in functions:
+                start, _, end, *_ = f["regions"][0]
+                measured.update(range(start, end + 1))
+            lcov = subprocess.check_output(["xcrun", "llvm-cov", "export", str(target / "last-test"),
+                                           "-instr-profile=" + str(target / "total.profdata"), "-format=lcov"], text=True)
+            lines = []
+            physical_fixture = False
+            for line in lcov.splitlines():
+                if line.startswith("SF:"):
+                    physical_fixture = line.endswith("/test.c")
+                if physical_fixture and line.startswith("DA:"):
+                    number, count = map(int, line[3:].split(",")[:2])
+                    if number in measured: lines.append(count)
+            assert lines and regions
+            summary = {"lines": round(100 * sum(n > 0 for n in lines) / len(lines), 2),
+                       "regions": round(100 * sum(r[4] > 0 for r in regions) / len(regions), 2)}
+            print("Field wallet production coverage:", summary)
+            assert min(summary.values()) >= 80, "Wallet coverage below 80%"
+
     def test_native_inspect_requires_the_matching_driver_without_executing_it(self):
         storage_native(r'''
 bool library_native_inspect_ready(Storage*,LibraryFileKind);
 static uint8_t elf[512];
+static unsigned api_minor=22;
 static void p16(unsigned at,uint16_t n){elf[at]=n;elf[at+1]=n>>8;}
 static void p32(unsigned at,uint32_t n){p16(at,n);p16(at+2,n>>16);}
 static void app_file(Storage*s,const char*path,const char*name,uint32_t version,unsigned api,unsigned target){
  memset(elf,0,sizeof(elf));memcpy(elf,"\177ELF\1\1\1",7);p16(16,1);p16(18,40);p32(20,1);p32(32,64);p16(40,52);p16(46,40);p16(48,3);p16(50,1);
  p32(108,3);p32(120,256);p32(124,32);p32(144,1);p32(148,1);p32(160,320);p32(164,85);memcpy(elf+256,"\0.fapmeta\0",10);
- p32(320,0x52474448);p32(324,1);p16(328,22);p16(330,api);p16(332,target);p32(336,version);memcpy(elf+340,name,strlen(name)+1);
+ p32(320,0x52474448);p32(324,1);p16(328,api_minor);p16(330,api);p16(332,target);p32(336,version);memcpy(elf+340,name,strlen(name)+1);
  storage_common_remove(s,path);File*f=storage_file_alloc(s);assert(storage_file_open(f,path,FSAM_WRITE,FSOM_CREATE_NEW));assert(storage_file_write(f,elf,sizeof(elf))==sizeof(elf));assert(storage_file_close(f));storage_file_free(f);
 }
 int main(int argc,char**argv){
@@ -59,6 +106,8 @@ int main(int argc,char**argv){
  const char*rf="/ext/apps/RFID/lfrfid.fap";
  app_file(&s,rf,"125 kHz RFID",0x10000,88,7);assert(!library_native_inspect_ready(&s,LibraryFileRfid));
  app_file(&s,rf,"125 kHz RFID",0x10001,88,7);assert(library_native_inspect_ready(&s,LibraryFileRfid));
+ api_minor=23;app_file(&s,rf,"125 kHz RFID",0x10001,88,7);assert(!library_native_inspect_ready(&s,LibraryFileRfid));
+ api_minor=22;app_file(&s,rf,"125 kHz RFID",0x10001,88,7);
  read_budget=1;assert(!library_native_inspect_ready(&s,LibraryFileRfid));read_budget=-1;
  close_failure=true;assert(!library_native_inspect_ready(&s,LibraryFileRfid));close_failure=false;
  app_file(&s,rf,"Wrong app",0x10001,88,7);assert(!library_native_inspect_ready(&s,LibraryFileRfid));

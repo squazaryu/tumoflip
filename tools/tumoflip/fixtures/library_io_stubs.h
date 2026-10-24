@@ -55,7 +55,9 @@ typedef void PluginManager;
 static bool furi_record_exists(const char*k){(void)k;return false;}
 static void*furi_record_open(const char*k){(void)k;return NULL;}
 static void furi_record_close(const char*k){(void)k;}
-static const void*firmware_api_interface;
+typedef struct{uint16_t api_version_major,api_version_minor;}ElfApiInterface;
+static const ElfApiInterface fixture_firmware_api={88,22};
+static const ElfApiInterface*const firmware_api_interface=&fixture_firmware_api;
 enum{PluginManagerErrorNone};
 static PluginManager*plugin_manager_alloc(const char*a,unsigned b,const void*c){(void)a;(void)b;(void)c;return NULL;}
 static int plugin_manager_load_single(PluginManager*a,const char*b){(void)a;(void)b;return 1;}
