@@ -10,6 +10,36 @@ APP = ROOT / "applications/system/device_library"
 
 
 class WalletMenuTests(unittest.TestCase):
+    def test_stale_menu_events_cannot_bypass_dirty_card_or_index_bounds(self):
+        source = (APP / "device_library.c").read_text()
+        enums = source[source.index("enum {"):source.index("typedef struct {")]
+        native(r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stdbool.h>
+''' + enums + r'''
+typedef struct{unsigned link_count;}DeviceCard;
+typedef struct{unsigned count;}LibraryPins;
+typedef struct{LibraryPage page;DeviceCard card;LibraryPins pins;unsigned count,link,pin_edit;bool dirty,pins_ready;void*sources;}Library;
+''' + function(source, "static bool library_event_allowed(") + r'''
+int main(void){
+ Library a={.page=PageCard,.card={.link_count=2},.dirty=true};
+ assert(!library_event_allowed(&a,NewCard)&&!library_event_allowed(&a,OpenCards)&&!library_event_allowed(&a,Discard));
+ assert(library_event_allowed(&a,LinkBase)&&!library_event_allowed(&a,LinkBase+2));
+ assert(library_event_allowed(&a,SaveCard)&&library_event_allowed(&a,EditObject));
+ a.page=PageLink;a.link=1;assert(library_event_allowed(&a,OpenLink)&&library_event_allowed(&a,RenameAction));
+ a.link=2;assert(!library_event_allowed(&a,OpenLink)&&!library_event_allowed(&a,RenameAction)&&!library_event_allowed(&a,Details));
+ a.page=PageConfirmUnpin;a.pins.count=1;a.pin_edit=0;a.pins_ready=true;assert(library_event_allowed(&a,ConfirmUnpin));
+ a.pin_edit=1;assert(!library_event_allowed(&a,ConfirmUnpin));
+ a.page=PagePins;assert(library_event_allowed(&a,PinBase)&&!library_event_allowed(&a,PinBase+1));
+ a.pins_ready=false;assert(!library_event_allowed(&a,PinBase));
+ a.page=PageMain;assert(library_event_allowed(&a,NewCard)&&library_event_allowed(&a,OpenPins));assert(!library_event_allowed(&a,NameDone));
+ a.page=PageInput;assert(library_event_allowed(&a,NameDone)&&!library_event_allowed(&a,NewCard));
+ a.page=PageSources;a.count=1;a.sources=&a;assert(library_event_allowed(&a,SourceBase)&&!library_event_allowed(&a,SourceBase+1));
+ return 0;
+}
+''')
+
     def test_back_keeps_edit_context_and_never_discards_dirty_objects(self):
         source = (APP / "device_library.c").read_text()
         enums = source[source.index("enum {"):source.index("typedef struct {")]
