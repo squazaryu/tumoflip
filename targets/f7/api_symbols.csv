@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,88.21,,
+Version,+,88.22,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/services/applications.h,,
 Header,+,applications/services/bt/bt_service/bt.h,,
@@ -3237,6 +3237,7 @@ Function,+,popup_set_context,void,"Popup*, void*"
 Function,+,popup_set_header,void,"Popup*, const char*, uint8_t, uint8_t, Align, Align"
 Function,+,popup_set_icon,void,"Popup*, uint8_t, uint8_t, const Icon*"
 Function,+,popup_set_text,void,"Popup*, const char*, uint8_t, uint8_t, Align, Align"
+Function,+,popup_set_text_width,void,"Popup*, uint8_t"
 Function,+,popup_set_timeout,void,"Popup*, uint32_t"
 Function,-,posix_memalign,int,"void**, size_t, size_t"
 Function,-,pow,double,"double, double"

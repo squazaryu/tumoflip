@@ -30,6 +30,7 @@ static u8g2_uint_t checked_ui_text(u8g2_t* fb,u8g2_uint_t x,u8g2_uint_t y,const 
     button = (ROOT / "applications/main/ibutton/scenes/ibutton_scene_write_success.c").read_text()
     code = r'''
 typedef void View;
+#define furi_string_cat_str furi_string_cat
 typedef struct {const Icon* frame;} IconAnimation;
 static void canvas_draw_icon_animation(Canvas* c,int x,int y,IconAnimation* a){canvas_draw_icon(c,x,y,a->frame);}
 typedef struct {const char* text;uint8_t x,y;Align horizontal,vertical;} TextElement;
@@ -79,6 +80,9 @@ int main(int argc,char** argv){assert(argc==2);Canvas c={0};static uint8_t buffe
  static const u8x8_display_info_t info={.tile_width=16,.tile_height=8,.pixel_width=128,.pixel_height=64};
  c.fb.u8x8.display_info=&info;u8g2_SetupBuffer(&c.fb,buffer,8,u8g2_ll_hvline_vertical_top_lsb,U8G2_R0);
  PopupModel model={0};Popup popup={.view=&model};
+ popup_set_text_width(&popup,255);assert(model.text_width==128);popup_reset(&popup);
+ assert(model.text_width==0);
+ CHECK_FIT
  LfRfid app={.dict="PAC/Stanley",.file_name=furi_string_alloc(),.popup=&popup};
  const char* names[]={"","FrontDoor","WWWWWWWWWWWWWWWWWWWWWWWWWW","Мой_домофон_очень_длинное_имя"};
  for(unsigned n=0;n<4;n++){
@@ -86,7 +90,10 @@ int main(int argc,char** argv){assert(argc==2);Canvas c={0};static uint8_t buffe
   popup_set_icon(&popup,0,8,&I_NFC_manual_60x50);
   popup_set_header(&popup,"Writing",HEADER_X,HEADER_Y,AlignCenter,AlignTop);
   furi_string_set(app.file_name,names[n]);lfrfid_scene_write_set_status(&app,"EM4305");
-  popup_view_draw_callback(&c,&model);char frame[40];snprintf(frame,sizeof(frame),"%02u-write",n+1);save(&c,argv[1],frame);
+  const char* original=model.text.text;char copy[128];snprintf(copy,sizeof(copy),"%s",original);
+  popup_view_draw_callback(&c,&model);assert(model.text.text==original&&!strcmp(copy,original));
+  assert(!strcmp(furi_string_get_cstr(app.file_name),names[n]));
+  char frame[40];snprintf(frame,sizeof(frame),"%02u-write",n+1);save(&c,argv[1],frame);
  }
  popup_reset(&popup);assert(model.text_width==0);
  iButton button={.popup=&popup,.worker="TM2004"};ibutton_scene_write_success_on_enter(&button);
@@ -99,6 +106,13 @@ int main(int argc,char** argv){assert(argc==2);Canvas c={0};static uint8_t buffe
  furi_string_free(app.file_name);return 0;}
 '''
     code = code.replace("HEADER_X", header[0]).replace("HEADER_Y", header[1])
+    code = code.replace("CHECK_FIT", r'''
+ canvas_set_font(&c,FontSecondary);
+ FuriString* tiny=popup_fit_text(&c,"Wide text",1);assert(furi_string_empty(tiny));furi_string_free(tiny);
+ FuriString* unicode=popup_fit_text(&c,"WWWWWWWWWWключ_длинный",64);
+ assert(canvas_string_width(&c,furi_string_get_cstr(unicode))<=64);
+ printf("%s\n",furi_string_get_cstr(unicode));furi_string_free(unicode);
+''' if "static FuriString* popup_fit_text(" in popup else "")
     assets = []
     symbols = set(re.findall(r"\bI_[A-Za-z0-9_]+", code))
     for symbol in sorted(symbols):
