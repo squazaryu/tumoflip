@@ -1,6 +1,9 @@
 #include "wallet_launch.h"
 #include "../../../lib/fap_metadata/fap_metadata.h"
+#include <flipper_application/elf/elf_api_interface.h>
 #include <string.h>
+
+extern const ElfApiInterface* const firmware_api_interface;
 
 static bool library_fap_read(void* context, uint32_t offset, void* output, size_t size) {
     File* file = context;
@@ -22,7 +25,9 @@ bool library_native_inspect_ready(Storage* storage, LibraryFileKind kind) {
     bool ok = open &&
               arf_elf_metadata_read(library_fap_read, file, storage_file_size(file), &metadata) ==
                   ArfElfOk &&
-              metadata.target == 7 && metadata.api_major == 88 &&
+              metadata.target == 7 &&
+              metadata.api_major == firmware_api_interface->api_version_major &&
+              metadata.api_minor <= firmware_api_interface->api_version_minor &&
               metadata.app_version >= 0x00010001U &&
               !strcmp(metadata.name, library_launch_target(kind));
     if(open) ok = storage_file_close(file) && ok;
