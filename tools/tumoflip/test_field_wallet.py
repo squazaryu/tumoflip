@@ -85,6 +85,31 @@ class FieldWalletTests(unittest.TestCase):
             print("Field wallet production coverage:", summary)
             assert min(summary.values()) >= 80, "Wallet coverage below 80%"
 
+    def test_readback_must_match_the_written_record_not_another_valid_checksum(self):
+        storage_native(r'''
+static void replace_written(const char*path){
+ write_closed_hook=NULL;FILE*f=fopen(path,"r+b");assert(f);
+ if(strstr(path,".card")){
+  CardEnvelope e;assert(fread(&e,1,sizeof(e),f)==sizeof(e));strcpy(e.card.notes,"Different record");e.generation++;
+  assert(!mbedtls_sha256((const uint8_t*)&e,offsetof(CardEnvelope,checksum),e.checksum,0));rewind(f);assert(fwrite(&e,1,sizeof(e),f)==sizeof(e));
+ }else{
+  PinEnvelope e;assert(fread(&e,1,sizeof(e),f)==sizeof(e));e.pins.count=0;e.generation++;
+  assert(!mbedtls_sha256((const uint8_t*)&e,offsetof(PinEnvelope,checksum),e.checksum,0));rewind(f);assert(fwrite(&e,1,sizeof(e),f)==sizeof(e));
+ }
+ assert(!fclose(f));
+}
+int main(int argc,char**argv){
+ assert(argc==2);Storage s={0};snprintf(s.root,sizeof(s.root),"%s",argv[1]);assert(storage_simply_mkdir(&s,"/ext/apps_data"));
+ DeviceCard card={.name="Office",.notes="Committed"},loaded;assert(library_card_save(&s,&card));
+ strcpy(card.notes,"Requested");write_closed_hook=replace_written;assert(!library_card_save(&s,&card));
+ assert(library_card_load(&s,"Office",&loaded)&&!strcmp(loaded.notes,"Committed"));
+ LibraryPins pins={0},read;assert(library_pins_toggle(&pins,"Office")&&library_pins_save(&s,&pins));
+ assert(library_pins_toggle(&pins,"Garage"));write_closed_hook=replace_written;assert(!library_pins_save(&s,&pins));
+ assert(library_pins_load(&s,&read)&&read.count==1&&library_pins_contains(&read,"Office"));
+ return 0;
+}
+''')
+
     def test_native_inspect_requires_the_matching_driver_without_executing_it(self):
         storage_native(r'''
 bool library_native_inspect_ready(Storage*,LibraryFileKind);
