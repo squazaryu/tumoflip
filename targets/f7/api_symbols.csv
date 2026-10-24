@@ -3693,8 +3693,8 @@ Function,+,subghz_devices_end,void,const SubGhzDevice*
 Function,+,subghz_devices_flush_rx,void,const SubGhzDevice*
 Function,+,subghz_devices_flush_tx,void,const SubGhzDevice*
 Function,+,subghz_devices_get_by_name,const SubGhzDevice*,const char*
-Function,+,subghz_devices_get_data_gpio,const GpioPin*,const SubGhzDevice*
 Function,+,subghz_devices_get_channel_checked,_Bool,"const SubGhzDevice*, uint8_t*"
+Function,+,subghz_devices_get_data_gpio,const GpioPin*,const SubGhzDevice*
 Function,+,subghz_devices_get_lqi,uint8_t,const SubGhzDevice*
 Function,+,subghz_devices_get_name,const char*,const SubGhzDevice*
 Function,+,subghz_devices_get_rssi,float,const SubGhzDevice*
@@ -3709,8 +3709,8 @@ Function,+,subghz_devices_read_packet,void,"const SubGhzDevice*, uint8_t*, uint8
 Function,+,subghz_devices_reset,void,const SubGhzDevice*
 Function,+,subghz_devices_rx_pipe_not_empty,_Bool,const SubGhzDevice*
 Function,+,subghz_devices_set_async_mirror_pin,void,"const SubGhzDevice*, const GpioPin*"
-Function,+,subghz_devices_set_frequency,uint32_t,"const SubGhzDevice*, uint32_t"
 Function,+,subghz_devices_set_channel_checked,_Bool,"const SubGhzDevice*, uint8_t"
+Function,+,subghz_devices_set_frequency,uint32_t,"const SubGhzDevice*, uint32_t"
 Function,+,subghz_devices_set_rx,void,const SubGhzDevice*
 Function,+,subghz_devices_set_tx,_Bool,const SubGhzDevice*
 Function,+,subghz_devices_sleep,void,const SubGhzDevice*
@@ -3805,9 +3805,9 @@ Function,+,subghz_protocol_marantec_crc8,uint8_t,"uint8_t*, size_t"
 Function,+,subghz_protocol_nice_flor_s_create_data,_Bool,"void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, SubGhzRadioPreset*, _Bool"
 Function,+,subghz_protocol_nice_flor_s_decrypt_ic,uint64_t,"uint64_t, uint16_t, const char*"
 Function,+,subghz_protocol_nice_o_create_data,_Bool,"void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, uint16_t, SubGhzRadioPreset*"
-Function,+,subghz_protocol_nice_o_one_create_data,_Bool,"void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, uint16_t, SubGhzRadioPreset*"
 Function,+,subghz_protocol_nice_o_get_parcel,uint8_t,uint64_t
 Function,+,subghz_protocol_nice_o_mask,void,"uint8_t, uint32_t*, uint16_t*"
+Function,+,subghz_protocol_nice_o_one_create_data,_Bool,"void*, FlipperFormat*, uint32_t, uint8_t, uint16_t, uint16_t, SubGhzRadioPreset*"
 Function,+,subghz_protocol_pack_group_get_name,const char*,SubGhzProtocolPackGroup
 Function,+,subghz_protocol_pack_registry_alloc,SubGhzProtocolPackRegistry*,"const SubGhzProtocolRegistry*, const char*, SubGhzProtocolPackGroup"
 Function,+,subghz_protocol_pack_registry_free,void,SubGhzProtocolPackRegistry*
@@ -3877,8 +3877,8 @@ Function,+,subghz_tx_rx_worker_free,void,SubGhzTxRxWorker*
 Function,+,subghz_tx_rx_worker_is_running,_Bool,SubGhzTxRxWorker*
 Function,+,subghz_tx_rx_worker_read,size_t,"SubGhzTxRxWorker*, uint8_t*, size_t"
 Function,+,subghz_tx_rx_worker_set_callback_have_read,void,"SubGhzTxRxWorker*, SubGhzTxRxWorkerCallbackHaveRead, void*"
-Function,+,subghz_tx_rx_worker_set_packet_preset,_Bool,"SubGhzTxRxWorker*, FuriHalSubGhzPreset, const uint8_t*, size_t"
 Function,+,subghz_tx_rx_worker_set_packet_channel,_Bool,"SubGhzTxRxWorker*, uint8_t"
+Function,+,subghz_tx_rx_worker_set_packet_preset,_Bool,"SubGhzTxRxWorker*, FuriHalSubGhzPreset, const uint8_t*, size_t"
 Function,+,subghz_tx_rx_worker_set_radio_lease,_Bool,"SubGhzTxRxWorker*, SubGhzRadioBroker*, const SubGhzRadioBrokerLease*"
 Function,+,subghz_tx_rx_worker_start,_Bool,"SubGhzTxRxWorker*, const SubGhzDevice*, uint32_t"
 Function,+,subghz_tx_rx_worker_stop,void,SubGhzTxRxWorker*
@@ -3937,11 +3937,11 @@ Function,-,tempnam,char*,"const char*, const char*"
 Function,+,texkom_alloc,TexkomData*,
 Function,+,texkom_copy,void,"TexkomData*, const TexkomData*"
 Function,+,texkom_free,void,TexkomData*
-Function,+,texkom_get_base_data,TexkomData*,"const TexkomData*"
+Function,+,texkom_get_base_data,TexkomData*,const TexkomData*
 Function,+,texkom_get_device_name,const char*,"const TexkomData*, NfcDeviceNameType"
 Function,+,texkom_get_expected_crc,_Bool,"const TexkomData*, uint8_t*"
 Function,+,texkom_get_uid,const uint8_t*,"const TexkomData*, size_t*"
-Function,+,texkom_is_crc_valid,_Bool,"const TexkomData*"
+Function,+,texkom_is_crc_valid,_Bool,const TexkomData*
 Function,+,texkom_is_equal,_Bool,"const TexkomData*, const TexkomData*"
 Function,+,texkom_load,_Bool,"TexkomData*, FlipperFormat*, uint32_t"
 Function,+,texkom_reset,void,TexkomData*
