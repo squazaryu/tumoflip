@@ -65,6 +65,13 @@ typedef enum {
     FuriHalRtcRegisterTumoflipActiveApp2,
     FuriHalRtcRegisterTumoflipActiveCommit,
 
+    /* Active app is now volatile C1 RAM. These retained indices hold OOM data. */
+    FuriHalRtcRegisterTumoflipOOMRequested = FuriHalRtcRegisterTumoflipActiveApp0,
+    FuriHalRtcRegisterTumoflipOOMStats0 = FuriHalRtcRegisterTumoflipActiveApp1,
+    FuriHalRtcRegisterTumoflipOOMStats1 = FuriHalRtcRegisterTumoflipActiveApp2,
+    FuriHalRtcRegisterTumoflipOOMThread0 = FuriHalRtcRegisterTumoflipActiveCommit,
+    FuriHalRtcRegisterTumoflipOOMThread1 = 19,
+
     FuriHalRtcRegisterMAX, /**< Service value, do not use */
 } FuriHalRtcRegister;
 

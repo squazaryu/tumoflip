@@ -1,6 +1,7 @@
 """Host checks for the bounded RTC crash record and its clear semantics."""
 
 import subprocess
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,22 +10,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
+_RTC_HEADER = (ROOT / "targets/f7/furi_hal/furi_hal_rtc.h").read_text()
+_RTC_ENUM = re.search(r"typedef enum \{\s*FuriHalRtcRegisterHeader,.*?\} FuriHalRtcRegister;", _RTC_HEADER, re.S).group(0)
 RTC_STUB = """
 #pragma once
 #include <stdint.h>
-typedef enum {
-    FuriHalRtcRegisterTumoflipCrashMarker = 8,
-    FuriHalRtcRegisterTumoflipCrashMeta,
-    FuriHalRtcRegisterTumoflipCrashCommit,
-    FuriHalRtcRegisterTumoflipCrashApp0,
-    FuriHalRtcRegisterTumoflipCrashApp1,
-    FuriHalRtcRegisterTumoflipCrashApp2,
-    FuriHalRtcRegisterTumoflipCrashChecksum,
-    FuriHalRtcRegisterTumoflipActiveApp0,
-    FuriHalRtcRegisterTumoflipActiveApp1,
-    FuriHalRtcRegisterTumoflipActiveApp2,
-    FuriHalRtcRegisterTumoflipActiveCommit,
-} FuriHalRtcRegister;
+#define FURI_DEPRECATED
+""" + _RTC_ENUM + """
 uint32_t furi_hal_rtc_get_register(FuriHalRtcRegister reg);
 void furi_hal_rtc_set_register(FuriHalRtcRegister reg, uint32_t value);
 """
@@ -39,8 +31,12 @@ HARNESS = r"""
 
 static uint32_t registers[20];
 static int last_written_register = -1;
-uint32_t furi_hal_rtc_get_register(FuriHalRtcRegister reg) { return registers[reg]; }
+static int writes_allowed = -1;
+uint32_t furi_hal_rtc_get_register(FuriHalRtcRegister reg) { assert((unsigned)reg<20);return registers[reg]; }
 void furi_hal_rtc_set_register(FuriHalRtcRegister reg, uint32_t value) {
+    assert((unsigned)reg<20);
+    if(writes_allowed == 0) return;
+    if(writes_allowed > 0) --writes_allowed;
     registers[reg] = value;
     last_written_register = reg;
 }
@@ -103,7 +99,8 @@ class CrashJournalTests(unittest.TestCase):
             binary = root / "test_crash_journal"
             command = [
                 "cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
-                "-I", str(root), "-I", str(ROOT), str(source), "-o", str(binary),
+                "-I", str(root), "-I", str(ROOT), "-I", str(ROOT / "lib"),
+                str(source), str(ROOT / "furi/core/crash_journal.c"), "-o", str(binary),
             ]
             compiled = subprocess.run(command, capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
