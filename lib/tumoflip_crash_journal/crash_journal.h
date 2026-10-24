@@ -13,6 +13,7 @@
 
 #define TUMOFLIP_CRASH_JOURNAL_MAGIC 0x54434A31UL
 #define TUMOFLIP_CRASH_JOURNAL_APP_LENGTH 12U
+#define TUMOFLIP_CRASH_OOM_MAGIC 0x54434A32UL
 
 typedef enum {
     TumoflipCrashKindNone = 0,
@@ -23,13 +24,24 @@ typedef enum {
     TumoflipCrashKindUsageFault = 5,
     TumoflipCrashKindWatchdog = 6,
     TumoflipCrashKindOther = 7,
+    TumoflipCrashKindOutOfMemory = 8,
 } TumoflipCrashKind;
+
+typedef struct {
+    uint32_t requested;
+    uint32_t free_heap;
+    uint32_t largest_block;
+    uint32_t tick_ms;
+    char thread[TUMOFLIP_CRASH_JOURNAL_APP_LENGTH + 1U];
+} TumoflipOOMContext;
 
 typedef struct {
     TumoflipCrashKind kind;
     uint16_t sequence;
     uint32_t commit;
     char app_id[TUMOFLIP_CRASH_JOURNAL_APP_LENGTH + 1U];
+    bool has_oom_context;
+    TumoflipOOMContext oom;
 } TumoflipCrashReport;
 
 static inline uint32_t tumoflip_crash_journal_commit(const char* git_hash) {
@@ -87,44 +99,65 @@ static inline uint32_t tumoflip_crash_journal_checksum(
            app[0] ^ app[1] ^ app[2];
 }
 
-static inline bool tumoflip_crash_journal_read(TumoflipCrashReport* report) {
-    if(!report ||
-       furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipCrashMarker) !=
-           TUMOFLIP_CRASH_JOURNAL_MAGIC) {
+static inline bool tumoflip_crash_journal_read_base(uint32_t data[5]) {
+    if(furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipCrashMarker) !=
+       TUMOFLIP_CRASH_JOURNAL_MAGIC) {
         return false;
     }
-    const uint32_t meta = furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipCrashMeta);
-    const uint32_t commit = furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipCrashCommit);
-    const uint32_t app[3] = {
-        furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipCrashApp0),
-        furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipCrashApp1),
-        furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipCrashApp2),
-    };
+    for(size_t i = 0; i < 5U; ++i)
+        data[i] = furi_hal_rtc_get_register((FuriHalRtcRegister)(FuriHalRtcRegisterTumoflipCrashMeta + i));
     if(furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipCrashChecksum) !=
-       tumoflip_crash_journal_checksum(meta, commit, app)) {
+       tumoflip_crash_journal_checksum(data[0], data[1], &data[2])) {
         return false;
     }
-    const uint32_t kind = (meta >> 24U) & 0xFFU;
-    const uint16_t sequence = (uint16_t)(meta & 0xFFFFU);
-    if(kind == TumoflipCrashKindNone || kind > TumoflipCrashKindOther || !sequence) return false;
+    const uint32_t kind = data[0] >> 24U;
+    return kind > TumoflipCrashKindNone && kind <= TumoflipCrashKindOutOfMemory &&
+           (uint16_t)data[0] != 0;
+}
 
-    report->kind = (TumoflipCrashKind)kind;
-    report->sequence = sequence;
-    report->commit = commit;
+static inline uint32_t tumoflip_crash_oom_checksum(const uint32_t words[7]) {
+    uint32_t checksum = TUMOFLIP_CRASH_OOM_MAGIC ^
+                        furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipCrashChecksum);
+    for(size_t i = 0; i < 7U; ++i) checksum ^= words[i];
+    return checksum;
+}
+
+static inline bool tumoflip_crash_journal_read(TumoflipCrashReport* report) {
+    uint32_t data[5];
+    if(!report || !tumoflip_crash_journal_read_base(data)) return false;
+    memset(report, 0, sizeof(*report));
+    report->kind = (TumoflipCrashKind)(data[0] >> 24U);
+    report->sequence = (uint16_t)data[0];
+    report->commit = data[1];
     for(size_t i = 0; i < TUMOFLIP_CRASH_JOURNAL_APP_LENGTH; i++) {
-        report->app_id[i] = (char)((app[i / 4U] >> ((i % 4U) * 8U)) & 0xFFU);
+        report->app_id[i] = (char)((data[2U + i / 4U] >> ((i % 4U) * 8U)) & 0xFFU);
     }
-    report->app_id[TUMOFLIP_CRASH_JOURNAL_APP_LENGTH] = '\0';
+    if(report->kind == TumoflipCrashKindOutOfMemory &&
+       furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipOOMMarker) == TUMOFLIP_CRASH_OOM_MAGIC) {
+        uint32_t words[7];
+        for(size_t i = 0; i < 7U; ++i)
+            words[i] = furi_hal_rtc_get_register((FuriHalRtcRegister)(FuriHalRtcRegisterTumoflipOOMRequested + i));
+        if(furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipOOMChecksum) ==
+           tumoflip_crash_oom_checksum(words)) {
+            report->has_oom_context = true;
+            report->oom.requested = words[0];
+            report->oom.free_heap = words[1];
+            report->oom.largest_block = words[2];
+            report->oom.tick_ms = words[3];
+            for(size_t i = 0; i < TUMOFLIP_CRASH_JOURNAL_APP_LENGTH; ++i)
+                report->oom.thread[i] = (char)(words[4U + i / 4U] >> ((i % 4U) * 8U));
+        }
+    }
     return true;
 }
 
 static inline void tumoflip_crash_journal_record(
     TumoflipCrashKind kind,
     const char* git_hash) {
-    if(kind == TumoflipCrashKindNone || kind > TumoflipCrashKindOther) return;
-    TumoflipCrashReport previous;
-    const uint16_t sequence = tumoflip_crash_journal_read(&previous) ?
-                                  (uint16_t)(previous.sequence + 1U) : 1U;
+    if(kind == TumoflipCrashKindNone || kind > TumoflipCrashKindOutOfMemory) return;
+    uint32_t previous[5];
+    const uint16_t sequence = tumoflip_crash_journal_read_base(previous) ?
+                                  (uint16_t)(previous[0] + 1U) : 1U;
     const uint16_t next_sequence = sequence ? sequence : 1U;
     const uint32_t commit = tumoflip_crash_journal_commit(git_hash);
     const uint32_t active_commit =
@@ -138,6 +171,7 @@ static inline void tumoflip_crash_journal_record(
     const uint32_t meta = ((uint32_t)kind << 24U) | next_sequence;
 
     furi_hal_rtc_set_register(FuriHalRtcRegisterTumoflipCrashMarker, 0);
+    furi_hal_rtc_set_register(FuriHalRtcRegisterTumoflipOOMMarker, 0);
     furi_hal_rtc_set_register(FuriHalRtcRegisterTumoflipCrashMeta, meta);
     furi_hal_rtc_set_register(FuriHalRtcRegisterTumoflipCrashCommit, commit);
     furi_hal_rtc_set_register(FuriHalRtcRegisterTumoflipCrashApp0, app[0]);
@@ -150,12 +184,29 @@ static inline void tumoflip_crash_journal_record(
         FuriHalRtcRegisterTumoflipCrashMarker, TUMOFLIP_CRASH_JOURNAL_MAGIC);
 }
 
+static inline void tumoflip_crash_journal_attach_oom(const TumoflipOOMContext* context) {
+    uint32_t base[5];
+    if(!context || !context->requested || !tumoflip_crash_journal_read_base(base) ||
+       base[0] >> 24U != TumoflipCrashKindOutOfMemory) return;
+    uint32_t words[7] = {context->requested, context->free_heap, context->largest_block, context->tick_ms};
+    for(size_t i = 0; i < TUMOFLIP_CRASH_JOURNAL_APP_LENGTH && context->thread[i]; ++i) {
+        const char c = tumoflip_crash_journal_app_char(context->thread[i]) ? context->thread[i] : '_';
+        words[4U + i / 4U] |= (uint32_t)(uint8_t)c << ((i % 4U) * 8U);
+    }
+    furi_hal_rtc_set_register(FuriHalRtcRegisterTumoflipOOMMarker, 0);
+    for(size_t i = 0; i < 7U; ++i)
+        furi_hal_rtc_set_register((FuriHalRtcRegister)(FuriHalRtcRegisterTumoflipOOMRequested + i), words[i]);
+    furi_hal_rtc_set_register(FuriHalRtcRegisterTumoflipOOMChecksum, tumoflip_crash_oom_checksum(words));
+    furi_hal_rtc_set_register(FuriHalRtcRegisterTumoflipOOMMarker, TUMOFLIP_CRASH_OOM_MAGIC);
+}
+
 static inline void tumoflip_crash_journal_ack(void) {
     furi_hal_rtc_set_register(FuriHalRtcRegisterTumoflipCrashMarker, 0);
 }
 
 static inline TumoflipCrashKind tumoflip_crash_journal_classify(const char* message) {
     if(!message) return TumoflipCrashKindOther;
+    if(strcmp(message, "out of memory") == 0) return TumoflipCrashKindOutOfMemory;
     if(strcmp(message, "HardFault") == 0) return TumoflipCrashKindHardFault;
     if(strcmp(message, "NULL pointer dereference") == 0) return TumoflipCrashKindNullPointer;
     if(strncmp(message, "MemManage", 9U) == 0 || strcmp(message, "StackOverflow") == 0 ||
@@ -176,6 +227,7 @@ static inline const char* tumoflip_crash_journal_kind_name(TumoflipCrashKind kin
     case TumoflipCrashKindUsageFault: return "usage_fault";
     case TumoflipCrashKindWatchdog: return "watchdog";
     case TumoflipCrashKindOther: return "other";
+    case TumoflipCrashKindOutOfMemory: return "oom";
     default: return "none";
     }
 }

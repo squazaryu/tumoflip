@@ -65,6 +65,17 @@ typedef enum {
     FuriHalRtcRegisterTumoflipActiveApp2,
     FuriHalRtcRegisterTumoflipActiveCommit,
 
+    /* Optional OOM context, appended without moving legacy register indices. */
+    FuriHalRtcRegisterTumoflipOOMMarker,
+    FuriHalRtcRegisterTumoflipOOMRequested,
+    FuriHalRtcRegisterTumoflipOOMFree,
+    FuriHalRtcRegisterTumoflipOOMLargest,
+    FuriHalRtcRegisterTumoflipOOMTicks,
+    FuriHalRtcRegisterTumoflipOOMThread0,
+    FuriHalRtcRegisterTumoflipOOMThread1,
+    FuriHalRtcRegisterTumoflipOOMThread2,
+    FuriHalRtcRegisterTumoflipOOMChecksum,
+
     FuriHalRtcRegisterMAX, /**< Service value, do not use */
 } FuriHalRtcRegister;
 

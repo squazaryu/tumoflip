@@ -1,4 +1,5 @@
 #include "check.h"
+#include "check_i.h"
 #include "common_defines.h"
 
 #include <stm32wbxx.h>
@@ -18,6 +19,7 @@
 
 PLACE_IN_SECTION("MB_MEM2") const char* __furi_check_message = NULL;
 PLACE_IN_SECTION("MB_MEM2") uint32_t __furi_check_registers[13] = {0};
+static TumoflipOOMContext __furi_oom_context;
 
 /** Load r12 value to __furi_check_message and store registers to __furi_check_registers */
 #define GET_MESSAGE_AND_STORE_REGISTERS()               \
@@ -136,6 +138,19 @@ static void __furi_print_name(bool isr) {
     }
 }
 
+FURI_NORETURN void __furi_crash_oom(size_t requested) {
+    __disable_irq();
+    HeapStats_t stats;
+    vPortGetHeapStats(&stats);
+    __furi_oom_context.requested = requested;
+    __furi_oom_context.free_heap = stats.xAvailableHeapSpaceInBytes;
+    __furi_oom_context.largest_block = stats.xSizeOfLargestFreeBlockInBytes;
+    __furi_oom_context.tick_ms = xTaskGetTickCount();
+    const char* name = pcTaskGetName(NULL);
+    strncpy(__furi_oom_context.thread, name ? name : "main", TUMOFLIP_CRASH_JOURNAL_APP_LENGTH);
+    furi_crash("out of memory");
+}
+
 FURI_NORETURN void __furi_crash_implementation(void) {
     __disable_irq();
     GET_MESSAGE_AND_STORE_REGISTERS();
@@ -150,6 +165,16 @@ FURI_NORETURN void __furi_crash_implementation(void) {
         __furi_check_message = "furi_check failed";
     }
 
+    bool debug = CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk;
+#ifdef FURI_NDEBUG
+    if(!debug) {
+        TumoflipCrashKind kind = tumoflip_crash_journal_classify(__furi_check_message);
+        tumoflip_crash_journal_record(kind, version_get_githash(NULL));
+        if(kind == TumoflipCrashKindOutOfMemory)
+            tumoflip_crash_journal_attach_oom(&__furi_oom_context);
+    }
+#endif
+
     furi_log_puts("\r\n\033[0;31m[CRASH]");
     __furi_print_name(isr);
     furi_log_puts(__furi_check_message);
@@ -163,7 +188,6 @@ FURI_NORETURN void __furi_crash_implementation(void) {
 
     // Check if debug enabled by DAP
     // https://developer.arm.com/documentation/ddi0403/d/Debug-Architecture/ARMv7-M-Debug/Debug-register-support-in-the-SCS/Debug-Halting-Control-and-Status-Register--DHCSR?lang=en
-    bool debug = CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk;
 #ifdef FURI_NDEBUG
     if(debug) {
 #endif
@@ -174,9 +198,6 @@ FURI_NORETURN void __furi_crash_implementation(void) {
         RESTORE_REGISTERS_AND_HALT_MCU(debug);
 #ifdef FURI_NDEBUG
     } else {
-        tumoflip_crash_journal_record(
-            tumoflip_crash_journal_classify(__furi_check_message),
-            version_get_githash(NULL));
         uint32_t ptr = (uint32_t)__furi_check_message;
         if(ptr < FLASH_BASE || ptr > (FLASH_BASE + FLASH_SIZE)) {
             ptr = (uint32_t) "Check serial logs";

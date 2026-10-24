@@ -24,6 +24,15 @@ typedef enum {
     FuriHalRtcRegisterTumoflipActiveApp1,
     FuriHalRtcRegisterTumoflipActiveApp2,
     FuriHalRtcRegisterTumoflipActiveCommit,
+    FuriHalRtcRegisterTumoflipOOMMarker,
+    FuriHalRtcRegisterTumoflipOOMRequested,
+    FuriHalRtcRegisterTumoflipOOMFree,
+    FuriHalRtcRegisterTumoflipOOMLargest,
+    FuriHalRtcRegisterTumoflipOOMTicks,
+    FuriHalRtcRegisterTumoflipOOMThread0,
+    FuriHalRtcRegisterTumoflipOOMThread1,
+    FuriHalRtcRegisterTumoflipOOMThread2,
+    FuriHalRtcRegisterTumoflipOOMChecksum,
 } FuriHalRtcRegister;
 uint32_t furi_hal_rtc_get_register(FuriHalRtcRegister reg);
 void furi_hal_rtc_set_register(FuriHalRtcRegister reg, uint32_t value);
@@ -37,7 +46,7 @@ HARNESS = r"""
 #include <string.h>
 #include "furi_hal_rtc.h"
 
-static uint32_t registers[20];
+static uint32_t registers[32];
 static int last_written_register = -1;
 uint32_t furi_hal_rtc_get_register(FuriHalRtcRegister reg) { return registers[reg]; }
 void furi_hal_rtc_set_register(FuriHalRtcRegister reg, uint32_t value) {

@@ -37,6 +37,7 @@
 
 #include "memmgr_heap.h"
 #include "check.h"
+#include "check_i.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -463,7 +464,8 @@ void* pvPortMalloc(size_t xWantedSize) {
 
     configASSERT((((size_t)pvReturn) & (size_t)portBYTE_ALIGNMENT_MASK) == 0);
 
-    furi_check(pvReturn, xWantedSize ? "out of memory" : "malloc(0)");
+    if(!pvReturn && xToWipe) __furi_crash_oom(xToWipe);
+    furi_check(pvReturn, "malloc(0)");
     pvReturn = memset(pvReturn, 0, xToWipe);
     return pvReturn;
 }

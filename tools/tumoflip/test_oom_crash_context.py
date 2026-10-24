@@ -18,7 +18,7 @@ EXTRA_REGISTERS = """
     FuriHalRtcRegisterTumoflipOOMThread2,
     FuriHalRtcRegisterTumoflipOOMChecksum,
 """
-STUB = RTC_STUB.replace("    FuriHalRtcRegisterTumoflipActiveCommit,", "    FuriHalRtcRegisterTumoflipActiveCommit," + EXTRA_REGISTERS)
+STUB = RTC_STUB if "FuriHalRtcRegisterTumoflipOOMMarker" in RTC_STUB else RTC_STUB.replace("    FuriHalRtcRegisterTumoflipActiveCommit,", "    FuriHalRtcRegisterTumoflipActiveCommit," + EXTRA_REGISTERS)
 PREAMBLE = HARNESS[:HARNESS.index("int main(void)")].replace("registers[20]", "registers[32]")
 
 
@@ -55,7 +55,7 @@ int main(void){
 int main(void){
  TumoflipCrashReport report;
  TumoflipOOMContext context={.requested=UINT32_MAX,.free_heap=114672,.largest_block=113448,
-                            .tick_ms=UINT32_MAX,.thread="BtSrv;payload"};
+                            .tick_ms=UINT32_MAX,.thread="BtSrv;payloa"};
  // A legacy record remains readable with no invented allocation context.
  tumoflip_crash_journal_record(TumoflipCrashKindOther,"8aaa6856");
  assert(tumoflip_crash_journal_read(&report)&&!report.has_oom_context);
@@ -90,7 +90,7 @@ int main(void){
     def test_capture_before_logging_preserves_actual_requested_size(self):
         allocator = (ROOT / "furi/core/memmgr_heap.c").read_text()
         self.assertIn("__furi_crash_oom(xToWipe)", allocator)
-        check = (ROOT / "furi/core/check.c").read_text()
+        check = (ROOT / "furi/core/check.c").read_text().replace("FURI_NORETURN ", "")
         crash = function(check, "__furi_crash_implementation")
         self.assertLess(crash.index("tumoflip_crash_journal_record("), crash.index("furi_log_puts("))
         capture = function(check, "__furi_crash_oom")
