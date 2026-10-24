@@ -17,7 +17,6 @@ env.Append(
         File("transmitter.h"),
         File("protocols/raw.h"),
         File("protocols/public_api.h"),
-        File("protocols/nice_o_counter.h"),
         File("protocols/plugin.h"),
         File("protocols/plugin_registry.h"),
         File("blocks/const.h"),

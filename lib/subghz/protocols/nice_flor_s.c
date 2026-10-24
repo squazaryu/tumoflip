@@ -1,6 +1,5 @@
 #include "nice_flor_s.h"
 #include "public_api.h"
-#include "nice_o_counter.h"
 
 #include "../blocks/const.h"
 #include "../blocks/decoder.h"

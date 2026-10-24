@@ -29,7 +29,6 @@
 #include <lib/subghz/protocols/protocol_items.h>
 #include <lib/subghz/protocols/nice_flor_s.h>
 #include <lib/subghz/protocols/public_api.h>
-#include <lib/subghz/protocols/nice_o_counter.h>
 #include <lib/subghz/blocks/generic.h>
 #include <lib/subghz/devices/devices.h>
 #include <lib/subghz/devices/cc1101_int/cc1101_int_interconnect.h>

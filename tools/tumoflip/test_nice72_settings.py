@@ -68,7 +68,7 @@ uint64_t subghz_protocol_nice_flor_s_encrypt_ic(uint64_t plain,uint16_t ic,const
 SubGhzProtocolStatus subghz_block_generic_serialize(SubGhzBlockGeneric* g,FlipperFormat* f,SubGhzRadioPreset* p){(void)p;if(f->fail)return 1;f->data=g->data;f->bits=g->data_count_bit;f->tail=(g->data_2>>4)&0xfffff;return 0;}
 bool flipper_format_rewind(FlipperFormat* f){return !f->fail;}
 bool flipper_format_insert_or_update_hex(FlipperFormat* f,const char* k,uint8_t* v,size_t n){(void)k;assert(n==2);f->ic=(uint16_t)v[0]<<8|v[1];return !f->fail_ic;}
-''' + (ROOT / "lib/subghz/protocols/nice_o_counter.h").read_text().replace("#pragma once", "") + "\n".join(function(source, s) for s in signatures) + r'''
+''' + function((ROOT / "lib/subghz/protocols/public_api.h").read_text(), "static inline uint16_t subghz_protocol_nice_o_cnt_swap(") + "\n".join(function(source, s) for s in signatures) + r'''
 int main(void){
  SubGhzProtocolEncoderNiceFlorS e={.nice_flor_s_rainbow_table_file_name="synthetic"};
  FlipperFormat f={0};SubGhzRadioPreset p=0;

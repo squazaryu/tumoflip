@@ -13,8 +13,8 @@ def counter_header():
     # new helper into that reproducer: its failure must be the old counter value.
     if os.environ.get("TUMO_NICE_SOURCE"):
         return ""
-    header = ROOT / "lib/subghz/protocols/nice_o_counter.h"
-    return header.read_text().replace("#pragma once", "") if header.exists() else ""
+    header = (ROOT / "lib/subghz/protocols/public_api.h").read_text()
+    return function(header, "static inline uint16_t subghz_protocol_nice_o_cnt_swap(")
 
 
 class NiceCounterTests(unittest.TestCase):

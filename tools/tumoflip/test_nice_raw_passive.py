@@ -39,7 +39,7 @@ uint64_t subghz_protocol_nice_flor_s_encrypt_ic(uint64_t p,uint16_t ic,const cha
 void subghz_protocol_nice_o_mask(uint8_t p,uint32_t* m,uint16_t* n){(void)p;*m=0;*n=0;}
 LevelDuration level_duration_make(bool l,uint32_t t){return(LevelDuration){l,t};}
 bool subghz_protocol_blocks_get_bit_array(uint8_t* p,unsigned n){return(p[n/8]>>(7-n%8))&1;}
-''' + (ROOT / "lib/subghz/protocols/nice_o_counter.h").read_text().replace("#pragma once", "") + "\n".join(function(source, s) for s in (
+''' + function((ROOT / "lib/subghz/protocols/public_api.h").read_text(), "static inline uint16_t subghz_protocol_nice_o_cnt_swap(") + "\n".join(function(source, s) for s in (
             "static uint32_t subghz_protocol_nice_one_crc(",
             "static void subghz_protocol_nice_one_get_data(uint8_t* p, uint8_t num_parcel, uint8_t hold_bit) {",
             "static void subghz_protocol_encoder_nice_flor_s_get_upload(",
