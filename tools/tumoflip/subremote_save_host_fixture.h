@@ -12,13 +12,15 @@
 #define MIN(a,b) ((a)<(b)?(a):(b))
 enum {FSAM_READ=1,FSAM_WRITE=2,FSAM_READ_WRITE=3};
 enum {FSOM_OPEN_EXISTING,FSOM_CREATE_NEW,FSOM_CREATE_ALWAYS};
+typedef int FS_OpenMode;
 enum {StreamOffsetFromStart,StreamOffsetFromCurrent,StreamOffsetFromEnd};
 typedef struct {unsigned unused;} Storage;
 typedef struct {char value[256];} FuriString;
 typedef struct {uint8_t data[2048];size_t size,pos;} Stream;
 typedef struct {Stream* stream;} FlipperFormat;
 typedef struct {uint8_t data[2048];size_t size;bool exists;} Entry;
-typedef struct {Entry* entry;size_t pos;bool opened;} File;
+typedef struct {Entry* entry;size_t pos;bool opened;int error;} File;
+enum {FSE_OK,FSE_ERROR};
 static Entry original,backup;
 static Storage storage;
 static unsigned operation,fail_at,fail_again;
@@ -55,14 +57,17 @@ static size_t storage_file_write(File* f,const void* src,size_t n){
  memcpy(f->entry->data+f->pos,src,n);f->pos+=n;
  if(f->pos>f->entry->size)f->entry->size=f->pos;return n;
 }
-static uint64_t storage_file_size(File* f){return f->entry->size;}
+static uint64_t storage_file_size(File* f){
+ if(fail()){f->error=FSE_ERROR;return 0;}return f->entry->size;
+}
+static int storage_file_get_error(File* f){return f->error;}
 static bool storage_file_seek(File* f,uint32_t p,bool start){
  assert(start);if(fail())return false;if(p>f->entry->size)return false;f->pos=p;return true;
 }
 static bool storage_file_truncate(File* f){if(fail())return false;f->entry->size=f->pos;return true;}
 static bool storage_file_sync(File* f){(void)f;return !fail();}
 static bool storage_simply_remove(Storage* s,const char* p){
- (void)s;entry(p)->exists=false;return true;
+ (void)s;if(fail())return false;entry(p)->exists=false;return true;
 }
 static bool storage_file_copy_to_file(File* in,File* out,size_t n){
  uint8_t buffer[128];while(n){size_t count=MIN(n,sizeof(buffer));
@@ -95,23 +100,28 @@ int main(void){
  for(unsigned i=0;i<sizeof(old_data);i++)old_data[i]=(uint8_t)(i*31+7);
  for(unsigned i=0;i<sizeof(new_data);i++)new_data[i]=(uint8_t)(i*17+3);
  Stream s;reset(&s);fail_at=0;fail_again=0;
- assert(subrem_safe_save(&storage,&s,"test.sub"));assert(is_new(&original));
+ assert(signal_file_update(&storage,&s,"test.sub"));assert(is_new(&original));
+ assert(s.pos==17);
  unsigned total=operation;
  for(unsigned first=1;first<=total;first++){
   reset(&s);fail_at=first;fail_again=0;
-  bool ok=subrem_safe_save(&storage,&s,"test.sub");
+  bool ok=signal_file_update(&storage,&s,"test.sub");
   assert(ok?is_new(&original):(is_old(&original)||is_old(&backup)));
   // A second independent error can occur during rollback/cleanup.
   unsigned with_failure=operation;
   for(unsigned second=first+1;second<=with_failure;second++){
    reset(&s);fail_at=first;fail_again=second;
-   ok=subrem_safe_save(&storage,&s,"test.sub");
+   ok=signal_file_update(&storage,&s,"test.sub");
    assert(ok?is_new(&original):(is_old(&original)||is_old(&backup)));
   }
  }
  reset(&s);fail_at=fail_again=0;backup.exists=true;backup.size=3;memcpy(backup.data,"own",3);
- assert(!subrem_safe_save(&storage,&s,"test.sub"));
+ assert(!signal_file_update(&storage,&s,"test.sub"));
  assert(is_old(&original)&&backup.size==3&&!memcmp(backup.data,"own",3));
- reset(&s);original.exists=false;assert(!subrem_safe_save(&storage,&s,"missing.sub"));
- assert(!original.exists);return 0;
+ reset(&s);original.exists=false;assert(!signal_file_update(&storage,&s,"missing.sub"));
+ assert(!original.exists);
+ reset(&s);s.size=0;assert(!signal_file_update(&storage,&s,"empty.sub"));assert(is_old(&original));
+ reset(&s);s.size=(size_t)INT32_MAX+1;assert(!signal_file_update(&storage,&s,"huge.sub"));assert(is_old(&original));
+ reset(&s);s.pos=(size_t)INT32_MAX+1;assert(!signal_file_update(&storage,&s,"hugepos.sub"));assert(is_old(&original));
+ return 0;
 }

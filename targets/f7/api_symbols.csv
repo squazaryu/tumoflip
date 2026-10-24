@@ -199,6 +199,7 @@ Header,+,lib/one_wire/one_wire_host.h,,
 Header,+,lib/one_wire/one_wire_slave.h,,
 Header,+,lib/print/wrappers.h,,
 Header,+,lib/pulse_reader/pulse_reader.h,,
+Header,+,lib/signal_file/signal_file.h,,
 Header,+,lib/signal_reader/signal_reader.h,,
 Header,+,lib/stm32wb_hal/Inc/stm32wbxx_ll_adc.h,,
 Header,+,lib/stm32wb_hal/Inc/stm32wbxx_ll_bus.h,,
@@ -3393,6 +3394,7 @@ Function,-,setkey,void,const char*
 Function,-,setlinebuf,int,FILE*
 Function,-,setstate,char*,char*
 Function,-,setvbuf,int,"FILE*, char*, int, size_t"
+Function,-,signal_file_update,_Bool,"Storage*, Stream*, const char*"
 Function,+,signal_reader_alloc,SignalReader*,"const GpioPin*, uint32_t"
 Function,+,signal_reader_free,void,SignalReader*
 Function,+,signal_reader_set_polarity,void,"SignalReader*, SignalReaderPolarity"

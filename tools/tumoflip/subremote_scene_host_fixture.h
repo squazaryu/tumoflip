@@ -14,17 +14,18 @@ enum {SubRemViewIDRemote,SubGhzRadioDeviceTypeInternal};
 typedef struct {int type;unsigned event;} SceneManagerEvent;
 typedef struct {int type;void* fff_data;} SubRemSubFilePreset;
 typedef struct {SubRemSubFilePreset* subs_preset[5];} SubRemMapPreset;
-typedef struct {void* transmitter;} SubGhzTxRx;
+typedef struct {void* transmitter;bool restore_failed;} SubGhzTxRx;
 typedef struct {
  SubGhzTxRx* txrx;void* subrem_remote_view;void* notifications;void* scene_manager;
- void* view_dispatcher;SubRemMapPreset* map_preset;uint8_t chosen_sub;
+ void* view_dispatcher;void* dialogs;SubRemMapPreset* map_preset;uint8_t chosen_sub;
  bool tx_running,tx_held,save_failed;
 } SubGhzRemoteApp;
 static int sequence_blink_start_magenta,sequence_blink_red_100,sequence_blink_stop;
 static int starts,stops,transition,active=-1;
-static bool complete,start_ok=true,endless;
+static bool complete,start_ok=true;
 static SubGhzRemoteApp* context;
 static struct {bool endless_tx;} subghz_block_generic_global;
+#define endless subghz_block_generic_global.endless_tx
 enum {SUBGHZ_CUSTOM_BTN_OK};
 static int subghz_custom_btn_get(void){return SUBGHZ_CUSTOM_BTN_OK;}
 static void subghz_custom_btn_set(int b){(void)b;}
@@ -34,6 +35,7 @@ static void subghz_custom_btns_reset(void){}
 static void subghz_txrx_reset_dynamic_and_custom_btns(SubGhzTxRx* t){(void)t;}
 static void subrem_view_remote_set_state(void* v,int s,int i){(void)v;(void)s;(void)i;}
 static void notification_message(void* n,const int* seq){(void)n;(void)seq;}
+static void dialog_message_show_storage_error(void* d,const char* s){(void)d;(void)s;}
 static bool scene_manager_previous_scene(void* m){(void)m;assert(active==-1);transition++;return true;}
 static void scene_manager_stop(void* m){(void)m;}
 static void view_dispatcher_stop(void* d){(void)d;}

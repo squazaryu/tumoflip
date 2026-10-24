@@ -60,20 +60,31 @@ typedef struct {
     App* app;
     SubGhzTxRx* txrx;
     const FuriString* file_path;
+    FuriString* error;
 } SubGhzNeedSaveContext;
 static const char* mode;
 static unsigned starts, waits, delays, callback_installs, saves, cleaned, live;
 static uint32_t delayed_ms;
+static struct { bool endless_tx; } subghz_block_generic_global;
+static uint32_t furi_get_tick(void) { return delayed_ms; }
+static uint32_t furi_ms_to_ticks(uint32_t ms) { return ms; }
 static bool quac_duration_valid(uint32_t ms) { return ms >= 100 && ms <= 60000; }
 static QuacActionWait* quac_action_wait_alloc(App* app) { live++; QuacActionWait* w=calloc(1,sizeof(*w)); w->app=app; return w; }
 static void quac_action_wait_complete(void* context) { ((QuacActionWait*)context)->complete=true; }
 static bool quac_action_wait_run(QuacActionWait* w,uint32_t ms) {
-    if(ms==FuriWaitForever) { assert(w->complete); waits++; }
-    else { delays++; delayed_ms=ms; }
+    (void)w; assert(ms==5); waits++; delayed_ms+=ms;
     return true;
 }
 static void quac_action_wait_free(QuacActionWait* w) { free(w); live--; }
 static bool raw;
+static unsigned released_polls;
+static bool subghz_txrx_tx_is_complete(SubGhzTxRx* t) {
+    assert(t->active);
+    if(raw) return waits>=3;
+    if(!subghz_block_generic_global.endless_tx) return ++released_polls>=2;
+    return false;
+}
+static void subghz_txrx_reset_dynamic_and_custom_btns(SubGhzTxRx* t) { assert(!t->active); }
 static bool is(const char* value) {
     return !strcmp(mode, value);
 }
@@ -264,11 +275,12 @@ int main(int argc, char** argv) {
     bool valid = is("raw") || is("parsed") || is("default-frequency") || is("valid-custom");
     bool rejected = is("start-raw") || is("start-parsed");
     REQUIRE(starts == (valid || rejected ? 1U : 0U));
-    REQUIRE(waits == (valid && raw ? 1U : 0U));
-    REQUIRE(callback_installs == (valid && raw ? 1U : 0U));
-    REQUIRE(delays == (valid && !raw ? 1U : 0U));
+    REQUIRE(valid ? waits>0 : waits==0);
+    REQUIRE(callback_installs == 0);
+    REQUIRE(delays == 0);
     REQUIRE(saves == (valid && !raw ? 1U : 0U));
-    REQUIRE(!delays || delayed_ms == 1234);
+    REQUIRE(!valid || raw || delayed_ms>=1234);
+    REQUIRE(!subghz_block_generic_global.endless_tx);
     REQUIRE((error.text[0] == 0) == valid);
     REQUIRE(cleaned == 1 && live == 0);
     return 0;
