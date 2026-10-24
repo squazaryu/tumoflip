@@ -213,59 +213,34 @@ static void subghz_protocol_encoder_nice_flor_s_get_upload(
     // if we change counter/button in SignalSettings menu then we must bypass counter_modes, just gen and save signal file.
     if(subghz_block_generic_global.cnt_need_override) bypass = true;
 
-    // Special modes pin literal on-air values. Preserve those semantics while
-    // keeping the shared/editor counter plain between calls.
-    const bool cnt_literal =
-        instance->o_code &&
-        !((nice_flors_counter_mode == 0 || bypass) &&
-          (furi_hal_subghz_get_rolling_counter_mult() != -0x7FFFFFFF || bypass));
-    if(cnt_literal) instance->generic.cnt = subghz_protocol_nice_o_cnt_swap(instance->generic.cnt);
-
-    if(nice_flors_counter_mode == 0 || bypass) {
-        // Check for OFEX (overflow experimental) mode
-        if(furi_hal_subghz_get_rolling_counter_mult() != -0x7FFFFFFF || bypass) {
-            bypass = false;
-            // standart counter mode. PULL data from subghz_block_generic_global variables
-            if(!subghz_block_generic_global_counter_override_get(&instance->generic.cnt)) {
-                // if counter_override_get return FALSE then counter was not changed and we increase counter by standart mult value
-                if((instance->generic.cnt + furi_hal_subghz_get_rolling_counter_mult()) > 0xFFFF) {
-                    instance->generic.cnt = 0;
-                } else {
-                    instance->generic.cnt += furi_hal_subghz_get_rolling_counter_mult();
-                }
-            }
-        } else {
-            if((instance->generic.cnt + 0x1) > 0xFFFF) {
-                instance->generic.cnt = 0;
-            } else if(instance->generic.cnt >= 0x1 && instance->generic.cnt != 0xFFFE) {
-                instance->generic.cnt = 0xFFFE;
-            } else {
-                instance->generic.cnt++;
-            }
-        }
-    } else if(nice_flors_counter_mode == 1) {
-        // Mode 1 (floxi2r)
-        // 0001 / FFFE
-        if(instance->generic.cnt == 0xFFFE) {
-            instance->generic.cnt = 0x0001;
-        } else {
-            instance->generic.cnt = 0xFFFE;
-        }
-    } else {
-        // Mode 2 (ox2)
-        // 0x0000 / 0x0001
-        if(instance->generic.cnt >= 0x0001) {
-            instance->generic.cnt = 0;
-        } else {
-            instance->generic.cnt++;
-        }
-    }
-
-    if(cnt_literal) instance->generic.cnt = subghz_protocol_nice_o_cnt_swap(instance->generic.cnt);
-
     const bool o_code = instance->o_code;
-    const uint16_t air_count = o_code ? subghz_protocol_nice_o_cnt_swap(instance->generic.cnt) :
-                                       (uint16_t)instance->generic.cnt;
+    const int32_t step = furi_hal_subghz_get_rolling_counter_mult();
+    const bool normal = (nice_flors_counter_mode == 0 || bypass) &&
+                        (step != -0x7FFFFFFF || bypass);
+    uint32_t count = instance->generic.cnt;
+    // Only normal mode counts presses. Special modes operate on literal wire
+    // values; keep that value for encryption instead of converting it twice.
+    if(o_code && !normal) count = subghz_protocol_nice_o_cnt_swap(count);
+    if(normal) {
+        bypass = false;
+        if(!subghz_block_generic_global_counter_override_get(&count)) {
+            count += step;
+            if(count > 0xFFFFU) count = 0;
+        }
+    } else if(nice_flors_counter_mode == 0) {
+        if(count == 0xFFFFU)
+            count = 0;
+        else if(count && count != 0xFFFEU)
+            count = 0xFFFEU;
+        else
+            count++;
+    } else if(nice_flors_counter_mode == 1) {
+        count = count == 0xFFFEU ? 1 : 0xFFFEU;
+    } else {
+        count = count ? 0 : 1;
+    }
+    instance->generic.cnt = o_code && !normal ? subghz_protocol_nice_o_cnt_swap(count) : count;
+    const uint16_t air_count = o_code && normal ? subghz_protocol_nice_o_cnt_swap(count) : count;
     uint64_t decrypt = ((uint64_t)instance->generic.serial << 16) | instance->generic.cnt;
     uint64_t enc_part = subghz_protocol_nice_flor_s_encrypt(decrypt, file_name);
 
