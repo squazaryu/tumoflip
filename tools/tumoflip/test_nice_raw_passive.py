@@ -8,10 +8,9 @@ from tools.tumoflip.test_nfc_completion_equality import native
 ROOT = Path(__file__).resolve().parents[2]
 
 
-class NiceRawPassiveTests(unittest.TestCase):
-    def test_production_encoder_sends_16_bounded_parcels_with_correct_flags(self):
-        source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
-        native(r'''
+def nice_encoder_source():
+    source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
+    return r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -43,7 +42,12 @@ bool subghz_protocol_blocks_get_bit_array(uint8_t* p,unsigned n){return(p[n/8]>>
             "static uint32_t subghz_protocol_nice_one_crc(",
             "static void subghz_protocol_nice_one_get_data(uint8_t* p, uint8_t num_parcel, uint8_t hold_bit) {",
             "static void subghz_protocol_encoder_nice_flor_s_get_upload(",
-        )) + r'''
+        ))
+
+
+class NiceRawPassiveTests(unittest.TestCase):
+    def test_production_encoder_sends_16_bounded_parcels_with_correct_flags(self):
+        native(nice_encoder_source() + r'''
 int main(void){
  const uint8_t k[16]={0x8f,0x8e,0x8d,0x8c,0x84,0x85,0x86,0x87,0x8f,0x8c,0x89,0x8d,0x8c,0x8d,0x8e,0x8f};
  struct {LevelDuration samples[4096];uint64_t guard;} buffer={.guard=0x123456789abcdefULL};

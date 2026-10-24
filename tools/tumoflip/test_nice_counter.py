@@ -4,6 +4,7 @@ import os
 import unittest
 from tools.tumoflip.test_hotplug_assets import function
 from tools.tumoflip.test_nfc_completion_equality import native
+from tools.tumoflip.test_nice_raw_passive import nice_encoder_source
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -18,6 +19,46 @@ def counter_header():
 
 
 class NiceCounterTests(unittest.TestCase):
+    def test_encoder_preserves_plain_variants_override_and_literal_modes(self):
+        body = nice_encoder_source()
+        body = body.replace("static uint8_t nice_flors_counter_mode;", "static uint8_t nice_flors_counter_mode;static int32_t mult=1;static bool overridden;static uint32_t override_count;")
+        body = body.replace("(void)c;return false;", "if(!overridden)return false;*c=override_count;return true;")
+        body = body.replace("furi_hal_subghz_get_rolling_counter_mult(void){return 1;}", "furi_hal_subghz_get_rolling_counter_mult(void){return mult;}")
+        native(body + r'''
+static uint16_t oracle(uint16_t value){const uint8_t d[]={1,0,6,7,5,4,2,3};uint16_t out=value&0x8000;for(unsigned n=0;n<15;n+=3)out|=(uint16_t)d[(value>>n)&7]<<n;return out;}
+static void check(bool o,unsigned bits,uint16_t before,unsigned mode,int32_t step,bool user,uint16_t after,uint16_t air){
+ LevelDuration samples[4096];SubGhzProtocolEncoderNiceFlorS e={.generic={.serial=123,.cnt=before,.btn=1,.data_count_bit=bits},.encoder={4096,samples},.o_code=o,.ic=0x1234};
+ nice_flors_counter_mode=mode;mult=step;overridden=user;override_count=123;bypass=false;subghz_block_generic_global.cnt_need_override=user;
+ subghz_protocol_encoder_nice_flor_s_get_upload(&e,1,"synthetic");assert(e.generic.cnt==after);
+ for(unsigned p=0;p<16;p++){unsigned at=p*(bits==72?148:108);uint64_t frame=0;for(unsigned n=0;n<52;n++)frame=(frame<<1)|(samples[at+3+n*2].duration==1000);assert((frame&0xffff)==air);}
+}
+int main(void){
+ for(unsigned bits=52;bits<=72;bits+=20){
+  const uint16_t counts[]={0,1,7,8,63,64,0x1249,0x7fff,0xfffe,0xffff};
+  for(unsigned i=0;i<sizeof(counts)/sizeof(counts[0]);i++){
+   uint16_t n=counts[i],next=(uint16_t)(n+1);
+   check(true,bits,n,0,1,false,next,oracle(next));
+   check(false,bits,n,0,1,false,next,next);
+   for(unsigned mode=0;mode<=2;mode++){
+    check(true,bits,n,mode,1,true,123,oracle(123));
+    check(false,bits,n,mode,1,true,123,123);
+   }
+  }
+  check(true,bits,oracle(0xfffe),1,1,false,oracle(1),1);
+  check(true,bits,oracle(1),1,1,false,oracle(0xfffe),0xfffe);
+  check(true,bits,oracle(0),2,1,false,oracle(1),1);
+  check(true,bits,oracle(1),2,1,false,oracle(0),0);
+  check(true,bits,oracle(0),0,-0x7fffffff,false,oracle(1),1);
+  check(true,bits,oracle(1),0,-0x7fffffff,false,oracle(0xfffe),0xfffe);
+  check(true,bits,oracle(0xfffe),0,-0x7fffffff,false,oracle(0xffff),0xffff);
+  check(true,bits,oracle(0xffff),0,-0x7fffffff,false,oracle(0),0);
+  check(false,bits,0xfffe,1,1,false,1,1);
+  check(false,bits,1,2,1,false,0,0);
+ }
+ return 0;
+}
+''')
+
     def test_actual_decoder_and_generator_use_plain_counts_and_preserve_old_keys(self):
         source = Path(os.environ.get("TUMO_NICE_SOURCE", ROOT / "lib/subghz/protocols/nice_flor_s.c")).read_text()
         native(r'''
