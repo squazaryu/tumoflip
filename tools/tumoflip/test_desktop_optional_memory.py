@@ -1,12 +1,10 @@
 """Optional Desktop frame allocations must not turn heap fragmentation into a reset."""
 from pathlib import Path
 import re
-import subprocess
-import tempfile
 import unittest
 
 from tools.tumoflip.test_hotplug_assets import function
-from tools.tumoflip.test_nfc_completion_equality import native
+from tools.tumoflip.native_optional_memory import native
 
 ROOT = Path(__file__).resolve().parents[2]
 STORAGE = ROOT / 'applications/services/desktop/animations/animation_storage.c'
@@ -28,22 +26,14 @@ def storage_native(program, metadata=False, manager=False):
         body += function(source, 'static BubbleAnimation* animation_storage_load_animation(const char* name) {')
     if manager:
         body += '\n#include "desktop_oom_manager.h"\n'
+        body += function(source, 'static bool animation_storage_reload_frames(const char* name, BubbleAnimation* animation) {')
+        body += function(source, 'void animation_storage_release_animation_frames(')
         body += function(source, 'void animation_storage_cache_animation(')
         body += function(source, 'const BubbleAnimation*\n    animation_storage_get_bubble_animation(')
         manager_source = (ROOT / 'applications/services/desktop/animations/animation_manager.c').read_text()
         body += function(manager_source, 'static StorageAnimation*\n    animation_manager_select_idle_animation(AnimationManager* animation_manager) {')
     body += '\n#undef malloc\n#undef calloc\n#undef free\n' + program
-    with tempfile.TemporaryDirectory(prefix='desktop-oom-io-') as directory:
-        work = Path(directory); (work / 'sd').mkdir(); (work / 'test.c').write_text(body)
-        command = ['cc', '-std=c11', '-D_DEFAULT_SOURCE', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
-                   '-Wno-unused-function', '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
-                   '-DMBEDTLS_CONFIG_FILE="library_crypto_config.h"',
-                   '-I', str(ROOT / 'tools/tumoflip/fixtures'), '-I', str(ROOT / 'lib/mbedtls/include'),
-                   str(work / 'test.c'), '-o', str(work / 'test')]
-        result = subprocess.run(command, capture_output=True, text=True)
-        if result.returncode: raise AssertionError(result.stderr)
-        result = subprocess.run([str(work / 'test'), str(work / 'sd')], capture_output=True, text=True)
-        if result.returncode: raise AssertionError(result.stderr)
+    native(body, storage=True)
 
 
 class DesktopOptionalMemoryTests(unittest.TestCase):
@@ -58,7 +48,14 @@ int main(int argc,char**argv){
  allocation_fail_at=-1;allocation_calls=0;
  selected=animation_manager_select_idle_animation(&manager);
  assert(selected==&candidate&&selected->animation&&live_frames==3);
- assert(builtin_selections==1);animation_storage_free_storage_animation(&selected);
+ assert(builtin_selections==1);
+ animation_storage_release_animation_frames(&candidate);assert(live_frames==2);
+ allocation_calls=0;allocation_fail_at=2;
+ selected=animation_manager_select_idle_animation(&manager);
+ assert(selected==&builtin&&builtin_selections==2&&!candidate.animation&&!live_frames&&!fatal_allocations);
+ allocation_fail_at=-1;allocation_calls=0;selected=animation_manager_select_idle_animation(&manager);
+ assert(selected==&candidate&&candidate.animation&&live_frames==3);
+ animation_storage_free_storage_animation(&selected);
  assert(!selected&&!live_frames);return 0;
 }
 ''', manager=True)
@@ -177,7 +174,10 @@ int main(void){
  AnimationFrameStorage*data=(AnimationFrameStorage*)((uint8_t*)animation.icon_animation.frames - offsetof(AnimationFrameStorage,frames));
  assert(data->bundled_data==(const uint8_t*)data->frames+62*sizeof(const uint8_t*));
  for(unsigned i=0;i<62;i++)assert(!animation.icon_animation.frames[i]);
- free(data);return 0;
+ free(data);
+ BubbleAnimation overflow={0};requested=0;
+ assert(!animation_storage_prepare_icon(&overflow,62,128,64,SIZE_MAX));
+ assert(!overflow.icon_animation.frames&&!requested&&!fatal_calls);return 0;
 }
 ''')
 

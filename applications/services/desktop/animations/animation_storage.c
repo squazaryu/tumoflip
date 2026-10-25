@@ -103,9 +103,8 @@ static bool animation_storage_load_single_manifest_info_from(
     return result;
 }
 
-static bool animation_storage_list_contains(
-    StorageAnimationList_t* animation_list,
-    const char* name) {
+static bool
+    animation_storage_list_contains(StorageAnimationList_t* animation_list, const char* name) {
     for
         M_EACH(item, *animation_list, StorageAnimationList_t) {
             if(strcmp(animation_storage_get_meta(*item)->name, name) == 0) return true;
@@ -116,7 +115,6 @@ static bool animation_storage_list_contains(
 static void animation_storage_append_manifest(
     StorageAnimationList_t* animation_list,
     const char* manifest_path) {
-
     Storage* storage = furi_record_open(RECORD_STORAGE);
     FlipperFormat* file = flipper_format_file_alloc(storage);
     /* Forbid skipping fields */
@@ -250,10 +248,8 @@ void animation_storage_cache_animation(StorageAnimation* storage_animation) {
                 animation_storage_load_animation(storage_animation->manifest_info.name);
         } else if(!storage_animation->animation->icon_animation.frames) {
             BubbleAnimation* animation = (BubbleAnimation*)storage_animation->animation;
-            if(!animation_storage_reload_frames(
-                   storage_animation->manifest_info.name, animation)) {
-                animation_storage_free_animation(
-                    (BubbleAnimation**)&storage_animation->animation);
+            if(!animation_storage_reload_frames(storage_animation->manifest_info.name, animation)) {
+                animation_storage_free_animation((BubbleAnimation**)&storage_animation->animation);
             }
         }
     }
@@ -322,8 +318,7 @@ static void animation_storage_free_frames(BubbleAnimation* animation) {
     if(!icon->frames) return;
 
     AnimationFrameStorage* frame_storage =
-        (AnimationFrameStorage*)((uint8_t*)icon->frames -
-                                 offsetof(AnimationFrameStorage, frames));
+        (AnimationFrameStorage*)((uint8_t*)icon->frames - offsetof(AnimationFrameStorage, frames));
     if(!frame_storage->bundled_data) {
         for(int i = 0; i < icon->frame_count; ++i) {
             if(icon->frames[i]) {
@@ -350,8 +345,7 @@ static bool animation_storage_prepare_icon(
         sizeof(AnimationFrameStorage) + frame_pointers_bytes + bundled_bytes);
     if(!frame_storage) return false;
     if(bundled_bytes) {
-        frame_storage->bundled_data =
-            (const uint8_t*)frame_storage->frames + frame_pointers_bytes;
+        frame_storage->bundled_data = (const uint8_t*)frame_storage->frames + frame_pointers_bytes;
     }
 
     Icon* icon = (Icon*)&animation->icon_animation;
@@ -411,9 +405,8 @@ static bool animation_storage_load_frame_bundle(
         const uint64_t bundle_file_size = storage_file_size(file);
         const uint64_t min_bundle_size =
             sizeof(AnimationFrameBundleHeader) + frame_sizes_bytes + frame_count;
-        const uint64_t max_bundle_size =
-            sizeof(AnimationFrameBundleHeader) + frame_sizes_bytes +
-            (frame_count * max_frame_size);
+        const uint64_t max_bundle_size = sizeof(AnimationFrameBundleHeader) + frame_sizes_bytes +
+                                         (frame_count * max_frame_size);
         if((bundle_file_size < min_bundle_size) || (bundle_file_size > max_bundle_size) ||
            (bundle_file_size > SIZE_MAX)) {
             break;
@@ -474,7 +467,7 @@ static bool animation_storage_load_frame_bundle(
         animation_storage_free_frames(animation);
     }
     if(bundle_present && !success) {
-        FURI_LOG_W(TAG, "Ignoring invalid frame bundle '%s'", furi_string_get_cstr(filename));
+        FURI_LOG_W(TAG, "Frame bundle not loaded '%s'", furi_string_get_cstr(filename));
     }
 
     storage_file_free(file);

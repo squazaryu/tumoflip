@@ -26,4 +26,3 @@ static StorageAnimation*animation_manager_select_weighted(StorageAnimationList_t
 static StorageAnimation*animation_storage_find_animation(const char*name){assert(!strcmp(name,HARDCODED_ANIMATION_NAME));builtin_selections++;return &builtin;}
 static StorageAnimationManifestInfo*animation_storage_get_meta(StorageAnimation*a){return &a->manifest_info;}
 static void animation_storage_free_storage_animation(StorageAnimation**a){assert(*a==&candidate);animation_storage_free_animation(&candidate.animation);*a=NULL;discarded_candidates++;}
-static bool animation_storage_reload_frames(const char*n,BubbleAnimation*a){(void)n;(void)a;assert(!"unexpected cache reload");return false;}

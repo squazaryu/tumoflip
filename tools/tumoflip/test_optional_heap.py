@@ -2,7 +2,7 @@
 from pathlib import Path
 import unittest
 from tools.tumoflip.test_hotplug_assets import function
-from tools.tumoflip.test_nfc_completion_equality import native
+from tools.tumoflip.native_optional_memory import native
 
 ROOT = Path(__file__).resolve().parents[2]
 
