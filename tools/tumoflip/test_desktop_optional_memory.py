@@ -151,8 +151,8 @@ static jmp_buf fatal;
 static size_t largest=31784,requested;
 static unsigned fatal_calls,allocations;
 static void* host_optional(size_t size){requested=size;if(size>largest)return NULL;allocations++;return calloc(1,size);}
-static void* __attribute__((unused)) memmgr_heap_alloc_optional(size_t size){return host_optional(size);}
-static void* __attribute__((unused)) fatal_calloc(size_t n,size_t size){
+static __attribute__((unused)) void* memmgr_heap_alloc_optional(size_t size){return host_optional(size);}
+static __attribute__((unused)) void* fatal_calloc(size_t n,size_t size){
  void*p=host_optional(n*size);if(!p){fatal_calls++;longjmp(fatal,1);}return p;
 }
 #define calloc fatal_calloc
