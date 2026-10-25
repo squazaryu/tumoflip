@@ -12,7 +12,8 @@
 #define ANIMATION_FRAMES_FILE "frames.bin"
 #define ANIMATION_FRAME_BUNDLE_VERSION 1U
 typedef struct{uint8_t frame_count,frame_rate,height,width;const uint8_t**frames;}Icon;
-typedef struct{Icon icon_animation;uint8_t passive_frames,active_frames;const uint8_t*frame_order;}BubbleAnimation;
+typedef struct{Icon icon_animation;uint8_t passive_frames,active_frames;uint8_t*frame_order;
+ uint32_t active_cycles,duration,active_cooldown;}BubbleAnimation;
 static const uint8_t animation_frame_bundle_magic[4]={'T','F','A','B'};
 static jmp_buf allocation_fault;
 static size_t largest_allowed=SIZE_MAX,allocation_calls,live_frames;
@@ -47,3 +48,24 @@ static void small_bundle(Storage*s){
   0,0xaa,0,0,0,0,0,0,0, 1,0,2,0,0xbb,0xcc };
  blob(s,ANIMATION_DIR "/Fixture/frames.bin",bytes,sizeof(bytes));
 }
+#define ANIMATION_META_FILE "meta.txt"
+#define RECORD_STORAGE "storage"
+typedef int FlipperFormat;
+static FlipperFormat metadata_file;
+static Storage*metadata_storage;
+static bool metadata_fail_after_frames;
+static void* animation_record_open(const char*key){assert(!strcmp(key,RECORD_STORAGE));return metadata_storage;}
+static FlipperFormat*flipper_format_file_alloc(Storage*s){assert(s==metadata_storage);return &metadata_file;}
+static void flipper_format_set_strict_mode(FlipperFormat*f,bool strict){(void)f;(void)strict;}
+static bool flipper_format_file_open_existing(FlipperFormat*f,const char*p){(void)f;assert(strstr(p,"/Fixture/meta.txt"));return true;}
+static bool flipper_format_read_header(FlipperFormat*f,FuriString*s,uint32_t*v){(void)f;*v=1;furi_string_set(s,"Flipper Animation");return true;}
+static int furi_string_cmp_str(FuriString*s,const char*t){return strcmp(s->text,t);}
+static bool flipper_format_get_value_count(FlipperFormat*f,const char*k,uint32_t*n){(void)f;assert(!strcmp(k,"Frames order"));*n=2;return true;}
+static bool flipper_format_read_uint32(FlipperFormat*f,const char*k,uint32_t*v,size_t n){
+ (void)f;if(!strcmp(k,"Frames order")){assert(n==2);v[0]=0;v[1]=1;return true;}assert(n==1);
+ if(!strcmp(k,"Active cycles")&&metadata_fail_after_frames)return false;
+ *v=!strcmp(k,"Width")?32:!strcmp(k,"Height")?2:1;return true;
+}
+static void flipper_format_free(FlipperFormat*f){assert(f==&metadata_file);}
+static bool animation_storage_load_bubbles(BubbleAnimation*a,FlipperFormat*f){(void)a;(void)f;return true;}
+static void animation_storage_free_bubbles(BubbleAnimation*a){(void)a;}

@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 STORAGE = ROOT / 'applications/services/desktop/animations/animation_storage.c'
 
 
-def storage_native(program):
+def storage_native(program, metadata=False):
     source = STORAGE.read_text()
     structures = source[source.index('typedef struct {'):source.index('_Static_assert')]
     signatures = ('static void animation_storage_free_frames(BubbleAnimation* animation) {',
@@ -23,6 +23,10 @@ def storage_native(program):
                   'static bool animation_storage_load_frames(')
     body = '#include "desktop_oom_io.h"\n' + structures + '\n#define malloc frame_malloc\n#define calloc frame_calloc\n#define free frame_free\n'
     body += '\n'.join(function(source, signature) for signature in signatures)
+    if metadata:
+        body += '\n#define furi_record_open animation_record_open\n'
+        body += function(source, 'static void animation_storage_free_animation(BubbleAnimation** animation) {')
+        body += function(source, 'static BubbleAnimation* animation_storage_load_animation(const char* name) {')
     body += '\n#undef malloc\n#undef calloc\n#undef free\n' + program
     with tempfile.TemporaryDirectory(prefix='desktop-oom-io-') as directory:
         work = Path(directory); (work / 'sd').mkdir(); (work / 'test.c').write_text(body)
@@ -38,6 +42,22 @@ def storage_native(program):
 
 
 class DesktopOptionalMemoryTests(unittest.TestCase):
+    def test_metadata_failure_after_frames_does_not_leak_the_loaded_bundle(self):
+        storage_native(r'''
+int main(int argc,char**argv){
+ assert(argc==2);Storage s={0};setup_storage(&s,argv[1]);metadata_storage=&s;small_bundle(&s);
+ metadata_fail_after_frames=true;
+ BubbleAnimation*a=animation_storage_load_animation("Fixture");assert(!a);
+ assert(!live_frames&&!fatal_allocations);
+ metadata_fail_after_frames=false;allocation_calls=0;
+ a=animation_storage_load_animation("Fixture");assert(a&&a->icon_animation.frames&&live_frames==3);
+ animation_storage_free_animation(&a);assert(!a&&!live_frames);
+ allocation_calls=0;allocation_fail_at=4;
+ a=animation_storage_load_animation("Fixture");assert(!a&&!live_frames&&!fatal_allocations);
+ return 0;
+}
+''', metadata=True)
+
     def test_bundle_load_and_corrupt_or_partial_reads_release_every_frame(self):
         storage_native(r'''
 int main(int argc,char**argv){
