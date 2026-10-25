@@ -539,7 +539,7 @@ static bool animation_storage_load_frames(
             break;
         }
 
-        FURI_CONST_ASSIGN_PTR(icon->frames[i], malloc(frame_size));
+        FURI_CONST_ASSIGN_PTR(icon->frames[i], memmgr_heap_alloc_optional(frame_size));
         if(!icon->frames[i]) {
             storage_file_close(file);
             break;
