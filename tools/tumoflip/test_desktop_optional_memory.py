@@ -1,6 +1,5 @@
 """Optional Desktop frame allocations must not turn heap fragmentation into a reset."""
 from pathlib import Path
-import os
 import re
 import subprocess
 import tempfile
@@ -89,6 +88,19 @@ int main(int argc,char**argv){
  assert(live_frames==1&&a.icon_animation.frame_count==2);
  assert(a.icon_animation.frames[0][1]==0xaa&&a.icon_animation.frames[1][4]==0xbb);
  animation_storage_free_frames(&a);assert(!live_frames&&!a.icon_animation.frames);
+ for(unsigned mode=0;mode<9;mode++){
+  uint8_t invalid[]={ 'T','F','A','B',15,0,0,0,1,2,32,2, 9,0,6,0,
+   0,0xaa,0,0,0,0,0,0,0, 1,0,2,0,0xbb,0xcc };
+  const unsigned positions[]={0,8,9,10,11,4,12,16,27};
+  invalid[positions[mode]]^=1;blob(&s,ANIMATION_DIR "/Fixture/frames.bin",invalid,sizeof(invalid));
+  assert(!animation_storage_load_frames(&s,"Fixture",&a,order,32,2));
+  assert(!live_frames&&!a.icon_animation.frames&&!fatal_allocations);
+ }
+ small_bundle(&s);allocation_calls=0;allocation_fail_at=1;
+ assert(!animation_storage_load_frames(&s,"Fixture",&a,order,32,2));assert(!live_frames&&!fatal_allocations);
+ allocation_fail_at=-1;largest_allowed=0;
+ assert(!animation_storage_load_frames(&s,"Fixture",&a,order,32,2));assert(!live_frames&&!fatal_allocations);
+ largest_allowed=SIZE_MAX;
  for(unsigned n=0;n<31;n++){
   read_budget=n;bool ok=animation_storage_load_frames(&s,"Fixture",&a,order,32,2);assert(!ok);
   assert(!live_frames&&!fatal_allocations&&!a.icon_animation.frames);read_budget=-1;
@@ -109,8 +121,9 @@ int main(int argc,char**argv){
  assert(argc==2);Storage s={0};setup_storage(&s,argv[1]);
  const uint8_t raw[]={0,0xaa,0,0,0,0,0,0,0},compressed[]={1,0,2,0,0xbb,0xcc};
  blob(&s,ANIMATION_DIR "/Fixture/frame_0.bm",raw,sizeof(raw));
- blob(&s,ANIMATION_DIR "/Fixture/frame_1.bm",compressed,sizeof(compressed));
  BubbleAnimation a={.passive_frames=1,.active_frames=1};uint32_t order[]={0,1};
+ assert(!animation_storage_load_frames(&s,"Fixture",&a,order,32,2));assert(!live_frames&&!fatal_allocations);
+ blob(&s,ANIMATION_DIR "/Fixture/frame_1.bm",compressed,sizeof(compressed));allocation_calls=0;
  volatile bool returned=false;allocation_fail_at=3; // Header + first frame succeed, second frame fails.
  if(!setjmp(allocation_fault)){assert(!animation_storage_load_frames(&s,"Fixture",&a,order,32,2));returned=true;}
  assert(returned&&!fatal_allocations&&!live_frames&&!a.icon_animation.frames);

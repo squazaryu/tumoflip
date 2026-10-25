@@ -24,7 +24,7 @@ def heap_source(hook=0):
         'void* pvPortMalloc(', 'void vPortFree(', 'void vPortGetHeapStats(',
     ))
     return f'#define configUSE_MALLOC_FAILED_HOOK {hook}\n' + prefix + block + validation + globals_ + declarations + definitions + optional + body + r'''
-static void fragmented(void){
+static void __attribute__((unused)) fragmented(void){
  memset(host_heap,0,sizeof(host_heap));prvHeapInit();
  const size_t offsets[]={0,40000,80000,120000},sizes[]={31784,30000,25000,13664};
  for(unsigned i=0;i<4;i++){
@@ -40,6 +40,25 @@ static void fragmented(void){
 
 
 class OptionalHeapTests(unittest.TestCase):
+    def test_cold_initialisation_exact_fit_and_coalescing_remain_usable(self):
+        native(heap_source() + r'''
+int main(void){
+ memset(host_heap,0xA5,sizeof(host_heap));pxEnd=NULL;
+ void*a=memmgr_heap_alloc_optional(17);assert(a&&!depth);
+ for(unsigned i=0;i<17;i++)assert(!((uint8_t*)a)[i]);
+ void*b=memmgr_heap_alloc_optional(79),*c=memmgr_heap_alloc_optional(37);assert(b&&c);
+ vPortFree(a);vPortFree(c);vPortFree(b);
+ HeapStats_t full;vPortGetHeapStats(&full);assert(full.xNumberOfFreeBlocks==1);
+ size_t available=full.xAvailableHeapSpaceInBytes;
+ a=memmgr_heap_alloc_optional(available-xHeapStructSize);assert(a&&xFreeBytesRemaining==0);
+ assert(!memmgr_heap_alloc_optional(1)&&!fatal_count);
+ vPortFree(a);assert(xFreeBytesRemaining==available);
+ assert(!memmgr_heap_alloc_optional(SIZE_MAX-xHeapStructSize-3));
+ assert(!memmgr_heap_alloc_optional((SIZE_MAX/2)+1));
+ assert(!depth&&!fatal_count);return 0;
+}
+''')
+
     def test_mandatory_allocator_still_crashes_and_preserves_request(self):
         native(heap_source() + r'''
 int main(void){
