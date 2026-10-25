@@ -724,11 +724,7 @@ static BubbleAnimation* animation_storage_load_animation(const char* name) {
     }
 
     if(!success) { //-V547
-        if(animation->frame_order) {
-            free((void*)animation->frame_order);
-        }
-        free(animation);
-        animation = NULL;
+        animation_storage_free_animation(&animation);
     }
 
     return animation;
