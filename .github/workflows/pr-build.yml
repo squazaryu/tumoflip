@@ -147,6 +147,7 @@ jobs:
           python3 -m pip install --user Pillow heatshrink2==0.13.0
           python3 -m unittest tools.tumoflip.test_fatfs_fragmentation tools.tumoflip.test_lfrfid_write_fill tools.tumoflip.test_fdx_b_134 tools.tumoflip.test_rfid_ui_updates tools.tumoflip.test_subremote_lifecycle tools.tumoflip.test_quac_hold
           python3 -m unittest tools.tumoflip.test_crash_journal tools.tumoflip.test_oom_crash_context
+          python3 -m unittest tools.tumoflip.test_optional_heap tools.tumoflip.test_desktop_optional_memory
 
       - name: Validate Wardriving lazy RX lifecycle
         shell: bash
