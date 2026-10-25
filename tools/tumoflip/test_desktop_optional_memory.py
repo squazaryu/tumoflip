@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 STORAGE = ROOT / 'applications/services/desktop/animations/animation_storage.c'
 
 
-def storage_native(program, metadata=False):
+def storage_native(program, metadata=False, manager=False):
     source = STORAGE.read_text()
     structures = source[source.index('typedef struct {'):source.index('_Static_assert')]
     signatures = ('static void animation_storage_free_frames(BubbleAnimation* animation) {',
@@ -23,10 +23,16 @@ def storage_native(program, metadata=False):
                   'static bool animation_storage_load_frames(')
     body = '#include "desktop_oom_io.h"\n' + structures + '\n#define malloc frame_malloc\n#define calloc frame_calloc\n#define free frame_free\n'
     body += '\n'.join(function(source, signature) for signature in signatures)
-    if metadata:
+    if metadata or manager:
         body += '\n#define furi_record_open animation_record_open\n'
         body += function(source, 'static void animation_storage_free_animation(BubbleAnimation** animation) {')
         body += function(source, 'static BubbleAnimation* animation_storage_load_animation(const char* name) {')
+    if manager:
+        body += '\n#include "desktop_oom_manager.h"\n'
+        body += function(source, 'void animation_storage_cache_animation(')
+        body += function(source, 'const BubbleAnimation*\n    animation_storage_get_bubble_animation(')
+        manager_source = (ROOT / 'applications/services/desktop/animations/animation_manager.c').read_text()
+        body += function(manager_source, 'static StorageAnimation*\n    animation_manager_select_idle_animation(AnimationManager* animation_manager) {')
     body += '\n#undef malloc\n#undef calloc\n#undef free\n' + program
     with tempfile.TemporaryDirectory(prefix='desktop-oom-io-') as directory:
         work = Path(directory); (work / 'sd').mkdir(); (work / 'test.c').write_text(body)
@@ -42,6 +48,22 @@ def storage_native(program, metadata=False):
 
 
 class DesktopOptionalMemoryTests(unittest.TestCase):
+    def test_actual_idle_selector_uses_builtin_after_failed_optional_frames(self):
+        storage_native(r'''
+int main(int argc,char**argv){
+ assert(argc==2);Storage s={0};setup_storage(&s,argv[1]);metadata_storage=&s;small_bundle(&s);
+ AnimationManager manager={0};allocation_fail_at=4;
+ StorageAnimation*selected=animation_manager_select_idle_animation(&manager);
+ assert(selected==&builtin&&builtin_selections==1&&discarded_candidates==1);
+ assert(!candidate.animation&&!live_frames&&!fatal_allocations);
+ allocation_fail_at=-1;allocation_calls=0;
+ selected=animation_manager_select_idle_animation(&manager);
+ assert(selected==&candidate&&selected->animation&&live_frames==3);
+ assert(builtin_selections==1);animation_storage_free_storage_animation(&selected);
+ assert(!selected&&!live_frames);return 0;
+}
+''', manager=True)
+
     def test_metadata_failure_after_frames_does_not_leak_the_loaded_bundle(self):
         storage_native(r'''
 int main(int argc,char**argv){
@@ -89,7 +111,7 @@ int main(int argc,char**argv){
  blob(&s,ANIMATION_DIR "/Fixture/frame_0.bm",raw,sizeof(raw));
  blob(&s,ANIMATION_DIR "/Fixture/frame_1.bm",compressed,sizeof(compressed));
  BubbleAnimation a={.passive_frames=1,.active_frames=1};uint32_t order[]={0,1};
- bool returned=false;allocation_fail_at=3; // Header + first frame succeed, second frame fails.
+ volatile bool returned=false;allocation_fail_at=3; // Header + first frame succeed, second frame fails.
  if(!setjmp(allocation_fault)){assert(!animation_storage_load_frames(&s,"Fixture",&a,order,32,2));returned=true;}
  assert(returned&&!fatal_allocations&&!live_frames&&!a.icon_animation.frames);
  allocation_fail_at=-1;allocation_calls=0;
@@ -128,7 +150,7 @@ static void* __attribute__((unused)) fatal_calloc(size_t n,size_t size){
 #undef calloc
 int main(void){
  BubbleAnimation animation={0};
- bool returned=false;
+ volatile bool returned=false;
  if(!setjmp(fatal)){
   assert(!animation_storage_prepare_icon(&animation,62,128,64,35016));returned=true;
  }

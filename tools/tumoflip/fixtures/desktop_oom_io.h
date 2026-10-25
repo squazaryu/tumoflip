@@ -2,8 +2,9 @@
 #include <setjmp.h>
 #define furi_assert assert
 #define furi_check assert
-#define FURI_LOG_E(...) ((void)0)
-#define FURI_LOG_W(...) ((void)0)
+static void frame_log(const char*format,...){(void)format;}
+#define FURI_LOG_E(tag,...) frame_log(__VA_ARGS__)
+#define FURI_LOG_W(tag,...) frame_log(__VA_ARGS__)
 #define FURI_CONST_ASSIGN(dst,value) ((dst)=(value))
 #define FURI_CONST_ASSIGN_PTR(dst,value) ((dst)=(value))
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -54,7 +55,7 @@ typedef int FlipperFormat;
 static FlipperFormat metadata_file;
 static Storage*metadata_storage;
 static bool metadata_fail_after_frames;
-static void* animation_record_open(const char*key){assert(!strcmp(key,RECORD_STORAGE));return metadata_storage;}
+static void* animation_record_open(const char*key){assert(!strcmp(key,RECORD_STORAGE)||!strcmp(key,"dolphin"));return metadata_storage;}
 static FlipperFormat*flipper_format_file_alloc(Storage*s){assert(s==metadata_storage);return &metadata_file;}
 static void flipper_format_set_strict_mode(FlipperFormat*f,bool strict){(void)f;(void)strict;}
 static bool flipper_format_file_open_existing(FlipperFormat*f,const char*p){(void)f;assert(strstr(p,"/Fixture/meta.txt"));return true;}
