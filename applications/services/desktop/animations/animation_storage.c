@@ -4,6 +4,7 @@
 #include <flipper_format/flipper_format.h>
 #include <furi.h>
 #include <core/dangerous_defines.h>
+#include <core/memmgr_heap_i.h>
 #include <storage/storage.h>
 #include <gui/icon_i.h>
 
@@ -345,8 +346,8 @@ static bool animation_storage_prepare_icon(
     if(bundled_bytes > (SIZE_MAX - sizeof(AnimationFrameStorage) - frame_pointers_bytes)) {
         return false;
     }
-    AnimationFrameStorage* frame_storage =
-        calloc(1, sizeof(AnimationFrameStorage) + frame_pointers_bytes + bundled_bytes);
+    AnimationFrameStorage* frame_storage = memmgr_heap_alloc_optional(
+        sizeof(AnimationFrameStorage) + frame_pointers_bytes + bundled_bytes);
     if(!frame_storage) return false;
     if(bundled_bytes) {
         frame_storage->bundled_data =
