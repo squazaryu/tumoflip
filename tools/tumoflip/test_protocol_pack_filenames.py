@@ -21,6 +21,8 @@ int main(void){
    const char* stem=subghz_protocol_pack_entries[i].filename;
    assert(!strstr(stem,"protocol_")&&!strstr(stem,".fal"));
  }
+ unsigned field=0;for(unsigned i=0;i<count;i++)if(!strncmp(subghz_protocol_pack_entries[i].filename,"rx_",3))field++;
+ assert(field==10);
 ''' + (r'''
  char path[48];assert(subghz_protocol_pack_filename("renault_v1",path,sizeof(path))&&!strcmp(path,"protocol_renault_v1.fal"));
  assert(!subghz_protocol_pack_filename("renault_v1",path,12));
