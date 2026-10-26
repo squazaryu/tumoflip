@@ -39,6 +39,16 @@ static bool subghz_protocol_pack_filename(const char* stem, char* output, size_t
 
 static const SubGhzProtocolPackEntry subghz_protocol_pack_entries[] = {
     {PACK_GROUP_ALL, "superrollo"},
+    {PACK_GROUP(SubGhzProtocolPackGroupCore), "rx_x10"},
+    {PACK_GROUP(SubGhzProtocolPackGroupCore), "rx_urmet"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_gm0"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_gm1"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_ty0"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_mz2"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "rx_mb0"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "rx_mb1"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "rx_op1"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "rx_bmw"},
     {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia),
      "kia_v0"},
     {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia),
