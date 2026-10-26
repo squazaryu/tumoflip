@@ -193,19 +193,18 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-009-031` | Published testing build; next Field Kit candidate is described below | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-009-032` | Field Kit hardware checks and feature validation | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
 
-The latest published Dev remains `t-dev-009-031` / API 88.22 with
-Device Library 1.1 delivered through **FW Packages Dev 027**. The local
-`t-dev-009-032` candidate uses API 88.23 for nonfatal IRQ reservation. Its
-Field Tools, experimental Passive NFC Sniffer, Device Library 1.2, TumoSpectrum
-3.4 and new receive-only protocol leaves require a new matching FW Packages
-revision; no catalog or firmware release has been published for this candidate.
-Publication and hardware acceptance remain separate checkpoints.
+Dev `t-dev-009-032` uses local API 88.23 for nonfatal IRQ reservation. Its Field
+Tools, experimental Passive NFC Sniffer, Device Library 1.2, TumoSpectrum 3.4
+and new receive-only protocol leaves are paired with **FW Packages Dev 028**.
+Check the release pages for publication status; hardware acceptance remains
+separate. Update TumoCompanion to **1.11.32**, install matching firmware first,
+then the independent FW Packages. Older catalogs and Stable remain immutable.
 
 ## Install
 
@@ -226,13 +225,13 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-009-031.tgz
+flipper-z-f7-update-t-dev-009-032.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: candidate `t-dev-009-032` uses `88.23`; immutable stable `v1.0.8` remains `88.7`.
+- Firmware API: Dev `t-dev-009-032` uses `88.23`; immutable stable `v1.0.8` remains `88.7`.
   Each release manifest records its compatible package API. API numbers are
   local to this fork.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or
