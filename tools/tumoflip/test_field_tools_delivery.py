@@ -9,6 +9,25 @@ APP = ROOT / "applications/system/device_library"
 
 
 class FieldToolsDeliveryTests(unittest.TestCase):
+    def test_round_object_route_requires_device_library_12_without_loading_it(self):
+        from tools.tumoflip.test_field_wallet import storage_native
+        storage_native(r'''
+static uint8_t elf[512];
+static void p16(unsigned a,uint16_t v){elf[a]=v;elf[a+1]=v>>8;}
+static void p32(unsigned a,uint32_t v){p16(a,v);p16(a+2,v>>16);}
+static void app_file(Storage*s,uint32_t version,const char*name){
+ memset(elf,0,sizeof(elf));memcpy(elf,"\177ELF\1\1\1",7);p16(16,1);p16(18,40);p32(20,1);p32(32,64);p16(40,52);p16(46,40);p16(48,3);p16(50,1);
+ p32(108,3);p32(120,256);p32(124,32);p32(144,1);p32(148,1);p32(160,320);p32(164,85);memcpy(elf+256,"\0.fapmeta\0",10);
+ p32(320,0x52474448);p32(324,1);p16(328,22);p16(330,88);p16(332,7);p32(336,version);memcpy(elf+340,name,strlen(name)+1);
+ const char*path="/ext/apps/Tools/device_library.fap";storage_common_remove(s,path);File*f=storage_file_alloc(s);assert(storage_file_open(f,path,FSAM_WRITE,FSOM_CREATE_NEW));assert(storage_file_write(f,elf,sizeof(elf))==sizeof(elf));assert(storage_file_close(f));storage_file_free(f);
+}
+int main(int argc,char**argv){assert(argc==2);Storage s={0};snprintf(s.root,sizeof(s.root),"%s",argv[1]);assert(storage_simply_mkdir(&s,"/ext/apps"));assert(storage_simply_mkdir(&s,"/ext/apps/Tools"));
+ assert(!library_object_entry_ready(&s));app_file(&s,0x10001,"Device Library");assert(!library_object_entry_ready(&s));
+ app_file(&s,0x10002,"Device Library");assert(library_object_entry_ready(&s));
+ app_file(&s,0x10002,"Other FAP");assert(!library_object_entry_ready(&s));app_file(&s,0x10002,"Device Library");
+ close_failure=true;assert(!library_object_entry_ready(&s));close_failure=false;read_budget=1;assert(!library_object_entry_ready(&s));return 0;}
+''')
+
     def test_new_faps_reach_the_actual_base_package_manifest(self):
         from tools.tumoflip.test_package_release import prepare_package_tree
         from tools.tumoflip.validate_release import package_entries
