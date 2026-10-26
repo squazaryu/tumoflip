@@ -685,7 +685,7 @@ static bool library_event(void* context, uint32_t event) {
     } else if(event == About)
         library_message(
             app,
-            "Device Library 1.1\n\nObjects link existing files: 8 named actions per object, 16 pinned objects. Removing a link or pin never deletes its file.\n\nNFC / RFID / iButton open a saved-file menu, not emulation. SUB / IR keep their native file flow. Unknown formats are references only.\n\nOld cards load without rewriting. Saving uses the new card format; older Device Library versions cannot read new revisions.\n\nHistory is opt-in for native SUB / IR / NFC saves. Three prior versions per file, 2 MiB each. Third-party writers and deletions are not intercepted.\n\nRestore creates a separate copy. Backups may contain private data; they stay on your SD. Lists use 32 entries per page.",
+            "Device Library 1.2\n\nObjects link existing files: 8 named actions per object, 16 pinned objects. Removing a link or pin never deletes its file.\n\nNFC / RFID / iButton open a saved-file menu, not emulation. SUB / IR keep their native file flow. Unknown formats are references only.\n\nField Tools adds manual rounds, portable object copies and read-only capture inventory through a separate FW Package. Opening an object never marks a check as passed.\n\nOld cards load without rewriting. Saving uses the new card format; older Device Library versions cannot read new revisions.\n\nHistory is opt-in for native SUB / IR / NFC saves. Three prior versions per file, 2 MiB each. Third-party writers and deletions are not intercepted.\n\nRestore creates a separate copy. Backups may contain private data; they stay on your SD. Lists use 32 entries per page.",
             app->page);
     return true;
 }

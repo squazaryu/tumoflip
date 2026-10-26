@@ -67,8 +67,21 @@ bool field_round_export(Storage* storage, const FieldRound* round, char* path, s
     if(!storage || !field_round_valid(round) || !path ||
        !storage_simply_mkdir(storage, LIBRARY_ROOT "/reports"))
         return false;
-    int length =
-        snprintf(path, size, LIBRARY_ROOT "/reports/round-%lu.txt", (unsigned long)round->started);
+    uint8_t identity[32];
+    if(mbedtls_sha256((const uint8_t*)round, sizeof(*round), identity, 0)) return false;
+    int length = snprintf(
+        path,
+        size,
+        LIBRARY_ROOT "/reports/round-%lu-%02x%02x%02x%02x%02x%02x%02x%02x.txt",
+        (unsigned long)round->started,
+        identity[0],
+        identity[1],
+        identity[2],
+        identity[3],
+        identity[4],
+        identity[5],
+        identity[6],
+        identity[7]);
     if(length < 0 || (size_t)length >= size) return false;
     File* file = storage_file_alloc(storage);
     bool created = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_NEW);

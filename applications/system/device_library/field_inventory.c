@@ -32,6 +32,8 @@ struct FieldInventoryWalk {
     FieldInventoryVisit visit;
     void* context;
     bool cancelled;
+    bool pinned;
+    uint8_t manifest_hash[32];
     mbedtls_sha256_context* sha;
     FieldInventoryStats* stats;
 };
@@ -83,23 +85,35 @@ static bool field_inventory_validate(File* file, uint32_t* count, FieldInventory
         ok = storage_file_read(file, &footer, sizeof(footer)) == sizeof(footer) &&
              footer.magic == 0x444E4554UL && footer.count == *count &&
              !mbedtls_sha256_finish(&sha, hash) && !memcmp(hash, footer.hash, 32);
+    if(ok) {
+        if(walk->pinned)
+            ok = !memcmp(walk->manifest_hash, footer.hash, sizeof(footer.hash));
+        else {
+            memcpy(walk->manifest_hash, footer.hash, sizeof(footer.hash));
+            walk->pinned = true;
+        }
+    }
     mbedtls_sha256_free(&sha);
     return ok;
 }
-static bool field_inventory_contains(FieldInventoryWalk* walk, const char* path) {
-    if(!storage_file_seek(walk->manifest, sizeof(FieldInventoryHeader), true)) return false;
+static int field_inventory_contains(FieldInventoryWalk* walk, const char* path) {
+    if(!storage_file_seek(walk->manifest, sizeof(FieldInventoryHeader), true)) return -1;
     FieldInventoryEntry entry;
     for(unsigned i = 0; i < walk->baseline_count; i++) {
-        if(storage_file_read(walk->manifest, &entry, sizeof(entry)) != sizeof(entry)) return false;
-        if(!strcmp(entry.path, path)) return true;
+        if(!field_inventory_progress(walk, path, i) ||
+           storage_file_read(walk->manifest, &entry, sizeof(entry)) != sizeof(entry))
+            return -1;
+        if(!strcmp(entry.path, path)) return 1;
     }
-    return false;
+    return 0;
 }
 static bool field_inventory_scan_file(FieldInventoryWalk* walk, const char* path) {
     if(++walk->count > FIELD_INVENTORY_MAX || !field_inventory_progress(walk, path, walk->count))
         return false;
     if(walk->stats) {
-        if(!field_inventory_contains(walk, path)) {
+        int found = field_inventory_contains(walk, path);
+        if(found < 0) return false;
+        if(!found) {
             if(storage_file_get_error(walk->manifest) != FSE_OK) return false;
             walk->stats->added++;
             if(walk->visit) walk->visit(walk->context, path, FieldInventoryAdded);
@@ -253,6 +267,17 @@ bool field_inventory_compare(
     if(ok) ok = field_inventory_walk_roots(&walk);
     if(opened) ok = storage_file_close(file) && ok;
     storage_file_free(file);
+    if(ok) {
+        // Reopen rather than trusting a possibly cached/changed read handle.
+        // Results belong to one content identity, not a mixture of baselines.
+        file = storage_file_alloc(storage);
+        opened = storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING);
+        uint32_t final_count = 0;
+        ok = opened && field_inventory_validate(file, &final_count, &walk) &&
+             final_count == walk.baseline_count;
+        if(opened) ok = storage_file_close(file) && ok;
+        storage_file_free(file);
+    }
     if(!ok) memset(stats, 0, sizeof(*stats));
     return ok;
 }

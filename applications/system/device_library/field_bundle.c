@@ -78,10 +78,11 @@ static bool field_bundle_payload_read(
     mbedtls_sha256_free(&sha);
     return ok;
 }
-bool field_bundle_inspect(
+bool field_bundle_inspect_receipt(
     Storage* storage,
     const char* path,
     DeviceCard* card,
+    uint8_t receipt[32],
     FieldProgress progress,
     void* context) {
     if(!storage || !library_path_valid(path) || !card) return false;
@@ -95,9 +96,20 @@ bool field_bundle_inspect(
             file, &header->files[i], header->card.links[i], progress, context);
     if(opened) ok = storage_file_close(file) && ok;
     storage_file_free(file);
-    if(ok) *card = header->card;
+    if(ok) {
+        *card = header->card;
+        if(receipt) memcpy(receipt, header->hash, 32);
+    }
     free(header);
     return ok;
+}
+bool field_bundle_inspect(
+    Storage* storage,
+    const char* path,
+    DeviceCard* card,
+    FieldProgress progress,
+    void* context) {
+    return field_bundle_inspect_receipt(storage, path, card, NULL, progress, context);
 }
 bool field_bundle_export(
     Storage* storage,
@@ -151,23 +163,29 @@ bool field_bundle_export(
     if(created) ok = storage_file_close(output) && ok;
     storage_file_free(output);
     // Full readback verifies both the manifest and each copied payload.
+    uint8_t readback[32];
     if(ok)
-        ok = field_bundle_inspect(storage, path, &header->card, progress, context) &&
-             !memcmp(card, &header->card, sizeof(*card));
+        ok = field_bundle_inspect_receipt(
+                 storage, path, &header->card, readback, progress, context) &&
+             !memcmp(card, &header->card, sizeof(*card)) && !memcmp(header->hash, readback, 32);
     free(header);
     if(!ok && created) storage_common_remove(storage, path);
     return ok;
 }
-bool field_bundle_import(
+bool field_bundle_import_receipt(
     Storage* storage,
     const char* path,
     const char* new_name,
+    const uint8_t receipt[32],
     FieldProgress progress,
     void* context) {
     if(!storage || !library_name_valid(new_name) || !library_path_valid(path)) return false;
     FieldBundleHeader* header = malloc(sizeof(*header));
     // Validate the complete input before creating anything on the destination SD.
-    bool ok = field_bundle_inspect(storage, path, &header->card, progress, context);
+    uint8_t observed[32];
+    bool ok =
+        field_bundle_inspect_receipt(storage, path, &header->card, observed, progress, context);
+    if(ok && receipt) ok = !memcmp(receipt, observed, 32);
     FuriString* directory = furi_string_alloc_printf(LIBRARY_CARDS "/%s", new_name);
     if(ok)
         ok = storage_common_stat(storage, furi_string_get_cstr(directory), NULL) ==
@@ -180,7 +198,7 @@ bool field_bundle_import(
         ok = storage_common_stat(storage, furi_string_get_cstr(directory), NULL) == FSE_NOT_EXIST;
     File* input = storage_file_alloc(storage);
     bool opened = ok && storage_file_open(input, path, FSAM_READ, FSOM_OPEN_EXISTING);
-    ok = opened && field_bundle_header_read(input, header);
+    ok = opened && field_bundle_header_read(input, header) && !memcmp(observed, header->hash, 32);
     if(ok) ok = storage_simply_mkdir(storage, furi_string_get_cstr(directory));
     for(unsigned i = 0; ok && i < header->card.link_count; i++) {
         const char* extension = field_bundle_extension(library_file_kind(header->card.links[i]));
@@ -235,4 +253,12 @@ bool field_bundle_import(
     // Failed imports intentionally keep their private partial copies for inspection;
     // they do not publish a card or remove/overwrite any existing capture.
     return ok;
+}
+bool field_bundle_import(
+    Storage* storage,
+    const char* path,
+    const char* new_name,
+    FieldProgress progress,
+    void* context) {
+    return field_bundle_import_receipt(storage, path, new_name, NULL, progress, context);
 }

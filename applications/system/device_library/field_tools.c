@@ -1,6 +1,7 @@
 #include "field_menu.h"
 #include "field_bundle.h"
 #include "field_inventory.h"
+#include "wallet_launch.h"
 #include <furi.h>
 #include <furi_hal_rtc.h>
 #include <gui/gui.h>
@@ -46,6 +47,7 @@ typedef struct {
     FuriThread* thread;
     File* report;
     FieldInventoryStats stats;
+    uint8_t bundle_receipt[32];
 } FieldTools;
 
 static void field_tools_show(FieldTools* app, FieldPage page);
@@ -143,12 +145,12 @@ static int32_t field_tools_worker(void* context) {
             field_bundle_export(app->storage, &app->card, app->path, field_tools_progress, app);
         break;
     case FieldJobInspect:
-        app->job_ok =
-            field_bundle_inspect(app->storage, app->path, &app->card, field_tools_progress, app);
+        app->job_ok = field_bundle_inspect_receipt(
+            app->storage, app->path, &app->card, app->bundle_receipt, field_tools_progress, app);
         break;
     case FieldJobImport:
-        app->job_ok =
-            field_bundle_import(app->storage, app->path, app->edit, field_tools_progress, app);
+        app->job_ok = field_bundle_import_receipt(
+            app->storage, app->path, app->edit, app->bundle_receipt, field_tools_progress, app);
         break;
     case FieldJobSnapshot:
         app->job_ok = field_inventory_create(app->storage, app->path, field_tools_progress, app);
@@ -192,7 +194,7 @@ static void field_tools_finish(FieldTools* app) {
     if(!app->job_ok) {
         field_tools_message(
             app,
-            "Cancelled or failed.\nCheck SD / limits.\nExisting captures unchanged.\nIncomplete import copies\nmay remain in imports/.",
+            "Cancelled or failed.\nCheck SD / limits.\nOriginal captures kept.\nIncomplete copies may\nremain in imports/.",
             FieldPageHome);
     } else if(app->job == FieldJobInspect) {
         field_tools_show(app, FieldPageBundle);
@@ -215,7 +217,7 @@ static void field_tools_finish(FieldTools* app) {
     } else {
         furi_string_printf(
             app->message,
-            "%s\n\n%s\n\nCopy this file to iPhone\nwith Companion > Files.\nIt may contain private data.",
+            "%s\n\n%s\n\nCopy from SD / USB.\nCompanion Files supports\nuploading a copy back.\nMay contain private data.",
             app->job == FieldJobExport ? "Object package verified." : "Capture baseline verified.",
             app->path);
         field_tools_message(app, furi_string_get_cstr(app->message), FieldPageHome);
@@ -325,7 +327,8 @@ static bool field_tools_event(void* context, uint32_t event) {
         }
     } else if(event == FieldOpenObject) {
         const char* name = app->round.items[app->state.selected].object;
-        if(library_card_load(app->storage, name, &app->card)) {
+        if(library_object_entry_ready(app->storage) &&
+           library_card_load(app->storage, name, &app->card)) {
             Loader* loader = furi_record_open(RECORD_LOADER);
             FuriString* argument = furi_string_alloc_printf("object:%s", name);
             loader_clear_launch_queue(loader);
@@ -339,7 +342,9 @@ static bool field_tools_event(void* context, uint32_t event) {
             view_dispatcher_stop(app->dispatcher);
         } else
             field_tools_message(
-                app, "Object missing / unreadable.\nRound result unchanged.", FieldPageItem);
+                app,
+                "Need Device Library 1.2\nand a readable object.\nUpdate FW Packages.\nRound result unchanged.",
+                FieldPageItem);
     } else if(event == FieldExportRound) {
         if(field_round_load(app->storage, &app->round) &&
            field_round_export(
@@ -385,7 +390,7 @@ static bool field_tools_event(void* context, uint32_t event) {
     } else if(event == FieldAbout)
         field_tools_message(
             app,
-            "Field tools 1.0\n\nRounds use pinned objects. Results are manual, not inferred from app launch. Export a round before starting another.\n\nObject packages contain private card data and capture bytes. Import creates separate copies; incomplete copies may remain after failure. No scripts or arbitrary FAPs are imported.\n\nInventories: 512 captures, 6 directory levels, 16 MiB per file. SUB / IR / NFC / RFID / iButton roots. Explicit scans only; Back cancels.\n\nAn inventory is not a backup. It cannot recover deleted bytes or prove which application deleted them. Export it off your SD with Companion > Files.",
+            "Field tools 1.0\n\nRounds use pinned objects. Results are manual, not inferred from app launch. Export a round before starting another.\n\nObject packages contain private card data and capture bytes. Import creates separate copies; incomplete copies may remain after failure. No scripts or arbitrary FAPs are imported.\n\nInventories: 512 captures, 6 directory levels, 16 MiB per file. SUB / IR / NFC / RFID / iButton roots. Explicit scans only; Back cancels.\n\nAn inventory is not a backup. It cannot recover deleted bytes or prove which application deleted them. Copy exports off SD via an SD reader or USB SD mode. Companion Files can upload a copy back; it currently has no download action.",
             FieldPageHome);
     return true;
 }

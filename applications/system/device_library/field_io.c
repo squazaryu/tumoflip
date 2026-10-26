@@ -6,6 +6,17 @@ typedef struct {
     uint8_t hash[32];
 } FieldRecord;
 
+static bool
+    field_record_hash(const FieldRecord* record, const void* data, size_t size, uint8_t hash[32]) {
+    mbedtls_sha256_context sha;
+    mbedtls_sha256_init(&sha);
+    bool ok = !mbedtls_sha256_starts(&sha, 0) &&
+              !mbedtls_sha256_update(&sha, (const uint8_t*)record, offsetof(FieldRecord, hash)) &&
+              !mbedtls_sha256_update(&sha, data, size) && !mbedtls_sha256_finish(&sha, hash);
+    mbedtls_sha256_free(&sha);
+    return ok;
+}
+
 bool field_text_valid(const char* text, size_t capacity) {
     if(!text) return false;
     for(size_t i = 0; i < capacity; i++) {
@@ -110,7 +121,8 @@ static int field_record_read(
                 result = -1;
             else if(
                 record.magic == magic && record.size == size && record.generation &&
-                !mbedtls_sha256(data, size, digest, 0) && !memcmp(digest, record.hash, 32)) {
+                field_record_hash(&record, data, size, digest) &&
+                !memcmp(digest, record.hash, 32)) {
                 *generation = record.generation;
                 result = 1;
             }
@@ -162,7 +174,7 @@ bool field_record_save(
         unsigned slot = library_write_slot(generations);
         FieldRecord record = {
             .magic = magic, .generation = newest < 0 ? 1 : generations[newest] + 1, .size = size};
-        ok = !mbedtls_sha256(data, size, record.hash, 0);
+        ok = field_record_hash(&record, data, size, record.hash);
         FuriString* path = furi_string_alloc_printf("%s/%u.record", root, slot);
         FS_Error removed = ok ? storage_common_remove(storage, furi_string_get_cstr(path)) :
                                 FSE_INTERNAL;

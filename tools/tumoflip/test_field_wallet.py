@@ -18,7 +18,13 @@ def storage_native(program, extra_sources=(), prelude=""):
                APP / "card_store.c", APP / "pin_store.c",
                ROOT / "lib/fap_metadata/fap_metadata.h", ROOT / "lib/fap_metadata/fap_metadata.c",
                APP / "wallet_launch.c"]
-    sources.extend(APP / name for name in extra_sources)
+    if os.environ.get("TUMO_FIELD_COVERAGE_DIR"):
+        logic = ("field_io.h", "field_io.c", "field_round.h", "field_round.c",
+                 "field_bundle.h", "field_bundle.c", "field_inventory.h", "field_inventory.c")
+        sources.extend(APP / name for name in logic)
+        sources.extend(APP / name for name in extra_sources if name not in logic)
+    else:
+        sources.extend(APP / name for name in extra_sources)
     body = '#include "library_io_stubs.h"\n' + prelude + "\n"
     for source in sources:
         if source.exists():
@@ -29,7 +35,8 @@ def storage_native(program, extra_sources=(), prelude=""):
         work = Path(folder)
         (work / "sd").mkdir()
         (work / "test.c").write_text(body)
-        flags = ["-fprofile-instr-generate", "-fcoverage-mapping"] if os.environ.get("TUMO_WALLET_COVERAGE_DIR") else []
+        coverage_directory = os.environ.get("TUMO_WALLET_COVERAGE_DIR") or os.environ.get("TUMO_FIELD_COVERAGE_DIR")
+        flags = ["-fprofile-instr-generate", "-fcoverage-mapping"] if coverage_directory else []
         result = subprocess.run(["cc", "-std=c11", "-D_DEFAULT_SOURCE", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
             "-Wno-unused-function", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", *flags,
             '-DMBEDTLS_CONFIG_FILE="library_crypto_config.h"', "-I", str(FIXTURES), "-I", str(ROOT / "lib/mbedtls/include"),
@@ -41,7 +48,7 @@ def storage_native(program, extra_sources=(), prelude=""):
                                 env=dict(os.environ, LLVM_PROFILE_FILE=str(work / "test.profraw")))
         if result.returncode:
             raise AssertionError(result.stderr)
-        if directory := os.environ.get("TUMO_WALLET_COVERAGE_DIR"):
+        if directory := coverage_directory:
             target = Path(directory); target.mkdir(parents=True, exist_ok=True)
             number = len(list(target.glob("*.profraw")))
             shutil.copy2(work / "test.profraw", target / f"test-{number}.profraw")

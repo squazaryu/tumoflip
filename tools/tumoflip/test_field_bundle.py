@@ -32,7 +32,9 @@ int main(int argc,char**argv){
  assert(field_bundle_export(&s,&card,pack,NULL,NULL));
  assert(!field_bundle_export(&s,&card,pack,NULL,NULL));
  assert(field_bundle_inspect(&s,pack,&read,NULL,NULL)&&!memcmp(&card,&read,sizeof(card)));
- assert(field_bundle_import(&s,pack,"Imported",NULL,NULL));
+ uint8_t receipt[32],wrong[32];assert(field_bundle_inspect_receipt(&s,pack,&read,receipt,NULL,NULL));memcpy(wrong,receipt,32);wrong[0]^=1;
+ assert(!field_bundle_import_receipt(&s,pack,"Wrong",wrong,NULL,NULL));assert(!library_card_load(&s,"Wrong",&read));
+ assert(field_bundle_import_receipt(&s,pack,"Imported",receipt,NULL,NULL));
  assert(library_card_load(&s,"Imported",&read)&&read.link_count==1&&!strcmp(read.labels[0],"Front gate"));
  assert(strcmp(read.links[0],card.links[0])&&strstr(read.links[0],"/imports/Imported/"));
  uint32_t n1,n2;uint8_t h1[32],h2[32];assert(field_file_hash(&s,read.links[0],&n1,h1,NULL,NULL));assert(field_file_hash(&s,card.links[0],&n2,h2,NULL,NULL));assert(n1==n2&&!memcmp(h1,h2,32));
