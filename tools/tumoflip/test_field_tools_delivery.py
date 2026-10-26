@@ -8,6 +8,17 @@ APP = ROOT / "applications/system/device_library"
 
 
 class FieldToolsDeliveryTests(unittest.TestCase):
+    def test_new_apps_are_base_packages_not_updater_payloads(self):
+        from tools.tumoflip import validate_release as release
+        expected = {"field_tools.fap": "apps/Tools/field_tools.fap",
+                    "tumo_nfc_sniffer.fap": "apps/NFC/tumo_nfc_sniffer.fap"}
+        for filename, path in expected.items():
+            self.assertEqual(release.package_extapp_exports().get(filename), path)
+            self.assertIn(path, release.PACKAGE_ONLY_PACKAGE_FILES)
+            self.assertEqual(release.PACKAGE_ONLY_PACKAGE_GROUPS[path], "base")
+        for stem in ("rx_x10", "rx_urmet", "rx_gm0", "rx_gm1", "rx_ty0", "rx_mz2", "rx_mb0", "rx_mb1", "rx_op1", "rx_bmw"):
+            self.assertIn("protocol_" + stem + ".fal", release.PROTOCOL_PACKS)
+
     def test_field_tools_is_a_buildable_package_only_application(self):
         apps = []
         exec(compile((APP / "application.fam").read_text(), "application.fam", "exec"), {
