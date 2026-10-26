@@ -38,7 +38,7 @@ void field_menu_build(Submenu* menu, const FieldMenuState* state,
         break;
     case FieldPageNewConfirm:
         submenu_set_header(menu, "New object round");
-        FIELD_ROW("Previous round retained", 0);
+        FIELD_ROW("Export old report first", 0);
         FIELD_ROW("Use current pinned list", FieldConfirmNew);
         FIELD_ROW("Back: keep current round", 0);
         break;

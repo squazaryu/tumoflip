@@ -110,8 +110,6 @@ bool field_bundle_export(Storage* storage, const DeviceCard* card, const char* p
     if(ok) ok = storage_file_sync(output);
     if(created) ok = storage_file_close(output) && ok;
     storage_file_free(output);
-    uint8_t expected[32];
-    memcpy(expected, header->hash, sizeof(expected));
     // Full readback verifies both the manifest and each copied payload.
     if(ok) ok = field_bundle_inspect(storage, path, &header->card, progress, context) &&
                 !memcmp(card, &header->card, sizeof(*card));
