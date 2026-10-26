@@ -6,6 +6,21 @@ SOURCES = ("field_io.h", "field_io.c", "field_inventory.h", "field_inventory.c")
 
 
 class FieldInventoryTests(unittest.TestCase):
+    def test_baseline_replacement_during_comparison_invalidates_the_result(self):
+        storage_native(r'''
+static void replace_baseline(void*c,const char*p,FieldInventoryState state){(void)p;if(state!=FieldInventoryUnchanged)return;Storage*s=c;
+ char path[1400];local_path(s,"/ext/baseline.tinv",path);FILE*f=fopen(path,"r+b");assert(f);
+ uint8_t bytes[sizeof(FieldInventoryHeader)+sizeof(FieldInventoryEntry)+sizeof(FieldInventoryFooter)];assert(fread(bytes,1,sizeof(bytes),f)==sizeof(bytes));
+ bytes[sizeof(FieldInventoryHeader)+offsetof(FieldInventoryEntry,hash)]^=1;
+ FieldInventoryFooter footer;memcpy(&footer,bytes+sizeof(bytes)-sizeof(footer),sizeof(footer));assert(!mbedtls_sha256(bytes,sizeof(bytes)-sizeof(footer),footer.hash,0));memcpy(bytes+sizeof(bytes)-sizeof(footer),&footer,sizeof(footer));
+ rewind(f);assert(fwrite(bytes,1,sizeof(bytes),f)==sizeof(bytes));assert(!fclose(f));
+}
+int main(int argc,char**argv){assert(argc==2);Storage s={0};snprintf(s.root,sizeof(s.root),"%s",argv[1]);assert(storage_simply_mkdir(&s,"/ext/subghz"));
+ File*f=storage_file_alloc(&s);assert(storage_file_open(f,"/ext/subghz/Own.sub",FSAM_WRITE,FSOM_CREATE_NEW));assert(storage_file_write(f,"Own",3)==3);assert(storage_file_close(f));storage_file_free(f);
+ assert(field_inventory_create(&s,"/ext/baseline.tinv",NULL,NULL));FieldInventoryStats stats;
+ assert(!field_inventory_compare(&s,"/ext/baseline.tinv",&stats,replace_baseline,NULL,&s));assert(!stats.unchanged&&!stats.changed&&!stats.added);return 0;}
+''', SOURCES)
+
     def test_short_manifest_lookup_is_an_error_not_a_new_capture(self):
         storage_native(r'''
 static void short_after_compare(void*c,const char*p,FieldInventoryState state){(void)c;(void)p;if(state==FieldInventoryUnchanged)read_budget=1;}
