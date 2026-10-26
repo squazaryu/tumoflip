@@ -1,0 +1,89 @@
+App(
+    appid="protocol_rx_x10",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_rx_x10_ep",
+    requires=["subghz"],
+    sources=["x10_plugin.c", "x10.c"],
+)
+
+App(
+    appid="protocol_rx_urmet",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_rx_urmet_ep",
+    requires=["subghz"],
+    sources=["urmet_plugin.c", "urmet.c"],
+)
+
+App(
+    appid="protocol_rx_gm0",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_rx_gm0_ep",
+    requires=["subghz"],
+    sources=["gm_v0_plugin.c", "gm_v0.c"],
+)
+
+App(
+    appid="protocol_rx_gm1",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_rx_gm1_ep",
+    requires=["subghz"],
+    sources=["gm_v1_plugin.c", "gm_v1.c"],
+)
+
+App(
+    appid="protocol_rx_ty0",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_rx_ty0_ep",
+    requires=["subghz"],
+    sources=["toyota_v0_plugin.c", "toyota_v0.c"],
+)
+
+App(
+    appid="protocol_rx_mz2",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_rx_mz2_ep",
+    requires=["subghz"],
+    sources=["mazda_v2_plugin.c", "mazda_v2.c"],
+)
+
+App(
+    appid="protocol_rx_mb0",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_rx_mb0_ep",
+    requires=["subghz"],
+    sources=["mercedes_v0_plugin.c", "mercedes_v0.c"],
+)
+
+App(
+    appid="protocol_rx_mb1",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_rx_mb1_ep",
+    requires=["subghz"],
+    sources=["mercedes_v1_plugin.c", "mercedes_v1.c"],
+)
+
+App(
+    appid="protocol_rx_op1",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_rx_op1_ep",
+    requires=["subghz"],
+    sources=["opel_v1_plugin.c", "opel_v1.c"],
+)
+
+App(
+    appid="protocol_rx_bmw",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_rx_bmw_ep",
+    requires=["subghz"],
+    sources=["bmw_plugin.c", "bmw.c"],
+)
