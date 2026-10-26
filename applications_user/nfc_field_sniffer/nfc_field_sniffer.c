@@ -135,7 +135,7 @@ static bool nfc_field_event(void* context, uint32_t action) {
             nfc_field_message(
                 app,
                 app->result == NfcFieldCaptureNoField ?
-                    "No external RF field.\nUse your own active reader\nand card near Flipper.\nPrevious saved trace unchanged." :
+                    "No external RF field.\nUse your own reader /\ncard near Flipper.\nSaved traces kept." :
                 app->result == NfcFieldCaptureBusy ?
                     "NFC / DMA / TIM2 busy.\nNo resource was taken\nfrom its current owner.\nPrevious trace unchanged." :
                     "Capture failed.\nResources released.\nNo files changed.");
@@ -153,7 +153,7 @@ static bool nfc_field_event(void* context, uint32_t action) {
         if(nfc_field_save(app, path)) {
             furi_string_printf(
                 app->message,
-                "Trace readback verified.\n%s\n\nMay contain private data.\nCopy with Companion > Files.",
+                "Trace readback verified.\n%s\n\nMay contain private data.\nCopy from SD / USB.",
                 path);
             nfc_field_message(app, furi_string_get_cstr(app->message));
         } else
@@ -162,7 +162,7 @@ static bool nfc_field_event(void* context, uint32_t action) {
     } else if(action == NfcFieldAbout)
         nfc_field_message(
             app,
-            "Tumo Passive NFC 1.0\n\nExperimental ISO14443-A106k candidate-frame sniffer for your own reader/card. Flipper does not generate an RF field, relay traffic or recover keys.\n\nPosition both devices close to Flipper. Capture lasts up to2 seconds. Back cancels and joins the worker before exit.\n\nStatic8KiB sample ring;24 frames/24 bytes each. Lost regions, overruns and truncation are reported. Timing is relative sample time; gaps may be lost after overruns. CRC is unverified unless matched; a match is not authentication.\n\nBusy resources fail closed. No capture runs in the background. Trace files may contain private data and are written only on Save. Physical-device acceptance is pending.");
+            "Tumo Passive NFC 1.0\n\nExperimental sniffer:\nISO14443-A / 106k.\nOwn reader / card only.\n\nNo RF field generation,\nrelay or key recovery.\n\nKeep both devices\nclose to Flipper.\nCapture: 2 seconds max.\nBack stops the worker\nbefore exit.\n\nStatic 8 KiB ring.\n24 frames, 24 B each.\nLost / truncated data\nis explicitly marked.\nTiming: relative.\nOverruns may lose gaps.\n\nCRC match does not\nauthenticate a frame.\nBusy resources fail.\nNo background capture.\nSave is manual only.\nTraces may be private.\n\nHardware acceptance\nis still pending.");
     return true;
 }
 static bool nfc_field_back(void* context) {

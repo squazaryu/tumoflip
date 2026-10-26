@@ -515,7 +515,7 @@ static void tumospectrum_band_map_draw(Canvas* canvas, void* context) {
         "%03lu.%03lu",
         (unsigned long)(snapshot.selected_frequency_hz / 1000000U),
         (unsigned long)((snapshot.selected_frequency_hz % 1000000U) / 1000U));
-    canvas_draw_str_aligned(canvas, 64, 8, AlignCenter, AlignBottom, text);
+    canvas_draw_str_aligned(canvas, 62, 8, AlignCenter, AlignBottom, text);
     snprintf(
         text,
         sizeof(text),
@@ -533,7 +533,7 @@ static void tumospectrum_band_map_draw(Canvas* canvas, void* context) {
         tumospectrum_band_map_status_name(snapshot.status));
     canvas_draw_str(canvas, 1, 18, text);
     snprintf(text, sizeof(text), "R%d N%d", snapshot.selected_rssi_dbm, snapshot.noise_floor_dbm);
-    canvas_draw_str_aligned(canvas, 72, 18, AlignCenter, AlignBottom, text);
+    canvas_draw_str_aligned(canvas, 78, 18, AlignCenter, AlignBottom, text);
     snprintf(text, sizeof(text), "%u/4", app->smart_capture_sample_count);
     canvas_draw_str_aligned(canvas, 127, 18, AlignRight, AlignBottom, text);
 

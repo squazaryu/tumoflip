@@ -19,7 +19,67 @@ def source(name):
         ["git", "show", BOUNDARY + ":lib/subghz/protocols/" + name + ".c"], cwd=ROOT, text=True)
 
 
+def positive_native(name, driver):
+    program = (ROOT / "tools/tumoflip/fixtures/field_rx_native.h").read_text()
+    program += re.sub(r"^#(?:include|pragma).*\n", "\n", (APP / (name + ".h")).read_text(), flags=re.M)
+    program += re.sub(r"^#include.*\n", "\n", source(name), flags=re.M)
+    program += driver
+    with tempfile.TemporaryDirectory(prefix="field-rx-positive-") as directory:
+        work = Path(directory)
+        (work / "test.c").write_text(program)
+        result = subprocess.run([
+            os.environ.get("CC", "cc"), "-std=c11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+            "-Wno-format", "-Wno-unused-function", "-Wno-unused-variable",
+            "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-I", str(ROOT),
+            str(work / "test.c"), str(ROOT / "lib/toolbox/manchester_decoder.c"), "-o", str(work / "test")],
+            capture_output=True, text=True)
+        if result.returncode:
+            raise AssertionError(result.stderr)
+        result = subprocess.run([str(work / "test")], capture_output=True, text=True, timeout=10)
+        if result.returncode:
+            raise AssertionError(result.stderr)
+
+
 class ArfFieldRxTests(unittest.TestCase):
+    def test_x10_pulse_frame_roundtrip_preserves_accepted_capture(self):
+        positive_native("x10", r'''
+static unsigned hits;
+static void found(SubGhzProtocolDecoderBase*b,void*c){(void)b;(void)c;hits++;}
+int main(void){const SubGhzProtocolDecoder*p=subghz_protocol_x10.decoder;
+ void*d=p->alloc(NULL);((SubGhzProtocolDecoderBase*)d)->callback=found;
+ const uint32_t key=0x12ed34cb;p->reset(d);p->feed(d,true,9600);p->feed(d,false,4800);
+ for(int bit=31;bit>=0;bit--){p->feed(d,true,600);p->feed(d,false,key&(1u<<bit)?1800:600);}
+ p->feed(d,true,600);assert(hits==1);FlipperFormat f={0};SubGhzRadioPreset preset={0};
+ assert(p->serialize(d,&f,&preset)==SubGhzProtocolStatusOk&&f.bits==32&&f.data==key);
+ void*restored=p->alloc(NULL);assert(p->deserialize(restored,&f)==SubGhzProtocolStatusOk);
+ FlipperFormat again={0};assert(p->serialize(restored,&again,&preset)==SubGhzProtocolStatusOk&&again.data==key&&again.bits==32);
+ FuriString text={0};p->get_string(restored,&text);assert(strstr(text.text,"X10")&&strstr(text.text,"32bit"));
+ p->free(restored);p->free(d);return 0;}
+''')
+
+    def test_urmet_preamble_and_usart_capture_roundtrip_keeps_full_raw_and_gaps(self):
+        positive_native("urmet", r'''
+static unsigned hits;
+static void found(SubGhzProtocolDecoderBase*b,void*c){(void)b;(void)c;hits++;}
+int main(void){const SubGhzProtocolDecoder*p=subghz_protocol_urmet.decoder;
+ void*d=p->alloc(NULL);((SubGhzProtocolDecoderBase*)d)->callback=found;p->reset(d);
+ for(unsigned i=0;i<20;i++)p->feed(d,i&1,100);p->feed(d,false,30000);
+ p->feed(d,true,500);p->feed(d,false,500);p->feed(d,true,500);p->feed(d,false,5500);
+ // Sixteen inverted 8N1 0x55 bytes after the observed FD prefix. No TX code.
+ for(unsigned byte=0;byte<16;byte++)for(unsigned i=0;i<5;i++){p->feed(d,true,500);p->feed(d,false,500);}
+ p->feed(d,false,20000);assert(hits==1);FlipperFormat f={0};SubGhzRadioPreset preset={0};
+ assert(p->serialize(d,&f,&preset)==SubGhzProtocolStatusOk&&f.bits==136);
+ RxField*raw=rx_field(&f,"Raw",false);RxField*gaps=rx_field(&f,"Gaps",false);
+ assert(raw&&raw->count==17&&raw->bytes[0]==0xfd&&gaps&&gaps->count>2);
+ for(unsigned i=1;i<17;i++)assert(raw->bytes[i]==0x55);
+ void*restored=p->alloc(NULL);assert(p->deserialize(restored,&f)==SubGhzProtocolStatusOk);
+ FlipperFormat again={0};assert(p->serialize(restored,&again,&preset)==SubGhzProtocolStatusOk);
+ RxField*r2=rx_field(&again,"Raw",false),*g2=rx_field(&again,"Gaps",false);
+ assert(r2&&g2&&r2->count==raw->count&&g2->count==gaps->count&&!memcmp(r2->bytes,raw->bytes,raw->count)&&!memcmp(g2->bytes,gaps->bytes,gaps->count));
+ again.fail_key="Gaps";assert(p->serialize(restored,&again,&preset)!=SubGhzProtocolStatusOk);
+ p->free(restored);p->free(d);return 0;}
+''')
+
     def test_all_adapted_leaves_are_receive_only_and_bound_malformed_pulses(self):
         for name in ("x10", "urmet", "gm_v0", "gm_v1", "toyota_v0", "mazda_v2", "mercedes_v0", "mercedes_v1", "opel_v1", "bmw"):
             with self.subTest(protocol=name):

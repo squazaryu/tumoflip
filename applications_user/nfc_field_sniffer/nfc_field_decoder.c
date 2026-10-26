@@ -30,10 +30,12 @@ static struct sfr* const s_fr = nfc_field_memory.frames;
 static int s_ntr, s_ongrid, s_offgrid, s_card_samp, s_nfr, s_tr_init, s_lvl, s_diag_maxrun, s_pos,
     s_last_bits;
 static uint32_t s_diag_dense;
+static bool s_decode_truncated;
 static const uint8_t s_cap_shift = 4;
 _Static_assert(sizeof(nfc_field_memory) < 16384, "NFC decoder workspace grew");
 static int miller_decode(const uint16_t* ps, int np, uint8_t* out, uint32_t* par) {
     *par = 0;
+    s_decode_truncated = false;
     uint8_t* seq = s_seq;
     __builtin_memset(seq, 0, 160);
     long base = (long)ps[0] * 100 - ETU100 / 4;
@@ -55,7 +57,8 @@ static int miller_decode(const uint16_t* ps, int np, uint8_t* out, uint32_t* par
         if(idx >= 0 && idx < 160) {
             if(seq[idx] == 0) seq[idx] = half ? 2 : 1;
             if(idx > maxi) maxi = idx;
-        }
+        } else
+            s_decode_truncated = true;
         base = (long)ps[i] * 100 - (long)idx * ETU100 - (half ? 3 * ETU100 / 4 : ETU100 / 4);
     }
     int sr = 0, nb = 0, n = 0;
@@ -81,6 +84,7 @@ static int miller_decode(const uint16_t* ps, int np, uint8_t* out, uint32_t* par
 }
 static int manch_decode(int s, int e, uint8_t* out, uint32_t* par) {
     *par = 0;
+    s_decode_truncated = false;
     const uint16_t* tr = s_tr;
     int nt = s_ntr;
 
@@ -123,6 +127,7 @@ static int manch_decode(int s, int e, uint8_t* out, uint32_t* par) {
         mid += adv;
         end += adv;
     }
+    if(nbits == 200 && h1 <= e + ETUSAMP) s_decode_truncated = true;
     int n = 0, i = 1;
     while(i + 8 <= nbits && n < 32) {
         int v = 0;
@@ -157,7 +162,7 @@ static void add_frame(int t, int tend, char dir, const uint8_t* b, int n, uint32
     f->tend = tend;
     f->dir = dir;
     f->par = par;
-    f->truncated = (unsigned)n > NFC_FIELD_FRAME_BYTES;
+    f->truncated = (unsigned)n > NFC_FIELD_FRAME_BYTES || s_decode_truncated;
     f->n = (unsigned)n > NFC_FIELD_FRAME_BYTES ? NFC_FIELD_FRAME_BYTES : (unsigned)n;
     f->bits = s_last_bits > f->n * 8 ? f->n * 8 : s_last_bits;
     memcpy(f->b, b, f->n);
@@ -278,6 +283,9 @@ static void scan_span(const uint8_t* seg, int len, int* pos_io) {
     *pos_io = pos + len;
 }
 static bool region_valid(void) {
+    for(int i = 0; i < s_nfr; i++)
+        if(s_fr[i].dir == 'C' && s_fr[i].bits == 4 && !s_fr[i].par && !s_fr[i].truncated)
+            return true;
     return (s_ongrid >= 4 && s_ongrid >= s_offgrid) || (s_card_samp >= 246);
 }
 static int find_cut(int start, int* cp, int* mgv, int* mgn, int* mgp) {
@@ -334,6 +342,7 @@ void nfc_field_decoder_reset(bool initial_level) {
     s_tr_init = s_lvl;
     s_ongrid = s_offgrid = s_card_samp = s_diag_maxrun = s_last_bits = 0;
     s_diag_dense = 0;
+    s_decode_truncated = false;
 }
 size_t nfc_field_decoder_workspace_size(void) {
     return sizeof(nfc_field_memory);

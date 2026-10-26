@@ -31,7 +31,7 @@ bool nfc_field_decoder_format(char* output, size_t size) {
         output,
         size,
         &used,
-        "Passive NFC A / 106k\nFrames: %lu Dropped: %lu\nOverruns: %lu Regions lost: %lu\nR=reader C=card\nCRC unverified unless matched.\n\n",
+        "Passive NFC A / 106k\nFrames: %lu Dropped: %lu\nOverruns: %lu Lost: %lu\nR=reader C=card\nCRC: unverified unless\nmatched.\n\n",
         (unsigned long)trace->count,
         (unsigned long)trace->frames_dropped,
         (unsigned long)trace->overruns,
