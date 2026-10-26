@@ -95,6 +95,12 @@ static void nfc_field_chip_prepare(void) {
     nfc_field_reg_write(ST25R3916_REG_CORR_CONF2,0);
     nfc_field_reg_write(ST25R3916_REG_BIT_RATE,0);
     nfc_field_reg_clear(ST25R3916_REG_OP_CONTROL,ST25R3916_REG_OP_CONTROL_tx_en);
+    nfc_field_reg_clear(ST25R3916_REG_OP_CONTROL,ST25R3916_REG_OP_CONTROL_en_fd_mask);
+    nfc_field_reg_set(ST25R3916_REG_OP_CONTROL,ST25R3916_REG_OP_CONTROL_en_fd_manual_efd_pdt);
+    nfc_field_reg_write(ST25R3916_REG_FIELD_THRESHOLD_ACTV,
+        nfc_field_reg_read(ST25R3916_REG_FIELD_THRESHOLD_ACTV)&~0x70U);
+    nfc_field_reg_write(ST25R3916_REG_FIELD_THRESHOLD_DEACTV,
+        nfc_field_reg_read(ST25R3916_REG_FIELD_THRESHOLD_DEACTV)&~0x70U);
 }
 static void nfc_field_chip_sniff(void) {
     nfc_field_command(ST25R3916_CMD_STOP);
@@ -159,6 +165,9 @@ NfcFieldCaptureResult nfc_field_capture(uint32_t timeout_ms,NfcFieldStop stop,vo
     NfcFieldHardware hardware={0};NfcFieldLease lease={0};
     static const NfcFieldLeaseOps ops={nfc_field_take,nfc_field_drop};
     if(!nfc_field_lease_acquire(&lease,&ops,&hardware)) return NfcFieldCaptureBusy;
+    // Cancellation/no-field must never present frames from an earlier capture
+    // as a new session. The UI may retain its separately formatted old snapshot.
+    nfc_field_decoder_reset(false);
     NfcFieldCaptureResult result=NfcFieldCaptureNoField;
     uint32_t start=furi_get_tick(),deadline=furi_ms_to_ticks(timeout_ms);
     furi_hal_power_insomnia_enter();hardware.insomnia=true;
