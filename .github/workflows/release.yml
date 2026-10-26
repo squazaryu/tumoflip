@@ -121,7 +121,7 @@ jobs:
             fap_nearby_files fap_hotels_parser fap_nice_o_code fap_secplus_pin fap_weather_editor \
             fap_lfrfid_hitags \
             fap_protopirate_to_subghz fap_capture_inspector fap_specter fap_hid_ble fap_hid_usb \
-            fap_device_library fap_file_history fap_signal_workbench
+            fap_device_library fap_file_history fap_signal_workbench fap_field_tools fap_tumo_nfc_sniffer
 
       - name: Validate BLE Remote peer policy and Toyota C compatibility
         run: python3 -m unittest tools.tumoflip.test_ble_gap_lifecycle tools.tumoflip.test_ble_remote_peers tools.tumoflip.test_ble_peer_service tools.tumoflip.test_ble_peer_privacy tools.tumoflip.test_hid_peer_store tools.tumoflip.test_hid_peer_scenes tools.tumoflip.test_toyota_c_files tools.tumoflip.test_toyota_vag_diagnostics
@@ -217,6 +217,9 @@ jobs:
 
       - name: Validate field wallet storage, navigation and native inspect routes
         run: python3 -m unittest tools.tumoflip.test_field_wallet tools.tumoflip.test_wallet_menu tools.tumoflip.test_wallet_inspect tools.tumoflip.test_wallet_flow
+
+      - name: Validate field kit data integrity, passive decoding and resource ownership
+        run: python3 -m unittest tools.tumoflip.test_nice_counter_v2 tools.tumoflip.test_protocol_pack_filenames tools.tumoflip.test_band_map_dual tools.tumoflip.test_arf_field_rx tools.tumoflip.test_arf_long_payload tools.tumoflip.test_field_rounds tools.tumoflip.test_field_bundle tools.tumoflip.test_field_inventory tools.tumoflip.test_field_menu tools.tumoflip.test_field_tools_delivery tools.tumoflip.test_interrupt_reservation tools.tumoflip.test_nfc_field_decoder tools.tumoflip.test_nfc_field_lease tools.tumoflip.test_nfc_field_owner tools.tumoflip.test_nfc_field_chip tools.tumoflip.test_nfc_field_delivery tools.tumoflip.test_nfc_field_ui
 
       - name: Validate passive protocol and bounded packet adaptations
         run: toolchain/x86_64-linux/bin/python3 -m unittest tools.tumoflip.test_upstream_1149_rfid_native tools.tumoflip.test_prastel_rx_native tools.tumoflip.test_packet_config_native tools.tumoflip.test_marauder_diagnostics

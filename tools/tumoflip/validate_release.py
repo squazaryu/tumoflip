@@ -37,6 +37,16 @@ DFUSE_VENDOR_ID = 0x0483
 DFUSE_SUFFIX_VERSION = 0x011A
 DFUSE_WHOLE_FILE_CRC = 0xFFFFFFFF
 PROTOCOL_PACKS = {
+    "protocol_rx_x10.fal",
+    "protocol_rx_urmet.fal",
+    "protocol_rx_gm0.fal",
+    "protocol_rx_gm1.fal",
+    "protocol_rx_ty0.fal",
+    "protocol_rx_mz2.fal",
+    "protocol_rx_mb0.fal",
+    "protocol_rx_mb1.fal",
+    "protocol_rx_op1.fal",
+    "protocol_rx_bmw.fal",
     "protocol_chrysler.fal",
     "protocol_fiat_marelli.fal",
     "protocol_ford_v0.fal",
@@ -147,6 +157,8 @@ SIGNAL_WORKBENCH_PACKAGE_FILE = "apps/Module One/Signals/signal_workbench.fap"
 SPECTER_PACKAGE_FILE = "apps/NFC/specter.fap"
 BLE_REMOTE_PACKAGE_FILE = "apps/Bluetooth/hid_ble.fap"
 DEVICE_LIBRARY_PACKAGE_FILE = "apps/Tools/device_library.fap"
+FIELD_TOOLS_PACKAGE_FILE = "apps/Tools/field_tools.fap"
+NFC_FIELD_PACKAGE_FILE = "apps/NFC/tumo_nfc_sniffer.fap"
 FILE_HISTORY_PACKAGE_FILE = "apps_data/device_library/plugins/file_history.fal"
 PACKAGE_ONLY_PACKAGE_FILES = frozenset(
     {
@@ -160,6 +172,8 @@ PACKAGE_ONLY_PACKAGE_FILES = frozenset(
         SPECTER_PACKAGE_FILE,
         BLE_REMOTE_PACKAGE_FILE,
         DEVICE_LIBRARY_PACKAGE_FILE,
+        FIELD_TOOLS_PACKAGE_FILE,
+        NFC_FIELD_PACKAGE_FILE,
         FILE_HISTORY_PACKAGE_FILE,
     }
 )
@@ -207,6 +221,8 @@ PACKAGE_ONLY_PACKAGE_GROUPS = {
     SPECTER_PACKAGE_FILE: "base",
     BLE_REMOTE_PACKAGE_FILE: "base",
     DEVICE_LIBRARY_PACKAGE_FILE: "base",
+    FIELD_TOOLS_PACKAGE_FILE: "base",
+    NFC_FIELD_PACKAGE_FILE: "base",
     FILE_HISTORY_PACKAGE_FILE: "base",
 }
 PACKAGE_RELEASE_OVERLAY_GROUPS = {
@@ -376,6 +392,8 @@ def package_extapp_exports() -> dict[str, str]:
     exports["specter.fap"] = SPECTER_PACKAGE_FILE
     exports["hid_ble.fap"] = BLE_REMOTE_PACKAGE_FILE
     exports["device_library.fap"] = DEVICE_LIBRARY_PACKAGE_FILE
+    exports["field_tools.fap"] = FIELD_TOOLS_PACKAGE_FILE
+    exports["tumo_nfc_sniffer.fap"] = NFC_FIELD_PACKAGE_FILE
     exports["file_history.fal"] = FILE_HISTORY_PACKAGE_FILE
     exports["module_one_cockpit.fap"] = "apps/Module One/Diagnostics/cockpit.fap"
     exports.update(
@@ -933,6 +951,8 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             resources / SPECTER_PACKAGE_FILE,
             resources / BLE_REMOTE_PACKAGE_FILE,
             resources / DEVICE_LIBRARY_PACKAGE_FILE,
+            resources / FIELD_TOOLS_PACKAGE_FILE,
+            resources / NFC_FIELD_PACKAGE_FILE,
             resources / FILE_HISTORY_PACKAGE_FILE,
             resources / LFRFID_HITAGS_PACKAGE_FILE,
             resources / "apps/Tools/tumoflip_packages.fap",
