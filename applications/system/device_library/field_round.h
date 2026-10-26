@@ -16,8 +16,12 @@ typedef struct {
     FieldRoundItem items[LIBRARY_PINS];
 } FieldRound;
 bool field_round_begin(FieldRound* round, const LibraryPins* pins, uint32_t timestamp);
-bool field_round_mark(FieldRound* round, unsigned index, FieldRoundResult result,
-                       const char* note, uint32_t timestamp);
+bool field_round_mark(
+    FieldRound* round,
+    unsigned index,
+    FieldRoundResult result,
+    const char* note,
+    uint32_t timestamp);
 bool field_round_complete(const FieldRound* round);
 bool field_round_load(Storage* storage, FieldRound* round);
 bool field_round_save(Storage* storage, const FieldRound* round);

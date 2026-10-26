@@ -15,8 +15,13 @@ bool field_text_valid(const char* text, size_t capacity) {
     return false;
 }
 
-bool field_file_hash(Storage* storage, const char* path, uint32_t* size, uint8_t hash[32],
-                     FieldProgress progress, void* context) {
+bool field_file_hash(
+    Storage* storage,
+    const char* path,
+    uint32_t* size,
+    uint8_t hash[32],
+    FieldProgress progress,
+    void* context) {
     if(!storage || !library_path_valid(path) || !size || !hash) return false;
     File* file = storage_file_alloc(storage);
     bool opened = storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING);
@@ -37,8 +42,9 @@ bool field_file_hash(Storage* storage, const char* path, uint32_t* size, uint8_t
         }
         offset += count;
     }
-    if(ok) ok = storage_file_size(file) == total && storage_file_get_error(file) == FSE_OK &&
-                !mbedtls_sha256_finish(&sha, hash);
+    if(ok)
+        ok = storage_file_size(file) == total && storage_file_get_error(file) == FSE_OK &&
+             !mbedtls_sha256_finish(&sha, hash);
     if(opened) ok = storage_file_close(file) && ok;
     storage_file_free(file);
     mbedtls_sha256_free(&sha);
@@ -46,8 +52,14 @@ bool field_file_hash(Storage* storage, const char* path, uint32_t* size, uint8_t
     return ok;
 }
 
-bool field_copy_checked(Storage* storage, File* source, File* destination, uint32_t size,
-                        const uint8_t expected[32], FieldProgress progress, void* context) {
+bool field_copy_checked(
+    Storage* storage,
+    File* source,
+    File* destination,
+    uint32_t size,
+    const uint8_t expected[32],
+    FieldProgress progress,
+    void* context) {
     (void)storage;
     if(!source || !destination || !expected || size > FIELD_FILE_MAX) return false;
     uint8_t buffer[512], hash[32];
@@ -69,8 +81,14 @@ bool field_copy_checked(Storage* storage, File* source, File* destination, uint3
 
 // Four fixed slots retain the latest valid generation. Failures may damage only
 // an older staging slot; neither the last valid slot nor user captures are removed.
-static int field_record_read(Storage* storage, const char* root, unsigned slot,
-                             uint32_t magic, void* data, size_t size, uint32_t* generation) {
+static int field_record_read(
+    Storage* storage,
+    const char* root,
+    unsigned slot,
+    uint32_t magic,
+    void* data,
+    size_t size,
+    uint32_t* generation) {
     FuriString* path = furi_string_alloc_printf("%s/%u.record", root, slot);
     FileInfo info;
     FS_Error status = storage_common_stat(storage, furi_string_get_cstr(path), &info);
@@ -79,16 +97,20 @@ static int field_record_read(Storage* storage, const char* root, unsigned slot,
         result = 0;
         if(info.size == sizeof(FieldRecord) + size) {
             File* file = storage_file_alloc(storage);
-            bool opened = storage_file_open(file, furi_string_get_cstr(path), FSAM_READ, FSOM_OPEN_EXISTING);
+            bool opened =
+                storage_file_open(file, furi_string_get_cstr(path), FSAM_READ, FSOM_OPEN_EXISTING);
             FieldRecord record;
             uint8_t digest[32];
-            bool ok = opened && storage_file_read(file, &record, sizeof(record)) == sizeof(record) &&
+            bool ok = opened &&
+                      storage_file_read(file, &record, sizeof(record)) == sizeof(record) &&
                       storage_file_read(file, data, size) == size;
             if(opened) ok = storage_file_close(file) && ok;
             storage_file_free(file);
-            if(!ok) result = -1;
-            else if(record.magic == magic && record.size == size && record.generation &&
-                    !mbedtls_sha256(data, size, digest, 0) && !memcmp(digest, record.hash, 32)) {
+            if(!ok)
+                result = -1;
+            else if(
+                record.magic == magic && record.size == size && record.generation &&
+                !mbedtls_sha256(data, size, digest, 0) && !memcmp(digest, record.hash, 32)) {
                 *generation = record.generation;
                 result = 1;
             }
@@ -98,8 +120,13 @@ static int field_record_read(Storage* storage, const char* root, unsigned slot,
     return result;
 }
 
-static bool field_record_generations(Storage* storage, const char* root, uint32_t magic,
-                                      void* scratch, size_t size, uint32_t generations[4]) {
+static bool field_record_generations(
+    Storage* storage,
+    const char* root,
+    uint32_t magic,
+    void* scratch,
+    size_t size,
+    uint32_t generations[4]) {
     memset(generations, 0, 4 * sizeof(uint32_t));
     for(unsigned i = 0; i < 4; i++)
         if(field_record_read(storage, root, i, magic, scratch, size, &generations[i]) < 0)
@@ -116,10 +143,16 @@ bool field_record_load(Storage* storage, const char* root, uint32_t magic, void*
            field_record_read(storage, root, newest, magic, data, size, &generations[newest]) == 1;
 }
 
-bool field_record_save(Storage* storage, const char* root, uint32_t magic, const void* data, size_t size) {
+bool field_record_save(
+    Storage* storage,
+    const char* root,
+    uint32_t magic,
+    const void* data,
+    size_t size) {
     if(!storage || !library_path_valid(root) || !data || !size || size > 8192 ||
        storage_sd_status(storage) != FSE_OK || !storage_simply_mkdir(storage, LIBRARY_ROOT) ||
-       !storage_simply_mkdir(storage, root)) return false;
+       !storage_simply_mkdir(storage, root))
+        return false;
     void* scratch = malloc(size);
     uint32_t generations[4];
     bool ok = field_record_generations(storage, root, magic, scratch, size, generations);
@@ -127,20 +160,25 @@ bool field_record_save(Storage* storage, const char* root, uint32_t magic, const
     if(newest >= 0 && generations[newest] == UINT32_MAX) ok = false;
     if(ok) {
         unsigned slot = library_write_slot(generations);
-        FieldRecord record = {.magic = magic, .generation = newest < 0 ? 1 : generations[newest] + 1, .size = size};
+        FieldRecord record = {
+            .magic = magic, .generation = newest < 0 ? 1 : generations[newest] + 1, .size = size};
         ok = !mbedtls_sha256(data, size, record.hash, 0);
         FuriString* path = furi_string_alloc_printf("%s/%u.record", root, slot);
-        FS_Error removed = ok ? storage_common_remove(storage, furi_string_get_cstr(path)) : FSE_INTERNAL;
+        FS_Error removed = ok ? storage_common_remove(storage, furi_string_get_cstr(path)) :
+                                FSE_INTERNAL;
         File* file = storage_file_alloc(storage);
-        bool created = (removed == FSE_OK || removed == FSE_NOT_EXIST) &&
-                       storage_file_open(file, furi_string_get_cstr(path), FSAM_WRITE, FSOM_CREATE_NEW);
+        bool created =
+            (removed == FSE_OK || removed == FSE_NOT_EXIST) &&
+            storage_file_open(file, furi_string_get_cstr(path), FSAM_WRITE, FSOM_CREATE_NEW);
         ok = created && storage_file_write(file, &record, sizeof(record)) == sizeof(record) &&
              storage_file_write(file, data, size) == size && storage_file_sync(file);
         if(created) ok = storage_file_close(file) && ok;
         storage_file_free(file);
         uint32_t read_generation = 0;
-        if(ok) ok = field_record_read(storage, root, slot, magic, scratch, size, &read_generation) == 1 &&
-                    read_generation == record.generation && !memcmp(scratch, data, size);
+        if(ok)
+            ok = field_record_read(storage, root, slot, magic, scratch, size, &read_generation) ==
+                     1 &&
+                 read_generation == record.generation && !memcmp(scratch, data, size);
         if(!ok && created) storage_common_remove(storage, furi_string_get_cstr(path));
         furi_string_free(path);
     }

@@ -4,24 +4,34 @@
 bool field_menu_allows(const FieldMenuState* state, uint32_t action) {
     if(!state || !action) return false;
     switch(state->page) {
-    case FieldPageHome: return action >= FieldStartRound && action <= FieldAbout;
-    case FieldPageNewConfirm: return action == FieldConfirmNew;
-    case FieldPageBundle: return action == FieldImport;
+    case FieldPageHome:
+        return action >= FieldStartRound && action <= FieldAbout;
+    case FieldPageNewConfirm:
+        return action == FieldConfirmNew;
+    case FieldPageBundle:
+        return action == FieldImport;
     case FieldPageCards:
-        return (action >= FieldCardBase && action < FieldCardBase + state->count && state->count <= 32) ||
+        return (action >= FieldCardBase && action < FieldCardBase + state->count &&
+                state->count <= 32) ||
                (action == FieldNextCards && state->more) ||
                (action == FieldPreviousCards && state->offset >= 32);
     case FieldPageRound:
         return state->round && state->round->count <= LIBRARY_PINS &&
-               ((action >= FieldRoundBase && action < FieldRoundBase + state->round->count) || action == FieldExportRound);
+               ((action >= FieldRoundBase && action < FieldRoundBase + state->round->count) ||
+                action == FieldExportRound);
     case FieldPageItem:
-        return state->round && state->selected < state->round->count && state->round->count <= LIBRARY_PINS &&
-               action >= FieldPass && action <= FieldOpenObject;
-    default: return false;
+        return state->round && state->selected < state->round->count &&
+               state->round->count <= LIBRARY_PINS && action >= FieldPass &&
+               action <= FieldOpenObject;
+    default:
+        return false;
     }
 }
-void field_menu_build(Submenu* menu, const FieldMenuState* state,
-                       void (*callback)(void*, uint32_t), void* context) {
+void field_menu_build(
+    Submenu* menu,
+    const FieldMenuState* state,
+    void (*callback)(void*, uint32_t),
+    void* context) {
     submenu_reset(menu);
 #define FIELD_ROW(label, action) submenu_add_item(menu, label, action, callback, context)
     switch(state->page) {
@@ -47,7 +57,12 @@ void field_menu_build(Submenu* menu, const FieldMenuState* state,
         if(state->round && state->round->count <= LIBRARY_PINS) {
             for(unsigned i = 0; i < state->round->count; i++) {
                 char label[64];
-                snprintf(label, sizeof(label), "%s %s", field_round_result_name(state->round->items[i].result), state->round->items[i].object);
+                snprintf(
+                    label,
+                    sizeof(label),
+                    "%s %s",
+                    field_round_result_name(state->round->items[i].result),
+                    state->round->items[i].object);
                 FIELD_ROW(label, FieldRoundBase + i);
             }
             FIELD_ROW("Export round report", FieldExportRound);
@@ -55,7 +70,8 @@ void field_menu_build(Submenu* menu, const FieldMenuState* state,
         break;
     case FieldPageItem:
         submenu_set_header(menu, "Object check");
-        if(state->round && state->selected < state->round->count) FIELD_ROW(state->round->items[state->selected].object, 0);
+        if(state->round && state->selected < state->round->count)
+            FIELD_ROW(state->round->items[state->selected].object, 0);
         FIELD_ROW("Open object actions", FieldOpenObject);
         FIELD_ROW("Mark PASS", FieldPass);
         FIELD_ROW("Mark PROBLEM", FieldProblem);
@@ -65,7 +81,8 @@ void field_menu_build(Submenu* menu, const FieldMenuState* state,
     case FieldPageCards:
         submenu_set_header(menu, "Export object");
         if(state->count <= 32 && state->names)
-            for(unsigned i = 0; i < state->count; i++) FIELD_ROW(state->names[i], FieldCardBase + i);
+            for(unsigned i = 0; i < state->count; i++)
+                FIELD_ROW(state->names[i], FieldCardBase + i);
         if(!state->count) FIELD_ROW("No objects", 0);
         if(state->offset) FIELD_ROW("< Previous page", FieldPreviousCards);
         if(state->more) FIELD_ROW("Next page >", FieldNextCards);
@@ -81,7 +98,9 @@ void field_menu_build(Submenu* menu, const FieldMenuState* state,
         FIELD_ROW("Reading / verifying files", 0);
         FIELD_ROW("Back: cancel operation", 0);
         break;
-    default: submenu_set_header(menu, "Field tools"); break;
+    default:
+        submenu_set_header(menu, "Field tools");
+        break;
     }
 #undef FIELD_ROW
 }
