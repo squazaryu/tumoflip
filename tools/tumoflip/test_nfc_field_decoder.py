@@ -38,6 +38,8 @@ int main(void){
  assert(t->count>=1&&t->count<=NFC_FIELD_FRAME_CAP);
  bool reqa=false;for(unsigned i=0;i<t->count;i++)if(t->frames[i].direction=='R'&&t->frames[i].bits==7&&t->frames[i].data[0]==0x26)reqa=true;
  assert(reqa);
+ // A four-bit card NAK0 is real data, not "all-zero noise".
+ s_nfr=0;s_last_bits=4;const uint8_t nak=0;add_frame(1,5,'C',&nak,1,0);assert(s_nfr==1&&s_fr[0].b[0]==0&&s_fr[0].bits==4);
  const uint8_t halt[]={0x50,0};assert(nfc_field_crc_a(halt,sizeof(halt))==0xcd57);
  struct{char out[4096];uint64_t guard;}text={.guard=0x123456789abcdef};assert(nfc_field_decoder_format(text.out,sizeof(text.out)));assert(strstr(text.out,"26")&&text.guard==0x123456789abcdef);
  char small[2];assert(!nfc_field_decoder_format(small,sizeof(small)));
