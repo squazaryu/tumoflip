@@ -178,7 +178,7 @@ class SubGhzProtocolCapabilitiesTest(unittest.TestCase):
             'requires=["gui", "storage", "subghz_radio_broker"]',
             self.arf_status_manifest,
         )
-        self.assertIn('fap_version="0.4.2"', self.arf_status_manifest)
+        self.assertIn('fap_version="0.4.3"', self.arf_status_manifest)
 
 
 if __name__ == "__main__":

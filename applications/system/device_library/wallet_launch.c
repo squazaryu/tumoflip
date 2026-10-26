@@ -10,6 +10,24 @@ static bool library_fap_read(void* context, uint32_t offset, void* output, size_
     return storage_file_seek(file, offset, true) && storage_file_read(file, output, size) == size;
 }
 
+bool library_object_entry_ready(Storage* storage) {
+    if(storage_sd_status(storage) != FSE_OK) return false;
+    File* file = storage_file_alloc(storage);
+    bool open = storage_file_open(
+        file, EXT_PATH("apps/Tools/device_library.fap"), FSAM_READ, FSOM_OPEN_EXISTING);
+    ArfElfMetadata metadata;
+    bool ok = open &&
+              arf_elf_metadata_read(library_fap_read, file, storage_file_size(file), &metadata) ==
+                  ArfElfOk &&
+              metadata.target == 7 &&
+              metadata.api_major == firmware_api_interface->api_version_major &&
+              metadata.api_minor <= firmware_api_interface->api_version_minor &&
+              metadata.app_version >= 0x00010002U && !strcmp(metadata.name, "Device Library");
+    if(open) ok = storage_file_close(file) && ok;
+    storage_file_free(file);
+    return ok;
+}
+
 bool library_native_inspect_ready(Storage* storage, LibraryFileKind kind) {
     if(storage_sd_status(storage) != FSE_OK) return false;
     const char* path;

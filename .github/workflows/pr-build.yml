@@ -194,6 +194,9 @@ jobs:
       - name: Validate field wallet storage, navigation and native inspect routes
         run: python3 -m unittest tools.tumoflip.test_field_wallet tools.tumoflip.test_wallet_menu tools.tumoflip.test_wallet_inspect tools.tumoflip.test_wallet_flow
 
+      - name: Validate field kit data integrity, passive decoding and resource ownership
+        run: python3 -m unittest tools.tumoflip.test_nice_counter_v2 tools.tumoflip.test_protocol_pack_filenames tools.tumoflip.test_band_map_dual tools.tumoflip.test_arf_field_rx tools.tumoflip.test_arf_long_payload tools.tumoflip.test_field_rounds tools.tumoflip.test_field_bundle tools.tumoflip.test_field_inventory tools.tumoflip.test_field_menu tools.tumoflip.test_field_tools_delivery tools.tumoflip.test_interrupt_reservation tools.tumoflip.test_nfc_field_decoder tools.tumoflip.test_nfc_field_lease tools.tumoflip.test_nfc_field_owner tools.tumoflip.test_nfc_field_chip tools.tumoflip.test_nfc_field_delivery tools.tumoflip.test_nfc_field_ui
+
       - name: Build firmware (minimal / clean)
         id: build
         shell: bash
@@ -206,7 +209,7 @@ jobs:
             fap_nearby_files fap_hotels_parser fap_nice_o_code fap_secplus_pin fap_weather_editor \
             fap_lfrfid_hitags \
             fap_protopirate_to_subghz fap_capture_inspector fap_specter fap_hid_ble fap_hid_usb \
-            fap_device_library fap_file_history fap_signal_workbench
+            fap_device_library fap_file_history fap_signal_workbench fap_field_tools fap_tumo_nfc_sniffer
 
       - name: Validate feature plugin imports and loader diagnostics
         run: |

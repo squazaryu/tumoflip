@@ -58,6 +58,7 @@ typedef enum {
     TumoSpectrumViewProtocol,
     TumoSpectrumViewSensorMenu,
     TumoSpectrumViewSensorInput,
+    TumoSpectrumViewBandPeaks,
 } TumoSpectrumView;
 
 typedef enum {
@@ -146,6 +147,7 @@ struct TumoSpectrumApp {
     Submenu* actions;
     Submenu* set_actions;
     Submenu* profile_menu;
+    Submenu* peak_menu;
     View* result_view;
     View* capture_set_view;
     View* protocol_view;
@@ -513,11 +515,12 @@ static void tumospectrum_band_map_draw(Canvas* canvas, void* context) {
         "%03lu.%03lu",
         (unsigned long)(snapshot.selected_frequency_hz / 1000000U),
         (unsigned long)((snapshot.selected_frequency_hz % 1000000U) / 1000U));
-    canvas_draw_str_aligned(canvas, 64, 8, AlignCenter, AlignBottom, text);
+    canvas_draw_str_aligned(canvas, 62, 8, AlignCenter, AlignBottom, text);
     snprintf(
         text,
         sizeof(text),
         "%s",
+        snapshot.radio == TumoSpectrumBandMapRadioDual ? "INT+EXT" :
         snapshot.radio == TumoSpectrumBandMapRadioExternal ? "EXT" : "INT");
     canvas_draw_str_aligned(canvas, 127, 8, AlignRight, AlignBottom, text);
     canvas_draw_line(canvas, 0, 10, 127, 10);
@@ -530,7 +533,7 @@ static void tumospectrum_band_map_draw(Canvas* canvas, void* context) {
         tumospectrum_band_map_status_name(snapshot.status));
     canvas_draw_str(canvas, 1, 18, text);
     snprintf(text, sizeof(text), "R%d N%d", snapshot.selected_rssi_dbm, snapshot.noise_floor_dbm);
-    canvas_draw_str_aligned(canvas, 72, 18, AlignCenter, AlignBottom, text);
+    canvas_draw_str_aligned(canvas, 78, 18, AlignCenter, AlignBottom, text);
     snprintf(text, sizeof(text), "%u/4", app->smart_capture_sample_count);
     canvas_draw_str_aligned(canvas, 127, 18, AlignRight, AlignBottom, text);
 
@@ -569,6 +572,36 @@ static void tumospectrum_band_map_draw(Canvas* canvas, void* context) {
     elements_button_right(canvas, "Tune");
 }
 
+static void tumospectrum_peak_selected(void* context, uint32_t index) {
+    TumoSpectrumApp* app = context;
+    if(index == 16) tumospectrum_band_map_clear_peaks(app->band_map);
+    else tumospectrum_band_map_select_peak(app->band_map, index);
+    tumospectrum_refresh_band_map(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewBandMap);
+}
+static uint32_t tumospectrum_peaks_previous(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewBandMap;
+}
+static void tumospectrum_open_peak_history(TumoSpectrumApp* app) {
+    TumoSpectrumBandMapSnapshot snapshot;
+    tumospectrum_band_map_get_snapshot(app->band_map, &snapshot);
+    submenu_reset(app->peak_menu);
+    submenu_set_header(app->peak_menu, "Peak history");
+    if(!snapshot.peak_count)
+        submenu_add_item(app->peak_menu, "No peaks yet", 17, tumospectrum_peak_selected, app);
+    for(unsigned i = 0; i < snapshot.peak_count && i < 16; i++) {
+        const TumoSpectrumBandPeak* peak = &snapshot.observed_peaks[i];
+        char label[32];
+        snprintf(label, sizeof(label), "%03lu.%03lu  %d dBm",
+                 (unsigned long)(peak->frequency_hz / 1000000U),
+                 (unsigned long)((peak->frequency_hz % 1000000U) / 1000U), peak->rssi_dbm);
+        submenu_add_item(app->peak_menu, label, i, tumospectrum_peak_selected, app);
+    }
+    if(snapshot.peak_count)
+        submenu_add_item(app->peak_menu, "Clear peak history", 16, tumospectrum_peak_selected, app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewBandPeaks);
+}
 static bool tumospectrum_band_map_input(InputEvent* event, void* context) {
     TumoSpectrumApp* app = context;
     if(event->type == InputTypeShort || event->type == InputTypeRepeat) {
@@ -607,6 +640,9 @@ static bool tumospectrum_band_map_input(InputEvent* event, void* context) {
             tumospectrum_band_map_cycle_zoom(app->band_map);
         } else if(event->key == InputKeyDown) {
             tumospectrum_band_map_snap_to_peak(app->band_map);
+        } else if(event->key == InputKeyRight) {
+            tumospectrum_open_peak_history(app);
+            return true;
         } else {
             return false;
         }
@@ -2734,6 +2770,7 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     app->actions = submenu_alloc();
     app->set_actions = submenu_alloc();
     app->profile_menu = submenu_alloc();
+    app->peak_menu = submenu_alloc();
     app->result_view = view_alloc();
     app->capture_set_view = view_alloc();
     app->protocol_view = view_alloc();
@@ -2874,6 +2911,8 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     view_dispatcher_add_view(
         app->view_dispatcher, TumoSpectrumViewSourceCheck, submenu_get_view(app->source_menu));
     view_dispatcher_add_view(app->view_dispatcher, TumoSpectrumViewBandMap, app->band_map_view);
+    view_set_previous_callback(submenu_get_view(app->peak_menu), tumospectrum_peaks_previous);
+    view_dispatcher_add_view(app->view_dispatcher, TumoSpectrumViewBandPeaks, submenu_get_view(app->peak_menu));
     view_dispatcher_add_view(app->view_dispatcher, TumoSpectrumViewResult, app->result_view);
     view_dispatcher_add_view(
         app->view_dispatcher, TumoSpectrumViewActions, submenu_get_view(app->actions));
@@ -2935,6 +2974,7 @@ static void tumospectrum_free(TumoSpectrumApp* app) {
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewActions);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewResult);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewBandMap);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewBandPeaks);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewCaptureSets);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewSourceCheck);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewMenu);
@@ -2949,6 +2989,7 @@ static void tumospectrum_free(TumoSpectrumApp* app) {
     submenu_free(app->set_actions);
     submenu_free(app->actions);
     submenu_free(app->profile_menu);
+    submenu_free(app->peak_menu);
     submenu_free(app->capture_sets_menu);
     submenu_free(app->source_menu);
     submenu_free(app->menu);

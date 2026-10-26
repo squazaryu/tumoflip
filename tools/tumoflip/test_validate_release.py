@@ -107,7 +107,7 @@ def make_dfuse(elements: list[tuple[int, bytes]]) -> bytes:
 
 class ValidateReleaseTest(unittest.TestCase):
     def test_protocol_pack_inventory_covers_active_arf_registry(self) -> None:
-        self.assertEqual(len(PROTOCOL_PACKS), 32)
+        self.assertEqual(len(PROTOCOL_PACKS), 42)
         self.assertIn("protocol_renault_v1.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_ford_v3.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_gm_rolling.fal", PROTOCOL_PACKS)
@@ -288,10 +288,12 @@ class ValidateReleaseTest(unittest.TestCase):
         specter = "apps/NFC/specter.fap"
         ble_remote = "apps/Bluetooth/hid_ble.fap"
         device_library = "apps/Tools/device_library.fap"
+        field_tools = "apps/Tools/field_tools.fap"
+        nfc_field = "apps/NFC/tumo_nfc_sniffer.fap"
         file_history = "apps_data/device_library/plugins/file_history.fal"
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_FILES,
-            {package_only, quac, nearby, weather, hitags, converter, inspector, specter, ble_remote, device_library, file_history},
+            {package_only, quac, nearby, weather, hitags, converter, inspector, specter, ble_remote, device_library, field_tools, nfc_field, file_history},
         )
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -306,6 +308,8 @@ class ValidateReleaseTest(unittest.TestCase):
                 specter: "base",
                 ble_remote: "base",
                 device_library: "base",
+                field_tools: "base",
+                nfc_field: "base",
                 file_history: "base",
             },
         )

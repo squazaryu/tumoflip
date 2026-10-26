@@ -192,7 +192,7 @@ class SuperrolloProtocolTests(unittest.TestCase):
         self.assertIn('"../../lib/subghz/protocols/superrollo.c"', fam)
         self.assertIn('"../../lib/subghz/protocols/keeloq_common.c"', fam)
         registry = PLUGIN_REGISTRY.read_text(encoding="utf-8")
-        self.assertIn('{PACK_GROUP_ALL, "protocol_superrollo.fal"}', registry)
+        self.assertIn('{PACK_GROUP_ALL, "superrollo"}', registry)
 
 
 if __name__ == "__main__":

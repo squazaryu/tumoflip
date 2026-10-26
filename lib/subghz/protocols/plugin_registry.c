@@ -6,6 +6,7 @@
 #include <furi/core/memmgr.h>
 #include <loader/firmware_api/firmware_api.h>
 #include <toolbox/path.h>
+#include <stdio.h>
 
 #define TAG "SubGhzProtocolPack"
 
@@ -18,50 +19,70 @@ struct SubGhzProtocolPackRegistry {
 
 typedef struct {
     uint32_t groups;
+    // Basename only. The invariant protocol_ / .fal text is stored once.
     const char* filename;
 } SubGhzProtocolPackEntry;
+
+static bool subghz_protocol_pack_filename(const char* stem, char* output, size_t size) {
+    if(!stem || !*stem || !output || !size) return false;
+    // Stems come exclusively from the immutable table below, not SD/user input.
+    // Its alphabet/length are checked in native build tests; retain bounds checks
+    // on the actual formatted result without validating constants on every load.
+    int written = snprintf(output, size, "protocol_%s.fal", stem);
+    return written > 0 && (size_t)written < size;
+}
 
 #define PACK_GROUP(group) (1UL << (group))
 #define PACK_GROUP_ALL ((1UL << SubGhzProtocolPackGroupCount) - 1UL)
 
 static const SubGhzProtocolPackEntry subghz_protocol_pack_entries[] = {
-    {PACK_GROUP_ALL, "protocol_superrollo.fal"},
+    {PACK_GROUP_ALL, "superrollo"},
+    {PACK_GROUP(SubGhzProtocolPackGroupCore), "rx_x10"},
+    {PACK_GROUP(SubGhzProtocolPackGroupCore), "rx_urmet"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_gm0"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_gm1"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_ty0"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_mz2"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "rx_mb0"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "rx_mb1"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "rx_op1"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "rx_bmw"},
     {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia),
-     "protocol_kia_v0.fal"},
+     "kia_v0"},
     {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia),
-     "protocol_kia_v1.fal"},
+     "kia_v1"},
     {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia),
-     "protocol_kia_v2.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupKia), "protocol_kia_v3_v4.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupKia), "protocol_kia_v5.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupKia), "protocol_kia_v6.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupKia), "protocol_kia_v7.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupFord), "protocol_ford_v0.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupFord), "protocol_ford_v1.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupFord), "protocol_ford_v2.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupFord), "protocol_ford_v3.fal"},
+     "kia_v2"},
+    {PACK_GROUP(SubGhzProtocolPackGroupKia), "kia_v3_v4"},
+    {PACK_GROUP(SubGhzProtocolPackGroupKia), "kia_v5"},
+    {PACK_GROUP(SubGhzProtocolPackGroupKia), "kia_v6"},
+    {PACK_GROUP(SubGhzProtocolPackGroupKia), "kia_v7"},
+    {PACK_GROUP(SubGhzProtocolPackGroupFord), "ford_v0"},
+    {PACK_GROUP(SubGhzProtocolPackGroupFord), "ford_v1"},
+    {PACK_GROUP(SubGhzProtocolPackGroupFord), "ford_v2"},
+    {PACK_GROUP(SubGhzProtocolPackGroupFord), "ford_v3"},
     {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupAsiaUs),
-     "protocol_mitsubishi_v0.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "protocol_fiat_marelli.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "protocol_renault_v1.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "protocol_land_rover_v0.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "protocol_porsche_cayenne.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "protocol_psa.fal"},
+     "mitsubishi_v0"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "fiat_marelli"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "renault_v1"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "land_rover_v0"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "porsche_cayenne"},
+    {PACK_GROUP(SubGhzProtocolPackGroupEurope), "psa"},
     {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupEurope),
-     "protocol_vag.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "protocol_chrysler.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "protocol_mazda_siemens.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "protocol_mazda_v0.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "protocol_subaru.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupAlarm), "protocol_scher_khan.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupAlarm), "protocol_sheriff_cfm.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupAlarm), "protocol_star_line.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_gm_rolling.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_honda_acura.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_hyundai_new.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_nissan.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_renault.fal"},
-    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "protocol_toyota_lexus.fal"},
+     "vag"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "chrysler"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "mazda_siemens"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "mazda_v0"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "subaru"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAlarm), "scher_khan"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAlarm), "sheriff_cfm"},
+    {PACK_GROUP(SubGhzProtocolPackGroupAlarm), "star_line"},
+    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "gm_rolling"},
+    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "honda_acura"},
+    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "hyundai_new"},
+    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "nissan"},
+    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "renault"},
+    {PACK_GROUP(SubGhzProtocolPackGroupShuka), "toyota_lexus"},
 };
 
 const char* subghz_protocol_pack_group_get_name(SubGhzProtocolPackGroup group) {
@@ -178,7 +199,7 @@ SubGhzProtocolPackRegistry* subghz_protocol_pack_registry_alloc(
 
     instance->report_entries =
         expected_plugin_count ?
-            malloc(sizeof(SubGhzProtocolPackReportEntry) * expected_plugin_count) :
+            malloc((sizeof(SubGhzProtocolPackReportEntry) + 48U) * expected_plugin_count) :
             NULL;
     instance->report = (SubGhzProtocolPackReport){
         .group = group,
@@ -203,15 +224,24 @@ SubGhzProtocolPackRegistry* subghz_protocol_pack_registry_alloc(
 
     FuriString* plugin_file = furi_string_alloc();
     size_t report_index = 0;
+    char (*filenames)[48] = (char (*)[48])(instance->report_entries + expected_plugin_count);
     for(size_t i = 0; i < COUNT_OF(subghz_protocol_pack_entries); i++) {
         const SubGhzProtocolPackEntry* entry = &subghz_protocol_pack_entries[i];
         if(!(entry->groups & group_mask)) continue;
 
         SubGhzProtocolPackReportEntry* report_entry = &instance->report_entries[report_index++];
-        report_entry->filename = entry->filename;
+        char* filename = filenames[report_index - 1];
+        if(!subghz_protocol_pack_filename(entry->filename, filename, 48)) {
+            filename[0] = '\0';
+            report_entry->filename = filename;
+            report_entry->protocol_name = NULL;
+            report_entry->status = SubGhzProtocolPackStatusInvalidFile;
+            continue;
+        }
+        report_entry->filename = filename;
         report_entry->protocol_name = NULL;
 
-        path_concat(plugin_path, entry->filename, plugin_file);
+        path_concat(plugin_path, filename, plugin_file);
         const PluginManagerLoadStatus load_status = plugin_manager_load_single_detailed(
             instance->manager, furi_string_get_cstr(plugin_file));
         report_entry->status = subghz_protocol_pack_status_from_load_status(load_status);

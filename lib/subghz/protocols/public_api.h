@@ -334,10 +334,14 @@ void subghz_protocol_decoder_bin_raw_data_input_rssi(
 bool subghz_protocol_secplus_v1_check_fixed(uint32_t fixed);
 
 /** Nice O-Code helpers used by the installer-code recovery app. */
-/* Source-only SDK helper: same mapping in either direction; no binary export. */
+/* Source-only SDK helpers. c66f01dce7 corrected the old involution: wire->plain
+ * and plain->wire are different affine maps. No binary export is added. */
 static inline uint16_t subghz_protocol_nice_o_cnt_swap(uint16_t count) {
-    const uint16_t bits = count & 0x2492U;
-    return count ^ (uint16_t)((bits << 1) | ((bits ^ 0x2492U) >> 1));
+    const uint16_t bits = count & 0x2222U;
+    return count ^ (uint16_t)((bits >> 1) ^ (bits << 1)) ^ 0x8B89U;
+}
+static inline uint16_t subghz_protocol_nice_o_cnt_encode(uint16_t count) {
+    return subghz_protocol_nice_o_cnt_swap(count ^ 0x8B89U) ^ 0x8B89U;
 }
 void subghz_protocol_nice_o_mask(uint8_t n, uint32_t* mask_32, uint16_t* mask_16);
 uint8_t subghz_protocol_nice_o_get_parcel(uint64_t data);

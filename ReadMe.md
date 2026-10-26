@@ -8,7 +8,7 @@
 
 [![Stable release](https://img.shields.io/github/v/release/squazaryu/tumoflip?label=stable&color=brightgreen)](https://github.com/squazaryu/tumoflip/releases/latest)
 [![Release workflow](https://img.shields.io/github/actions/workflow/status/squazaryu/tumoflip/release.yml?branch=main&label=build)](https://github.com/squazaryu/tumoflip/actions/workflows/release.yml)
-![Firmware API](https://img.shields.io/badge/Dev%20source%20API-88.22-8b5cf6)
+![Firmware API](https://img.shields.io/badge/Dev%20source%20API-88.23-8b5cf6)
 ![Target](https://img.shields.io/badge/Target-Flipper%20Zero%20F7-f97316)
 [![License](https://img.shields.io/badge/License-GPLv3-2563eb)](LICENSE)
 
@@ -193,18 +193,19 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-009-031` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-009-031` | Published testing build; next Field Kit candidate is described below | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
 
-For Dev `t-dev-009-031` / API 88.22, **FW Packages Dev 026 remains compatible**.
-Device Library 1.1 is delivered separately through **FW Packages Dev 027**.
-The firmware release includes a freshly generated
-package manifest and bundle for this exact firmware commit. Publication and
-hardware acceptance are separate; use the release page for availability and the
-hardware checklist for testing.
+The latest published Dev remains `t-dev-009-031` / API 88.22 with
+Device Library 1.1 delivered through **FW Packages Dev 027**. The local
+`t-dev-009-032` candidate uses API 88.23 for nonfatal IRQ reservation. Its
+Field Tools, experimental Passive NFC Sniffer, Device Library 1.2, TumoSpectrum
+3.4 and new receive-only protocol leaves require a new matching FW Packages
+revision; no catalog or firmware release has been published for this candidate.
+Publication and hardware acceptance remain separate checkpoints.
 
 ## Install
 
@@ -231,7 +232,7 @@ flipper-z-f7-update-t-dev-009-031.tgz
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: Dev `t-dev-009-031` uses `88.22`; immutable stable `v1.0.8` remains `88.7`.
+- Firmware API: candidate `t-dev-009-032` uses `88.23`; immutable stable `v1.0.8` remains `88.7`.
   Each release manifest records its compatible package API. API numbers are
   local to this fork.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or

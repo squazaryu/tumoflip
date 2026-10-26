@@ -58,6 +58,8 @@ enum {
     TogglePin,
     RemovePins,
     ConfirmUnpin,
+    OpenFieldTools,
+    ExportObject,
     NextCards = 30,
     PreviousCards,
     NextHistories,
@@ -170,6 +172,7 @@ static void library_show(Library* app, LibraryPage page) {
         library_item(app, "All objects", OpenCards);
         library_item(app, "New object", NewCard);
         library_item(app, "File History", History);
+        library_item(app, "Field tools", OpenFieldTools);
         library_item(app, "About / limits", About);
     } else if(page == PageCards) {
         submenu_set_header(app->menu, "All objects");
@@ -199,6 +202,7 @@ static void library_show(Library* app, LibraryPage page) {
         library_item(app, "Edit notes", Note);
         library_item(app, "Edit tags", Tags);
         library_item(app, "Mark checked", MarkChecked);
+        library_item(app, "Export object copy", ExportObject);
         library_item(app, "Add file action", AddLink);
         library_item(app, app->dirty ? "Save changes *" : "Save card", SaveCard);
         library_item(
@@ -361,6 +365,7 @@ static bool library_event_allowed(const Library* app, uint32_t event) {
     case OpenCards:
     case OpenPins:
     case History:
+    case OpenFieldTools:
         return app->page == PageMain;
     case NextCards:
     case PreviousCards:
@@ -371,6 +376,7 @@ static bool library_event_allowed(const Library* app, uint32_t event) {
     case Tags:
     case MarkChecked:
     case TogglePin:
+    case ExportObject:
         return app->page == PageManage;
     case AddLink:
     case SaveCard:
@@ -421,7 +427,20 @@ static bool library_event_allowed(const Library* app, uint32_t event) {
 static bool library_event(void* context, uint32_t event) {
     Library* app = context;
     if(!library_event_allowed(app, event)) return true;
-    if(event == NewCard)
+    if(event == OpenFieldTools || event == ExportObject) {
+        const char* target = "/ext/apps/Tools/field_tools.fap";
+        if(event == ExportObject && app->dirty) {
+            library_message(app, "Save object first.\nNo files exported.", PageManage);
+        } else if(!storage_file_exists(app->storage, target)) {
+            library_message(app, "Install Field Tools\nfrom FW Packages.\nOriginal files unchanged.", app->page);
+        } else {
+            FuriString* argument = furi_string_alloc_printf("%s%s", event == ExportObject ? "export:" : "", event == ExportObject ? app->card.name : "");
+            loader_clear_launch_queue(app->loader);
+            loader_enqueue_launch(app->loader, target, furi_string_get_cstr(argument), LoaderDeferredLaunchFlagGui);
+            furi_string_free(argument);
+            view_dispatcher_stop(app->dispatcher);
+        }
+    } else if(event == NewCard)
         library_edit(app, NewCard);
     else if(event == OpenPins && app->page == PageMain) {
         app->pins_ready = library_pins_load(app->storage, &app->pins);
@@ -666,7 +685,7 @@ static bool library_event(void* context, uint32_t event) {
     } else if(event == About)
         library_message(
             app,
-            "Device Library 1.1\n\nObjects link existing files: 8 named actions per object, 16 pinned objects. Removing a link or pin never deletes its file.\n\nNFC / RFID / iButton open a saved-file menu, not emulation. SUB / IR keep their native file flow. Unknown formats are references only.\n\nOld cards load without rewriting. Saving uses the new card format; older Device Library versions cannot read new revisions.\n\nHistory is opt-in for native SUB / IR / NFC saves. Three prior versions per file, 2 MiB each. Third-party writers and deletions are not intercepted.\n\nRestore creates a separate copy. Backups may contain private data; they stay on your SD. Lists use 32 entries per page.",
+            "Device Library 1.2\n\nObjects link existing files: 8 named actions per object, 16 pinned objects. Removing a link or pin never deletes its file.\n\nNFC / RFID / iButton open a saved-file menu, not emulation. SUB / IR keep their native file flow. Unknown formats are references only.\n\nField Tools adds manual rounds, portable object copies and read-only capture inventory through a separate FW Package. Opening an object never marks a check as passed.\n\nOld cards load without rewriting. Saving uses the new card format; older Device Library versions cannot read new revisions.\n\nHistory is opt-in for native SUB / IR / NFC saves. Three prior versions per file, 2 MiB each. Third-party writers and deletions are not intercepted.\n\nRestore creates a separate copy. Backups may contain private data; they stay on your SD. Lists use 32 entries per page.",
             app->page);
     return true;
 }
@@ -699,7 +718,6 @@ static bool library_back(void* context) {
     return true;
 }
 int32_t device_library_app(void* context) {
-    UNUSED(context);
     Library* app = calloc(1, sizeof(*app));
     app->storage = furi_record_open(RECORD_STORAGE);
     app->dialogs = furi_record_open(RECORD_DIALOGS);
@@ -720,7 +738,11 @@ int32_t device_library_app(void* context) {
     view_dispatcher_add_view(app->dispatcher, LibraryTextView, text_box_get_view(app->text_view));
     view_dispatcher_add_view(app->dispatcher, LibraryInputView, text_input_get_view(app->input));
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);
-    library_show(app, PageMain);
+    const char* argument = context;
+    if(argument && !strncmp(argument, "object:", 7) && library_name_valid(argument + 7) &&
+       library_card_load(app->storage, argument + 7, &app->card))
+        library_show(app, PageCard);
+    else library_show(app, PageMain);
     view_dispatcher_run(app->dispatcher);
     if(app->history_manager) plugin_manager_free(app->history_manager);
     view_dispatcher_remove_view(app->dispatcher, LibraryInputView);

@@ -1,3 +1,11 @@
+## Tumoflip Dev 009-032 — unpublished candidate
+- Nice O-Code: correct the asymmetric counter conversion, preserve old saved payloads, and accept upstream `No_IC` without overriding explicit unknown-state protection. Existing 52/72-bit scope remains unchanged.
+- Sub-GHz: add ten lazy receive-only protocol leaves selected from ARF, including X10 and Urmet; preserve complete long saved payloads. Existing Toyota/Mazda equivalents are not duplicated. No new automotive encoder, enrollment or key/seed brute force is added.
+- TumoSpectrum 3.4: bounded peak history and broker-owned internal/external dual-radio sweeps, with loss/error cleanup and single-radio fallback. Physical RF acceptance remains pending.
+- FW Packages candidate: Device Library 1.2 opens saved objects by a validated route; separate Field Tools adds manual object rounds, verified copy-only object import/export, and explicit read-only capture inventory comparison. Original captures are not deleted or overwritten. Copy exports off the SD using a reader or USB SD mode; Companion Files supports uploading a copy back, not generic download.
+- Experimental package-only Passive NFC Sniffer: bounded ISO14443-A candidate-frame capture, explicit resource reservation/cancellation, and verified create-new trace saving. No RF field generation, relay or key recovery. Hardware acceptance is pending.
+- Local F7 API advances to 88.23 for one new nonfatal IRQ-reservation function. This is not upstream API parity. New managed FAPs need matching firmware and FW Packages; existing stored cards remain readable. No release, installation or stable promotion is implied by this entry.
+
 ## Tumoflip Dev 009-023
 - TumoSpectrum 3.3: browse timestamped capture-set analyses, reopen saved snapshots, and verify source files by SHA-256. Legacy schema 1/2 sets remain readable but are explicitly marked unverified. Source captures are read-only and exports use new filenames.
 

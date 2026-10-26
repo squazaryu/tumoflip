@@ -50,7 +50,8 @@ int main(void){
         body = body.replace("(void)c;return false;", "if(!overridden)return false;*c=override_count;return true;")
         body = body.replace("furi_hal_subghz_get_rolling_counter_mult(void){return 1;}", "furi_hal_subghz_get_rolling_counter_mult(void){return mult;}")
         native(body + r'''
-static uint16_t oracle(uint16_t value){const uint8_t d[]={1,0,6,7,5,4,2,3};uint16_t out=value&0x8000;for(unsigned n=0;n<15;n+=3)out|=(uint16_t)d[(value>>n)&7]<<n;return out;}
+static uint16_t decode(uint16_t wire){uint16_t out=0x8b89;for(unsigned n=0;n<16;n++)if(wire&(1u<<n)){out^=(uint16_t)(1u<<n);if(n%4==1)out^=(uint16_t)((1u<<(n-1))|(1u<<(n+1)));}return out;}
+static uint16_t oracle(uint16_t plain){return decode(plain^0x8b89)^0x8b89;}
 static void check(bool o,unsigned bits,uint16_t before,unsigned mode,int32_t step,bool user,uint16_t after,uint16_t air){
  LevelDuration samples[4096];SubGhzProtocolEncoderNiceFlorS e={.generic={.serial=123,.cnt=before,.btn=1,.data_count_bit=bits},.encoder={4096,samples},.o_code=o,.ic=0x1234};
  nice_flors_counter_mode=mode;mult=step;overridden=user;override_count=123;bypass=false;subghz_block_generic_global.cnt_need_override=user;
@@ -69,14 +70,14 @@ int main(void){
     check(false,bits,n,mode,1,true,123,123);
    }
   }
-  check(true,bits,oracle(0xfffe),1,1,false,oracle(1),1);
-  check(true,bits,oracle(1),1,1,false,oracle(0xfffe),0xfffe);
-  check(true,bits,oracle(0),2,1,false,oracle(1),1);
-  check(true,bits,oracle(1),2,1,false,oracle(0),0);
-  check(true,bits,oracle(0),0,-0x7fffffff,false,oracle(1),1);
-  check(true,bits,oracle(1),0,-0x7fffffff,false,oracle(0xfffe),0xfffe);
-  check(true,bits,oracle(0xfffe),0,-0x7fffffff,false,oracle(0xffff),0xffff);
-  check(true,bits,oracle(0xffff),0,-0x7fffffff,false,oracle(0),0);
+  check(true,bits,decode(0xfffe),1,1,false,decode(1),1);
+  check(true,bits,decode(1),1,1,false,decode(0xfffe),0xfffe);
+  check(true,bits,decode(0),2,1,false,decode(1),1);
+  check(true,bits,decode(1),2,1,false,decode(0),0);
+  check(true,bits,decode(0),0,-0x7fffffff,false,decode(1),1);
+  check(true,bits,decode(1),0,-0x7fffffff,false,decode(0xfffe),0xfffe);
+  check(true,bits,decode(0xfffe),0,-0x7fffffff,false,decode(0xffff),0xffff);
+  check(true,bits,decode(0xffff),0,-0x7fffffff,false,decode(0),0);
   check(false,bits,0xfffe,1,1,false,1,1);
   check(false,bits,1,2,1,false,0,0);
  }
@@ -99,8 +100,8 @@ static uint8_t subghz_protocol_nice_o_get_parcel(uint64_t d){return ((((d>>48)&1
 static uint64_t subghz_protocol_nice_flor_s_decrypt_ic(uint64_t d,uint16_t ic,const char* f){(void)ic;(void)f;return unavailable?UINT64_MAX:d&0xfffffffffffULL;}
 static uint64_t subghz_protocol_nice_flor_s_encrypt_ic(uint64_t d,uint16_t ic,const char* f){return subghz_protocol_nice_flor_s_decrypt_ic(d,ic,f);}
 static uint16_t oracle(uint16_t count){
- const uint8_t digits[]={1,0,6,7,5,4,2,3};uint16_t result=count&0x8000u;
- for(unsigned shift=0;shift<15;shift+=3)result|=(uint16_t)digits[(count>>shift)&7]<<shift;
+ uint16_t wire=count^0x8b89u,result=wire;
+ for(unsigned shift=1;shift<16;shift+=4)if(wire&(1u<<shift))result^=(uint16_t)((1u<<(shift-1))|(1u<<(shift+1)));
  return result;
 }
 ''' + counter_header() + "\n" + function(source, "static bool subghz_protocol_nice_o_decrypt(")
@@ -110,7 +111,7 @@ int main(void){
  // Existing saved Key bytes must be read as-is, not rewritten or double-converted.
  const uint64_t saved=0x2d012345124eULL;
  assert(subghz_protocol_nice_o_decrypt(saved,0x1234,"fixture",&serial,&count,&button));
- assert(count==2); // Raw +1 used to move this counter by the wrong number of presses.
+ assert(count==0x9cc2); // Upstream-corrected interpretation; saved Key bytes unchanged.
  for(uint32_t n=0;n<=65535;n++){
   uint64_t key=0;
   assert(subghz_protocol_nice_o_make_data(0x12345,n,2,0,0x1234,"fixture",&key));
