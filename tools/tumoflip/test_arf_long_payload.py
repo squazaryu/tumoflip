@@ -23,6 +23,7 @@ class ArfLongPayloadTests(unittest.TestCase):
                 shared = re.sub(r"^#(?:include|pragma).*\n", "\n", helper.read_text(), flags=re.M) if helper.exists() and not baseline else ""
                 code = subprocess.check_output(["git", "show", "701a7f5aa9:applications_user/field_rx_protocols/" + name + ".c"], cwd=ROOT, text=True) if baseline else (APP / (name + ".c")).read_text()
                 body = "SubGhzProtocolStatus " + function(code, method + "(")
+                read_checks = "SubGhzBlockGeneric restored={0};assert(field_rx_read_tail(&restored,&f)&&restored.data_2==d.generic.data_2);" if shared else ""
                 native(r'''
 #include <assert.h>
 #include <stdbool.h>
@@ -44,6 +45,7 @@ static SubGhzProtocolStatus subghz_block_generic_serialize(SubGhzBlockGeneric*g,
 int main(void){{{kind} d={{.generic={{.data=0x8123456789abcdefULL,.data_2=0x123456789abc0000ULL,.data_count_bit={bits}}}}};FlipperFormat f={{0}};
  assert({method}(&d,&f,NULL)==SubGhzProtocolStatusOk&&f.has_tail);
  const uint8_t expected[8]={{0x12,0x34,0x56,0x78,0x9a,0xbc,0,0}};assert(!memcmp(f.tail,expected,8));
+ {read_checks}
  f.fail=true;assert({method}(&d,&f,NULL)!=SubGhzProtocolStatusOk);
  return 0;}}
 ''')

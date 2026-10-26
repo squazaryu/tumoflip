@@ -2,6 +2,7 @@
  * 9b18419de2774a9693f91a3631653d1538f0f91a. See PROVENANCE.md.
  * Encoder implementations are intentionally not imported. */
 #include "bmw.h"
+#include "rx_format.h"
 
 #include <lib/subghz/blocks/const.h>
 #include <lib/subghz/blocks/decoder.h>
@@ -419,7 +420,12 @@ SubGhzProtocolStatus subghz_protocol_decoder_bmw_serialize(
     SubGhzRadioPreset* preset) {
     furi_check(context);
     SubGhzProtocolDecoderBMW* instance = context;
-    return subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
+    SubGhzProtocolStatus status =
+        subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
+    if(status == SubGhzProtocolStatusOk &&
+       !field_rx_write_tail(&instance->generic, flipper_format))
+        status = SubGhzProtocolStatusErrorParserKey;
+    return status;
 }
 
 SubGhzProtocolStatus
@@ -429,6 +435,8 @@ SubGhzProtocolStatus
     SubGhzProtocolStatus ret = subghz_block_generic_deserialize_check_count_bit(
         &instance->generic, flipper_format, BMW_PAYLOAD_BITS);
     if(ret == SubGhzProtocolStatusOk) {
+        if(!field_rx_read_tail(&instance->generic, flipper_format))
+            return SubGhzProtocolStatusErrorParserKey;
         bmw_normalize_stored_payload(&instance->generic);
         bmw_parse_fields(&instance->generic);
     }

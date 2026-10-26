@@ -2,6 +2,7 @@
  * 9b18419de2774a9693f91a3631653d1538f0f91a. See PROVENANCE.md.
  * Encoder implementations are intentionally not imported. */
 #include "mercedes_v0.h"
+#include "rx_format.h"
 #include <lib/subghz/protocols/common.h>
 
 #include <lib/subghz/blocks/custom_btn_i.h>
@@ -180,13 +181,18 @@ static uint8_t mercedes_v0_hash(void* context) {
 static SubGhzProtocolStatus
     mercedes_v0_serialize(void* context, FlipperFormat* format, SubGhzRadioPreset* preset) {
     MercedesV0Decoder* instance = context;
-    return subghz_block_generic_serialize(&instance->generic, format, preset);
+    SubGhzProtocolStatus status =
+        subghz_block_generic_serialize(&instance->generic, format, preset);
+    if(status == SubGhzProtocolStatusOk && !field_rx_write_tail(&instance->generic, format))
+        status = SubGhzProtocolStatusErrorParserKey;
+    return status;
 }
 
 static SubGhzProtocolStatus mercedes_v0_deserialize(void* context, FlipperFormat* format) {
     MercedesV0Decoder* instance = context;
     SubGhzProtocolStatus status = subghz_block_generic_deserialize(&instance->generic, format);
     if(status != SubGhzProtocolStatusOk) return status;
+    if(!field_rx_read_tail(&instance->generic, format)) return SubGhzProtocolStatusErrorParserKey;
     if(!mercedes_v0_data_valid(&instance->generic)) {
         return SubGhzProtocolStatusErrorValueBitCount;
     }

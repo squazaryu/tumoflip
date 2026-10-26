@@ -27,7 +27,8 @@ class ArfFieldRxTests(unittest.TestCase):
                 symbol = re.search(r"const SubGhzProtocol\s+(\w+)\s*=", code)[1]
                 header = re.sub(r"^#(?:include|pragma).*\n", "\n", (APP / (name + ".h")).read_text(), flags=re.M)
                 code = re.sub(r"^#include.*\n", "\n", code, flags=re.M)
-                program = (ROOT / "tools/tumoflip/fixtures/field_rx_native.h").read_text() + header + code + r'''
+                tail = re.sub(r"^#(?:include|pragma).*\n", "\n", (APP / "rx_format.h").read_text(), flags=re.M) if (APP / "rx_format.h").exists() else ""
+                program = (ROOT / "tools/tumoflip/fixtures/field_rx_native.h").read_text() + header + tail + code + r'''
 static unsigned hits;
 static void found(SubGhzProtocolDecoderBase*b,void*c){(void)b;(void)c;hits++;}
 int main(void){
