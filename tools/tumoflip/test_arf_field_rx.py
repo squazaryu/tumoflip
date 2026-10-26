@@ -63,7 +63,10 @@ static unsigned hits;
 static void found(SubGhzProtocolDecoderBase*b,void*c){(void)b;(void)c;hits++;}
 int main(void){const SubGhzProtocolDecoder*p=subghz_protocol_urmet.decoder;
  void*d=p->alloc(NULL);((SubGhzProtocolDecoderBase*)d)->callback=found;p->reset(d);
- for(unsigned i=0;i<20;i++)p->feed(d,i&1,100);p->feed(d,false,30000);
+ for(unsigned i=0;i<20;i++){
+  p->feed(d,i&1,100);
+ }
+ p->feed(d,false,30000);
  p->feed(d,true,500);p->feed(d,false,500);p->feed(d,true,500);p->feed(d,false,5500);
  // Sixteen inverted 8N1 0x55 bytes after the observed FD prefix. No TX code.
  for(unsigned byte=0;byte<16;byte++)for(unsigned i=0;i<5;i++){p->feed(d,true,500);p->feed(d,false,500);}
