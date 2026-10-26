@@ -138,8 +138,8 @@ static int
 static void add_frame(int t,int tend,char dir,const uint8_t*b,int n,uint32_t par){
  if(n<=0)return;
  if(s_nfr>=NFC_FIELD_FRAME_CAP){nfc_field_memory.trace.frames_dropped++;return;}
- bool nonzero=false;for(int i=0;i<n;i++)if(b[i])nonzero=true;if(!nonzero)return;
- if(dir=='C'){int ff=0;for(int i=0;i<n;i++)if(b[i]==0xff)ff++;if(ff*4>=n*3)return;}
+ // Value-based noise suppression would hide valid short NAK0 and diagnostic
+ // all-zero/all-one payloads. Keep framed candidates; CRC remains unverified.
  struct sfr*f=&s_fr[s_nfr++];memset(f,0,sizeof(*f));f->t=t;f->tend=tend;f->dir=dir;f->par=par;
  f->truncated=n>NFC_FIELD_FRAME_BYTES;
  f->n=n>NFC_FIELD_FRAME_BYTES?NFC_FIELD_FRAME_BYTES:n;
@@ -236,7 +236,8 @@ static void scan_span(const uint8_t* seg, int len, int* pos_io) {
     }
 
     for(; i + 4 <= len; i += 4) {
-        uint32_t raw = *(const uint32_t*)(seg + i);
+        uint32_t raw;
+        memcpy(&raw, seg + i, sizeof(raw));
         uint32_t bits = (raw >> s_cap_shift) & 0x01010101u;
         uint32_t edg = (bits ^ ((bits << 8) | (uint32_t)lvl)) & 0x01010101u;
         if(edg) {
