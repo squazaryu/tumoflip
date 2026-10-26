@@ -35,6 +35,8 @@ int main(void){
  a.page=PagePins;assert(library_event_allowed(&a,PinBase)&&!library_event_allowed(&a,PinBase+1));
  a.pins_ready=false;assert(!library_event_allowed(&a,PinBase));
  a.page=PageMain;assert(library_event_allowed(&a,NewCard)&&library_event_allowed(&a,OpenPins));assert(!library_event_allowed(&a,NameDone));
+ assert(library_event_allowed(&a,OpenFieldTools));assert(!library_event_allowed(&a,ExportObject));
+ a.page=PageManage;assert(library_event_allowed(&a,ExportObject)&&!library_event_allowed(&a,OpenFieldTools));
  a.page=PageInput;assert(library_event_allowed(&a,NameDone)&&!library_event_allowed(&a,NewCard));
  a.page=PageSources;a.count=1;a.sources=&a;assert(library_event_allowed(&a,SourceBase)&&!library_event_allowed(&a,SourceBase+1));
  return 0;
