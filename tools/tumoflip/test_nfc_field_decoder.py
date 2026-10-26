@@ -40,6 +40,12 @@ int main(void){
  assert(reqa);
  // A four-bit card NAK0 is real data, not "all-zero noise".
  s_nfr=0;s_last_bits=4;const uint8_t nak=0;add_frame(1,5,'C',&nak,1,0);assert(s_nfr==1&&s_fr[0].b[0]==0&&s_fr[0].bits==4);
+ s_ongrid=s_offgrid=0;s_card_samp=116;assert(region_valid());
+ // Reader messages longer than the bounded symbol window remain visible only
+ // as explicitly truncated prefixes, never as a complete/CRC-verified frame.
+ uint16_t pauses[300];for(unsigned k=0;k<300;k++)pauses[k]=(uint16_t)((2324*k+581+50)/100);
+ uint8_t bytes[32];uint32_t parity;s_nfr=0;int decoded=miller_decode(pauses,300,bytes,&parity);
+ add_frame(0,7000,'R',bytes,decoded,parity);assert(s_nfr==1&&s_fr[0].truncated);
  const uint8_t halt[]={0x50,0};assert(nfc_field_crc_a(halt,sizeof(halt))==0xcd57);
  struct{char out[4096];uint64_t guard;}text={.guard=0x123456789abcdef};assert(nfc_field_decoder_format(text.out,sizeof(text.out)));assert(strstr(text.out,"26")&&text.guard==0x123456789abcdef);
  char small[2];assert(!nfc_field_decoder_format(small,sizeof(small)));
