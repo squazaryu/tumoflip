@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def nice_counter_source():
     source = (ROOT / "lib/subghz/protocols/nice_flor_s.c").read_text()
-    return function((ROOT / "lib/subghz/protocols/public_api.h").read_text(), "static inline uint16_t subghz_protocol_nice_o_cnt_swap(") + "\n" + function(source, "static uint16_t nice_o_counter_value(uint16_t count) {")
+    return function((ROOT / "lib/subghz/protocols/public_api.h").read_text(), "static inline uint16_t subghz_protocol_nice_o_cnt_swap(") + "\n" + function(source, "static uint16_t nice_o_counter_value(uint16_t count) {") + "\n" + function(source, "static uint16_t nice_o_counter_wire(uint16_t count) {")
 
 
 def nice_encoder_source():

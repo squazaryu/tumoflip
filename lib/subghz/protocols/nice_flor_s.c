@@ -188,6 +188,9 @@ static uint16_t nice_o_counter_value(uint16_t count) __attribute__((noinline));
 static uint16_t nice_o_counter_value(uint16_t count) {
     return subghz_protocol_nice_o_cnt_swap(count);
 }
+static uint16_t nice_o_counter_wire(uint16_t count) {
+    return nice_o_counter_value(count ^ 0x8B89U) ^ 0x8B89U;
+}
 
 static uint16_t nice_flor_s_counter_next(uint32_t* plain, bool o_code) {
     const int32_t step = furi_hal_subghz_get_rolling_counter_mult();
@@ -202,8 +205,8 @@ static uint16_t nice_flor_s_counter_next(uint32_t* plain, bool o_code) {
     } else {
         // Plain representations of wire 0 / FFFF. The adjacent literal state
         // differs only in bit zero, for both plain and O-Code counters.
-        const uint16_t zero = o_code ? 0x1249 : 0x0000;
-        const uint16_t last = o_code ? 0xB6DB : 0xFFFF;
+        const uint16_t zero = o_code ? 0x8B89 : 0x0000;
+        const uint16_t last = o_code ? 0x2123 : 0xFFFF;
         if(nice_flors_counter_mode == 0)
             *plain = *plain == last ? zero :
                      *plain == zero ? (zero ^ 1U) :
@@ -213,7 +216,7 @@ static uint16_t nice_flor_s_counter_next(uint32_t* plain, bool o_code) {
         else
             *plain = *plain == zero ? (zero ^ 1U) : zero;
     }
-    return o_code ? nice_o_counter_value(*plain) : *plain;
+    return o_code ? nice_o_counter_wire(*plain) : *plain;
 }
 
 static void subghz_protocol_encoder_nice_flor_s_get_upload(
@@ -703,7 +706,7 @@ static bool subghz_protocol_nice_o_make_data(
     subghz_protocol_nice_o_mask(parcel, &mask_32, &mask_16);
 
     const uint64_t plain = ((uint64_t)((serial ^ mask_32) & 0x0FFFFFFFu) << 16) |
-                           nice_o_counter_value(cnt);
+                           nice_o_counter_wire(cnt);
     const uint64_t encrypted =
         subghz_protocol_nice_flor_s_encrypt_ic(plain, (uint16_t)(ic ^ mask_16), file_name);
     if(encrypted == SUBGHZ_NO_NICE_FLOR_S_RAINBOW_TABLE) return false;
