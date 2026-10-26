@@ -6,6 +6,18 @@ SOURCES = ("field_io.h", "field_io.c", "field_bundle.h", "field_bundle.c")
 
 
 class FieldBundleTests(unittest.TestCase):
+    def test_valid_package_replacement_between_validation_and_copy_is_rejected(self):
+        storage_native(r'''
+static bool replaced;
+static bool replace(void*c,const char*p,uint32_t n){(void)n;if(replaced||!p||!strstr(p,".sub"))return true;replaced=true;Storage*s=c;
+ char host[1400];local_path(s,"/ext/Object.tobj",host);FILE*f=fopen(host,"r+b");assert(f);FieldBundleHeader h;assert(fread(&h,1,sizeof(h),f)==sizeof(h));strcpy(h.card.notes,"Different validated object");assert(!mbedtls_sha256((const uint8_t*)&h,offsetof(FieldBundleHeader,hash),h.hash,0));rewind(f);assert(fwrite(&h,1,sizeof(h),f)==sizeof(h));assert(!fclose(f));return true;}
+int main(int argc,char**argv){assert(argc==2);Storage s={0};snprintf(s.root,sizeof(s.root),"%s",argv[1]);assert(storage_simply_mkdir(&s,"/ext/apps_data"));assert(storage_simply_mkdir(&s,"/ext/subghz"));
+ File*f=storage_file_alloc(&s);assert(storage_file_open(f,"/ext/subghz/Own.sub",FSAM_WRITE,FSOM_CREATE_NEW));assert(storage_file_write(f,"Own",3)==3);assert(storage_file_close(f));storage_file_free(f);
+ DeviceCard card={.name="Office",.link_count=1,.links={"/ext/subghz/Own.sub"}};
+ assert(field_bundle_export(&s,&card,"/ext/Object.tobj",NULL,NULL));
+ assert(!field_bundle_import(&s,"/ext/Object.tobj","Changed",replace,&s));assert(!library_card_load(&s,"Changed",&card));return 0;}
+''', SOURCES)
+
     def test_verified_export_import_collisions_corruption_and_cancellation(self):
         storage_native(r'''
 static bool cancel(void*c,const char*p,uint32_t n){(void)c;(void)p;(void)n;return false;}
