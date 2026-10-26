@@ -6,6 +6,15 @@ SOURCES = ("field_io.h", "field_io.c", "field_round.h", "field_round.c")
 
 
 class FieldRoundsTests(unittest.TestCase):
+    def test_updated_round_exports_a_new_report_without_replacing_the_old_one(self):
+        storage_native(r'''
+int main(int argc,char**argv){assert(argc==2);Storage s={0};snprintf(s.root,sizeof(s.root),"%s",argv[1]);assert(storage_simply_mkdir(&s,"/ext/apps_data"));
+ LibraryPins pins={.count=1,.names={"Office"}};FieldRound r={0};char old[256],next[256];
+ assert(field_round_begin(&r,&pins,100)&&field_round_save(&s,&r));assert(field_round_export(&s,&r,old,sizeof(old)));
+ assert(field_round_mark(&r,0,FieldRoundPassed,"Checked",101)&&field_round_save(&s,&r));
+ assert(field_round_export(&s,&r,next,sizeof(next))&&strcmp(old,next));assert(storage_common_stat(&s,old,NULL)==FSE_OK);return 0;}
+''', SOURCES)
+
     def test_generation_corruption_cannot_override_the_last_valid_round(self):
         storage_native(r'''
 int main(int argc,char**argv){assert(argc==2);Storage s={0};snprintf(s.root,sizeof(s.root),"%s",argv[1]);assert(storage_simply_mkdir(&s,"/ext/apps_data"));
