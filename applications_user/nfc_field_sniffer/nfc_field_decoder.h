@@ -3,10 +3,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define NFC_FIELD_FRAME_CAP 24U
-#define NFC_FIELD_FRAME_BYTES 24U
+#define NFC_FIELD_FRAME_CAP     24U
+#define NFC_FIELD_FRAME_BYTES   24U
 #define NFC_FIELD_SAMPLE_CYCLES 26U
-#define NFC_FIELD_SAMPLE_BATCH 2048U
+#define NFC_FIELD_SAMPLE_BATCH  2048U
 typedef struct {
     uint32_t start_us, end_us, parity_errors;
     uint16_t bits;
