@@ -9,6 +9,19 @@ APP = ROOT / "applications/system/device_library"
 
 
 class FieldToolsDeliveryTests(unittest.TestCase):
+    def test_native_catalog_can_deliver_rx_leaves_and_matching_status_without_rebasing(self):
+        from tools.tumoflip import validate_release as release
+        paths = [f"apps_data/subghz/plugins/protocol_rx_{stem}.fal" for stem in
+                 ("x10", "urmet", "gm0", "gm1", "ty0", "mz2", "mb0", "mb1", "op1", "bmw")]
+        paths.append("apps_data/arf_subghz_full/modules/arf_status.fap")
+        exports = release.package_extapp_exports()
+        for path in paths:
+            self.assertEqual(exports.get(Path(path).name), path)
+            self.assertIn(path, release.PACKAGE_RELEASE_OVERLAY_FILES)
+            self.assertEqual(release.PACKAGE_RELEASE_OVERLAY_GROUPS[path],
+                             "arf" if path.endswith("arf_status.fap") else "protocol_packs")
+            self.assertNotIn(path, release.PACKAGE_ONLY_PACKAGE_FILES)
+
     def test_round_object_route_requires_device_library_12_without_loading_it(self):
         from tools.tumoflip.test_field_wallet import storage_native
         storage_native(r'''
