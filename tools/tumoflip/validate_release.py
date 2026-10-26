@@ -201,6 +201,11 @@ MORSE_PLAYER_PACKAGE_FILE = "apps/Tools/morse_player.fap"
 # Independent FW Packages revisions may replace files that are also bundled in
 # updater resources. This is intentionally broader than PACKAGE_ONLY_PACKAGE_FILES:
 # the latter remains reserved for artifacts that must never inflate resources.ths.
+FIELD_RX_PACKAGE_FILES = tuple(
+    f"apps_data/subghz/plugins/protocol_rx_{stem}.fal"
+    for stem in ("x10", "urmet", "gm0", "gm1", "ty0", "mz2", "mb0", "mb1", "op1", "bmw")
+)
+ARF_STATUS_PACKAGE_FILE = "apps_data/arf_subghz_full/modules/arf_status.fap"
 PACKAGE_RELEASE_OVERLAY_FILES = frozenset(
     {
         *PACKAGE_ONLY_PACKAGE_FILES,
@@ -208,6 +213,8 @@ PACKAGE_RELEASE_OVERLAY_FILES = frozenset(
         SIGNAL_WORKBENCH_PACKAGE_FILE,
         MORSE_PLAYER_PACKAGE_FILE,
         *TOTP_CLI_PLUGIN_PACKAGE_FILES,
+        *FIELD_RX_PACKAGE_FILES,
+        ARF_STATUS_PACKAGE_FILE,
     }
 )
 PACKAGE_ONLY_PACKAGE_GROUPS = {
@@ -231,6 +238,8 @@ PACKAGE_RELEASE_OVERLAY_GROUPS = {
     SIGNAL_WORKBENCH_PACKAGE_FILE: "module_one",
     MORSE_PLAYER_PACKAGE_FILE: "base",
     **{relative: "base" for relative in TOTP_CLI_PLUGIN_PACKAGE_FILES},
+    **{relative: "protocol_packs" for relative in FIELD_RX_PACKAGE_FILES},
+    ARF_STATUS_PACKAGE_FILE: "arf",
 }
 MODULE_ONE_PACKAGE_DATA_FILES = (
     "apps_data/tumoflow/workflows/field_demo.tflow",
@@ -408,6 +417,7 @@ def package_extapp_exports() -> dict[str, str]:
             for relative in TOTP_CLI_PLUGIN_PACKAGE_FILES
         }
     )
+    exports.update({Path(relative).name: relative for relative in FIELD_RX_PACKAGE_FILES})
     return exports
 
 
