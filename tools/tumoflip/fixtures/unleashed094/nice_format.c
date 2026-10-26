@@ -12,7 +12,7 @@ typedef struct {uint32_t repeat;bool is_running;} SubGhzProtocolBlockEncoder;
 typedef struct {uint64_t data,data_2;uint16_t data_count_bit;uint32_t serial,cnt;uint8_t btn;} SubGhzBlockGeneric;
 typedef int SubGhzRadioPreset;
 typedef enum {SubGhzProtocolStatusOk,SubGhzProtocolStatusError,SubGhzProtocolStatusErrorParserOthers,SubGhzProtocolStatusErrorValueBitCount} SubGhzProtocolStatus;
-typedef struct {uint64_t data,tail;uint16_t bits,ic;bool has_ic,has_known,known,bad_known,has_tail,fail_write;} FlipperFormat;
+typedef struct {uint64_t data,tail;uint16_t bits,ic;bool has_ic,has_known,known,bad_known,has_tail,fail_write,has_no_ic,bad_no_ic;uint32_t no_ic;} FlipperFormat;
 typedef struct SubGhzProtocolDecoderNiceFlorS SubGhzProtocolDecoderNiceFlorS;
 typedef struct SubGhzProtocolEncoderNiceFlorS SubGhzProtocolEncoderNiceFlorS;
 /* @STRUCTS@ */
@@ -23,10 +23,10 @@ static uint8_t nice_flors_counter_mode;
 static const struct {unsigned min_count_bit_for_found;} subghz_protocol_nice_flor_s_const={52};
 static unsigned decodes,uploads;
 bool flipper_format_rewind(FlipperFormat* f){(void)f;return true;}
-bool flipper_format_key_exist(FlipperFormat* f,const char* key){return !strcmp(key,"ICKnown") && f->has_known;}
+bool flipper_format_key_exist(FlipperFormat* f,const char* key){return (!strcmp(key,"ICKnown") && f->has_known)||(!strcmp(key,"No_IC") && f->has_no_ic);}
 bool flipper_format_read_bool(FlipperFormat* f,const char* key,bool* b,size_t n){assert(n==1 && !strcmp(key,"ICKnown"));if(!f->has_known || f->bad_known)return false;*b=f->known;return true;}
 bool flipper_format_insert_or_update_bool(FlipperFormat* f,const char* key,const bool* b,size_t n){assert(n==1 && !strcmp(key,"ICKnown"));if(f->fail_write)return false;f->has_known=true;f->known=*b;return true;}
-bool flipper_format_read_uint32(FlipperFormat* f,const char* key,uint32_t* value,size_t n){assert(n==1);if(!strcmp(key,"Data")){*value=(uint32_t)f->tail;return true;}return false;}
+bool flipper_format_read_uint32(FlipperFormat* f,const char* key,uint32_t* value,size_t n){assert(n==1);if(!strcmp(key,"Data")){*value=(uint32_t)f->tail;return true;}if(!strcmp(key,"No_IC")&&f->has_no_ic&&!f->bad_no_ic){*value=f->no_ic;return true;}return false;}
 bool flipper_format_insert_or_update_uint32(FlipperFormat* f,const char* key,const uint32_t* value,size_t n){assert(n==1 && !strcmp(key,"Data"));f->tail=*value;return !f->fail_write;}
 bool flipper_format_update_uint32(FlipperFormat* f,const char* key,const uint32_t* value,size_t n){return flipper_format_insert_or_update_uint32(f,key,value,n);}
 bool flipper_format_read_hex(FlipperFormat* f,const char* key,uint8_t* value,size_t n){
@@ -53,6 +53,17 @@ int main(void){
     FlipperFormat legacy={.bits=52,.data=0x123456789abcdULL,.has_ic=true,.ic=0xffff};
     assert(subghz_protocol_decoder_nice_flor_s_deserialize(&d,&legacy)==SubGhzProtocolStatusOk);
     assert(d.o_code && !d.o_code_no_ic);
+    FlipperFormat foreign=legacy;foreign.bits=72;foreign.has_no_ic=true;foreign.no_ic=1;
+    assert(subghz_protocol_decoder_nice_flor_s_deserialize(&d,&foreign)==SubGhzProtocolStatusOk);
+    assert(d.o_code && d.o_code_no_ic);
+    SubGhzProtocolEncoderNiceFlorS foreign_tx={0};
+    assert(subghz_protocol_encoder_nice_flor_s_deserialize(&foreign_tx,&foreign)!=SubGhzProtocolStatusOk && !uploads);
+    foreign.has_known=true;foreign.known=true;
+    assert(subghz_protocol_encoder_nice_flor_s_deserialize(&foreign_tx,&foreign)!=SubGhzProtocolStatusOk && !uploads);
+    foreign.no_ic=2;
+    assert(subghz_protocol_decoder_nice_flor_s_deserialize(&d,&foreign)!=SubGhzProtocolStatusOk);
+    foreign.no_ic=0;foreign.bad_no_ic=true;
+    assert(subghz_protocol_decoder_nice_flor_s_deserialize(&d,&foreign)!=SubGhzProtocolStatusOk);
     FlipperFormat raw=legacy;raw.bits=112;raw.tail=0x123456789abcdefULL;raw.has_tail=true;raw.has_known=true;raw.known=false;
     assert(subghz_protocol_decoder_nice_flor_s_deserialize(&d,&raw)==SubGhzProtocolStatusOk);
     assert(d.o_code_no_ic && d.generic.data_2==raw.tail);
