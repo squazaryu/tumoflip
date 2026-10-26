@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stm32wbxx_ll_tim.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -96,6 +97,12 @@ void furi_hal_interrupt_init(void);
  * @param      context  - isr context
  */
 void furi_hal_interrupt_set_isr(FuriHalInterruptId index, FuriHalInterruptISR isr, void* context);
+
+/** Atomically reserve an unowned interrupt; return false instead of crashing on
+ * invalid/busy resources. Release a successful reservation with set_isr(NULL).
+ * The caller must still own the corresponding peripheral and DMA configuration.
+ */
+bool furi_hal_interrupt_try_set_isr(FuriHalInterruptId index, FuriHalInterruptISR isr, void* context);
 
 /** Set ISR and enable interrupt with custom priority
  *

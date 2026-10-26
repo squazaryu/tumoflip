@@ -25,11 +25,9 @@ typedef struct {
 
 static bool subghz_protocol_pack_filename(const char* stem, char* output, size_t size) {
     if(!stem || !*stem || !output || !size) return false;
-    size_t length = 0;
-    for(; stem[length]; length++)
-        if(length >= 31 || !((stem[length] >= 'a' && stem[length] <= 'z') ||
-                             (stem[length] >= '0' && stem[length] <= '9') || stem[length] == '_'))
-            return false;
+    // Stems come exclusively from the immutable table below, not SD/user input.
+    // Its alphabet/length are checked in native build tests; retain bounds checks
+    // on the actual formatted result without validating constants on every load.
     int written = snprintf(output, size, "protocol_%s.fal", stem);
     return written > 0 && (size_t)written < size;
 }

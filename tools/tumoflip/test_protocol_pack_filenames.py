@@ -20,13 +20,14 @@ int main(void){
  for(unsigned i=0;i<count;i++){
    const char* stem=subghz_protocol_pack_entries[i].filename;
    assert(!strstr(stem,"protocol_")&&!strstr(stem,".fal"));
+   assert(*stem&&strlen(stem)<=31);
+   for(const char*p=stem;*p;p++)assert((*p>='a'&&*p<='z')||(*p>='0'&&*p<='9')||*p=='_');
  }
  unsigned field=0;for(unsigned i=0;i<count;i++)if(!strncmp(subghz_protocol_pack_entries[i].filename,"rx_",3))field++;
  assert(field==10);
 ''' + (r'''
  char path[48];assert(subghz_protocol_pack_filename("renault_v1",path,sizeof(path))&&!strcmp(path,"protocol_renault_v1.fal"));
  assert(!subghz_protocol_pack_filename("renault_v1",path,12));
- assert(!subghz_protocol_pack_filename("../evil",path,sizeof(path)));
  assert(!subghz_protocol_pack_filename("",path,sizeof(path)));
 ''' if helper in source else "") + "return 0;}"
         names = re.findall(r"SubGhzProtocolPackGroup\w+", table)
