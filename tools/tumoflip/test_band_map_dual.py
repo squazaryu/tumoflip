@@ -3,12 +3,43 @@ from pathlib import Path
 import re
 import unittest
 from tools.tumoflip.test_nfc_completion_equality import native
+from tools.tumoflip.test_hotplug_assets import function
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "applications_user/signal_workbench"
 
 
 class BandMapDualTests(unittest.TestCase):
+    def test_peak_menu_uses_bounded_native_rows_and_keeps_an_empty_state(self):
+        header = re.sub(r"^#(?:include|pragma).*\n", "\n", (APP / "tumospectrum_band_map.h").read_text(), flags=re.M)
+        source = (APP / "signal_workbench.c").read_text()
+        signature = "static void tumospectrum_open_peak_history("
+        body = function(source, signature) if signature in source else "static void tumospectrum_open_peak_history(TumoSpectrumApp* app);"
+        native(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+''' + header + r'''
+typedef struct{unsigned count;char rows[20][64];}Submenu;
+typedef struct{Submenu*peak_menu;TumoSpectrumBandMap*band_map;void*view_dispatcher;}TumoSpectrumApp;
+enum{TumoSpectrumViewBandPeaks};
+static TumoSpectrumBandMapSnapshot snapshot;
+static void tumospectrum_peak_selected(void*c,uint32_t n){(void)c;(void)n;}
+void tumospectrum_band_map_get_snapshot(const TumoSpectrumBandMap*m,TumoSpectrumBandMapSnapshot*s){(void)m;*s=snapshot;}
+static void submenu_reset(Submenu*m){m->count=0;}
+static void submenu_set_header(Submenu*m,const char*h){(void)m;assert(!strcmp(h,"Peak history"));}
+static void submenu_add_item(Submenu*m,const char*l,uint32_t n,void(*c)(void*,uint32_t),void*a){(void)n;(void)c;(void)a;assert(m->count<20);snprintf(m->rows[m->count++],64,"%s",l);}
+static void view_dispatcher_switch_to_view(void*d,unsigned n){(void)d;assert(n==TumoSpectrumViewBandPeaks);}
+''' + body + r'''
+int main(void){Submenu menu={0};TumoSpectrumApp app={.peak_menu=&menu};
+ tumospectrum_open_peak_history(&app);assert(menu.count>=1&&!strcmp(menu.rows[0],"No peaks yet"));
+ snapshot.peak_count=16;for(unsigned i=0;i<16;i++)snapshot.observed_peaks[i]=(TumoSpectrumBandPeak){.frequency_hz=433920000+i*1000,.rssi_dbm=-45};
+ tumospectrum_open_peak_history(&app);assert(menu.count==17&&strstr(menu.rows[0],"433.920"));return 0;}
+''')
+
     def test_dual_sweep_peak_history_loss_and_broker_release(self):
         source = "\n".join(re.sub(r"^#(?:include|pragma).*\n", "\n", (APP / name).read_text(), flags=re.M)
                            for name in ("tumospectrum_band_map.h", "tumospectrum_band_map.c"))
