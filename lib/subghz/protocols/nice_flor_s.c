@@ -357,6 +357,22 @@ static bool nice_flor_s_read_modes(FlipperFormat* format, uint16_t* ic, bool* o_
     return true;
 }
 
+static bool nice_flor_s_read_known(FlipperFormat* format, bool* known) {
+    if(flipper_format_key_exist(format, "ICKnown") &&
+       (!flipper_format_rewind(format) ||
+        !flipper_format_read_bool(format, "ICKnown", known, 1)))
+        return false;
+    if(flipper_format_key_exist(format, "No_IC")) {
+        uint32_t unknown;
+        if(!flipper_format_rewind(format) ||
+           !flipper_format_read_uint32(format, "No_IC", &unknown, 1) || unknown > 1)
+            return false;
+        // Either explicit unknown marker wins over a conflicting known marker.
+        if(unknown) *known = false;
+    }
+    return true;
+}
+
 SubGhzProtocolStatus
     subghz_protocol_encoder_nice_flor_s_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_assert(context);
@@ -374,11 +390,7 @@ SubGhzProtocolStatus
            instance->generic.data_count_bit != NICE_ONE_COUNT_BIT)
             break;
         bool ic_known = true;
-        if(flipper_format_key_exist(flipper_format, "ICKnown") &&
-           (!flipper_format_rewind(flipper_format) ||
-            !flipper_format_read_bool(flipper_format, "ICKnown", &ic_known, 1)))
-            break;
-        if(!ic_known) break;
+        if(!nice_flor_s_read_known(flipper_format, &ic_known) || !ic_known) break;
         if(!flipper_format_rewind(flipper_format)) break;
 
         // Optional value
@@ -1260,14 +1272,14 @@ SubGhzProtocolStatus
          * which is what a received frame is stored with. */
         // Explicit legacy IC=FFFF is valid. Only an explicit unknown marker (or
         // a long raw frame without any IC) denotes receive-only data.
-        bool ic_known = instance->o_code;
-        if(flipper_format_key_exist(flipper_format, "ICKnown") &&
-           (!flipper_format_rewind(flipper_format) ||
-            !flipper_format_read_bool(flipper_format, "ICKnown", &ic_known, 1))) {
+        bool ic_known = instance->o_code ||
+                        instance->generic.data_count_bit != NICE_O_LONG_COUNT_BIT;
+        if(!nice_flor_s_read_known(flipper_format, &ic_known)) {
             ret = SubGhzProtocolStatusErrorParserOthers;
             break;
         }
-        if(instance->generic.data_count_bit == NICE_O_LONG_COUNT_BIT) instance->o_code = true;
+        if(!ic_known || instance->generic.data_count_bit == NICE_O_LONG_COUNT_BIT)
+            instance->o_code = true;
         instance->o_code_no_ic = instance->o_code && !ic_known;
         instance->has_held = false;
         instance->held_repeat = false;
