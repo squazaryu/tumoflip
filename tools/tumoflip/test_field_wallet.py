@@ -13,11 +13,12 @@ APP = ROOT / "applications/system/device_library"
 FIXTURES = ROOT / "tools/tumoflip/fixtures"
 
 
-def storage_native(program):
+def storage_native(program, extra_sources=()):
     sources = [APP / "library_model.h", APP / "library_model.c", APP / "card_store.h",
                APP / "card_store.c", APP / "pin_store.c",
                ROOT / "lib/fap_metadata/fap_metadata.h", ROOT / "lib/fap_metadata/fap_metadata.c",
                APP / "wallet_launch.c"]
+    sources.extend(APP / name for name in extra_sources)
     body = '#include "library_io_stubs.h"\n'
     for source in sources:
         if source.exists():
