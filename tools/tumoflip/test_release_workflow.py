@@ -17,6 +17,10 @@ class ReleaseWorkflowTest(unittest.TestCase):
             workflow = (REPO_ROOT / ".github/workflows" / name).read_text()
             self.assertIn("fap_device_library", workflow, name)
             self.assertIn("fap_file_history", workflow, name)
+            self.assertIn("fap_field_tools", workflow, name)
+            self.assertIn("fap_tumo_nfc_sniffer", workflow, name)
+            self.assertIn("test_nfc_field_owner", workflow, name)
+            self.assertIn("test_field_inventory", workflow, name)
 
     def test_release_workflow_publishes_companion_packages(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text(
