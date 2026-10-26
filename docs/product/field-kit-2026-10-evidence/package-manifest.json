@@ -1,0 +1,1156 @@
+{
+  "artifacts": {
+    "firmware.dfu": {
+      "bytes": 876837,
+      "sha256": "ac51826575f4920722fb7fd675e903f83b8c44a37c9223b98f30a14686174940"
+    },
+    "radio.bin": {
+      "bytes": 116956,
+      "sha256": "134a9af448d2bc35995600c9e95723a387c144c2d1adea671086f16f95d327df"
+    },
+    "resources.ths": {
+      "bytes": 4120719,
+      "sha256": "602c3c0738eb2e6d7af6790c9750e8488f66a61b31c2c92dbf98e0c82d3c923c"
+    },
+    "splash.bin": {
+      "bytes": 2751,
+      "sha256": "0f0ec17ed2096dccddc7831615a30c780e59b617042d9d78510d09450aa7c5c3"
+    },
+    "updater.bin": {
+      "bytes": 120209,
+      "sha256": "9e7be9c725767f81854f4e5f83376bb9038e6a6235df0dcbec67418305ad99da"
+    }
+  },
+  "cleanup": [
+    {
+      "canonical": "/ext/apps/Bluetooth/flipper_companion.fap",
+      "group": "base",
+      "legacy": "/ext/apps/Scripts/js_app.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/arf_car_emulate.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/ARF Car Emulate.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/arf_counter_bf.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/ARF Counter BF.fap"
+    },
+    {
+      "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/ARF Frequency Analyzer.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/arf_keeloq.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/ARF KeeLoq.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/arf_psa_decrypt.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/ARF PSA Decrypt.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/arf_status.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/ARF Status.fap"
+    },
+    {
+      "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/ARF Sub-GHz Full.fap"
+    },
+    {
+      "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/ARF Sub-GHz.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/proto_pirate.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/ProtoPirate.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/subghz_bruteforcer.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/Sub-GHz Bruteforcer.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/arf_car_emulate.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/arf_car_emulate.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/arf_counter_bf.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/arf_counter_bf.fap"
+    },
+    {
+      "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/arf_frequency_analyzer.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/arf_keeloq.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/arf_keeloq.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/arf_psa_decrypt.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/arf_psa_decrypt.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/arf_status.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/arf_status.fap"
+    },
+    {
+      "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/arf_subghz.fap"
+    },
+    {
+      "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/arf_subghz_standard.fap"
+    },
+    {
+      "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/ble_killer.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/proto_pirate.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/proto_pirate.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/rolljam.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/rolljam.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/rolljam.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/rolljam_standalone.fap"
+    },
+    {
+      "canonical": "/ext/apps_data/arf_subghz_full/modules/subghz_bruteforcer.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/ARF Tools/subghz_bruteforcer.fap"
+    },
+    {
+      "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+      "group": "arf",
+      "legacy": "/ext/apps/Module One/Sub-GHz/freq_analyzer_ext.fap"
+    },
+    {
+      "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+      "group": "arf",
+      "legacy": "/ext/apps_data/arf_subghz_full/modules/arf_frequency_analyzer.fap"
+    },
+    {
+      "canonical": "/ext/apps/ARF Tools/arf_subghz_full.fap",
+      "group": "arf",
+      "legacy": "/ext/apps_data/arf_subghz_full/modules/arf_subghz_standard.fap"
+    },
+    {
+      "canonical": "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+      "group": "module_one",
+      "legacy": "/ext/apps/GPIO/esp_flasher.fap"
+    },
+    {
+      "canonical": "/ext/apps/Module One/Diagnostics/cockpit.fap",
+      "group": "module_one",
+      "legacy": "/ext/apps/Module One/Diagnostics/module_one_cockpit.fap"
+    },
+    {
+      "canonical": "/ext/apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
+      "group": "module_one",
+      "legacy": "/ext/apps/Module One/ESP32 Wi-Fi/wifi_map.fap"
+    },
+    {
+      "canonical": "/ext/apps/Module One/Signals/signal_workbench.fap",
+      "group": "module_one",
+      "legacy": "/ext/apps/Module One/Signals/protocol_compiler.fap"
+    },
+    {
+      "canonical": "/ext/apps/Module One/Diagnostics/cockpit.fap",
+      "group": "module_one",
+      "legacy": "/ext/apps/Module One/module_one_cockpit.fap"
+    },
+    {
+      "canonical": "/ext/apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
+      "group": "module_one",
+      "legacy": "/ext/apps/Module One/module_one_sensor_logger.fap"
+    },
+    {
+      "canonical": "/ext/apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
+      "group": "module_one",
+      "legacy": "/ext/apps/Module One/tumo_acceptance_suite.fap"
+    }
+  ],
+  "firmware": {
+    "api": "88.23",
+    "name": "tumoflip",
+    "radio_address": "0x080D7000",
+    "target": 7,
+    "version": "t-dev-009-032"
+  },
+  "packages": {
+    "arf": [
+      {
+        "bytes": 4536,
+        "md5": "c36f9f41e49c4cebe6e3fc4e3e4e4188",
+        "sha256": "66d2759efd3c3bb3247b63a828dd0fbfb8b2f5863912a7f60a18249c663ff9ac",
+        "source": "apps/ARF Tools/arf_subghz_full.fap",
+        "target": "/ext/apps/ARF Tools/arf_subghz_full.fap"
+      },
+      {
+        "bytes": 98624,
+        "md5": "6836754cc6c99d1fc870b74c795f85bb",
+        "sha256": "6748efb4716ebe2f0aaa5e46120fe068ebeef526b9b6bd30c339a39097452dc6",
+        "source": "apps/ARF Tools/garage_door_remote.fap",
+        "target": "/ext/apps/ARF Tools/garage_door_remote.fap"
+      },
+      {
+        "bytes": 5632,
+        "md5": "2b946042bc0cfe71514f53731ce3a3ff",
+        "sha256": "5f7382b6d5360e4fafdd8f1fb5c07ef60923d4b8b24bb84641ef15384f43fcb8",
+        "source": "apps/ARF Tools/keeloq_keystore_decryptor.fap",
+        "target": "/ext/apps/ARF Tools/keeloq_keystore_decryptor.fap"
+      },
+      {
+        "bytes": 32736,
+        "md5": "999752564069d94994376e6e7191780c",
+        "sha256": "3057e7335aac289f892cd7b5dc09f1c2ec7552785d39ceeab3e9da93992cdaa6",
+        "source": "apps/ARF Tools/subghz_raw_edit.fap",
+        "target": "/ext/apps/ARF Tools/subghz_raw_edit.fap"
+      },
+      {
+        "bytes": 48732,
+        "md5": "c1986d85f53624b45d0ab5bd0bdcceec",
+        "sha256": "93a776a8b0dee91994b64aac7f01ac2c4c996e836545d219e52118fc29c6ea0b",
+        "source": "apps_data/arf_subghz_full/modules/arf_car_emulate.fap",
+        "target": "/ext/apps_data/arf_subghz_full/modules/arf_car_emulate.fap"
+      },
+      {
+        "bytes": 38008,
+        "md5": "2881e64af4a6d1d55b975a3b96ffe8cc",
+        "sha256": "7bacb1c637472438decf14bb00aa3bca291ccdd36f75af26bd8add3f6a10c0b8",
+        "source": "apps_data/arf_subghz_full/modules/arf_counter_bf.fap",
+        "target": "/ext/apps_data/arf_subghz_full/modules/arf_counter_bf.fap"
+      },
+      {
+        "bytes": 52708,
+        "md5": "d8ffffc0dc87002b431c58b39497b88d",
+        "sha256": "85666b7612d4adf4541fba4d92349312a2ca552600578ff554895f7b3037a6ff",
+        "source": "apps_data/arf_subghz_full/modules/arf_keeloq.fap",
+        "target": "/ext/apps_data/arf_subghz_full/modules/arf_keeloq.fap"
+      },
+      {
+        "bytes": 38588,
+        "md5": "d491c868a209c867e839a61b93ea1172",
+        "sha256": "2de9653662c186367d0d80e86f97e93ac1d1891881b101ded008002289b77580",
+        "source": "apps_data/arf_subghz_full/modules/arf_psa_decrypt.fap",
+        "target": "/ext/apps_data/arf_subghz_full/modules/arf_psa_decrypt.fap"
+      },
+      {
+        "bytes": 13704,
+        "md5": "770f2747fdc90a5303d222f0ad7fcbd3",
+        "sha256": "b1b9a40553a614c19c9504154cb0a062e54412ae3172d9d36eda072848ce1d58",
+        "source": "apps_data/arf_subghz_full/modules/arf_status.fap",
+        "target": "/ext/apps_data/arf_subghz_full/modules/arf_status.fap"
+      },
+      {
+        "bytes": 478520,
+        "md5": "00c8a75e41736f9a828cb63f22673ae6",
+        "sha256": "7408c8ca6ed1e3e92665868f5e6b4641adbb33fbc5aab3cf56c86e3caa98cacd",
+        "source": "apps_data/arf_subghz_full/modules/proto_pirate.fap",
+        "target": "/ext/apps_data/arf_subghz_full/modules/proto_pirate.fap"
+      },
+      {
+        "bytes": 34440,
+        "md5": "5cc6af92b39b8d8cf95369cb6b4b42c0",
+        "sha256": "5edd55f8efad96b8be8742c87870ae0f011e86a0dd60c8eb8abb2f4f278da54b",
+        "source": "apps_data/arf_subghz_full/modules/rolljam.fap",
+        "target": "/ext/apps_data/arf_subghz_full/modules/rolljam.fap"
+      },
+      {
+        "bytes": 67556,
+        "md5": "d9d1a39f34de81faa9d1411cff01d413",
+        "sha256": "bb0cbdcbaa6e94f55fd0b1d40026138517d92003e85d09c7dc5bfb08f0e56a21",
+        "source": "apps_data/arf_subghz_full/modules/subghz_bruteforcer.fap",
+        "target": "/ext/apps_data/arf_subghz_full/modules/subghz_bruteforcer.fap"
+      },
+      {
+        "bytes": 11924,
+        "md5": "4660ed4b3e0b8c996e4a1d3a828a802d",
+        "sha256": "3eee4835c8ac5ea908eb013fac06e96f0b00a311b2df0ed32066d5ae6d9dd3c0",
+        "source": "apps_data/arf_subghz_full/packages/protopirate_to_subghz.fap",
+        "target": "/ext/apps_data/arf_subghz_full/packages/protopirate_to_subghz.fap"
+      },
+      {
+        "bytes": 17168,
+        "md5": "64f70e86ba54c32143b62a12cdfed599",
+        "sha256": "db0be36158ea084d7574924ddab6f21fde75102bd12f834bf9e2f9279759cebf",
+        "source": "apps_data/arf_subghz_full/packages/capture_inspector.fap",
+        "target": "/ext/apps_data/arf_subghz_full/packages/capture_inspector.fap"
+      }
+    ],
+    "base": [
+      {
+        "bytes": 60756,
+        "md5": "9ad9e93d13ff9d6ec14da52e9c48a87a",
+        "sha256": "70ed3723237f95764f410b0796569e0b718a77fc8faeec7c49912c2410ea4d75",
+        "source": "apps/Bluetooth/claude_buddy.fap",
+        "target": "/ext/apps/Bluetooth/claude_buddy.fap"
+      },
+      {
+        "bytes": 32208,
+        "md5": "4177b9c3bdcecd1b2a51b9ba6382cc50",
+        "sha256": "bbc4a18786472cd2a2aa9f05d57a3c51114ca987828f268e7ac6f7179f80ea5a",
+        "source": "apps/Bluetooth/flipper_companion.fap",
+        "target": "/ext/apps/Bluetooth/flipper_companion.fap"
+      },
+      {
+        "bytes": 116984,
+        "md5": "4b03b0ad1d046be7da307482d25010db",
+        "sha256": "01f12f82c81e3284dfe76f4f153ab3958983d9ae4358889cddbb32087d4c1174",
+        "source": "apps/Sub-GHz/subghz_wardriving.fap",
+        "target": "/ext/apps/Sub-GHz/subghz_wardriving.fap"
+      },
+      {
+        "bytes": 20604,
+        "md5": "147778b263d26a5090ac73df4d29062d",
+        "sha256": "5b9e0027e70c73a1e437fe31b11bf2c43ec13cb90970464b466630012f778898",
+        "source": "apps/Tools/ai_dashboard.fap",
+        "target": "/ext/apps/Tools/ai_dashboard.fap"
+      },
+      {
+        "bytes": 12096,
+        "md5": "5766f7fea386a13e8df88a08f59fc478",
+        "sha256": "e03f43b07b4fbba082a32013cdc1637dc11f01c65b0ae18472e1e2275424123b",
+        "source": "apps/Tools/clock.fap",
+        "target": "/ext/apps/Tools/clock.fap"
+      },
+      {
+        "bytes": 3152,
+        "md5": "771da069e6390e5eee223d808707c7a8",
+        "sha256": "7723e9fec9eaf590009ab12a838050a4cf2ed4cce3510539d5700117d12ac19f",
+        "source": "apps/Tools/flipper_relay.fap",
+        "target": "/ext/apps/Tools/flipper_relay.fap"
+      },
+      {
+        "bytes": 17324,
+        "md5": "c55678c60b0ee5404f9dc1a09f3c04c9",
+        "sha256": "4593e87e62c79a49d88a01b6186f939a7930f0156d7d4e0f0f256bba30756a3c",
+        "source": "apps/Tools/morse_player.fap",
+        "target": "/ext/apps/Tools/morse_player.fap"
+      },
+      {
+        "bytes": 83440,
+        "md5": "2a50ff48add3dde91c0580727f9099d4",
+        "sha256": "031cfff4003b102e8fdf58a1ade80df57b9aba91ab164754eeefbc4090e6be20",
+        "source": "apps/Tools/quac.fap",
+        "target": "/ext/apps/Tools/quac.fap"
+      },
+      {
+        "bytes": 54792,
+        "md5": "87ab6509d1ec6a32f81912acc3e9516b",
+        "sha256": "f357bd5969a58308875b50c86d222f63cf50ce245e19dc26b4bf37ac6f58bbdd",
+        "source": "apps/GPIO/nearby_files.fap",
+        "target": "/ext/apps/GPIO/nearby_files.fap"
+      },
+      {
+        "bytes": 183740,
+        "md5": "1a6fd9b0041aca1e9e98d6442826788e",
+        "sha256": "6789b9438817b5d3867f6831fb98858590ee5834b0995ab3edca3495939f1fcd",
+        "source": "apps/Sub-GHz/weather_editor.fap",
+        "target": "/ext/apps/Sub-GHz/weather_editor.fap"
+      },
+      {
+        "bytes": 63848,
+        "md5": "7512783ba0282983b1146f5a70cadfe2",
+        "sha256": "a1e72fd94cd27b7bf7f6af1f86826ad6abe1bd3cdd500492a2fff733343e02ad",
+        "source": "apps/NFC/specter.fap",
+        "target": "/ext/apps/NFC/specter.fap"
+      },
+      {
+        "bytes": 108444,
+        "md5": "b7f4be021ab8331a20f63e8a51ee54f0",
+        "sha256": "2cafe82b76ce43386c771fe5d1b9e13156156b9eb6687a2b32c66038eb541978",
+        "source": "apps/Bluetooth/hid_ble.fap",
+        "target": "/ext/apps/Bluetooth/hid_ble.fap"
+      },
+      {
+        "bytes": 31076,
+        "md5": "f25c921bb99a6f1447bf0a9f3a5b86f7",
+        "sha256": "d2f23b8e4811fc5bb1ec0832b1fdd4105217147cd1416f4e1b9076ca61a767e2",
+        "source": "apps/Tools/device_library.fap",
+        "target": "/ext/apps/Tools/device_library.fap"
+      },
+      {
+        "bytes": 40912,
+        "md5": "ca4294e2bfe8602e63b06bcb29d68585",
+        "sha256": "0bf68a22d03b57ea1db956bc3a48198eee8913e9baccfd4fd4147cbd54df3d76",
+        "source": "apps/Tools/field_tools.fap",
+        "target": "/ext/apps/Tools/field_tools.fap"
+      },
+      {
+        "bytes": 18296,
+        "md5": "5570a3f32e28d05e2518ec3a52b26d0e",
+        "sha256": "6f8342a6420f9ae115ef20080726de81ed9d5b6e483c8519d4e094c7b8bf92d8",
+        "source": "apps/NFC/tumo_nfc_sniffer.fap",
+        "target": "/ext/apps/NFC/tumo_nfc_sniffer.fap"
+      },
+      {
+        "bytes": 12364,
+        "md5": "69b75f537b8113ca92233b79a99fd3f9",
+        "sha256": "8a4a52164e5cc4cb049d9c23da21351a2ce1b5e1a1282a9aef2da2cb1f4e25df",
+        "source": "apps_data/device_library/plugins/file_history.fal",
+        "target": "/ext/apps_data/device_library/plugins/file_history.fal"
+      },
+      {
+        "bytes": 7660,
+        "md5": "3c43c189e68b6606f9362a00f92d25e3",
+        "sha256": "93aeb249637e50ad63b04443a927faa915cd99c10a2542585d8f35ffafec7fa2",
+        "source": "apps_data/lfrfid/plugins/lfrfid_hitags.fal",
+        "target": "/ext/apps_data/lfrfid/plugins/lfrfid_hitags.fal"
+      },
+      {
+        "bytes": 19980,
+        "md5": "6417a9ef7af8488c04afe8df45998a61",
+        "sha256": "daff5547dff17e4043f68289c90fb2e113be0c68da8ad3e9093175f7992aef6f",
+        "source": "apps/Tools/tumoflip_packages.fap",
+        "target": "/ext/apps/Tools/tumoflip_packages.fap"
+      },
+      {
+        "bytes": 111524,
+        "md5": "6ce3d44b25ff5706aca5c43157df4c3b",
+        "sha256": "4fed08e6cfdade72fb49a97b7e59396641122989226987f7595ca98ff7fbae53",
+        "source": "apps/Tools/totp.fap",
+        "target": "/ext/apps/Tools/totp.fap"
+      },
+      {
+        "bytes": 8936,
+        "md5": "f451e9ee5e502906452cf67fc7f82011",
+        "sha256": "0540df8886c450cd7e6a1b31589ca55b8e6b7ae0308c4ea24c99af3032745382",
+        "source": "apps_data/totp/plugins/totp_cli_add_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_add_plugin.fal"
+      },
+      {
+        "bytes": 5524,
+        "md5": "482b98bb08a4cb84740fc0980a54ce1b",
+        "sha256": "e48df4fe4289d8b44cc6da1eef7f6246f507cfc0dba2d33b9f9686d0ada78579",
+        "source": "apps_data/totp/plugins/totp_cli_automation_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_automation_plugin.fal"
+      },
+      {
+        "bytes": 4184,
+        "md5": "eba59939a382be21bb081a588bf72433",
+        "sha256": "9c957945c189eda0ba435e6b040368e848acc4b1ceb9cf12df2d36c15ae79908",
+        "source": "apps_data/totp/plugins/totp_cli_delete_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_delete_plugin.fal"
+      },
+      {
+        "bytes": 6688,
+        "md5": "d6b07ff63a4bf314e1b045568b510f6d",
+        "sha256": "89b10e3041a9f0621d1e862b63e5ab8211a0f5bf02e5f4ea2afc4b407b093423",
+        "source": "apps_data/totp/plugins/totp_cli_details_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_details_plugin.fal"
+      },
+      {
+        "bytes": 4448,
+        "md5": "36ec588217d55094a56c40f8c8cdef88",
+        "sha256": "f6434eef45c40a7e1a2af44706c155679fa8b139047ac6396e810de088e8958b",
+        "source": "apps_data/totp/plugins/totp_cli_export_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_export_plugin.fal"
+      },
+      {
+        "bytes": 1732,
+        "md5": "ff46d2f58865ae8cd3729015d0418627",
+        "sha256": "0d6a86e47d240aea995edde347e892b08216c24c9b8ba946118c81fa58caaa21",
+        "source": "apps_data/totp/plugins/totp_cli_help_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_help_plugin.fal"
+      },
+      {
+        "bytes": 4676,
+        "md5": "32a3331aa913c03fc5db72d687d7fdfa",
+        "sha256": "cc24d9786d449a69ddba5f338bf8fa470e98133e678ffbd1fb8a314fbafea187",
+        "source": "apps_data/totp/plugins/totp_cli_list_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_list_plugin.fal"
+      },
+      {
+        "bytes": 3316,
+        "md5": "5dc5f321ba368ec18fe4802b7f982f16",
+        "sha256": "bef0ac1927396029e82e24d7984cbd1d0f150d146589ec49bee51707fcef19d1",
+        "source": "apps_data/totp/plugins/totp_cli_move_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_move_plugin.fal"
+      },
+      {
+        "bytes": 3316,
+        "md5": "24d3568b6563a9766857190a6078ad82",
+        "sha256": "5c49be55c0647469e90f71ea6c74069dd481f5b10093a8870b1ee5f8b07e93f0",
+        "source": "apps_data/totp/plugins/totp_cli_notification_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_notification_plugin.fal"
+      },
+      {
+        "bytes": 4632,
+        "md5": "bb3456ac6a6d57b963d5ec14104f4ca2",
+        "sha256": "7fe6e8a6c39cd88aab1c510f2af7c6ef8e3dd31655c18cc8759b9d79e9956a61",
+        "source": "apps_data/totp/plugins/totp_cli_pin_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_pin_plugin.fal"
+      },
+      {
+        "bytes": 3244,
+        "md5": "c3e1d87b3195cee3b290c9ad0e3a2e8b",
+        "sha256": "ab29b2493261bddcf431c89280fd36d2ad77cebf977d0c61e2520f50eefacfcc",
+        "source": "apps_data/totp/plugins/totp_cli_reset_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_reset_plugin.fal"
+      },
+      {
+        "bytes": 4236,
+        "md5": "e2f012fd50fdff4705121d819d1ea7c2",
+        "sha256": "398faf2b96de7541d6ccc5f9fe5c9042e52af8417df887289cfe74ac4bff36e6",
+        "source": "apps_data/totp/plugins/totp_cli_timezone_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_timezone_plugin.fal"
+      },
+      {
+        "bytes": 9456,
+        "md5": "fa5ac5a60ee979a50f88a6cc99ba796f",
+        "sha256": "9c5796d96276528ef336314970cdf268b1a6f224ea7b6d02f4f55d3de11b4872",
+        "source": "apps_data/totp/plugins/totp_cli_update_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_update_plugin.fal"
+      },
+      {
+        "bytes": 1248,
+        "md5": "8cabd9f848cedb7c46611c0bb15ab19f",
+        "sha256": "d56ffafc439e74f905c93d24cf941d706b91e63c228faaecd3588203883bf66e",
+        "source": "apps_data/totp/plugins/totp_cli_version_plugin.fal",
+        "target": "/ext/apps_data/totp/plugins/totp_cli_version_plugin.fal"
+      }
+    ],
+    "module_one": [
+      {
+        "bytes": 17688,
+        "md5": "9c0cbe91e5f49ec5a6474c66cb8f975a",
+        "sha256": "dc2e19f40494ea32fb6556bf086652dd9606fc476cbecc910d2ab64dee217b81",
+        "source": "apps/Module One/Diagnostics/cockpit.fap",
+        "target": "/ext/apps/Module One/Diagnostics/cockpit.fap"
+      },
+      {
+        "bytes": 40172,
+        "md5": "23ca0aa3ccbf3f535e7493a88b934762",
+        "sha256": "eb86642629f04c01080ad318a90e0a6d441023361e588a3381ad2e012e995c07",
+        "source": "apps/Module One/Diagnostics/tumo_acceptance_suite.fap",
+        "target": "/ext/apps/Module One/Diagnostics/tumo_acceptance_suite.fap"
+      },
+      {
+        "bytes": 7000,
+        "md5": "0512e397917da1d8dea76f6b7151cf05",
+        "sha256": "455e4bee9d89e66ea9f3fff4233f949c8f91d68389b4c396ff53d3b62aaaa6b4",
+        "source": "apps/Module One/Diagnostics/runtime_trace_viewer.fap",
+        "target": "/ext/apps/Module One/Diagnostics/runtime_trace_viewer.fap"
+      },
+      {
+        "bytes": 25792,
+        "md5": "cf58a8e5a70f70b685935404b01ba04a",
+        "sha256": "b20e779ef0005a1b094b8172ee350132358072eb3898dda0d639eb0a7f72339c",
+        "source": "apps/Module One/Field/field_logger.fap",
+        "target": "/ext/apps/Module One/Field/field_logger.fap"
+      },
+      {
+        "bytes": 132812,
+        "md5": "0360fe78cfa6490828c5187346585b95",
+        "sha256": "c48ea6611df259134c0941e4612680a31bb55b6885a5f591b6d7d76596f49079",
+        "source": "apps/Module One/Signals/signal_workbench.fap",
+        "target": "/ext/apps/Module One/Signals/signal_workbench.fap"
+      },
+      {
+        "bytes": 14328,
+        "md5": "858c68c1fefe571034d92ffeed24d7e1",
+        "sha256": "f03173145dd04d465f57579252fb8cb17dcdd85e15a8d3c674ae9fe5132fdb12",
+        "source": "apps/Module One/Signals/tumo_rx_link.fap",
+        "target": "/ext/apps/Module One/Signals/tumo_rx_link.fap"
+      },
+      {
+        "bytes": 22428,
+        "md5": "91f0710c25b8164a376b9b12aab6e90f",
+        "sha256": "27922ce97db0ad128e8a4b123e66005970e284bf14309a7e01556922a3c836c4",
+        "source": "apps/Module One/Signals/tumoscope.fap",
+        "target": "/ext/apps/Module One/Signals/tumoscope.fap"
+      },
+      {
+        "bytes": 42248,
+        "md5": "7e6da1ecaea06b44144d964d7ba7547e",
+        "sha256": "cea4168215df91241779e1d5e2f35ad5db9e1707147f71a45a7824d2b8e7c5c6",
+        "source": "apps/Module One/Network/tumonet_gateway.fap",
+        "target": "/ext/apps/Module One/Network/tumonet_gateway.fap"
+      },
+      {
+        "bytes": 38752,
+        "md5": "dc92fac12b6e08410f6c43fd849e8bbe",
+        "sha256": "795887c7d78e214bac0c5d94b6324a43aaebbb548e64778cda7f05afacf72f9e",
+        "source": "apps/Module One/Sub-GHz/tumonet_bench.fap",
+        "target": "/ext/apps/Module One/Sub-GHz/tumonet_bench.fap"
+      },
+      {
+        "bytes": 14660,
+        "md5": "bfa14a4d355a250197e34c9f47a14628",
+        "sha256": "95136bdcf45a36c6f5a5918e207bd9155c153e563345175d65cd9ddad70de8b9",
+        "source": "apps/Module One/VGM/tumovgm_bridge.fap",
+        "target": "/ext/apps/Module One/VGM/tumovgm_bridge.fap"
+      },
+      {
+        "bytes": 17236,
+        "md5": "ada2b589a05984c4c47587c2a6bb742b",
+        "sha256": "9abd12eb125cf9092c7ef151150b67e7d7e58ef69c4334dc30c31cd198c8239c",
+        "source": "apps/Module One/Modules/tumomodule_runtime.fap",
+        "target": "/ext/apps/Module One/Modules/tumomodule_runtime.fap"
+      },
+      {
+        "bytes": 21300,
+        "md5": "b39cb8ea91d8f85dcd11c205b7023c12",
+        "sha256": "7056d7cab11802804f4ebe7f7f5dccd37e1735c11c11434c5f92e6755dde27f4",
+        "source": "apps/Module One/Sensors BME280/module_one_sensor_logger.fap",
+        "target": "/ext/apps/Module One/Sensors BME280/module_one_sensor_logger.fap"
+      },
+      {
+        "bytes": 8364,
+        "md5": "800da81819f20408501d4187ba0b60ef",
+        "sha256": "a64a70fe2edb0b264ea45c7594bed51f6cc023cdf6cdf15d0a51801f3c1f57c3",
+        "source": "apps/Module One/BLE/ble_gatt_lab.fap",
+        "target": "/ext/apps/Module One/BLE/ble_gatt_lab.fap"
+      },
+      {
+        "bytes": 11376,
+        "md5": "f719c2ebba33a05c720b3ad0ded4fe90",
+        "sha256": "d1322639eb66ec8046a482df097d471e2c96c613829598db9714f8f8d8a20030",
+        "source": "apps/Module One/BLE/app_bridge_terminal.fap",
+        "target": "/ext/apps/Module One/BLE/app_bridge_terminal.fap"
+      },
+      {
+        "bytes": 43324,
+        "md5": "e5c89e407888e59b262e12c46f4d2ee7",
+        "sha256": "9989b52cf67bb5170fb8f62a340d5a5951ea919c6ff302440538a002088c5efe",
+        "source": "apps/Module One/Automation/tumoflow.fap",
+        "target": "/ext/apps/Module One/Automation/tumoflow.fap"
+      },
+      {
+        "bytes": 11724,
+        "md5": "7443f21a95cdc977409f95a02aa6f251",
+        "sha256": "448ca1a7068bd62f93db8770e9b05ccb303ca0c151df50e55e9bfd81a93276fa",
+        "source": "apps/Module One/Macros/tumo_macro_deck.fap",
+        "target": "/ext/apps/Module One/Macros/tumo_macro_deck.fap"
+      },
+      {
+        "bytes": 16752,
+        "md5": "941b1d428b08ec7d132626f8b2ddc0cf",
+        "sha256": "6680481c6f01255e4526e021ae221110841aec6a92c7b5395ee467b1f230c446",
+        "source": "apps/Module One/Scripts/tumoscript.fap",
+        "target": "/ext/apps/Module One/Scripts/tumoscript.fap"
+      },
+      {
+        "bytes": 9388,
+        "md5": "4fb45f26f950fd10ac9ef3dc3fa69ada",
+        "sha256": "b7230cf7c0e0e18d0480dec17bbe28aa7af2d5ad180346f8f25e99daaab64654",
+        "source": "apps/Module One/IR Blaster/tumo_ir_lab.fap",
+        "target": "/ext/apps/Module One/IR Blaster/tumo_ir_lab.fap"
+      },
+      {
+        "bytes": 109420,
+        "md5": "d4dc156a407ff1b96c841d0877b192cd",
+        "sha256": "c975b349951eedca0c64ee07f00c15ca29818174e72593fe75dc26f39fc2a2db",
+        "source": "apps/Module One/IR Blaster/tumoflip_xremote.fap",
+        "target": "/ext/apps/Module One/IR Blaster/tumoflip_xremote.fap"
+      },
+      {
+        "bytes": 44548,
+        "md5": "578a3c2c95cf7f33747f14a0f69f396a",
+        "sha256": "0547f10eaea1852d11230c77101abb47f8872b26d25741d950619db774c785f6",
+        "source": "apps_data/tumoflip_xremote/components/tumoflip_xremote_ac.fap",
+        "target": "/ext/apps_data/tumoflip_xremote/components/tumoflip_xremote_ac.fap"
+      },
+      {
+        "bytes": 123048,
+        "md5": "e0197c7e2ba7127eb90059f373381773",
+        "sha256": "896fef7c66bef8d44ef31c6116ed19728b31b36d11a410c9170af2fd487a0b75",
+        "source": "apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
+        "target": "/ext/apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap"
+      },
+      {
+        "bytes": 6675720,
+        "md5": "ced9d070edb6b89cf40a9e6bd8f878d2",
+        "sha256": "ad64d42f4d33aeda871b54c899a998eec4178c313971b24615687c38f6b7f97b",
+        "source": "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+        "target": "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
+      },
+      {
+        "bytes": 45004,
+        "md5": "0af5d2e77d70ed2c5be745fc9a3b8e9f",
+        "sha256": "d5802ea3067cc2c6868084500970c13f93b01410fbf09ab36cef04993c8ba87a",
+        "source": "apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap",
+        "target": "/ext/apps/Module One/ESP32 Wi-Fi/wifi_mapper.fap"
+      },
+      {
+        "bytes": 20720,
+        "md5": "ac8ec8665e61414f3f4613e835b94b10",
+        "sha256": "28cf363a3d59ed49f8327dfa5528fdd654e4b70f9569e39e8fdf458f66ba3c7e",
+        "source": "apps/Module One/Labs/tumovm_poc.fap",
+        "target": "/ext/apps/Module One/Labs/tumovm_poc.fap"
+      },
+      {
+        "bytes": 19592,
+        "md5": "00fd2753df74a95d7e2525ba698f8202",
+        "sha256": "f4a6bc701bb28d1b126062aef61a89cdbd33ceed9da8cab041ead9495ba4da6e",
+        "source": "apps/Module One/Labs/tumovm_peripherals.fap",
+        "target": "/ext/apps/Module One/Labs/tumovm_peripherals.fap"
+      },
+      {
+        "bytes": 5472,
+        "md5": "75e0a5829e975433359d22a9a930364f",
+        "sha256": "28795871fb3bea871de7baaec2b154e9e0658479980ae5532c9d70aae6466d9f",
+        "source": "apps/Module One/Labs/tumofabric_node.fap",
+        "target": "/ext/apps/Module One/Labs/tumofabric_node.fap"
+      },
+      {
+        "bytes": 8940,
+        "md5": "1258a77acd256bbd3e424d92dabce304",
+        "sha256": "aed08e2aaeb164e88c0dd49895cefc73f4c2b2975176236e5ab38c4c2340d7f8",
+        "source": "apps/Module One/Labs/tumokey_phase_a.fap",
+        "target": "/ext/apps/Module One/Labs/tumokey_phase_a.fap"
+      },
+      {
+        "bytes": 18804,
+        "md5": "a506bacda738ba5530e53b29f2a9dc7c",
+        "sha256": "6393bb9aa5ac67dd5f2c12980630d9137bf0cb45d44713e46cec1b5725c7541a",
+        "source": "apps/Module One/NFC/nfc_ccid_bridge.fap",
+        "target": "/ext/apps/Module One/NFC/nfc_ccid_bridge.fap"
+      },
+      {
+        "bytes": 26392,
+        "md5": "dfd0714261e6fbe3b243f295875f9663",
+        "sha256": "51bbe1f33c1186d6e61a7e8389ccadfe0e7203a467de0b3f3152d08ae485da2b",
+        "source": "apps/Module One/NFC/tumocard_os.fap",
+        "target": "/ext/apps/Module One/NFC/tumocard_os.fap"
+      },
+      {
+        "bytes": 28396,
+        "md5": "b39fd9411124813a5b2f513ae3b837ae",
+        "sha256": "ae18f34712686872ccf6af884bee8a24530695e01941500fba8bc1f359d5a21d",
+        "source": "apps/Module One/NFC/tumotag_verify.fap",
+        "target": "/ext/apps/Module One/NFC/tumotag_verify.fap"
+      },
+      {
+        "bytes": 177,
+        "md5": "cdfbbba4453279f74cf8cfd2a257f4b5",
+        "sha256": "8042b6bd036d54afc9dc53936a02445dfb2456cc1126e8c5c803f3abecdde08b",
+        "source": "apps_data/tumoflow/workflows/field_demo.tflow",
+        "target": "/ext/apps_data/tumoflow/workflows/field_demo.tflow"
+      },
+      {
+        "bytes": 174,
+        "md5": "807fc68e7a3389a129b5e3eb68464bc6",
+        "sha256": "7dfd95ed8e90c99f5be1d5e3525e19ee99306ef1714fba1e2a1a26ffa6fcfcd5",
+        "source": "apps_data/tumoflow/workflows/bounded_outputs.tflow",
+        "target": "/ext/apps_data/tumoflow/workflows/bounded_outputs.tflow"
+      },
+      {
+        "bytes": 140,
+        "md5": "7adbe317133467969ef4f350e8c8ee17",
+        "sha256": "5d8623cd10dc6c6ac089eaa670ca4744747a0867bc9b5241464901dab2cd4c0d",
+        "source": "apps_data/tumo_macro_deck/macros/safe_demo.tmacro",
+        "target": "/ext/apps_data/tumo_macro_deck/macros/safe_demo.tmacro"
+      },
+      {
+        "bytes": 202,
+        "md5": "0e84fae8283b2aa1678847c2430990b2",
+        "sha256": "410a25d90b5e69e2c261f803fec0500c39efe0a719211ce6eb811b0903580619",
+        "source": "apps_data/tumoscript/scripts/safe_demo.tscr",
+        "target": "/ext/apps_data/tumoscript/scripts/safe_demo.tscr"
+      },
+      {
+        "bytes": 204,
+        "md5": "ddbfedc253961b5cf9c68aa41261ea7b",
+        "sha256": "8c73f90ab20e56dd4a25317dd861f5cc271764eb361e1d33ab0177ea81466735",
+        "source": "apps_data/tumomodule_runtime/modules/bme280.tmod",
+        "target": "/ext/apps_data/tumomodule_runtime/modules/bme280.tmod"
+      },
+      {
+        "bytes": 203,
+        "md5": "655872237f9c219310083a5689c71c83",
+        "sha256": "00518df35cd125537294c805f22c6c7b32d434d4949b7fae2fc7e7273f966f01",
+        "source": "apps_data/tumomodule_runtime/modules/tumovgm.tmod",
+        "target": "/ext/apps_data/tumomodule_runtime/modules/tumovgm.tmod"
+      },
+      {
+        "bytes": 289,
+        "md5": "22242b219c5e6902c377ddefb26be82d",
+        "sha256": "b622d825f67fe2413c371b5afc102bbc7d8eae4eb82f857d8bee2c71bbdee39f",
+        "source": "apps_data/tumovm_peripherals/packages/nfc_state.tper",
+        "target": "/ext/apps_data/tumovm_peripherals/packages/nfc_state.tper"
+      },
+      {
+        "bytes": 185,
+        "md5": "50601aa39228f1796be0dc18502fed0b",
+        "sha256": "00da9ca43e4901834e638b2d44afc0bdaafa50eb7e0a728c1d7e16c14587593c",
+        "source": "apps_data/tumovm_peripherals/packages/usb_media.tper",
+        "target": "/ext/apps_data/tumovm_peripherals/packages/usb_media.tper"
+      },
+      {
+        "bytes": 582,
+        "md5": "679ce1dc2e26c3f9b834693d595d100e",
+        "sha256": "b0a7acf9dce0f98b5640210c880c6e8d7c36b482d3ef34ffdfbac5a844311086",
+        "source": "apps_data/signal_workbench/profiles/demo_pulse_pair.tproto",
+        "target": "/ext/apps_data/signal_workbench/profiles/demo_pulse_pair.tproto"
+      },
+      {
+        "bytes": 483,
+        "md5": "b792635659fa54860e832463d31a67a8",
+        "sha256": "ebaca6af3bbf41b7972f6c83c5cb4e1fe1df723a1e85c5a1695bb88ffe5a3b3a",
+        "source": "apps_data/signal_workbench/demo/validation.sub",
+        "target": "/ext/apps_data/signal_workbench/demo/validation.sub"
+      },
+      {
+        "bytes": 483,
+        "md5": "7048cd44e487c3d7ecadca6db950299c",
+        "sha256": "d19c791c94287e8b4a91cf33b902e1ab6d72fa39bd3eb950c6178bac27a43107",
+        "source": "subghz/TumoSpectrum Samples/train_0.sub",
+        "target": "/ext/subghz/TumoSpectrum Samples/train_0.sub"
+      },
+      {
+        "bytes": 483,
+        "md5": "599b872b27ee152fc41cafcc2bb28039",
+        "sha256": "d50600098097c4f720eeb98510568ca6d81173fe808f6cc77a16c82710b50cf2",
+        "source": "subghz/TumoSpectrum Samples/train_1.sub",
+        "target": "/ext/subghz/TumoSpectrum Samples/train_1.sub"
+      },
+      {
+        "bytes": 483,
+        "md5": "0d5dcf1602fbb053f9042da67db1dedd",
+        "sha256": "eadd0f59abfa2f7cc24c35093e7ecacd2221c00b002949fd135a1dc3269cfee6",
+        "source": "subghz/TumoSpectrum Samples/train_2.sub",
+        "target": "/ext/subghz/TumoSpectrum Samples/train_2.sub"
+      },
+      {
+        "bytes": 483,
+        "md5": "a94b1bf50bf33f1140d36a3889b445be",
+        "sha256": "2d1a86cdcc8bca0681efdcccf410f3c0ada83484f105b4faa4dd21eeea458e1b",
+        "source": "subghz/TumoSpectrum Samples/train_3.sub",
+        "target": "/ext/subghz/TumoSpectrum Samples/train_3.sub"
+      }
+    ],
+    "protocol_packs": [
+      {
+        "bytes": 7408,
+        "md5": "555653cced158b2567a333f2cc5778ad",
+        "sha256": "886f47d3d6a2ef3a838e9b131a2f344874fdd75cbcb2632c9dc21b9f857422d1",
+        "source": "apps_data/subghz/plugins/protocol_chrysler.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_chrysler.fal"
+      },
+      {
+        "bytes": 7676,
+        "md5": "3c1e248a661908661b6779ebf1c244e7",
+        "sha256": "036ed2702dea9aab6e700543dcd4243c5c70e06e5c2997fe1db9fa523a493b5a",
+        "source": "apps_data/subghz/plugins/protocol_fiat_marelli.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_fiat_marelli.fal"
+      },
+      {
+        "bytes": 7924,
+        "md5": "80ab754038ed6e35fd25ac175cc65a2e",
+        "sha256": "46ef0f9a6d421f01b95b3e19dfc64198dca36affaf1450eb4e785b2e574cbb7f",
+        "source": "apps_data/subghz/plugins/protocol_ford_v0.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_ford_v0.fal"
+      },
+      {
+        "bytes": 13592,
+        "md5": "19dc5333b18fc1e6f7cdb901c80fd312",
+        "sha256": "fdeeb70e5ee8573c78d7e31b024c2f38e4b8b17301def58262345940c0f157a6",
+        "source": "apps_data/subghz/plugins/protocol_ford_v1.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_ford_v1.fal"
+      },
+      {
+        "bytes": 10136,
+        "md5": "7e91530e133f1070750627b0ef1017fa",
+        "sha256": "4863d8d6d18e83eea34a682892ac3ee15c40cdaade7dc5dd95955b6655fd20d2",
+        "source": "apps_data/subghz/plugins/protocol_ford_v2.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_ford_v2.fal"
+      },
+      {
+        "bytes": 5288,
+        "md5": "a525b36a0a94b1a09ba0503846395944",
+        "sha256": "a0b7333094e262cb155d15db1f32eea9db65d9df1277284eb5460de9ca4eb82f",
+        "source": "apps_data/subghz/plugins/protocol_ford_v3.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_ford_v3.fal"
+      },
+      {
+        "bytes": 3980,
+        "md5": "cbf2c7fb511073a00d7a44240abbf0e1",
+        "sha256": "1842260580fb617bb857429f64795e798bf7593f92ba408a8330a2514154657a",
+        "source": "apps_data/subghz/plugins/protocol_gm_rolling.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_gm_rolling.fal"
+      },
+      {
+        "bytes": 3888,
+        "md5": "6af3e58817a9f94bcceed3deb9f02f17",
+        "sha256": "f052832aabcf280fc8ba71dfa0e9be228ac93fda926f1b6e235314a105f6d07e",
+        "source": "apps_data/subghz/plugins/protocol_honda_acura.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_honda_acura.fal"
+      },
+      {
+        "bytes": 4108,
+        "md5": "842d2124bb81879f43fe6af180e0e16e",
+        "sha256": "8f551633baf4d4da705c4be507916748ed3b405488c4915e21ecf70fc7668b80",
+        "source": "apps_data/subghz/plugins/protocol_hyundai_new.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_hyundai_new.fal"
+      },
+      {
+        "bytes": 6740,
+        "md5": "3415c9a95ae4ec60b16b537071a1d51c",
+        "sha256": "086e0e790fd39a3615da9009f7f9f50158d68b5a2084165d5f75fe197ad6516d",
+        "source": "apps_data/subghz/plugins/protocol_kia_v0.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_kia_v0.fal"
+      },
+      {
+        "bytes": 6616,
+        "md5": "21fd1bf79f23029408d73f873c63b2a8",
+        "sha256": "1bdc5b05a6a909304af519eaa1da9c502e74b271371ef42e1312f404a616ea92",
+        "source": "apps_data/subghz/plugins/protocol_kia_v1.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_kia_v1.fal"
+      },
+      {
+        "bytes": 6112,
+        "md5": "77d281598ddd7c69a8e83f005b07e338",
+        "sha256": "08888ab2c6c3d79e48ff2311808ae806f312336ed133171fcc25cc05b3d576e8",
+        "source": "apps_data/subghz/plugins/protocol_kia_v2.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_kia_v2.fal"
+      },
+      {
+        "bytes": 10500,
+        "md5": "5a06674402c7c613758ca35aa52c444d",
+        "sha256": "63cfc92296dcf83b62720b4e48a1aeef18f17aef122f84069a9a1b660af9c90e",
+        "source": "apps_data/subghz/plugins/protocol_kia_v3_v4.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_kia_v3_v4.fal"
+      },
+      {
+        "bytes": 8852,
+        "md5": "0e6606eb1b6edbed65b08cc1e2be6f85",
+        "sha256": "bf5aa7c947e872ea962aa53ac71b20ca50b0c7d1d81cfc9d015a5211f49fad85",
+        "source": "apps_data/subghz/plugins/protocol_kia_v5.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_kia_v5.fal"
+      },
+      {
+        "bytes": 8672,
+        "md5": "35e40c2499874ce2c9af226ee0be022a",
+        "sha256": "fc84d46ce13a16baab9e6e358a4b193ef6ff2bb3da366e3dfdadc41653a74404",
+        "source": "apps_data/subghz/plugins/protocol_kia_v6.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_kia_v6.fal"
+      },
+      {
+        "bytes": 8400,
+        "md5": "8c4c45e80527dcf1f30eddc3d71c4102",
+        "sha256": "1c587acc94cc8e9cfd7cf87ffbab93df650c360aaf22e368cf09e6698a80fb68",
+        "source": "apps_data/subghz/plugins/protocol_kia_v7.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_kia_v7.fal"
+      },
+      {
+        "bytes": 10204,
+        "md5": "88aac6c8304dcd0b5cfde0ad0a09a290",
+        "sha256": "f9acaba5c03ad2b57e209a87197cadf3368bd02d6f7252e58d5e2c2d8ff4830d",
+        "source": "apps_data/subghz/plugins/protocol_land_rover_v0.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_land_rover_v0.fal"
+      },
+      {
+        "bytes": 5704,
+        "md5": "223ae2923b8b74f0bd762c2ff3629a17",
+        "sha256": "a754c0216abbba93231dbab71438ce1e3aaf99f92a7ece4f198fc900ff041811",
+        "source": "apps_data/subghz/plugins/protocol_mazda_siemens.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_mazda_siemens.fal"
+      },
+      {
+        "bytes": 8764,
+        "md5": "941413b6c5ebe5f752d1c879502833be",
+        "sha256": "c41663372e4eaf741da7af9fb46bb0fb942b7b1e17195d6dccd6e944ffa6d65d",
+        "source": "apps_data/subghz/plugins/protocol_mazda_v0.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_mazda_v0.fal"
+      },
+      {
+        "bytes": 5136,
+        "md5": "7f9c2cde0d01cd103c404cb3d3f576d5",
+        "sha256": "b5d658c2f83d9639c4dcf2c3adcbe332b0b91451b4fe702c1113e3f2b9ae3b93",
+        "source": "apps_data/subghz/plugins/protocol_mitsubishi_v0.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_mitsubishi_v0.fal"
+      },
+      {
+        "bytes": 3904,
+        "md5": "2341cca517090624b68f4a97c754d161",
+        "sha256": "ae56afeeac116aa1f07c9326e6e7c16c7bd652b8b63c1966c9a058320be372cd",
+        "source": "apps_data/subghz/plugins/protocol_nissan.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_nissan.fal"
+      },
+      {
+        "bytes": 8128,
+        "md5": "e97be1c0a0e9818a0aa5a3744d881b2e",
+        "sha256": "0952b27694ead50d42489176038d65a5e54f9cc72375366e2e8b6b87c3d67cbc",
+        "source": "apps_data/subghz/plugins/protocol_porsche_cayenne.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_porsche_cayenne.fal"
+      },
+      {
+        "bytes": 13084,
+        "md5": "8e19e6164d3a23646d3d31040a30007f",
+        "sha256": "4fceb2a505bef8ce767317bc0d2c220c6b1018b3a275642bc412e2f367ee8391",
+        "source": "apps_data/subghz/plugins/protocol_psa.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_psa.fal"
+      },
+      {
+        "bytes": 3716,
+        "md5": "b53cc96a0e2a49335c418c311e3889bc",
+        "sha256": "b04df84a2c46ff2cb8315c3b16e4760afff59f5c31f47eb50a0f85ab600e06ca",
+        "source": "apps_data/subghz/plugins/protocol_renault.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_renault.fal"
+      },
+      {
+        "bytes": 5692,
+        "md5": "6324b1387820ddc8ae17a30fd20c3362",
+        "sha256": "057dbf260c8d017ca7bd3bbc5bbcd736ad1709721f000d0d0e929e3efc3955c6",
+        "source": "apps_data/subghz/plugins/protocol_renault_v1.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_renault_v1.fal"
+      },
+      {
+        "bytes": 5832,
+        "md5": "b67d68b5fdce2a7fbef123ce078e9b12",
+        "sha256": "30bdf15ca7a5b98383890002fe1d3e454ce4a77fe71a9a41610ae8cce9e26b6b",
+        "source": "apps_data/subghz/plugins/protocol_rx_bmw.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_rx_bmw.fal"
+      },
+      {
+        "bytes": 5244,
+        "md5": "cd642af11b83b7ca46053e51d239fbc9",
+        "sha256": "dde52a1284a5d587b4d0af373302b6c63b76f960f594f67f5d4b58337e9dc017",
+        "source": "apps_data/subghz/plugins/protocol_rx_gm0.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_rx_gm0.fal"
+      },
+      {
+        "bytes": 5244,
+        "md5": "e1fc44004509154f9d93b98090071b16",
+        "sha256": "9628c0baae21a038e5c302ae9ed418bfcbf175c78f929aa1a6806839f24d9535",
+        "source": "apps_data/subghz/plugins/protocol_rx_gm1.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_rx_gm1.fal"
+      },
+      {
+        "bytes": 4264,
+        "md5": "8b82c07b56d8530025da99873b7502ea",
+        "sha256": "4b3a99ce5a38dd6eaaeef69da4d3e9a9fdd22cb08c2d9c31abfdd85c96d0299a",
+        "source": "apps_data/subghz/plugins/protocol_rx_mb0.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_rx_mb0.fal"
+      },
+      {
+        "bytes": 5952,
+        "md5": "e64aa70a24494a8373328ed287850fdf",
+        "sha256": "be568ad1fb15ae101845d6e2d4f6ce71707c8ef391a1450d0adcffb28cb8aa58",
+        "source": "apps_data/subghz/plugins/protocol_rx_mb1.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_rx_mb1.fal"
+      },
+      {
+        "bytes": 5964,
+        "md5": "1247abd7d9594f8ddbd2c73e5a6403da",
+        "sha256": "db66fd15ef01b8c3b7f5940f1c40e02f4a03785015c06777dbea6fb22accec10",
+        "source": "apps_data/subghz/plugins/protocol_rx_mz2.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_rx_mz2.fal"
+      },
+      {
+        "bytes": 5448,
+        "md5": "424eca54c53fc5945bb5f083fbe80d8c",
+        "sha256": "3cf8743f22c1fdeb7121c07b4e4b7ee100b7993758330abc980e232ed738aeed",
+        "source": "apps_data/subghz/plugins/protocol_rx_op1.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_rx_op1.fal"
+      },
+      {
+        "bytes": 7828,
+        "md5": "092e1ef99c721c539152a260843c39ff",
+        "sha256": "bc202cd76a71f7a00365a7b4afdea70ca4ac2cca318d3690ba81cc4a77403922",
+        "source": "apps_data/subghz/plugins/protocol_rx_ty0.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_rx_ty0.fal"
+      },
+      {
+        "bytes": 6240,
+        "md5": "cb0eff67b520d1e32cf33f06e2c2d01f",
+        "sha256": "79e034d6e465cc1a54b8bcf7b576d61255ac8167352c6f46b1e6f2eacff59307",
+        "source": "apps_data/subghz/plugins/protocol_rx_urmet.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_rx_urmet.fal"
+      },
+      {
+        "bytes": 3704,
+        "md5": "2908824776fb393e2d5236de0c98df62",
+        "sha256": "efa74f098c056870d7597453e79ca5dfdbe09107677018e9316c97b9f3248eed",
+        "source": "apps_data/subghz/plugins/protocol_rx_x10.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_rx_x10.fal"
+      },
+      {
+        "bytes": 13300,
+        "md5": "abb9f450e9e369c4800ad8accf26d024",
+        "sha256": "45bba67d01f4ae1012b01ff72b04b8a1b3df9a382a9802c13ce515be63542718",
+        "source": "apps_data/subghz/plugins/protocol_scher_khan.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_scher_khan.fal"
+      },
+      {
+        "bytes": 8608,
+        "md5": "f96351413b7f8cba9d7b37a673b1721b",
+        "sha256": "25da856b4bde26bd840e797cc0d24637c71f3aebee60673be00cc48830d2b2b6",
+        "source": "apps_data/subghz/plugins/protocol_sheriff_cfm.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_sheriff_cfm.fal"
+      },
+      {
+        "bytes": 13936,
+        "md5": "4c92246460e28797c1686dc902e7bcde",
+        "sha256": "075839c77fa57356db68b8c189b0ed109740ad7c44e549c81a6742679849908f",
+        "source": "apps_data/subghz/plugins/protocol_star_line.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_star_line.fal"
+      },
+      {
+        "bytes": 6896,
+        "md5": "8934adddc2427e2fd8f21c8d85fe659b",
+        "sha256": "fc9ba47c2bdfed67616abfad6a5fad099caa28eef6ffca6babdb8a4178e10297",
+        "source": "apps_data/subghz/plugins/protocol_subaru.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_subaru.fal"
+      },
+      {
+        "bytes": 9344,
+        "md5": "3a602020e9352ea6cb83c6ca0dd3fa0f",
+        "sha256": "b16889c9e9e6430faf732f70472ee1289fb1fc9a22e16a845b1cf7455ea5d9e6",
+        "source": "apps_data/subghz/plugins/protocol_superrollo.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_superrollo.fal"
+      },
+      {
+        "bytes": 4156,
+        "md5": "aa18627d31d0dc7b2a6d4f2c619aeaf9",
+        "sha256": "eec9feb57b81c6f97262f13caba03ecd6967ee315273fdbf0d7983607218113a",
+        "source": "apps_data/subghz/plugins/protocol_toyota_lexus.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_toyota_lexus.fal"
+      },
+      {
+        "bytes": 14012,
+        "md5": "fda1bd4e40704c87a7646b78e2b3c56a",
+        "sha256": "741d700e9a21f5d3e0ed2d85cfb3cc1c2949d266d868903ef8a50515c47fc4a9",
+        "source": "apps_data/subghz/plugins/protocol_vag.fal",
+        "target": "/ext/apps_data/subghz/plugins/protocol_vag.fal"
+      }
+    ]
+  },
+  "release_id": "6046b0b261195b67e94baed8174f0615c6b95c879c87cb136aa70ef2d6756879",
+  "safety": {
+    "dfu_gap_bytes": 3803,
+    "dfuse_flash_end": "0x080D5FF0",
+    "erase_aligned_flash_end": "0x080D6000",
+    "minimum_c2_gap_bytes": 4096,
+    "physical_c2_gap_bytes": 4096,
+    "section_gap_bytes": 4112,
+    "updater_bytes": 120209,
+    "updater_limit_bytes": 131072
+  },
+  "schema": 2
+}

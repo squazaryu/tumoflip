@@ -1,0 +1,30 @@
+{
+  "field_io.c": {
+    "functions": 10,
+    "functions_hit": 10,
+    "lines_percent": 96.67,
+    "regions_percent": 88.6,
+    "unhit": []
+  },
+  "field_round.c": {
+    "functions": 8,
+    "functions_hit": 8,
+    "lines_percent": 98.04,
+    "regions_percent": 88.54,
+    "unhit": []
+  },
+  "field_bundle.c": {
+    "functions": 9,
+    "functions_hit": 9,
+    "lines_percent": 93.17,
+    "regions_percent": 91.92,
+    "unhit": []
+  },
+  "field_inventory.c": {
+    "functions": 12,
+    "functions_hit": 12,
+    "lines_percent": 94.61,
+    "regions_percent": 90.4,
+    "unhit": []
+  }
+}
