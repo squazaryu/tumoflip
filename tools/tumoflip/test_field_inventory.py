@@ -6,6 +6,15 @@ SOURCES = ("field_io.h", "field_io.c", "field_inventory.h", "field_inventory.c")
 
 
 class FieldInventoryTests(unittest.TestCase):
+    def test_short_manifest_lookup_is_an_error_not_a_new_capture(self):
+        storage_native(r'''
+static void short_after_compare(void*c,const char*p,FieldInventoryState state){(void)c;(void)p;if(state==FieldInventoryUnchanged)read_budget=1;}
+int main(int argc,char**argv){assert(argc==2);Storage s={0};snprintf(s.root,sizeof(s.root),"%s",argv[1]);
+ assert(storage_simply_mkdir(&s,"/ext/subghz"));File*f=storage_file_alloc(&s);assert(storage_file_open(f,"/ext/subghz/Own.sub",FSAM_WRITE,FSOM_CREATE_NEW));assert(storage_file_write(f,"Own",3)==3);assert(storage_file_close(f));storage_file_free(f);
+ assert(field_inventory_create(&s,"/ext/baseline.tinv",NULL,NULL));FieldInventoryStats stats;
+ assert(!field_inventory_compare(&s,"/ext/baseline.tinv",&stats,short_after_compare,NULL,NULL));assert(!stats.added&&!stats.unchanged);return 0;}
+''', SOURCES)
+
     def test_inventory_finds_changed_missing_new_and_rejects_bad_baselines(self):
         storage_native(r'''
 static bool cancel(void*c,const char*p,uint32_t n){(void)c;(void)p;(void)n;return false;}
