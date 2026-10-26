@@ -1,4 +1,4 @@
-## Tumoflip Dev 009-032 — unpublished candidate
+## Tumoflip Dev 009-032
 - Nice O-Code: correct the asymmetric counter conversion, preserve old saved payloads, and accept upstream `No_IC` without overriding explicit unknown-state protection. Existing 52/72-bit scope remains unchanged.
 - Sub-GHz: add ten lazy receive-only protocol leaves selected from ARF, including X10 and Urmet; preserve complete long saved payloads. Existing Toyota/Mazda equivalents are not duplicated. No new automotive encoder, enrollment or key/seed brute force is added.
 - TumoSpectrum 3.4: bounded peak history and broker-owned internal/external dual-radio sweeps, with loss/error cleanup and single-radio fallback. Physical RF acceptance remains pending.
