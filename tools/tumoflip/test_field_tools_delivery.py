@@ -1,5 +1,6 @@
 """Real application manifest routing; never hide field tools in core flash."""
 from pathlib import Path
+import tempfile
 from types import SimpleNamespace
 import unittest
 
@@ -8,6 +9,15 @@ APP = ROOT / "applications/system/device_library"
 
 
 class FieldToolsDeliveryTests(unittest.TestCase):
+    def test_new_faps_reach_the_actual_base_package_manifest(self):
+        from tools.tumoflip.test_package_release import prepare_package_tree
+        from tools.tumoflip.validate_release import package_entries
+        with tempfile.TemporaryDirectory(prefix="field-package-contract-") as directory:
+            _, _, resources = prepare_package_tree(Path(directory))
+            paths = {entry["source"] for entry in package_entries(resources)["base"]}
+            self.assertIn("apps/Tools/field_tools.fap", paths)
+            self.assertIn("apps/NFC/tumo_nfc_sniffer.fap", paths)
+
     def test_new_apps_are_base_packages_not_updater_payloads(self):
         from tools.tumoflip import validate_release as release
         expected = {"field_tools.fap": "apps/Tools/field_tools.fap",
