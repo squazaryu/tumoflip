@@ -83,8 +83,8 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_app_migrates_in_place_without_duplicate_fap(self) -> None:
         self.assertIn('appid="signal_workbench"', self.manifest)
         self.assertIn('name="TumoSpectrum"', self.manifest)
-        self.assertIn('fap_version="3.4.0"', self.manifest)
-        self.assertIn('"TumoSpectrum 3.3"', self.source)
+        self.assertIn('fap_version="3.5.0"', self.manifest)
+        self.assertIn('"TumoSpectrum 3.5"', self.source)
         self.assertIn('fap_category="Module One/Signals"', self.manifest)
         self.assertIn(
             'fap_dist_path="apps/Module One/Signals/signal_workbench.fap"', self.manifest
