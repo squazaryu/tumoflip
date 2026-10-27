@@ -64,12 +64,12 @@ int main(void){
 
     def test_app_routes_envelope_without_a_background_service_or_driver_abi(self):
         source = (APP / "signal_workbench.c").read_text()
-        self.assertIn('"Envelope Check"', source)
-        self.assertIn('case TumoSpectrumMenuEnvelope:', source)
-        self.assertIn('tumospectrum_envelope_tick(app->envelope)', source)
-        self.assertIn('tumospectrum_envelope_free(app->envelope)', source)
-        self.assertIn('TumoSpectrumViewEnvelope, app->envelope_view', source)
-        self.assertIn('with_view_model(\n        app->envelope_view', source)
+        for route in ('"Envelope Check"', 'case TumoSpectrumMenuEnvelope:',
+                      'tumospectrum_envelope_tick(app->envelope)',
+                      'tumospectrum_envelope_free(app->envelope)',
+                      'TumoSpectrumViewEnvelope, app->envelope_view',
+                      'with_view_model(\n        app->envelope_view'):
+            self.assertTrue(route in source, f'Missing envelope route: {route}')
         self.assertIn('fap_version="3.5.0"', (APP / 'application.fam').read_text())
         self.assertIn('Version,+,88.23', (ROOT / 'targets/f7/api_symbols.csv').read_text())
 
@@ -91,7 +91,7 @@ enum {SubGhzRadioBrokerStateProbing,SubGhzRadioBrokerStateInitialized,
       FuriHalSubGhzPreset2FSKDev476Async};
 static SubGhzDevice radios[2]={{0},{1}};
 static int records,leases,inits,ends[2],reads;
-static bool deny,connected=true,begin_fail,tune_fail,power_fail,missing,invalid_rssi;
+static bool deny,connected=true,begin_fail,tune_fail,power_fail,missing,invalid_rssi,slow_read;
 static unsigned elapsed,clock_tick,signal_mode;
 static void* furi_record_open(const char*n){assert(!strcmp(n,"radio"));records++;return &records;}
 static void furi_record_close(const char*n){assert(!strcmp(n,"radio")&&records>0);records--;}
@@ -113,14 +113,21 @@ static uint32_t subghz_devices_set_frequency(const SubGhzDevice*d,uint32_t f){as
 static void subghz_devices_set_rx(const SubGhzDevice*d){assert(d&&leases);}
 static void subghz_devices_idle(const SubGhzDevice*d){assert(d&&leases);}
 static void subghz_devices_sleep(const SubGhzDevice*d){assert(d&&leases);}
-static float subghz_devices_get_rssi(const SubGhzDevice*d){assert(d&&leases);reads++;if(invalid_rssi)return NAN;return !signal_mode?-105:signal_mode==1?-60:((reads%16)<8?-60:-105);}
+static float subghz_devices_get_rssi(const SubGhzDevice*d){assert(d&&leases);reads++;if(slow_read)elapsed+=2000;if(invalid_rssi)return NAN;return !signal_mode?-105:signal_mode==1?-60:((reads%16)<8?-60:-105);}
 static void furi_delay_ms(unsigned ms){elapsed+=ms*1000;}
 static void furi_delay_us(unsigned us){assert(us<=100);elapsed+=us;}
 static void furi_thread_yield(void){}
 static uint32_t furi_get_tick(void){return clock_tick+elapsed/1000;}
 '''.replace('\nstatic ', '\n') + body + r'''
 int main(void) {
+    assert(!tumospectrum_envelope_start(NULL,433920000,false));
+    assert(!tumospectrum_envelope_cycle_radio(NULL));
+    assert(!tumospectrum_envelope_tune(NULL,1));
+    tumospectrum_envelope_calibrate(NULL);tumospectrum_envelope_tick(NULL);
+    tumospectrum_envelope_stop(NULL);tumospectrum_envelope_next_band(NULL);
+    tumospectrum_envelope_snapshot(NULL,NULL);
     TumoSpectrumEnvelope* e=tumospectrum_envelope_alloc(); assert(e);
+    assert(!tumospectrum_envelope_tune(e,0));
     TumoEnvelopeSnapshot s;
     deny=true;assert(!tumospectrum_envelope_start(e,433920000,false));
     tumospectrum_envelope_snapshot(e,&s);assert(s.status==TumoEnvelopeBusy&&!records&&!leases&&!inits);deny=false;
@@ -146,6 +153,9 @@ int main(void) {
     connected=true;signal_mode=0;assert(tumospectrum_envelope_start(e,433920000,false));
     tumospectrum_envelope_calibrate(e);tumospectrum_envelope_tick(e);
     invalid_rssi=true;tumospectrum_envelope_tick(e);invalid_rssi=false;
+    tumospectrum_envelope_snapshot(e,&s);assert(s.status==TumoEnvelopeError&&!leases&&!records&&!inits);
+    assert(tumospectrum_envelope_start(e,433920000,false));slow_read=true;
+    tumospectrum_envelope_tick(e);slow_read=false;
     tumospectrum_envelope_snapshot(e,&s);assert(s.status==TumoEnvelopeError&&!leases&&!records&&!inits);
     assert(tumospectrum_envelope_start(e,361000000,false));
     assert(!tumospectrum_envelope_tune(e,1)); // never call crash-on-invalid HAL
@@ -224,6 +234,9 @@ int main(void) {
     w.kind = TumoEnvelopePulsed; tumo_envelope_session_add(&s, &w);
     assert(s.kind == TumoEnvelopeLearning && !s.agreement);
     assert(!strcmp(tumo_envelope_kind_name(TumoEnvelopeFlat), "Flat carrier"));
+    for(unsigned i=0;i<=TumoEnvelopeInvalid;i++)assert(tumo_envelope_kind_name(i)[0]);
+    tumo_envelope_session_reset(NULL);tumo_envelope_session_add(NULL,&w);
+    tumo_envelope_session_add(&s,NULL);
     return 0;
 }
 ''')
