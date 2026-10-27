@@ -99,7 +99,7 @@ enum {SubGhzRadioBrokerStateProbing,SubGhzRadioBrokerStateInitialized,
       FuriHalSubGhzPreset2FSKDev476Async};
 static SubGhzDevice radios[2]={{0},{1}};
 static int records,leases,inits,ends[2],reads;
-static bool deny,connected=true,begin_fail,tune_fail,power_fail,missing,invalid_rssi,slow_read;
+static bool deny,connected=true,begin_fail,tune_fail,power_fail,missing,invalid_rssi,slow_read,quiet_limit;
 static unsigned elapsed,clock_tick,signal_mode;
 static void* furi_record_open(const char*n){assert(!strcmp(n,"radio"));records++;return &records;}
 static void furi_record_close(const char*n){assert(!strcmp(n,"radio")&&records>0);records--;}
@@ -121,7 +121,7 @@ static uint32_t subghz_devices_set_frequency(const SubGhzDevice*d,uint32_t f){as
 static void subghz_devices_set_rx(const SubGhzDevice*d){assert(d&&leases);}
 static void subghz_devices_idle(const SubGhzDevice*d){assert(d&&leases);}
 static void subghz_devices_sleep(const SubGhzDevice*d){assert(d&&leases);}
-static float subghz_devices_get_rssi(const SubGhzDevice*d){assert(d&&leases);reads++;if(slow_read)elapsed+=2000;if(invalid_rssi)return NAN;return !signal_mode?-105:signal_mode==1?-60:((reads%16)<8?-60:-105);}
+static float subghz_devices_get_rssi(const SubGhzDevice*d){assert(d&&leases);reads++;if(slow_read)elapsed+=2000;if(invalid_rssi)return NAN;if(quiet_limit)return -138;return !signal_mode?-105:signal_mode==1?-60:((reads%16)<8?-60:-105);}
 static void furi_delay_ms(unsigned ms){elapsed+=ms*1000;}
 static void furi_delay_us(unsigned us){assert(us<=100);elapsed+=us;}
 static void furi_thread_yield(void){}
@@ -147,6 +147,10 @@ int main(void) {
     power_fail=true;assert(!tumospectrum_envelope_start(e,433920000,true));assert(!leases&&!records&&!inits);power_fail=false;
     tune_fail=true;assert(!tumospectrum_envelope_start(e,433920000,false));assert(!leases&&!records&&!inits);tune_fail=false;
     assert(tumospectrum_envelope_start(e,433920000,false));
+    quiet_limit=true;tumospectrum_envelope_tick(e);tumospectrum_envelope_snapshot(e,&s);
+    int measured_floor=s.floor_dbm;
+    assert(s.status==TumoEnvelopeRunning&&s.calibrated&&measured_floor==-138);
+    quiet_limit=false;tumospectrum_envelope_calibrate(e);
     clock_tick=UINT32_MAX-5;elapsed=0;
     tumospectrum_envelope_tick(e);tumospectrum_envelope_snapshot(e,&s);
     assert(s.calibrated&&s.floor_dbm==-105&&s.sample_period_us>=100);
