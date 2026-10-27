@@ -19,6 +19,12 @@ def stats_source():
 
 
 class RssiEnvelopeTests(unittest.TestCase):
+    def test_pull_request_and_release_ci_run_the_new_regressions(self):
+        for name in ('pr-build.yml', 'release.yml'):
+            workflow = (ROOT / '.github/workflows' / name).read_text()
+            self.assertTrue('tools.tumoflip.test_rssi_envelope' in workflow,
+                            f'{name} does not run the envelope regressions')
+
     def test_flipper_controls_retry_calibrate_and_release_on_back(self):
         source = (APP / "signal_workbench.c").read_text()
         signatures = (
