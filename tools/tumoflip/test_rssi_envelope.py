@@ -4,6 +4,7 @@ import re
 import unittest
 
 from tools.tumoflip.test_nfc_completion_equality import native
+from tools.tumoflip.test_hotplug_assets import function
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "applications_user/signal_workbench"
@@ -18,6 +19,60 @@ def stats_source():
 
 
 class RssiEnvelopeTests(unittest.TestCase):
+    def test_flipper_controls_retry_calibrate_and_release_on_back(self):
+        source = (APP / "signal_workbench.c").read_text()
+        signatures = (
+            "static uint32_t tumospectrum_envelope_previous(",
+            "static bool tumospectrum_envelope_input(",
+        )
+        body = '\n'.join(function(source, s) if s in source else s +
+                         ('void* context);' if 'previous' in s else 'InputEvent* event, void* context);')
+                         for s in signatures)
+        native(f'#include "{APP / "tumospectrum_envelope.h"}"\n' + r'''
+#include <assert.h>
+#include <stddef.h>
+enum {InputTypeShort,InputTypeLong,InputTypeRepeat,InputKeyBack,InputKeyLeft,
+      InputKeyRight,InputKeyUp,InputKeyDown,InputKeyOk,TumoSpectrumViewMenu};
+typedef struct {unsigned type,key;} InputEvent;
+typedef struct {TumoSpectrumEnvelope* envelope;} TumoSpectrumApp;
+static unsigned stops,frees,refreshes,tunes,cycles,bands,starts,calibrations;
+static TumoEnvelopeSnapshot snap={.status=TumoEnvelopeRunning,.frequency_hz=433920000};
+void tumospectrum_envelope_snapshot(const TumoSpectrumEnvelope* e,TumoEnvelopeSnapshot* s){assert(e);*s=snap;}
+void tumospectrum_envelope_stop(TumoSpectrumEnvelope* e){assert(e);stops++;}
+void tumospectrum_envelope_free(TumoSpectrumEnvelope* e){assert(e);frees++;}
+bool tumospectrum_envelope_tune(TumoSpectrumEnvelope* e,int d){assert(e&&(d==1||d==-1));tunes++;return true;}
+bool tumospectrum_envelope_cycle_radio(TumoSpectrumEnvelope* e){assert(e);cycles++;return true;}
+void tumospectrum_envelope_next_band(TumoSpectrumEnvelope* e){assert(e);bands++;}
+bool tumospectrum_envelope_start(TumoSpectrumEnvelope* e,uint32_t f,bool ext){assert(e&&f==433920000&&!ext);starts++;return true;}
+void tumospectrum_envelope_calibrate(TumoSpectrumEnvelope* e){assert(e);calibrations++;}
+void tumospectrum_refresh_envelope(TumoSpectrumApp* a){assert(a);refreshes++;}
+''' + body + r'''
+int main(void){
+    TumoSpectrumApp app={.envelope=(void*)1};
+    const unsigned keys[]={InputKeyLeft,InputKeyRight,InputKeyUp,InputKeyDown,InputKeyOk};
+    for(unsigned i=0;i<5;i++){InputEvent e={InputTypeShort,keys[i]};assert(tumospectrum_envelope_input(&e,&app));}
+    assert(tunes==2&&cycles==1&&bands==1&&calibrations==1&&refreshes==5);
+    snap.status=TumoEnvelopeBusy;InputEvent e={InputTypeShort,InputKeyOk};
+    assert(tumospectrum_envelope_input(&e,&app)&&starts==1);
+    e=(InputEvent){InputTypeLong,InputKeyOk};assert(!tumospectrum_envelope_input(&e,&app));
+    e=(InputEvent){InputTypeShort,InputKeyBack};assert(!tumospectrum_envelope_input(&e,&app));
+    assert(tumospectrum_envelope_previous(&app)==TumoSpectrumViewMenu);
+    assert(frees==1&&!app.envelope);
+    return 0;
+}
+''')
+
+    def test_app_routes_envelope_without_a_background_service_or_driver_abi(self):
+        source = (APP / "signal_workbench.c").read_text()
+        self.assertIn('"Envelope Check"', source)
+        self.assertIn('case TumoSpectrumMenuEnvelope:', source)
+        self.assertIn('tumospectrum_envelope_tick(app->envelope)', source)
+        self.assertIn('tumospectrum_envelope_free(app->envelope)', source)
+        self.assertIn('TumoSpectrumViewEnvelope, app->envelope_view', source)
+        self.assertIn('with_view_model(\n        app->envelope_view', source)
+        self.assertIn('fap_version="3.5.0"', (APP / 'application.fam').read_text())
+        self.assertIn('Version,+,88.23', (ROOT / 'targets/f7/api_symbols.csv').read_text())
+
     def test_radio_lease_faults_retune_calibration_and_external_disconnect(self):
         implementation = APP / "tumospectrum_envelope.c"
         body = implementation.read_text() if implementation.exists() else ""
