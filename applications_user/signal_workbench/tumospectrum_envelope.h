@@ -17,12 +17,12 @@ typedef struct {
     TumoEnvelopeKind kind;
     uint32_t frequency_hz;
     uint16_t sample_period_us;
-    int8_t floor_dbm;
-    int8_t high_dbm;
+    int16_t floor_dbm;
+    int16_t high_dbm;
     uint8_t agreement;
     bool external;
     bool calibrated;
-    int8_t samples[TUMO_ENVELOPE_SAMPLES];
+    int16_t samples[TUMO_ENVELOPE_SAMPLES];
 } TumoEnvelopeSnapshot;
 
 TumoSpectrumEnvelope* tumospectrum_envelope_alloc(void);

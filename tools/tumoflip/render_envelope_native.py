@@ -23,6 +23,7 @@ def build_source():
     source += r'''
 typedef struct {TumoEnvelopeSnapshot snapshot;} TumoSpectrumEnvelopeModel;
 static struct {int left,right,y;} text_bounds[16];static unsigned text_count;
+static int graph_min_y,graph_max_y;
 static void envelope_bounds(Canvas*c,int left,int y,const char*t){
  int right=left+canvas_string_width(c,t);assert(left>=0&&right<=128&&y>=7&&y<=64);
  if(y==50){assert(y-u8g2_GetAscent(&c->fb)>40);assert(y-u8g2_GetDescent(&c->fb)<54);}
@@ -35,6 +36,7 @@ static void envelope_aligned(Canvas*c,int x,int y,Align h,Align v,const char*t){
 static void envelope_line(Canvas*c,int x1,int y1,int x2,int y2){
  assert(x1>=0&&x2<=127&&y1>=0&&y2<=63);
  if(x1==x2){assert(y1<=40&&y2<=40&&y1>=24&&y2>=24);}
+ if(x1==x2){if(y2<graph_min_y)graph_min_y=y2;if(y2>graph_max_y)graph_max_y=y2;}
  canvas_draw_line(c,x1,y1,x2,y2);
 }
 #define canvas_draw_str envelope_str
@@ -51,23 +53,27 @@ int main(int argc,char**argv){
  static const u8x8_display_info_t info={.tile_width=16,.tile_height=8,.pixel_width=128,.pixel_height=64};
  c.fb.u8x8.display_info=&info;u8g2_SetupBuffer(&c.fb,buf,8,u8g2_ll_hvline_vertical_top_lsb,U8G2_R0);canvas_set_color(&c,ColorBlack);
  TumoSpectrumEnvelopeModel m={.snapshot={.status=TumoEnvelopeRunning,.frequency_hz=433920000,.floor_dbm=-105,.high_dbm=-60}};
- const char*names[]={"01-calibrate","02-learning","03-no-signal","04-pulsed","05-flat-carrier","06-unclear","07-overload","08-stopped","09-radio-busy","10-no-radio","11-read-error","12-long-values"};
- for(unsigned state=0;state<12;state++){
+ const char*names[]={"01-calibrate","02-learning","03-no-signal","04-pulsed","05-flat-carrier","06-unclear","07-overload","08-stopped","09-radio-busy","10-no-radio","11-read-error","12-long-values","13-weak-pulsed"};
+ for(unsigned state=0;state<13;state++){
   TumoEnvelopeSnapshot*s=&m.snapshot;s->status=TumoEnvelopeRunning;s->calibrated=state>0;s->external=state%2;s->frequency_hz=state==11?915000000:433920000;s->agreement=0;s->floor_dbm=-105;s->high_dbm=state==2?-105:state==6?-20:-60;
   s->kind=state==1?TumoEnvelopeLearning:state==2?TumoEnvelopeNoSignal:state==3?TumoEnvelopePulsed:state==4?TumoEnvelopeFlat:state==5?TumoEnvelopeUnclear:state==6?TumoEnvelopeTooStrong:TumoEnvelopeInvalid;
   if(state>=8&&state<=10)s->status=state==8?TumoEnvelopeBusy:state==9?TumoEnvelopeMissing:TumoEnvelopeError;
   if(state==7)s->status=TumoEnvelopeIdle;
   if(state>=7&&state<=10){s->calibrated=false;s->floor_dbm=-127;s->high_dbm=-127;}
   if(state==3||state==4)s->agreement=100;
-  if(state==11){s->kind=TumoEnvelopeFlat;s->agreement=100;s->floor_dbm=-127;s->high_dbm=-31;}
+  if(state==11){s->kind=TumoEnvelopeFlat;s->agreement=100;s->floor_dbm=-138;s->high_dbm=-31;}
+  if(state==12){s->kind=TumoEnvelopePulsed;s->agreement=100;s->floor_dbm=-138;s->high_dbm=-120;}
   for(unsigned i=0;i<128;i++)s->samples[i]=state==3?(i%16<8?-60:-105):state==5?(i%16<8?-60:-83):state==2?-105:state==6?-20:state==11?-31:-60;
-  text_count=0;tumospectrum_envelope_draw(&c,&m);save(&c,argv[1],names[state]);
+  if(state==12)for(unsigned i=0;i<128;i++)s->samples[i]=i%16<8?-120:-138;
+  text_count=0;graph_min_y=100;graph_max_y=-1;tumospectrum_envelope_draw(&c,&m);
+  if(state==12)assert(graph_min_y<graph_max_y); // weak pulse must not disappear into clipping
+  save(&c,argv[1],names[state]);
  }
  const char*items[]={"Band Map","Envelope Check","Capture Sub-GHz RAW","Capture Infrared RAW"};
- menu(&c,argv[1],"13-menu","TumoSpectrum",items,4,1,0);
+ menu(&c,argv[1],"14-menu","TumoSpectrum",items,4,1,0);
 '''
-    source += 'text_page(&c,argv[1],"14-about",' + radio.message(workbench, "Autonomous receive-only Band Map,") + ',0);\n'
-    source += 'text_page(&c,argv[1],"15-guide",' + radio.message(workbench, "Envelope Check:") + ',0);\nreturn 0;}'
+    source += 'text_page(&c,argv[1],"15-about",' + radio.message(workbench, "Autonomous receive-only Band Map,") + ',0);\n'
+    source += 'text_page(&c,argv[1],"16-guide",' + radio.message(workbench, "Envelope Check:") + ',0);\nreturn 0;}'
     return source
 
 
@@ -90,9 +96,9 @@ def main():
         subprocess.run([str(work / "render"), str(output)], check=True,
                        env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
     frames = sorted(output.glob("*.pgm"))
-    if len(frames) != 15:
-        raise RuntimeError(f"Expected 15 frames, got {len(frames)}")
-    sheet = Image.new("RGB", (3 * 404, 5 * 224), "#ececec")
+    if len(frames) != 16:
+        raise RuntimeError(f"Expected 16 frames, got {len(frames)}")
+    sheet = Image.new("RGB", (3 * 404, 6 * 224), "#ececec")
     draw = ImageDraw.Draw(sheet)
     for index, path in enumerate(frames):
         frame = Image.open(path).convert("RGB")

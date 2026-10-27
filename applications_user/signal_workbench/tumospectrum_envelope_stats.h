@@ -6,6 +6,7 @@
 
 #define TUMO_ENVELOPE_SAMPLES 128U
 #define TUMO_ENVELOPE_HISTORY 24U
+#define TUMO_ENVELOPE_RSSI_MIN (-138)
 
 // RSSI envelope evidence, NOT a modulation/protocol identification.
 typedef enum {
@@ -20,8 +21,8 @@ typedef enum {
 
 typedef struct {
     TumoEnvelopeKind kind;
-    int8_t low_dbm;
-    int8_t high_dbm;
+    int16_t low_dbm;
+    int16_t high_dbm;
     uint8_t transitions;
 } TumoEnvelopeWindow;
 
@@ -34,9 +35,9 @@ typedef struct {
 } TumoEnvelopeSession;
 
 bool tumo_envelope_analyze(
-    const int8_t* samples,
+    const int16_t* samples,
     size_t count,
-    int8_t floor_dbm,
+    int16_t floor_dbm,
     TumoEnvelopeWindow* out);
 void tumo_envelope_session_reset(TumoEnvelopeSession* session);
 void tumo_envelope_session_add(TumoEnvelopeSession* session, const TumoEnvelopeWindow* window);

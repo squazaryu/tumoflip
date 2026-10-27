@@ -542,9 +542,10 @@ static void tumospectrum_envelope_draw(Canvas* canvas, void* context) {
 
     if(snapshot->status == TumoEnvelopeRunning && snapshot->calibrated) {
         for(unsigned x = 0; x < TUMO_ENVELOPE_SAMPLES; x++) {
-            const int16_t value = snapshot->samples[x] < -120 ? -120 :
+            const int16_t value = snapshot->samples[x] < TUMO_ENVELOPE_RSSI_MIN ? TUMO_ENVELOPE_RSSI_MIN :
                                  snapshot->samples[x] > -25 ? -25 : snapshot->samples[x];
-            const unsigned y = 40 - ((value + 120) * 14) / 95;
+            const unsigned y = 40 - ((value - TUMO_ENVELOPE_RSSI_MIN) * 14) /
+                                        (-25 - TUMO_ENVELOPE_RSSI_MIN);
             canvas_draw_line(canvas, x, 40, x, y);
         }
         snprintf(text, sizeof(text), "R%d N%d", snapshot->high_dbm, snapshot->floor_dbm);

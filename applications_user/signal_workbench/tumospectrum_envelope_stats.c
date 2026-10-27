@@ -4,7 +4,7 @@
 
 // Inspired by doctor-firmware / ARF Mod Analyzer (6958d6abb2). Deliberately
 // reports amplitude evidence only: a flat envelope does not prove FSK/FM.
-static bool tumo_envelope_level(const int8_t* samples, size_t count, size_t i, int16_t mid) {
+static bool tumo_envelope_level(const int16_t* samples, size_t count, size_t i, int16_t mid) {
     const bool current = samples[i] > mid;
     if(i == 0 || i + 1 == count) return current;
     const bool before = samples[i - 1] > mid;
@@ -13,23 +13,23 @@ static bool tumo_envelope_level(const int8_t* samples, size_t count, size_t i, i
 }
 
 bool tumo_envelope_analyze(
-    const int8_t* samples,
+    const int16_t* samples,
     size_t count,
-    int8_t floor_dbm,
+    int16_t floor_dbm,
     TumoEnvelopeWindow* out) {
     if(!out) return false;
     *out = (TumoEnvelopeWindow){.kind = TumoEnvelopeInvalid};
-    if(!samples || count < 16 || count > TUMO_ENVELOPE_SAMPLES || floor_dbm < -127 ||
+    if(!samples || count < 16 || count > TUMO_ENVELOPE_SAMPLES || floor_dbm < TUMO_ENVELOPE_RSSI_MIN ||
        floor_dbm > -1) {
         return false;
     }
 
-    int8_t sorted[TUMO_ENVELOPE_SAMPLES];
+    int16_t sorted[TUMO_ENVELOPE_SAMPLES];
     for(size_t i = 0; i < count; i++) {
-        if(samples[i] < -127 || samples[i] > -1) return false;
+        if(samples[i] < TUMO_ENVELOPE_RSSI_MIN || samples[i] > -1) return false;
         sorted[i] = samples[i];
         for(size_t j = i; j > 0 && sorted[j] < sorted[j - 1]; j--) {
-            const int8_t value = sorted[j];
+            const int16_t value = sorted[j];
             sorted[j] = sorted[j - 1];
             sorted[j - 1] = value;
         }
@@ -49,7 +49,7 @@ bool tumo_envelope_analyze(
     const int16_t mid = (out->low_dbm + out->high_dbm) / 2;
     bool previous = tumo_envelope_level(samples, count, 0, mid);
     size_t run_start = 0;
-    int8_t run_min = samples[0];
+    int16_t run_min = samples[0];
     uint8_t quiet_runs = 0;
     for(size_t i = 1; i <= count; i++) {
         const bool current = i < count ? tumo_envelope_level(samples, count, i, mid) : !previous;
