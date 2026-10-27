@@ -51,21 +51,23 @@ int main(int argc,char**argv){
  static const u8x8_display_info_t info={.tile_width=16,.tile_height=8,.pixel_width=128,.pixel_height=64};
  c.fb.u8x8.display_info=&info;u8g2_SetupBuffer(&c.fb,buf,8,u8g2_ll_hvline_vertical_top_lsb,U8G2_R0);canvas_set_color(&c,ColorBlack);
  TumoSpectrumEnvelopeModel m={.snapshot={.status=TumoEnvelopeRunning,.frequency_hz=433920000,.floor_dbm=-105,.high_dbm=-60}};
- const char*names[]={"01-calibrate","02-learning","03-no-signal","04-pulsed","05-flat-carrier","06-unclear","07-overload","08-bad-sample","09-radio-busy","10-no-radio","11-read-error","12-long-values"};
+ const char*names[]={"01-calibrate","02-learning","03-no-signal","04-pulsed","05-flat-carrier","06-unclear","07-overload","08-stopped","09-radio-busy","10-no-radio","11-read-error","12-long-values"};
  for(unsigned state=0;state<12;state++){
-  TumoEnvelopeSnapshot*s=&m.snapshot;s->status=TumoEnvelopeRunning;s->calibrated=state>0;s->external=state%2;s->frequency_hz=state==11?915000000:433920000;s->agreement=0;
+  TumoEnvelopeSnapshot*s=&m.snapshot;s->status=TumoEnvelopeRunning;s->calibrated=state>0;s->external=state%2;s->frequency_hz=state==11?915000000:433920000;s->agreement=0;s->floor_dbm=-105;s->high_dbm=state==2?-105:state==6?-20:-60;
   s->kind=state==1?TumoEnvelopeLearning:state==2?TumoEnvelopeNoSignal:state==3?TumoEnvelopePulsed:state==4?TumoEnvelopeFlat:state==5?TumoEnvelopeUnclear:state==6?TumoEnvelopeTooStrong:TumoEnvelopeInvalid;
   if(state>=8&&state<=10)s->status=state==8?TumoEnvelopeBusy:state==9?TumoEnvelopeMissing:TumoEnvelopeError;
+  if(state==7)s->status=TumoEnvelopeIdle;
+  if(state>=7&&state<=10){s->calibrated=false;s->floor_dbm=-127;s->high_dbm=-127;}
   if(state==3||state==4)s->agreement=100;
   if(state==11){s->kind=TumoEnvelopeFlat;s->agreement=100;s->floor_dbm=-127;s->high_dbm=-31;}
-  for(unsigned i=0;i<128;i++)s->samples[i]=state==3?(i%16<8?-60:-105):state==2?-105:state==6?-20:state==11?-31:-60;
+  for(unsigned i=0;i<128;i++)s->samples[i]=state==3?(i%16<8?-60:-105):state==5?(i%16<8?-60:-83):state==2?-105:state==6?-20:state==11?-31:-60;
   text_count=0;tumospectrum_envelope_draw(&c,&m);save(&c,argv[1],names[state]);
  }
  const char*items[]={"Band Map","Envelope Check","Capture Sub-GHz RAW","Capture Infrared RAW"};
  menu(&c,argv[1],"13-menu","TumoSpectrum",items,4,1,0);
 '''
     source += 'text_page(&c,argv[1],"14-about",' + radio.message(workbench, "Autonomous receive-only Band Map,") + ',0);\n'
-    source += 'text_page(&c,argv[1],"15-guide",' + radio.message(workbench, "Envelope Check: release") + ',0);\nreturn 0;}'
+    source += 'text_page(&c,argv[1],"15-guide",' + radio.message(workbench, "Envelope Check:") + ',0);\nreturn 0;}'
     return source
 
 

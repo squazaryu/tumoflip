@@ -2661,8 +2661,8 @@ static void tumospectrum_menu_callback(void* context, uint32_t index) {
             "TumoSpectrum 3.5",
             "Autonomous receive-only Band Map, Smart Capture, profile building and multi-capture signal research workspace.\n\n"
             "Band Map: Left/Right tunes, Up changes band, Down selects radio. Long Up zooms, long Down snaps to peak and long OK holds the scan.\n\n"
-            "Envelope Check: release your transmitter before opening or pressing OK (CAL). Left/Right tunes 25 kHz, Up selects INT/EXT CC1101, Down changes band. Back releases the radio.\n\n"
-            "Pulsed / Flat carrier describes RSSI amplitude only, not AM/FM or a protocol. Percent is agreement of recent windows, not identification confidence. Flat can be FM, CW or interference. Fast bursts may be missed.\n\n"
+            "Envelope Check:\nRelease TX before open\nor OK CAL (quiet floor).\n\nLeft/Right: tune 25 kHz\nUp: INT/EXT CC1101\nDown: next common band\nBack: release radio.\n\n"
+            "RSSI envelope only:\nPulsed / Flat / Unclear\nis NOT AM/FM or protocol\nidentification. Percent\nmeans window agreement,\nnot confidence. Flat may\nbe FM, CW or interference.\nFast bursts may be missed.\n\n"
             "Protocol Profiles performs bounded receive-only decoding on Flipper and logs changed observations to SD.\n\n"
             "Capture Sets opens the latest analysis or browses saved sessions. Source files are checked by content digest and never modified.\n\n"
             "A Sub-GHz capture set can build a receive-only live profile from three or four RAW recordings without a computer.\n\n"
