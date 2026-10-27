@@ -77,7 +77,9 @@ int main(void){
                       'with_view_model(\n        app->envelope_view'):
             self.assertTrue(route in source, f'Missing envelope route: {route}')
         self.assertIn('fap_version="3.5.0"', (APP / 'application.fam').read_text())
-        self.assertIn('Version,+,88.23', (ROOT / 'targets/f7/api_symbols.csv').read_text())
+        sampler = (APP / 'tumospectrum_envelope.c').read_text()
+        self.assertIn('subghz_devices_get_rssi(envelope->device)', sampler)
+        self.assertNotRegex(sampler, r'subghz_devices_(?:set_tx|start_async_tx|write_packet)\s*\(')
 
     def test_radio_lease_faults_retune_calibration_and_external_disconnect(self):
         implementation = APP / "tumospectrum_envelope.c"
