@@ -25,19 +25,26 @@ typedef struct {TumoEnvelopeSnapshot snapshot;} TumoSpectrumEnvelopeModel;
 static struct {int left,right,y;} text_bounds[16];static unsigned text_count;
 static void envelope_bounds(Canvas*c,int left,int y,const char*t){
  int right=left+canvas_string_width(c,t);assert(left>=0&&right<=128&&y>=7&&y<=64);
+ if(y==50){assert(y-u8g2_GetAscent(&c->fb)>40);assert(y-u8g2_GetDescent(&c->fb)<54);}
  for(unsigned i=0;i<text_count;i++)if(text_bounds[i].y==y){
   if(left<text_bounds[i].right+2&&right+2>text_bounds[i].left){fprintf(stderr,"Overlapping envelope text: %s at y%d\n",t,y);abort();}}
  assert(text_count<16);text_bounds[text_count].left=left;text_bounds[text_count].right=right;text_bounds[text_count++].y=y;
 }
 static void envelope_str(Canvas*c,int x,int y,const char*t){envelope_bounds(c,x,y,t);canvas_draw_str(c,x,y,t);}
 static void envelope_aligned(Canvas*c,int x,int y,Align h,Align v,const char*t){int w=canvas_string_width(c,t);envelope_bounds(c,x-(h==AlignCenter?w/2:h==AlignRight?w:0),y,t);canvas_draw_str_aligned(c,x,y,h,v,t);}
+static void envelope_line(Canvas*c,int x1,int y1,int x2,int y2){
+ assert(x1>=0&&x2<=127&&y1>=0&&y2<=63);
+ if(x1==x2){assert(y1<=40&&y2<=40&&y1>=24&&y2>=24);}
+ canvas_draw_line(c,x1,y1,x2,y2);
+}
 #define canvas_draw_str envelope_str
 #define canvas_draw_str_aligned envelope_aligned
+#define canvas_draw_line envelope_line
 '''
     workbench = (APP / "signal_workbench.c").read_text()
     source += function(workbench, "static const char* tumospectrum_envelope_status_name(")
     source += function(workbench, "static void tumospectrum_envelope_draw(")
-    source += "\n#undef canvas_draw_str\n#undef canvas_draw_str_aligned\n"
+    source += "\n#undef canvas_draw_str\n#undef canvas_draw_str_aligned\n#undef canvas_draw_line\n"
     source += r'''
 int main(int argc,char**argv){
  assert(argc==2);Canvas c={0};static uint8_t buf[1024];
@@ -58,7 +65,7 @@ int main(int argc,char**argv){
  menu(&c,argv[1],"13-menu","TumoSpectrum",items,4,1,0);
 '''
     source += 'text_page(&c,argv[1],"14-about",' + radio.message(workbench, "Autonomous receive-only Band Map,") + ',0);\n'
-    source += 'text_page(&c,argv[1],"15-guide",' + radio.message(workbench, "Autonomous receive-only Band Map,") + ',4);\nreturn 0;}'
+    source += 'text_page(&c,argv[1],"15-guide",' + radio.message(workbench, "Envelope Check: release") + ',0);\nreturn 0;}'
     return source
 
 
