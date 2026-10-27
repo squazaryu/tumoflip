@@ -15,10 +15,30 @@ def stats_source():
     implementation = APP / "tumospectrum_envelope_stats.c"
     return (f'#include "{header}"\n#include <assert.h>\n#include <string.h>\n'
             + (implementation.read_text().replace('#include "tumospectrum_envelope_stats.h"', "")
-               if implementation.exists() else ""))
+               if implementation.exists() else "")
+            + '\nvoid fill_samples(int16_t* s,size_t n,int16_t v){for(size_t i=0;i<n;i++)s[i]=v;}\n')
 
 
 class RssiEnvelopeTests(unittest.TestCase):
+    def test_full_cc1101_rssi_byte_range_and_weak_pulses_are_representable(self):
+        native(stats_source() + r'''
+int main(void) {
+    int16_t samples[128]; TumoEnvelopeWindow w;
+    for(int raw=0;raw<256;raw++) {
+        // Independent oracle for the actual INT/EXT HAL formulas.
+        float dbm=(float)(raw>=128?raw-256:raw)/2.0f-74.0f;
+        int16_t measured=(int16_t)dbm;
+        fill_samples(samples,128,measured);
+        assert(tumo_envelope_analyze(samples,128,measured,&w));
+        assert(w.low_dbm==measured&&w.high_dbm==measured);
+    }
+    for(unsigned i=0;i<128;i++)samples[i]=i%16<8?-120:-138;
+    assert(tumo_envelope_analyze(samples,128,-138,&w));
+    assert(w.kind==TumoEnvelopePulsed&&w.low_dbm==-138&&w.high_dbm==-120);
+    return 0;
+}
+''')
+
     def test_pull_request_and_release_ci_run_the_new_regressions(self):
         for name in ('pr-build.yml', 'release.yml'):
             workflow = (ROOT / '.github/workflows' / name).read_text()
@@ -134,7 +154,7 @@ int main(void) {
     tumospectrum_envelope_calibrate(NULL);tumospectrum_envelope_tick(NULL);
     tumospectrum_envelope_stop(NULL);tumospectrum_envelope_next_band(NULL);
     tumospectrum_envelope_snapshot(NULL,NULL);
-    TumoSpectrumEnvelope* e=tumospectrum_envelope_alloc(); assert(e);
+    TumoSpectrumEnvelope* e=tumospectrum_envelope_alloc(); assert(e&&sizeof(*e)<=512);
     assert(!tumospectrum_envelope_tune(e,0));
     TumoEnvelopeSnapshot s;
     deny=true;assert(!tumospectrum_envelope_start(e,433920000,false));
@@ -182,24 +202,24 @@ int main(void) {
     def test_weak_overloaded_flat_pulsed_and_ambiguous_windows(self):
         native(stats_source() + r'''
 int main(void) {
-    int8_t s[TUMO_ENVELOPE_SAMPLES]; TumoEnvelopeWindow w;
-    memset(s, -105, sizeof(s));
-    assert(tumo_envelope_analyze(s, sizeof(s), -105, &w));
+    int16_t s[TUMO_ENVELOPE_SAMPLES]; TumoEnvelopeWindow w;
+    fill_samples(s, 128, -105);
+    assert(tumo_envelope_analyze(s, 128, -105, &w));
     assert(w.kind == TumoEnvelopeNoSignal);
-    memset(s, -60, sizeof(s));
-    assert(tumo_envelope_analyze(s, sizeof(s), -105, &w));
+    fill_samples(s, 128, -60);
+    assert(tumo_envelope_analyze(s, 128, -105, &w));
     assert(w.kind == TumoEnvelopeFlat && w.transitions == 0);
-    for (unsigned i = 0; i < sizeof(s); ++i) s[i] = i % 16 < 8 ? -60 : -105;
-    assert(tumo_envelope_analyze(s, sizeof(s), -105, &w));
+    for (unsigned i = 0; i < 128; ++i) s[i] = i % 16 < 8 ? -60 : -105;
+    assert(tumo_envelope_analyze(s, 128, -105, &w));
     assert(w.kind == TumoEnvelopePulsed && w.transitions >= 4);
-    for (unsigned i = 0; i < sizeof(s); ++i) s[i] = i % 16 < 8 ? -60 : -83;
-    assert(tumo_envelope_analyze(s, sizeof(s), -105, &w));
+    for (unsigned i = 0; i < 128; ++i) s[i] = i % 16 < 8 ? -60 : -83;
+    assert(tumo_envelope_analyze(s, 128, -105, &w));
     assert(w.kind == TumoEnvelopeUnclear); // no quiet-floor evidence
-    for (unsigned i = 0; i < sizeof(s); ++i) s[i] = i % 16 < 8 ? -20 : -105;
-    assert(tumo_envelope_analyze(s, sizeof(s), -105, &w));
+    for (unsigned i = 0; i < 128; ++i) s[i] = i % 16 < 8 ? -20 : -105;
+    assert(tumo_envelope_analyze(s, 128, -105, &w));
     assert(w.kind == TumoEnvelopeTooStrong);
-    memset(s, -105, sizeof(s)); s[40] = -50;
-    assert(tumo_envelope_analyze(s, sizeof(s), -105, &w));
+    fill_samples(s, 128, -105); s[40] = -50;
+    assert(tumo_envelope_analyze(s, 128, -105, &w));
     assert(w.kind == TumoEnvelopeNoSignal); // isolated noise spike
     return 0;
 }
@@ -208,7 +228,7 @@ int main(void) {
     def test_invalid_inputs_do_not_read_past_bounds_or_reuse_a_verdict(self):
         native(stats_source() + r'''
 int main(void) {
-    int8_t s[TUMO_ENVELOPE_SAMPLES] = {0};
+    int16_t s[TUMO_ENVELOPE_SAMPLES] = {0};
     TumoEnvelopeWindow w = {.kind = TumoEnvelopePulsed};
     assert(!tumo_envelope_analyze(NULL, 128, -100, &w));
     assert(w.kind == TumoEnvelopeInvalid);
@@ -216,9 +236,9 @@ int main(void) {
     assert(!tumo_envelope_analyze(s, 15, -100, &w));
     assert(!tumo_envelope_analyze(s, 129, -100, &w));
     assert(!tumo_envelope_analyze(s, 128, -100, NULL));
-    assert(!tumo_envelope_analyze(s, 128, -128, &w));
+    assert(!tumo_envelope_analyze(s, 128, -139, &w));
     assert(!tumo_envelope_analyze(s, 128, -100, &w)); // impossible RSSI=0
-    memset(s, -60, sizeof(s)); s[127] = -128;
+    fill_samples(s, 128, -60); s[127] = -139;
     assert(!tumo_envelope_analyze(s, 128, -100, &w));
     return 0;
 }
@@ -256,12 +276,12 @@ int main(void) {
     def test_random_windows_are_read_only_and_bounded(self):
         native(stats_source() + r'''
 int main(void) {
-    int8_t samples[128], original[128]; uint32_t rng=0x12345678;
+    int16_t samples[128], original[128]; uint32_t rng=0x12345678;
     TumoEnvelopeWindow w;
     for (unsigned trial=0; trial<10000; ++trial) {
         for (unsigned i=0; i<128; ++i) {
             rng = rng * 1664525U + 1013904223U;
-            samples[i] = -(int8_t)(1 + (rng % 127));
+            samples[i] = -(int16_t)(1 + (rng % 138));
         }
         memcpy(original, samples, sizeof(samples));
         assert(tumo_envelope_analyze(samples, 128, -105, &w));

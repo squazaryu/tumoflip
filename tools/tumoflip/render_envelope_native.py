@@ -59,7 +59,7 @@ int main(int argc,char**argv){
   if(state==7)s->status=TumoEnvelopeIdle;
   if(state>=7&&state<=10){s->calibrated=false;s->floor_dbm=-127;s->high_dbm=-127;}
   if(state==3||state==4)s->agreement=100;
-  if(state==11){s->kind=TumoEnvelopeFlat;s->agreement=100;s->floor_dbm=-127;s->high_dbm=-31;}
+  if(state==11){s->kind=TumoEnvelopeFlat;s->agreement=100;s->floor_dbm=-138;s->high_dbm=-31;}
   for(unsigned i=0;i<128;i++)s->samples[i]=state==3?(i%16<8?-60:-105):state==5?(i%16<8?-60:-83):state==2?-105:state==6?-20:state==11?-31:-60;
   text_count=0;tumospectrum_envelope_draw(&c,&m);save(&c,argv[1],names[state]);
  }

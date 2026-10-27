@@ -25,10 +25,12 @@ void tumospectrum_envelope_calibrate(TumoSpectrumEnvelope* envelope) {
     envelope->snapshot.kind = TumoEnvelopeLearning;
     envelope->snapshot.agreement = 0;
     envelope->snapshot.calibrated = false;
-    envelope->snapshot.floor_dbm = -127;
-    envelope->snapshot.high_dbm = -127;
+    envelope->snapshot.floor_dbm = TUMO_ENVELOPE_RSSI_MIN;
+    envelope->snapshot.high_dbm = TUMO_ENVELOPE_RSSI_MIN;
     envelope->snapshot.sample_period_us = 0;
-    memset(envelope->snapshot.samples, -127, sizeof(envelope->snapshot.samples));
+    for(unsigned i = 0; i < TUMO_ENVELOPE_SAMPLES; i++) {
+        envelope->snapshot.samples[i] = TUMO_ENVELOPE_RSSI_MIN;
+    }
 }
 
 TumoSpectrumEnvelope* tumospectrum_envelope_alloc(void) {
@@ -145,12 +147,12 @@ void tumospectrum_envelope_tick(TumoSpectrumEnvelope* envelope) {
     const uint32_t started = furi_get_tick();
     for(unsigned i = 0; i < TUMO_ENVELOPE_SAMPLES; i++) {
         const float value = subghz_devices_get_rssi(envelope->device);
-        if(!isfinite(value) || value < -127.0f || value > -1.0f ||
+        if(!isfinite(value) || value < (float)TUMO_ENVELOPE_RSSI_MIN || value > -1.0f ||
            furi_get_tick() - started > 50U) {
             tumospectrum_envelope_fail(envelope, TumoEnvelopeError);
             return;
         }
-        envelope->snapshot.samples[i] = (int8_t)value;
+        envelope->snapshot.samples[i] = (int16_t)value;
         // Own/release SPI per sample; no IRQ masking, high-priority worker or
         // long exclusive SPI burst. Yield to BLE/SD between groups.
         if(i + 1 < TUMO_ENVELOPE_SAMPLES) furi_delay_us(100);
