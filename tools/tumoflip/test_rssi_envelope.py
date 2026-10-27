@@ -1,5 +1,6 @@
 """RSSI envelope evidence on synthetic samples only; no radio or TX."""
 from pathlib import Path
+import re
 import unittest
 
 from tools.tumoflip.test_nfc_completion_equality import native
@@ -17,6 +18,90 @@ def stats_source():
 
 
 class RssiEnvelopeTests(unittest.TestCase):
+    def test_radio_lease_faults_retune_calibration_and_external_disconnect(self):
+        implementation = APP / "tumospectrum_envelope.c"
+        body = implementation.read_text() if implementation.exists() else ""
+        body = re.sub(r'^#include .*\n', '', body, flags=re.M)
+        native(stats_source() + f'\n#include "{APP / "tumospectrum_envelope.h"}"\n' + r'''
+#include <stdlib.h>
+#include <math.h>
+#define RECORD_SUBGHZ_RADIO_BROKER "radio"
+#define COUNT_OF(x) (sizeof(x)/sizeof(*(x)))
+typedef struct {int id;} SubGhzDevice;
+typedef int SubGhzRadioBroker;
+typedef unsigned SubGhzRadioBrokerLease;
+enum {SubGhzRadioBrokerStateProbing,SubGhzRadioBrokerStateInitialized,
+      SubGhzRadioBrokerStateRx,SubGhzRadioBrokerStateCleaningUp,
+      SubGhzRadioBrokerDeviceInternal,SubGhzRadioBrokerDeviceExternalCC1101,
+      FuriHalSubGhzPreset2FSKDev476Async};
+static SubGhzDevice radios[2]={{0},{1}};
+static int records,leases,inits,ends[2],reads;
+static bool deny,connected=true,begin_fail,tune_fail,power_fail,missing,invalid_rssi;
+static unsigned elapsed,clock_tick,signal_mode;
+static void* furi_record_open(const char*n){assert(!strcmp(n,"radio"));records++;return &records;}
+static void furi_record_close(const char*n){assert(!strcmp(n,"radio")&&records>0);records--;}
+static bool subghz_radio_broker_acquire(SubGhzRadioBroker*b,const char*n,unsigned t,SubGhzRadioBrokerLease*l){(void)b;assert(n&&t<=500);if(deny)return false;assert(!leases);leases++;*l=1;return true;}
+static void subghz_radio_broker_release(SubGhzRadioBroker*b,SubGhzRadioBrokerLease*l){(void)b;assert(*l&&leases);leases--;}
+static void subghz_radio_broker_set_state(SubGhzRadioBroker*b,SubGhzRadioBrokerLease*l,int s){(void)b;(void)s;assert(*l&&leases);}
+static void subghz_radio_broker_set_selected_device(SubGhzRadioBroker*b,SubGhzRadioBrokerLease*l,int s){(void)b;(void)s;assert(*l&&leases);}
+static bool subghz_radio_broker_external_power_on(SubGhzRadioBroker*b,SubGhzRadioBrokerLease*l){(void)b;assert(*l&&leases);return !power_fail;}
+static void subghz_devices_init(void){assert(leases);inits++;}
+static void subghz_devices_deinit(void){assert(inits>0);inits--;}
+static const SubGhzDevice* subghz_devices_get_by_name(const char*n){assert(inits);return missing?NULL:&radios[strstr(n,"ext")?1:0];}
+static bool subghz_devices_is_connect(const SubGhzDevice*d){assert(d);return d->id==0||connected;}
+static bool subghz_devices_begin(const SubGhzDevice*d){assert(d);return !begin_fail;}
+static void subghz_devices_end(const SubGhzDevice*d){assert(leases);ends[d->id]++;}
+static void subghz_devices_reset(const SubGhzDevice*d){assert(d&&leases);}
+static void subghz_devices_load_preset(const SubGhzDevice*d,int p,void*c){assert(d&&leases&&p==FuriHalSubGhzPreset2FSKDev476Async&&!c);}
+static bool furi_hal_subghz_is_frequency_valid(uint32_t f){return(f>=281000000&&f<=361000000)||(f>=378000000&&f<=481000000)||(f>=749000000&&f<=962000000);}
+static uint32_t subghz_devices_set_frequency(const SubGhzDevice*d,uint32_t f){assert(d&&leases&&furi_hal_subghz_is_frequency_valid(f));return tune_fail?0:f;}
+static void subghz_devices_set_rx(const SubGhzDevice*d){assert(d&&leases);}
+static void subghz_devices_idle(const SubGhzDevice*d){assert(d&&leases);}
+static void subghz_devices_sleep(const SubGhzDevice*d){assert(d&&leases);}
+static float subghz_devices_get_rssi(const SubGhzDevice*d){assert(d&&leases);reads++;if(invalid_rssi)return NAN;return !signal_mode?-105:signal_mode==1?-60:((reads%16)<8?-60:-105);}
+static void furi_delay_ms(unsigned ms){elapsed+=ms*1000;}
+static void furi_delay_us(unsigned us){assert(us<=100);elapsed+=us;}
+static void furi_thread_yield(void){}
+static uint32_t furi_get_tick(void){return clock_tick+elapsed/1000;}
+'''.replace('\nstatic ', '\n') + body + r'''
+int main(void) {
+    TumoSpectrumEnvelope* e=tumospectrum_envelope_alloc(); assert(e);
+    TumoEnvelopeSnapshot s;
+    deny=true;assert(!tumospectrum_envelope_start(e,433920000,false));
+    tumospectrum_envelope_snapshot(e,&s);assert(s.status==TumoEnvelopeBusy&&!records&&!leases&&!inits);deny=false;
+    assert(!tumospectrum_envelope_start(e,UINT32_MAX,false));assert(!records&&!leases);
+    connected=false;assert(!tumospectrum_envelope_start(e,433920000,true));
+    assert(!records&&!leases&&!inits);connected=true;
+    begin_fail=true;assert(!tumospectrum_envelope_start(e,433920000,true));assert(ends[1]&&!leases&&!records&&!inits);begin_fail=false;
+    missing=true;assert(!tumospectrum_envelope_start(e,433920000,false));assert(!leases&&!records&&!inits);missing=false;
+    power_fail=true;assert(!tumospectrum_envelope_start(e,433920000,true));assert(!leases&&!records&&!inits);power_fail=false;
+    tune_fail=true;assert(!tumospectrum_envelope_start(e,433920000,false));assert(!leases&&!records&&!inits);tune_fail=false;
+    assert(tumospectrum_envelope_start(e,433920000,false));
+    clock_tick=UINT32_MAX-5;elapsed=0;
+    tumospectrum_envelope_tick(e);tumospectrum_envelope_snapshot(e,&s);
+    assert(s.calibrated&&s.floor_dbm==-105&&s.sample_period_us>=100);
+    signal_mode=2;
+    for(unsigned i=0;i<6;i++)tumospectrum_envelope_tick(e);
+    tumospectrum_envelope_snapshot(e,&s);assert(s.kind==TumoEnvelopePulsed&&s.agreement==100);
+    assert(tumospectrum_envelope_tune(e,1));tumospectrum_envelope_snapshot(e,&s);
+    assert(s.frequency_hz==433945000&&!s.calibrated&&!s.agreement);
+    assert(tumospectrum_envelope_cycle_radio(e));tumospectrum_envelope_snapshot(e,&s);assert(s.external);
+    connected=false;int before=reads;tumospectrum_envelope_tick(e);assert(reads==before);
+    tumospectrum_envelope_snapshot(e,&s);assert(s.status==TumoEnvelopeMissing&&!leases&&!records&&!inits);
+    connected=true;signal_mode=0;assert(tumospectrum_envelope_start(e,433920000,false));
+    tumospectrum_envelope_calibrate(e);tumospectrum_envelope_tick(e);
+    invalid_rssi=true;tumospectrum_envelope_tick(e);invalid_rssi=false;
+    tumospectrum_envelope_snapshot(e,&s);assert(s.status==TumoEnvelopeError&&!leases&&!records&&!inits);
+    assert(tumospectrum_envelope_start(e,361000000,false));
+    assert(!tumospectrum_envelope_tune(e,1)); // never call crash-on-invalid HAL
+    tumospectrum_envelope_next_band(e);tumospectrum_envelope_snapshot(e,&s);assert(s.frequency_hz==390000000);
+    tumospectrum_envelope_stop(e);tumospectrum_envelope_stop(e);
+    assert(!leases&&!records&&!inits);before=reads;tumospectrum_envelope_tick(e);assert(reads==before);
+    tumospectrum_envelope_free(e);tumospectrum_envelope_free(NULL);
+    return 0;
+}
+''')
+
     def test_weak_overloaded_flat_pulsed_and_ambiguous_windows(self):
         native(stats_source() + r'''
 int main(void) {
