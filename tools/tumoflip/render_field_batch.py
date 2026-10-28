@@ -17,6 +17,7 @@ from tools.tumoflip.render_weather_native import function
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / 'applications/system/device_library'
 SERVO = ROOT / 'applications_user/servo_tester_plus'
+EXPECTED_FRAMES = 44
 
 
 def declaration(path):
@@ -61,6 +62,11 @@ static void batch_aligned(Canvas*c,int x,int y,Align h,Align v,const char*t){int
     for path, name in sources:
         result += function(path.read_text(), 'static void ' + name + '(')
     result += '\n#undef canvas_draw_str\n#undef canvas_draw_str_aligned\n'
+    result += r'''
+typedef struct {ServoModel model;Submenu*calibration;}ServoApp;
+static void servo_edit_limit(void*c,uint32_t n){(void)c;(void)n;}
+'''
+    result += function((SERVO / 'servo_tester_plus.c').read_text(), 'static void servo_build_calibration(ServoApp* app) {')
     result += r'''
 int main(int argc,char**argv){assert(argc==2);Canvas c={0};screen=&c;static uint8_t buf[1024];
  static const u8x8_display_info_t info={.tile_width=16,.tile_height=8,.pixel_width=128,.pixel_height=64};
@@ -107,6 +113,29 @@ int main(int argc,char**argv){assert(argc==2);Canvas c={0};screen=&c;static uint
         text = path.read_text()
         result += f'text_page(&c,argv[1],"{index:02d}-scope",{radio.message(text, marker)},0);\n'
         result += f'text_page(&c,argv[1],"{index+5:02d}-scope-bottom",{radio.message(text, marker)},1000);\n'
+    for index, (path, title) in enumerate((
+        (SERVO / 'servo_tester_plus.c', 'Servo Tester+'),
+        (APP / 'power_journal.c', 'Power Journal'), (APP / 'uhf_app.c', 'Tumo UHF Inventory'),
+        (APP / 'sensor_app.c', 'Sensor Watch / AM650'), (APP / 'varta_app.c', 'Varta Inspector'),
+    ), 32):
+        text = path.read_text()
+        labels = re.search(r'const char\* labels\[\]\s*=\s*\{(.*?)\};', text, re.S)[1]
+        labels = labels.replace('app->gpio_power', 'servo.gpio_power')
+        if path.name == 'sensor_app.c':
+            labels += ',' + re.search(r'const char\* bands\[\]\s*=\s*\{(.*?)\};', text, re.S)[1]
+        result += f'const char* menu{index}[]={{ {labels} }};\n'
+        result += f'menu(&c,argv[1],"{index:02d}-menu","{title}",menu{index},COUNT_OF(menu{index}),0,0);\n'
+        result += f'menu(&c,argv[1],"{index+5:02d}-menu-bottom","{title}",menu{index},COUNT_OF(menu{index}),COUNT_OF(menu{index})-1,COUNT_OF(menu{index})-3);\n'
+    result += r'''
+ Submenu calibration={0};SubmenuItemArray_init(calibration.items);calibration.header=furi_string_alloc();
+ ServoApp servo_app={.model={.minimum_us=500,.maximum_us=2500},.calibration=&calibration};
+ servo_build_calibration(&servo_app);render_menu(&c,argv[1],"42-servo-calibration",&calibration,0,0);
+ NumberInputModel number={.header=furi_string_alloc_set("Minimum pulse us"),.text_buffer=furi_string_alloc_set("500"),.current_number=500,.min_value=500,.max_value=2400};
+ canvas_clear(&c);canvas_set_color(&c,ColorBlack);number_input_view_draw_callback(&c,&number);save(&c,argv[1],"43-servo-minimum");
+ furi_string_set(number.header,"Maximum pulse us");furi_string_set(number.text_buffer,"2500");number.current_number=2500;number.min_value=600;number.max_value=2500;
+ canvas_clear(&c);canvas_set_color(&c,ColorBlack);number_input_view_draw_callback(&c,&number);save(&c,argv[1],"44-servo-maximum");
+ submenu_reset(&calibration);SubmenuItemArray_clear(calibration.items);furi_string_free(calibration.header);furi_string_free(number.header);furi_string_free(number.text_buffer);
+'''
     result += 'return 0;}\n'
     return result
 
@@ -124,7 +153,7 @@ def render(output):
         subprocess.run([str(work / 'render'), str(output.resolve())], check=True,
                        env={**os.environ, 'ASAN_OPTIONS': 'detect_leaks=0'})
     frames = sorted(output.glob('*.pgm'))
-    if len(frames) != 31: raise RuntimeError(f'Expected 31 field-batch frames, got {len(frames)}')
+    if len(frames) != EXPECTED_FRAMES: raise RuntimeError(f'Expected {EXPECTED_FRAMES} field-batch frames, got {len(frames)}')
     sheet = Image.new('RGB', (3 * 404, ((len(frames) + 2) // 3) * 224), '#ececec')
     draw = ImageDraw.Draw(sheet)
     for index, path in enumerate(frames):
@@ -134,6 +163,14 @@ def render(output):
         draw.text((x, y - 19), path.stem, fill='black')
         sheet.paste(frame.resize((384, 192), Image.Resampling.NEAREST), (x, y))
     sheet.save(output / 'contact-sheet.png')
+    selected = ('01-servo-off', '05-power-live', '15-sensor-card', '16-sensor-history', '12-uhf-inventory', '19-varta-observation')
+    overview = Image.new('RGB', (808, 672), '#ececec')
+    labels = ImageDraw.Draw(overview)
+    for index, name in enumerate(selected):
+        x, y = index % 2 * 404 + 10, index // 2 * 224 + 24
+        labels.text((x, y - 19), name, fill='black')
+        overview.paste(Image.open(output / (name + '.png')).resize((384, 192), Image.Resampling.NEAREST), (x, y))
+    overview.save(output / 'overview.png')
     (output / 'report.json').write_text(json.dumps({'frames': len(frames), 'hardware_test': False,
         'renderer': 'production callbacks / stock GUI / U8g2 fonts', 'text_bounds_and_overlap': True}, indent=2))
     return len(frames)

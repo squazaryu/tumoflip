@@ -16,6 +16,10 @@ TARGETS = {
 
 
 class FieldBatchPackageTests(unittest.TestCase):
+    def test_existing_field_hosts_bump_their_feature_versions(self):
+        self.assertIn('fap_version="1.3"', (ROOT / 'applications/system/device_library/application.fam').read_text())
+        self.assertIn('fap_version="3.6.0"', (ROOT / 'applications_user/signal_workbench/application.fam').read_text())
+
     def test_all_field_batch_exports_are_source_owned_base_packages(self):
         exports = package_extapp_exports()
         for app, path in TARGETS.items():
