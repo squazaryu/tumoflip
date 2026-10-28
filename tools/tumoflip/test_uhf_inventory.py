@@ -16,8 +16,10 @@ def production():
             + r'''
 static bool frame(UhfInventory*h,uint8_t cmd,const uint8_t*p,unsigned n,unsigned ts){
  uint8_t b[257]={0xA0,(uint8_t)(n+3),0,cmd};memcpy(b+4,p,n);uint8_t sum=0;
- for(unsigned i=0;i<n+4;i++)sum+=b[i];b[n+4]=(uint8_t)-sum;bool changed=false;
- for(unsigned i=0;i<n+5;i++)changed=uhf_inventory_feed(h,b[i],ts)||changed;return changed;}
+ for(unsigned i=0;i<n+4;i++){sum+=b[i];}
+ b[n+4]=(uint8_t)-sum;bool changed=false;
+ for(unsigned i=0;i<n+5;i++){changed=uhf_inventory_feed(h,b[i],ts)||changed;}
+ return changed;}
 ''')
 
 

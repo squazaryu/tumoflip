@@ -17,7 +17,7 @@ from tools.tumoflip.render_weather_native import function
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / 'applications/system/device_library'
 SERVO = ROOT / 'applications_user/servo_tester_plus'
-EXPECTED_FRAMES = 44
+EXPECTED_FRAMES = 45
 
 
 def declaration(path):
@@ -93,17 +93,19 @@ int main(int argc,char**argv){assert(argc==2);Canvas c={0};screen=&c;static uint
  batch_count=0;uhf_app_draw(&c,&uhf);save(&c,argv[1],"12-uhf-inventory");
  uhf.running=false;uhf.timeout=true;batch_count=0;uhf_app_draw(&c,&uhf);save(&c,argv[1],"13-uhf-timeout");
  SensorViewModel sensor={.writable=true,.saved=true};batch_count=0;sensor_app_draw(&c,&sensor);save(&c,argv[1],"14-sensor-empty");
- strcpy(sensor.card.protocol,"LaCrosse_TX141THBv2");sensor.count=8;sensor.index=7;sensor.card.id=0xFFFFFFFF;sensor.card.channel=255;sensor.card.count=32;sensor.card.head=0;sensor.listening=true;
- for(unsigned i=0;i<32;i++)sensor.card.history[i]=(SensorPoint){.timestamp=100+i,.temperature=-198+i,.humidity=100,.fields=7};sensor.now=191;
+ strcpy(sensor.card.protocol,"Nexus-TH");sensor.count=8;sensor.index=7;sensor.card.id=0x42;sensor.card.channel=2;sensor.card.count=32;sensor.card.head=0;sensor.listening=true;
+ for(unsigned i=0;i<32;i++)sensor.card.history[i]=(SensorPoint){.timestamp=100+i,.temperature=-198+i,.humidity=56,.fields=7};sensor.now=191;
  batch_count=0;sensor_app_draw(&c,&sensor);save(&c,argv[1],"15-sensor-card");
  sensor.graph=true;batch_count=0;sensor_app_draw(&c,&sensor);save(&c,argv[1],"16-sensor-history");
- sensor.graph=false;sensor.card.channel=254;sensor.now=UINT32_MAX;sensor.card.history[31].fields=0;sensor.writable=false;
+ sensor.graph=false;strcpy(sensor.card.protocol,"WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW");sensor.card.id=0xFFFFFFFE;sensor.card.channel=254;sensor.now=UINT32_MAX;sensor.card.history[31].fields=SensorBattery;sensor.writable=false;
  batch_count=0;sensor_app_draw(&c,&sensor);save(&c,argv[1],"17-sensor-long-values");
  VartaViewModel varta={.reading=true,.seconds=15};batch_count=0;varta_app_draw(&c,&varta);save(&c,argv[1],"18-varta-reading");
  varta.reading=false;varta.ready=true;varta.result=(VartaInspection){.id={3,0,0x12,0x34,0x56},.known_prefix=true};
  batch_count=0;varta_app_draw(&c,&varta);save(&c,argv[1],"19-varta-observation");
  varta.result.known_prefix=false;batch_count=0;varta_app_draw(&c,&varta);save(&c,argv[1],"20-varta-unusual");
  varta.ready=false;batch_count=0;varta_app_draw(&c,&varta);save(&c,argv[1],"21-varta-timeout");
+ uhf=(UhfViewModel){.connected=true,.identified=true,.running=true,.version={1,2,3},.count=6};
+ batch_count=0;uhf_app_draw(&c,&uhf);save(&c,argv[1],"45-uhf-normal");
 '''
     # Exact production help text; exercise every scroll position using stock TextBox.
     helps = [(SERVO / 'servo_tester_plus.c', r'Servo Tester+\n\nPA7'),
@@ -163,7 +165,7 @@ def render(output):
         draw.text((x, y - 19), path.stem, fill='black')
         sheet.paste(frame.resize((384, 192), Image.Resampling.NEAREST), (x, y))
     sheet.save(output / 'contact-sheet.png')
-    selected = ('01-servo-off', '05-power-live', '15-sensor-card', '16-sensor-history', '12-uhf-inventory', '19-varta-observation')
+    selected = ('01-servo-off', '05-power-live', '15-sensor-card', '16-sensor-history', '45-uhf-normal', '19-varta-observation')
     overview = Image.new('RGB', (808, 672), '#ececec')
     labels = ImageDraw.Draw(overview)
     for index, name in enumerate(selected):
