@@ -15,6 +15,17 @@ def production():
 
 
 class PowerHistoryTests(unittest.TestCase):
+    def test_app_is_passive_external_and_does_not_claim_background_history(self):
+        path=APP/'power_journal.c'
+        self.assertTrue(path.exists(),'missing Power Journal FAP implementation')
+        app=path.read_text()
+        self.assertIn('APP-ONLY',app)
+        self.assertIn('power_store_load',app)
+        self.assertIn('power_history_pause',app)
+        self.assertIn('power_store_export',app)
+        self.assertNotRegex(app,r'(charge_suppress|charging_voltage_limit|set_charge)\s*\(')
+        self.assertIn('appid="power_journal"',(APP/'application.fam').read_text())
+
     def test_atomic_history_save_checked_csv_and_no_cross_launch_integration(self):
         storage_native(r'''
 int main(int argc,char**argv){assert(argc==2);Storage s={0};snprintf(s.root,sizeof(s.root),"%s",argv[1]);
