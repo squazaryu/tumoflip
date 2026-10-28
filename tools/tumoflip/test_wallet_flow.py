@@ -37,6 +37,8 @@ static void dialog_file_browser_set_basic_options(DialogsFileBrowserOptions*o,co
 static bool dialog_file_browser_show(DialogsApp*d,FuriString*p,FuriString*q,DialogsFileBrowserOptions*o){(void)d;(void)q;(void)o;furi_string_set(p,selected_path);return true;}
 static bool storage_file_exists(Storage*s,const char*p){return storage_common_stat(s,p,NULL)==FSE_OK;}
 static void loader_clear_launch_queue(Loader*l){(void)l;}
+static bool loader_get_application_launch_path(Loader*l,FuriString*p){(void)l;(void)p;return false;}
+static void furi_string_reset(FuriString*s){furi_string_set(s,"");}
 static void loader_enqueue_launch(Loader*l,const char*a,const char*p,int f){
  (void)l;(void)f;size_t na=strlen(a),np=strlen(p);
  assert(na<sizeof(launched_app)&&np<sizeof(launched_path));
@@ -63,6 +65,11 @@ int main(int argc,char**argv){
  LibraryPins external={0};assert(library_pins_save(&s,&external));library_event(&a,ConfirmUnpin);
  assert(a.page==PagePins&&!library_pins_contains(&a.pins,"Office"));assert(library_pins_load(&s,&external)&&!external.count);
  assert(library_card_load(&s,"Office",&a.card)&&!strcmp(a.card.labels[0],"Entry pass"));
+ // A per-object Sensor Watch launch carries only the validated object name.
+ assert(storage_simply_mkdir(&s,"/ext/apps"));assert(storage_simply_mkdir(&s,"/ext/apps/Sub-GHz"));
+ f=storage_file_alloc(&s);assert(storage_file_open(f,"/ext/apps/Sub-GHz/sensor_watch.fap",FSAM_WRITE,FSOM_CREATE_NEW));assert(storage_file_close(f));storage_file_free(f);
+ library_show(&a,PageCard);unsigned before=launches;library_event(&a,OpenSensorWatch);
+ assert(launches==before+1&&!strcmp(launched_app,"/ext/apps/Sub-GHz/sensor_watch.fap")&&!strcmp(launched_path,"object:Office"));
  char bytes[sizeof(original)];f=storage_file_alloc(&s);assert(storage_file_open(f,selected_path,FSAM_READ,FSOM_OPEN_EXISTING));assert(storage_file_read(f,bytes,sizeof(bytes))==sizeof(bytes)&&!memcmp(bytes,original,sizeof(bytes)));assert(storage_file_close(f));storage_file_free(f);
  furi_string_free(a.text);furi_string_free(a.path);free(a.sources);return 0;
 }

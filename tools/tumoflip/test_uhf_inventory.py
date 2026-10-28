@@ -74,7 +74,11 @@ int main(void){(void)frame;UhfRuntime r={0};UhfInventory h;uhf_inventory_init(&h
  ticks=60000;uhf_runtime_tick(&r);assert(!r.running&&r.timed_out&&last_command==0x8C);
  uhf_runtime_disconnect(&r);assert(!r.serial&&!r.stream&&!r.expansion&&!h.identified&&releases==2&&stops==1);
  assert(uhf_runtime_connect(&r,&h));h.identified=true;r.last_rx=ticks;assert(uhf_runtime_start(&r));
- r.overflow=true;uhf_runtime_tick(&r);assert(!r.running&&h.errors&&last_command==0x8C);
+ incoming=0xA0;uhf_runtime_rx(&port,FuriHalSerialRxEventData,&r);assert(buffer.used==1);
+ uhf_runtime_rx(&port,FuriHalSerialRxEventFrameError,&r);assert(r.overflow);
+ uhf_runtime_tick(&r);assert(!r.running&&h.errors&&last_command==0x8C);
+ buffer.used=sizeof(buffer.data);uhf_runtime_rx(&port,FuriHalSerialRxEventData,&r);assert(r.overflow);
+ uhf_runtime_tick(&r);assert(!buffer.used);
  uhf_runtime_disconnect(&r);return 0;}
 ''')
 
