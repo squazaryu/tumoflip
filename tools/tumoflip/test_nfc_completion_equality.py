@@ -17,7 +17,7 @@ def native(body):
         (path / "test.c").write_text(body)
         result = subprocess.run(["cc", "-std=c11", "-Wall", "-Werror", "-O1", "-g",
                                  "-fsanitize=address,undefined", "-fno-sanitize-recover=all", str(path / "test.c"),
-                                 "-o", str(path / "test")], text=True, capture_output=True)
+                                 "-o", str(path / "test"), "-lm"], text=True, capture_output=True)
         if result.returncode:
             raise AssertionError(result.stderr)
         result = subprocess.run([str(path / "test")], text=True, capture_output=True)

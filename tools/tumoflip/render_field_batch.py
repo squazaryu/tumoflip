@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 from PIL import Image, ImageDraw
 from tools.tumoflip import render_field_radio as radio
@@ -149,7 +150,8 @@ def render(output):
         (work / 'render.c').write_text(build_source())
         sources = [p for p in (ROOT / 'lib/u8g2').glob('*.c') if p.name != 'u8g2_glue.c']
         built = subprocess.run(['cc', '-std=gnu11', '-O1', '-g', '-w', '-fsanitize=address,undefined',
-            '-fno-sanitize-recover=all', '-ffunction-sections', '-Wl,-dead_strip', '-I', str(ROOT / 'lib/u8g2'),
+            '-fno-sanitize-recover=all', '-ffunction-sections',
+            '-Wl,-dead_strip' if sys.platform == 'darwin' else '-Wl,--gc-sections', '-I', str(ROOT / 'lib/u8g2'),
             '-I', str(ROOT / 'lib/mlib'), str(work / 'render.c'), *map(str, sources), '-lm', '-o', str(work / 'render')], capture_output=True, text=True)
         if built.returncode: raise RuntimeError(built.stderr)
         subprocess.run([str(work / 'render'), str(output.resolve())], check=True,
