@@ -21,6 +21,7 @@ typedef struct {
     volatile bool overrun;
     bool devices;
     bool listening;
+    bool changed;
 } SensorRuntime;
 
 bool sensor_runtime_start(SensorRuntime* runtime, SensorCards* cards, uint32_t frequency);

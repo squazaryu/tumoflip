@@ -29,6 +29,7 @@ int main(void){SensorCards cards;sensor_cards_init(&cards);SensorRuntime r={0};
  missing=true;assert(!sensor_runtime_start(&r,&cards,433920000)&&!device_inits);missing=false;
  frequency_failure=true;assert(!sensor_runtime_start(&r,&cards,433920000)&&!device_inits);frequency_failure=false;
  assert(sensor_runtime_start(&r,&cards,433920000)&&r.listening&&reset_count);
+ sensor_rx(true,500,&r);assert(!sensor_runtime_tick(&r)); // RF noise must not mark saved history dirty
  decode_on_feed=true;sensor_rx(true,500,&r);assert(sensor_runtime_tick(&r)&&cards.count==1);
  const SensorPoint*p=sensor_card_point(&cards.cards[0],0);assert(p->temperature==-198&&p->humidity==56&&p->battery_low==1&&p->fields==7);
  ff_temperature=NAN;ff_humidity=255;ff_battery=255;sensor_rx(true,500,&r);sensor_runtime_tick(&r);assert(cards.cards[0].count==1); // no false zero-valued measurement

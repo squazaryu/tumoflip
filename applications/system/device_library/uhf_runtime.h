@@ -10,6 +10,7 @@ typedef struct {
     FuriStreamBuffer* stream;
     Expansion* expansion;
     uint32_t last_rx;
+    uint32_t last_reply;
     uint32_t last_poll;
     uint32_t started;
     uint32_t completed;
