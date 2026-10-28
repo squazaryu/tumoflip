@@ -92,13 +92,13 @@ static void power_journal_draw(Canvas* canvas, void* context) {
         canvas_draw_str(canvas, 48, 32, "%");
         snprintf(text, sizeof(text), "%u.%03u V", model->sample.voltage_mv / 1000U,
                  model->sample.voltage_mv % 1000U);
-        canvas_draw_str_aligned(canvas, 127, 23, AlignRight, AlignBottom, text);
+        canvas_draw_str_aligned(canvas, 127, 21, AlignRight, AlignBottom, text);
         snprintf(text, sizeof(text), "%ld mA", (long)model->sample.current_ma);
-        canvas_draw_str_aligned(canvas, 127, 33, AlignRight, AlignBottom, text);
+        canvas_draw_str_aligned(canvas, 127, 31, AlignRight, AlignBottom, text);
         const int temperature = model->sample.temperature_tenths;
         snprintf(text, sizeof(text), "%s%d.%d C", temperature < 0 ? "-" : "",
                  abs(temperature) / 10, abs(temperature) % 10);
-        canvas_draw_str_aligned(canvas, 127, 43, AlignRight, AlignBottom, text);
+        canvas_draw_str_aligned(canvas, 127, 41, AlignRight, AlignBottom, text);
         snprintf(text, sizeof(text), "Gauge %u%%", model->sample.gauge_health);
         canvas_draw_str(canvas, 1, 51, text);
         snprintf(text, sizeof(text), "Heap %luK", (unsigned long)(model->sample.heap_free / 1024U));

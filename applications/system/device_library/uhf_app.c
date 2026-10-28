@@ -65,7 +65,9 @@ static void uhf_app_draw(Canvas* canvas, void* context) {
     else snprintf(line, sizeof(line), "%s", model->connected ? "Waiting for UCM601..." : "Connect UCM601 first");
     canvas_draw_str(canvas, 1, 36, line);
     if(model->timeout) snprintf(line, sizeof(line), "Session stopped / timeout");
-    else snprintf(line, sizeof(line), "Bad:%lu Full:%lu", (unsigned long)model->errors, (unsigned long)model->full);
+    else snprintf(line, sizeof(line), "Bad:%lu%s Full:%lu%s",
+        (unsigned long)(model->errors > 9999U ? 9999U : model->errors), model->errors > 9999U ? "+" : "",
+        (unsigned long)(model->full > 9999U ? 9999U : model->full), model->full > 9999U ? "+" : "");
     canvas_draw_str(canvas, 1, 48, line);
     elements_button_left(canvas, "Tags");
     elements_button_center(canvas, model->running ? "Stop" : "Start");

@@ -48,7 +48,7 @@ static void batch_bounds(Canvas*c,int x,int y,const char*t){
  if(!width)return;
  if(x<0||x+width>128||top<0||bottom>53){fprintf(stderr,"Bad field-batch bounds: %s x%d..%d y%d..%d\n",t,x,x+width,top,bottom);abort();}
  for(unsigned i=0;i<batch_count;i++)if(x<batch_spans[i].right+1&&x+width+1>batch_spans[i].left&&
-    top<batch_spans[i].bottom&&bottom>batch_spans[i].top){fprintf(stderr,"Overlapping field-batch text: %s\n",t);abort();}
+    top<batch_spans[i].bottom&&bottom>batch_spans[i].top){fprintf(stderr,"Overlapping field-batch text: %s y%d..%d, prior y%d..%d\n",t,top,bottom,batch_spans[i].top,batch_spans[i].bottom);abort();}
  assert(batch_count<32);batch_spans[batch_count++]=(typeof(batch_spans[0])){x,x+width,top,bottom};
 }
 static void batch_str(Canvas*c,int x,int y,const char*t){batch_bounds(c,x,y,t);canvas_draw_str(c,x,y,t);}

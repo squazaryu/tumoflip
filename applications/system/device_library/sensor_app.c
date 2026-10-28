@@ -101,24 +101,24 @@ static void sensor_app_draw(Canvas* canvas, void* context) {
             if(point->fields & SensorTemperature) snprintf(text, sizeof(text), "%s%d.%d C",
                 point->temperature < 0 ? "-" : "", abs(point->temperature) / 10, abs(point->temperature) % 10);
             else snprintf(text, sizeof(text), "-- C");
-            canvas_draw_str(canvas, 1, 34, text);
+            canvas_draw_str(canvas, 1, 31, text);
             if(point->fields & SensorHumidity) snprintf(text, sizeof(text), "%u%%", point->humidity);
             else snprintf(text, sizeof(text), "--%%");
-            canvas_draw_str_aligned(canvas, 127, 34, AlignRight, AlignBottom, text);
+            canvas_draw_str_aligned(canvas, 127, 31, AlignRight, AlignBottom, text);
             canvas_set_font(canvas, FontSecondary);
             snprintf(text, sizeof(text), "%08lX C:%s", (unsigned long)model->card.id,
                      model->card.channel == 255U ? "?" : "");
             if(model->card.channel != 255U) snprintf(text, sizeof(text), "%08lX C:%u",
                                                    (unsigned long)model->card.id, model->card.channel);
-            canvas_draw_str(canvas, 1, 44, text);
+            canvas_draw_str(canvas, 1, 41, text);
             snprintf(text, sizeof(text), "B:%s", !(point->fields & SensorBattery) ? "?" : point->battery_low ? "LOW" : "OK");
-            canvas_draw_str_aligned(canvas, 127, 44, AlignRight, AlignBottom, text);
+            canvas_draw_str_aligned(canvas, 127, 41, AlignRight, AlignBottom, text);
             if(model->now < point->timestamp) snprintf(text, sizeof(text), "Clock changed");
             else snprintf(text, sizeof(text), "%lu s ago", (unsigned long)(model->now - point->timestamp));
-            canvas_draw_str(canvas, 1, 53, text);
+            canvas_draw_str(canvas, 1, 51, text);
             snprintf(text, sizeof(text), "%u/%u %s", model->index + 1U, model->count,
                      !model->writable ? "RO" : model->saved ? "SD" : "RAM");
-            canvas_draw_str_aligned(canvas, 127, 53, AlignRight, AlignBottom, text);
+            canvas_draw_str_aligned(canvas, 127, 51, AlignRight, AlignBottom, text);
         }
     }
     elements_button_left(canvas, "Prev");

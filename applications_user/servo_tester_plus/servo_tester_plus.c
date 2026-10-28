@@ -85,12 +85,12 @@ static void servo_draw(Canvas* canvas, void* context) {
     canvas_draw_line(canvas, 0, 10, 127, 10);
     snprintf(text, sizeof(text), "%u", model->pulse_us);
     canvas_set_font(canvas, FontBigNumbers);
-    canvas_draw_str_aligned(canvas, 59, 30, AlignCenter, AlignCenter, text);
+    canvas_draw_str_aligned(canvas, 59, 22, AlignCenter, AlignCenter, text);
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, 104, 33, "us");
     const char* modes[] = {"Manual", "Center", "Sweep"};
     snprintf(text, sizeof(text), "%s / 50 Hz", modes[model->mode]);
-    canvas_draw_str(canvas, 1, 43, text);
+    canvas_draw_str(canvas, 1, 41, text);
     snprintf(text, sizeof(text), "%u..%u us", model->minimum_us, model->maximum_us);
     canvas_draw_str(canvas, 1, 51, text);
     canvas_draw_str_aligned(
