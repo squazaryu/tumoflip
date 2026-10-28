@@ -52,6 +52,8 @@ int main(void){ServoApp app={0};servo_model_init(&app.model);
         self.assertIn('appid="servo_tester_plus"',fam)
         self.assertIn('fap_package_only=True',fam)
         self.assertIn('fap_dist_path="apps/GPIO/servo_tester_plus.fap"',fam)
+        self.assertIn('fap_file_assets="assets"', fam)
+        self.assertEqual((APP / 'LICENSE').read_bytes(), (APP / 'assets/LICENSE.txt').read_bytes())
 
     def test_real_backend_owns_pwm_restores_only_owned_power_and_cleans_every_failure(self):
         header = re.sub(r'^#(?:include|pragma).*\n', '', (APP/'servo_hardware.h').read_text(), flags=re.M)
