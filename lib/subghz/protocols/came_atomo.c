@@ -164,8 +164,8 @@ bool subghz_protocol_came_atomo_create_data(
     pack[7] = (instance->generic.data_2 & 0xFF);
 
     atomo_encrypt(pack);
-    uint32_t hi = pack[0] << 24 | pack[1] << 16 | pack[2] << 8 | pack[3];
-    uint32_t lo = pack[4] << 24 | pack[5] << 16 | pack[6] << 8 | pack[7];
+    uint32_t hi = (uint32_t)pack[0] << 24 | pack[1] << 16 | pack[2] << 8 | pack[3];
+    uint32_t lo = (uint32_t)pack[4] << 24 | pack[5] << 16 | pack[6] << 8 | pack[7];
     instance->generic.data = (uint64_t)hi << 32 | lo;
 
     instance->generic.data ^= 0xFFFFFFFFFFFFFFFF;
@@ -373,8 +373,8 @@ static void subghz_protocol_encoder_came_atomo_get_upload(
     pack[7] = (btn << 4);
 
     atomo_encrypt(pack);
-    uint32_t hi = (uint32_t)pack[0] << 24 | pack[1] << 16 | pack[2] << 8 | pack[3];
-    uint32_t lo = (uint32_t)pack[4] << 24 | pack[5] << 16 | pack[6] << 8 | pack[7];
+    uint32_t hi = pack[0] << 24 | pack[1] << 16 | pack[2] << 8 | pack[3];
+    uint32_t lo = pack[4] << 24 | pack[5] << 16 | pack[6] << 8 | pack[7];
     instance->generic.data = (uint64_t)hi << 32 | lo;
 
     instance->generic.data ^= 0xFFFFFFFFFFFFFFFF;
