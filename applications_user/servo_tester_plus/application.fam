@@ -7,6 +7,7 @@ App(
     requires=["gui", "dialogs", "subghz_radio_broker"],
     stack_size=3 * 1024,
     fap_package_only=True,
+    fap_file_assets="assets",
     fap_dist_path="apps/GPIO/servo_tester_plus.fap",
     fap_category="GPIO",
     fap_icon="icon.png",
