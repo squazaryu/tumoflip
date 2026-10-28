@@ -281,7 +281,7 @@ int32_t sensor_watch_app(void* context) {
         "8 cards, 32 samples each.\nFull table never evicts.\nAge uses Flipper clock.\nRepeated frames in one\nsecond are coalesced.\n\n"
         "Stop/Back saves checked\nSD slots. Bad storage\nopens read-only, never\nerases user captures.\nHistory is app-only.\nNo background guarantee.\n\n"
         "Device Library opens\nper-object histories.\nCSV in reports includes\nobject ID and units.\nCopy via SD/USB reader.\n\n"
-        "Temperature graph is\nauto-scaled to observed\nmin/max, not a fixed\nphysical Y scale.");
+        "Temperature graph is\nauto-scaled to observed\nmin/max, not a fixed\nphysical Y scale.\nX is sample order, not\nelapsed time spacing.");
     view_dispatcher_add_view(app->dispatcher, SensorMenu, submenu_get_view(app->menu));
     view_dispatcher_add_view(app->dispatcher, SensorDisplay, app->view);
     view_dispatcher_add_view(app->dispatcher, SensorHelp, text_box_get_view(app->help));
