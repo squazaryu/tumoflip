@@ -103,9 +103,14 @@ bool sensor_runtime_start(SensorRuntime* runtime, SensorCards* cards, uint32_t f
     }
     subghz_environment_set_protocol_registry(runtime->environment, &weather_station_protocol_registry);
     runtime->receiver = subghz_receiver_alloc_init(runtime->environment);
+    if(!runtime->receiver) {
+        sensor_runtime_stop(runtime);
+        return false;
+    }
     subghz_receiver_set_filter(runtime->receiver, SubGhzProtocolFlag_Decodable);
     subghz_receiver_set_modulation_filter(runtime->receiver, SubGhzProtocolFlag_AM);
     subghz_receiver_set_rx_callback(runtime->receiver, sensor_decoded, runtime);
+    subghz_receiver_reset(runtime->receiver);
     subghz_devices_init();
     runtime->devices = true;
     runtime->device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
