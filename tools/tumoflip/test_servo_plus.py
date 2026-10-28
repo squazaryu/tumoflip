@@ -4,6 +4,7 @@ import re
 import unittest
 
 from tools.tumoflip.test_nfc_completion_equality import native
+from tools.tumoflip.test_hotplug_assets import function
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "applications_user/servo_tester_plus"
@@ -16,6 +17,42 @@ def model_source():
 
 
 class ServoPlusTests(unittest.TestCase):
+    def test_user_controls_do_not_arm_by_navigation_and_back_stops(self):
+        path=APP/'servo_tester_plus.c';source=path.read_text() if path.exists() else ''
+        signatures=("static void servo_stop(","static uint32_t servo_previous(","static bool servo_input(")
+        body='\n'.join(function(source,s) if s in source else s+tail for s,tail in zip(signatures,(
+            'ServoApp* app);','void* context);','InputEvent* event, void* context);')))
+        native(model_source()+r'''
+#include <stddef.h>
+enum {InputTypeShort,InputTypeLong,InputKeyBack,InputKeyLeft,InputKeyRight,InputKeyOk,ServoViewMenu};
+typedef struct {unsigned type,key;}InputEvent;
+typedef struct {bool pwm_owned;}ServoHardware;
+typedef struct {ServoModel model;ServoHardware hardware;}ServoApp;
+static unsigned stops,toggles,updates,refreshes;
+void servo_hardware_stop(ServoHardware*h){h->pwm_owned=false;stops++;}
+bool servo_hardware_apply(ServoHardware*h,uint16_t p){assert(h&&p>=500&&p<=2500);updates++;return true;}
+void servo_refresh(ServoApp*a){assert(a);refreshes++;}
+void servo_toggle(ServoApp*a){assert(a);toggles++;}
+''' +body+r'''
+int main(void){ServoApp app={0};servo_model_init(&app.model);
+ InputEvent e={InputTypeShort,InputKeyRight};assert(servo_input(&e,&app)&&app.model.pulse_us==1510&&!app.model.armed&&!toggles);
+ servo_model_arm(&app.model,0);app.hardware.pwm_owned=true;
+ e.key=InputKeyLeft;assert(servo_input(&e,&app)&&updates==1);
+ e.key=InputKeyOk;assert(servo_input(&e,&app)&&toggles==1);
+ e.key=InputKeyBack;assert(!servo_input(&e,&app));
+ assert(servo_previous(&app)==ServoViewMenu&&!app.model.armed&&!app.hardware.pwm_owned&&stops);
+ e.type=InputTypeLong;assert(!servo_input(&e,&app));assert(refreshes>=3);
+ return 0;}
+''')
+
+    def test_packaged_app_is_external_and_has_no_degree_or_charger_claim(self):
+        path=APP/'application.fam'
+        self.assertTrue(path.exists(),'missing servo external application')
+        fam=path.read_text()
+        self.assertIn('appid="servo_tester_plus"',fam)
+        self.assertIn('fap_package_only=True',fam)
+        self.assertIn('fap_dist_path="apps/GPIO/servo_tester_plus.fap"',fam)
+
     def test_real_backend_owns_pwm_restores_only_owned_power_and_cleans_every_failure(self):
         header = re.sub(r'^#(?:include|pragma).*\n', '', (APP/'servo_hardware.h').read_text(), flags=re.M)
         implementation=APP/'servo_hardware.c'
