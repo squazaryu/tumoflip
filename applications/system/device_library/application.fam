@@ -58,3 +58,21 @@ App(
     fap_package_only=True,
     fap_libs=["mbedtls"],
 )
+
+App(
+    appid="tumo_uhf_inventory",
+    name="Tumo UHF Inventory",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="tumo_uhf_inventory_app",
+    sources=["uhf_app.c", "uhf_runtime.c", "uhf_inventory.c", "field_report.c", "field_io.c", "library_model.c"],
+    requires=["gui", "dialogs", "storage", "expansion"],
+    stack_size=4 * 1024,
+    fap_icon="../protopirate_to_subghz/icon.png",
+    fap_category="GPIO",
+    fap_dist_path="apps/GPIO/tumo_uhf_inventory.fap",
+    fap_version="1.0",
+    fap_description="Explicit, bounded UCM601 inventory and checked EPC reports. Separate powered UHF hardware required.",
+    fap_package_only=True,
+    fap_libs=["mbedtls"],
+)
