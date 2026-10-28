@@ -23,6 +23,39 @@ static uint64_t encode(const uint8_t id[5]){uint64_t f=0x1FF;unsigned columns=0;
 
 
 class VartaInspectionTests(unittest.TestCase):
+    def test_worker_join_precedes_coil_release_and_late_events_are_ignored(self):
+        source = (APP / 'varta_app.c').read_text()
+        bodies = ''.join(function(source, signature) for signature in (
+            'static void varta_app_stop(', 'static uint32_t varta_app_previous(',
+            'static void varta_app_read_done(', 'static bool varta_app_event(', 'static void varta_app_tick('))
+        native(production() + r'''
+typedef int LFRFIDWorker,ProtocolDict,SubGhzRadioBroker,ViewDispatcher;
+typedef int32_t ProtocolId;typedef unsigned LFRFIDWorkerReadResult;
+enum {VartaMenu,VartaReadEvent=100,LFRFIDWorkerReadDone=7};
+#define RECORD_SUBGHZ_RADIO_BROKER "radio"
+typedef struct {VartaInspection result;LFRFIDWorker*worker;ProtocolDict*dict;SubGhzRadioBroker*broker;unsigned lease;
+ ViewDispatcher*dispatcher;uint32_t started;const char*source;bool reading,ready;}VartaApp;
+static bool active,stop_requested;static unsigned released,queued,refreshed,ticks;
+static void lfrfid_worker_stop(LFRFIDWorker*w){(void)w;assert(active);stop_requested=true;}
+static void lfrfid_worker_stop_thread(LFRFIDWorker*w){(void)w;assert(active&&stop_requested);active=false;stop_requested=false;}
+static void subghz_radio_broker_release(SubGhzRadioBroker*b,unsigned*l){assert(b&&l&&!active);released++;}
+static void furi_record_close(const char*k){assert(!strcmp(k,"radio"));}
+static void view_dispatcher_send_custom_event(ViewDispatcher*d,unsigned event){(void)d;queued=event;}
+static size_t protocol_dict_get_data_size(ProtocolDict*d,unsigned p){(void)d;assert(p<3&&!active);return 5;}
+static void protocol_dict_get_data(ProtocolDict*d,unsigned p,uint8_t*out,size_t n){(void)d;assert(p<3&&n==5&&!active);memcpy(out,(uint8_t[]){3,0,1,2,3},5);}
+static void varta_app_refresh(VartaApp*a){assert(a);refreshed++;}
+static uint32_t furi_get_tick(void){return ticks;}
+''' + bodies + r'''
+int main(void){(void)encode;int broker=1;VartaApp a={.broker=&broker,.reading=true};active=true;
+ varta_app_read_done(0,0,&a);assert(!queued);varta_app_read_done(LFRFIDWorkerReadDone,3,&a);assert(!queued);
+ varta_app_read_done(LFRFIDWorkerReadDone,0,&a);assert(queued==100);
+ assert(varta_app_event(&a,queued)&&a.ready&&!a.reading&&!a.broker&&!active&&released==1&&a.result.known_prefix);
+ assert(!varta_app_event(&a,queued));
+ a.ready=false;a.reading=true;a.broker=&broker;a.started=UINT32_MAX-100;ticks=14900;active=true;
+ varta_app_tick(&a);assert(!a.reading&&!active&&released==2&&!a.ready);
+ assert(!varta_app_event(&a,queued));assert(varta_app_previous(&a)==VartaMenu&&refreshed>=2);return 0;}
+''')
+
     def test_saved_files_open_read_only_and_ignore_password_block(self):
         source = (APP / 'varta_app.c').read_text()
         bodies = function(source, 'static bool varta_app_load_dump(') + function(source, 'static bool varta_app_load_rfid(')
