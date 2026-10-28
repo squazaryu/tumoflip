@@ -40,3 +40,21 @@ App(
     fap_package_only=True,
     fap_libs=["mbedtls"],
 )
+
+App(
+    appid="power_journal",
+    name="Power Journal",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="power_journal_app",
+    sources=["power_journal.c", "power_history.c", "power_store.c", "field_io.c", "library_model.c"],
+    requires=["gui", "dialogs", "storage", "power"],
+    stack_size=4 * 1024,
+    fap_icon="../protopirate_to_subghz/icon.png",
+    fap_category="Tools/Diagnostics",
+    fap_dist_path="apps/Tools/Diagnostics/power_journal.fap",
+    fap_version="1.0",
+    fap_description="Passive app-only power history, qualified capacity evidence and checked CSV export. No charge control.",
+    fap_package_only=True,
+    fap_libs=["mbedtls"],
+)
