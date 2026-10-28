@@ -2,6 +2,7 @@
 from pathlib import Path
 import unittest
 from tools.tumoflip.test_nfc_completion_equality import native
+from tools.tumoflip.test_field_wallet import storage_native
 
 ROOT=Path(__file__).resolve().parents[2]
 APP=ROOT/'applications/system/device_library'
@@ -14,6 +15,24 @@ def production():
 
 
 class PowerHistoryTests(unittest.TestCase):
+    def test_atomic_history_save_checked_csv_and_no_cross_launch_integration(self):
+        storage_native(r'''
+int main(int argc,char**argv){assert(argc==2);Storage s={0};snprintf(s.root,sizeof(s.root),"%s",argv[1]);
+ PowerHistory h,read;power_history_init(&h);
+ assert(power_store_load(&s,&read)==PowerStoreEmpty);
+ PowerHistorySample sample={.voltage_mv=3800,.temperature_tenths=250,.current_ma=-100,.soc=90,.gauge_health=95,.gauge_ok=1,.timestamp=123};
+ for(unsigned i=0;i<10;i++){sample.tick_ms=i*5000;assert(power_history_add(&h,&sample));}
+ assert(power_store_save(&s,&h));assert(power_store_load(&s,&read)==PowerStoreOk&&read.count==10&&!read.continuous);
+ sample.tick_ms+=5000;sample.soc=89;assert(power_history_add(&h,&sample));
+ write_budget=1;assert(!power_store_save(&s,&h));write_budget=-1;
+ assert(power_store_load(&s,&read)==PowerStoreOk&&read.count==10);
+ char a[256],b[256];assert(power_store_export(&s,&h,a,sizeof(a)));assert(power_store_export(&s,&h,b,sizeof(b))&&strcmp(a,b));
+ File*f=storage_file_alloc(&s);assert(storage_file_open(f,a,FSAM_READ,FSOM_OPEN_EXISTING));char text[2048]={0};assert(storage_file_read(f,text,sizeof(text)-1)>0);assert(strstr(text,"voltage_mv")&&strstr(text,"3800"));assert(storage_file_close(f));storage_file_free(f);
+ write_budget=4;assert(!power_store_export(&s,&h,b,sizeof(b)));write_budget=-1;
+ assert(storage_common_stat(&s,a,NULL)==FSE_OK);
+ return 0;}
+''',('field_io.h','field_io.c','power_history.h','power_history.c','power_store.h','power_store.c'))
+
     def test_bounded_history_invalid_gauge_and_saved_state_validation(self):
         native(production()+r'''
 int main(void){
