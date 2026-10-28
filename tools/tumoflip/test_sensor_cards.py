@@ -15,6 +15,18 @@ def production():
 
 
 class SensorCardTests(unittest.TestCase):
+    def test_owned_package_entry_points_and_object_namespace(self):
+        app = (APP / 'sensor_app.c').read_text()
+        self.assertIn('library_name_valid(argument + 7)', app)
+        self.assertIn('"obj_"', app)
+        self.assertIn('field_record_save', app)
+        self.assertIn('field_record_load', app)
+        self.assertIn('field_report_save', app)
+        self.assertIn('Sensor Watch', (APP / 'device_library.c').read_text())
+        spectrum = (ROOT / 'applications_user/signal_workbench/signal_workbench.c').read_text()
+        self.assertIn('"Sensor Watch"', spectrum)
+        self.assertIn('/ext/apps/Sub-GHz/sensor_watch.fap', spectrum)
+
     def test_decoders_are_shared_without_weather_ui_or_tx_and_have_explicit_lease(self):
         path = APP / 'sensor_runtime.c'
         self.assertTrue(path.exists(), 'missing sensor receiver integration')
