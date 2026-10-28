@@ -14,6 +14,7 @@ typedef struct {
     SubGhzEnvironment* environment;
     SubGhzReceiver* receiver;
     FlipperFormat* format;
+    FuriString* preset_name;
     FuriStreamBuffer* stream;
     uint32_t frequency;
     uint32_t lost;

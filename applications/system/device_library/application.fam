@@ -76,3 +76,29 @@ App(
     fap_package_only=True,
     fap_libs=["mbedtls"],
 )
+
+App(
+    appid="sensor_watch",
+    name="Sensor Watch",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="sensor_watch_app",
+    sources=["sensor_app.c", "sensor_cards.c", "sensor_runtime.c", "field_report.c", "field_io.c", "library_model.c"] + [
+        "../../applications_user/weather_editor/protocols/" + source + ".c"
+        for source in ["protocol_items", "ws_generic", "infactory", "thermopro_tx4", "nexus_th",
+                       "gt_wt_02", "gt_wt_03", "acurite_606tx", "acurite_609txc", "acurite_986",
+                       "lacrosse_tx", "lacrosse_tx141thbv2", "oregon2", "oregon3", "acurite_592txr",
+                       "ambient_weather", "solight_te44", "auriol_hg0601a", "tx_8300", "wendox_w6726",
+                       "auriol_ahfl", "kedsum_th", "emos_e601x", "acurite_5n1", "bresser_3ch",
+                       "vauno_en8822c", "bl999"]
+    ],
+    requires=["gui", "dialogs", "storage", "subghz_radio_broker"],
+    stack_size=4 * 1024,
+    fap_icon="../protopirate_to_subghz/icon.png",
+    fap_category="Sub-GHz",
+    fap_dist_path="apps/Sub-GHz/sensor_watch.fap",
+    fap_version="1.0",
+    fap_description="Receive-only decoded sensor cards, object histories and checked CSV. Shared Weather Editor decoders.",
+    fap_package_only=True,
+    fap_libs=["mbedtls"],
+)

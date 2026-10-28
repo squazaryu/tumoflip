@@ -85,7 +85,7 @@ bool sensor_cards_add(SensorCards* cards, const char* protocol, uint32_t id, uin
 bool sensor_card_row(const SensorCard* card, size_t index, char* row, size_t capacity) {
     const SensorPoint* point = sensor_card_point(card, index);
     if(!point || !row || !sensor_protocol_valid(card->protocol)) return false;
-    char temperature[8] = "", humidity[4] = "", battery[2] = "";
+    char temperature[8] = "", humidity[4] = "", battery[4] = "";
     if(point->fields & SensorTemperature) snprintf(temperature, sizeof(temperature), "%d", point->temperature);
     if(point->fields & SensorHumidity) snprintf(humidity, sizeof(humidity), "%u", point->humidity);
     if(point->fields & SensorBattery) snprintf(battery, sizeof(battery), "%u", point->battery_low);
