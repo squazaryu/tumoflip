@@ -102,3 +102,21 @@ App(
     fap_package_only=True,
     fap_libs=["mbedtls"],
 )
+
+App(
+    appid="tumo_varta",
+    name="Varta Inspector",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="tumo_varta_app",
+    sources=["varta_app.c", "varta_inspect.c", "field_report.c", "field_io.c", "library_model.c"],
+    requires=["gui", "dialogs", "storage", "subghz_radio_broker"],
+    stack_size=4 * 1024,
+    fap_icon="../protopirate_to_subghz/icon.png",
+    fap_category="RFID",
+    fap_dist_path="apps/RFID/tumo_varta.fap",
+    fap_version="1.0",
+    fap_description="Own EM4100 observations and strict saved T5577 structure inspection. No protected reads or writes.",
+    fap_package_only=True,
+    fap_libs=["mbedtls"],
+)
