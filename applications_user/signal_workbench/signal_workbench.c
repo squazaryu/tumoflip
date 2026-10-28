@@ -2677,7 +2677,7 @@ static void tumospectrum_menu_callback(void* context, uint32_t index) {
     case TumoSpectrumMenuAbout:
         tumospectrum_show_text(
             app,
-            "TumoSpectrum 3.5",
+            "TumoSpectrum 3.6",
             "Autonomous receive-only Band Map, Smart Capture, profile building and multi-capture signal research workspace.\n\n"
             "Band Map: Left/Right tunes, Up changes band, Down selects radio. Long Up zooms, long Down snaps to peak and long OK holds the scan.\n\n"
             "Envelope Check:\nRelease TX before open\nor OK CAL (quiet floor).\n\nLeft/Right: tune 25 kHz\nUp: INT/EXT CC1101\nDown: next common band\nBack: release radio.\n\n"
