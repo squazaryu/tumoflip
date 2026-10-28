@@ -1,5 +1,6 @@
 """Bounded decoded-sensor identity/history; not guessed protocol or RF acceptance."""
 from pathlib import Path
+import re
 import unittest
 from tools.tumoflip.test_nfc_completion_equality import native
 
@@ -15,6 +16,31 @@ def production():
 
 
 class SensorCardTests(unittest.TestCase):
+    def test_real_receiver_lifecycle_serialization_and_discontinuities(self):
+        runtime = re.sub(r'^#include.*\n', '\n', (APP / 'sensor_runtime.c').read_text(), flags=re.M)
+        header = re.sub(r'^#.*\n', '\n', (APP / 'sensor_runtime.h').read_text(), flags=re.M)
+        stubs = ROOT / 'tools/tumoflip/fixtures/sensor_runtime_stubs.h'
+        native(production() + f'\n#include "{stubs}"\n' + header + runtime + r'''
+int main(void){SensorCards cards;sensor_cards_init(&cards);SensorRuntime r={0};
+ heap=1000;assert(!sensor_runtime_start(&r,&cards,433920000)&&!open_records);heap=50000;
+ deny=true;assert(!sensor_runtime_start(&r,&cards,433920000)&&!open_records);deny=false;
+ format_failure=true;assert(!sensor_runtime_start(&r,&cards,433920000)&&!open_records&&!leases);format_failure=false;
+ receiver_failure=true;assert(!sensor_runtime_start(&r,&cards,433920000)&&!open_records&&!leases);receiver_failure=false;
+ missing=true;assert(!sensor_runtime_start(&r,&cards,433920000)&&!device_inits);missing=false;
+ frequency_failure=true;assert(!sensor_runtime_start(&r,&cards,433920000)&&!device_inits);frequency_failure=false;
+ assert(sensor_runtime_start(&r,&cards,433920000)&&r.listening&&reset_count);
+ decode_on_feed=true;sensor_rx(true,500,&r);assert(sensor_runtime_tick(&r)&&cards.count==1);
+ const SensorPoint*p=sensor_card_point(&cards.cards[0],0);assert(p->temperature==-198&&p->humidity==56&&p->battery_low==1&&p->fields==7);
+ ff_temperature=NAN;ff_humidity=255;ff_battery=255;sensor_rx(true,500,&r);sensor_runtime_tick(&r);assert(cards.cards[0].count==1); // no false zero-valued measurement
+ ff_bad_id=true;sensor_rx(true,500,&r);sensor_runtime_tick(&r);assert(cards.count==1);ff_bad_id=false;
+ ff_bad_channel=true;sensor_rx(true,500,&r);sensor_runtime_tick(&r);ff_bad_channel=false;
+ ff_channel=256;sensor_rx(true,500,&r);sensor_runtime_tick(&r);assert(cards.count==1);
+ unsigned resets=reset_count;r.overrun=true;sensor_runtime_tick(&r);assert(reset_count>resets&&r.lost==1);
+ sensor_rx(true,1,&r);sensor_runtime_tick(&r);sensor_rx(true,1000001,&r);sensor_runtime_tick(&r);
+ sensor_runtime_stop(&r);sensor_runtime_stop(&r);assert(!active&&!leases&&!open_records&&!device_inits);
+ assert(!sensor_runtime_start(&r,&cards,400000000)&&!open_records);return 0;}
+''')
+
     def test_owned_package_entry_points_and_object_namespace(self):
         app = (APP / 'sensor_app.c').read_text()
         self.assertIn('library_name_valid(argument + 7)', app)
