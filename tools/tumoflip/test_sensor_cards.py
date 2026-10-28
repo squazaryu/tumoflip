@@ -15,6 +15,20 @@ def production():
 
 
 class SensorCardTests(unittest.TestCase):
+    def test_decoders_are_shared_without_weather_ui_or_tx_and_have_explicit_lease(self):
+        path = APP / 'sensor_runtime.c'
+        self.assertTrue(path.exists(), 'missing sensor receiver integration')
+        runtime = path.read_text()
+        for token in ('subghz_radio_broker_acquire', 'subghz_radio_broker_release',
+                      'subghz_devices_stop_async_rx', 'subghz_receiver_reset',
+                      'subghz_protocol_decoder_base_serialize', 'weather_station_protocol_registry'):
+            self.assertIn(token, runtime)
+        self.assertNotIn('start_async_tx', runtime)
+        self.assertNotIn('WSBlockGeneric*', runtime)
+        registry = ROOT / 'applications_user/weather_editor/protocols/protocol_items.h'
+        self.assertNotIn('weather_station_app_i.h', registry.read_text())
+        self.assertTrue((APP / 'sensor_app.c').exists())
+
     def test_identity_duplicate_frames_and_ring_history(self):
         native(production() + r'''
 int main(void){SensorCards cards;sensor_cards_init(&cards);assert(sensor_cards_valid(&cards));
