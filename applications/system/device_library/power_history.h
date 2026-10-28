@@ -16,10 +16,10 @@ typedef struct {
     int16_t temperature_tenths;
     uint8_t soc;
     uint8_t gauge_health;
-    bool gauge_ok;
-    bool charging;
-    bool usb;
-    bool ble;
+    uint8_t gauge_ok;
+    uint8_t charging;
+    uint8_t usb;
+    uint8_t ble;
 } PowerHistorySample;
 
 typedef struct {
@@ -37,7 +37,7 @@ typedef struct {
     uint32_t duration_ms;
     uint32_t session_samples;
     uint8_t start_soc;
-    bool continuous;
+    uint8_t continuous;
 } PowerHistory;
 
 void power_history_init(PowerHistory* history);
