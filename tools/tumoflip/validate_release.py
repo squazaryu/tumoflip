@@ -160,8 +160,16 @@ DEVICE_LIBRARY_PACKAGE_FILE = "apps/Tools/device_library.fap"
 FIELD_TOOLS_PACKAGE_FILE = "apps/Tools/field_tools.fap"
 NFC_FIELD_PACKAGE_FILE = "apps/NFC/tumo_nfc_sniffer.fap"
 FILE_HISTORY_PACKAGE_FILE = "apps_data/device_library/plugins/file_history.fal"
+FIELD_BATCH_PACKAGE_FILES = {
+    "servo_tester_plus.fap": "apps/GPIO/servo_tester_plus.fap",
+    "power_journal.fap": "apps/Tools/Diagnostics/power_journal.fap",
+    "tumo_uhf_inventory.fap": "apps/GPIO/tumo_uhf_inventory.fap",
+    "sensor_watch.fap": "apps/Sub-GHz/sensor_watch.fap",
+    "tumo_varta.fap": "apps/RFID/tumo_varta.fap",
+}
 PACKAGE_ONLY_PACKAGE_FILES = frozenset(
     {
+        *FIELD_BATCH_PACKAGE_FILES.values(),
         "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
         QUAC_PACKAGE_FILE,
         NEARBY_FILES_PACKAGE_FILE,
@@ -218,6 +226,7 @@ PACKAGE_RELEASE_OVERLAY_FILES = frozenset(
     }
 )
 PACKAGE_ONLY_PACKAGE_GROUPS = {
+    **{path: "base" for path in FIELD_BATCH_PACKAGE_FILES.values()},
     "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap": "module_one",
     QUAC_PACKAGE_FILE: "base",
     NEARBY_FILES_PACKAGE_FILE: "base",
@@ -391,6 +400,7 @@ def release_cleanup_entries() -> list[dict[str, str]]:
 
 def package_extapp_exports() -> dict[str, str]:
     exports = {Path(relative).name: relative for relative in MODULE_ONE_PACKAGE_FILES}
+    exports.update(FIELD_BATCH_PACKAGE_FILES)
     exports["morse_player.fap"] = MORSE_PLAYER_PACKAGE_FILE
     exports["quac.fap"] = QUAC_PACKAGE_FILE
     exports["nearby_files.fap"] = NEARBY_FILES_PACKAGE_FILE
@@ -964,6 +974,7 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             resources / FIELD_TOOLS_PACKAGE_FILE,
             resources / NFC_FIELD_PACKAGE_FILE,
             resources / FILE_HISTORY_PACKAGE_FILE,
+            *[resources / path for path in FIELD_BATCH_PACKAGE_FILES.values()],
             resources / LFRFID_HITAGS_PACKAGE_FILE,
             resources / "apps/Tools/tumoflip_packages.fap",
             resources / "apps/Tools/totp.fap",
