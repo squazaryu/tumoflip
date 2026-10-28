@@ -84,7 +84,7 @@ bool uhf_runtime_connect(UhfRuntime* runtime, UhfInventory* inventory) {
 
 bool uhf_runtime_start(UhfRuntime* runtime) {
     if(!runtime || !runtime->serial || !runtime->inventory->identified || runtime->running ||
-       furi_get_tick() - runtime->last_rx > 3000U) return false;
+       furi_get_tick() - runtime->last_reply > 3000U) return false;
     runtime->started = runtime->last_poll = furi_get_tick();
     runtime->completed = runtime->inventory->completed;
     runtime->timed_out = false;
@@ -111,11 +111,14 @@ void uhf_runtime_tick(UhfRuntime* runtime) {
         if(now - runtime->last_rx > 200U && runtime->inventory->used)
             uhf_inventory_discontinuity(runtime->inventory);
         runtime->last_rx = now;
-        for(size_t i = 0; i < size; i++)
-            uhf_inventory_feed(runtime->inventory, bytes[i], furi_hal_rtc_get_timestamp());
+        for(size_t i = 0; i < size; i++) {
+            const uint32_t completed = runtime->inventory->completed;
+            if(uhf_inventory_feed(runtime->inventory, bytes[i], furi_hal_rtc_get_timestamp()) ||
+               completed != runtime->inventory->completed) runtime->last_reply = now;
+        }
     }
     if(runtime->running) {
-        if(now - runtime->started >= 60000U || now - runtime->last_rx > 3000U) {
+        if(now - runtime->started >= 60000U || now - runtime->last_reply > 3000U) {
             uhf_runtime_stop(runtime);
             runtime->timed_out = true;
         } else if(runtime->inventory->completed != runtime->completed &&
@@ -126,7 +129,7 @@ void uhf_runtime_tick(UhfRuntime* runtime) {
         }
     } else if(now - runtime->last_poll >= 2000U) {
         runtime->last_poll = now;
-        runtime->inventory->identified = false;
+        if(now - runtime->last_reply > 3000U) runtime->inventory->identified = false;
         uhf_runtime_send(runtime, 0x72);
     }
 }

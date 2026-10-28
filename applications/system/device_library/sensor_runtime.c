@@ -36,7 +36,8 @@ static void sensor_decoded(SubGhzReceiver* receiver, SubGhzProtocolDecoderBase* 
         point.fields |= SensorTemperature;
         point.temperature = (int16_t)lroundf(temperature * 10.0f);
     }
-    sensor_cards_add(runtime->cards, decoder->protocol->name, id, channel, runtime->frequency, &point);
+    if(sensor_cards_add(runtime->cards, decoder->protocol->name, id, channel, runtime->frequency, &point))
+        runtime->changed = true;
 }
 
 static void sensor_rx(bool level, uint32_t duration, void* context) {
@@ -144,13 +145,12 @@ bool sensor_runtime_tick(SensorRuntime* runtime) {
         if(runtime->lost != UINT32_MAX) runtime->lost++;
     }
     LevelDuration sample;
-    bool received = false;
+    runtime->changed = false;
     for(unsigned i = 0; i < 1024U; i++) {
         if(furi_stream_buffer_receive(runtime->stream, &sample, sizeof(sample), 0) != sizeof(sample)) break;
         const uint32_t duration = level_duration_get_duration(sample);
         if(duration < 40U || duration > 1000000U) subghz_receiver_reset(runtime->receiver);
         else subghz_receiver_decode(runtime->receiver, level_duration_get_level(sample), duration);
-        received = true;
     }
-    return received;
+    return runtime->changed;
 }
