@@ -21,6 +21,22 @@ static bool frame(UhfInventory*h,uint8_t cmd,const uint8_t*p,unsigned n,unsigned
 
 
 class UhfInventoryTests(unittest.TestCase):
+    def test_uart_ownership_explicit_start_timeout_and_release(self):
+        runtime = APP / 'uhf_runtime.c'
+        self.assertTrue(runtime.exists(), 'missing UHF UART lifecycle implementation')
+        source = runtime.read_text()
+        self.assertIn('expansion_is_connected', source)
+        self.assertIn('furi_hal_serial_control_acquire', source)
+        self.assertIn('furi_hal_serial_async_rx_stop', source)
+        self.assertIn('furi_hal_serial_control_release', source)
+        self.assertNotIn('otg_enable', source)
+        self.assertNotIn('set_power', source)
+        self.assertIn('60000U', source)
+        app = APP / 'uhf_app.c'
+        self.assertTrue(app.exists(), 'missing explicit UHF inventory UI')
+        self.assertIn('field_report_save', app.read_text())
+        self.assertIn('RF interrogation', app.read_text())
+
     def test_version_checksum_address_and_explicit_command_allowlist(self):
         native(production() + r'''
 int main(void){UhfInventory h;uhf_inventory_init(&h);uint8_t b[6];
