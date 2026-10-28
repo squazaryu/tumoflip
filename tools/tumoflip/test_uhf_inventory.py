@@ -1,5 +1,6 @@
 """Execute the bounded UCM601 inventory contract without any UART/RF device."""
 from pathlib import Path
+import re
 import unittest
 from tools.tumoflip.test_nfc_completion_equality import native
 
@@ -21,6 +22,62 @@ static bool frame(UhfInventory*h,uint8_t cmd,const uint8_t*p,unsigned n,unsigned
 
 
 class UhfInventoryTests(unittest.TestCase):
+    def test_execute_uart_failure_cleanup_and_session_timeout(self):
+        path = APP / 'uhf_runtime.c'
+        self.assertTrue(path.exists())
+        header = re.sub(r'^#.*\n', '\n', (APP / 'uhf_runtime.h').read_text(), flags=re.M)
+        runtime = re.sub(r'^#include.*\n', '\n', path.read_text(), flags=re.M)
+        native(production() + r'''
+typedef struct {bool initialized;} FuriHalSerialHandle;
+typedef struct {uint8_t data[8192];unsigned used;} FuriStreamBuffer;
+typedef struct {bool connected;} Expansion;
+typedef unsigned FuriHalSerialRxEvent;
+enum {FuriHalSerialRxEventData=1,FuriHalSerialRxEventFrameError=2,FuriHalSerialRxEventNoiseError=4,
+ FuriHalSerialRxEventOverrunError=8,FuriHalSerialRxEventParityError=16,FuriHalSerialIdUsart};
+#define RECORD_EXPANSION "expansion"
+#define FURI_CRITICAL_ENTER() do{}while(0)
+#define FURI_CRITICAL_EXIT() do{}while(0)
+static FuriHalSerialHandle port;static Expansion expansion;static FuriStreamBuffer buffer;
+static unsigned ticks,disables,enables,releases,stops,frees,closes,last_command,tx_count;
+static bool busy,allocation_failure;static uint8_t incoming;
+static void* furi_record_open(const char*s){(void)s;return &expansion;}
+static void furi_record_close(const char*s){(void)s;closes++;}
+static bool expansion_is_connected(Expansion*e){return e->connected;}
+static void expansion_disable(Expansion*e){(void)e;disables++;}
+static void expansion_enable(Expansion*e){(void)e;enables++;}
+static FuriHalSerialHandle*furi_hal_serial_control_acquire(unsigned id){(void)id;return busy?NULL:&port;}
+static void furi_hal_serial_control_release(FuriHalSerialHandle*p){assert(!p->initialized);releases++;}
+static void furi_hal_serial_init(FuriHalSerialHandle*p,unsigned baud){assert(baud==115200&&!p->initialized);p->initialized=true;}
+static void furi_hal_serial_deinit(FuriHalSerialHandle*p){assert(p->initialized);p->initialized=false;}
+static void furi_hal_serial_async_rx_stop(FuriHalSerialHandle*p){assert(p->initialized);stops++;}
+static void furi_hal_serial_tx(FuriHalSerialHandle*p,const uint8_t*b,size_t n){assert(p->initialized&&n>=5);last_command=b[3];tx_count++;}
+static void furi_hal_serial_tx_wait_complete(FuriHalSerialHandle*p){assert(p->initialized);}
+static uint8_t furi_hal_serial_async_rx(FuriHalSerialHandle*p){assert(p->initialized);return incoming;}
+static void furi_hal_serial_async_rx_start(FuriHalSerialHandle*p,void(*cb)(FuriHalSerialHandle*,FuriHalSerialRxEvent,void*),void*c,bool errors){assert(p->initialized&&cb&&c&&errors);}
+static FuriStreamBuffer*furi_stream_buffer_alloc(size_t n,size_t t){assert(n==4096&&t==1);buffer.used=0;return allocation_failure?NULL:&buffer;}
+static void furi_stream_buffer_free(FuriStreamBuffer*b){assert(b==&buffer);frees++;}
+static size_t furi_stream_buffer_send(FuriStreamBuffer*b,const void*p,size_t n,unsigned timeout){(void)timeout;if(n>sizeof(b->data)-b->used)return 0;memcpy(b->data+b->used,p,n);b->used+=n;return n;}
+static size_t furi_stream_buffer_receive(FuriStreamBuffer*b,void*p,size_t n,unsigned timeout){(void)timeout;if(n>b->used)n=b->used;memcpy(p,b->data,n);b->used-=n;memmove(b->data,b->data+n,b->used);return n;}
+static void furi_stream_buffer_reset(FuriStreamBuffer*b){b->used=0;}
+static uint32_t furi_get_tick(void){return ticks;}
+static uint32_t furi_hal_rtc_get_timestamp(void){return ticks/1000;}
+''' + header + runtime + r'''
+int main(void){(void)frame;UhfRuntime r={0};UhfInventory h;uhf_inventory_init(&h);
+ expansion.connected=true;assert(!uhf_runtime_connect(&r,&h)&&!disables&&closes==1);expansion.connected=false;
+ busy=true;assert(!uhf_runtime_connect(&r,&h)&&enables==1&&!releases&&!port.initialized);busy=false;
+ allocation_failure=true;assert(!uhf_runtime_connect(&r,&h)&&releases==1&&!port.initialized);allocation_failure=false;
+ assert(uhf_runtime_connect(&r,&h)&&last_command==0x72&&!r.running);assert(!uhf_runtime_start(&r));
+ uint8_t ver[]={0xA0,6,0,0x72,1,2,3,0xE2}; // additive checksum
+ uint8_t sum=0;for(unsigned i=0;i<7;i++)sum+=ver[i];ver[7]=(uint8_t)-sum;
+ furi_stream_buffer_send(&buffer,ver,sizeof(ver),0);uhf_runtime_tick(&r);
+ assert(h.identified&&uhf_runtime_start(&r)&&last_command==0x89);
+ ticks=60000;uhf_runtime_tick(&r);assert(!r.running&&r.timed_out&&last_command==0x8C);
+ uhf_runtime_disconnect(&r);assert(!r.serial&&!r.stream&&!r.expansion&&!h.identified&&releases==2&&stops==1);
+ assert(uhf_runtime_connect(&r,&h));h.identified=true;r.last_rx=ticks;assert(uhf_runtime_start(&r));
+ r.overflow=true;uhf_runtime_tick(&r);assert(!r.running&&h.errors&&last_command==0x8C);
+ uhf_runtime_disconnect(&r);return 0;}
+''')
+
     def test_uart_ownership_explicit_start_timeout_and_release(self):
         runtime = APP / 'uhf_runtime.c'
         self.assertTrue(runtime.exists(), 'missing UHF UART lifecycle implementation')

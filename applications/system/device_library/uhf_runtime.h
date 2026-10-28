@@ -14,6 +14,7 @@ typedef struct {
     uint32_t started;
     uint32_t completed;
     volatile bool overflow;
+    bool initialized;
     bool running;
     bool timed_out;
 } UhfRuntime;
