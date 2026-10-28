@@ -21,6 +21,17 @@ static uint64_t encode(const uint8_t id[5]){uint64_t f=0x1FF;unsigned columns=0;
 
 
 class VartaInspectionTests(unittest.TestCase):
+    def test_external_diagnostic_has_cancel_ownership_and_no_tag_write_or_password_path(self):
+        path = APP / 'varta_app.c'
+        self.assertTrue(path.exists(), 'missing Varta diagnostic UI')
+        source = path.read_text()
+        for token in ('lfrfid_worker_stop_thread', 'subghz_radio_broker_release',
+                      'FSAM_READ', 'VartaMissingBlocks', 'field_report_save'):
+            self.assertIn(token, source)
+        self.assertNotRegex(source, r'(t5577_\w+|lfrfid_worker_write\w*|lfrfid_worker_emulate\w*)\s*\(')
+        self.assertNotIn('VARTA_PASSWORD', source)
+        self.assertIn('15000U', source)
+
     def test_em4100_frame_all_single_bit_corruptions_and_atomic_result(self):
         native(production() + r'''
 int main(void){uint8_t id[]={3,0,0x12,0x34,0x56},out[5];uint64_t f=encode(id);
