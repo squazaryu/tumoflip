@@ -148,11 +148,13 @@ static bool varta_app_load_dump(VartaApp* app) {
     if(ok) ok = flipper_format_read_string(file, "Page 0 blocks read", text) &&
                 varta_inspect_read_list(furi_string_get_cstr(text), &mask);
     for(unsigned i = 0; ok && i < 8U; i++) {
-        if(!(mask & (1U << i))) continue;
+        if(!(mask & (1U << i)) || (i != 0U && i != 1U && i != 2U && i != 6U)) continue;
         char key[24];
         uint8_t bytes[4];
         snprintf(key, sizeof(key), "Page 0 Block %u", i);
-        if(!flipper_format_rewind(file) || !flipper_format_read_hex(file, key, bytes, sizeof(bytes))) {
+        uint32_t count = 0;
+        if(!flipper_format_rewind(file) || !flipper_format_get_value_count(file, key, &count) ||
+           count != sizeof(bytes) || !flipper_format_read_hex(file, key, bytes, sizeof(bytes))) {
             ok = false;
             break;
         }
