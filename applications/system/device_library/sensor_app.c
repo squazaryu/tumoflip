@@ -72,7 +72,9 @@ static void sensor_app_draw(Canvas* canvas, void* context) {
         canvas_draw_str(canvas, 1, 49, "Internal CC1101 / AM650");
     } else {
         const SensorPoint* point = sensor_card_point(&model->card, model->card.count - 1U);
-        snprintf(text, sizeof(text), "%.21s", model->card.protocol);
+        snprintf(text, sizeof(text), "%.31s", model->card.protocol);
+        size_t title_length = strlen(text);
+        while(title_length && canvas_string_width(canvas, text) > 126U) text[--title_length] = 0;
         canvas_draw_str(canvas, 1, 20, text);
         if(model->graph) {
             int minimum = 1000, maximum = -800;
@@ -94,7 +96,10 @@ static void sensor_app_draw(Canvas* canvas, void* context) {
                     }
                 }
             }
-            snprintf(text, sizeof(text), "%u samples / temp x0.1C", model->card.count);
+            if(minimum <= maximum) snprintf(text, sizeof(text), "%s%d.%d..%s%d.%dC /%u",
+                minimum < 0 ? "-" : "", abs(minimum) / 10, abs(minimum) % 10,
+                maximum < 0 ? "-" : "", abs(maximum) / 10, abs(maximum) % 10, model->card.count);
+            else snprintf(text, sizeof(text), "%u samples / no temp", model->card.count);
             canvas_draw_str(canvas, 1, 51, text);
         } else {
             canvas_set_font(canvas, FontPrimary);
