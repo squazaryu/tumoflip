@@ -78,6 +78,7 @@ typedef enum {
     TumoSpectrumMenuNotebook,
     TumoSpectrumMenuAbout,
     TumoSpectrumMenuEnvelope,
+    TumoSpectrumMenuSensorWatch,
 } TumoSpectrumMenuAction;
 
 typedef enum {
@@ -2599,6 +2600,23 @@ static bool tumospectrum_resume_capture(TumoSpectrumApp* app) {
 static void tumospectrum_menu_callback(void* context, uint32_t index) {
     TumoSpectrumApp* app = context;
     switch(index) {
+    case TumoSpectrumMenuSensorWatch: {
+        const char* target = "/ext/apps/Sub-GHz/sensor_watch.fap";
+        if(!storage_file_exists(app->storage, target)) {
+            tumospectrum_show_text(app, "Sensor Watch", "Install Sensor Watch\nfrom FW Packages first.", TumoSpectrumViewMenu);
+            break;
+        }
+        tumospectrum_band_map_stop(app->band_map);
+        tumospectrum_protocol_runtime_stop(app->protocol_runtime);
+        loader_clear_launch_queue(app->loader);
+        loader_enqueue_launch(app->loader, target, NULL, LoaderDeferredLaunchFlagGui);
+        FuriString* self = furi_string_alloc();
+        if(loader_get_application_launch_path(app->loader, self))
+            loader_enqueue_launch(app->loader, furi_string_get_cstr(self), NULL, LoaderDeferredLaunchFlagGui);
+        furi_string_free(self);
+        view_dispatcher_stop(app->view_dispatcher);
+        break;
+    }
     case TumoSpectrumMenuBandMap:
         tumospectrum_open_band_map(app);
         break;
@@ -2659,7 +2677,7 @@ static void tumospectrum_menu_callback(void* context, uint32_t index) {
     case TumoSpectrumMenuAbout:
         tumospectrum_show_text(
             app,
-            "TumoSpectrum 3.5",
+            "TumoSpectrum 3.6",
             "Autonomous receive-only Band Map, Smart Capture, profile building and multi-capture signal research workspace.\n\n"
             "Band Map: Left/Right tunes, Up changes band, Down selects radio. Long Up zooms, long Down snaps to peak and long OK holds the scan.\n\n"
             "Envelope Check:\nRelease TX before open\nor OK CAL (quiet floor).\n\nLeft/Right: tune 25 kHz\nUp: INT/EXT CC1101\nDown: next common band\nBack: release radio.\n\n"
@@ -2948,6 +2966,8 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     submenu_set_header(app->menu, "TumoSpectrum");
     submenu_add_item(
         app->menu, "Band Map", TumoSpectrumMenuBandMap, tumospectrum_menu_callback, app);
+    submenu_add_item(
+        app->menu, "Sensor Watch", TumoSpectrumMenuSensorWatch, tumospectrum_menu_callback, app);
     submenu_add_item(
         app->menu, "Envelope Check", TumoSpectrumMenuEnvelope, tumospectrum_menu_callback, app);
     submenu_add_item(

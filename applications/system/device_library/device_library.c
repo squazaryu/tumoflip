@@ -60,6 +60,7 @@ enum {
     ConfirmUnpin,
     OpenFieldTools,
     ExportObject,
+    OpenSensorWatch,
     NextCards = 30,
     PreviousCards,
     NextHistories,
@@ -173,6 +174,7 @@ static void library_show(Library* app, LibraryPage page) {
         library_item(app, "New object", NewCard);
         library_item(app, "File History", History);
         library_item(app, "Field tools", OpenFieldTools);
+        library_item(app, "Sensor Watch", OpenSensorWatch);
         library_item(app, "About / limits", About);
     } else if(page == PageCards) {
         submenu_set_header(app->menu, "All objects");
@@ -195,6 +197,7 @@ static void library_show(Library* app, LibraryPage page) {
         }
         if(!app->card.link_count) library_item(app, "Add first action", AddLink);
         if(app->dirty) library_item(app, "Save changes *", SaveCard);
+        library_item(app, "Sensor Watch", OpenSensorWatch);
         library_item(app, "Edit object...", EditObject);
     } else if(page == PageManage) {
         submenu_set_header(app->menu, "Edit object");
@@ -361,6 +364,8 @@ static void library_set_pin(Library* app, const char* name, bool pinned, Library
 
 static bool library_event_allowed(const Library* app, uint32_t event) {
     switch(event) {
+    case OpenSensorWatch:
+        return app->page == PageMain || app->page == PageCard;
     case NewCard:
     case OpenCards:
     case OpenPins:
@@ -427,7 +432,28 @@ static bool library_event_allowed(const Library* app, uint32_t event) {
 static bool library_event(void* context, uint32_t event) {
     Library* app = context;
     if(!library_event_allowed(app, event)) return true;
-    if(event == OpenFieldTools || event == ExportObject) {
+    if(event == OpenSensorWatch) {
+        const char* target = "/ext/apps/Sub-GHz/sensor_watch.fap";
+        if(app->dirty) {
+            library_message(app, "Save object first.\nNo receiver was started.", app->page);
+        } else if(!storage_file_exists(app->storage, target)) {
+            library_message(app, "Install Sensor Watch\nfrom FW Packages first.", app->page);
+        } else {
+            FuriString* argument = furi_string_alloc();
+            if(app->page == PageCard) furi_string_printf(argument, "object:%s", app->card.name);
+            loader_clear_launch_queue(app->loader);
+            loader_enqueue_launch(app->loader, target, furi_string_get_cstr(argument), LoaderDeferredLaunchFlagGui);
+            FuriString* self = furi_string_alloc();
+            if(loader_get_application_launch_path(app->loader, self)) {
+                furi_string_reset(argument);
+                if(app->page == PageCard) furi_string_printf(argument, "object:%s", app->card.name);
+                loader_enqueue_launch(app->loader, furi_string_get_cstr(self), furi_string_get_cstr(argument), LoaderDeferredLaunchFlagGui);
+            }
+            furi_string_free(self);
+            furi_string_free(argument);
+            view_dispatcher_stop(app->dispatcher);
+        }
+    } else if(event == OpenFieldTools || event == ExportObject) {
         const char* target = "/ext/apps/Tools/field_tools.fap";
         if(event == ExportObject && app->dirty) {
             library_message(app, "Save object first.\nNo files exported.", PageManage);
@@ -685,7 +711,7 @@ static bool library_event(void* context, uint32_t event) {
     } else if(event == About)
         library_message(
             app,
-            "Device Library 1.2\n\nObjects link existing files: 8 named actions per object, 16 pinned objects. Removing a link or pin never deletes its file.\n\nNFC / RFID / iButton open a saved-file menu, not emulation. SUB / IR keep their native file flow. Unknown formats are references only.\n\nField Tools adds manual rounds, portable object copies and read-only capture inventory through a separate FW Package. Opening an object never marks a check as passed.\n\nOld cards load without rewriting. Saving uses the new card format; older Device Library versions cannot read new revisions.\n\nHistory is opt-in for native SUB / IR / NFC saves. Three prior versions per file, 2 MiB each. Third-party writers and deletions are not intercepted.\n\nRestore creates a separate copy. Backups may contain private data; they stay on your SD. Lists use 32 entries per page.",
+            "Device Library 1.3\n\nObjects link existing files: 8 named actions per object, 16 pinned objects. Removing a link or pin never deletes its file.\n\nNFC / RFID / iButton open a saved-file menu, not emulation. SUB / IR keep their native file flow. Unknown formats are references only.\n\nField Tools adds manual rounds, portable object copies and read-only capture inventory through a separate FW Package. Opening an object never marks a check as passed.\n\nSensor Watch is a separate receive-only FW Package. Opening it from an object selects that object's sensor history, but does not start radio reception automatically. Sampling is app-only.\n\nOld cards load without rewriting. Saving uses the new card format; older Device Library versions cannot read new revisions.\n\nHistory is opt-in for native SUB / IR / NFC saves. Three prior versions per file, 2 MiB each. Third-party writers and deletions are not intercepted.\n\nRestore creates a separate copy. Backups may contain private data; they stay on your SD. Lists use 32 entries per page.",
             app->page);
     return true;
 }

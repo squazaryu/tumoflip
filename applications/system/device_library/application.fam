@@ -9,8 +9,8 @@ App(
     stack_size=4096,
     fap_icon="../protopirate_to_subghz/icon.png",
     fap_category="Tools",
-    fap_version="1.2",
-    fap_description="Pinned objects, named file actions and opt-in version history. No automatic radio actions.",
+    fap_version="1.3",
+    fap_description="Pinned objects, named file actions, Sensor Watch object histories and opt-in file history. No automatic radio actions.",
     fap_package_only=True,
     fap_libs=["mbedtls", "fap_metadata"],
 )
@@ -37,6 +37,86 @@ App(
     entry_point="file_history_ep",
     requires=["device_library"],
     sources=["history_engine.c", "library_model.c"],
+    fap_package_only=True,
+    fap_libs=["mbedtls"],
+)
+
+App(
+    appid="power_journal",
+    name="Power Journal",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="power_journal_app",
+    sources=["power_journal.c", "power_history.c", "power_store.c", "field_io.c", "library_model.c"],
+    requires=["gui", "dialogs", "storage", "power"],
+    stack_size=4 * 1024,
+    fap_icon="../protopirate_to_subghz/icon.png",
+    fap_category="Tools/Diagnostics",
+    fap_dist_path="apps/Tools/Diagnostics/power_journal.fap",
+    fap_version="1.0",
+    fap_description="Passive app-only power history, qualified capacity evidence and checked CSV export. No charge control.",
+    fap_package_only=True,
+    fap_libs=["mbedtls"],
+)
+
+App(
+    appid="tumo_uhf_inventory",
+    name="Tumo UHF Inventory",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="tumo_uhf_inventory_app",
+    sources=["uhf_app.c", "uhf_runtime.c", "uhf_inventory.c", "field_report.c", "field_io.c", "library_model.c"],
+    requires=["gui", "dialogs", "storage", "expansion"],
+    stack_size=4 * 1024,
+    fap_icon="../protopirate_to_subghz/icon.png",
+    fap_category="GPIO",
+    fap_dist_path="apps/GPIO/tumo_uhf_inventory.fap",
+    fap_version="1.0",
+    fap_description="Explicit, bounded UCM601 inventory and checked EPC reports. Separate powered UHF hardware required.",
+    fap_package_only=True,
+    fap_libs=["mbedtls"],
+)
+
+App(
+    appid="sensor_watch",
+    name="Sensor Watch",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="sensor_watch_app",
+    sources=["sensor_app.c", "sensor_cards.c", "sensor_runtime.c", "field_report.c", "field_io.c", "library_model.c"] + [
+        "../../applications_user/weather_editor/protocols/" + source + ".c"
+        for source in ["protocol_items", "ws_generic", "infactory", "thermopro_tx4", "nexus_th",
+                       "gt_wt_02", "gt_wt_03", "acurite_606tx", "acurite_609txc", "acurite_986",
+                       "lacrosse_tx", "lacrosse_tx141thbv2", "oregon2", "oregon3", "acurite_592txr",
+                       "ambient_weather", "solight_te44", "auriol_hg0601a", "tx_8300", "wendox_w6726",
+                       "auriol_ahfl", "kedsum_th", "emos_e601x", "acurite_5n1", "bresser_3ch",
+                       "vauno_en8822c", "bl999"]
+    ],
+    requires=["gui", "dialogs", "storage", "subghz_radio_broker"],
+    stack_size=4 * 1024,
+    fap_icon="../protopirate_to_subghz/icon.png",
+    fap_category="Sub-GHz",
+    fap_dist_path="apps/Sub-GHz/sensor_watch.fap",
+    fap_version="1.0",
+    fap_description="Receive-only decoded sensor cards, object histories and checked CSV. Shared Weather Editor decoders.",
+    fap_package_only=True,
+    fap_libs=["mbedtls"],
+)
+
+App(
+    appid="tumo_varta",
+    name="Varta Inspector",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="tumo_varta_app",
+    sources=["varta_app.c", "varta_inspect.c", "field_report.c", "field_io.c", "library_model.c"],
+    requires=["gui", "dialogs", "storage", "subghz_radio_broker"],
+    stack_size=4 * 1024,
+    fap_icon="../protopirate_to_subghz/icon.png",
+    fap_category="RFID",
+    fap_dist_path="apps/RFID/tumo_varta.fap",
+    fap_version="1.0",
+    fap_description="Own EM4100 observations and strict saved T5577 structure inspection. No protected reads or writes.",
     fap_package_only=True,
     fap_libs=["mbedtls"],
 )

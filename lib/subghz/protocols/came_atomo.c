@@ -646,8 +646,8 @@ static uint64_t subghz_protocol_came_atomo_remote_controller(SubGhzBlockGeneric*
         instance->btn = 0x6;
     }
 
-    uint32_t hi = pack[0] << 24 | pack[1] << 16 | pack[2] << 8 | pack[3];
-    uint32_t lo = pack[4] << 24 | pack[5] << 16 | pack[6] << 8 | pack[7];
+    uint32_t hi = (uint32_t)pack[0] << 24 | pack[1] << 16 | pack[2] << 8 | pack[3];
+    uint32_t lo = (uint32_t)pack[4] << 24 | pack[5] << 16 | pack[6] << 8 | pack[7];
     instance->data_2 = (uint64_t)hi << 32 | lo;
 
     // Save original button for later use

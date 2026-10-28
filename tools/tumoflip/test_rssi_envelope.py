@@ -96,7 +96,7 @@ int main(void){
                       'TumoSpectrumViewEnvelope, app->envelope_view',
                       'with_view_model(\n        app->envelope_view'):
             self.assertTrue(route in source, f'Missing envelope route: {route}')
-        self.assertIn('fap_version="3.5.0"', (APP / 'application.fam').read_text())
+        self.assertIn('fap_version="3.6.0"', (APP / 'application.fam').read_text())
         sampler = (APP / 'tumospectrum_envelope.c').read_text()
         self.assertIn('subghz_devices_get_rssi(envelope->device)', sampler)
         self.assertNotRegex(sampler, r'subghz_devices_(?:set_tx|start_async_tx|write_packet)\s*\(')

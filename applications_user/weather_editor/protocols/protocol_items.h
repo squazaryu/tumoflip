@@ -1,5 +1,5 @@
 #pragma once
-#include "../weather_station_app_i.h"
+#include <lib/subghz/registry.h>
 
 #include "infactory.h"
 #include "thermopro_tx4.h"

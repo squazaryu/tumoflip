@@ -167,6 +167,11 @@ int main(void){
     assert(g.data==original);uint32_t serial=g.serial,counter=g.cnt;
     subghz_protocol_came_atomo_remote_controller(&g);
     assert(g.data==original && g.serial==serial && g.cnt==counter);
+    const uint64_t cases[]={0,UINT64_MAX,0x8000000080000000ULL,0x00FF00FF00FF00FFULL};
+    for(unsigned i=0;i<sizeof(cases)/sizeof(cases[0]);i++){
+        g.data=cases[i];subghz_protocol_came_atomo_remote_controller(&g);
+        assert(g.data==cases[i] && g.data_2==((cases[i]^UINT64_MAX)<<4));
+    }
     return 0;
 }
 ''')
