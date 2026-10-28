@@ -2,7 +2,7 @@
 
 static bool servo_limits_valid(uint16_t minimum, uint16_t maximum) {
     return minimum >= 500U && maximum <= 2500U && maximum > minimum &&
-           maximum - minimum >= 100U;
+           (uint32_t)(maximum - minimum) >= 100U;
 }
 
 void servo_model_init(ServoModel* model) {
@@ -31,7 +31,7 @@ void servo_model_stop(ServoModel* model) {
 }
 
 bool servo_model_mode(ServoModel* model, ServoMode mode, uint32_t now) {
-    if(!model || mode < ServoManual || mode > ServoSweep) return false;
+    if(!model || (unsigned)mode > (unsigned)ServoSweep) return false;
     // Selecting another mode never silently restarts or moves an actuator.
     servo_model_stop(model);
     model->mode = mode;
