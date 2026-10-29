@@ -20,6 +20,7 @@ class DooyaButtonsTests(unittest.TestCase):
 #include <stdbool.h>
 #include <stddef.h>
 #define furi_assert assert
+#define bit_read(v,b) (((v)>>(b))&1U)
 #define FURI_LOG_E(...) ((void)0)
 #define FURI_LOG_D(...) ((void)0)
 #define SUBGHZ_CUSTOM_BTN_OK 0
@@ -49,7 +50,7 @@ int main(void){LevelDuration upload[128];const uint8_t captured[]={0x11,0x1e,0x3
   assert(subghz_protocol_encoder_dooya_get_upload(&x));
   assert(x.generic.data==(0xe1dc030500ULL|(command?expected[command]:original)));
   assert(x.encoder.size_upload==82);
-  uint64_t decoded=0;for(unsigned i=0;i<40;i++){size_t p=2+i*2;assert(upload[p].level&&!upload[p+1].level);decoded=(decoded<<1)|(upload[p].duration==733);}
+  uint64_t decoded=0;for(unsigned i=0;i<40;i++){size_t p=3+i*2;assert(upload[p].level&&!upload[p+1].level);decoded=(decoded<<1)|(upload[p].duration==733);}
   assert(decoded==x.generic.data);
  }}
  command=1;original=0x55;override=true;override_btn=0x79;
