@@ -14,8 +14,6 @@ class FavoritesReplaceTests(unittest.TestCase):
         fixture = fixture.replace('return strstr(p,".tumo-bak")?&backup:&original;',
                                   'return !strcmp(p,"favorites.tmp")?&replacement:strstr(p,".tumo-bak")?&backup:&original;')
         fixture += r'''
-#define FSE_NOT_EXIST 2
-static int storage_common_stat(Storage*s,const char*p,void*i){(void)s;(void)i;return fail()?FSE_ERROR:entry(p)->exists?FSE_OK:FSE_NOT_EXIST;}
 bool signal_file_replace(Storage*,const char*,const char*);
 /* SIGNAL_IMPLEMENTATION */
 static void reset_files(void){memset(&original,0,sizeof(original));memset(&backup,0,sizeof(backup));memset(&replacement,0,sizeof(replacement));

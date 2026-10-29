@@ -28,7 +28,9 @@ void archive_scene_delete_on_enter(void* context) {
     ArchiveFile_t* current = archive_get_current_file(app->browser);
     if(!current) {
         furi_string_free(filename);
-        scene_manager_previous_scene(app->scene_manager);
+        widget_add_text_box_element(
+            app->widget, 0, 0, 128, 40, AlignCenter, AlignCenter, "No file selected", false);
+        view_dispatcher_switch_to_view(app->view_dispatcher, ArchiveViewWidget);
         return;
     }
 

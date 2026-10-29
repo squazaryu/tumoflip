@@ -159,14 +159,13 @@ bool archive_scene_browser_on_event(void* context, SceneManagerEvent event) {
             }
             const char* name = archive_get_name(browser);
             if(favorites) {
-                archive_favorites_delete("%s", name);
-                archive_file_array_rm_selected(browser);
+                if(archive_favorites_delete("%s", name)) archive_file_array_rm_selected(browser);
                 archive_show_file_menu(browser, false);
             } else if(archive_is_known_app(selected->type)) {
                 if(archive_is_favorite("%s", name)) {
                     archive_favorites_delete("%s", name);
                 } else {
-                    archive_file_append(ARCHIVE_FAV_PATH, "%s\n", name);
+                    archive_add_to_favorites(name);
                 }
                 archive_show_file_menu(browser, false);
             }

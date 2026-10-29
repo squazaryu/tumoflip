@@ -20,7 +20,7 @@ typedef struct {uint8_t data[2048];size_t size,pos;} Stream;
 typedef struct {Stream* stream;} FlipperFormat;
 typedef struct {uint8_t data[2048];size_t size;bool exists;} Entry;
 typedef struct {Entry* entry;size_t pos;bool opened;int error;} File;
-enum {FSE_OK,FSE_ERROR};
+typedef enum {FSE_OK,FSE_ERROR,FSE_NOT_EXIST} FS_Error;
 static Entry original,backup;
 static Storage storage;
 static unsigned operation,fail_at,fail_again;
@@ -40,6 +40,7 @@ static bool flipper_format_insert_or_update_uint32(FlipperFormat* f,const char* 
 static File* storage_file_alloc(Storage* s){(void)s;return calloc(1,sizeof(File));}
 static void storage_file_free(File* f){assert(!f->opened);free(f);}
 static Entry* entry(const char* p){return strstr(p,".tumo-bak")?&backup:&original;}
+static FS_Error storage_common_stat(Storage*s,const char*p,void*i){(void)s;(void)i;return fail()?FSE_ERROR:entry(p)->exists?FSE_OK:FSE_NOT_EXIST;}
 static bool storage_file_open(File* f,const char* p,int a,int m){
  (void)a;if(fail())return false;Entry* e=entry(p);
  if(m==FSOM_CREATE_NEW&&e->exists)return false;

@@ -1639,8 +1639,8 @@ Function,+,furi_hal_interrupt_get_name,const char*,uint8_t
 Function,+,furi_hal_interrupt_get_time_in_isr_total,uint32_t,
 Function,-,furi_hal_interrupt_init,void,
 Function,+,furi_hal_interrupt_set_isr,void,"FuriHalInterruptId, FuriHalInterruptISR, void*"
-Function,+,furi_hal_interrupt_try_set_isr,_Bool,"FuriHalInterruptId, FuriHalInterruptISR, void*"
 Function,+,furi_hal_interrupt_set_isr_ex,void,"FuriHalInterruptId, FuriHalInterruptPriority, FuriHalInterruptISR, void*"
+Function,+,furi_hal_interrupt_try_set_isr,_Bool,"FuriHalInterruptId, FuriHalInterruptISR, void*"
 Function,+,furi_hal_light_blink_set_color,void,Light
 Function,+,furi_hal_light_blink_start,void,"Light, uint8_t, uint16_t, uint16_t"
 Function,+,furi_hal_light_blink_stop,void,
@@ -1875,8 +1875,8 @@ Function,+,furi_hal_spi_release,void,const FuriHalSpiBusHandle*
 Function,-,furi_hal_subghz_dump_state,void,
 Function,+,furi_hal_subghz_flush_rx,void,
 Function,+,furi_hal_subghz_flush_tx,void,
-Function,+,furi_hal_subghz_get_data_gpio,const GpioPin*,
 Function,+,furi_hal_subghz_get_channel_checked,_Bool,uint8_t*
+Function,+,furi_hal_subghz_get_data_gpio,const GpioPin*,
 Function,+,furi_hal_subghz_get_ext_leds_and_amp,_Bool,
 Function,+,furi_hal_subghz_get_lqi,uint8_t,
 Function,+,furi_hal_subghz_get_rolling_counter_mult,int32_t,
@@ -1895,9 +1895,9 @@ Function,+,furi_hal_subghz_reset,void,
 Function,+,furi_hal_subghz_rx,void,
 Function,+,furi_hal_subghz_rx_pipe_not_empty,_Bool,
 Function,+,furi_hal_subghz_set_async_mirror_pin,void,const GpioPin*
+Function,+,furi_hal_subghz_set_channel_checked,_Bool,uint8_t
 Function,+,furi_hal_subghz_set_ext_leds_and_amp,void,_Bool
 Function,+,furi_hal_subghz_set_frequency,uint32_t,uint32_t
-Function,+,furi_hal_subghz_set_channel_checked,_Bool,uint8_t
 Function,+,furi_hal_subghz_set_frequency_and_path,uint32_t,uint32_t
 Function,+,furi_hal_subghz_set_path,void,FuriHalSubGhzPath
 Function,+,furi_hal_subghz_set_rolling_counter_mult,void,int32_t
@@ -3395,6 +3395,7 @@ Function,-,setkey,void,const char*
 Function,-,setlinebuf,int,FILE*
 Function,-,setstate,char*,char*
 Function,-,setvbuf,int,"FILE*, char*, int, size_t"
+Function,-,signal_file_replace,_Bool,"Storage*, const char*, const char*"
 Function,-,signal_file_update,_Bool,"Storage*, Stream*, const char*"
 Function,+,signal_reader_alloc,SignalReader*,"const GpioPin*, uint32_t"
 Function,+,signal_reader_free,void,SignalReader*

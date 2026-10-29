@@ -30,12 +30,13 @@ void nfc_scene_delete_on_enter(void* context) {
     for(size_t i = 0; i < uid_len; i++) {
         furi_string_cat_printf(temp_str, " %02X", uid[i]);
     }
-    widget_add_string_element(
-        nfc->widget, 64, 24, AlignCenter, AlignTop, FontSecondary, furi_string_get_cstr(temp_str));
+    // A 10-byte UID needs two lines; centering one long string clipped both ends.
+    widget_add_text_box_element(
+        nfc->widget, 0, 24, 128, 18, AlignCenter, AlignTop, furi_string_get_cstr(temp_str), false);
 
     furi_string_set_str(temp_str, nfc_device_get_name(nfc->nfc_device, NfcDeviceNameTypeFull));
-    widget_add_string_element(
-        nfc->widget, 64, 34, AlignCenter, AlignTop, FontSecondary, furi_string_get_cstr(temp_str));
+    widget_add_text_box_element(
+        nfc->widget, 0, 43, 128, 9, AlignCenter, AlignTop, furi_string_get_cstr(temp_str), true);
     furi_string_free(temp_str);
 
     view_dispatcher_switch_to_view(nfc->view_dispatcher, NfcViewWidget);

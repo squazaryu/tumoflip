@@ -96,6 +96,41 @@ static bool signal_file_write_stream(Storage* storage, Stream* source, const cha
     return result && closed;
 }
 
+bool signal_file_replace(Storage* storage, const char* source, const char* path) {
+    furi_assert(storage);
+    furi_assert(source);
+    furi_assert(path);
+    if(strcmp(source, path) == 0) return false;
+    bool created = false;
+    const FS_Error status = storage_common_stat(storage, path, NULL);
+    if(status == FSE_NOT_EXIST) {
+        bool ok = signal_file_copy_existing(storage, source, path, FSOM_CREATE_NEW, &created) &&
+                  signal_file_contents_equal(storage, source, path);
+        if(!ok && created) storage_simply_remove(storage, path);
+        return ok;
+    }
+    if(status != FSE_OK) return false;
+    FuriString* backup = furi_string_alloc_printf("%s.tumo-bak", path);
+    const char* backup_path = furi_string_get_cstr(backup);
+    bool ok = false;
+    if(signal_file_copy_existing(storage, path, backup_path, FSOM_CREATE_NEW, &created) &&
+       signal_file_contents_equal(storage, path, backup_path)) {
+        bool opened = false;
+        ok = signal_file_copy_existing(storage, source, path, FSOM_OPEN_EXISTING, &opened) &&
+             signal_file_contents_equal(storage, source, path);
+        if(ok) {
+            storage_simply_remove(storage, backup_path);
+        } else {
+            // Keep the verified original even when a second error prevents rollback.
+            signal_file_copy_existing(storage, backup_path, path, FSOM_OPEN_EXISTING, &opened);
+        }
+    } else if(created) {
+        storage_simply_remove(storage, backup_path);
+    }
+    furi_string_free(backup);
+    return ok;
+}
+
 bool signal_file_update(Storage* storage, Stream* source, const char* path) {
     furi_assert(storage);
     furi_assert(source);
