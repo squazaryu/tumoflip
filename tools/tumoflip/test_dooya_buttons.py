@@ -41,6 +41,8 @@ static const struct {uint32_t te_short,te_long;} subghz_protocol_dooya_const={36
 static uint8_t command,original;static bool override;static uint8_t override_btn;
 static uint8_t __attribute__((unused)) subghz_custom_btn_get(void){return command;}
 static uint8_t __attribute__((unused)) subghz_custom_btn_get_original(void){return original;}
+static void __attribute__((unused)) subghz_custom_btn_set_original(uint8_t b){original=b;}
+static void __attribute__((unused)) subghz_custom_btn_set_max(uint8_t n){assert(n==4);}
 static bool __attribute__((unused)) subghz_block_generic_global_button_override_get(uint8_t*b){if(override)*b=override_btn;return override;}
 ''' + helpers + "\n" + function(source, "static bool subghz_protocol_encoder_dooya_get_upload(") + r'''
 int main(void){LevelDuration upload[128];const uint8_t captured[]={0x11,0x1e,0x33,0x3c,0x55,0x79,0xcc};

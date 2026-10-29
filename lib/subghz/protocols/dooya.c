@@ -4,11 +4,18 @@
 #include "../blocks/encoder.h"
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
+#include "../blocks/custom_btn_i.h"
 #include "common.h"
 
 #define TAG "SubGhzProtocolDooya"
 
 #define DOYA_SINGLE_CHANNEL 0xFF
+
+#define DOOYA_BTN_UP_LONG    0x11
+#define DOOYA_BTN_UP_SHORT   0x1E
+#define DOOYA_BTN_DOWN_LONG  0x33
+#define DOOYA_BTN_DOWN_SHORT 0x3C
+#define DOOYA_BTN_STOP       0x55
 
 static const SubGhzBlockConst subghz_protocol_dooya_const = {
     .te_short = 366,
@@ -84,6 +91,16 @@ void* subghz_protocol_encoder_dooya_alloc(SubGhzEnvironment* environment) {
  * @param instance Pointer to a SubGhzProtocolEncoderDooya instance
  * @return true Always; this encoder has no failure path
  */
+static uint8_t subghz_protocol_dooya_get_btn_code(void) {
+    switch(subghz_custom_btn_get()) {
+    case SUBGHZ_CUSTOM_BTN_UP: return DOOYA_BTN_UP_LONG;
+    case SUBGHZ_CUSTOM_BTN_DOWN: return DOOYA_BTN_DOWN_LONG;
+    case SUBGHZ_CUSTOM_BTN_LEFT: return DOOYA_BTN_UP_SHORT;
+    case SUBGHZ_CUSTOM_BTN_RIGHT: return DOOYA_BTN_DOWN_SHORT;
+    default: return subghz_custom_btn_get_original();
+    }
+}
+
 static bool subghz_protocol_encoder_dooya_get_upload(void* context) {
     SubGhzProtocolEncoderDooya* instance = context;
     furi_assert(instance);
@@ -96,6 +113,15 @@ static bool subghz_protocol_encoder_dooya_get_upload(void* context) {
     } else {
         instance->encoder.size_upload = size_upload;
     }
+
+    // Latch the captured command once. Direction changes must not replace OK's original.
+    if(subghz_custom_btn_get_original() == 0) {
+        subghz_custom_btn_set_original((uint8_t)instance->generic.data);
+    }
+    subghz_custom_btn_set_max(4);
+    instance->generic.btn = subghz_protocol_dooya_get_btn_code();
+    subghz_block_generic_global_button_override_get(&instance->generic.btn);
+    instance->generic.data = (instance->generic.data & ~0xFFULL) | instance->generic.btn;
 
     //Send header
     if(bit_read(instance->generic.data, 0)) {
@@ -279,6 +305,10 @@ static void subghz_protocol_dooya_check_remote_controller(SubGhzBlockGeneric* in
         instance->cnt = DOYA_SINGLE_CHANNEL;
     }
     instance->btn = instance->data & 0xFF;
+    if(subghz_custom_btn_get_original() == 0) {
+        subghz_custom_btn_set_original(instance->btn);
+    }
+    subghz_custom_btn_set_max(4);
 }
 
 SubGhzProtocolStatus
@@ -337,7 +367,7 @@ void subghz_protocol_decoder_dooya_get_string(void* context, FuriString* output)
     subghz_protocol_dooya_check_remote_controller(&instance->generic);
 
     // push protocol data to global variable
-    subghz_block_generic_global.btn_is_available = false;
+    subghz_block_generic_global.btn_is_available = true;
     subghz_block_generic_global.current_btn = instance->generic.btn;
     subghz_block_generic_global.btn_length_bit = 8;
     //
