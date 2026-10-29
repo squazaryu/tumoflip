@@ -19,6 +19,26 @@ def source(name):
 
 
 class UsbCdromTests(unittest.TestCase):
+    def test_usb_profile_is_restored_before_freeing_active_callbacks(self):
+        code = source("helpers/cd_usb.c")
+        native(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#define furi_check assert
+typedef struct{void*str_prod_descr,*str_serial_descr;}Interface;
+typedef struct{Interface usb;Interface*usb_prev;void*thread;}CdUsb;
+static bool locked=true,active=true;
+static Interface*current;
+static Interface* __attribute__((unused)) furi_hal_usb_get_config(void){return current;}
+static void __attribute__((unused)) furi_hal_usb_unlock(void){locked=false;}
+static bool furi_hal_usb_set_config(Interface*p,void*c){(void)c;if(locked)return false;current=p;active=false;return true;}
+static void furi_thread_free(void*p){(void)p;assert(!active);}
+''' + function(code, "void cd_usb_stop(") + r'''
+int main(void){Interface prior={0};CdUsb*p=calloc(1,sizeof(*p));p->usb_prev=&prior;current=&p->usb;
+ p->usb.str_prod_descr=malloc(1);p->usb.str_serial_descr=malloc(1);cd_usb_stop(p);assert(!locked&&!active&&current==&prior);return 0;}
+''')
+
     def test_big_endian_lba_never_shifts_signed_bytes(self):
         native("#include <stdint.h>\n#include <assert.h>\n" + function(source("helpers/scsi_cd.c"), "static uint32_t get_be32(") + r'''
 int main(void){for(unsigned i=0;i<256;i++){uint8_t p[]={(uint8_t)i,0x81,0xfe,0xff};
