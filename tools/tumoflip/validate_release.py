@@ -161,6 +161,7 @@ FIELD_TOOLS_PACKAGE_FILE = "apps/Tools/field_tools.fap"
 NFC_FIELD_PACKAGE_FILE = "apps/NFC/tumo_nfc_sniffer.fap"
 FILE_HISTORY_PACKAGE_FILE = "apps_data/device_library/plugins/file_history.fal"
 FIELD_BATCH_PACKAGE_FILES = {
+    "usb_cdrom.fap": "apps/USB/usb_cdrom.fap",
     "servo_tester_plus.fap": "apps/GPIO/servo_tester_plus.fap",
     "power_journal.fap": "apps/Tools/Diagnostics/power_journal.fap",
     "tumo_uhf_inventory.fap": "apps/GPIO/tumo_uhf_inventory.fap",
@@ -935,11 +936,13 @@ def validate_resources_archive(
 
 def validate_subghz_feature_resources(repo_root: Path, resources: Path, archive_path: Path) -> None:
     archive_hashes = resources_archive_hashes(repo_root, archive_path)
-    for name in ("subghz_frequency_analyzer.fal", "subghz_add_manually.fal", "subghz_workspaces.fal"):
-        relative = "apps_data/subghz/plugins/" + name
-        path = require_file(resources / relative, "Sub-GHz feature plugin")
+    required = ["apps_data/subghz/plugins/" + name for name in (
+        "subghz_frequency_analyzer.fal", "subghz_add_manually.fal", "subghz_workspaces.fal")]
+    required.append("apps_data/archive/plugins/archive_favorites.fal")
+    for relative in required:
+        path = require_file(resources / relative, "Native feature plugin")
         if archive_hashes.get(relative) != sha256(path):
-            raise ValidationError(f"Sub-GHz feature differs or is absent in updater: {relative}")
+            raise ValidationError(f"Native feature differs or is absent in updater: {relative}")
 
 
 def prune_legacy_resource_exports(resources: Path) -> None:

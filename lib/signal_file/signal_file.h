@@ -14,6 +14,12 @@ extern "C" {
  */
 bool signal_file_update(Storage* storage, Stream* source, const char* path);
 
+/** Replace from a closed file, allowing empty lists and create-new destinations.
+ * The source is never removed. Existing destination backups are never clobbered.
+ * Like signal_file_update, this requires caller-serialized access, not power-loss atomicity.
+ */
+bool signal_file_replace(Storage* storage, const char* source, const char* path);
+
 #ifdef __cplusplus
 }
 #endif

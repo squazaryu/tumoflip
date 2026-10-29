@@ -8,4 +8,15 @@ App(
     stack_size=6 * 1024,
     icon="A_FileManager_14",
     order=10,
+    sources=["*.c*", "!plugins"],
+)
+
+App(
+    appid="archive_favorites",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="archive_favorites_ep",
+    requires=["archive"],
+    sources=["plugins/favorites_writer.c"],
+    fap_libs=["signal_file"],
 )
