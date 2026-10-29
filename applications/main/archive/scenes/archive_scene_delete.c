@@ -26,6 +26,11 @@ void archive_scene_delete_on_enter(void* context) {
     filename = furi_string_alloc();
 
     ArchiveFile_t* current = archive_get_current_file(app->browser);
+    if(!current) {
+        furi_string_free(filename);
+        scene_manager_previous_scene(app->scene_manager);
+        return;
+    }
 
     FuriString* filename_no_ext = furi_string_alloc();
     path_extract_filename(current->path, filename_no_ext, true);
@@ -34,10 +39,12 @@ void archive_scene_delete_on_enter(void* context) {
 
     path_extract_filename(current->path, filename, false);
 
-    char delete_str[64];
-    snprintf(delete_str, sizeof(delete_str), "\e#Delete %s?\e#", furi_string_get_cstr(filename));
+    // File name on its own line in the small font, a long one broke mid-word before and
+    // did not fit in the two big-font lines the old 23px box had room for
+    char delete_str[MAX_NAME_LEN + 16];
+    snprintf(delete_str, sizeof(delete_str), "\e#Delete\e#\n%s?", furi_string_get_cstr(filename));
     widget_add_text_box_element(
-        app->widget, 0, 0, 128, 23, AlignCenter, AlignCenter, delete_str, false);
+        app->widget, 0, 0, 128, 52, AlignCenter, AlignCenter, delete_str, true);
 
     furi_string_free(filename);
 
@@ -54,6 +61,7 @@ bool archive_scene_delete_on_event(void* context, SceneManagerEvent event) {
 
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == GuiButtonTypeRight) {
+            if(!selected) return scene_manager_previous_scene(app->scene_manager);
             // Show loading popup on delete
             view_dispatcher_switch_to_view(app->view_dispatcher, ArchiveViewStack);
             archive_show_loading_popup(app, true);

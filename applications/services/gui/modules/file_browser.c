@@ -64,13 +64,16 @@ static void BrowserItem_t_init_set(BrowserItem_t* obj, const BrowserItem_t* src)
 }
 
 static void BrowserItem_t_set(BrowserItem_t* obj, const BrowserItem_t* src) {
+    if(obj == src) return;
     obj->unsorted_idx = src->unsorted_idx;
     obj->type = src->type;
     furi_string_set(obj->name, src->name);
     furi_string_set(obj->display_name, src->display_name);
     if(src->custom_icon_data) {
+        if(!obj->custom_icon_data) obj->custom_icon_data = malloc(CUSTOM_ICON_MAX_SIZE);
         memcpy(obj->custom_icon_data, src->custom_icon_data, CUSTOM_ICON_MAX_SIZE);
     } else {
+        free(obj->custom_icon_data);
         obj->custom_icon_data = NULL;
     }
 }
@@ -486,7 +489,8 @@ static void browser_list_item_cb(
             {
                 if(model->item_cnt <= BROWSER_SORT_THRESHOLD) {
                     FuriString* selected = NULL;
-                    if(model->item_idx > 0) {
+                    if((model->item_idx > 0) &&
+                       ((size_t)model->item_idx < items_array_size(model->items))) {
                         selected = furi_string_alloc_set(
                             items_array_get(model->items, model->item_idx)->name);
                     }

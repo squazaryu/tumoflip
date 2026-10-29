@@ -303,9 +303,9 @@ ArchiveFile_t* archive_get_current_file(ArchiveBrowserView* browser) {
         browser->view,
         ArchiveBrowserViewModel * model,
         {
-            selected = files_array_size(model->files) ?
-                           files_array_get(model->files, model->item_idx - model->array_offset) :
-                           NULL;
+            if(archive_is_item_in_array(model, model->item_idx)) {
+                selected = files_array_get(model->files, model->item_idx - model->array_offset);
+            }
         },
         false);
     return selected;
@@ -320,8 +320,9 @@ ArchiveFile_t* archive_get_file_at(ArchiveBrowserView* browser, size_t idx) {
         browser->view,
         ArchiveBrowserViewModel * model,
         {
-            idx = CLAMP(idx - model->array_offset, files_array_size(model->files), 0u);
-            selected = files_array_size(model->files) ? files_array_get(model->files, idx) : NULL;
+            if(archive_is_item_in_array(model, idx)) {
+                selected = files_array_get(model->files, idx - model->array_offset);
+            }
         },
         false);
     return selected;
@@ -349,7 +350,7 @@ bool archive_is_home(ArchiveBrowserView* browser) {
 
 const char* archive_get_name(ArchiveBrowserView* browser) {
     ArchiveFile_t* selected = archive_get_current_file(browser);
-    return furi_string_get_cstr(selected->path);
+    return selected ? furi_string_get_cstr(selected->path) : "";
 }
 
 void archive_set_tab(ArchiveBrowserView* browser, ArchiveTabEnum tab) {
