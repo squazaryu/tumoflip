@@ -505,11 +505,18 @@ CdUsb* cd_usb_start(CdDevice device) {
         free(cd_usb);
         return NULL;
     }
+    // This foreground session now owns the profile; prevent an unrelated switch
+    // while the USB callbacks still reference its memory.
+    furi_hal_usb_lock();
     return cd_usb;
 }
 
 void cd_usb_stop(CdUsb* cd_usb) {
-    furi_hal_usb_set_config(cd_usb->usb_prev, NULL);
+    if(furi_hal_usb_get_config() == &cd_usb->usb) {
+        furi_hal_usb_unlock();
+        // Deinit synchronously joins the worker before the callbacks are freed.
+        furi_check(furi_hal_usb_set_config(cd_usb->usb_prev, NULL));
+    }
     furi_thread_free(cd_usb->thread);
     free(cd_usb->usb.str_prod_descr);
     free(cd_usb->usb.str_serial_descr);
