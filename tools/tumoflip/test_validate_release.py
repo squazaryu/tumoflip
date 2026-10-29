@@ -295,7 +295,8 @@ class ValidateReleaseTest(unittest.TestCase):
             PACKAGE_ONLY_PACKAGE_FILES,
             {package_only, quac, nearby, weather, hitags, converter, inspector, specter, ble_remote, device_library, field_tools, nfc_field, file_history,
              "apps/GPIO/servo_tester_plus.fap", "apps/Tools/Diagnostics/power_journal.fap",
-             "apps/Sub-GHz/sensor_watch.fap", "apps/RFID/tumo_varta.fap", "apps/GPIO/tumo_uhf_inventory.fap"},
+             "apps/Sub-GHz/sensor_watch.fap", "apps/RFID/tumo_varta.fap", "apps/GPIO/tumo_uhf_inventory.fap",
+             "apps/USB/usb_cdrom.fap"},
         )
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -318,6 +319,7 @@ class ValidateReleaseTest(unittest.TestCase):
                 "apps/Sub-GHz/sensor_watch.fap": "base",
                 "apps/RFID/tumo_varta.fap": "base",
                 "apps/GPIO/tumo_uhf_inventory.fap": "base",
+                "apps/USB/usb_cdrom.fap": "base",
             },
         )
         regular = "apps/Tools/clock.fap"

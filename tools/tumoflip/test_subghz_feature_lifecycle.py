@@ -16,11 +16,15 @@ class FeatureLifecycleTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             hashes = {}
-            for name in ("subghz_frequency_analyzer.fal", "subghz_add_manually.fal", "subghz_workspaces.fal"):
-                relative = "apps_data/subghz/plugins/" + name
+            for relative in (
+                "apps_data/subghz/plugins/subghz_frequency_analyzer.fal",
+                "apps_data/subghz/plugins/subghz_add_manually.fal",
+                "apps_data/subghz/plugins/subghz_workspaces.fal",
+                "apps_data/archive/plugins/archive_favorites.fal",
+            ):
                 file = root / relative
                 file.parent.mkdir(parents=True, exist_ok=True)
-                file.write_bytes(name.encode())
+                file.write_bytes(relative.encode())
                 hashes[relative] = hashlib.sha256(file.read_bytes()).hexdigest()
             with patch("tools.tumoflip.validate_release.resources_archive_hashes", return_value=hashes):
                 validate_subghz_feature_resources(ROOT, root, root / "resources.ths")

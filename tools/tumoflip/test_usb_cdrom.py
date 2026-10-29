@@ -42,7 +42,8 @@ int main(void){for(unsigned i=0;i<256;i++){uint8_t p[]={(uint8_t)i,0x81,0xfe,0xf
 #define FURI_LOG_T(...) ((void)0)
 ''' + header + code + r'''
 static unsigned reads;
-static void media(void*c,CdMedia*m){(void)c;*m=(CdMedia){.blocks=32,.id=1};}
+static uint32_t medium_blocks=32;
+static void media(void*c,CdMedia*m){(void)c;*m=(CdMedia){.blocks=medium_blocks,.id=1};}
 static bool read_block(void*c,uint32_t lba,uint32_t n,uint8_t*out){(void)c;assert(lba<=32&&n<=32-lba);memset(out,0x5a,n*2048);reads++;return true;}
 static void eject(void*c){(void)c;}
 static void lock(void*c,bool l){(void)c;(void)l;}
@@ -50,6 +51,8 @@ int main(void){CdSession s;CdDevice d={.media=media,.read=read_block,.eject=ejec
  scsi_cd_init(&s,d);cmd[0]=0x28;cmd[8]=2;assert(scsi_cd_cmd_start(&s,cmd,10));
  assert(scsi_cd_cmd_tx_data(&s,out,&len,sizeof(out))&&len==4096&&reads==1&&out[0]==0x5a);assert(scsi_cd_cmd_end(&s));
  cmd[0]=0x2a;assert(!scsi_cd_cmd_start(&s,cmd,10));assert(reads==1);
+ medium_blocks=2097152;memset(cmd,0,sizeof(cmd));cmd[0]=0xa8;cmd[7]=0x20;
+ assert(!scsi_cd_cmd_start(&s,cmd,12));medium_blocks=32;memset(cmd,0,sizeof(cmd));cmd[8]=2;
  cmd[0]=0x28;cmd[2]=0xff;assert(!scsi_cd_cmd_start(&s,cmd,10));assert(reads==1);
  for(unsigned op=0;op<256;op++){for(unsigned n=0;n<=16;n++){
   memset(cmd,0,sizeof(cmd));cmd[0]=op;scsi_cd_init(&s,d);bool ok=scsi_cd_cmd_start(&s,cmd,n);
