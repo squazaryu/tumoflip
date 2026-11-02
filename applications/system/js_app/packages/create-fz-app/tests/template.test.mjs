@@ -3,14 +3,19 @@ import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
-import { replaceInFileSync } from "replace-in-file";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const packageRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const packageRoot = process.env.WIZARD_PACKAGE_ROOT
+  ? path.resolve(process.env.WIZARD_PACKAGE_ROOT)
+  : path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const { replaceTemplatePlaceholders } = await import(
+  pathToFileURL(path.join(packageRoot, "template-files.js"))
+);
+const temporaryRoot = process.env.SDK_TEST_TEMP_ROOT ?? os.tmpdir();
 
 test("creates a project template without unresolved placeholders", async () => {
   const fixtureRoot = await mkdtemp(
-    path.join(os.tmpdir(), "tumoflip-create-fz-"),
+    path.join(temporaryRoot, "tumoflip-create-fz-"),
   );
   const projectRoot = path.join(fixtureRoot, "sample-app");
 
@@ -18,11 +23,7 @@ test("creates a project template without unresolved placeholders", async () => {
     await cp(path.join(packageRoot, "template"), projectRoot, {
       recursive: true,
     });
-    replaceInFileSync({
-      files: `${projectRoot}/**/*`,
-      from: /<app_name>/g,
-      to: "sample-app",
-    });
+    replaceTemplatePlaceholders(projectRoot, "sample-app");
 
     const packageJson = JSON.parse(
       await readFile(path.join(projectRoot, "package.json"), "utf8"),
@@ -41,9 +42,12 @@ test("creates a project template without unresolved placeholders", async () => {
   }
 });
 
-test("pins the audited template dependency", async () => {
+test("does not pull a generic glob/replacement runtime into the wizard", async () => {
   const packageJson = JSON.parse(
     await readFile(path.join(packageRoot, "package.json"), "utf8"),
   );
-  assert.equal(packageJson.dependencies["replace-in-file"], "8.4.0");
+  assert.equal(packageJson.engines.node, ">=18.12");
+  assert.equal(packageJson.dependencies["replace-in-file"], undefined);
+  const entry = await readFile(path.join(packageRoot, "index.js"), "utf8");
+  assert.match(entry, /replaceTemplatePlaceholders\(name, name\)/);
 });

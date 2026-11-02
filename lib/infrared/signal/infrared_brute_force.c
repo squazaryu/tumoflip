@@ -91,7 +91,7 @@ InfraredErrorCode infrared_brute_force_calculate_messages(InfraredBruteForce* br
     furi_check(brute_force);
     furi_assert(!brute_force->is_started);
     furi_assert(brute_force->db_filename);
-    InfraredErrorCode error = InfraredErrorCodeNone;
+    InfraredErrorCode error = InfraredErrorCodeSignalNameNotFound;
 
     Storage* storage = furi_record_open(RECORD_STORAGE);
     FlipperFormat* ff = flipper_format_buffered_file_alloc(storage);
@@ -104,19 +104,22 @@ InfraredErrorCode infrared_brute_force_calculate_messages(InfraredBruteForce* br
             break;
         }
 
-        bool signal_valid = false;
         while(infrared_signal_read_name(ff, signal_name) == InfraredErrorCodeNone) {
             size_t signal_start = flipper_format_tell(ff);
             error = infrared_signal_read_body(signal, ff);
-            signal_valid = (!INFRARED_ERROR_PRESENT(error)) && infrared_signal_is_valid(signal);
-            if(!signal_valid) break;
+            if(INFRARED_ERROR_PRESENT(error) || !infrared_signal_is_valid(signal)) {
+                if(error == InfraredErrorCodeNone) error = InfraredErrorCodeSignalMessageIsInvalid;
+                break;
+            }
 
             InfraredBruteForceRecord* record =
                 InfraredBruteForceRecordDict_get(brute_force->records, signal_name);
-            furi_assert(record);
+            if(!record) {
+                error = InfraredErrorCodeSignalNameNotFound;
+                break;
+            }
             SignalPositionArray_push_back(record->signals, signal_start);
         }
-        if(!signal_valid) break;
     } while(false);
 
     infrared_signal_free(signal);

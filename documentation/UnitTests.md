@@ -15,12 +15,38 @@ Running existing unit tests is useful to ensure that the new code doesn't introd
 
 To run the unit tests, follow these steps:
 
-1. Compile the firmware with the tests enabled: `./fbt FIRMWARE_APP_SET=unit_tests updater_package`.
+1. Compile the separate test firmware: `./fbt -j2 COMPACT=1 DEBUG=0 FIRMWARE_APP_SET=unit_tests updater_package`.
 2. Flash the firmware using your preferred method, including SD card resources (`build/latest/resources`).
 3. Launch the CLI session and run the `unit_tests` command.
 
 **NOTE:** To run a particular test (and skip all others), specify its name as the command argument.
 Test names match application names defined [here](https://github.com/flipperdevices/flipperzero-firmware/blob/dev/applications/debug/unit_tests/application.fam).
+
+This is a diagnostic firmware profile, not the normal Dev firmware or a FW
+Packages group. Building it does not install it on a device. Flash it only as a
+separate, explicitly approved hardware test, and restore normal firmware with
+its resources afterwards. A successful compile is not a passing on-device run.
+Keep the physical C2 reserve of at least 4096 bytes and validate the actual DFU
+ranges, not just file size. `DEBUG=0` also means `furi_assert()` is disabled;
+input validation must use real error handling rather than debug assertions.
+
+After building and before any device installation, run
+`toolchain/current/bin/python3 tools/tumoflip/validate_unit_profile.py --expect-commit "$(git rev-parse HEAD)"`.
+It checks DFU ranges, updater CRCs, the exact declared test-plugin set, resource
+bytes and every FAL import against the real core test host plus public API.
+Private UL-AES crypto and Kia V1 code is linked into its test FAL, not added to
+the resident firmware or public SDK. A separate read-only CI job performs the
+same build/check; it neither flashes hardware nor publishes test images.
+
+## JavaScript test boundary
+
+JS Runner and its modules are intentionally excluded in Tumoflip. The core
+test resolver cannot import private functions from that excluded FAP. The old
+JS suite, scripts, helper module and typings are preserved byte-for-byte with
+source hashes under `tools/tumoflip/fixtures/deferred_js_tests/`; they are not
+compiled, installed, executed or counted as passing core tests. Re-enabling
+them requires a separately reviewed out-of-core JS host, not restoring JS to
+the resident firmware. Do not infer JavaScript coverage from core test results.
 
 ## Adding unit tests
 
