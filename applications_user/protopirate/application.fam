@@ -17,6 +17,7 @@ _ENABLE_EMULATE = ProtoPirateDefineEnabled("ENABLE_EMULATE_FEATURE")
 
 _MAIN_APP_SOURCES = [
     "*.c*",
+    "../../lib/subghz/subghz_rx_profiles.c",
     "!protocols/plugins",
     "!scenes/plugins",
     "!protocols",

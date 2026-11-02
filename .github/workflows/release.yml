@@ -131,6 +131,9 @@ jobs:
       - name: Validate November NFC, decoder bounds and optional RX memory
         run: python3 -m unittest tools.tumoflip.test_upstream_20261102 tools.tumoflip.test_rx_memory_20261102
 
+      - name: Validate automatic hopping excludes explicit RX profiles
+        run: python3 -m unittest tools.tumoflip.test_hopper_profile_filter tools.tumoflip.test_rx_profiles
+
       - name: Validate field-batch data and hardware ownership contracts
         run: python3 -m unittest tools.tumoflip.test_servo_plus tools.tumoflip.test_power_history tools.tumoflip.test_uhf_inventory tools.tumoflip.test_sensor_cards tools.tumoflip.test_varta_inspect tools.tumoflip.test_field_report tools.tumoflip.test_field_batch_packages
 
