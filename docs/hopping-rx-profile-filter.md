@@ -32,6 +32,12 @@ not automatically register this profile and is unchanged. This patch requires
 a new firmware build for installation; it does not replace the immutable034
 release and does not require an independent FW Packages or iOS content update.
 
+The private registration implementation and its46-byte preset live once in
+`subghz_rx_profiles.c`, instead of being duplicated by header inclusion in the
+allocator and UI. ProtoPirate links that private source into its own native FAP;
+no new firmware SDK export is introduced. This behavior-preserving factoring
+retains the full4096-byte C2 reserve without removing functions.
+
 ## Verification
 
 `test_hopper_profile_filter` compiles the actual production hopper and RX catalog
