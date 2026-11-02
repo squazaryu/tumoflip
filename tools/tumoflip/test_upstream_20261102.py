@@ -11,6 +11,40 @@ PROTOCOLS = ROOT / 'lib/subghz/protocols'
 
 
 class UpstreamNovemberSafetyTests(unittest.TestCase):
+    def test_compact_manchester_duration_mapping_preserves_all_symbols_and_errors(self):
+        header = (ROOT / 'lib/toolbox/manchester_encoder.h').read_text().replace('#pragma once', '')
+        for name in ['came_twee', 'power_smart', 'honeywell', 'marantec', 'revers_rb2', 'secplus_v2']:
+            with self.subTest(protocol=name):
+                text = (PROTOCOLS / (name + '.c')).read_text()
+                symbol = 'subghz_protocol_encoder_' + name + '_add_duration_to_upload'
+                constant = re.search(r'static const SubGhzBlockConst subghz_protocol_' + name + r'_const = \{.*?\};', text, re.S).group()
+                native(r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <setjmp.h>
+#include <string.h>
+static jmp_buf trap;
+_Noreturn static void invalid_symbol(const char* msg) {
+    assert(!strcmp(msg,"SubGhz: ManchesterEncoderResult is incorrect."));longjmp(trap,1);
+}
+#define furi_crash invalid_symbol
+typedef struct {bool level;uint32_t duration;} LevelDuration;
+typedef struct {uint32_t te_short,te_long,te_delta,min_count_bit_for_found;} SubGhzBlockConst;
+static LevelDuration level_duration_make(bool l,uint32_t d) {return (LevelDuration){l,d};}
+''' + header + '\n' + constant + '\n' + function(text, symbol) + f'''
+int main(void) {{
+    for(unsigned i=0;i<4;i++) {{
+        LevelDuration d={symbol}((ManchesterEncoderResult)i);
+        assert(d.level==(i>=2));
+        assert(d.duration==((i==1||i==2)?subghz_protocol_{name}_const.te_long:subghz_protocol_{name}_const.te_short));
+    }}
+    if(!setjmp(trap)) {{{symbol}((ManchesterEncoderResult)4);assert(false);}}
+    if(!setjmp(trap)) {{{symbol}((ManchesterEncoderResult)-1);assert(false);}}
+    return 0;
+}}
+''')
+
     def test_power_smart_worst_case_executes_real_manchester_encoder(self):
         text = (PROTOCOLS / 'power_smart.c').read_text()
         manchester = (ROOT / 'lib/toolbox/manchester_encoder.c').read_text()
