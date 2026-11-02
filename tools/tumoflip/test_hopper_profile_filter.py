@@ -28,9 +28,14 @@ class HopperProfileFilterTests(unittest.TestCase):
         if helper in source:
             actual += "\n" + function(source, helper)
         actual += "\n" + function(source, "void subghz_txrx_hopper_update(")
+        initialization = re.search(
+            r"(?:instance->rx_profile_preset_owned\s*=\s*)?subghz_rx_profiles_init\(instance->setting\);",
+            function(source, "SubGhzTxRx* subghz_txrx_alloc("),
+        ).group()
         fixture = (ROOT / "tools/tumoflip/tests/hopper_profile_host.c").read_text()
         cls.input = cls.work / "test.c"
-        cls.input.write_text(fixture.replace("/* ACTUAL_PRODUCTION */", actual))
+        cls.input.write_text(fixture.replace("/* ACTUAL_PRODUCTION */", actual)
+                            .replace("/* ACTUAL_PROFILE_INIT */", initialization))
         cls.binary = cls.work / "test"
         cls.coverage = os.environ.get("HOPPER_HOST_COVERAGE") == "1"
         flags = ["-fprofile-instr-generate", "-fcoverage-mapping"] if cls.coverage else []
@@ -86,6 +91,9 @@ class HopperProfileFilterTests(unittest.TestCase):
 
     def test_custom_presets_and_user_owned_honda_name_are_not_removed(self):
         self.run_case("custom")
+
+    def test_user_honda_collision_with_only_pa_difference_is_preserved(self):
+        self.run_case("custom-power")
 
     def test_frequency_only_keeps_the_explicitly_selected_preset(self):
         self.run_case("frequency")

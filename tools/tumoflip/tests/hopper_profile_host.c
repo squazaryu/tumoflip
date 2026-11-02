@@ -44,6 +44,7 @@ typedef struct {
     void* radio_device;
     void* diversity_radio_device;
     size_t selected;
+    bool rx_profile_preset_owned;
 } SubGhzTxRx;
 
 static unsigned loads, stops, starts, resets, allocations, lookups;
@@ -102,6 +103,10 @@ static void subghz_txrx_rx(SubGhzTxRx* x, uint32_t f) {
 
 /* ACTUAL_PRODUCTION */
 
+static void init_profiles(SubGhzTxRx* instance) {
+    /* ACTUAL_PROFILE_INIT */
+}
+
 static void reset(SubGhzSetting* s) {
     memset(s, 0, sizeof(*s));
     s->frequencies[0] = 315000000; s->frequencies[1] = 433920000;
@@ -111,18 +116,21 @@ static void reset(SubGhzSetting* s) {
     loads = stops = starts = resets = lookups = 0; rssi = -100;
 }
 static SubGhzTxRx receiver(SubGhzSetting* s, SubGhzRadioPreset* p) {
-    return (SubGhzTxRx){.hopper_state = SubGhzHopperStateRunning,
+    SubGhzTxRx instance = {.hopper_state = SubGhzHopperStateRunning,
         .txrx_state = SubGhzTxRxStateRx, .setting = s, .preset = p,
         .radio_device = (void*)1, .selected = 0};
+    init_profiles(&instance);
+    return instance;
 }
 static void tick(SubGhzTxRx* x, bool frequency, bool preset) {
     x->hopper_timeout = 0;
     subghz_txrx_hopper_update(x, -85, frequency, preset);
 }
-static void cycle(SubGhzSetting* s, const size_t* expected, size_t count, bool frequency) {
-    SubGhzSetting saved = *s;
+static void cycle_with_pa(SubGhzSetting* s, const size_t* expected, size_t count, bool frequency, int pa) {
     SubGhzRadioPreset p = {.frequency = s->frequencies[0]};
     SubGhzTxRx x = receiver(s, &p);
+    if(pa >= 0) s->presets[5].bytes[s->presets[5].size - 8 + (size_t)pa] ^= 0x5A;
+    SubGhzSetting saved = *s;
     x.radio_device_type = SubGhzRadioDeviceTypeAuto; x.diversity_radio_device = (void*)2;
     for(size_t step = 1; step <= count * 3; step++) {
         unsigned previous_loads = loads;
@@ -133,6 +141,9 @@ static void cycle(SubGhzSetting* s, const size_t* expected, size_t count, bool f
     }
     assert(!memcmp(s, &saved, sizeof(*s))); // No preset/config list rewrite.
     assert(!allocations);
+}
+static void cycle(SubGhzSetting* s, const size_t* expected, size_t count, bool frequency) {
+    cycle_with_pa(s, expected, count, frequency, -1);
 }
 
 static void automatic(void) {
@@ -163,17 +174,25 @@ static void automatic_power(void) {
     for(size_t byte = 0; byte < 8; byte++) {
         SubGhzSetting s; reset(&s); assert(subghz_rx_profiles_init(&s));
         // TX power edits the trailing PA table in place, not the RX registers.
-        s.presets[5].bytes[s.presets[5].size - 8 + byte] ^= 0x5A;
-        const size_t expected[] = {0, 1, 2, 3, 4}; cycle(&s, expected, 5, true);
+        const size_t expected[] = {0, 1, 2, 3, 4};
+        cycle_with_pa(&s, expected, 5, true, (int)byte);
     }
 }
 static void custom(void) {
     SubGhzSetting s; reset(&s);
     const size_t ordinary[] = {0, 1, 2, 3, 4}; cycle(&s, ordinary, 5, true);
+    reset(&s);
     add_preset(&s, "TumoHonda", user_data, sizeof(user_data));
     assert(!subghz_rx_profiles_init(&s)); // Same name is not sufficient ownership.
     const size_t user[] = {0, 1, 2, 3, 4, 5}; cycle(&s, user, 6, false);
     s.presets[5].size--; cycle(&s, user, 6, true);
+}
+static void custom_power(void) {
+    SubGhzSetting s; reset(&s);
+    add_preset(&s, "TumoHonda", subghz_rx_honda_preset, sizeof(subghz_rx_honda_preset));
+    s.presets[5].bytes[s.presets[5].size - 8] ^= 0x5A;
+    // This collision existed before initialization; it is not an app-owned preset.
+    const size_t expected[] = {0, 1, 2, 3, 4, 5}; cycle(&s, expected, 6, true);
 }
 static void frequency_only(void) {
     SubGhzSetting s; reset(&s); assert(subghz_rx_profiles_init(&s));
@@ -228,6 +247,7 @@ int main(int argc, char** argv) {
     else if(!strcmp(argv[1], "configured")) configured();
     else if(!strcmp(argv[1], "power")) automatic_power();
     else if(!strcmp(argv[1], "custom")) custom();
+    else if(!strcmp(argv[1], "custom-power")) custom_power();
     else if(!strcmp(argv[1], "frequency")) frequency_only();
     else if(!strcmp(argv[1], "profile")) explicit_profile();
     else if(!strcmp(argv[1], "boundaries")) boundaries();
