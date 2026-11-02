@@ -143,10 +143,13 @@ static void mutex_case(void) {
     view_port_update(p); view_port_update(p);
     assert(gui.updates == 2 && !p->was_drawn && !p->mutex->depth);
     assert(view_port_get_orientation(p) == ViewPortOrientationHorizontal);
+    view_port_enabled_set(p, false);
+    view_port_enabled_set(p, true);
+    assert(gui.updates == 4 && !p->was_drawn && !p->mutex->depth);
     view_port_draw(p, &c);
-    assert(gui.updates == 3 && !p->was_drawn && !p->mutex->depth);
+    assert(gui.updates == 5 && !p->was_drawn && !p->mutex->depth);
     lock_fails = false; view_port_draw(p, &c); assert(p->was_drawn);
-    view_port_update(p); assert(gui.updates == 4);
+    view_port_update(p); assert(gui.updates == 6);
     free_port(p);
 }
 static void getters_case(void) {

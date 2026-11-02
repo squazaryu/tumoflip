@@ -23,10 +23,10 @@ ARRAY_DEF(VariableItemArray, VariableItem, M_POD_OPLIST); //-V658
 
 struct VariableItemList {
     View* view;
-    VariableItemListEnterCallback callback;
-    void* context;
     FuriTimer* scroll_timer;
     FuriTimer* locked_timer;
+    VariableItemListEnterCallback callback;
+    void* context;
 };
 
 typedef struct {

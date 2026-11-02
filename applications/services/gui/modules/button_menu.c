@@ -29,15 +29,15 @@ ARRAY_DEF(ButtonMenuItemArray, ButtonMenuItem, M_POD_OPLIST); //-V658
 
 struct ButtonMenu {
     View* view;
+    FuriTimer* scroll_timer;
     bool freeze_input;
 };
 
 typedef struct {
     ButtonMenuItemArray_t items;
     size_t position;
-    const char* header;
     size_t scroll_counter;
-    FuriTimer* scroll_timer;
+    const char* header;
 } ButtonMenuModel;
 
 static void button_menu_draw_text(
@@ -405,24 +405,19 @@ static void button_menu_process_timer_callback(void* context) {
 
 static void button_menu_enter_callback(void* context) {
     ButtonMenu* instance = context;
-    FuriTimer* timer;
     with_view_model(
         instance->view,
         ButtonMenuModel * model,
         {
             model->scroll_counter = 0;
-            timer = model->scroll_timer;
         },
         false);
-    furi_timer_start(timer, SCROLL_INTERVAL);
+    furi_timer_start(instance->scroll_timer, SCROLL_INTERVAL);
 }
 
 static void button_menu_exit_callback(void* context) {
     ButtonMenu* instance = context;
-    FuriTimer* timer;
-    with_view_model(
-        instance->view, ButtonMenuModel * model, { timer = model->scroll_timer; }, false);
-    furi_timer_stop(timer);
+    furi_timer_stop(instance->scroll_timer);
 }
 
 ButtonMenu* button_menu_alloc(void) {
@@ -444,11 +439,11 @@ ButtonMenu* button_menu_alloc(void) {
             model->position = 0;
             model->header = NULL;
             model->scroll_counter = 0;
-            model->scroll_timer = furi_timer_alloc(
-                button_menu_process_timer_callback, FuriTimerTypePeriodic, button_menu);
         },
         true);
 
+    button_menu->scroll_timer = furi_timer_alloc(
+        button_menu_process_timer_callback, FuriTimerTypePeriodic, button_menu);
     button_menu->freeze_input = false;
     return button_menu;
 }
@@ -456,18 +451,15 @@ ButtonMenu* button_menu_alloc(void) {
 void button_menu_free(ButtonMenu* button_menu) {
     furi_check(button_menu);
 
-    FuriTimer* timer;
+    furi_timer_stop(button_menu->scroll_timer);
+    furi_timer_free(button_menu->scroll_timer);
     with_view_model(
         button_menu->view,
         ButtonMenuModel * model,
         {
             ButtonMenuItemArray_clear(model->items);
-            timer = model->scroll_timer;
         },
         false);
-    // Timer commands can wait for a daemon which is taking the model mutex.
-    furi_timer_stop(timer);
-    furi_timer_free(timer);
     view_free(button_menu->view);
     free(button_menu);
 }
