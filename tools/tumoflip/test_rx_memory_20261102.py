@@ -118,6 +118,9 @@ static uint8_t subghz_protocol_blocks_add_bytes(const uint8_t* p,size_t n) {
 #define free tracked_free
 ''' + definition + '\n' + actual + r'''
 int main(void) {
+    for(unsigned bits=0;bits<=UINT16_MAX;bits++) {
+        assert(subghz_protocol_bin_raw_get_full_byte(bits)==bits/8+(bits%8!=0));
+    }
     SubGhzProtocolDecoderBinRAW* x=subghz_protocol_decoder_bin_raw_alloc(NULL);
     assert(allocated==sizeof(*x)&&live==1&&!x->data&&!x->data_raw);
     assert(!subghz_protocol_decoder_bin_raw_get_hash_data(x)&&!hashes);
@@ -149,6 +152,7 @@ int main(void) {
     assert(analyses==1&&x->decoder.parser_step==BinRAWDecoderStepReset);
     subghz_protocol_decoder_bin_raw_data_input_rssi(x,-10);
     assert(attempts==2&&!x->data_raw_ind&&!x->data[0]); // Reuse, not another allocation.
+    assert(!x->data[BIN_RAW_BUF_RAW_SIZE-1]&&!x->data_raw[BIN_RAW_BUF_RAW_SIZE-1]);
     subghz_protocol_decoder_bin_raw_reset(x);
     assert(live==2); // Payload retained until decoder destruction.
     subghz_protocol_decoder_bin_raw_free(x); assert(!live);

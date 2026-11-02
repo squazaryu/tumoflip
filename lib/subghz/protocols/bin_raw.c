@@ -132,11 +132,7 @@ const SubGhzProtocol subghz_protocol_bin_raw = {
 };
 
 static uint16_t subghz_protocol_bin_raw_get_full_byte(uint16_t bit_count) {
-    if(bit_count & 0x7) {
-        return (bit_count >> 3) + 1;
-    } else {
-        return bit_count >> 3;
-    }
+    return (bit_count + 7U) / 8U;
 }
 
 void* subghz_protocol_encoder_bin_raw_alloc(SubGhzEnvironment* environment) {
@@ -883,8 +879,11 @@ void subghz_protocol_decoder_bin_raw_data_input_rssi(
         if(rssi > (instance->adaptive_threshold_rssi + BIN_RAW_DELTA_RSSI)) {
             if(!subghz_protocol_decoder_bin_raw_buffers(instance)) break;
             instance->data_raw_ind = 0;
-            memset(instance->data_raw, 0x00, BIN_RAW_BUF_RAW_SIZE * sizeof(int32_t));
-            memset(instance->data, 0x00, BIN_RAW_BUF_RAW_SIZE * sizeof(uint8_t));
+            // The payload arrays share one contiguous allocation.
+            memset(
+                instance->data_raw,
+                0x00,
+                BIN_RAW_BUF_RAW_SIZE * (sizeof(int32_t) + sizeof(uint8_t)));
             instance->decoder.parser_step = BinRAWDecoderStepWrite;
             bin_raw_debug_tag(TAG, "RSSI\r\n");
         } else {
