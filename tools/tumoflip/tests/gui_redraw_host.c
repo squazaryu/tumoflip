@@ -16,9 +16,11 @@ enum { FuriStatusOk, FuriStatusError, FuriMutexTypeRecursive, ViewPortOrientatio
 typedef struct { unsigned updates; } Gui;
 typedef struct { unsigned depth; } FuriMutex;
 typedef int Canvas;
+typedef int ViewPortOrientation;
+typedef void (*ViewPortDrawCallback)(Canvas*, void*);
 typedef struct ViewPort {
     Gui* gui; FuriMutex* mutex; bool is_enabled, was_drawn; int orientation;
-    uint8_t width; void (*draw_callback)(Canvas*, void*); void* draw_callback_context;
+    uint8_t width, height; ViewPortDrawCallback draw_callback; void* draw_callback_context;
 } ViewPort;
 static Gui gui;
 static bool lock_fails;
@@ -26,13 +28,13 @@ static unsigned model_depth, draws;
 static FuriMutex* furi_mutex_alloc(int type) { assert(type == FuriMutexTypeRecursive); return malloc(sizeof(FuriMutex)); }
 static int furi_mutex_acquire(FuriMutex* m, unsigned timeout) { (void)timeout; if(lock_fails) return FuriStatusError; m->depth++; return FuriStatusOk; }
 static int furi_mutex_release(FuriMutex* m) { assert(m->depth); m->depth--; return FuriStatusOk; }
+static void furi_mutex_free(FuriMutex* m) { assert(!m->depth); free(m); }
 static void gui_update(Gui* g) { assert(g == &gui); g->updates++; }
 static void view_port_setup_canvas_orientation(const ViewPort* p, Canvas* c) { assert(p && c); }
-static void view_port_set_width(ViewPort* p, uint8_t width) { p->width = width; }
-static void view_port_enabled_set(ViewPort* p, bool enabled) { if(p->is_enabled != enabled) { p->is_enabled = enabled; if(p->gui) gui_update(p->gui); } }
-static void view_port_draw_callback_set(ViewPort* p, void (*cb)(Canvas*, void*), void* context) { p->draw_callback = cb; p->draw_callback_context = context; }
+void view_port_free(ViewPort* p);
+void view_port_gui_set(ViewPort* p, Gui* g);
 static void draw(Canvas* c, void* context) { assert(c); draws++; if(context) { extern void view_port_update(ViewPort*); view_port_update(context); } }
-static void free_port(ViewPort* p) { assert(!p->mutex->depth); free(p->mutex); free(p); }
+static void free_port(ViewPort* p) { assert(!p->mutex->depth); view_port_gui_set(p, NULL); view_port_free(p); }
 
 typedef struct FuriTimer { void (*callback)(void*); void* context; bool active, freed; unsigned interval; } FuriTimer;
 static FuriTimer* timers[8];
@@ -57,8 +59,10 @@ static __attribute__((unused)) void view_set_exit_callback(View* v, void (*cb)(v
 #define view_set_input_callback(...) ((void)0)
 #define with_view_model(v, declaration, body, update) do { declaration = (v)->model; model_depth++; body; model_depth--; if(update) (v)->updates++; } while(0)
 typedef struct { char* current_value_text; char* locked_message; } VariableItem;
-typedef struct { int items; uint8_t position, window_position; size_t scroll_counter; bool locked_message_visible; } VariableItemListModel;
-typedef struct { View* view; void* callback; void* context; FuriTimer* scroll_timer; FuriTimer* locked_timer; } VariableItemList;
+typedef int VariableItemArray_t;
+typedef struct VariableItemList VariableItemList;
+typedef void (*VariableItemListEnterCallback)(void*, uint32_t);
+/* VARIABLEITEMLIST_TYPES */
 typedef unsigned VariableItemArray_it_t[1];
 static VariableItem empty_item;
 #define VariableItemArray_init(a) ((a) = 0)
@@ -68,8 +72,10 @@ static VariableItem empty_item;
 #define VariableItemArray_next(it) ((it)[0]--)
 #define VariableItemArray_ref(it) ((void)(it), &empty_item)
 static void furi_string_free(char* text) { free(text); }
-typedef struct { int items; size_t position; const char* header; size_t scroll_counter; FuriTimer* scroll_timer; } ButtonMenuModel;
-typedef struct { View* view; bool freeze_input; } ButtonMenu;
+typedef int ButtonMenuItemArray_t;
+typedef struct ButtonMenu ButtonMenu;
+/* BUTTONMENU_TYPES */
+static FuriTimer* button_timer(ButtonMenu* menu) { return /* BUTTON_TIMER */; }
 #define ButtonMenuItemArray_init(a) ((a) = 0)
 #define ButtonMenuItemArray_clear(a) ((a) = 0)
 #define SCROLL_INTERVAL 333
@@ -136,10 +142,20 @@ static void mutex_case(void) {
     lock_fails = true;
     view_port_update(p); view_port_update(p);
     assert(gui.updates == 2 && !p->was_drawn && !p->mutex->depth);
+    assert(view_port_get_orientation(p) == ViewPortOrientationHorizontal);
     view_port_draw(p, &c);
     assert(gui.updates == 3 && !p->was_drawn && !p->mutex->depth);
     lock_fails = false; view_port_draw(p, &c); assert(p->was_drawn);
     view_port_update(p); assert(gui.updates == 4);
+    free_port(p);
+}
+static void getters_case(void) {
+    ViewPort* p = port();
+    assert(view_port_get_width(p) == 0 && view_port_get_height(p) == 0 && view_port_is_enabled(p));
+    view_port_set_width(p, 19); view_port_set_height(p, 8);
+    assert(view_port_get_width(p) == 19 && view_port_get_height(p) == 8);
+    assert(view_port_get_orientation(p) == ViewPortOrientationHorizontal && !p->mutex->depth);
+    view_port_enabled_set(p, false); assert(!view_port_is_enabled(p));
     free_port(p);
 }
 static void list_case(void) {
@@ -157,10 +173,11 @@ static void list_case(void) {
 }
 static void buttons_case(void) {
     ButtonMenu* menu = button_menu_alloc(); ButtonMenuModel* model = menu->view->model;
-    assert(!model->scroll_timer->active && menu->view->enter && menu->view->exit);
+    FuriTimer* timer = button_timer(menu);
+    assert(!timer->active && menu->view->enter && menu->view->exit);
     model->scroll_counter = 4;
-    menu->view->enter(menu); tick(model->scroll_timer); assert(model->scroll_counter == 1);
-    menu->view->exit(menu); tick(model->scroll_timer); assert(model->scroll_counter == 1);
+    menu->view->enter(menu); tick(timer); assert(model->scroll_counter == 1);
+    menu->view->exit(menu); tick(timer); assert(model->scroll_counter == 1);
     menu->view->enter(menu); assert(!model->scroll_counter);
     button_menu_free(menu);
 }
@@ -206,6 +223,7 @@ int main(int argc, char** argv) {
     assert(argc == 2);
     if(!strcmp(argv[1], "viewport")) viewport_case();
     else if(!strcmp(argv[1], "mutex")) mutex_case();
+    else if(!strcmp(argv[1], "getters")) getters_case();
     else if(!strcmp(argv[1], "list")) list_case();
     else if(!strcmp(argv[1], "buttons")) buttons_case();
     else if(!strcmp(argv[1], "bt")) bt_case();

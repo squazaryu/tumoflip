@@ -15,12 +15,15 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class NativeRegression(unittest.TestCase):
     @classmethod
-    def compile_fixture(cls, fixture, production, prefix):
+    def compile_fixture(cls, fixture, production, prefix, replacements=None):
         cls.temporary = tempfile.TemporaryDirectory(prefix=prefix)
         cls.addClassCleanup(cls.temporary.cleanup)
         cls.work = Path(cls.temporary.name)
         cls.input = cls.work / "test.c"
-        cls.input.write_text((ROOT / fixture).read_text().replace("/* PRODUCTION */", production))
+        text = (ROOT / fixture).read_text().replace("/* PRODUCTION */", production)
+        for marker, value in (replacements or {}).items():
+            text = text.replace(marker, value)
+        cls.input.write_text(text)
         cls.binary = cls.work / "test"
         cls.coverage = os.environ.get("GUI_IR_COVERAGE") == "1"
         flags = ["-fprofile-instr-generate", "-fcoverage-mapping"] if cls.coverage else []
@@ -77,14 +80,26 @@ class GuiRedrawTests(NativeRegression):
         "variable_item_list_enter_callback", "variable_item_list_exit_callback",
         "button_menu_enter_callback", "button_menu_exit_callback", "button_menu_free",
         "bt_statusbar_update", "storage_tick",
+        "view_port_lock", "view_port_unlock", "view_port_get_orientation",
     }
 
     @classmethod
     def setUpClass(cls):
         gui = ROOT / "applications/services/gui"
         viewport = (gui / "view_port.c").read_text()
-        production = "\n".join(function(viewport, signature) for signature in (
-            "ViewPort* view_port_alloc(", "void view_port_update(", "void view_port_draw("))
+        production = ""
+        for name in ("lock", "unlock"):
+            signature = f"static __attribute__((noinline)) void view_port_{name}("
+            if signature in viewport:
+                production += function(viewport, signature) + "\n"
+        production += "\n".join(function(viewport, signature) for signature in (
+            "ViewPort* view_port_alloc(", "void view_port_free(", "void view_port_set_width(",
+            "uint8_t view_port_get_width(", "void view_port_set_height(", "uint8_t view_port_get_height(",
+            "bool view_port_is_enabled(", "void view_port_enabled_set(",
+            "void view_port_draw_callback_set(", "void view_port_gui_set(",
+            "ViewPortOrientation view_port_get_orientation(",
+            "void view_port_update(", "void view_port_draw("))
+        replacements = {}
         for module, functions in (
             ("variable_item_list", ["static void variable_item_list_scroll_timer_callback(",
                 "void variable_item_list_locked_timer_callback(", "VariableItemList* variable_item_list_alloc(",
@@ -93,6 +108,14 @@ class GuiRedrawTests(NativeRegression):
                 "ButtonMenu* button_menu_alloc(", "void button_menu_free("]),
         ):
             source = (gui / "modules" / (module + ".c")).read_text()
+            owner = "ButtonMenu" if module == "button_menu" else "VariableItemList"
+            array = "ButtonMenuItemArray_t" if module == "button_menu" else "VariableItemArray_t"
+            controller = re.search(rf"struct {owner} \{{.*?^}};", source, re.M | re.S).group()
+            model = re.search(rf"typedef struct \{{\n    {array} items;.*?}} {owner}Model;", source, re.S).group()
+            replacements[f"/* {owner.upper()}_TYPES */"] = controller + "\n" + model
+            if owner == "ButtonMenu":
+                replacements["/* BUTTON_TIMER */"] = ("menu->scroll_timer" if "scroll_timer" in controller
+                    else "((ButtonMenuModel*)menu->view->model)->scroll_timer")
             for suffix in ("enter_callback", "exit_callback"):
                 signature = f"static void {module}_{suffix}("
                 if signature in source:
@@ -103,13 +126,16 @@ class GuiRedrawTests(NativeRegression):
         storage = (ROOT / "applications/services/storage/storage.c").read_text()
         production += "\n" + function(storage, "Storage* storage_app_alloc(")
         production += "\n" + function(storage, "void storage_tick(")
-        cls.compile_fixture("tools/tumoflip/tests/gui_redraw_host.c", production, "tumo-gui-redraw-")
+        cls.compile_fixture("tools/tumoflip/tests/gui_redraw_host.c", production, "tumo-gui-redraw-", replacements)
 
     def test_covered_viewport_coalesces_updates_and_rearms_after_actual_draw(self):
         self.run_case("viewport")
 
     def test_mutex_timeout_forwards_update_without_unowned_unlock_or_flag_write(self):
         self.run_case("mutex")
+
+    def test_blocking_viewport_accessors_keep_values_and_balanced_mutex(self):
+        self.run_case("getters")
 
     def test_variable_list_timer_runs_only_between_enter_and_exit(self):
         self.run_case("list")
