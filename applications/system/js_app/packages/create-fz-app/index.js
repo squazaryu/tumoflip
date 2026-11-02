@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "url";
 import { spawnSync } from "node:child_process";
-import { replaceInFileSync } from "replace-in-file";
+import { replaceTemplatePlaceholders } from "./template-files.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,7 +55,7 @@ const __dirname = path.dirname(__filename);
 
     console.log("Copying files...");
     fs.cpSync(path.resolve(__dirname, "template"), name, { recursive: true });
-    replaceInFileSync({ files: `${name}/**/*`, from: /<app_name>/g, to: name });
+    replaceTemplatePlaceholders(name, name);
 
     console.log("Installing packages...");
     spawnSync("bash", ["-c", `cd ${name} && ${pkgManager} install`], {

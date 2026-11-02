@@ -3,7 +3,14 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { replaceTemplatePlaceholders } from "../template-files.js";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const packageRoot = process.env.WIZARD_PACKAGE_ROOT
+  ? path.resolve(process.env.WIZARD_PACKAGE_ROOT)
+  : path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const { replaceTemplatePlaceholders } = await import(
+  pathToFileURL(path.join(packageRoot, "template-files.js"))
+);
 
 function fixture(run) {
   const root = mkdtempSync(path.join(process.env.SDK_TEST_TEMP_ROOT ?? os.tmpdir(), "sdk-template-"));
@@ -58,5 +65,15 @@ test("a symlink root cannot redirect writes outside the project", () => {
     symlinkSync(target, path.join(root, "project"));
     assert.throws(() => replaceTemplatePlaceholders(path.join(root, "project"), "app"));
     assert.equal(readFileSync(path.join(target, "file.txt"), "utf8"), "<app_name>");
+  });
+});
+
+test("invalid arguments fail without modifying a template file", () => {
+  fixture((root) => {
+    const file = path.join(root, "file.txt");
+    writeFileSync(file, "<app_name>");
+    assert.throws(() => replaceTemplatePlaceholders(root, null), TypeError);
+    assert.throws(() => replaceTemplatePlaceholders(file, "app"), TypeError);
+    assert.equal(readFileSync(file, "utf8"), "<app_name>");
   });
 });

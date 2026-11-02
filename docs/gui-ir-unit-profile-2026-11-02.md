@@ -70,3 +70,23 @@ and transfer icon on a static screen; SD error/recovery icon; display stream and
 direct-draw resume; supported IR databases and both malformed test fixtures.
 Use a test SD/backup and separate permission for diagnostic firmware installation.
 No hardware tests or independent review are claimed by this source work.
+
+## SDK audit gate
+
+The separate JavaScript SDK audit also blocked this integration. Keep its
+`moderate` threshold unchanged: no ignored advisories or registry-error bypass.
+The documentation-only TypeDoc/theme move to development dependencies; scoped
+overrides resolve minimatch11.0.4, brace-expansion5.0.12 and markdown-it14.3.3.
+A checked-in TypeDoc adapter preserves the old partial-directory and negation
+behavior against minimatch11, with real TypeDoc regression tests and a full
+documentation build. Building repository documentation uses Node22; installed
+SDK/wizard runtime support stays at Node>=18.12.
+
+The wizard only replaces the literal `<app_name>` marker in a copied template.
+Use a small binary-safe file walker instead of the generic replacement/glob
+dependency chain; skip hidden entries and links. Its tests cover the real
+template, literal paths/replacements, binary bytes and invalid roots. Existing
+interactive prompts and installation behavior are not redesigned by this patch.
+CI verifies packed candidates in fresh production consumers on Node18.12.0 and22,
+so local development overrides cannot mask an incompatible published layout.
+No npm publication, JS firmware runtime, new ABI export or device flash is added.

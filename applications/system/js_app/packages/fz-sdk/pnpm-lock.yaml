@@ -4,6 +4,16 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  typedoc>minimatch: 11.0.4
+  typedoc>markdown-it: 14.3.3
+  minimatch@11.0.4>brace-expansion: 5.0.12
+
+patchedDependencies:
+  typedoc@0.28.20:
+    hash: a7e17e362272e5b7918c3786164697069cb7abb80ee21ef21b83c35db023aa96
+    path: patches/typedoc@0.28.20.patch
+
 importers:
 
   .:
@@ -23,12 +33,13 @@ importers:
       serialport:
         specifier: ^12.0.0
         version: 12.0.0
+    devDependencies:
       typedoc:
         specifier: 0.28.20
-        version: 0.28.20(typescript@5.6.3)
+        version: 0.28.20(patch_hash=a7e17e362272e5b7918c3786164697069cb7abb80ee21ef21b83c35db023aa96)(typescript@5.6.3)
       typedoc-material-theme:
         specifier: 1.4.1
-        version: 1.4.1(typedoc@0.28.20(typescript@5.6.3))
+        version: 1.4.1(typedoc@0.28.20(patch_hash=a7e17e362272e5b7918c3786164697069cb7abb80ee21ef21b83c35db023aa96)(typescript@5.6.3))
 
 packages:
 
@@ -191,6 +202,9 @@ packages:
   '@gerrit0/mini-shiki@3.23.0':
     resolution: {integrity: sha512-bEMORlG0cqdjVyCEuU0cDQbORWX+kYCeo0kV1lbxF5bt4r7SID2l9bqsxJEM0zndaxpOUT7riCyIVEuqq/Ynxg==}
 
+  '@isaacs/nonrecursive-glob-match@1.0.3':
+    resolution: {integrity: sha512-SI7kyKHq4XXDRozw+r9GlRZkia1ZkFrpLW98r2IC2Bpr8YkFGE3fvjzmxCG0x78A++69HmDNrDvSMYBZmHGpKA==}
+
   '@material/material-color-utilities@0.3.0':
     resolution: {integrity: sha512-ztmtTd6xwnuh2/xu+Vb01btgV8SQWYCaK56CkRK8gEkWe5TuDyBcYJ0wgkMRn+2VcE9KUmhvkz+N9GHrqw/C0g==}
 
@@ -286,8 +300,8 @@ packages:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
 
-  brace-expansion@5.0.9:
-    resolution: {integrity: sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==}
+  brace-expansion@5.0.12:
+    resolution: {integrity: sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ==}
     engines: {node: 20 || >=22}
 
   debug@4.3.4:
@@ -328,16 +342,16 @@ packages:
   lunr@2.3.9:
     resolution: {integrity: sha512-zTU3DaZaF3Rt9rhN3uBMGQD3dD2/vFQqnvZCDv4dl5iOzq2IZQqTxu90r4E5J+nP70J3ilqVCrbho2eWaeW8Ow==}
 
-  markdown-it@14.3.0:
-    resolution: {integrity: sha512-RCEsPjR+sr0x+AuYp601tKTkgFG4YEPLCzHST3cQ/fhlJkqAkz1L2/Qbp1j9qw5SBwQHFBoW8+hoN5xssOF0Tw==}
+  markdown-it@14.3.3:
+    resolution: {integrity: sha512-L//tDAkjTjJCU6pBUSBTgs3Kg4InVaZuUZog/b6V12UKhcDQ7S78877ibbCanRExwPuYP1CZD7Gd2dxSy1GXRg==}
     hasBin: true
 
   mdurl@2.0.0:
     resolution: {integrity: sha512-Lf+9+2r+Tdp5wXDXC4PcIBjTDtq4UKjCPMQhKIuzpJNW0b96kVqSwW0bT7FhRSfmAiFYgP+SCRvdrDozfh0U5w==}
 
-  minimatch@10.2.5:
-    resolution: {integrity: sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg==}
-    engines: {node: 18 || 20 || >=22}
+  minimatch@11.0.4:
+    resolution: {integrity: sha512-/UJ1dEoVQTjPNDh6SGlUo+ueLMmoHTas4q+8yaAR/5t6nLAIiBDJtoYUh20IYleix7ehiQkgczb84PE3uzHkxg==}
+    engines: {node: 20 || >=22}
 
   ms@2.1.2:
     resolution: {integrity: sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==}
@@ -482,6 +496,8 @@ snapshots:
       '@shikijs/types': 3.23.0
       '@shikijs/vscode-textmate': 10.0.2
 
+  '@isaacs/nonrecursive-glob-match@1.0.3': {}
+
   '@material/material-color-utilities@0.3.0': {}
 
   '@serialport/binding-mock@10.2.2':
@@ -568,7 +584,7 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
-  brace-expansion@5.0.9:
+  brace-expansion@5.0.12:
     dependencies:
       balanced-match: 4.0.4
 
@@ -622,7 +638,7 @@ snapshots:
 
   lunr@2.3.9: {}
 
-  markdown-it@14.3.0:
+  markdown-it@14.3.3:
     dependencies:
       argparse: 2.0.1
       entities: 4.5.0
@@ -633,9 +649,10 @@ snapshots:
 
   mdurl@2.0.0: {}
 
-  minimatch@10.2.5:
+  minimatch@11.0.4:
     dependencies:
-      brace-expansion: 5.0.9
+      '@isaacs/nonrecursive-glob-match': 1.0.3
+      brace-expansion: 5.0.12
 
   ms@2.1.2: {}
 
@@ -673,17 +690,17 @@ snapshots:
 
   strip-comments@2.0.1: {}
 
-  typedoc-material-theme@1.4.1(typedoc@0.28.20(typescript@5.6.3)):
+  typedoc-material-theme@1.4.1(typedoc@0.28.20(patch_hash=a7e17e362272e5b7918c3786164697069cb7abb80ee21ef21b83c35db023aa96)(typescript@5.6.3)):
     dependencies:
       '@material/material-color-utilities': 0.3.0
-      typedoc: 0.28.20(typescript@5.6.3)
+      typedoc: 0.28.20(patch_hash=a7e17e362272e5b7918c3786164697069cb7abb80ee21ef21b83c35db023aa96)(typescript@5.6.3)
 
-  typedoc@0.28.20(typescript@5.6.3):
+  typedoc@0.28.20(patch_hash=a7e17e362272e5b7918c3786164697069cb7abb80ee21ef21b83c35db023aa96)(typescript@5.6.3):
     dependencies:
       '@gerrit0/mini-shiki': 3.23.0
       lunr: 2.3.9
-      markdown-it: 14.3.0
-      minimatch: 10.2.5
+      markdown-it: 14.3.3
+      minimatch: 11.0.4
       typescript: 5.6.3
       yaml: 2.9.0
 
