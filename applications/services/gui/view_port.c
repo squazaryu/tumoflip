@@ -94,6 +94,7 @@ ViewPort* view_port_alloc(void) {
     ViewPort* view_port = malloc(sizeof(ViewPort));
     view_port->orientation = ViewPortOrientationHorizontal;
     view_port->is_enabled = true;
+    view_port->was_drawn = true;
     view_port->mutex = furi_mutex_alloc(FuriMutexTypeRecursive);
     return view_port;
 }
@@ -184,12 +185,18 @@ void view_port_update(ViewPort* view_port) {
 
     // We are not going to lockup system, but will notify you instead
     // Make sure that you don't call viewport methods inside of another mutex, especially one that is used in draw call
-    if(furi_mutex_acquire(view_port->mutex, 2) != FuriStatusOk) {
+    const bool locked = furi_mutex_acquire(view_port->mutex, 2) == FuriStatusOk;
+    if(!locked) {
         FURI_LOG_W(TAG, "ViewPort lockup: see %s:%d", __FILE__, __LINE__ - 3);
     }
 
-    if(view_port->gui && view_port->is_enabled) gui_update(view_port->gui);
-    furi_mutex_release(view_port->mutex);
+    // A covered port must not repaint the application above it. An uncover
+    // forces a GUI redraw independently, which re-arms this flag in draw().
+    if(view_port->gui && view_port->is_enabled && (!locked || view_port->was_drawn)) {
+        if(locked) view_port->was_drawn = false;
+        gui_update(view_port->gui);
+    }
+    if(locked) furi_mutex_release(view_port->mutex);
 }
 
 void view_port_gui_set(ViewPort* view_port, Gui* gui) {
@@ -205,7 +212,8 @@ void view_port_draw(ViewPort* view_port, Canvas* canvas) {
 
     // We are not going to lockup system, but will notify you instead
     // Make sure that you don't call viewport methods inside of another mutex, especially one that is used in draw call
-    if(furi_mutex_acquire(view_port->mutex, 2) != FuriStatusOk) {
+    const bool locked = furi_mutex_acquire(view_port->mutex, 2) == FuriStatusOk;
+    if(!locked) {
         FURI_LOG_W(TAG, "ViewPort lockup: see %s:%d", __FILE__, __LINE__ - 3);
     }
 
@@ -216,7 +224,15 @@ void view_port_draw(ViewPort* view_port, Canvas* canvas) {
         view_port->draw_callback(canvas, view_port->draw_callback_context);
     }
 
-    furi_mutex_release(view_port->mutex);
+    if(locked) {
+        // Set after the callback: a recursive update must not re-arm itself.
+        view_port->was_drawn = true;
+        furi_mutex_release(view_port->mutex);
+    } else {
+        // Preserve the old non-blocking draw fallback, but retry under the
+        // mutex before trusting the visibility flag. Never unlock another owner.
+        gui_update(view_port->gui);
+    }
 }
 
 void view_port_input(ViewPort* view_port, InputEvent* event) {
