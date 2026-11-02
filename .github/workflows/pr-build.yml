@@ -225,6 +225,12 @@ jobs:
       - name: Validate automatic hopping excludes explicit RX profiles
         run: python3 -m unittest tools.tumoflip.test_hopper_profile_filter tools.tumoflip.test_rx_profiles
 
+      - name: Validate GUI redraw, defensive IR and diagnostic-profile boundaries
+        run: python3 -m unittest tools.tumoflip.test_gui_ir_20261102 tools.tumoflip.test_unit_profile tools.tumoflip.test_unit_profile_validation
+
+      - name: Validate normal updater physical C2 reserve and native resources
+        run: toolchain/x86_64-linux/bin/python3 tools/tumoflip/validate_release.py --min-c2-gap 4096 --write-manifest
+
       - name: Validate field-batch data and hardware ownership contracts
         run: python3 -m unittest tools.tumoflip.test_servo_plus tools.tumoflip.test_power_history tools.tumoflip.test_uhf_inventory tools.tumoflip.test_sensor_cards tools.tumoflip.test_varta_inspect tools.tumoflip.test_field_report tools.tumoflip.test_field_batch_packages
 
@@ -341,4 +347,37 @@ jobs:
             pr_report.md
             pr_number.txt
           retention-days: 1
+          if-no-files-found: error
+
+  unit-tests-profile:
+    name: core unit-test profile
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      WORKFLOW_BRANCH_OR_TAG: unit-tests
+    steps:
+      - name: Checkout isolated diagnostic build
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          clean: "true"
+      - name: Install resource validation dependency
+        run: python3 -m pip install --user heatshrink2==0.13.0
+      - name: Build diagnostic image without flashing
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIST_SUFFIX="${GITHUB_SHA:0:8}" ./fbt -j2 COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" FIRMWARE_APP_SET=unit_tests updater_package
+      - name: Validate diagnostic DFU, resource payloads and exact host imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          toolchain/x86_64-linux/bin/python3 tools/tumoflip/validate_unit_profile.py --expect-commit "$(git rev-parse HEAD)" > unit-profile-validation.json
+          toolchain/x86_64-linux/bin/python3 -m unittest tools.tumoflip.test_arf_elf_metadata
+      - name: Upload compact diagnostic receipt only
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-profile-validation
+          path: unit-profile-validation.json
+          retention-days: 14
           if-no-files-found: error

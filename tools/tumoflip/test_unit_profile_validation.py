@@ -46,8 +46,8 @@ class UnitProfileValidationTests(unittest.TestCase):
 
     def test_private_algorithm_implementations_stay_in_test_plugins(self):
         manifest = (ROOT / "applications/debug/unit_tests/application.fam").read_text()
-        self.assertIn('"../../../lib/subghz/protocols/kia_v1.c"', manifest)
-        self.assertIn('"../../../lib/nfc/protocols/mf_ultralight/mf_ultralight_aes_crypto.c"', manifest)
+        self.assertIn('"../../lib/subghz/protocols/kia_v1.c"', manifest)
+        self.assertIn('"../../lib/nfc/protocols/mf_ultralight/mf_ultralight_aes_crypto.c"', manifest)
         api = (ROOT / "targets/f7/api_symbols.csv").read_text()
         self.assertNotIn("Function,+,mf_ultralight_aes_cmac,", api)
         self.assertNotIn("Function,+,subghz_protocol_decoder_kia_v1_alloc,", api)

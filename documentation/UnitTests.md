@@ -30,6 +30,14 @@ Keep the physical C2 reserve of at least 4096 bytes and validate the actual DFU
 ranges, not just file size. `DEBUG=0` also means `furi_assert()` is disabled;
 input validation must use real error handling rather than debug assertions.
 
+After building and before any device installation, run
+`toolchain/current/bin/python3 tools/tumoflip/validate_unit_profile.py --expect-commit "$(git rev-parse HEAD)"`.
+It checks DFU ranges, updater CRCs, the exact declared test-plugin set, resource
+bytes and every FAL import against the real core test host plus public API.
+Private UL-AES crypto and Kia V1 code is linked into its test FAL, not added to
+the resident firmware or public SDK. A separate read-only CI job performs the
+same build/check; it neither flashes hardware nor publishes test images.
+
 ## JavaScript test boundary
 
 JS Runner and its modules are intentionally excluded in Tumoflip. The core
