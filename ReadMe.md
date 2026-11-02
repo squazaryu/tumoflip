@@ -193,21 +193,25 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-009-033` | Field apps, sensor histories and hardware checks | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-009-034` | NFC/Sub-GHz stability, optional RX memory and browser fixes | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
 
-Dev `t-dev-009-033` retains local API 88.23 and the full 4096-byte physical C2
-reserve. Five new external apps (Servo Tester+, Power Journal, Sensor Watch,
-Varta Inspector and Tumo UHF Inventory), Device Library 1.3 and TumoSpectrum 3.6
-are paired with **FW Packages Dev 030**. Install firmware first, then the Base
-and Module One package updates; firmware alone does not install the new FAPs.
-Check both release pages for publication status. Existing TumoCompanion
-**1.11.32** is sufficient; no new iOS or ESP32 release is required. Electrical/RF
-acceptance remains for Dev testing. The emulator is deferred, not a release payload.
-Older catalogs and Stable remain immutable.
+Dev `t-dev-009-034` retains local API 88.23 and the full 4096-byte physical C2
+reserve. It adds NFC/Sub-GHz bounds fixes, lazy optional BinRAW buffers,
+Wardriving memory admission, browser hardening and transactional favorites.
+**FW Packages Dev 031** adds the protected read-only USB CD-ROM app while
+retaining the cumulative Dev030 content. Install firmware with native resources
+first, then refresh FW Packages and install **Base**. ARF and Wardriving updates
+are firmware resources, not new independent overlays. Existing TumoCompanion
+**1.11.32** supports installation, but until the prepared iOS protection patch
+is published, manually protect `usb_cdrom` and `archive_favorites` in Community
+Apps before using that updater. No ESP32 update is required for this batch.
+Check both release pages for publication status. Hardware acceptance remains
+for Dev testing; this is not proof of a fix for the historic idle OOM symptom.
+Older catalogs and Stable remain immutable; the emulator remains deferred.
 
 ## Install
 
@@ -228,13 +232,13 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-009-033.tgz
+flipper-z-f7-update-t-dev-009-034.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: Dev `t-dev-009-033` uses `88.23`; immutable stable `v1.0.8` remains `88.7`.
+- Firmware API: Dev `t-dev-009-034` uses `88.23`; immutable stable `v1.0.8` remains `88.7`.
   Each release manifest records its compatible package API. API numbers are
   local to this fork.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or
