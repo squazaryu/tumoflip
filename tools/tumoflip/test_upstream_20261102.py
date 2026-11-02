@@ -11,6 +11,24 @@ PROTOCOLS = ROOT / 'lib/subghz/protocols'
 
 
 class UpstreamNovemberSafetyTests(unittest.TestCase):
+    def test_came_twee_does_not_index_parcel_f_outside_table(self):
+        text=(PROTOCOLS/'came_twee.c').read_text()
+        table=re.search(r'static const uint32_t came_twee_magic_numbers_xor\[15\] = \{.*?\};',text,re.S).group()
+        native(r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#define COUNT_OF(a) (sizeof(a)/sizeof((a)[0]))
+typedef struct{uint64_t data;uint32_t serial,btn,cnt;}SubGhzBlockGeneric;
+static uint64_t subghz_protocol_blocks_reverse_key(uint64_t x,unsigned n){uint64_t y=0;for(unsigned i=0;i<n;i++){y=(y<<1)|(x&1);x>>=1;}return y;}
+''' + table + '\n' + function(text,'subghz_protocol_came_twee_remote_controller') + r'''
+int main(void){SubGhzBlockGeneric g={.data=0x3fff720000000fULL,.serial=123,.btn=4,.cnt=5};
+ subghz_protocol_came_twee_remote_controller(&g);assert(g.serial==123&&g.btn==4&&g.cnt==5);
+ for(unsigned i=0;i<15;i++){g.data=0x3fff7200000000ULL|i;subghz_protocol_came_twee_remote_controller(&g);assert(g.serial==((uint32_t)g.data^came_twee_magic_numbers_xor[i]));}
+ return 0;}
+''')
+
     def test_ultralight_rejects_exact_end_page_but_keeps_i2c_validation(self):
         text = (ROOT/'lib/nfc/protocols/mf_ultralight/mf_ultralight_listener.c').read_text()
         native(r'''
