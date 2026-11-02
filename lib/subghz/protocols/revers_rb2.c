@@ -82,15 +82,10 @@ void* subghz_protocol_encoder_revers_rb2_alloc(SubGhzEnvironment* environment) {
 
 static LevelDuration
     subghz_protocol_encoder_revers_rb2_add_duration_to_upload(ManchesterEncoderResult result) {
-    if((unsigned)result > ManchesterEncoderResultShortHigh) {
-        furi_crash("SubGhz: ManchesterEncoderResult is incorrect.");
-    }
-    const bool long_pulse = result == ManchesterEncoderResultLongLow ||
-                            result == ManchesterEncoderResultLongHigh;
-    return level_duration_make(
-        result >= ManchesterEncoderResultLongHigh,
-        long_pulse ? subghz_protocol_revers_rb2_const.te_long :
-                     subghz_protocol_revers_rb2_const.te_short);
+    return subghz_protocol_encoder_common_manchester_duration(
+        result,
+        subghz_protocol_revers_rb2_const.te_short,
+        subghz_protocol_revers_rb2_const.te_long);
 }
 
 /**

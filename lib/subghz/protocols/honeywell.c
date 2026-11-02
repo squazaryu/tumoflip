@@ -121,15 +121,10 @@ uint16_t subghz_protocol_honeywell_crc16(
 
 static LevelDuration
     subghz_protocol_encoder_honeywell_add_duration_to_upload(ManchesterEncoderResult result) {
-    if((unsigned)result > ManchesterEncoderResultShortHigh) {
-        furi_crash("SubGhz: ManchesterEncoderResult is incorrect.");
-    }
-    const bool long_pulse = result == ManchesterEncoderResultLongLow ||
-                            result == ManchesterEncoderResultLongHigh;
-    return level_duration_make(
-        result >= ManchesterEncoderResultLongHigh,
-        long_pulse ? subghz_protocol_honeywell_const.te_long :
-                     subghz_protocol_honeywell_const.te_short);
+    return subghz_protocol_encoder_common_manchester_duration(
+        result,
+        subghz_protocol_honeywell_const.te_short,
+        subghz_protocol_honeywell_const.te_long);
 }
 
 static void

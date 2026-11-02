@@ -38,10 +38,10 @@ static bool secondary;
 static unsigned calls;
 static int primary,other;
 static void* subghz_txrx_get_decoder(void* x) {(void)x;return &primary;}
-static void* __attribute__((unused)) subghz_wardriving_txrx_get_decoder(void* x) {
+static __attribute__((unused)) void* subghz_wardriving_txrx_get_decoder(void* x) {
     return subghz_txrx_get_decoder(x);
 }
-static void* __attribute__((unused)) subghz_txrx_get_diversity_decoder(void* x) {
+static __attribute__((unused)) void* subghz_txrx_get_diversity_decoder(void* x) {
     (void)x;return secondary?&other:0;
 }
 static void subghz_protocol_decoder_bin_raw_data_input_rssi(void* x,float rssi) {

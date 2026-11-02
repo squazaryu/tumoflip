@@ -32,7 +32,7 @@ _Noreturn static void invalid_symbol(const char* msg) {
 typedef struct {bool level;uint32_t duration;} LevelDuration;
 typedef struct {uint32_t te_short,te_long,te_delta,min_count_bit_for_found;} SubGhzBlockConst;
 static LevelDuration level_duration_make(bool l,uint32_t d) {return (LevelDuration){l,d};}
-''' + header + '\n' + constant + '\n' + function(text, symbol) + f'''
+''' + header + '\n' + function((PROTOCOLS / 'common.c').read_text(), 'subghz_protocol_encoder_common_manchester_duration') + '\n' + constant + '\n' + function(text, symbol) + f'''
 int main(void) {{
     for(unsigned i=0;i<4;i++) {{
         LevelDuration d={symbol}((ManchesterEncoderResult)i);
@@ -80,7 +80,7 @@ static void* subghz_protocol_encoder_common_alloc(size_t size,const void* p,size
 }
 static LevelDuration level_duration_make(bool l,uint32_t d) {return (LevelDuration){l,d};}
 static bool level_duration_get_level(LevelDuration d) {return d.level;}
-''' + header + '\n' + actual + r'''
+''' + header + '\n' + function((PROTOCOLS / 'common.c').read_text(), 'subghz_protocol_encoder_common_manchester_duration') + '\n' + actual + r'''
 int main(void) {
     SubGhzProtocolEncoderPowerSmart* x=subghz_protocol_encoder_power_smart_alloc(NULL);
     const uint64_t samples[]={0,UINT64_MAX,0x5555555555555555ULL,0xAAAAAAAAAAAAAAAAULL,
