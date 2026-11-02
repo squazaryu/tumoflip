@@ -8,7 +8,7 @@
 #define malloc(n) calloc(1, (n)) /* Furi allocations are zero-filled. */
 #define furi_check assert
 #define furi_assert assert
-#define FURI_LOG_W(...) ((void)0)
+#define FURI_LOG_W(tag, format, file, line) log_timeout(line)
 #define FURI_LOG_I(...) ((void)0)
 #define FuriWaitForever 0xffffffffu
 enum { FuriStatusOk, FuriStatusError, FuriMutexTypeRecursive, ViewPortOrientationHorizontal,
@@ -25,6 +25,8 @@ typedef struct ViewPort {
 static Gui gui;
 static bool lock_fails;
 static unsigned model_depth, draws;
+static unsigned timeout_logs;
+static void log_timeout(int line) { assert(line > 0); timeout_logs++; }
 static FuriMutex* furi_mutex_alloc(int type) { assert(type == FuriMutexTypeRecursive); return malloc(sizeof(FuriMutex)); }
 static int furi_mutex_acquire(FuriMutex* m, unsigned timeout) { (void)timeout; if(lock_fails) return FuriStatusError; m->depth++; return FuriStatusOk; }
 static int furi_mutex_release(FuriMutex* m) { assert(m->depth); m->depth--; return FuriStatusOk; }
@@ -150,6 +152,7 @@ static void mutex_case(void) {
     assert(gui.updates == 5 && !p->was_drawn && !p->mutex->depth);
     lock_fails = false; view_port_draw(p, &c); assert(p->was_drawn);
     view_port_update(p); assert(gui.updates == 6);
+    assert(timeout_logs == 6);
     free_port(p);
 }
 static void getters_case(void) {

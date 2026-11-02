@@ -81,6 +81,7 @@ class GuiRedrawTests(NativeRegression):
         "button_menu_enter_callback", "button_menu_exit_callback", "button_menu_free",
         "bt_statusbar_update", "storage_tick",
         "view_port_lock", "view_port_unlock", "view_port_get_orientation",
+        "view_port_try_lock",
     }
 
     @classmethod
@@ -92,6 +93,9 @@ class GuiRedrawTests(NativeRegression):
             signature = f"static __attribute__((noinline)) void view_port_{name}("
             if signature in viewport:
                 production += function(viewport, signature) + "\n"
+        signature = "static __attribute__((noinline)) bool view_port_try_lock("
+        if signature in viewport:
+            production += function(viewport, signature) + "\n"
         production += "\n".join(function(viewport, signature) for signature in (
             "ViewPort* view_port_alloc(", "void view_port_free(", "void view_port_set_width(",
             "uint8_t view_port_get_width(", "void view_port_set_height(", "uint8_t view_port_get_height(",
