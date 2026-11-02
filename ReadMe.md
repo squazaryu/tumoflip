@@ -193,25 +193,25 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-009-034` | NFC/Sub-GHz stability, optional RX memory and browser fixes | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-009-035` | Keep explicit Honda RX out of automatic preset hopping | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
 
-Dev `t-dev-009-034` retains local API 88.23 and the full 4096-byte physical C2
-reserve. It adds NFC/Sub-GHz bounds fixes, lazy optional BinRAW buffers,
-Wardriving memory admission, browser hardening and transactional favorites.
-**FW Packages Dev 031** adds the protected read-only USB CD-ROM app while
-retaining the cumulative Dev030 content. Install firmware with native resources
-first, then refresh FW Packages and install **Base**. ARF and Wardriving updates
-are firmware resources, not new independent overlays. Existing TumoCompanion
-**1.11.32** supports installation, but until the prepared iOS protection patch
-is published, manually protect `usb_cdrom` and `archive_favorites` in Community
-Apps before using that updater. No ESP32 update is required for this batch.
-Check both release pages for publication status. Hardware acceptance remains
-for Dev testing; this is not proof of a fix for the historic idle OOM symptom.
-Older catalogs and Stable remain immutable; the emulator remains deferred.
+Dev `t-dev-009-035` retains local API 88.23 and the full 4096-byte physical C2
+reserve. Standard Sub-GHz no longer visits the built-in TumoHonda profile in
+automatic **Preset** or **Combined** hopping. Explicit Honda RX, frequency-only
+hopping, user presets and explicit hopping lists remain available. No settings
+or recordings are removed. All changes from 009-034 are retained.
+Install firmware with native resources. **FW Packages Dev 031** and
+**TumoCompanion 1.11.33** remain compatible; this resident hopper fix requires no
+new independent package or iOS release. The published iOS version includes
+Community Apps protection for `usb_cdrom` and `archive_favorites`. No ESP32
+update is required. Check release pages for publication status. Hardware
+acceptance remains for Dev testing; this is not proof of a fix for the historic
+idle OOM symptom. Older catalogs and Stable remain immutable; the emulator
+remains deferred.
 
 ## Install
 
@@ -232,13 +232,13 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-009-034.tgz
+flipper-z-f7-update-t-dev-009-035.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: Dev `t-dev-009-034` uses `88.23`; immutable stable `v1.0.8` remains `88.7`.
+- Firmware API: Dev `t-dev-009-035` uses `88.23`; immutable stable `v1.0.8` remains `88.7`.
   Each release manifest records its compatible package API. API numbers are
   local to this fork.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or
