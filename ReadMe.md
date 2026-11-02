@@ -206,7 +206,9 @@ Wardriving memory admission, browser hardening and transactional favorites.
 retaining the cumulative Dev030 content. Install firmware with native resources
 first, then refresh FW Packages and install **Base**. ARF and Wardriving updates
 are firmware resources, not new independent overlays. Existing TumoCompanion
-**1.11.32** is sufficient; no iOS or ESP32 update is required for this batch.
+**1.11.32** supports installation, but until the prepared iOS protection patch
+is published, manually protect `usb_cdrom` and `archive_favorites` in Community
+Apps before using that updater. No ESP32 update is required for this batch.
 Check both release pages for publication status. Hardware acceptance remains
 for Dev testing; this is not proof of a fix for the historic idle OOM symptom.
 Older catalogs and Stable remain immutable; the emulator remains deferred.
