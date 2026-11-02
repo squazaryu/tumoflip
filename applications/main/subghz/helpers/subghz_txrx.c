@@ -770,6 +770,22 @@ void subghz_txrx_stop(SubGhzTxRx* instance) {
     }
 }
 
+// The Honda RX profile is registered for explicit selection, not general scans.
+// Match RX registers as well as the reserved name so unrelated user presets stay
+// eligible. The trailing eight PA bytes can change with TX power independently.
+static int subghz_txrx_hopper_profile_preset_index(SubGhzSetting* setting) {
+    const int index = subghz_setting_get_inx_preset_by_name(setting, SUBGHZ_RX_CUSTOM_NAME);
+    if(index >= 0 &&
+       subghz_setting_get_preset_data_size(setting, index) == sizeof(subghz_rx_honda_preset) &&
+       memcmp(
+           subghz_setting_get_preset_data(setting, index),
+           subghz_rx_honda_preset,
+           sizeof(subghz_rx_honda_preset) - 8U) == 0) {
+        return index;
+    }
+    return -1;
+}
+
 void subghz_txrx_hopper_update(
     SubGhzTxRx* instance,
     float stay_threshold,
@@ -817,6 +833,11 @@ void subghz_txrx_hopper_update(
     size_t preset_count = configured_preset_count > 0 ?
                               configured_preset_count :
                               subghz_setting_get_preset_count(instance->setting);
+    const int profile_preset_index =
+        hop_preset && configured_preset_count == 0 ?
+            subghz_txrx_hopper_profile_preset_index(instance->setting) :
+            -1;
+    if(profile_preset_index >= 0) preset_count--;
     size_t frequency_index = instance->hopper_idx_frequency;
     size_t preset_hopper_index = instance->preset_hopper_idx;
     SubGhzHopperPlan hopper_plan;
@@ -848,6 +869,9 @@ void subghz_txrx_hopper_update(
                                       subghz_setting_get_hopper_preset_index(
                                           instance->setting, hopper_plan.preset_hopper_index) :
                                       hopper_plan.preset_hopper_index;
+            if(profile_preset_index >= 0 && preset_index >= (size_t)profile_preset_index) {
+                preset_index++;
+            }
             subghz_txrx_set_preset_internal(instance, frequency, preset_index, 0);
             subghz_devices_load_preset(
                 instance->radio_device, FuriHalSubGhzPresetCustom, instance->preset->data);

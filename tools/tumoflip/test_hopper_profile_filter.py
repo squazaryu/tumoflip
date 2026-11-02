@@ -81,6 +81,9 @@ class HopperProfileFilterTests(unittest.TestCase):
     def test_explicit_user_hopping_list_preserves_order_and_duplicates(self):
         self.run_case("configured")
 
+    def test_tx_power_changes_do_not_reintroduce_the_builtin_rx_profile(self):
+        self.run_case("power")
+
     def test_custom_presets_and_user_owned_honda_name_are_not_removed(self):
         self.run_case("custom")
 

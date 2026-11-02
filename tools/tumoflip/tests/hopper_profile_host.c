@@ -159,6 +159,14 @@ static void configured(void) {
         cycle(&s, s.configured, s.configured_count, mode != 0);
     }
 }
+static void automatic_power(void) {
+    for(size_t byte = 0; byte < 8; byte++) {
+        SubGhzSetting s; reset(&s); assert(subghz_rx_profiles_init(&s));
+        // TX power edits the trailing PA table in place, not the RX registers.
+        s.presets[5].bytes[s.presets[5].size - 8 + byte] ^= 0x5A;
+        const size_t expected[] = {0, 1, 2, 3, 4}; cycle(&s, expected, 5, true);
+    }
+}
 static void custom(void) {
     SubGhzSetting s; reset(&s);
     const size_t ordinary[] = {0, 1, 2, 3, 4}; cycle(&s, ordinary, 5, true);
@@ -218,6 +226,7 @@ int main(int argc, char** argv) {
     assert(argc == 2);
     if(!strcmp(argv[1], "automatic")) automatic();
     else if(!strcmp(argv[1], "configured")) configured();
+    else if(!strcmp(argv[1], "power")) automatic_power();
     else if(!strcmp(argv[1], "custom")) custom();
     else if(!strcmp(argv[1], "frequency")) frequency_only();
     else if(!strcmp(argv[1], "profile")) explicit_profile();
