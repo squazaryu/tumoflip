@@ -7,9 +7,22 @@
 
 #include <furi.h>
 
-#define SUBGHZ_HISTORY_MAX       15
-#define SUBGHZ_HISTORY_FREE_HEAP (2048)
-#define TAG                      "SubGhzWarDrivingHistory"
+#define SUBGHZ_HISTORY_MAX              15
+#define SUBGHZ_HISTORY_FREE_HEAP        (6U * 1024U)
+#define SUBGHZ_HISTORY_RAW_FREE_HEAP     (14U * 1024U)
+#define SUBGHZ_HISTORY_MIN_BLOCK        (1024U + 8U)
+#define SUBGHZ_HISTORY_RAW_MIN_BLOCK    (6U * 1024U + 8U)
+#define TAG                            "SubGhzWarDrivingHistory"
+
+// Total free bytes alone do not cover a fragmented heap or BinRAW serialization.
+// Refuse a new RAM history item without deleting earlier items or any SD files.
+static bool subghz_wardriving_history_has_room(uint8_t type) {
+    const bool raw = type == SubGhzProtocolTypeBinRAW;
+    return memmgr_get_free_heap() >=
+               (raw ? SUBGHZ_HISTORY_RAW_FREE_HEAP : SUBGHZ_HISTORY_FREE_HEAP) &&
+           memmgr_heap_get_max_free_block() >=
+               (raw ? SUBGHZ_HISTORY_RAW_MIN_BLOCK : SUBGHZ_HISTORY_MIN_BLOCK);
+}
 
 typedef struct {
     FuriString* item_str;
@@ -200,7 +213,7 @@ bool subghz_wardriving_history_get_text_space_left(
     uint8_t sats) {
     furi_assert(instance);
     if(!ignore_full) {
-        if(memmgr_get_free_heap() < SUBGHZ_HISTORY_FREE_HEAP) {
+        if(!subghz_wardriving_history_has_room(SubGhzProtocolTypeStatic)) {
             if(output != NULL) furi_string_set(output, "Memory is FULL");
             return true;
         }
@@ -248,10 +261,10 @@ bool subghz_wardriving_history_add_to_history(
     furi_assert(instance);
     furi_assert(context);
 
-    if(memmgr_get_free_heap() < SUBGHZ_HISTORY_FREE_HEAP) return false;
+    SubGhzProtocolDecoderBase* decoder_base = context;
+    if(!subghz_wardriving_history_has_room(decoder_base->protocol->type)) return false;
     if(instance->last_index_write >= SUBGHZ_HISTORY_MAX) return false;
 
-    SubGhzProtocolDecoderBase* decoder_base = context;
     uint32_t hash_data = subghz_protocol_decoder_base_get_hash_data(decoder_base);
     if((instance->code_last_hash_data == hash_data) &&
        ((furi_get_tick() - instance->last_update_timestamp) < 600)) {
@@ -363,7 +376,7 @@ void subghz_wardriving_history_remove_duplicates(SubGhzHistory* instance) {
 }
 
 bool subghz_wardriving_history_full(SubGhzHistory* instance) {
-    if(memmgr_get_free_heap() < SUBGHZ_HISTORY_FREE_HEAP) return true;
+    if(!subghz_wardriving_history_has_room(SubGhzProtocolTypeStatic)) return true;
     if(instance->last_index_write >= SUBGHZ_HISTORY_MAX) return true;
     return false;
 }

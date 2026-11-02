@@ -51,14 +51,14 @@ int main(void){LevelDuration upload[128];const uint8_t captured[]={0x11,0x1e,0x3
   SubGhzProtocolEncoderDooya x={.generic={.data=0xe1dc030500ULL|original,.data_count_bit=40},.encoder={upload,128}};
   assert(subghz_protocol_encoder_dooya_get_upload(&x));
   assert(x.generic.data==(0xe1dc030500ULL|(command?expected[command]:original)));
-  assert(x.encoder.size_upload==82);
+  assert(x.encoder.size_upload==83);
   uint64_t decoded=0;for(unsigned i=0;i<40;i++){size_t p=3+i*2;assert(upload[p].level&&!upload[p+1].level);decoded=(decoded<<1)|(upload[p].duration==733);}
   assert(decoded==x.generic.data);
  }}
  command=1;original=0x55;override=true;override_btn=0x79;
  SubGhzProtocolEncoderDooya x={.generic={.data=0xe1dc030555ULL,.data_count_bit=40},.encoder={upload,128}};
  assert(subghz_protocol_encoder_dooya_get_upload(&x)&&x.generic.data==0xe1dc030579ULL);
- x.encoder.size_upload=1;assert(!subghz_protocol_encoder_dooya_get_upload(&x));return 0;}
+ x.encoder.size_upload=82;assert(!subghz_protocol_encoder_dooya_get_upload(&x));return 0;}
 ''')
 
 

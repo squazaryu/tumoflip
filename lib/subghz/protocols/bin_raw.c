@@ -6,6 +6,7 @@
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
 #include "common.h"
+#include <core/memmgr_heap_i.h>
 #include <lib/toolbox/float_tools.h>
 #include <lib/toolbox/stream/stream.h>
 #include <lib/flipper_format/flipper_format_i.h>
@@ -131,11 +132,7 @@ const SubGhzProtocol subghz_protocol_bin_raw = {
 };
 
 static uint16_t subghz_protocol_bin_raw_get_full_byte(uint16_t bit_count) {
-    if(bit_count & 0x7) {
-        return (bit_count >> 3) + 1;
-    } else {
-        return bit_count >> 3;
-    }
+    return (bit_count + 7U) / 8U;
 }
 
 void* subghz_protocol_encoder_bin_raw_alloc(SubGhzEnvironment* environment) {
@@ -329,13 +326,25 @@ SubGhzProtocolStatus
     return res;
 }
 
+// Keep disabled BinRAW cheap. One optional allocation is atomic with respect to
+// other heap users and cannot invoke the fatal mandatory-allocation OOM hook.
+static bool subghz_protocol_decoder_bin_raw_buffers(SubGhzProtocolDecoderBinRAW* instance) {
+    if(instance->data_raw) return true;
+    int32_t* data_raw = memmgr_heap_alloc_optional(
+        BIN_RAW_BUF_RAW_SIZE * (sizeof(int32_t) + sizeof(uint8_t)));
+    if(!data_raw) return false;
+    instance->data_raw = data_raw;
+    instance->data = (uint8_t*)(data_raw + BIN_RAW_BUF_RAW_SIZE);
+    return true;
+}
+
 void* subghz_protocol_decoder_bin_raw_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
     SubGhzProtocolDecoderBinRAW* instance = subghz_protocol_decoder_common_alloc(
         sizeof(SubGhzProtocolDecoderBinRAW), &subghz_protocol_bin_raw);
     instance->data_raw_ind = 0;
-    instance->data_raw = malloc(BIN_RAW_BUF_RAW_SIZE * sizeof(int32_t));
-    instance->data = malloc(BIN_RAW_BUF_RAW_SIZE * sizeof(uint8_t));
+    instance->data_raw = NULL;
+    instance->data = NULL;
     memset(instance->data_markup, 0x00, BIN_RAW_MAX_MARKUP_COUNT * sizeof(BinRAW_Markup));
     instance->adaptive_threshold_rssi = BIN_RAW_THRESHOLD_RSSI;
     return instance;
@@ -345,7 +354,6 @@ void subghz_protocol_decoder_bin_raw_free(void* context) {
     furi_assert(context);
     SubGhzProtocolDecoderBinRAW* instance = context;
     free(instance->data_raw);
-    free(instance->data);
     free(instance);
 }
 
@@ -364,7 +372,7 @@ void subghz_protocol_decoder_bin_raw_feed(void* context, bool level, uint32_t du
     furi_assert(context);
     SubGhzProtocolDecoderBinRAW* instance = context;
 
-    if(instance->decoder.parser_step == BinRAWDecoderStepWrite) {
+    if(instance->data_raw && instance->decoder.parser_step == BinRAWDecoderStepWrite) {
         if(instance->data_raw_ind == BIN_RAW_BUF_RAW_SIZE) {
             instance->decoder.parser_step = BinRAWDecoderStepBufFull;
         } else {
@@ -869,9 +877,13 @@ void subghz_protocol_decoder_bin_raw_data_input_rssi(
 
         bin_raw_debug("%ld %ld :", (int32_t)rssi, (int32_t)instance->adaptive_threshold_rssi);
         if(rssi > (instance->adaptive_threshold_rssi + BIN_RAW_DELTA_RSSI)) {
+            if(!subghz_protocol_decoder_bin_raw_buffers(instance)) break;
             instance->data_raw_ind = 0;
-            memset(instance->data_raw, 0x00, BIN_RAW_BUF_RAW_SIZE * sizeof(int32_t));
-            memset(instance->data, 0x00, BIN_RAW_BUF_RAW_SIZE * sizeof(uint8_t));
+            // The payload arrays share one contiguous allocation.
+            memset(
+                instance->data_raw,
+                0x00,
+                BIN_RAW_BUF_RAW_SIZE * (sizeof(int32_t) + sizeof(uint8_t)));
             instance->decoder.parser_step = BinRAWDecoderStepWrite;
             bin_raw_debug_tag(TAG, "RSSI\r\n");
         } else {
@@ -944,6 +956,7 @@ void subghz_protocol_decoder_bin_raw_data_input_rssi(
 uint8_t subghz_protocol_decoder_bin_raw_get_hash_data(void* context) {
     furi_assert(context);
     SubGhzProtocolDecoderBinRAW* instance = context;
+    if(!instance->data) return 0;
     return subghz_protocol_blocks_add_bytes(
         instance->data + instance->data_markup[0].byte_bias,
         subghz_protocol_bin_raw_get_full_byte(instance->data_markup[0].bit_count));
@@ -955,6 +968,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_bin_raw_serialize(
     SubGhzRadioPreset* preset) {
     furi_assert(context);
     SubGhzProtocolDecoderBinRAW* instance = context;
+    if(!instance->data) return SubGhzProtocolStatusErrorParserOthers;
 
     SubGhzProtocolStatus res = SubGhzProtocolStatusError;
     FuriString* temp_str;
@@ -1045,6 +1059,9 @@ SubGhzProtocolStatus
     subghz_protocol_decoder_bin_raw_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_assert(context);
     SubGhzProtocolDecoderBinRAW* instance = context;
+    if(!subghz_protocol_decoder_bin_raw_buffers(instance)) {
+        return SubGhzProtocolStatusErrorParserOthers;
+    }
 
     SubGhzProtocolStatus res = SubGhzProtocolStatusError;
     uint32_t temp_data = 0;
@@ -1113,6 +1130,7 @@ SubGhzProtocolStatus
 void subghz_protocol_decoder_bin_raw_get_string(void* context, FuriString* output) {
     furi_assert(context);
     SubGhzProtocolDecoderBinRAW* instance = context;
+    if(!instance->data) return;
     furi_string_cat_printf(
         output,
         "%s %dbit\r\n"

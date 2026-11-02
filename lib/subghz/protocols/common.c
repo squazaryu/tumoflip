@@ -4,6 +4,24 @@
 #include "came_atomo.h"
 #include "nice_flor_s.h"
 
+// Keep one resident copy: specializing the constants for each protocol defeats
+// the flash saving. These attributes do not change the timing conversion.
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((noinline, noclone))
+#endif
+LevelDuration subghz_protocol_encoder_common_manchester_duration(
+    ManchesterEncoderResult result,
+    uint32_t te_short,
+    uint32_t te_long) {
+    if((unsigned)result > ManchesterEncoderResultShortHigh) {
+        furi_crash("SubGhz: ManchesterEncoderResult is incorrect.");
+    }
+    const bool long_pulse = result == ManchesterEncoderResultLongLow ||
+                            result == ManchesterEncoderResultLongHigh;
+    return level_duration_make(
+        result >= ManchesterEncoderResultLongHigh, long_pulse ? te_long : te_short);
+}
+
 bool subghz_protocol_decoder_get_press_identity(
     SubGhzProtocolDecoderBase* decoder,
     uint32_t* identity) {
