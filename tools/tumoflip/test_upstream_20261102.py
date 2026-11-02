@@ -11,6 +11,58 @@ PROTOCOLS = ROOT / 'lib/subghz/protocols'
 
 
 class UpstreamNovemberSafetyTests(unittest.TestCase):
+    def test_power_smart_worst_case_executes_real_manchester_encoder(self):
+        text = (PROTOCOLS / 'power_smart.c').read_text()
+        manchester = (ROOT / 'lib/toolbox/manchester_encoder.c').read_text()
+        header = (ROOT / 'lib/toolbox/manchester_encoder.h').read_text().replace('#pragma once', '')
+        actual = '\n'.join(function(manchester, name) for name in [
+            'manchester_encoder_reset', 'manchester_encoder_advance', 'manchester_encoder_finish',
+        ])
+        actual += '\n' + definition(text, 'void* subghz_protocol_encoder_power_smart_alloc(')
+        actual += '\n' + function(text, 'subghz_protocol_encoder_power_smart_add_duration_to_upload')
+        actual += '\n' + function(text, 'subghz_protocol_encoder_power_smart_get_upload')
+        native(r'''
+#include <assert.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#define furi_assert assert
+#define furi_check assert
+#define furi_crash(...) abort()
+#define UNUSED(x) ((void)x)
+#define bit_read(v,b) (((v)>>(b))&1U)
+typedef int SubGhzEnvironment;
+typedef struct {bool level;uint32_t duration;} LevelDuration;
+typedef struct {struct {uint64_t data;unsigned data_count_bit;} generic;
+                struct {LevelDuration* upload;size_t size_upload;} encoder;} SubGhzProtocolEncoderPowerSmart;
+static const int subghz_protocol_power_smart=0;
+static const struct {unsigned te_short,te_long;} subghz_protocol_power_smart_const={225,450};
+static size_t capacity;
+static void* subghz_protocol_encoder_common_alloc(size_t size,const void* p,size_t repeat,size_t count) {
+    (void)p;(void)repeat;SubGhzProtocolEncoderPowerSmart* x=calloc(1,size);assert(x);
+    capacity=count;x->encoder.upload=calloc(count,sizeof(LevelDuration));assert(x->encoder.upload);
+    x->encoder.size_upload=count;return x;
+}
+static LevelDuration level_duration_make(bool l,uint32_t d) {return (LevelDuration){l,d};}
+static bool level_duration_get_level(LevelDuration d) {return d.level;}
+''' + header + '\n' + actual + r'''
+int main(void) {
+    SubGhzProtocolEncoderPowerSmart* x=subghz_protocol_encoder_power_smart_alloc(NULL);
+    const uint64_t samples[]={0,UINT64_MAX,0x5555555555555555ULL,0xAAAAAAAAAAAAAAAAULL,
+                              0xFD2137ACAADEC852ULL};
+    size_t largest=0;
+    for(unsigned i=0;i<sizeof(samples)/sizeof(samples[0]);i++) {
+        x->generic.data=samples[i];x->generic.data_count_bit=64;x->encoder.size_upload=capacity;
+        subghz_protocol_encoder_power_smart_get_upload(x);
+        assert(x->encoder.size_upload<=capacity);
+        if(x->encoder.size_upload>largest) largest=x->encoder.size_upload;
+    }
+    assert(largest==1025); // Old 1024 allocation writes past the actual heap buffer.
+    free(x->encoder.upload);free(x);return 0;
+}
+''')
+
     def test_came_twee_saved_frame_is_validated_before_upload(self):
         text = (PROTOCOLS / 'came_twee.c').read_text()
         table = re.search(r'static const uint32_t came_twee_magic_numbers_xor\[15\] = \{.*?\};', text, re.S).group()
