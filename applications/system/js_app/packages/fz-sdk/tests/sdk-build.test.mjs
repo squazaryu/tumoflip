@@ -6,11 +6,14 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-const packageRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const packageRoot = process.env.SDK_PACKAGE_ROOT
+  ? path.resolve(process.env.SDK_PACKAGE_ROOT)
+  : path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const temporaryRoot = process.env.SDK_TEST_TEMP_ROOT ?? os.tmpdir();
 const sdkPath = path.join(packageRoot, "sdk.js");
 
 async function buildFixture(minify) {
-  const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), "tumoflip-js-sdk-"));
+  const fixtureRoot = await mkdtemp(path.join(temporaryRoot, "tumoflip-js-sdk-"));
   const distDir = path.join(fixtureRoot, "dist");
   await mkdir(distDir);
 
@@ -69,4 +72,13 @@ test("pins the audited esbuild release", async () => {
     await readFile(path.join(packageRoot, "package.json"), "utf8"),
   );
   assert.equal(packageJson.dependencies.esbuild, "0.28.1");
+});
+
+test("keeps documentation parsers out of the Node 18 SDK runtime", async () => {
+  const packageJson = JSON.parse(
+    await readFile(path.join(packageRoot, "package.json"), "utf8"),
+  );
+  assert.equal(packageJson.engines.node, ">=18.12");
+  assert.equal(packageJson.dependencies.typedoc, undefined);
+  assert.equal(packageJson.dependencies["typedoc-material-theme"], undefined);
 });

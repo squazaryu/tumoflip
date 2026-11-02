@@ -7,10 +7,11 @@ import { fileURLToPath } from "node:url";
 import { replaceInFileSync } from "replace-in-file";
 
 const packageRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const temporaryRoot = process.env.SDK_TEST_TEMP_ROOT ?? os.tmpdir();
 
 test("creates a project template without unresolved placeholders", async () => {
   const fixtureRoot = await mkdtemp(
-    path.join(os.tmpdir(), "tumoflip-create-fz-"),
+    path.join(temporaryRoot, "tumoflip-create-fz-"),
   );
   const projectRoot = path.join(fixtureRoot, "sample-app");
 
