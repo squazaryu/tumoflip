@@ -788,30 +788,15 @@ static void subghz_protocol_secplus_v2_encode(SubGhzProtocolEncoderSecPlus_v2* i
 
 static LevelDuration
     subghz_protocol_encoder_secplus_v2_add_duration_to_upload(ManchesterEncoderResult result) {
-    LevelDuration data = {.duration = 0, .level = 0};
-    switch(result) {
-    case ManchesterEncoderResultShortLow:
-        data.duration = subghz_protocol_secplus_v2_const.te_short;
-        data.level = false;
-        break;
-    case ManchesterEncoderResultLongLow:
-        data.duration = subghz_protocol_secplus_v2_const.te_long;
-        data.level = false;
-        break;
-    case ManchesterEncoderResultLongHigh:
-        data.duration = subghz_protocol_secplus_v2_const.te_long;
-        data.level = true;
-        break;
-    case ManchesterEncoderResultShortHigh:
-        data.duration = subghz_protocol_secplus_v2_const.te_short;
-        data.level = true;
-        break;
-
-    default:
+    if((unsigned)result > ManchesterEncoderResultShortHigh) {
         furi_crash("SubGhz: ManchesterEncoderResult is incorrect.");
-        break;
     }
-    return level_duration_make(data.level, data.duration);
+    const bool long_pulse = result == ManchesterEncoderResultLongLow ||
+                            result == ManchesterEncoderResultLongHigh;
+    return level_duration_make(
+        result >= ManchesterEncoderResultLongHigh,
+        long_pulse ? subghz_protocol_secplus_v2_const.te_long :
+                     subghz_protocol_secplus_v2_const.te_short);
 }
 
 /**
