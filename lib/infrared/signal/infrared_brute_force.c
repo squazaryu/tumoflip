@@ -109,14 +109,22 @@ InfraredErrorCode infrared_brute_force_calculate_messages(InfraredBruteForce* br
             size_t signal_start = flipper_format_tell(ff);
             error = infrared_signal_read_body(signal, ff);
             signal_valid = (!INFRARED_ERROR_PRESENT(error)) && infrared_signal_is_valid(signal);
-            if(!signal_valid) break;
+            if(!signal_valid) {
+                if(error == InfraredErrorCodeNone) error = InfraredErrorCodeSignalMessageIsInvalid;
+                break;
+            }
 
             InfraredBruteForceRecord* record =
                 InfraredBruteForceRecordDict_get(brute_force->records, signal_name);
-            furi_assert(record);
+            if(!record) {
+                error = InfraredErrorCodeSignalNameNotFound;
+                break;
+            }
             SignalPositionArray_push_back(record->signals, signal_start);
         }
-        if(!signal_valid) break;
+        if(!signal_valid && error == InfraredErrorCodeNone) {
+            error = InfraredErrorCodeSignalNameNotFound;
+        }
     } while(false);
 
     infrared_signal_free(signal);
