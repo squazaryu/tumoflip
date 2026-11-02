@@ -840,7 +840,6 @@ void subghz_txrx_hopper_update(
     if(profile_preset_index >= 0) preset_count--;
     size_t frequency_index = instance->hopper_idx_frequency;
     size_t preset_hopper_index = instance->preset_hopper_idx;
-    SubGhzHopperPlan hopper_plan;
     if(!subghz_hopper_plan_next(
            &frequency_index,
            &preset_hopper_index,
@@ -848,15 +847,27 @@ void subghz_txrx_hopper_update(
            hop_preset,
            frequency_count,
            preset_count,
-           &hopper_plan)) {
+           NULL)) {
         return;
     }
     instance->hopper_idx_frequency = (uint8_t)frequency_index;
     instance->preset_hopper_idx = preset_hopper_index;
 
+    // Resolve the table index before stopping RX. Only the two updated indices
+    // from the planner are needed; its optional change-report struct is unused.
+    size_t preset_index = preset_hopper_index;
+    if(hop_preset) {
+        if(configured_preset_count > 0) {
+            preset_index =
+                subghz_setting_get_hopper_preset_index(instance->setting, preset_hopper_index);
+        } else if(profile_preset_index >= 0 && preset_index >= (size_t)profile_preset_index) {
+            preset_index++;
+        }
+    }
+
     uint32_t frequency =
         hop_frequency ?
-            subghz_setting_get_hopper_frequency(instance->setting, hopper_plan.frequency_index) :
+            subghz_setting_get_hopper_frequency(instance->setting, frequency_index) :
             instance->preset->frequency;
 
     if(instance->txrx_state == SubGhzTxRxStateRx) {
@@ -865,13 +876,6 @@ void subghz_txrx_hopper_update(
     if(instance->txrx_state == SubGhzTxRxStateIDLE) {
         subghz_txrx_receiver_reset(instance);
         if(hop_preset) {
-            size_t preset_index = configured_preset_count > 0 ?
-                                      subghz_setting_get_hopper_preset_index(
-                                          instance->setting, hopper_plan.preset_hopper_index) :
-                                      hopper_plan.preset_hopper_index;
-            if(profile_preset_index >= 0 && preset_index >= (size_t)profile_preset_index) {
-                preset_index++;
-            }
             subghz_txrx_set_preset_internal(instance, frequency, preset_index, 0);
             subghz_devices_load_preset(
                 instance->radio_device, FuriHalSubGhzPresetCustom, instance->preset->data);
