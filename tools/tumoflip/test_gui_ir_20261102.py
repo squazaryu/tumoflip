@@ -126,8 +126,13 @@ class GuiRedrawTests(NativeRegression):
     def test_uncover_paths_still_force_gui_redraw(self):
         source = (ROOT / "applications/services/gui/gui.c").read_text()
         for name in ("void gui_add_view_port(", "void gui_remove_view_port(",
-                     "void gui_view_port_send_to_front(", "void gui_view_port_send_to_back("):
+                     "void gui_view_port_send_to_front(", "void gui_view_port_send_to_back(",
+                     "void gui_add_framebuffer_callback(", "void gui_set_lockdown(",
+                     "void gui_set_lockdown_inhibit(", "void gui_set_status_bar_hidden(",
+                     "void gui_direct_draw_release("):
             self.assertIn("gui_update(", function(source, name))
+        viewport = (ROOT / "applications/services/gui/view_port.c").read_text()
+        self.assertIn("gui_update(", function(viewport, "void view_port_enabled_set("))
 
     def test_no_retained_apps_browser_or_api_bump(self):
         loader = (ROOT / "applications/services/loader/loader_applications.c").read_text()

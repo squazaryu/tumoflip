@@ -29,6 +29,9 @@ typedef enum {
 
 /** Get button menu view
  *
+ * The module uses enter/exit callbacks for scrolling lifetime. Wrap the view
+ * in a parent container instead of replacing these internal callbacks.
+ *
  * @param      button_menu  ButtonMenu instance
  *
  * @return     View instance that can be used for embedding
