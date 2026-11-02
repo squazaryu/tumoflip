@@ -81,7 +81,7 @@ const SubGhzProtocolEncoder subghz_protocol_somfy_keytis_encoder = {
 void* subghz_protocol_encoder_somfy_keytis_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
     return subghz_protocol_encoder_common_alloc(
-        sizeof(SubGhzProtocolEncoderSomfyKeytis), &subghz_protocol_somfy_keytis, 3, 512);
+        sizeof(SubGhzProtocolEncoderSomfyKeytis), &subghz_protocol_somfy_keytis, 3, 560);
 }
 
 void* subghz_protocol_decoder_somfy_keytis_alloc(SubGhzEnvironment* environment) {
@@ -436,7 +436,10 @@ SubGhzProtocolStatus
     SubGhzProtocolStatus res = SubGhzProtocolStatusError;
     do {
         if(SubGhzProtocolStatusOk !=
-           subghz_block_generic_deserialize(&instance->generic, flipper_format)) {
+           subghz_block_generic_deserialize_check_count_bit(
+               &instance->generic,
+               flipper_format,
+               subghz_protocol_somfy_keytis_const.min_count_bit_for_found)) {
             FURI_LOG_E(TAG, "Deserialize error");
             break;
         }
