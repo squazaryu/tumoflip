@@ -48,10 +48,21 @@ class NativeRegression(unittest.TestCase):
             name = item["name"].rsplit(":", 1)[-1]
             if name not in cls.covered_functions:
                 continue
-            regions = [r for r in item["regions"] if r[-1] == 0]
+            # File 0 is the production function's source body. Additional file
+            # IDs are expansions of host-only assert/model/logging stubs, not
+            # firmware branches. Clang also emits zero-length source anchors
+            # for assert macro failure arms. Keep the inclusive count visible,
+            # but gate non-empty function-body regions, not those anchors.
+            inclusive = [r for r in item["regions"] if r[-1] == 0]
+            regions = [r for r in inclusive if r[5] == 0 and r[:2] != r[2:4]]
             covered = sum(r[4] > 0 for r in regions)
-            print(f"{name}: {covered}/{len(regions)} regions covered")
+            print(f"{name}: {covered}/{len(regions)} source regions; "
+                  f"including host macros {sum(r[4] > 0 for r in inclusive)}/{len(inclusive)}")
             if not regions or covered / len(regions) < 0.8:
+                lines = cls.input.read_text().splitlines()
+                for region in regions:
+                    if not region[4]:
+                        print("uncovered", region[:4], lines[region[0] - 1].strip())
                 raise AssertionError(f"Coverage below 80% for {name}")
 
     def run_case(self, case):

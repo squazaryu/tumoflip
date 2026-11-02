@@ -564,17 +564,40 @@ MU_TEST(infrared_test_audio_database) {
 }
 
 MU_TEST(infrared_test_projector_database) {
-    infrared_brute_force_set_db_filename(test->brutedb, EXT_PATH("infrared/assets/projector.ir"));
+    infrared_brute_force_set_db_filename(test->brutedb, EXT_PATH("infrared/assets/projectors.ir"));
     uint32_t i = 0;
     infrared_brute_force_add_record(test->brutedb, i++, "Power");
     infrared_brute_force_add_record(test->brutedb, i++, "Mute");
     infrared_brute_force_add_record(test->brutedb, i++, "Vol_up");
     infrared_brute_force_add_record(test->brutedb, i++, "Vol_dn");
+    infrared_brute_force_add_record(test->brutedb, i++, "Play");
+    infrared_brute_force_add_record(test->brutedb, i++, "Pause");
 
     mu_assert(
         infrared_brute_force_calculate_messages(test->brutedb) == InfraredErrorCodeNone,
         "universal projector database is invalid");
 
+    infrared_brute_force_reset(test->brutedb);
+}
+
+MU_TEST(infrared_test_unknown_database_button) {
+    infrared_brute_force_set_db_filename(
+        test->brutedb, IR_TEST_FILES_DIR "unexpected_button.ir");
+    infrared_brute_force_add_record(test->brutedb, 0, "Power");
+    mu_assert(
+        infrared_brute_force_calculate_messages(test->brutedb) ==
+            InfraredErrorCodeSignalNameNotFound,
+        "unregistered database button must return an error, not crash");
+    infrared_brute_force_reset(test->brutedb);
+}
+
+MU_TEST(infrared_test_empty_database) {
+    infrared_brute_force_set_db_filename(test->brutedb, IR_TEST_FILES_DIR "empty_database.ir");
+    infrared_brute_force_add_record(test->brutedb, 0, "Power");
+    mu_assert(
+        infrared_brute_force_calculate_messages(test->brutedb) ==
+            InfraredErrorCodeSignalNameNotFound,
+        "an empty universal database must not report success");
     infrared_brute_force_reset(test->brutedb);
 }
 
@@ -618,6 +641,8 @@ MU_TEST_SUITE(infrared_test) {
     MU_RUN_TEST(infrared_test_ac_database);
     MU_RUN_TEST(infrared_test_audio_database);
     MU_RUN_TEST(infrared_test_projector_database);
+    MU_RUN_TEST(infrared_test_unknown_database_button);
+    MU_RUN_TEST(infrared_test_empty_database);
     MU_RUN_TEST(infrared_test_tv_database);
 }
 
