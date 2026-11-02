@@ -11,6 +11,60 @@ PROTOCOLS = ROOT / 'lib/subghz/protocols'
 
 
 class UpstreamNovemberSafetyTests(unittest.TestCase):
+    def test_came_twee_saved_frame_is_validated_before_upload(self):
+        text = (PROTOCOLS / 'came_twee.c').read_text()
+        table = re.search(r'static const uint32_t came_twee_magic_numbers_xor\[15\] = \{.*?\};', text, re.S).group()
+        native(r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#define COUNT_OF(a) (sizeof(a)/sizeof((a)[0]))
+#define furi_assert assert
+typedef struct {uint64_t data;uint32_t serial,btn,cnt;} SubGhzBlockGeneric;
+typedef struct {SubGhzBlockGeneric generic;struct {unsigned repeat,front;bool is_running;} encoder;} SubGhzProtocolEncoderCameTwee;
+typedef struct {SubGhzBlockGeneric generic;} SubGhzProtocolDecoderCameTwee;
+typedef struct {uint64_t data;int status;} FlipperFormat;
+typedef int SubGhzProtocolStatus;
+enum {SubGhzProtocolStatusError=-1,SubGhzProtocolStatusOk,SubGhzProtocolStatusErrorParserOthers};
+static const struct {unsigned min_count_bit_for_found;} subghz_protocol_came_twee_const={54};
+static unsigned uploads;
+static int subghz_block_generic_deserialize_check_count_bit(SubGhzBlockGeneric* g,FlipperFormat* f,unsigned bits) {
+    assert(bits==54);g->data=f->data;return f->status;
+}
+static bool flipper_format_read_uint32(FlipperFormat* f,const char* key,uint32_t* value,size_t n) {
+    (void)f;(void)key;(void)value;(void)n;return false;
+}
+static void subghz_protocol_encoder_came_twee_get_upload(SubGhzProtocolEncoderCameTwee* x) {
+    assert((x->generic.data&15)<15);uploads++;
+}
+static uint64_t subghz_protocol_blocks_reverse_key(uint64_t x,unsigned n) {
+    uint64_t y=0;for(unsigned i=0;i<n;i++){y=(y<<1)|(x&1);x>>=1;}return y;
+}
+''' + table + '\n' + '\n'.join(function(text, name) for name in [
+            'subghz_protocol_came_twee_remote_controller',
+            'subghz_protocol_encoder_came_twee_deserialize',
+            'subghz_protocol_decoder_came_twee_deserialize',
+        ]) + r'''
+int main(void) {
+    SubGhzProtocolEncoderCameTwee e={0};SubGhzProtocolDecoderCameTwee d={0};
+    FlipperFormat f={.data=0x3fff720000000fULL,.status=SubGhzProtocolStatusOk};
+    assert(subghz_protocol_encoder_came_twee_deserialize(&e,&f)==SubGhzProtocolStatusErrorParserOthers);
+    assert(!e.encoder.is_running&&!uploads);
+    assert(subghz_protocol_decoder_came_twee_deserialize(&d,&f)==SubGhzProtocolStatusErrorParserOthers);
+    for(unsigned i=0;i<15;i++) {
+        f.data=0x3fff7200000000ULL|i;
+        assert(subghz_protocol_decoder_came_twee_deserialize(&d,&f)==SubGhzProtocolStatusOk);
+        assert(subghz_protocol_encoder_came_twee_deserialize(&e,&f)==SubGhzProtocolStatusOk);
+        assert(e.encoder.is_running&&e.encoder.front==0);
+    }
+    f.status=SubGhzProtocolStatusError;
+    assert(subghz_protocol_decoder_came_twee_deserialize(&d,&f)==SubGhzProtocolStatusError);
+    assert(subghz_protocol_encoder_came_twee_deserialize(&e,&f)==SubGhzProtocolStatusError);
+    assert(uploads==15);return 0;
+}
+''')
+
     def test_came_twee_does_not_index_parcel_f_outside_table(self):
         text=(PROTOCOLS/'came_twee.c').read_text()
         table=re.search(r'static const uint32_t came_twee_magic_numbers_xor\[15\] = \{.*?\};',text,re.S).group()
