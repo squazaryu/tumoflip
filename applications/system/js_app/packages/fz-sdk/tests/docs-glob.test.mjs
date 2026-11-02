@@ -50,3 +50,12 @@ test("TypeDoc excludes node_modules unless the entry point explicitly includes i
       [`${root}/node_modules/pkg/index.d.ts`]);
   });
 });
+
+test("TypeDoc keeps legacy traversal for negated patterns and empty matchers", async () => {
+  await fixture(async (root) => {
+    const pattern = `!${createGlobString(root, "{alpha,beta}/**/index.d.ts")}`;
+    assert.deepEqual(glob(pattern, root), [`${root}/alpha/nested/extra.d.ts`]);
+    assert.deepEqual(glob("#comment", root), []);
+    assert.deepEqual(glob("", root), []);
+  });
+});
