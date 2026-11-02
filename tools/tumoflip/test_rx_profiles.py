@@ -80,15 +80,17 @@ typedef struct {const char*label;uint32_t frequency;const char*preset;} SubGhzRx
 typedef struct {int hopping_mode;uint32_t frequency,raw_frequency;int preset_index,raw_preset_index;} Settings;
 typedef struct {void*context;unsigned index;char text[32];}VariableItem;
 typedef int SubGhzSetting;
-typedef struct {void*txrx;Settings*last_settings;VariableItem*variable_item_list;bool raw;int tx_power;}SubGhz;
+typedef struct {bool rx_profile_preset_owned;}SubGhzTxRx;
+typedef struct {SubGhzTxRx*txrx;Settings*last_settings;VariableItem*variable_item_list;bool raw;int tx_power;}SubGhz;
 static int applied,available=1;static bool valid=true;
 static const SubGhzRxProfile profile={"433 FM476",433920000,"FM476"};
+static const SubGhzRxProfile honda={"Honda 433",433920000,"TumoHonda"};
 static void* variable_item_get_context(VariableItem*i){return i->context;}
 static unsigned variable_item_get_current_value_index(VariableItem*i){return i->index;}
 static void variable_item_set_current_value_index(VariableItem*i,unsigned v){i->index=v;}
 static void variable_item_set_current_value_text(VariableItem*i,const char*t){snprintf(i->text,sizeof(i->text),"%s",t);}
 static VariableItem* variable_item_list_get(VariableItem*i,unsigned v){return i+v;}
-static const SubGhzRxProfile* subghz_rx_profile_get(unsigned i){return i==2?&profile:NULL;}
+static const SubGhzRxProfile* subghz_rx_profile_get(unsigned i){return i==2?&profile:i==7?&honda:NULL;}
 static bool subghz_scene_receiver_config_is_raw(SubGhz*s){return s->raw;}
 static SubGhzSetting* subghz_txrx_get_setting(void*x){return x;}
 static int subghz_rx_profile_preset_index(SubGhzSetting*s,unsigned i){(void)s;(void)i;return available;}
@@ -106,7 +108,11 @@ int main(void){Settings settings={0,315000000,868350000,0,4};VariableItem rows[2
  app.raw=false;choice.index=2;subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==2&&choice.index==0);
  settings.hopping_mode=SubGhzHoppingModeOff;available=-1;choice.index=2;subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==2&&!strcmp(choice.text,"Unavailable"));
  available=1;valid=false;choice.index=2;subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==2);
- choice.index=0;subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==2&&!strcmp(choice.text,"Manual"));return 0;}
+ choice.index=0;subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==2&&!strcmp(choice.text,"Manual"));
+ SubGhzTxRx radio={0};app.txrx=&radio;valid=true;choice.index=7;
+ subghz_scene_receiver_config_set_rx_profile(&choice);assert(applied==3&&radio.rx_profile_preset_owned);
+ choice.index=2;subghz_scene_receiver_config_set_rx_profile(&choice);assert(radio.rx_profile_preset_owned);
+ return 0;}
 ''')
 
     def test_profiles_do_not_shift_protopirate_plugin_context_layout(self):

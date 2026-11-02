@@ -495,6 +495,9 @@ static void subghz_scene_receiver_config_set_rx_profile(VariableItem* item) {
         variable_item_set_current_value_text(item, "Unavailable");
         return;
     }
+    if(!strcmp(profile->preset, SUBGHZ_RX_CUSTOM_NAME)) {
+        subghz->txrx->rx_profile_preset_owned = true;
+    }
     subghz_txrx_set_preset_internal(
         subghz->txrx, profile->frequency, preset_index, subghz->tx_power);
     if(is_raw) {

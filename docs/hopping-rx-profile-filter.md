@@ -11,10 +11,10 @@ The protocol-pack selection and radio-preset selection are independent.
 - Filter the built-in Honda RX setup only from the **automatic fallback** when
   no `Hopping_Preset` list is configured. Map filtered ordinals back to actual
   setting indices without deleting/reordering the underlying preset table.
-- Match the reserved name, payload size and RX register bytes. A different user
-  RX preset with the same name remains eligible. The trailing eight PA bytes
-  affect TX power, not RX setup; changing power must not reintroduce Honda into
-  automatic scans.
+- Remember whether registration/validation of the built-in profile succeeded,
+  then resolve its current table index by name. A user collision rejected by the
+  catalog remains eligible, even if it differs only in TX power. Changing the
+  PA table after successful registration does not lose the ownership marker.
 - Preserve all explicit `Hopping_Preset` entries, including order, duplicates
   and deliberately selected Honda presets. This is not a restriction on user
   configuration.
@@ -23,7 +23,9 @@ The protocol-pack selection and radio-preset selection are independent.
   dwell, wrap, Combined frequency progression and AUTO diversity radio loads.
 - Keep the Honda 433/315 profile catalog and its existing registration/collision
   policy unchanged. No protocol is removed, no settings/.sub files are rewritten,
-  no SD migration, public export, private struct layout or API version changes.
+  no SD migration, public export or API version changes. One private ownership
+  flag uses existing tail padding; a compile-time check preserves the struct
+  size and all prior member offsets.
 
 Only Standard's resident automatic hopper changes. ARF's separate hopper does
 not automatically register this profile and is unchanged. This patch requires

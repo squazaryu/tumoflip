@@ -35,7 +35,9 @@ static inline const SubGhzRxProfile* subghz_rx_profile_get(unsigned index) {
     return index > 0 && index < SUBGHZ_RX_PROFILE_COUNT ? &profiles[index - 1] : NULL;
 }
 
-static inline bool subghz_rx_profiles_init(SubGhzSetting* setting) {
+// Startup/profile selection is not a hot path. Keep the registration and
+// collision checks shared instead of cloning them into the allocator and UI.
+static __attribute__((noinline)) bool subghz_rx_profiles_init(SubGhzSetting* setting) {
     const int existing = subghz_setting_get_inx_preset_by_name(setting, SUBGHZ_RX_CUSTOM_NAME);
     if(existing >= 0) {
         // Never overwrite or silently adopt a user preset with the same name.
