@@ -20,6 +20,9 @@ class HopperProfileFilterTests(unittest.TestCase):
         cls.work = Path(cls.temporary.name)
         source = (ROOT / "applications/main/subghz/helpers/subghz_txrx.c").read_text()
         profiles = (ROOT / "lib/subghz/subghz_rx_profiles.h").read_text()
+        implementation = ROOT / "lib/subghz/subghz_rx_profiles.c"
+        if implementation.exists():
+            profiles += "\n" + implementation.read_text()
         plan = (ROOT / "lib/subghz/subghz_hopper_plan.h").read_text()
         actual = "\n".join(line for line in (profiles + "\n" + plan).splitlines()
                            if not line.startswith(("#include", "#pragma once")))
@@ -58,7 +61,7 @@ class HopperProfileFilterTests(unittest.TestCase):
                                 "-o", str(merged)], check=True)
                 subprocess.run(["xcrun", "llvm-cov", "report", str(cls.binary),
                                 "-instr-profile=" + str(merged), "-show-functions",
-                                "-name-regex=subghz_txrx_hopper_|subghz_rx_profile_custom_preset_matches",
+                                "-name-regex=subghz_txrx_hopper_update|init_profiles",
                                 str(cls.input)], check=True)
                 # Export is printed only when explicitly requested for a coverage receipt.
                 report = json.loads(subprocess.check_output([
@@ -66,8 +69,7 @@ class HopperProfileFilterTests(unittest.TestCase):
                     "-instr-profile=" + str(merged),
                 ], text=True))
                 for item in report["data"][0]["functions"]:
-                    if item["name"].endswith(("subghz_txrx_hopper_profile_preset_index",
-                                               "subghz_rx_profile_custom_preset_matches")):
+                    if item["name"].endswith(("subghz_txrx_hopper_update", "init_profiles")):
                         regions = [r for r in item["regions"] if r[-1] == 0]
                         covered = sum(r[4] > 0 for r in regions)
                         if not regions or covered / len(regions) < 0.8:

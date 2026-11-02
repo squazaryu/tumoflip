@@ -147,7 +147,11 @@ int main(void){struct{int data;}preset={0};SubGhzSetting s={(void*)&preset};int 
     def test_catalog_is_bounded_and_data_is_owned_by_settings(self):
         path = ROOT / "lib/subghz/subghz_rx_profiles.h"
         self.assertTrue(path.exists(), "shared RX profile catalog missing")
-        source = "\n".join(l for l in path.read_text().splitlines() if not l.startswith(("#pragma once", "#include")))
+        text = path.read_text()
+        implementation = ROOT / "lib/subghz/subghz_rx_profiles.c"
+        if implementation.exists():
+            text += "\n" + implementation.read_text()
+        source = "\n".join(l for l in text.splitlines() if not l.startswith(("#pragma once", "#include")))
         native(r'''
 #include <stdint.h>
 #include <stdbool.h>
