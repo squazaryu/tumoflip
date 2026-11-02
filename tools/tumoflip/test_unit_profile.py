@@ -46,6 +46,12 @@ class UnitProfileTests(unittest.TestCase):
         registered = set(re.findall(r'add_record\([^;]+"([^"]+)"\)', test))
         self.assertTrue(shipped <= registered, shipped - registered)
 
+    def test_ir_error_fixtures_keep_the_valid_universal_database_header(self):
+        header = (ROOT / "applications/main/infrared/resources/infrared/assets/projectors.ir").read_text().splitlines()[:2]
+        assets = ROOT / "applications/debug/unit_tests/resources/unit_tests/infrared"
+        for name in ("empty_database.ir", "unexpected_button.ir"):
+            self.assertEqual((assets / name).read_text().splitlines()[:2], header)
+
 
 if __name__ == "__main__":
     unittest.main()

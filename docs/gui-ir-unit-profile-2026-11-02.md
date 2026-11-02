@@ -17,6 +17,11 @@ unchanged; the normal updater must keep at least4096B physical C2 reserve.
   non-blocking draw fallback is retained and queues a locked redraw to re-arm.
   Timer start/stop/free commands are outside model locks, including ButtonMenu
   teardown, to avoid a timer-daemon/model-lock inversion.
+  ButtonMenu owns its timer in the controller, not its drawing model. Repeated
+  blocking and bounded ViewPort lock bodies are shared; mandatory checks,
+  timeout, ownership and diagnostic lines remain. GCC cloning is disabled for
+  the small shared timeout helper, not for the whole firmware. This removes
+  duplication rather than functionality and preserves the required C2 page.
 - Local IR fix: unknown database button names, empty databases and invalid
   parsed signals return existing errors rather than relying on release-disabled
   assertions. Scratch allocations close on every path. Registered names, offsets
