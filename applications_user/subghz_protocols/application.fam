@@ -326,5 +326,11 @@ App(
     targets=["f7"],
     entry_point="subghz_protocol_freezer_plugin_ep",
     requires=["subghz"],
-    sources=["freezer_plugin.c", "../../lib/subghz/protocols/freezer.c"],
+    sources=[
+        "freezer_plugin.c",
+        "../../lib/subghz/protocols/freezer.c",
+        # Private helpers are not SDK imports. Link the needed bodies into this
+        # external-only FAL; unused bodies are garbage-collected.
+        "../../lib/subghz/protocols/common.c",
+    ],
 )

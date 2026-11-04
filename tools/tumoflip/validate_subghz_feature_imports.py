@@ -1,9 +1,14 @@
-"""Resolve feature FAL imports against firmware plus the exact Sub-GHz host table."""
+"""Check each FAL against the resolver actually used by its host."""
 import argparse
 import csv
 from pathlib import Path
 import re
 import subprocess
+
+try:
+    from .validate_release import PROTOCOL_PACKS
+except ImportError:
+    from validate_release import PROTOCOL_PACKS
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -27,6 +32,19 @@ def validate(build, nm):
         if missing:
             raise ValueError(f"{app}: unresolved imports {sorted(missing)}")
         print(f"{app}: {len(imports)} imports resolved, {len(imports & private)} via Sub-GHz host")
+
+    # ProtocolPackRegistry passes only firmware_api_interface, not the feature
+    # host's composite resolver. Private feature exports cannot satisfy a FAL here.
+    for filename in sorted(PROTOCOL_PACKS):
+        artifact = build / ".extapps" / filename
+        if not artifact.is_file():
+            raise ValueError(f"Missing protocol artifact: {filename}")
+        output = subprocess.check_output([nm, "-u", str(artifact)], text=True)
+        imports = {line.split()[-1] for line in output.splitlines() if line.split()}
+        missing = imports - public
+        if missing:
+            raise ValueError(f"{filename}: imports outside public firmware resolver {sorted(missing)}")
+        print(f"{filename}: {len(imports)} imports resolved by public firmware API")
 
 
 if __name__ == "__main__":
