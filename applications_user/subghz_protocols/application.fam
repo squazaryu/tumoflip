@@ -319,3 +319,12 @@ App(
         "../../lib/subghz/protocols/keeloq_common.c",
     ],
 )
+
+App(
+    appid="protocol_freezer",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_freezer_plugin_ep",
+    requires=["subghz"],
+    sources=["freezer_plugin.c", "../../lib/subghz/protocols/freezer.c"],
+)

@@ -39,6 +39,7 @@ static const SubGhzProtocolPackEntry subghz_protocol_pack_entries[] = {
     {PACK_GROUP_ALL, "superrollo"},
     {PACK_GROUP(SubGhzProtocolPackGroupCore), "rx_x10"},
     {PACK_GROUP(SubGhzProtocolPackGroupCore), "rx_urmet"},
+    {PACK_GROUP(SubGhzProtocolPackGroupCore), "freezer"},
     {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_gm0"},
     {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_gm1"},
     {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_ty0"},

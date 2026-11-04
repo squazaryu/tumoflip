@@ -25,7 +25,14 @@ def declarations(source, stem):
         r"typedef enum \{.*?\} \w+DecoderStep;",
     ):
         sections.extend(re.findall(pattern, source, re.S))
-    sections.extend(re.findall(r"^#define (?:MARANTEC24|CAME_TWEE|FREEZER)_.*(?:\\\n.*)*", source, re.M))
+    lines = source.splitlines()
+    for index, line in enumerate(lines):
+        if re.match(r"#define (?:MARANTEC24|CAME_TWEE|FREEZER)_", line):
+            macro = [line]
+            while macro[-1].rstrip().endswith("\\"):
+                index += 1
+                macro.append(lines[index])
+            sections.append("\n".join(macro))
     return "\n".join(sections) + "\n"
 
 
