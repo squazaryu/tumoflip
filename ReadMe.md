@@ -193,21 +193,21 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-009-036` | GUI redraw efficiency, BLE/SD icon refresh and defensive IR databases | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-009-037` | Static decoder corrections, external Freezer and truthful diagnostic reports | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
 
-Dev `t-dev-009-036` retains local API 88.23 and the full 4096-byte physical C2
-reserve. Covered views avoid redundant redraws, menu scrolling timers run only
-while visible, and BLE/SD status changes explicitly refresh their icons.
-Malformed universal IR databases return ordinary errors instead of a NULL
-access. The separate core diagnostic profile builds without the excluded JS
-host; SDK documentation dependency audits remain strict and pass. All changes
-from 009-035, including the automatic Honda RX hopping fix, are retained.
+Dev `t-dev-009-037` retains local API 88.23 and the full 4096-byte physical C2
+reserve. It corrects Marantec24 timing, Linear Delta3 repetition/state, Holtek
+reset isolation and CAME TWEE false positives. Freezer 433.92 MHz / 24-bit is an
+external Core-group protocol FAL, delivered in native firmware resources rather
+than resident decoder code. Diagnostic reports no longer call incomplete runs
+successful, and all protocol FAL imports are checked against their actual public
+resolver. All 009-036 GUI/IR and earlier Honda hopping fixes are retained.
 Install firmware with native resources. **FW Packages Dev 031** and
-**TumoCompanion 1.11.33** remain compatible; these internal changes require no
+**TumoCompanion 1.11.33** remain compatible; these changes require no
 new independent package or iOS release. The published iOS version includes
 Community Apps protection for `usb_cdrom` and `archive_favorites`. No ESP32
 update is required. Check release pages for publication status. Hardware
@@ -234,13 +234,13 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-009-036.tgz
+flipper-z-f7-update-t-dev-009-037.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: Dev `t-dev-009-036` uses `88.23`; immutable stable `v1.0.8` remains `88.7`.
+- Firmware API: Dev `t-dev-009-037` uses `88.23`; immutable stable `v1.0.8` remains `88.7`.
   Each release manifest records its compatible package API. API numbers are
   local to this fork.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or
