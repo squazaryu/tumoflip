@@ -96,9 +96,16 @@ class SubGhzCommonHandlersTest(unittest.TestCase):
             )
         )
 
+        resident = (PROTOCOL_DIR / "protocol_items.c").read_text(encoding="utf-8")
+        # Shared helpers stay resident; an external-only protocol may import them,
+        # but must not duplicate an already-resident protocol implementation.
+        self.assertNotIn("../../lib/subghz/protocols/common.c", manifests)
         for source in protocol_sources_using(COMMON_HANDLERS):
             relative = source.relative_to(REPO_ROOT).as_posix()
-            self.assertNotIn(relative, manifests, relative)
+            descriptor = re.search(r"const SubGhzProtocol (\w+) =", source.read_text())
+            self.assertIsNotNone(descriptor, source.name)
+            if "&" + descriptor.group(1) in resident:
+                self.assertNotIn(relative, manifests, relative)
 
     def test_common_implementations_preserve_protocol_semantics(self) -> None:
         for required in (

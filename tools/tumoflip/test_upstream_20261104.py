@@ -63,6 +63,14 @@ LevelDuration level_duration_make(bool level,uint32_t duration){return (LevelDur
 void subghz_protocol_blocks_add_bit(SubGhzBlockDecoder* d,uint8_t bit){d->decode_data=(d->decode_data<<1)|bit;d->decode_count_bit++;}
 static unsigned received;
 static uint64_t expected;
+#define FUZZ_DECODER(Type,feed,states) do { \
+    const uint32_t durations[]={0,120,250,320,500,640,800,1000,1600,2000,2400,3200,9000,15200,UINT32_MAX}; \
+    for(unsigned state=0;state<(states);state++)for(unsigned level=0;level<2;level++) \
+    for(unsigned a=0;a<COUNT_OF(durations);a++)for(unsigned b=0;b<COUNT_OF(durations);b++){ \
+        Type noise={0};noise.decoder.parser_step=state;noise.decoder.te_last=durations[b]; \
+        feed(&noise,level,durations[a]); \
+    } \
+}while(0)
 '''
 
 
@@ -97,6 +105,7 @@ int main(void){
         subghz_protocol_decoder_marantec24_feed(&d,false,gap);
         if(gap<=14400||gap>=16000)assert(d.decoder.parser_step==Marantec24DecoderStepReset);
     }
+    FUZZ_DECODER(SubGhzProtocolDecoderMarantec24,subghz_protocol_decoder_marantec24_feed,3);
     return 0;
 }
 ''')
@@ -143,6 +152,7 @@ int main(void){
         assert(d.decoder.decode_count_bit<=8);
         free(e->encoder.upload);free(e);
     }
+    FUZZ_DECODER(SubGhzProtocolDecoderLinearDelta3,subghz_protocol_decoder_linear_delta3_feed,3);
     return 0;
 }
 ''')
@@ -173,6 +183,7 @@ int main(void){
     subghz_protocol_decoder_holtek_th12x_feed(&d,false,8960);
     frame(&d,expected);assert(received==0);
     frame(&d,expected);assert(received==1);
+    FUZZ_DECODER(SubGhzProtocolDecoderHoltek_HT12X,subghz_protocol_decoder_holtek_th12x_feed,4);
     return 0;
 }
 ''')
@@ -184,7 +195,10 @@ int main(void){
 typedef int ManchesterState;
 typedef int ManchesterEvent;
 enum {ManchesterEventReset,ManchesterEventShortLow,ManchesterEventLongLow,ManchesterEventShortHigh,ManchesterEventLongHigh};
-bool manchester_advance(int old,int event,int* next,bool* bit){(void)old;(void)event;(void)next;(void)bit;return false;}
+static bool provide_bit;
+bool manchester_advance(int old,int event,int* next,bool* bit){
+    (void)old;(void)next;if(bit&&provide_bit){*bit=event&1;return true;}return false;
+}
 typedef struct SubGhzProtocolDecoderCameTwee SubGhzProtocolDecoderCameTwee;
 typedef struct SubGhzProtocolEncoderCameTwee SubGhzProtocolEncoderCameTwee;
 ''' + declarations(source, "came_twee") + table + "\n" + body(source, "subghz_protocol_decoder_came_twee_feed") + r'''
@@ -202,6 +216,10 @@ int main(void){
         subghz_protocol_decoder_came_twee_feed(&d,false,3000);
         assert(received==(unsigned)(prefix==0&&parcel<15));
     }
+    for(unsigned mode=0;mode<2;mode++){
+        provide_bit=mode;
+        FUZZ_DECODER(SubGhzProtocolDecoderCameTwee,subghz_protocol_decoder_came_twee_feed,2);
+    }
     return 0;
 }
 ''')
@@ -214,6 +232,9 @@ int main(void){
                    "int main(void){subghz_protocol_decoder_freezer_reset(0);return 0;}\n")
             return
         source = path.read_text()
+        raw = (ROOT / "tools/tumoflip/fixtures/upstream_20261104/freezer_raw.sub").read_text()
+        captured = [int(value) for line in raw.splitlines() if line.startswith("RAW_Data:")
+                    for value in line.partition(":")[2].split()]
         production = "\n".join(body(source, name) for name in (
             "subghz_protocol_freezer_check_remote_controller",
             "subghz_protocol_encoder_freezer_get_upload",
@@ -222,7 +243,8 @@ int main(void){
             "subghz_protocol_decoder_freezer_feed"))
         native(PRELUDE + "typedef struct SubGhzProtocolDecoderFreezer SubGhzProtocolDecoderFreezer;\n"
                "typedef struct SubGhzProtocolEncoderFreezer SubGhzProtocolEncoderFreezer;\n" +
-               declarations(source, "freezer") + production + r'''
+               declarations(source, "freezer") + production +
+               "\nstatic const int32_t captured[]={" + ",".join(map(str, captured)) + "};\n" + r'''
 static void capture(SubGhzProtocolDecoderBase* b,void* c){
     (void)c;assert(((SubGhzProtocolDecoderFreezer*)b)->generic.data==expected);received++;
 }
@@ -254,6 +276,14 @@ int main(void){
         e.generic.data_count_bit=24;e.encoder.size_upload=2;
         assert(!subghz_protocol_encoder_freezer_get_upload(&e));
     }
+    expected=0xc31c1f;received=0;SubGhzProtocolDecoderFreezer recording={.base={.callback=capture}};
+    subghz_protocol_decoder_freezer_reset(&recording);
+    for(unsigned i=0;i<COUNT_OF(captured);i++){
+        int32_t pulse=captured[i];
+        subghz_protocol_decoder_freezer_feed(&recording,pulse>0,pulse>0?(uint32_t)pulse:(uint32_t)-pulse);
+    }
+    assert(received>0);
+    FUZZ_DECODER(SubGhzProtocolDecoderFreezer,subghz_protocol_decoder_freezer_feed,4);
     return 0;
 }
 ''')

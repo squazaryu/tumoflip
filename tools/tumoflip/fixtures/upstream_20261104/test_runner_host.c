@@ -36,6 +36,8 @@ static const int sequence_error=1,sequence_success=2,sequence_blink_magenta_100=
 static const char* suites[4];
 static unsigned suite_count,started,live,last_notification;
 static bool directory_ok=true,locked,interrupt_run;
+static unsigned mkdir_fail,mkdir_calls,heap_calls;
+static int heap_change;
 static bool current_failed;
 static char output[8192];
 int captured_printf(const char* format,...){
@@ -46,7 +48,7 @@ bool loader_is_locked(Loader* p){(void)p;return locked;}
 void notification_message(NotificationApp* p,const int* sequence){(void)p;last_notification=*sequence;}
 void notification_message_block(NotificationApp* p,const int* sequence){notification_message(p,sequence);}
 unsigned long furi_get_tick(void){return 100;}
-uint32_t memmgr_get_free_heap(void){return 12000;}
+uint32_t memmgr_get_free_heap(void){return heap_calls++?12000+heap_change:12000;}
 void furi_delay_ms(unsigned n){(void)n;}
 FuriString* furi_string_alloc(void){live++;return calloc(1,sizeof(FuriString));}
 void furi_string_free(FuriString* s){assert(live);live--;free(s);}
@@ -62,7 +64,7 @@ void path_extract_filename(FuriString* in,FuriString* out,bool extension){
 }
 File* storage_file_alloc(Storage* p){(void)p;live++;return calloc(1,sizeof(File));}
 void storage_file_free(File* p){assert(live);live--;free(p);}
-bool storage_simply_mkdir(Storage* p,const char* name){(void)p;(void)name;return true;}
+bool storage_simply_mkdir(Storage* p,const char* name){(void)p;(void)name;return ++mkdir_calls!=mkdir_fail;}
 bool storage_dir_open(File* p,const char* name){(void)name;p->index=0;return directory_ok;}
 bool storage_dir_read(File* p,void* info,char* name,size_t size){
     (void)info;if(p->index>=suite_count)return false;assert(strlen(suites[p->index])<size);strcpy(name,suites[p->index++]);return true;
@@ -82,7 +84,7 @@ PluginManagerError plugin_manager_load_single(PluginManager* p,const char* path)
     p->fail=strstr(path,"failed")!=NULL;p->foreign=strstr(path,"foreign")!=NULL;
     return p->foreign?PluginManagerErrorInvalidFile:PluginManagerErrorNone;
 }
-const void* plugin_manager_get_ep(PluginManager* p,unsigned index){assert(index==0);current_failed=p->fail;return &test_api;}
+const void* plugin_manager_get_ep(PluginManager* p,unsigned index){assert(index==0);current_failed=p->fail;return p->foreign?NULL:&test_api;}
 void plugin_manager_free(PluginManager* p){assert(live);live--;free(p);}
 FlipperApplication* flipper_application_alloc(Storage* s,void* r){(void)s;(void)r;live++;return calloc(1,sizeof(FlipperApplication));}
 int flipper_application_preload(FlipperApplication* p,const char* path){p->fail=strstr(path,"failed")!=NULL;p->foreign=strstr(path,"foreign")!=NULL;return 0;}
@@ -111,14 +113,19 @@ int main(int argc,char** argv){
         test_runner_run(&runner);assert(started==0&&last_notification==sequence_error);
     }else if(!strcmp(argv[1],"directory")){
         directory_ok=false;test_runner_run(&runner);assert(last_notification==sequence_error&&strstr(output,"Status: FAILED"));
+    }else if(!strcmp(argv[1],"mkdir1")||!strcmp(argv[1],"mkdir2")){
+        mkdir_fail=argv[1][5]-'0';test_runner_run(&runner);assert(last_notification==sequence_error&&strstr(output,"Status: FAILED"));
     }else if(!strcmp(argv[1],"interrupt")){
         interrupt_run=true;test_runner_run(&runner);assert(last_notification==sequence_error&&strstr(output,"Interrupted"));
     }else if(!strcmp(argv[1],"locked")){
         locked=true;test_runner_run(&runner);assert(last_notification==sequence_blink_magenta_100&&strstr(output,"Status: FAILED"));
     }else{
         suite_count=1;suites[0]="test_good.fal";runner.minunit_run=99;runner.minunit_fail=5;
+        if(!strcmp(argv[1],"gain"))heap_change=1000;
+        if(!strcmp(argv[1],"leak"))heap_change=-1000;
         test_runner_run(&runner);assert(runner.minunit_run==2&&runner.minunit_fail==0&&started==1);
         assert(last_notification==sequence_success&&strstr(output,"Status: PASSED"));
+        assert(strstr(output,heap_change<0?"Leaked: 1000":"Leaked: 0"));
     }
     assert(live==0);return 0;
 }

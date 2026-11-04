@@ -34,7 +34,8 @@ class DiagnosticRunnerReportingTests(unittest.TestCase):
             raise AssertionError(result.stderr)
 
     def test_each_result_is_truthful_and_all_resources_are_released(self):
-        for scenario in ("empty", "missing", "aggregate", "foreign", "directory", "interrupt", "locked", "pass"):
+        for scenario in ("empty", "missing", "aggregate", "foreign", "directory", "mkdir1", "mkdir2",
+                         "interrupt", "locked", "pass", "gain", "leak"):
             with self.subTest(scenario=scenario):
                 result = subprocess.run([str(self.binary), scenario], capture_output=True, text=True,
                                         env={**os.environ, "LLVM_PROFILE_FILE": str(self.work / "%p.profraw")})

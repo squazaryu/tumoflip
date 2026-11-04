@@ -102,7 +102,8 @@ static bool subghz_protocol_encoder_marantec24_get_upload(void* context) {
                 level_duration_make(true, (uint32_t)subghz_protocol_marantec24_const.te_short);
             if(i == 1) {
                 //Send gap if bit was last
-                instance->encoder.upload[index++] = level_duration_make(false, MARANTEC24_GAP_DURATION);
+                instance->encoder.upload[index++] =
+                    level_duration_make(false, MARANTEC24_GAP_DURATION);
             } else {
                 instance->encoder.upload[index++] = level_duration_make(
                     false, (uint32_t)subghz_protocol_marantec24_const.te_long * 2);
@@ -113,7 +114,8 @@ static bool subghz_protocol_encoder_marantec24_get_upload(void* context) {
                 level_duration_make(true, (uint32_t)subghz_protocol_marantec24_const.te_long);
             if(i == 1) {
                 //Send gap if bit was last
-                instance->encoder.upload[index++] = level_duration_make(false, MARANTEC24_GAP_DURATION);
+                instance->encoder.upload[index++] =
+                    level_duration_make(false, MARANTEC24_GAP_DURATION);
             } else {
                 instance->encoder.upload[index++] = level_duration_make(
                     false, (uint32_t)subghz_protocol_marantec24_const.te_short * 3);

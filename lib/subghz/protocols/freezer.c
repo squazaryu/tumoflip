@@ -284,4 +284,3 @@ void subghz_protocol_decoder_freezer_get_string(void* context, FuriString* outpu
         instance->generic.serial,
         instance->generic.btn);
 }
-

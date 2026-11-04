@@ -117,9 +117,7 @@ void* subghz_protocol_encoder_came_twee_alloc(SubGhzEnvironment* environment) {
 static LevelDuration
     subghz_protocol_encoder_came_twee_add_duration_to_upload(ManchesterEncoderResult result) {
     return subghz_protocol_encoder_common_manchester_duration(
-        result,
-        subghz_protocol_came_twee_const.te_short,
-        subghz_protocol_came_twee_const.te_long);
+        result, subghz_protocol_came_twee_const.te_short, subghz_protocol_came_twee_const.te_long);
 }
 
 /**
@@ -314,9 +312,9 @@ void subghz_protocol_decoder_came_twee_feed(void* context, bool level, uint32_t 
                              subghz_protocol_came_twee_const.te_delta)) {
                 if(instance->decoder.decode_count_bit ==
                        subghz_protocol_came_twee_const.min_count_bit_for_found &&
-                   ((instance->decoder.decode_data >> 32) & 0x3FFFFFUL) == CAME_TWEE_FRAME_PREFIX &&
-                   (instance->decoder.decode_data & 0xF) <
-                       COUNT_OF(came_twee_magic_numbers_xor)) {
+                   ((instance->decoder.decode_data >> 32) & 0x3FFFFFUL) ==
+                       CAME_TWEE_FRAME_PREFIX &&
+                   (instance->decoder.decode_data & 0xF) < COUNT_OF(came_twee_magic_numbers_xor)) {
                     instance->generic.data = instance->decoder.decode_data;
                     instance->generic.data_count_bit = instance->decoder.decode_count_bit;
 
