@@ -37,6 +37,7 @@ DFUSE_VENDOR_ID = 0x0483
 DFUSE_SUFFIX_VERSION = 0x011A
 DFUSE_WHOLE_FILE_CRC = 0xFFFFFFFF
 PROTOCOL_PACKS = {
+    "protocol_freezer.fal",
     "protocol_rx_x10.fal",
     "protocol_rx_urmet.fal",
     "protocol_rx_gm0.fal",

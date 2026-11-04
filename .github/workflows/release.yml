@@ -137,6 +137,9 @@ jobs:
       - name: Validate GUI redraw, defensive IR and diagnostic-profile boundaries
         run: python3 -m unittest tools.tumoflip.test_gui_ir_20261102 tools.tumoflip.test_unit_profile tools.tumoflip.test_unit_profile_validation
 
+      - name: Validate November static decoders, external Freezer and diagnostic reports
+        run: python3 -m unittest tools.tumoflip.test_upstream_20261104 tools.tumoflip.test_unit_runner_reporting
+
       - name: Validate field-batch data and hardware ownership contracts
         run: python3 -m unittest tools.tumoflip.test_servo_plus tools.tumoflip.test_power_history tools.tumoflip.test_uhf_inventory tools.tumoflip.test_sensor_cards tools.tumoflip.test_varta_inspect tools.tumoflip.test_field_report tools.tumoflip.test_field_batch_packages
 

@@ -16,6 +16,9 @@
 
 #define TAG "SubGhzProtocolCameTwee"
 
+// A bit count alone also matches unrelated Manchester-like signals.
+#define CAME_TWEE_FRAME_PREFIX 0x3FFF72UL
+
 #define DIP_PATTERN "%c%c%c%c%c%c%c%c%c%c"
 #define CNT_TO_DIP(dip)                                                                     \
     (dip & 0x0200 ? '1' : '0'), (dip & 0x0100 ? '1' : '0'), (dip & 0x0080 ? '1' : '0'),     \
@@ -114,9 +117,7 @@ void* subghz_protocol_encoder_came_twee_alloc(SubGhzEnvironment* environment) {
 static LevelDuration
     subghz_protocol_encoder_came_twee_add_duration_to_upload(ManchesterEncoderResult result) {
     return subghz_protocol_encoder_common_manchester_duration(
-        result,
-        subghz_protocol_came_twee_const.te_short,
-        subghz_protocol_came_twee_const.te_long);
+        result, subghz_protocol_came_twee_const.te_short, subghz_protocol_came_twee_const.te_long);
 }
 
 /**
@@ -311,8 +312,9 @@ void subghz_protocol_decoder_came_twee_feed(void* context, bool level, uint32_t 
                              subghz_protocol_came_twee_const.te_delta)) {
                 if(instance->decoder.decode_count_bit ==
                        subghz_protocol_came_twee_const.min_count_bit_for_found &&
-                   (instance->decoder.decode_data & 0xF) <
-                       COUNT_OF(came_twee_magic_numbers_xor)) {
+                   ((instance->decoder.decode_data >> 32) & 0x3FFFFFUL) ==
+                       CAME_TWEE_FRAME_PREFIX &&
+                   (instance->decoder.decode_data & 0xF) < COUNT_OF(came_twee_magic_numbers_xor)) {
                     instance->generic.data = instance->decoder.decode_data;
                     instance->generic.data_count_bit = instance->decoder.decode_count_bit;
 

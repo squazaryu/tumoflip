@@ -96,9 +96,22 @@ class SubGhzCommonHandlersTest(unittest.TestCase):
             )
         )
 
+        resident = (PROTOCOL_DIR / "protocol_items.c").read_text(encoding="utf-8")
+        # Only the external-only Freezer FAL may link the resident-private helper
+        # source. Already-resident protocol implementations stay single-copy.
+        for manifest in sorted((REPO_ROOT / "applications_user").rglob("application.fam")):
+            contents = manifest.read_text()
+            if "../../lib/subghz/protocols/common.c" in contents:
+                blocks = re.split(r"\nApp\(", "\n" + contents)
+                owners = [block for block in blocks if "../../lib/subghz/protocols/common.c" in block]
+                self.assertEqual(len(owners), 1)
+                self.assertIn('appid="protocol_freezer"', owners[0])
         for source in protocol_sources_using(COMMON_HANDLERS):
             relative = source.relative_to(REPO_ROOT).as_posix()
-            self.assertNotIn(relative, manifests, relative)
+            descriptor = re.search(r"const SubGhzProtocol (\w+) =", source.read_text())
+            self.assertIsNotNone(descriptor, source.name)
+            if "&" + descriptor.group(1) in resident:
+                self.assertNotIn(relative, manifests, relative)
 
     def test_common_implementations_preserve_protocol_semantics(self) -> None:
         for required in (

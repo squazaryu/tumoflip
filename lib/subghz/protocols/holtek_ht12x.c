@@ -56,12 +56,19 @@ typedef enum {
     Holtek_HT12XDecoderStepCheckDuration,
 } Holtek_HT12XDecoderStep;
 
+static void subghz_protocol_decoder_holtek_th12x_reset(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderHoltek_HT12X* instance = context;
+    instance->decoder.parser_step = Holtek_HT12XDecoderStepReset;
+    instance->last_data = 0;
+}
+
 const SubGhzProtocolDecoder subghz_protocol_holtek_th12x_decoder = {
     .alloc = subghz_protocol_decoder_holtek_th12x_alloc,
     .free = subghz_protocol_decoder_common_free,
 
     .feed = subghz_protocol_decoder_holtek_th12x_feed,
-    .reset = subghz_protocol_decoder_common_reset,
+    .reset = subghz_protocol_decoder_holtek_th12x_reset,
 
     .get_hash_data = subghz_protocol_decoder_common_get_hash_data,
     .serialize = subghz_protocol_decoder_common_serialize_te,
