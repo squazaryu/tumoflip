@@ -50,6 +50,13 @@ static inline uint32_t subghz_protocol_keeloq_te_delta(uint32_t te) {
     return te * subghz_protocol_keeloq_const.te_delta / subghz_protocol_keeloq_const.te_short;
 }
 
+static inline bool subghz_protocol_keeloq_te_preamble(uint32_t duration) {
+    // The two allowed short-pulse bands overlap; their union is contiguous.
+    return duration > KEELOQ_TE_FAST - subghz_protocol_keeloq_te_delta(KEELOQ_TE_FAST) &&
+           duration <
+               subghz_protocol_keeloq_const.te_short + subghz_protocol_keeloq_const.te_delta;
+}
+
 static inline uint32_t subghz_protocol_keeloq_te_sanitize(uint32_t te) {
     return te == KEELOQ_TE_FAST ? KEELOQ_TE_FAST : subghz_protocol_keeloq_const.te_short;
 }
@@ -97,6 +104,56 @@ typedef enum {
 } KeeloqDecoderStep;
 
 static uint8_t keeloq_counter_mode = 0;
+
+// One file-metadata path for RX inspection and TX loading. Keep it outlined:
+// duplicating this logic per caller wastes resident flash without changing I/O.
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((noinline, noclone))
+#endif
+static bool
+    subghz_protocol_keeloq_read_metadata(
+        SubGhzBlockGeneric* generic,
+        FlipperFormat* format,
+        SubGhzKeystore* keystore,
+        FuriString* manufacture_from_file,
+        const char** manufacture_name,
+        uint16_t* te) {
+    uint8_t seed[sizeof(uint32_t)];
+    for(size_t i = 0; i < sizeof(seed); i++) {
+        seed[sizeof(seed) - i - 1] = (generic->seed >> (i * 8)) & 0xFF;
+    }
+    flipper_format_read_hex(format, "Seed", seed, sizeof(seed));
+    generic->seed = (uint32_t)seed[0] << 24 | (uint32_t)seed[1] << 16 | (uint32_t)seed[2] << 8 |
+                    seed[3];
+    if(!flipper_format_rewind(format)) return false;
+
+    if(flipper_format_read_string(format, "Manufacture", manufacture_from_file)) {
+        *manufacture_name = furi_string_get_cstr(manufacture_from_file);
+        keystore->mfname = *manufacture_name;
+        // Preserve the existing old-file name migration.
+        if(strcmp(*manufacture_name, "Sommer(fsk476)") == 0) {
+            *manufacture_name = "Sommer";
+            keystore->mfname = *manufacture_name;
+            if(!flipper_format_rewind(format) ||
+               !flipper_format_update_string_cstr(format, "Manufacture", *manufacture_name)) {
+                return false;
+            }
+        }
+    }
+    if(!flipper_format_rewind(format)) return false;
+
+    uint32_t value = subghz_protocol_keeloq_const.te_short;
+    if(!flipper_format_read_uint32(format, "TE", &value, 1)) {
+        value = subghz_protocol_keeloq_const.te_short;
+    }
+    *te = subghz_protocol_keeloq_te_sanitize(value);
+    if(!flipper_format_rewind(format)) return false;
+
+    value = 0;
+    keeloq_counter_mode =
+        flipper_format_read_uint32(format, "CounterMode", &value, 1) ? (uint8_t)value : 0;
+    return flipper_format_rewind(format);
+}
 
 const SubGhzProtocolDecoder subghz_protocol_keeloq_decoder = {
     .alloc = subghz_protocol_decoder_keeloq_alloc,
@@ -669,8 +726,11 @@ static size_t subghz_protocol_encoder_keeloq_encode_to_timings(
         return 0;
     }
 
-    const uint32_t te_short = instance->te;
-    const uint32_t te_long = te_short * 2;
+    // Build the existing nominal waveform once. A fast file scales only this
+    // appended frame afterwards, avoiding duplicated variable-timing packing.
+    const size_t first = index;
+    const uint32_t te_short = subghz_protocol_keeloq_const.te_short;
+    const uint32_t te_long = subghz_protocol_keeloq_const.te_long;
     uint32_t gap_duration = te_short * 40;
     if((strcmp(instance->manufacture_name, "Sommer") == 0)) {
         gap_duration = te_short * 29;
@@ -702,6 +762,12 @@ static size_t subghz_protocol_encoder_keeloq_encode_to_timings(
     // send end
     instance->encoder.upload[index++] = level_duration_make(true, te_short);
     instance->encoder.upload[index++] = level_duration_make(false, gap_duration);
+
+    if(instance->te == KEELOQ_TE_FAST) {
+        for(size_t i = first; i < index; i++) {
+            instance->encoder.upload[i].duration /= 2;
+        }
+    }
 
     return index;
 }
@@ -777,66 +843,14 @@ SubGhzProtocolStatus
             break;
         }
 
-        uint8_t seed_data[sizeof(uint32_t)] = {0};
-        for(size_t i = 0; i < sizeof(uint32_t); i++) {
-            seed_data[sizeof(uint32_t) - i - 1] = (instance->generic.seed >> i * 8) & 0xFF;
-        }
-        if(!flipper_format_read_hex(flipper_format, "Seed", seed_data, sizeof(uint32_t))) {
-            FURI_LOG_D(TAG, "ENCODER: Missing Seed");
-        }
-        instance->generic.seed = seed_data[0] << 24 | seed_data[1] << 16 | seed_data[2] << 8 |
-                                 seed_data[3];
-
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            break;
-        }
-        // Read manufacturer from file
-        if(flipper_format_read_string(
-               flipper_format, "Manufacture", instance->manufacture_from_file)) {
-            instance->manufacture_name = furi_string_get_cstr(instance->manufacture_from_file);
-            instance->keystore->mfname = instance->manufacture_name;
-            // Compatibility fixes for old names in user files
-            if(strcmp(instance->manufacture_name, "Sommer(fsk476)") == 0) {
-                instance->manufacture_name = "Sommer";
-                instance->keystore->mfname = instance->manufacture_name;
-                if(!flipper_format_rewind(flipper_format)) {
-                    FURI_LOG_E(TAG, "Rewind error");
-                    break;
-                }
-                if(!flipper_format_update_string_cstr(
-                       flipper_format, "Manufacture", instance->manufacture_name)) {
-                    FURI_LOG_E(TAG, "DECODER: Unable to fix Sommer manufacture name");
-                    ret = SubGhzProtocolStatusError;
-                    break;
-                }
-            }
-        } else {
-            FURI_LOG_D(TAG, "ENCODER: Missing Manufacture");
-        }
-
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            break;
-        }
-
-        uint32_t tmp_te = subghz_protocol_keeloq_const.te_short;
-        flipper_format_read_uint32(flipper_format, "TE", &tmp_te, 1);
-        instance->te = subghz_protocol_keeloq_te_sanitize(tmp_te);
-        if(!flipper_format_rewind(flipper_format)) {
+        if(!subghz_protocol_keeloq_read_metadata(
+               &instance->generic,
+               flipper_format,
+               instance->keystore,
+               instance->manufacture_from_file,
+               &instance->manufacture_name,
+               &instance->te)) {
             ret = SubGhzProtocolStatusErrorParserOthers;
-            break;
-        }
-
-        uint32_t tmp_counter_mode;
-        if(flipper_format_read_uint32(flipper_format, "CounterMode", &tmp_counter_mode, 1)) {
-            keeloq_counter_mode = (uint8_t)tmp_counter_mode;
-        } else {
-            keeloq_counter_mode = 0;
-        }
-
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
             break;
         }
 
@@ -928,20 +942,14 @@ void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t dur
 
     switch(instance->decoder.parser_step) {
     case KeeloqDecoderStepReset:
-        if(level && (DURATION_DIFF(duration, subghz_protocol_keeloq_const.te_short) <
-                         subghz_protocol_keeloq_const.te_delta ||
-                     DURATION_DIFF(duration, KEELOQ_TE_FAST) <
-                         subghz_protocol_keeloq_te_delta(KEELOQ_TE_FAST))) {
+        if(level && subghz_protocol_keeloq_te_preamble(duration)) {
             instance->decoder.parser_step = KeeloqDecoderStepCheckPreambula;
             instance->decoder.te_last = duration;
             instance->header_count++;
         }
         break;
     case KeeloqDecoderStepCheckPreambula:
-        if(!level && (DURATION_DIFF(duration, subghz_protocol_keeloq_const.te_short) <
-                          subghz_protocol_keeloq_const.te_delta ||
-                      DURATION_DIFF(duration, KEELOQ_TE_FAST) <
-                          subghz_protocol_keeloq_te_delta(KEELOQ_TE_FAST))) {
+        if(!level && subghz_protocol_keeloq_te_preamble(duration)) {
             instance->decoder.parser_step = KeeloqDecoderStepReset;
             break;
         }
@@ -996,28 +1004,17 @@ void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t dur
                     instance->header_count = 0;
                 }
                 break;
-            } else if(
-                instance->decoder.decode_count_bit >
-                subghz_protocol_keeloq_const.min_count_bit_for_found + 1) {
-                // Never let an overlong frame wrap the uint8_t bit counter.
-                instance->decoder.parser_step = KeeloqDecoderStepReset;
-                instance->header_count = 0;
-            } else if(
-                (DURATION_DIFF(instance->decoder.te_last, te) < te_delta) &&
-                (DURATION_DIFF(duration, te * 2) < te_delta * 2)) {
+            }
+            const bool bit = DURATION_DIFF(instance->decoder.te_last, te) < te_delta &&
+                             DURATION_DIFF(duration, te * 2) < te_delta * 2;
+            // Never let an overlong frame wrap the uint8_t bit counter.
+            if(instance->decoder.decode_count_bit <
+                   subghz_protocol_keeloq_const.min_count_bit_for_found + 2 &&
+               (bit || (DURATION_DIFF(instance->decoder.te_last, te * 2) < te_delta * 2 &&
+                        DURATION_DIFF(duration, te) < te_delta))) {
                 if(instance->decoder.decode_count_bit <
                    subghz_protocol_keeloq_const.min_count_bit_for_found) {
-                    subghz_protocol_blocks_add_bit(&instance->decoder, 1);
-                } else {
-                    instance->decoder.decode_count_bit++;
-                }
-                instance->decoder.parser_step = KeeloqDecoderStepSaveDuration;
-            } else if(
-                (DURATION_DIFF(instance->decoder.te_last, te * 2) < te_delta * 2) &&
-                (DURATION_DIFF(duration, te) < te_delta)) {
-                if(instance->decoder.decode_count_bit <
-                   subghz_protocol_keeloq_const.min_count_bit_for_found) {
-                    subghz_protocol_blocks_add_bit(&instance->decoder, 0);
+                    subghz_protocol_blocks_add_bit(&instance->decoder, bit);
                 } else {
                     instance->decoder.decode_count_bit++;
                 }
@@ -1655,65 +1652,13 @@ SubGhzProtocolStatus
             break;
         }
 
-        uint8_t seed_data[sizeof(uint32_t)] = {0};
-        for(size_t i = 0; i < sizeof(uint32_t); i++) {
-            seed_data[sizeof(uint32_t) - i - 1] = (instance->generic.seed >> i * 8) & 0xFF;
-        }
-        if(!flipper_format_read_hex(flipper_format, "Seed", seed_data, sizeof(uint32_t))) {
-            FURI_LOG_D(TAG, "DECODER: Missing Seed");
-        }
-        instance->generic.seed = seed_data[0] << 24 | seed_data[1] << 16 | seed_data[2] << 8 |
-                                 seed_data[3];
-
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            break;
-        }
-        // Read manufacturer from file
-        if(flipper_format_read_string(
-               flipper_format, "Manufacture", instance->manufacture_from_file)) {
-            instance->manufacture_name = furi_string_get_cstr(instance->manufacture_from_file);
-            instance->keystore->mfname = instance->manufacture_name;
-            // Compatibility fixes for old names in user files
-            if(strcmp(instance->manufacture_name, "Sommer(fsk476)") == 0) {
-                instance->manufacture_name = "Sommer";
-                instance->keystore->mfname = instance->manufacture_name;
-                if(!flipper_format_rewind(flipper_format)) {
-                    FURI_LOG_E(TAG, "Rewind error");
-                    break;
-                }
-                if(!flipper_format_update_string_cstr(
-                       flipper_format, "Manufacture", instance->manufacture_name)) {
-                    FURI_LOG_E(TAG, "DECODER: Unable to fix Sommer manufacture name");
-                    res = SubGhzProtocolStatusError;
-                    break;
-                }
-            }
-        } else {
-            FURI_LOG_D(TAG, "DECODER: Missing Manufacture");
-        }
-
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
-            break;
-        }
-
-        uint32_t tmp_te = subghz_protocol_keeloq_const.te_short;
-        flipper_format_read_uint32(flipper_format, "TE", &tmp_te, 1);
-        instance->te = subghz_protocol_keeloq_te_sanitize(tmp_te);
-        if(!flipper_format_rewind(flipper_format)) {
-            break;
-        }
-
-        uint32_t tmp_counter_mode;
-        if(flipper_format_read_uint32(flipper_format, "CounterMode", &tmp_counter_mode, 1)) {
-            keeloq_counter_mode = (uint8_t)tmp_counter_mode;
-        } else {
-            keeloq_counter_mode = 0;
-        }
-
-        if(!flipper_format_rewind(flipper_format)) {
-            FURI_LOG_E(TAG, "Rewind error");
+        if(!subghz_protocol_keeloq_read_metadata(
+               &instance->generic,
+               flipper_format,
+               instance->keystore,
+               instance->manufacture_from_file,
+               &instance->manufacture_name,
+               &instance->te)) {
             break;
         }
 
@@ -1724,146 +1669,29 @@ SubGhzProtocolStatus
 }
 
 static uint8_t subghz_protocol_keeloq_get_btn_code(uint8_t last_btn_code) {
-    uint8_t custom_btn_id = subghz_custom_btn_get();
-    uint8_t original_btn_code = subghz_custom_btn_get_original();
-    uint8_t btn = original_btn_code;
-
+    const uint8_t custom_btn_id = subghz_custom_btn_get();
+    const uint8_t original = subghz_custom_btn_get_original();
     if(last_btn_code == 0) {
         last_btn_code = 0xA;
     }
 
-    // Set custom button
-    // Basic set | 0x1 | 0x2 | 0x4 | 0x8 | 0xA or Special Learning Code |
-    if((custom_btn_id == SUBGHZ_CUSTOM_BTN_OK) && (original_btn_code != 0)) {
-        // Restore original button code
-        btn = original_btn_code;
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_UP) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x2;
-            break;
-        case 0x2:
-            btn = 0x1;
-            break;
-        case 0xA:
-            btn = 0x1;
-            break;
-        case 0x4:
-            btn = 0x1;
-            break;
-        case 0x8:
-            btn = 0x1;
-            break;
-        case 0xF:
-            btn = 0x1;
-            break;
-        case 0x9:
-            btn = 0x2;
-            break;
-        case 0x6:
-            btn = 0x2;
-            break;
-
-        default:
-            btn = 0x1;
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_DOWN) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x4;
-            break;
-        case 0x2:
-            btn = 0x4;
-            break;
-        case 0xA:
-            btn = 0x4;
-            break;
-        case 0x4:
-            btn = last_btn_code;
-            break;
-        case 0x8:
-            btn = 0x4;
-            break;
-        case 0xF:
-            btn = 0x4;
-            break;
-        case 0x9:
-            btn = 0x4;
-            break;
-        case 0x6:
-            btn = 0x4;
-            break;
-
-        default:
-            btn = 0x4;
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_LEFT) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = 0x8;
-            break;
-        case 0x2:
-            btn = 0x8;
-            break;
-        case 0xA:
-            btn = 0x8;
-            break;
-        case 0x4:
-            btn = 0x8;
-            break;
-        case 0x8:
-            btn = 0x2;
-            break;
-        case 0xF:
-            btn = 0x8;
-            break;
-        case 0x9:
-            btn = 0x6;
-            break;
-        case 0x6:
-            btn = 0x9;
-            break;
-
-        default:
-            btn = 0x8;
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_RIGHT) {
-        switch(original_btn_code) {
-        case 0x1:
-            btn = last_btn_code;
-            break;
-        case 0x2:
-            btn = last_btn_code;
-            break;
-        case 0xA:
-            btn = 0x2;
-            break;
-        case 0x4:
-            btn = 0x2;
-            break;
-        case 0x8:
-            btn = last_btn_code;
-            break;
-        case 0xF:
-            btn = 0x2;
-            break;
-        case 0x9:
-            btn = last_btn_code;
-            break;
-        case 0x6:
-            btn = last_btn_code;
-            break;
-
-        default:
-            btn = last_btn_code;
-            break;
-        }
+    // Same mapping for every uint8_t original/direction/fallback value; the
+    // exhaustive frozen-vector test also includes unknown codes and zero.
+    switch(custom_btn_id) {
+    case SUBGHZ_CUSTOM_BTN_UP:
+        return original == 0x1 || original == 0x9 || original == 0x6 ? 0x2 : 0x1;
+    case SUBGHZ_CUSTOM_BTN_DOWN:
+        return original == 0x4 ? last_btn_code : 0x4;
+    case SUBGHZ_CUSTOM_BTN_LEFT:
+        if(original == 0x8) return 0x2;
+        if(original == 0x9) return 0x6;
+        if(original == 0x6) return 0x9;
+        return 0x8;
+    case SUBGHZ_CUSTOM_BTN_RIGHT:
+        return original == 0xA || original == 0x4 || original == 0xF ? 0x2 : last_btn_code;
+    default:
+        return original;
     }
-
-    return btn;
 }
 
 void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output) {

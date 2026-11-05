@@ -226,6 +226,7 @@ int main(void) {
         production = "\n".join(function(source, signature) for signature in (
             "static inline uint32_t subghz_protocol_keeloq_te_sanitize(",
             "static inline uint32_t subghz_protocol_keeloq_te_nominal(",
+            "static bool\n    subghz_protocol_keeloq_read_metadata(",
             "SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(",
         ))
         production += "\nSubGhzProtocolStatus\n" + function(
@@ -236,6 +237,7 @@ typedef enum { SubGhzProtocolStatusOk, SubGhzProtocolStatusError } SubGhzProtoco
 typedef struct { uint32_t seed, data_count_bit; uint64_t data; } SubGhzBlockGeneric;
 typedef struct { uint32_t frequency; const char* name; } SubGhzRadioPreset;
 typedef struct { const char* mfname; } Keystore;
+typedef Keystore SubGhzKeystore;
 typedef struct { char text[32]; } FuriString;
 typedef struct { SubGhzBlockGeneric generic; Keystore* keystore;
                  const char* manufacture_name; FuriString* manufacture_from_file;

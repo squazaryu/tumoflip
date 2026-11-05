@@ -73,14 +73,19 @@ typedef enum {SubGhzProtocolStatusError=-1,SubGhzProtocolStatusOk,
     SubGhzProtocolStatusErrorEncoderGetUpload=1,SubGhzProtocolStatusErrorParserOthers,
     SubGhzProtocolStatusErrorParserKey} SubGhzProtocolStatus;
 typedef struct {uint32_t input_te,saved_te,mode;unsigned te_writes,cursor;
-    bool has_te,fail_te_write,fail_rewind,fail_serialize;} FlipperFormat;
+    unsigned rewinds,fail_rewind_at;const char* manufacture;
+    bool has_te,fail_te_read,fail_mode_read,fail_te_write,fail_rewind,fail_serialize,
+        fail_manufacture_update;} FlipperFormat;
 static uint8_t keeloq_counter_mode;
-bool flipper_format_rewind(FlipperFormat* f){f->cursor=0;return !f->fail_rewind;}
+bool flipper_format_rewind(FlipperFormat* f){
+    f->cursor=0;f->rewinds++;
+    return !f->fail_rewind && (!f->fail_rewind_at || f->rewinds!=f->fail_rewind_at);
+}
 bool flipper_format_read_uint32(FlipperFormat* f,const char* name,uint32_t* value,unsigned n){
     assert(n==1);
     if(strcmp(name,"TE")==0){assert(f->cursor==0);f->cursor=1;
-        if(f->has_te){*value=f->input_te;return true;}return false;}
-    if(strcmp(name,"CounterMode")==0){assert(f->cursor==0);f->cursor=1;*value=f->mode;return true;}
+        if(f->has_te){*value=f->input_te;return !f->fail_te_read;}return false;}
+    if(strcmp(name,"CounterMode")==0){assert(f->cursor==0);f->cursor=1;*value=f->mode;return !f->fail_mode_read;}
     return false;
 }
 bool flipper_format_write_uint32(FlipperFormat* f,const char* name,const uint32_t* value,unsigned n){
@@ -97,11 +102,11 @@ bool flipper_format_update_hex(FlipperFormat* f,const char* n,const uint8_t* p,s
     (void)f;(void)n;(void)p;(void)s;return true;
 }
 bool flipper_format_read_string(FlipperFormat* f,const char* n,FuriString* s){
-    (void)n;f->cursor=1;s->text="AN-Motors";return true;
+    (void)n;f->cursor=1;s->text=f->manufacture?f->manufacture:"AN-Motors";return true;
 }
 const char* furi_string_get_cstr(FuriString* s){return s->text;}
 bool flipper_format_update_string_cstr(FlipperFormat* f,const char* n,const char* s){
-    (void)f;(void)n;(void)s;return true;
+    (void)n;(void)s;return !f->fail_manufacture_update;
 }
 bool flipper_format_write_string_cstr(FlipperFormat* f,const char* n,const char* s){
     (void)f;assert(strcmp(n,"Manufacture")==0 && s);return true;
@@ -177,7 +182,7 @@ int main(void){
 
     def test_keeloq_both_rates_drift_reset_and_bounded_frames(self):
         source = (PROTOCOLS / "keeloq.c").read_text()
-        native(keeloq_declarations(source, ("delta",)) + function(
+        native(keeloq_declarations(source, ("delta", "preamble")) + function(
             source, "void subghz_protocol_decoder_keeloq_reset(") + "\n" + function(
             source, "void subghz_protocol_decoder_keeloq_feed(") + KEELOQ_FRAMES + r'''
 int main(void){
@@ -225,6 +230,7 @@ int main(void){
     def test_keeloq_timing_survives_file_round_trip_and_resets_on_legacy_load(self):
         source = (PROTOCOLS / "keeloq.c").read_text()
         production = "\n".join(production_function(source, name) for name in (
+            "subghz_protocol_keeloq_read_metadata",
             "subghz_protocol_encoder_keeloq_encode_to_timings",
             "subghz_protocol_encoder_keeloq_deserialize",
             "subghz_protocol_decoder_keeloq_deserialize",
@@ -277,6 +283,25 @@ int main(void){
     bad=(FlipperFormat){.fail_serialize=true};
     assert(subghz_protocol_decoder_keeloq_serialize(&d,&bad,NULL)==SubGhzProtocolStatusError);
     assert(bad.te_writes==0);
+    // A parser can modify its output before returning false. Ignore that output.
+    input=(FlipperFormat){.has_te=true,.input_te=200,.fail_te_read=true,
+        .mode=7,.fail_mode_read=true};
+    assert(subghz_protocol_decoder_keeloq_deserialize(&d,&input)==SubGhzProtocolStatusOk);
+    assert(keeloq_counter_mode==0);
+    FlipperFormat legacy={0};
+    assert(subghz_protocol_decoder_keeloq_serialize(&d,&legacy,NULL)==SubGhzProtocolStatusOk);
+    assert(legacy.te_writes==0);
+    for(unsigned step=1;step<=4;step++){
+        bad=(FlipperFormat){.has_te=true,.input_te=200,.fail_rewind_at=step};
+        assert(subghz_protocol_decoder_keeloq_deserialize(&d,&bad)!=SubGhzProtocolStatusOk);
+        bad.rewinds=0;
+        assert(subghz_protocol_encoder_keeloq_deserialize(&e,&bad)!=SubGhzProtocolStatusOk);
+    }
+    input=(FlipperFormat){.manufacture="Sommer(fsk476)"};
+    assert(subghz_protocol_decoder_keeloq_deserialize(&d,&input)==SubGhzProtocolStatusOk);
+    assert(strcmp(d.manufacture_name,"Sommer")==0 && strcmp(store.mfname,"Sommer")==0);
+    bad=(FlipperFormat){.manufacture="Sommer(fsk476)",.fail_manufacture_update=true};
+    assert(subghz_protocol_decoder_keeloq_deserialize(&d,&bad)!=SubGhzProtocolStatusOk);
     bad=(FlipperFormat){.fail_rewind=true};
     assert(subghz_protocol_decoder_keeloq_deserialize(&d,&bad)!=SubGhzProtocolStatusOk);
     generation_ok=false;upload[0].duration=12345;

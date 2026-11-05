@@ -8,6 +8,8 @@ FUNCTIONS = {
     "subghz_protocol_decoder_hormann_check_pattern",
     "subghz_protocol_decoder_hormann_feed",
     "subghz_protocol_keeloq_te_delta",
+    "subghz_protocol_keeloq_te_preamble",
+    "subghz_protocol_keeloq_read_metadata",
     "subghz_protocol_keeloq_te_sanitize",
     "subghz_protocol_keeloq_te_nominal",
     "subghz_protocol_decoder_keeloq_reset",
