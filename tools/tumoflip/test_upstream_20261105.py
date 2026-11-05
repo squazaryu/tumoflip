@@ -120,8 +120,9 @@ SubGhzProtocolStatus subghz_block_generic_serialize(SubGhzBlockGeneric* g,
 uint32_t subghz_protocol_keeloq_check_remote_controller(SubGhzBlockGeneric* g,
     SubGhzKeystore* k,const char** n){(void)g;(void)k;*n="AN-Motors";return 0;}
 // Do not generate/encrypt codes in a timing regression. Hold synthetic data fixed.
+static bool generation_ok=true;
 bool subghz_protocol_keeloq_gen_data(SubGhzProtocolEncoderKeeloq* e,uint8_t b,bool c,bool skip){
-    (void)e;(void)b;(void)c;(void)skip;return true;
+    (void)e;(void)b;(void)c;(void)skip;return generation_ok;
 }
 bool subghz_protocol_keeloq_receive_only(const char* n,uint32_t seed){
     (void)n;(void)seed;return false;
@@ -233,7 +234,7 @@ int main(void){
     (void)received;(void)expected;
     SubGhzKeystore store={0};FuriString manufacturer={"AN-Motors"};
     SubGhzProtocolDecoderKeeloq d={.keystore=&store,.manufacture_from_file=&manufacturer};
-    LevelDuration upload[156];
+    LevelDuration upload[159];
     SubGhzProtocolEncoderKeeloq e={.keystore=&store,.manufacture_from_file=&manufacturer,
         .encoder={.upload=upload,.size_upload=156},.manufacture_name="AN-Motors"};
     const uint32_t values[]={200,400,0,UINT32_MAX,199,201};
@@ -255,6 +256,17 @@ int main(void){
         e.manufacture_name="Sommer";
         assert(subghz_protocol_encoder_keeloq_encode_to_timings(&e,0,false,0)==156);
         assert(upload[155].duration==te*29);e.manufacture_name="AN-Motors";
+        for(unsigned bit=0;bit<64;bit++){
+            bool one=(e.generic.data>>(63-bit))&1;
+            assert(upload[24+bit*2].level && !upload[25+bit*2].level);
+            assert(upload[24+bit*2].duration==(one?te:te*2));
+            assert(upload[25+bit*2].duration==(one?te*2:te));
+        }
+        // Appended frames must not rescale or overwrite earlier upload entries.
+        for(unsigned prefix=0;prefix<3;prefix++)upload[prefix]=(LevelDuration){false,12345};
+        assert(subghz_protocol_encoder_keeloq_encode_to_timings(&e,0,false,3)==159);
+        for(unsigned prefix=0;prefix<3;prefix++)assert(upload[prefix].duration==12345);
+        assert(upload[3].duration==te && upload[158].duration==te*40);
     }
     // Failed write is an error, not a successful half-rate capture without its TE.
     FlipperFormat input={.has_te=true,.input_te=200};
@@ -267,6 +279,9 @@ int main(void){
     assert(bad.te_writes==0);
     bad=(FlipperFormat){.fail_rewind=true};
     assert(subghz_protocol_decoder_keeloq_deserialize(&d,&bad)!=SubGhzProtocolStatusOk);
+    generation_ok=false;upload[0].duration=12345;
+    assert(subghz_protocol_encoder_keeloq_encode_to_timings(&e,0,false,0)==0);
+    assert(upload[0].duration==12345);
     return 0;
 }
 ''')
