@@ -9,7 +9,9 @@
 
 #define TAG "SubGhzProtocolHormannHsm"
 
-#define HORMANN_HSM_PATTERN 0xFF000000003
+// HSM has both seven- and eight-one preambles. Keep all seven common bits
+// and both stop bits mandatory; the total frame length remains exactly 44.
+#define HORMANN_HSM_PATTERN 0xFE000000003
 
 static const SubGhzBlockConst subghz_protocol_hormann_const = {
     .te_short = 500,
@@ -198,7 +200,7 @@ void subghz_protocol_decoder_hormann_feed(void* context, bool level, uint32_t du
             if(duration >= (subghz_protocol_hormann_const.te_short * 5) &&
                subghz_protocol_decoder_hormann_check_pattern(instance)) {
                 instance->decoder.parser_step = HormannDecoderStepFoundStartBit;
-                if(instance->decoder.decode_count_bit >=
+                if(instance->decoder.decode_count_bit ==
                    subghz_protocol_hormann_const.min_count_bit_for_found) {
                     instance->generic.data = instance->decoder.decode_data;
                     instance->generic.data_count_bit = instance->decoder.decode_count_bit;
@@ -216,10 +218,14 @@ void subghz_protocol_decoder_hormann_feed(void* context, bool level, uint32_t du
         break;
     case HormannDecoderStepCheckDuration:
         if(!level) {
-            if((DURATION_DIFF(instance->decoder.te_last, subghz_protocol_hormann_const.te_short) <
-                subghz_protocol_hormann_const.te_delta) &&
-               (DURATION_DIFF(duration, subghz_protocol_hormann_const.te_long) <
-                subghz_protocol_hormann_const.te_delta)) {
+            if(instance->decoder.decode_count_bit >=
+               subghz_protocol_hormann_const.min_count_bit_for_found) {
+                instance->decoder.parser_step = HormannDecoderStepReset;
+            } else if(
+                (DURATION_DIFF(instance->decoder.te_last, subghz_protocol_hormann_const.te_short) <
+                 subghz_protocol_hormann_const.te_delta) &&
+                (DURATION_DIFF(duration, subghz_protocol_hormann_const.te_long) <
+                 subghz_protocol_hormann_const.te_delta)) {
                 subghz_protocol_blocks_add_bit(&instance->decoder, 0);
                 instance->decoder.parser_step = HormannDecoderStepSaveDuration;
             } else if(

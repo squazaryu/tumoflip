@@ -223,7 +223,12 @@ int main(void) {
 
     def test_saved_seed_roundtrip_and_write_failure(self) -> None:
         source = read("lib/subghz/protocols/keeloq.c")
-        production = function(source, "SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(")
+        production = "\n".join(function(source, signature) for signature in (
+            "static inline uint32_t subghz_protocol_keeloq_te_sanitize(",
+            "static inline uint32_t subghz_protocol_keeloq_te_nominal(",
+            "static bool\n    subghz_protocol_keeloq_read_metadata(",
+            "SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(",
+        ))
         production += "\nSubGhzProtocolStatus\n" + function(
             source, "    subghz_protocol_decoder_keeloq_deserialize("
         )
@@ -232,14 +237,17 @@ typedef enum { SubGhzProtocolStatusOk, SubGhzProtocolStatusError } SubGhzProtoco
 typedef struct { uint32_t seed, data_count_bit; uint64_t data; } SubGhzBlockGeneric;
 typedef struct { uint32_t frequency; const char* name; } SubGhzRadioPreset;
 typedef struct { const char* mfname; } Keystore;
+typedef Keystore SubGhzKeystore;
 typedef struct { char text[32]; } FuriString;
 typedef struct { SubGhzBlockGeneric generic; Keystore* keystore;
                  const char* manufacture_name; FuriString* manufacture_from_file;
+                 uint16_t te;
                } SubGhzProtocolDecoderKeeloq;
 typedef struct { SubGhzBlockGeneric generic; uint32_t frequency; const char* preset;
                  bool has_seed, fail_seed; uint8_t seed[4]; char manufacture[32];
                } FlipperFormat;
-static const struct { uint32_t min_count_bit_for_found; } subghz_protocol_keeloq_const = {64};
+#define KEELOQ_TE_FAST 200u
+static const struct { uint32_t min_count_bit_for_found,te_short; } subghz_protocol_keeloq_const = {64,400};
 static uint8_t keeloq_counter_mode;
 static SubGhzProtocolStatus subghz_block_generic_serialize(
     const SubGhzBlockGeneric* generic, FlipperFormat* format, const SubGhzRadioPreset* preset) {
@@ -296,6 +304,11 @@ static bool flipper_format_read_uint32(FlipperFormat* format, const char* key,
                                       uint32_t* value, size_t count) {
     (void)format; (void)key; (void)value; (void)count; return false;
 }
+static bool flipper_format_write_uint32(FlipperFormat* format, const char* key,
+                                       const uint32_t* value, size_t count) {
+    (void)format;(void)key;(void)value;(void)count;
+    assert(false && "Legacy 400us capture must not gain a TE field");return false;
+}
 """ + production + r"""
 int main(void) {
     const char* names[] = {"Erreka", "BFT", "Monarch"};
@@ -309,7 +322,7 @@ int main(void) {
                 SubGhzProtocolDecoderKeeloq original = {
                     .generic = {.seed = seeds[s], .data_count_bit = 64,
                                 .data = UINT64_C(0x12345678ABCDEF01)},
-                    .keystore = &keystore, .manufacture_name = names[n]};
+                    .keystore = &keystore, .manufacture_name = names[n], .te = 400};
                 FlipperFormat saved = {0};
                 assert(subghz_protocol_decoder_keeloq_serialize(&original, &saved, &preset) ==
                        SubGhzProtocolStatusOk);
@@ -331,7 +344,7 @@ int main(void) {
         }
     }
     SubGhzProtocolDecoderKeeloq unseeded = {.keystore = &keystore,
-                                         .manufacture_name = "Sommer"};
+                                         .manufacture_name = "Sommer", .te = 400};
     SubGhzRadioPreset preset = {433920000, "AM650"};
     FlipperFormat saved = {0};
     assert(subghz_protocol_decoder_keeloq_serialize(&unseeded, &saved, &preset) ==
