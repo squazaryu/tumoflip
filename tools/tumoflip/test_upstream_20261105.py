@@ -20,13 +20,14 @@ def production_function(source, name):
     return function(source, signature.group()[:-1].rstrip())
 
 
-def timing_helpers(source):
+def timing_helpers(source, selected):
     names = re.findall(r"(?m)^static (?:inline )?(?:bool|uint32_t) "
                        r"(subghz_protocol_keeloq_te_\w+)\(", source)
-    return "\n".join(production_function(source, name) for name in names)
+    return "\n".join(production_function(source, name) for name in names
+                     if name.rsplit("_", 1)[-1] in selected)
 
 
-def keeloq_declarations(source):
+def keeloq_declarations(source, helpers):
     macros = "\n".join(re.findall(r"(?m)^#define KEELOQ_TE_.*$", source))
     return (PRELUDE.replace("uint32_t serial,btn,cnt;", "uint32_t serial,btn,cnt,seed;")
             .replace("unsigned repeat;", "unsigned repeat,front;bool is_running;") + r'''
@@ -36,7 +37,7 @@ typedef struct {const char* text;} FuriString;
 typedef struct {const char* mfname;unsigned kl_type;} SubGhzKeystore;
 typedef struct SubGhzProtocolDecoderKeeloq SubGhzProtocolDecoderKeeloq;
 typedef struct SubGhzProtocolEncoderKeeloq SubGhzProtocolEncoderKeeloq;
-''' + macros + "\n" + declarations(source, "keeloq") + timing_helpers(source))
+''' + macros + "\n" + declarations(source, "keeloq") + timing_helpers(source, helpers))
 
 
 KEELOQ_FRAMES = r'''
@@ -171,7 +172,7 @@ int main(void){
 
     def test_keeloq_both_rates_drift_reset_and_bounded_frames(self):
         source = (PROTOCOLS / "keeloq.c").read_text()
-        native(keeloq_declarations(source) + function(
+        native(keeloq_declarations(source, ("delta",)) + function(
             source, "void subghz_protocol_decoder_keeloq_reset(") + "\n" + function(
             source, "void subghz_protocol_decoder_keeloq_feed(") + KEELOQ_FRAMES + r'''
 int main(void){
@@ -212,7 +213,7 @@ int main(void){
             "subghz_protocol_encoder_keeloq_deserialize",
             "subghz_protocol_decoder_keeloq_deserialize",
             "subghz_protocol_decoder_keeloq_serialize"))
-        native(keeloq_declarations(source) + FORMAT_MOCKS + production + r'''
+        native(keeloq_declarations(source, ("sanitize", "nominal")) + FORMAT_MOCKS + production + r'''
 int main(void){
     (void)received;(void)expected;
     SubGhzKeystore store={0};FuriString manufacturer={"AN-Motors"};
