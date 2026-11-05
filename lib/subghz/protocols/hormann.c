@@ -221,10 +221,11 @@ void subghz_protocol_decoder_hormann_feed(void* context, bool level, uint32_t du
             if(instance->decoder.decode_count_bit >=
                subghz_protocol_hormann_const.min_count_bit_for_found) {
                 instance->decoder.parser_step = HormannDecoderStepReset;
-            } else if((DURATION_DIFF(instance->decoder.te_last, subghz_protocol_hormann_const.te_short) <
-                subghz_protocol_hormann_const.te_delta) &&
-               (DURATION_DIFF(duration, subghz_protocol_hormann_const.te_long) <
-                subghz_protocol_hormann_const.te_delta)) {
+            } else if(
+                (DURATION_DIFF(instance->decoder.te_last, subghz_protocol_hormann_const.te_short) <
+                 subghz_protocol_hormann_const.te_delta) &&
+                (DURATION_DIFF(duration, subghz_protocol_hormann_const.te_long) <
+                 subghz_protocol_hormann_const.te_delta)) {
                 subghz_protocol_blocks_add_bit(&instance->decoder, 0);
                 instance->decoder.parser_step = HormannDecoderStepSaveDuration;
             } else if(

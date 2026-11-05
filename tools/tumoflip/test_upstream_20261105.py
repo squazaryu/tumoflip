@@ -41,13 +41,14 @@ typedef struct SubGhzProtocolEncoderKeeloq SubGhzProtocolEncoderKeeloq;
 
 
 KEELOQ_FRAMES = r'''
-static void frame(SubGhzProtocolDecoderKeeloq* d,uint64_t data,uint32_t te,unsigned bits){
+static void frame_with_gap(SubGhzProtocolDecoderKeeloq* d,uint64_t data,uint32_t te,
+    unsigned bits,uint32_t gap){
     for(unsigned i=0;i<11;i++){
         subghz_protocol_decoder_keeloq_feed(d,true,te);
         subghz_protocol_decoder_keeloq_feed(d,false,te);
     }
     subghz_protocol_decoder_keeloq_feed(d,true,te);
-    subghz_protocol_decoder_keeloq_feed(d,false,te*10);
+    subghz_protocol_decoder_keeloq_feed(d,false,gap);
     for(unsigned i=0;i<bits;i++){
         bool bit=i<64?((data>>(63-i))&1):true;
         subghz_protocol_decoder_keeloq_feed(d,true,bit?te:te*2);
@@ -55,6 +56,9 @@ static void frame(SubGhzProtocolDecoderKeeloq* d,uint64_t data,uint32_t te,unsig
     }
     subghz_protocol_decoder_keeloq_feed(d,true,te);
     subghz_protocol_decoder_keeloq_feed(d,false,te*40);
+}
+static void frame(SubGhzProtocolDecoderKeeloq* d,uint64_t data,uint32_t te,unsigned bits){
+    frame_with_gap(d,data,te,bits,te*10);
 }
 static void capture(SubGhzProtocolDecoderBase* b,void* c){
     (void)c;SubGhzProtocolDecoderKeeloq* d=(void*)b;
@@ -189,6 +193,16 @@ int main(void){
         subghz_protocol_decoder_keeloq_reset(&d);received=0;expected=data[0];
         frame(&d,expected,200,bits);assert(received==(unsigned)(bits>=64 && bits<=66));
     }
+    // Retain the legacy standard sync tolerance, including the overlap with fast TE.
+    for(unsigned gap=2201;gap<5800;gap+=17){
+        subghz_protocol_decoder_keeloq_reset(&d);received=0;expected=data[0];
+        frame_with_gap(&d,expected,400,64,gap);assert(received==1);
+    }
+    const unsigned invalid_gaps[]={0,1000,1550,2200,5800,UINT32_MAX};
+    for(unsigned i=0;i<COUNT_OF(invalid_gaps);i++){
+        subghz_protocol_decoder_keeloq_reset(&d);received=0;
+        frame_with_gap(&d,expected,400,64,invalid_gaps[i]);assert(received==0);
+    }
     // Alternating half/normal rate frames must lock independently without a user reset.
     subghz_protocol_decoder_keeloq_reset(&d);received=0;
     for(unsigned i=0;i<20;i++){
@@ -202,6 +216,7 @@ int main(void){
         subghz_protocol_decoder_keeloq_feed(&d,false,200);
     }
     assert(received==0);
+    FUZZ_DECODER(SubGhzProtocolDecoderKeeloq,subghz_protocol_decoder_keeloq_feed,4);
     return 0;
 }
 ''')
@@ -237,6 +252,9 @@ int main(void){
         assert(subghz_protocol_encoder_keeloq_encode_to_timings(&e,0,false,0)==156);
         assert(upload[0].duration==te && upload[23].duration==te*10);
         assert(upload[155].duration==te*40);
+        e.manufacture_name="Sommer";
+        assert(subghz_protocol_encoder_keeloq_encode_to_timings(&e,0,false,0)==156);
+        assert(upload[155].duration==te*29);e.manufacture_name="AN-Motors";
     }
     // Failed write is an error, not a successful half-rate capture without its TE.
     FlipperFormat input={.has_te=true,.input_te=200};

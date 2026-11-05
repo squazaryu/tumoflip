@@ -26,7 +26,7 @@
 
 // Some HCS encoders use TE 200us instead of 400us. Select the rate from
 // preamble + sync, without changing the frame format or counter semantics.
-#define KEELOQ_TE_FAST 200u
+#define KEELOQ_TE_FAST           200u
 #define KEELOQ_TE_FAST_GAP_DELTA 450u
 
 // This adaptation adds recognition only. Keep the existing Monarch variant's
@@ -843,7 +843,8 @@ SubGhzProtocolStatus
         subghz_protocol_keeloq_check_remote_controller(
             &instance->generic, instance->keystore, &instance->manufacture_name);
 
-        if(subghz_protocol_keeloq_receive_only(instance->manufacture_name, instance->generic.seed)) {
+        if(subghz_protocol_keeloq_receive_only(
+               instance->manufacture_name, instance->generic.seed)) {
             FURI_LOG_W(TAG, "This variant supports receive/inspection only");
             ret = SubGhzProtocolStatusErrorEncoderGetUpload;
             break;
@@ -927,22 +928,20 @@ void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t dur
 
     switch(instance->decoder.parser_step) {
     case KeeloqDecoderStepReset:
-        if(level &&
-           (DURATION_DIFF(duration, subghz_protocol_keeloq_const.te_short) <
-                subghz_protocol_keeloq_const.te_delta ||
-            DURATION_DIFF(duration, KEELOQ_TE_FAST) <
-                subghz_protocol_keeloq_te_delta(KEELOQ_TE_FAST))) {
+        if(level && (DURATION_DIFF(duration, subghz_protocol_keeloq_const.te_short) <
+                         subghz_protocol_keeloq_const.te_delta ||
+                     DURATION_DIFF(duration, KEELOQ_TE_FAST) <
+                         subghz_protocol_keeloq_te_delta(KEELOQ_TE_FAST))) {
             instance->decoder.parser_step = KeeloqDecoderStepCheckPreambula;
             instance->decoder.te_last = duration;
             instance->header_count++;
         }
         break;
     case KeeloqDecoderStepCheckPreambula:
-        if(!level &&
-           (DURATION_DIFF(duration, subghz_protocol_keeloq_const.te_short) <
-                subghz_protocol_keeloq_const.te_delta ||
-            DURATION_DIFF(duration, KEELOQ_TE_FAST) <
-                subghz_protocol_keeloq_te_delta(KEELOQ_TE_FAST))) {
+        if(!level && (DURATION_DIFF(duration, subghz_protocol_keeloq_const.te_short) <
+                          subghz_protocol_keeloq_const.te_delta ||
+                      DURATION_DIFF(duration, KEELOQ_TE_FAST) <
+                          subghz_protocol_keeloq_te_delta(KEELOQ_TE_FAST))) {
             instance->decoder.parser_step = KeeloqDecoderStepReset;
             break;
         }
@@ -1093,8 +1092,8 @@ static inline bool subghz_protocol_keeloq_check_decrypt_monarch(
     furi_assert(instance);
 
     uint16_t disc = ((uint16_t)(decrypt >> 16)) & 0xFFF;
-    if((decrypt >> 28 == btn) && ((disc == KEELOQ_MONARCH_DISCRIMINATOR_A) ||
-                                  (disc == KEELOQ_MONARCH_DISCRIMINATOR_B))) {
+    if((decrypt >> 28 == btn) &&
+       ((disc == KEELOQ_MONARCH_DISCRIMINATOR_A) || (disc == KEELOQ_MONARCH_DISCRIMINATOR_B))) {
         instance->cnt = decrypt & 0x0000FFFF;
         instance->seed = disc;
         return true;
@@ -1210,8 +1209,8 @@ static uint32_t subghz_protocol_keeloq_check_remote_controller_selector(
                             keystore->mfname = *manufacture_name;
                             return decrypt;
                         }
-                    } else if((strcmp(
-                                   furi_string_get_cstr(manufacture_code->name), "Monarch") == 0)) {
+                    } else if((strcmp(furi_string_get_cstr(manufacture_code->name), "Monarch") ==
+                               0)) {
                         if(subghz_protocol_keeloq_check_decrypt_monarch(instance, decrypt, btn)) {
                             *manufacture_name = furi_string_get_cstr(manufacture_code->name);
                             keystore->mfname = *manufacture_name;
