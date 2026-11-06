@@ -193,19 +193,20 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-009-037` | Static decoder corrections, external Freezer and truthful diagnostic reports | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-009-038` | Hormann HSM preambles, KeeLoq TE200 timing and bounded frame parsing | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
 
-Dev `t-dev-009-037` retains local API 88.23 and the full 4096-byte physical C2
-reserve. It corrects Marantec24 timing, Linear Delta3 repetition/state, Holtek
-reset isolation and CAME TWEE false positives. Freezer 433.92 MHz / 24-bit is an
-external Core-group protocol FAL, delivered in native firmware resources rather
-than resident decoder code. Diagnostic reports no longer call incomplete runs
-successful, and all protocol FAL imports are checked against their actual public
-resolver. All 009-036 GUI/IR and earlier Honda hopping fixes are retained.
+Dev `t-dev-009-038` retains local API 88.23 and the full 4096-byte physical C2
+reserve. Hormann HSM accepts both seven- and eight-one preambles while requiring
+exactly 44 bits. KeeLoq supports TE 200 us, preserves that timing in saved files
+and retains the existing 400 us path. Overlong frames cannot wrap the bit count.
+Shared private metadata parsing and compact identical waveforms preserve the
+flash reserve without removing functions or adding public API symbols.
+All 009-037 decoder, external Core-group Freezer, diagnostic, GUI/IR and earlier
+Honda hopping fixes remain. No counter-resync packs or password workflows are added.
 Install firmware with native resources. **FW Packages Dev 031** and
 **TumoCompanion 1.11.33** remain compatible; these changes require no
 new independent package or iOS release. The published iOS version includes
@@ -234,13 +235,13 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-009-037.tgz
+flipper-z-f7-update-t-dev-009-038.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: Dev `t-dev-009-037` uses `88.23`; immutable stable `v1.0.8` remains `88.7`.
+- Firmware API: Dev `t-dev-009-038` uses `88.23`; immutable stable `v1.0.8` remains `88.7`.
   Each release manifest records its compatible package API. API numbers are
   local to this fork.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or
