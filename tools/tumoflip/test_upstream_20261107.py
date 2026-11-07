@@ -1,9 +1,16 @@
 """Source-owned Archive/CLI regressions for the November 7 upstream delta."""
 from pathlib import Path
+import hashlib
+import re
+import runpy
+from types import SimpleNamespace
+import tempfile
 import unittest
+from unittest.mock import patch
 
 from tools.tumoflip.test_hotplug_assets import function
 from tools.tumoflip.test_nfc_completion_equality import native
+from tools.tumoflip import validate_release as release
 
 ROOT = Path(__file__).resolve().parents[2]
 ARCHIVE = ROOT / 'applications/main/archive/helpers'
@@ -51,6 +58,57 @@ void archive_update_offset(ArchiveBrowserView* b){(void)b;updated++;}
 
 
 class NovemberSevenTests(unittest.TestCase):
+    def test_gpio_led_vibro_i2c_are_lazy_but_recovery_commands_stay_resident(self):
+        nodes = []
+        runpy.run_path(str(ROOT / 'applications/services/cli/application.fam'), init_globals={
+            'App': lambda **values: nodes.append(values),
+            'FlipperAppType': SimpleNamespace(STARTUP='startup', SERVICE='service', PLUGIN='plugin'),
+        })
+        by_id = {node['appid']: node for node in nodes}
+        self.assertNotIn('cli_command_gpio.c', by_id['cli']['sources'])
+        main = (ROOT / 'applications/services/cli/cli_main_commands.c').read_text()
+        for name in ('gpio', 'led', 'vibro', 'i2c'):
+            node = by_id.get('cli_' + name)
+            self.assertIsNotNone(node, name)
+            self.assertEqual(node['apptype'], 'plugin')
+            self.assertIn('cli', node['requires'])
+            self.assertNotRegex(main, r'cli_registry_add_command\(registry, "' + name + '"')
+            path = ROOT / 'applications/services/cli' / node['sources'][0]
+            self.assertIn('CLI_COMMAND_INTERFACE(' + name + ',', path.read_text())
+        for name in ('device_info', 'free', 'free_blocks', 'top', 'uptime'):
+            self.assertIn('"' + name + '"', main)
+        self.assertIn('appid="bt_start"', (ROOT / 'applications/services/bt/application.fam').read_text())
+        self.assertIn('appid="crypto_start"', (ROOT / 'applications/services/crypto/application.fam').read_text())
+
+    def test_moved_cli_handlers_keep_existing_behavior(self):
+        expected = {
+            'vibro': 'c338917339499c8aaf99823ff3187cbe9a490a4313588a6ab1fcdc913036545c',
+            'led': 'c6af976bd76967d85e8581f01ab7acde56d8aa4eb64a0b86fead1fa33a22ee85',
+            'i2c': '2e26f495cc261de9042c4fb49533b4754792011deef494559980585a9f0bc462',
+        }
+        for name, digest in expected.items():
+            source = (ROOT / 'applications/services/cli/commands' / (name + '.c')).read_text()
+            body = function(source, 'void cli_command_' + name + '(')
+            self.assertEqual(hashlib.sha256(re.sub(r'\s+', ' ', body).strip().encode()).hexdigest(), digest)
+
+    def test_native_resources_must_contain_exact_lazy_cli_modules(self):
+        with tempfile.TemporaryDirectory(prefix='cli-resource-') as directory:
+            root = Path(directory)
+            hashes = {}
+            for name in ('gpio', 'led', 'vibro', 'i2c'):
+                relative = 'apps_data/cli/plugins/cli_' + name + '.fal'
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(name.encode())
+                hashes[relative] = hashlib.sha256(name.encode()).hexdigest()
+            with patch.object(release, 'resources_archive_hashes', return_value=hashes):
+                release.validate_cli_command_resources(root, root, root / 'resources.ths')
+                hashes.pop('apps_data/cli/plugins/cli_led.fal')
+                with self.assertRaises(release.ValidationError):
+                    release.validate_cli_command_resources(root, root, root / 'resources.ths')
+            caller = (ROOT / 'tools/tumoflip/validate_release.py').read_text()
+            self.assertIn('validate_cli_command_resources(repo_root, resources, referenced["Resources"])', caller)
+
     def test_archive_remove_rejects_empty_or_unloaded_selection(self):
         source = (ARCHIVE / 'archive_browser.c').read_text()
         actual = function(source, 'bool archive_is_item_in_array(')
