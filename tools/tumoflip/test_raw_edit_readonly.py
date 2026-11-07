@@ -34,7 +34,7 @@ static size_t input_size=256,free_heap=100000,max_block=100000;
 static bool copy_ok=true,rewind_ok=true;
 static unsigned input_writes,memory_writes,formats,streams,envs,transmitters,packs;
 size_t memmgr_get_free_heap(void){return free_heap;}
-size_t memmgr_get_max_free_block(void){return max_block;}
+size_t memmgr_heap_get_max_free_block(void){return max_block;}
 FlipperFormat* flipper_format_file_alloc(Storage* s){(void)s;FlipperFormat* f=calloc(1,sizeof(*f));f->file=true;formats++;return f;}
 FlipperFormat* flipper_format_string_alloc(void){FlipperFormat* f=calloc(1,sizeof(*f));formats++;return f;}
 bool flipper_format_file_open_existing(FlipperFormat* f,const char* p){(void)f;(void)p;return true;}
@@ -97,7 +97,7 @@ int main(void){
         input_size=sizes[i];data=(SubData){0};
         assert(!synthesize_via_transmitter(&storage,"/ext/subghz/owned.sub","KeeLoq",&data));free(data.data);
     }
-    input_size=256;free_heap=13000;data=(SubData){0};
+    input_size=256;free_heap=12500;data=(SubData){0};
     assert(!synthesize_via_transmitter(&storage,"/ext/subghz/owned.sub","KeeLoq",&data));
     free_heap=100000;max_block=256;data=(SubData){0};
     assert(!synthesize_via_transmitter(&storage,"/ext/subghz/owned.sub","KeeLoq",&data));
