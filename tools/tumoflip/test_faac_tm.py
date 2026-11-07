@@ -20,6 +20,14 @@ def context(source):
 
 
 class FaacTmTests(unittest.TestCase):
+    def test_868_mhz_is_selectable_without_changing_default_hopping(self):
+        source = (ROOT / 'lib/subghz/subghz_setting.c').read_text()
+        normal = re.search(r'static const uint32_t subghz_frequency_list\[\] = \{(.*?)\};', source, re.S).group(1)
+        hopper = re.search(r'static const uint32_t subghz_hopper_frequency_list\[\] = \{(.*?)\};', source, re.S).group(1)
+        self.assertIn('868000000', normal)
+        self.assertEqual([int(n) for n in re.findall(r'\b\d+\b', hopper)],
+                         [315000000,390000000,430500000,433920000,434420000,868350000,0])
+
     def test_came_12bit_keeps_legacy_timing_but_does_not_claim_faac_frames(self):
         source = (ROOT / 'lib/subghz/protocols/came.c').read_text()
         macros = '\n'.join(re.findall(r'(?m)^#define (?:CAME_|AIRFORCE_|PRASTEL_).*$', source))
@@ -171,6 +179,8 @@ int main(void){
         f=(FlipperFormat){.bits=12,.fail_at=fail};
         assert(subghz_protocol_encoder_faac_tm_deserialize(&e,&f)!=SubGhzProtocolStatusOk && !e.encoder.is_running);
     }
+    f=(FlipperFormat){.bits=12,.fail_generic=true};
+    assert(subghz_protocol_encoder_faac_tm_deserialize(&e,&f)!=SubGhzProtocolStatusOk && !e.encoder.is_running);
     f=(FlipperFormat){.bits=12,.te=500,.has_te=true,.fail_te=true,.repeat=99,.has_repeat=true,.fail_repeat=true};
     assert(subghz_protocol_encoder_faac_tm_deserialize(&e,&f)==SubGhzProtocolStatusOk);
     assert(e.te==400 && e.encoder.repeat==3);return 0;
