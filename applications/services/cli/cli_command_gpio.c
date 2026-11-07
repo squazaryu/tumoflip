@@ -1,4 +1,5 @@
 #include "cli_command_gpio.h"
+#include "cli_main_commands.h"
 
 #include <furi.h>
 #include <furi_hal.h>
