@@ -20,6 +20,48 @@ def context(source):
 
 
 class FaacTmTests(unittest.TestCase):
+    def test_came_12bit_keeps_legacy_timing_but_does_not_claim_faac_frames(self):
+        source = (ROOT / 'lib/subghz/protocols/came.c').read_text()
+        macros = '\n'.join(re.findall(r'(?m)^#define (?:CAME_|AIRFORCE_|PRASTEL_).*$', source))
+        helper = ''
+        if 'subghz_protocol_came_is_foreign_12bit(' in source:
+            helper = production_function(source, 'subghz_protocol_came_is_foreign_12bit')
+        actual = production_function(source, 'subghz_protocol_decoder_came_feed')
+        native(PRELUDE + '\ntypedef struct SubGhzProtocolDecoderCame SubGhzProtocolDecoderCame;\n'
+               + declarations(source, 'came') + macros + '\n' + helper + actual + r'''
+static void capture(SubGhzProtocolDecoderBase* b,void* c){
+    (void)c;assert(((SubGhzProtocolDecoderCame*)b)->generic.data==expected);received++;
+}
+static void frame(SubGhzProtocolDecoderCame* d,uint64_t value,unsigned bits,unsigned te,unsigned gap){
+    subghz_protocol_decoder_came_feed(d,false,te*gap);
+    subghz_protocol_decoder_came_feed(d,true,te);
+    for(unsigned i=0;i<bits;i++){
+        bool bit=i<64 && ((value>>((bits-i-1)&63))&1);
+        subghz_protocol_decoder_came_feed(d,false,te*(bit?2:1));
+        subghz_protocol_decoder_came_feed(d,true,te*(bit?1:2));
+    }
+    subghz_protocol_decoder_came_feed(d,false,te*gap);
+}
+int main(void){
+    for(unsigned key=0;key<4096;key++){
+        SubGhzProtocolDecoderCame d={.base={.callback=capture}};
+        expected=key;received=0;frame(&d,key,12,320,47);assert(received==1);
+        d=(SubGhzProtocolDecoderCame){.base={.callback=capture}};
+        received=0;frame(&d,key,12,380,47);assert(received==1);
+        d=(SubGhzProtocolDecoderCame){.base={.callback=capture}};
+        received=0;frame(&d,key,12,380,35);assert(received==0);
+    }
+    const unsigned widths[]={18,24,25};
+    for(unsigned i=0;i<COUNT_OF(widths);i++){
+        SubGhzProtocolDecoderCame d={.base={.callback=capture}};
+        expected=7;received=0;frame(&d,7,widths[i],320,widths[i]==24?76:47);assert(received==1);
+    }
+    SubGhzProtocolDecoderCame d={.base={.callback=capture}};
+    expected=0;received=0;frame(&d,0,280,320,47);assert(received==0);
+    return 0;
+}
+''')
+
     def test_all_dips_round_trip_confirmed_and_overlong_frames_rejected(self):
         if not PATH.exists():
             # Intentional link-time RED: the new protocol interface is absent.
