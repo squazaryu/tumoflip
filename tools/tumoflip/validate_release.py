@@ -935,6 +935,16 @@ def validate_resources_archive(
                 raise ValidationError(f"Package entry differs in resources.ths: {relative}")
 
 
+def validate_cli_command_resources(repo_root: Path, resources: Path, archive_path: Path) -> None:
+    """Lazy commands are useful only if their exact modules reach native resources."""
+    hashes = resources_archive_hashes(repo_root, archive_path)
+    for name in ("gpio", "led", "vibro", "i2c"):
+        relative = f"apps_data/cli/plugins/cli_{name}.fal"
+        payload = require_file(resources / relative, f"CLI command module {name}")
+        if hashes.get(relative) != sha256(payload):
+            raise ValidationError(f"Native resources omit or change CLI command module: {relative}")
+
+
 def validate_subghz_feature_resources(repo_root: Path, resources: Path, archive_path: Path) -> None:
     archive_hashes = resources_archive_hashes(repo_root, archive_path)
     required = ["apps_data/subghz/plugins/" + name for name in (
@@ -1121,6 +1131,7 @@ def validate_release(
     ).parent
     validate_static_sd_resources(repo_root, resources)
     validate_subghz_feature_resources(repo_root, resources, referenced["Resources"])
+    validate_cli_command_resources(repo_root, resources, referenced["Resources"])
     validate_layout(resources)
     unexpectedly_bundled = sorted(
         relative

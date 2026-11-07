@@ -203,3 +203,5 @@ void cli_command_gpio(PipeSide* pipe, FuriString* args, void* context) {
 
     furi_string_free(cmd);
 }
+
+CLI_COMMAND_INTERFACE(gpio, cli_command_gpio, CliCommandFlagDefault, 4 * 1024, CLI_APPID);
