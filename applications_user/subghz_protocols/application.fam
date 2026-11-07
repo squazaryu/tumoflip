@@ -334,3 +334,16 @@ App(
         "../../lib/subghz/protocols/common.c",
     ],
 )
+
+App(
+    appid="protocol_faac_tm",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_faac_tm_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "faac_tm_plugin.c",
+        "../../lib/subghz/protocols/faac_tm.c",
+        "../../lib/subghz/protocols/common.c",
+    ],
+)

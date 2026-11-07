@@ -34,6 +34,7 @@ class FaacTmTests(unittest.TestCase):
 static void capture(SubGhzProtocolDecoderBase* b,void* c){
     (void)c;SubGhzProtocolDecoderFaacTm* d=(void*)b;
     assert(d->generic.data==expected && d->generic.data_count_bit==12);
+    assert(d->generic.serial==0 && d->generic.btn==0 && d->generic.cnt==0);
     assert(d->te>=350 && d->te<=450);received++;
 }
 static void frame(SubGhzProtocolDecoderFaacTm* d,LevelDuration* upload,unsigned count){
@@ -48,6 +49,7 @@ int main(void){
         assert(subghz_protocol_encoder_faac_tm_get_upload(&e));
         assert(e.encoder.size_upload==26 && !upload[0].level && upload[0].duration==rates[r]*35);
         SubGhzProtocolDecoderFaacTm d={.base={.callback=capture}};
+        d.generic.serial=7;d.generic.btn=9;d.generic.cnt=11;
         subghz_protocol_decoder_faac_tm_reset(&d);
         frame(&d,upload,26);assert(received==0);
         frame(&d,upload,26);assert(received==0);
@@ -106,6 +108,7 @@ bool flipper_format_read_uint32(FlipperFormat* f,const char* key,uint32_t* out,u
 }
 ''' + functions + r'''
 int main(void){
+    (void)received;(void)expected;
     LevelDuration upload[26];SubGhzProtocolEncoderFaacTm e={.encoder={.upload=upload,.size_upload=26}};
     const unsigned rates[]={0,100,101,360,400,440,999,1000,UINT32_MAX};
     for(unsigned i=0;i<COUNT_OF(rates);i++){
