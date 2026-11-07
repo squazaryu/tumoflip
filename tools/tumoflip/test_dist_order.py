@@ -13,7 +13,7 @@ FIXTURE = ROOT / "tools/tumoflip/fixtures/dist_order/SConstruct"
 
 
 class DistOrderTests(unittest.TestCase):
-    def run_graph(self, targets, *, fail_validator=False, empty=False):
+    def run_graph(self, targets, *, fail_validator=False, empty=False, repeat=False):
         with tempfile.TemporaryDirectory(prefix="tumoflip-dist-order-") as directory:
             result = subprocess.run(
                 [sys.executable, "-m", "SCons", "-Q", "-j2", "-f", str(FIXTURE), *targets],
@@ -22,6 +22,14 @@ class DistOrderTests(unittest.TestCase):
                      "TUMOFLIP_DIST_TEST_FAIL_VALIDATOR": "1" if fail_validator else "0",
                      "TUMOFLIP_DIST_TEST_EMPTY": "1" if empty else "0"},
             )
+            if repeat and result.returncode == 0:
+                result = subprocess.run(
+                    [sys.executable, "-m", "SCons", "-Q", "-j2", "-f", str(FIXTURE), *targets],
+                    cwd=directory, capture_output=True, text=True, timeout=20,
+                    env={**os.environ, "TUMOFLIP_DIST_TEST_ROOT": str(ROOT),
+                         "TUMOFLIP_DIST_TEST_FAIL_VALIDATOR": "0",
+                         "TUMOFLIP_DIST_TEST_EMPTY": "0"},
+                )
             root = Path(directory)
             events = (root / "dist-events.txt").read_text().splitlines() if (root / "dist-events.txt").exists() else []
             return {
@@ -44,6 +52,12 @@ class DistOrderTests(unittest.TestCase):
         result = self.run_graph(["dist_updater_package", "fap_dist"])
         self.assertEqual(result["returncode"], 0, result["output"])
         self.assertEqual(result["fap"], b"FAP fixture", result["output"])
+
+    def test_repeated_combined_build_reinstalls_apps_after_dist_cleans_output(self):
+        result = self.run_graph(["updater_package", "fap_dist"], repeat=True)
+        self.assertEqual(result["returncode"], 0, result["output"])
+        self.assertEqual(result["fap"], b"FAP fixture", result["output"])
+        self.assertTrue(result["debug"], result["output"])
 
     def test_all_selected_dist_commands_complete_before_install(self):
         result = self.run_graph(["fap_dist", "fw_dist", "updater_minpackage"])
