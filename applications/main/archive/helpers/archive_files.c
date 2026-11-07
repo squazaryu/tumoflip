@@ -113,11 +113,10 @@ void archive_delete_file(void* context, const char* format, ...) {
 
     furi_record_close(RECORD_STORAGE);
 
-    if(archive_is_favorite("%s", furi_string_get_cstr(filename))) {
-        archive_favorites_delete("%s", furi_string_get_cstr(filename));
-    }
-
     if(res) {
+        if(archive_is_favorite("%s", furi_string_get_cstr(filename))) {
+            archive_favorites_delete("%s", furi_string_get_cstr(filename));
+        }
         archive_file_array_rm_selected(browser);
     }
 
