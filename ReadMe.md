@@ -193,22 +193,23 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-009-038` | Hormann HSM preambles, KeeLoq TE200 timing and bounded frame parsing | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-009-039` | External FAAC TM, read-only RAW Edit imports and Archive/CLI reliability | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
 
 Dev `t-dev-009-038` retains local API 88.23 and the full 4096-byte physical C2
-reserve. Hormann HSM accepts both seven- and eight-one preambles while requiring
-exactly 44 bits. KeeLoq supports TE 200 us, preserves that timing in saved files
-and retains the existing 400 us path. Overlong frames cannot wrap the bit count.
-Shared private metadata parsing and compact identical waveforms preserve the
-flash reserve without removing functions or adding public API symbols.
-All 009-037 decoder, external Core-group Freezer, diagnostic, GUI/IR and earlier
-Honda hopping fixes remain. No counter-resync packs or password workflows are added.
+reserve. Static 12-DIP FAAC TM is an external Core module, with CAME timing
+disambiguation and an explicit 868.000 MHz choice; default hopping is unchanged.
+RAW Edit 1.8 synthesizes from bounded read-only input copies and retains merge
+guard metadata. Archive bounds empty/windowed list edits and retains favorites
+after failed deletion. GPIO/LED/vibro/I2C CLI handlers load from matching native
+SD resources; Bluetooth, crypto and recovery servicing stay resident. Repeated
+distribution reliably reinstalls FAP files. All 009-038 timing/decoder fixes and
+earlier functionality remain; no new public API or irreversible write mode is added.
 Install firmware with native resources. **FW Packages Dev 031** and
-**TumoCompanion 1.11.33** remain compatible; these changes require no
+**TumoCompanion 1.11.35** remain compatible; these changes require no
 new independent package or iOS release. The published iOS version includes
 Community Apps protection for `usb_cdrom` and `archive_favorites`. No ESP32
 update is required. Check release pages for publication status. Hardware
@@ -235,7 +236,7 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-009-038.tgz
+flipper-z-f7-update-t-dev-009-039.tgz
 ```
 
 ## Compatibility notes
