@@ -64,5 +64,6 @@ program = ast.Module(body=nodes[start:end + 1], type_ignores=[])
 exec(compile(program, str(root / "SConstruct"), "exec"), {
     "distenv": env, "dist_dir": env.Dir("dist/f7-C"), "external_app_list": artifacts,
     "Depends": Depends, "Requires": Requires, "Alias": Alias,
+    "os": os,
     "BUILD_TARGETS": COMMAND_LINE_TARGETS,
 })

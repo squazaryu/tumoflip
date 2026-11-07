@@ -17,7 +17,7 @@ class SubGhzRawEditTest(unittest.TestCase):
         self.assertIn('name="Sub-GHz RAW Edit"', manifest)
         self.assertIn('fap_category="ARF Tools"', manifest)
         self.assertIn("Lechnio; tumoflip integration", manifest)
-        self.assertIn('fap_version="1.7"', manifest)
+        self.assertIn('fap_version="1.8"', manifest)
         self.assertNotIn("fap_dist_path", manifest)
 
     def test_raw_edit_is_source_only_import(self) -> None:

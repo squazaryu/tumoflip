@@ -210,12 +210,12 @@ void archive_file_array_rm_selected(ArchiveBrowserView* browser) {
         browser->view,
         ArchiveBrowserViewModel * model,
         {
-            files_array_remove_v(
-                model->files,
-                model->item_idx - model->array_offset,
-                model->item_idx - model->array_offset + 1);
-            model->item_cnt--;
-            model->item_idx = CLAMP(model->item_idx, (int32_t)model->item_cnt - 1, 0);
+            if(model->item_cnt > 0 && archive_is_item_in_array(model, model->item_idx)) {
+                const size_t index = (size_t)(model->item_idx - model->array_offset);
+                files_array_remove_v(model->files, index, index + 1);
+                model->item_cnt--;
+                model->item_idx = CLAMP(model->item_idx, (int32_t)model->item_cnt - 1, 0);
+            }
             items_cnt = model->item_cnt;
         },
         false);
@@ -235,22 +235,28 @@ void archive_file_array_swap(ArchiveBrowserView* browser, int8_t dir) {
         browser->view,
         ArchiveBrowserViewModel * model,
         {
-            ArchiveFile_t temp;
-            size_t array_size = files_array_size(model->files) - 1;
-            uint8_t swap_idx = CLAMP((size_t)(model->item_idx + dir), array_size, 0u);
-
-            if(model->item_idx == 0 && dir < 0) {
-                ArchiveFile_t_init(&temp);
-                files_array_pop_at(&temp, model->files, array_size);
-                files_array_push_at(model->files, model->item_idx, temp);
-                ArchiveFile_t_clear(&temp);
-            } else if(((uint32_t)model->item_idx == array_size) && (dir > 0)) {
-                ArchiveFile_t_init(&temp);
-                files_array_pop_at(&temp, model->files, 0);
-                files_array_push_at(model->files, array_size, temp);
-                ArchiveFile_t_clear(&temp);
-            } else {
-                files_array_swap_at(model->files, model->item_idx, swap_idx);
+            const size_t count = files_array_size(model->files);
+            // Reordering is meaningful only for a complete favorites list. A
+            // worker's unloaded/partial window must not become a saved new order.
+            if(dir && count && model->array_offset == 0 && count == model->item_cnt &&
+               model->item_idx >= 0 && (size_t)model->item_idx < count) {
+                ArchiveFile_t temp;
+                const size_t last = count - 1;
+                const size_t index = (size_t)model->item_idx;
+                if(index == 0 && dir < 0) {
+                    ArchiveFile_t_init(&temp);
+                    files_array_pop_at(&temp, model->files, last);
+                    files_array_push_at(model->files, index, temp);
+                    ArchiveFile_t_clear(&temp);
+                } else if(index == last && dir > 0) {
+                    ArchiveFile_t_init(&temp);
+                    files_array_pop_at(&temp, model->files, 0);
+                    files_array_push_at(model->files, last, temp);
+                    ArchiveFile_t_clear(&temp);
+                } else {
+                    const size_t adjacent = dir > 0 ? index + 1 : index - 1;
+                    files_array_swap_at(model->files, index, adjacent);
+                }
             }
         },
         false);
