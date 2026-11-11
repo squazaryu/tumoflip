@@ -110,6 +110,10 @@ bool subghz_scene_save_name_on_event(void* context, SceneManagerEvent event) {
     } else if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == SubGhzCustomEventSceneSaveName) {
             if(strcmp(subghz->file_name_tmp, "") != 0) {
+                // next_scene invokes on_exit synchronously and clears the flag.
+                const bool generated = scene_manager_get_scene_state(
+                                           subghz->scene_manager, SubGhzSceneSaveName) !=
+                                       SubGhzCustomEventManagerNoSet;
                 furi_string_cat_printf(
                     subghz->file_path,
                     "/%s%s",
@@ -121,9 +125,6 @@ bool subghz_scene_save_name_on_event(void* context, SceneManagerEvent event) {
                     }
                 } else {
                     // The type scene stores a submenu row, not ownership of data.
-                    const bool generated = scene_manager_get_scene_state(
-                                               subghz->scene_manager, SubGhzSceneSaveName) !=
-                                           SubGhzCustomEventManagerNoSet;
                     FlipperFormat* data =
                         generated ?
                             subghz_txrx_get_fff_data(subghz->txrx) :
@@ -154,9 +155,7 @@ bool subghz_scene_save_name_on_event(void* context, SceneManagerEvent event) {
                 } else if(scene_manager_has_previous_scene(
                               subghz->scene_manager, SubGhzSceneMoreRAW)) {
                     // Ditto, for RAW signals
-                } else if(
-                    scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneSaveName) !=
-                    SubGhzCustomEventManagerNoSet) {
+                } else if(generated) {
                     dolphin_deed(DolphinDeedSubGhzAddManually);
                 } else {
                     dolphin_deed(DolphinDeedSubGhzSave);
