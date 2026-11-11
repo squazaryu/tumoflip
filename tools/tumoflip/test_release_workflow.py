@@ -8,6 +8,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReleaseWorkflowTest(unittest.TestCase):
+    def test_stable_publisher_pins_metadata_to_the_checked_out_tag_commit(self) -> None:
+        workflow=(REPO_ROOT / ".github/workflows/release.yml").read_text()
+        publish=workflow.split("- name: Publish GitHub release",1)[1]
+        self.assertIn('SOURCE_COMMIT="$(git rev-parse HEAD)"',publish)
+        self.assertIn('--target "$SOURCE_COMMIT"',publish)
+
     def test_pr_firmware_build_uses_bounded_parallelism(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/pr-build.yml").read_text()
         self.assertIn("./fbt -j2 COMPACT=1 DEBUG=0", workflow)
