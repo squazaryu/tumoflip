@@ -526,9 +526,13 @@ static FS_Error
         error = storage_common_rename(storage, furi_string_get_cstr(temp_path), new_path);
         if(error != FSE_OK) {
             // Restore the original name if the second step failed
-            FS_Error restored = storage_common_rename(storage, furi_string_get_cstr(temp_path), old_path);
+            FS_Error restored =
+                storage_common_rename(storage, furi_string_get_cstr(temp_path), old_path);
             if(restored != FSE_OK) {
-                FURI_LOG_E(TAG, "Rename restore failed; copy retained at %s", furi_string_get_cstr(temp_path));
+                FURI_LOG_E(
+                    TAG,
+                    "Rename restore failed; copy retained at %s",
+                    furi_string_get_cstr(temp_path));
             }
         }
     } while(false);
@@ -664,7 +668,7 @@ FS_Error storage_common_copy(Storage* storage, const char* old_path, const char*
                 // A short/silent write or failed sync must never authorize a
                 // rename caller to remove its still-valid source.
                 complete = stream_copy_full(stream_from, stream_to) == fileinfo.size &&
-                           stream_sync(stream_to);
+                           file_stream_close(stream_to);
             } while(false);
 
             error = file_stream_get_error(stream_from);

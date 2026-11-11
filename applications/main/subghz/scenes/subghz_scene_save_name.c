@@ -33,8 +33,7 @@ void subghz_scene_save_name_on_enter(void* context) {
             if(decoder_result != NULL) {
                 if(strlen(decoder_result->protocol->name) != 0 &&
                    subghz->last_settings->protocol_file_names) {
-                    if(scene_manager_get_scene_state(
-                           subghz->scene_manager, SubGhzSceneSaveName) ==
+                    if(scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneSaveName) ==
                        SubGhzCustomEventManagerNoSet) {
                         name_generator_make_auto_datetime(
                             file_name_buf,
@@ -122,12 +121,13 @@ bool subghz_scene_save_name_on_event(void* context, SceneManagerEvent event) {
                     }
                 } else {
                     // The type scene stores a submenu row, not ownership of data.
-                    const bool generated =
-                        scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneSaveName) !=
-                        SubGhzCustomEventManagerNoSet;
-                    FlipperFormat* data = generated ? subghz_txrx_get_fff_data(subghz->txrx) :
-                                                     subghz_history_get_raw_data(
-                                                         subghz->history, subghz->idx_menu_chosen);
+                    const bool generated = scene_manager_get_scene_state(
+                                               subghz->scene_manager, SubGhzSceneSaveName) !=
+                                           SubGhzCustomEventManagerNoSet;
+                    FlipperFormat* data =
+                        generated ?
+                            subghz_txrx_get_fff_data(subghz->txrx) :
+                            subghz_history_get_raw_data(subghz->history, subghz->idx_menu_chosen);
                     if(!subghz_save_protocol_to_file(
                            subghz, data, furi_string_get_cstr(subghz->file_path))) {
                         furi_string_set(subghz->error_str, "Cannot save signal");
@@ -154,9 +154,9 @@ bool subghz_scene_save_name_on_event(void* context, SceneManagerEvent event) {
                 } else if(scene_manager_has_previous_scene(
                               subghz->scene_manager, SubGhzSceneMoreRAW)) {
                     // Ditto, for RAW signals
-                } else if(scene_manager_get_scene_state(
-                              subghz->scene_manager, SubGhzSceneSaveName) !=
-                          SubGhzCustomEventManagerNoSet) {
+                } else if(
+                    scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneSaveName) !=
+                    SubGhzCustomEventManagerNoSet) {
                     dolphin_deed(DolphinDeedSubGhzAddManually);
                 } else {
                     dolphin_deed(DolphinDeedSubGhzSave);

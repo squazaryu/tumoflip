@@ -136,11 +136,11 @@ static FS_Error storage_copy_recursive(Storage* s,const char* a,const char* b){(
 static Stream* file_stream_alloc(Storage* s){(void)s;return malloc(sizeof(Stream));}
 static bool file_stream_open(Stream* s,const char* p,int a,int m){(void)s;(void)p;(void)a;(void)m;return true;}
 static size_t stream_copy_full(Stream* a,Stream* b){(void)a;(void)b;return copied;}
-static bool stream_sync(Stream* s){(void)s;return synced;}
+static bool file_stream_close(Stream* s){(void)s;return synced;}
 static FS_Error file_stream_get_error(Stream* s){(void)s;return FSE_OK;}
 static void stream_free(Stream* s){free(s);}
 ''' + actual + r'''
-int main(void){(void)stream_sync;Storage s=0;
+int main(void){(void)file_stream_close;Storage s=0;
  copied=2;assert(storage_common_copy(&s,"a","b")!=FSE_OK);
  copied=3;synced=false;assert(storage_common_copy(&s,"a","b")!=FSE_OK);
  synced=true;assert(storage_common_copy(&s,"a","b")==FSE_OK);return 0;}

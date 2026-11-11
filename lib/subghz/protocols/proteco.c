@@ -68,9 +68,8 @@ static const SubGhzProtocolEncoder subghz_protocol_proteco_encoder = {
 const SubGhzProtocol subghz_protocol_proteco = {
     .name = SUBGHZ_PROTOCOL_PROTECO_NAME,
     .type = SubGhzProtocolTypeStatic,
-    .flag = SubGhzProtocolFlag_433 | SubGhzProtocolFlag_AM |
-            SubGhzProtocolFlag_Decodable | SubGhzProtocolFlag_Load | SubGhzProtocolFlag_Save |
-            SubGhzProtocolFlag_Send,
+    .flag = SubGhzProtocolFlag_433 | SubGhzProtocolFlag_AM | SubGhzProtocolFlag_Decodable |
+            SubGhzProtocolFlag_Load | SubGhzProtocolFlag_Save | SubGhzProtocolFlag_Send,
     .decoder = &subghz_protocol_proteco_decoder,
     .encoder = &subghz_protocol_proteco_encoder,
 };
