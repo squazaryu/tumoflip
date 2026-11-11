@@ -98,7 +98,7 @@ int main(void){
         start=function(source,'void file_browser_start(')
         self.assertIn('file_browser_worker_alloc_deferred(',start)
         self.assertLess(start.index('file_browser_worker_set_long_load_callback('),start.index('file_browser_worker_start('))
-        callback=function(source,'static void browser_folder_error_cb(')
+        callback=function(source,'static void browser_folder_error_cb(void* context) {')
         self.assertIn('browser_list_load_cb(browser, 0)',callback)
         self.assertIn('model->list_loading = false',callback)
         self.assertIn('model->folder_loading = false',callback)
