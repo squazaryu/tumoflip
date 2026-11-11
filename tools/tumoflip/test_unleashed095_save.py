@@ -17,8 +17,8 @@ class SaveSourceTests(unittest.TestCase):
                            'test_unleashed095_browser','test_proteco'):
                 self.assertIn('tools.tumoflip.'+module,source)
 
-    def run_save_cases(self, failure_first=False):
-        source = SAVE.read_text()
+    def run_save_cases(self, failure_first=False, source_path=SAVE):
+        source = source_path.read_text()
         actual = function(source, 'bool subghz_scene_save_name_on_event(')
         actual += '\n' + function(source, 'void subghz_scene_save_name_on_exit(')
         native(('#define CHECK_FAILURE_FIRST\n' if failure_first else '') + r'''
@@ -91,6 +91,12 @@ int main(void){
 
     def test_write_failure_cannot_show_save_success(self):
         self.run_save_cases(failure_first=True)
+
+    def test_arf_uses_the_same_generated_data_contract(self):
+        self.run_save_cases(source_path=ROOT/'applications_user/arf_subghz_full/scenes/subghz_scene_save_name.c')
+
+    def test_arf_write_failure_cannot_show_save_success(self):
+        self.run_save_cases(failure_first=True,source_path=ROOT/'applications_user/arf_subghz_full/scenes/subghz_scene_save_name.c')
 
     def test_all_generators_and_private_plugin_version_use_the_new_contract(self):
         base = ROOT / 'applications/main/subghz/plugins/add_manually'
