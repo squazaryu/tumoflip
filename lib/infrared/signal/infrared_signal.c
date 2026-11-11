@@ -226,6 +226,12 @@ static inline InfraredErrorCode
             break;
         }
 
+        if(timings_size == 0) {
+            // A zero-length setter is a no-op: never report the previous signal
+            // as a successfully parsed new RAW record.
+            error = InfraredErrorCodeSignalRawUnableToReadTimingsSize;
+            break;
+        }
         if(timings_size > MAX_TIMINGS_AMOUNT) {
             error = InfraredErrorCodeSignalRawUnableToReadTooLongData;
             break;

@@ -135,7 +135,8 @@ void infrared_brute_force_add_record(
     const char* name);
 
 /**
- * @brief Reset an InfraredBruteForce instance.
+ * @brief Reset records and discard the borrowed database filename.
+ * Configure the filename again before calculating messages or starting.
  *
  * @param[in,out] brute_force pointer to the instance to be reset.
  */
