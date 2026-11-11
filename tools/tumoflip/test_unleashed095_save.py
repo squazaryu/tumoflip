@@ -23,7 +23,7 @@ class SaveSourceTests(unittest.TestCase):
         actual += '\n' + function(source, 'void subghz_scene_save_name_on_exit(')
         # Distinguish the two production bodies in coverage instead of merging
         # different functions under their common C identifier.
-        alias = '' if source_path == SAVE else (
+        alias = '#define CHECK_DEED\n' if source_path == SAVE else (
             '#define subghz_scene_save_name_on_event arf_subghz_scene_save_name_on_event\n'
             '#define subghz_scene_save_name_on_exit arf_subghz_scene_save_name_on_exit\n')
         native(alias + ('#define CHECK_FAILURE_FIRST\n' if failure_first else '') + r'''
@@ -45,12 +45,15 @@ typedef struct {void* scene_manager;FuriString *file_path,*file_path_tmp,*error_
  char file_name_tmp[32];void *txrx,*history,*text_input;unsigned idx_menu_chosen;} SubGhz;
 typedef int FlipperFormat;
 static unsigned states[8],next_scene=99,saved_source;
+static unsigned last_deed;
 static bool can_save=true,rename;
+static SubGhz* active;
+void subghz_scene_save_name_on_exit(void* context);
 static uint32_t scene_manager_get_scene_state(void* s,unsigned id){(void)s;return states[id];}
 static void scene_manager_set_scene_state(void* s,unsigned id,unsigned v){(void)s;states[id]=v;}
 static bool scene_manager_has_previous_scene(void* s,unsigned id){(void)s;return id==SubGhzSceneSetType;}
 static void scene_manager_previous_scene(void* s){(void)s;}
-static void scene_manager_next_scene(void* s,unsigned id){(void)s;next_scene=id;}
+static void scene_manager_next_scene(void* s,unsigned id){(void)s;next_scene=id;subghz_scene_save_name_on_exit(active);}
 #define furi_string_set(d,s) ((void)(d),(void)(s))
 static const char* furi_string_get_cstr(FuriString* s){return s->text;}
 static void furi_string_cat_printf(FuriString* s,const char* f,...){(void)s;(void)f;}
@@ -62,7 +65,7 @@ static bool subghz_save_protocol_to_file(SubGhz* s,FlipperFormat* f,const char* 
 static const char* subghz_txrx_radio_device_get_name(void* t){(void)t;return "internal";}
 static void subghz_protocol_raw_gen_fff_data(void* f,const char* p,const char* n){(void)f;(void)p;(void)n;}
 static void subghz_file_name_clear(SubGhz* s){(void)s;}
-static void dolphin_deed(unsigned d){(void)d;}
+static void dolphin_deed(unsigned d){last_deed=d;}
 static void* text_input_get_validator_callback_context(void* t){return t;}
 static void text_input_set_validator(void* t,void* a,void* b){(void)t;(void)a;(void)b;}
 static void validator_is_file_free(void* t){(void)t;}
@@ -71,6 +74,7 @@ static void text_input_reset(void* t){(void)t;}
 int main(void){
  FuriString path={"/ext/subghz"},tmp={""},err={""};
  SubGhz s={.file_path=&path,.file_path_tmp=&tmp,.error_str=&err};strcpy(s.file_name_tmp,"owned");
+ active=&s;(void)last_deed;
  SceneManagerEvent ev={SceneManagerEventTypeCustom,SubGhzCustomEventSceneSaveName};
 #ifdef CHECK_FAILURE_FIRST
  can_save=false;assert(subghz_scene_save_name_on_event(&s,ev));
@@ -80,6 +84,9 @@ int main(void){
  assert(subghz_scene_save_name_on_event(&s,ev));assert(saved_source==2 && states[SubGhzSceneSetType]==17);
  states[SubGhzSceneSetType]=0;states[SubGhzSceneSaveName]=SubGhzCustomEventManagerSet;
  assert(subghz_scene_save_name_on_event(&s,ev));assert(saved_source==1);
+#ifdef CHECK_DEED
+ assert(last_deed==DolphinDeedSubGhzAddManually);
+#endif
  can_save=false;next_scene=99;assert(subghz_scene_save_name_on_event(&s,ev));
  assert(next_scene!=SubGhzSceneSaveSuccess);
  states[SubGhzSceneSetType]=123;subghz_scene_save_name_on_exit(&s);
