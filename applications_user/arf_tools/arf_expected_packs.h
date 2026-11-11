@@ -18,4 +18,5 @@ static const char* const arf_expected_packs[] = {
     "protocol_superrollo.fal",      "protocol_toyota_lexus.fal",  "protocol_vag.fal",
     "protocol_freezer.fal",
     "protocol_faac_tm.fal",
+    "protocol_proteco.fal",
 };

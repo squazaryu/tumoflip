@@ -11,7 +11,8 @@ PATH=ROOT/'lib/subghz/protocols/proteco.c'
 
 
 def context(source):
-    return (PRELUDE+'typedef struct SubGhzProtocolDecoderProteco SubGhzProtocolDecoderProteco;\n'
+    return (PRELUDE.replace('unsigned repeat;', 'unsigned repeat,front;bool is_running;')
+            +'typedef struct SubGhzProtocolDecoderProteco SubGhzProtocolDecoderProteco;\n'
             +'typedef struct SubGhzProtocolEncoderProteco SubGhzProtocolEncoderProteco;\n'
             +declarations(source,'proteco')+'\n'
             +'\n'.join(re.findall(r'(?m)^#define PROTECO_.*$',source))+'\n')
@@ -37,6 +38,7 @@ class ProtecoTests(unittest.TestCase):
 static void receive(SubGhzProtocolDecoderBase* b,void* c){(void)c;
  assert(((SubGhzProtocolDecoderProteco*)b)->generic.data==expected);received++;}
 int main(void){
+ (void)subghz_protocol_proteco_const;
  const int32_t* captures[]={capture0,capture1,capture2};
  const size_t sizes[]={COUNT_OF(capture0),COUNT_OF(capture1),COUNT_OF(capture2)};
  const uint64_t keys[]={0xDF2396,0xDF2394,0xDF2395};
@@ -86,6 +88,35 @@ int main(void){
         registry=(ROOT/'lib/subghz/protocols/plugin_registry.c').read_text()
         self.assertRegex(registry,r'PACK_GROUP\(SubGhzProtocolPackGroupCore\), "proteco"')
         self.assertNotIn('&subghz_protocol_proteco',(ROOT/'lib/subghz/protocols/protocol_items.c').read_text())
+
+    def test_file_width_timing_and_repeat_do_not_leak_from_previous_file(self):
+        source=self.require_source()
+        actual='\n'.join(production_function(source,n) for n in (
+            'subghz_protocol_proteco_read_key','subghz_protocol_encoder_proteco_get_upload',
+            'subghz_protocol_encoder_proteco_deserialize'))
+        native(context(source)+r'''
+typedef enum {SubGhzProtocolStatusError=-1,SubGhzProtocolStatusOk,
+ SubGhzProtocolStatusErrorEncoderGetUpload,SubGhzProtocolStatusErrorParserOthers} SubGhzProtocolStatus;
+typedef struct {unsigned bits,rewinds,fail_at;uint64_t key;uint32_t te,repeat;bool optional;} FlipperFormat;
+static SubGhzProtocolStatus subghz_block_generic_deserialize_check_count_bit(SubGhzBlockGeneric* g,FlipperFormat* f,unsigned bits){
+ assert(bits==24);g->data=f->key;g->data_count_bit=f->bits;return SubGhzProtocolStatusOk;}
+static bool flipper_format_rewind(FlipperFormat* f){return ++f->rewinds!=f->fail_at;}
+static bool flipper_format_read_uint32(FlipperFormat* f,const char* name,uint32_t* out,unsigned n){
+ assert(n==1);*out=!strcmp(name,"TE")?f->te:f->repeat;return f->optional;}
+''' +actual+r'''
+int main(void){(void)received;(void)expected;LevelDuration samples[50];
+ SubGhzProtocolEncoderProteco e={.encoder={.upload=samples,.size_upload=50}};
+ FlipperFormat f={.bits=24,.key=0xDF2396,.te=480,.repeat=7,.optional=true};
+ assert(subghz_protocol_encoder_proteco_deserialize(&e,&f)==SubGhzProtocolStatusOk && e.te==480 && e.encoder.repeat==7);
+ f=(FlipperFormat){.bits=24};assert(subghz_protocol_encoder_proteco_deserialize(&e,&f)==SubGhzProtocolStatusOk);
+ assert(e.te==440 && e.encoder.repeat==3 && e.encoder.front==0);
+ for(unsigned bits=0;bits<80;bits++){
+  f=(FlipperFormat){.bits=bits};assert((subghz_protocol_encoder_proteco_deserialize(&e,&f)==SubGhzProtocolStatusOk)==(bits==24));}
+ f=(FlipperFormat){.bits=24,.key=0x1000000};assert(subghz_protocol_encoder_proteco_deserialize(&e,&f)!=SubGhzProtocolStatusOk && !e.encoder.is_running);
+ for(unsigned fail=1;fail<=2;fail++){
+  f=(FlipperFormat){.bits=24,.fail_at=fail};assert(subghz_protocol_encoder_proteco_deserialize(&e,&f)!=SubGhzProtocolStatusOk && !e.encoder.is_running);}
+ return 0;}
+''')
 
 
 if __name__=='__main__':unittest.main()

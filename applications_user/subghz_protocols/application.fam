@@ -347,3 +347,16 @@ App(
         "../../lib/subghz/protocols/common.c",
     ],
 )
+
+App(
+    appid="protocol_proteco",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_proteco_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "proteco_plugin.c",
+        "../../lib/subghz/protocols/proteco.c",
+        "../../lib/subghz/protocols/common.c",
+    ],
+)
