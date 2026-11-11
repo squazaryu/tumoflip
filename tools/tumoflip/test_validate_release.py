@@ -107,7 +107,7 @@ def make_dfuse(elements: list[tuple[int, bytes]]) -> bytes:
 
 class ValidateReleaseTest(unittest.TestCase):
     def test_protocol_pack_inventory_covers_active_arf_registry(self) -> None:
-        self.assertEqual(len(PROTOCOL_PACKS), 44)
+        self.assertEqual(len(PROTOCOL_PACKS), 45)
         self.assertIn("protocol_faac_tm.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_freezer.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_renault_v1.fal", PROTOCOL_PACKS)

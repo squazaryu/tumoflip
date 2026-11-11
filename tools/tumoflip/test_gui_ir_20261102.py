@@ -188,7 +188,7 @@ class InfraredDatabaseTests(NativeRegression):
     def test_unknown_first_button_fails_without_dereference_or_file_write(self):
         self.run_case("unknown")
 
-    def test_unknown_button_after_valid_record_returns_error_and_releases_scratch(self):
+    def test_unrequested_valid_names_are_skipped_without_losing_requested_offsets(self):
         self.run_case("mixed")
 
     def test_known_names_keep_offsets_and_successful_eof(self):
@@ -199,6 +199,9 @@ class InfraredDatabaseTests(NativeRegression):
 
     def test_empty_database_and_open_failure_report_error_and_free_scratch(self):
         self.run_case("empty")
+
+    def test_unconfigured_database_returns_error_without_opening_storage(self):
+        self.run_case("unconfigured")
 
 
 if __name__ == "__main__":

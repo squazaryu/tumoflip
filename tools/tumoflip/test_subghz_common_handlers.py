@@ -106,7 +106,7 @@ class SubGhzCommonHandlersTest(unittest.TestCase):
                 owners = [block for block in blocks if "../../lib/subghz/protocols/common.c" in block]
                 self.assertEqual(
                     {re.search(r'appid="([^"]+)"', owner).group(1) for owner in owners},
-                    {"protocol_freezer", "protocol_faac_tm"},
+                    {"protocol_freezer", "protocol_faac_tm", "protocol_proteco"},
                 )
         for source in protocol_sources_using(COMMON_HANDLERS):
             relative = source.relative_to(REPO_ROOT).as_posix()

@@ -33,8 +33,8 @@ void subghz_scene_save_name_on_enter(void* context) {
             if(decoder_result != NULL) {
                 if(strlen(decoder_result->protocol->name) != 0 &&
                    subghz->last_settings->protocol_file_names) {
-                    if(!scene_manager_has_previous_scene(
-                           subghz->scene_manager, SubGhzSceneSetType)) {
+                    if(scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneSaveName) ==
+                       SubGhzCustomEventManagerNoSet) {
                         name_generator_make_auto_datetime(
                             file_name_buf,
                             SUBGHZ_MAX_LEN_NAME,
@@ -110,6 +110,10 @@ bool subghz_scene_save_name_on_event(void* context, SceneManagerEvent event) {
     } else if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == SubGhzCustomEventSceneSaveName) {
             if(strcmp(subghz->file_name_tmp, "") != 0) {
+                // next_scene invokes on_exit synchronously and clears the flag.
+                const bool generated = scene_manager_get_scene_state(
+                                           subghz->scene_manager, SubGhzSceneSaveName) !=
+                                       SubGhzCustomEventManagerNoSet;
                 furi_string_cat_printf(
                     subghz->file_path,
                     "/%s%s",
@@ -120,21 +124,16 @@ bool subghz_scene_save_name_on_event(void* context, SceneManagerEvent event) {
                         return false;
                     }
                 } else {
-                    if(scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneSetType) !=
-                       SubGhzCustomEventManagerNoSet) {
-                        subghz_save_protocol_to_file(
-                            subghz,
-                            subghz_txrx_get_fff_data(subghz->txrx),
-                            furi_string_get_cstr(subghz->file_path));
-                        scene_manager_set_scene_state(
-                            subghz->scene_manager,
-                            SubGhzSceneSetType,
-                            SubGhzCustomEventManagerNoSet);
-                    } else {
-                        subghz_save_protocol_to_file(
-                            subghz,
-                            subghz_history_get_raw_data(subghz->history, subghz->idx_menu_chosen),
-                            furi_string_get_cstr(subghz->file_path));
+                    // The type scene stores a submenu row, not ownership of data.
+                    FlipperFormat* data =
+                        generated ?
+                            subghz_txrx_get_fff_data(subghz->txrx) :
+                            subghz_history_get_raw_data(subghz->history, subghz->idx_menu_chosen);
+                    if(!subghz_save_protocol_to_file(
+                           subghz, data, furi_string_get_cstr(subghz->file_path))) {
+                        furi_string_set(subghz->error_str, "Cannot save signal");
+                        scene_manager_next_scene(subghz->scene_manager, SubGhzSceneShowErrorSub);
+                        return true;
                     }
                 }
 
@@ -156,8 +155,7 @@ bool subghz_scene_save_name_on_event(void* context, SceneManagerEvent event) {
                 } else if(scene_manager_has_previous_scene(
                               subghz->scene_manager, SubGhzSceneMoreRAW)) {
                     // Ditto, for RAW signals
-                } else if(scene_manager_has_previous_scene(
-                              subghz->scene_manager, SubGhzSceneSetType)) {
+                } else if(generated) {
                     dolphin_deed(DolphinDeedSubGhzAddManually);
                 } else {
                     dolphin_deed(DolphinDeedSubGhzSave);
@@ -175,6 +173,9 @@ bool subghz_scene_save_name_on_event(void* context, SceneManagerEvent event) {
 
 void subghz_scene_save_name_on_exit(void* context) {
     SubGhz* subghz = context;
+
+    scene_manager_set_scene_state(
+        subghz->scene_manager, SubGhzSceneSaveName, SubGhzCustomEventManagerNoSet);
 
     // Clear validator
     void* validator_context = text_input_get_validator_callback_context(subghz->text_input);

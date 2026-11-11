@@ -90,8 +90,9 @@ void infrared_brute_force_set_db_filename(InfraredBruteForce* brute_force, const
 InfraredErrorCode infrared_brute_force_calculate_messages(InfraredBruteForce* brute_force) {
     furi_check(brute_force);
     furi_assert(!brute_force->is_started);
-    furi_assert(brute_force->db_filename);
+    if(!brute_force->db_filename) return InfraredErrorCodeFileOperationFailed;
     InfraredErrorCode error = InfraredErrorCodeSignalNameNotFound;
+    bool matched = false;
 
     Storage* storage = furi_record_open(RECORD_STORAGE);
     FlipperFormat* ff = flipper_format_buffered_file_alloc(storage);
@@ -114,11 +115,12 @@ InfraredErrorCode infrared_brute_force_calculate_messages(InfraredBruteForce* br
 
             InfraredBruteForceRecord* record =
                 InfraredBruteForceRecordDict_get(brute_force->records, signal_name);
-            if(!record) {
-                error = InfraredErrorCodeSignalNameNotFound;
-                break;
+            // A universal database may contain valid buttons this caller did not
+            // request. Validate their bodies, but collect only registered names.
+            if(record) {
+                SignalPositionArray_push_back(record->signals, signal_start);
+                matched = true;
             }
-            SignalPositionArray_push_back(record->signals, signal_start);
         }
     } while(false);
 
@@ -127,6 +129,7 @@ InfraredErrorCode infrared_brute_force_calculate_messages(InfraredBruteForce* br
 
     flipper_format_free(ff);
     furi_record_close(RECORD_STORAGE);
+    if(error == InfraredErrorCodeNone && !matched) error = InfraredErrorCodeSignalNameNotFound;
     return error;
 }
 
@@ -232,6 +235,8 @@ void infrared_brute_force_add_record(
 }
 
 void infrared_brute_force_reset(InfraredBruteForce* brute_force) {
+    furi_check(brute_force);
     furi_assert(!brute_force->is_started);
+    brute_force->db_filename = NULL;
     InfraredBruteForceRecordDict_reset(brute_force->records);
 }

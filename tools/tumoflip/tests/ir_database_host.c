@@ -78,9 +78,9 @@ int main(int argc, char** argv) {
         assert(calculate() == InfraredErrorCodeSignalNameNotFound);
         assert(record.signals.count == 0);
     } else if(!strcmp(argv[1], "mixed")) {
-        frames[0] = "Power"; frames[1] = "UnknownButton"; frame_count = 2;
-        assert(calculate() == InfraredErrorCodeSignalNameNotFound);
-        assert(record.signals.count == 1);
+        frames[0] = "UnknownButton"; frames[1] = "Power"; frames[2] = "Other"; frame_count = 3;
+        assert(calculate() == InfraredErrorCodeNone);
+        assert(record.signals.count == 1 && record.signals.positions[0] == 20);
     } else if(!strcmp(argv[1], "valid")) {
         frames[0] = frames[1] = "Power"; frame_count = 2;
         assert(calculate() == InfraredErrorCodeNone);
@@ -94,6 +94,10 @@ int main(int argc, char** argv) {
         assert(calculate() == InfraredErrorCodeSignalNameNotFound);
         reset(); can_open = false;
         assert(calculate() == InfraredErrorCodeFileOperationFailed);
+    } else if(!strcmp(argv[1], "unconfigured")) {
+        InfraredBruteForce instance = {0};
+        assert(infrared_brute_force_calculate_messages(&instance) == InfraredErrorCodeFileOperationFailed);
+        assert(!scratch && !records_open);
     } else {
         assert(false);
     }

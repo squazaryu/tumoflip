@@ -99,9 +99,9 @@ void archive_delete_file(void* context, const char* format, ...) {
     Storage* fs_api = furi_record_open(RECORD_STORAGE);
 
     FileInfo fileinfo;
-    const bool is_dir = (storage_common_stat(fs_api, furi_string_get_cstr(filename), &fileinfo) ==
-                         FSE_OK) &&
-                        file_info_is_dir(&fileinfo);
+    const bool is_dir =
+        (storage_common_stat(fs_api, furi_string_get_cstr(filename), &fileinfo) == FSE_OK) &&
+        file_info_is_dir(&fileinfo);
 
     bool res = false;
 
@@ -142,6 +142,11 @@ FS_Error archive_rename_copy_file_or_dir(
         error = FSE_INVALID_NAME;
     } else if(!copy && !strcmp(src_path, dst_path)) {
         error = FSE_EXIST;
+    } else if(!copy && storage_common_equivalent_path(fs_api, src_path, dst_path)) {
+        // Same entry under a different spelling, as when only the case of the name changes:
+        // the free-name search below would see the entry itself as a collision and rename to
+        // a numbered name instead, so the rename goes straight to storage.
+        error = storage_common_rename(fs_api, src_path, dst_path);
     } else {
         if(storage_common_exists(fs_api, dst_path)) {
             FuriString* filename = furi_string_alloc();
@@ -177,7 +182,7 @@ FS_Error archive_rename_copy_file_or_dir(
     }
     furi_record_close(RECORD_STORAGE);
 
-    if(!copy && archive_is_favorite("%s", src_path)) {
+    if(error == FSE_OK && !copy && archive_is_favorite("%s", src_path)) {
         archive_favorites_rename(src_path, dst_path);
     }
 

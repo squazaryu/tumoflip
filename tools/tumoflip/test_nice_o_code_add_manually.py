@@ -62,7 +62,7 @@ class NiceOCodeAddManuallyTest(unittest.TestCase):
         self.assertIn("SUBGHZ_NO_NICE_FLOR_S_RAINBOW_TABLE", protocol)
         self.assertEqual(symbols.splitlines()[1], "Version,+,88.23,,")
         self.assertIn("subghz_protocol_nice_o_create_data", symbols)
-        self.assertIn("SUBGHZ_FEATURE_PLUGIN_API_VERSION 1003", plugin_api)
+        self.assertIn("SUBGHZ_FEATURE_PLUGIN_API_VERSION 1004", plugin_api)
 
     def test_add_manually_uses_new_encoder_only_for_o_code(self) -> None:
         type_scene = self.read("applications/main/subghz/plugins/add_manually/subghz_scene_set_type.c")

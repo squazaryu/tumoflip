@@ -117,10 +117,18 @@ bool subghz_scene_save_name_on_event(void* context, SceneManagerEvent event) {
                         return false;
                     }
                 } else {
-                    subghz_save_protocol_to_file(
-                        subghz,
-                        subghz_history_get_raw_data(subghz->history, subghz->idx_menu_chosen),
-                        furi_string_get_cstr(subghz->file_path));
+                    const bool generated =
+                        scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneSaveName) !=
+                        SubGhzCustomEventManagerNoSet;
+                    FlipperFormat* data = generated ? subghz_txrx_get_fff_data(subghz->txrx) :
+                                                     subghz_history_get_raw_data(
+                                                         subghz->history, subghz->idx_menu_chosen);
+                    if(!subghz_save_protocol_to_file(
+                           subghz, data, furi_string_get_cstr(subghz->file_path))) {
+                        furi_string_set(subghz->error_str, "Cannot save signal");
+                        scene_manager_next_scene(subghz->scene_manager, SubGhzSceneShowErrorSub);
+                        return true;
+                    }
                 }
 
                 if(scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneReadRAW) !=
@@ -154,6 +162,9 @@ bool subghz_scene_save_name_on_event(void* context, SceneManagerEvent event) {
 
 void subghz_scene_save_name_on_exit(void* context) {
     SubGhz* subghz = context;
+
+    scene_manager_set_scene_state(
+        subghz->scene_manager, SubGhzSceneSaveName, SubGhzCustomEventManagerNoSet);
 
     // Clear validator
     void* validator_context = text_input_get_validator_callback_context(subghz->text_input);

@@ -23,7 +23,8 @@ extern "C" {
  * the signature of an exported symbol - the API hash covers the name only, so a changed signature
  * still resolves and then miscalls. Dropping an export needs no bump; that one fails to resolve.
  */
-#define SUBGHZ_FEATURE_PLUGIN_API_VERSION 1003
+// 1004 also separates SaveName's generated-data flag from SetType's menu row.
+#define SUBGHZ_FEATURE_PLUGIN_API_VERSION 1004
 
 /** Where the feature plugins live - fbt's default folder for this app's plugins, shared with the
  * radio device drivers, whose registry only loads radio_device_*.fal and skips the rest. */

@@ -39,6 +39,7 @@ DFUSE_WHOLE_FILE_CRC = 0xFFFFFFFF
 PROTOCOL_PACKS = {
     "protocol_freezer.fal",
     "protocol_faac_tm.fal",
+    "protocol_proteco.fal",
     "protocol_rx_x10.fal",
     "protocol_rx_urmet.fal",
     "protocol_rx_gm0.fal",
