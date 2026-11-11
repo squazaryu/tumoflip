@@ -21,7 +21,12 @@ class SaveSourceTests(unittest.TestCase):
         source = source_path.read_text()
         actual = function(source, 'bool subghz_scene_save_name_on_event(')
         actual += '\n' + function(source, 'void subghz_scene_save_name_on_exit(')
-        native(('#define CHECK_FAILURE_FIRST\n' if failure_first else '') + r'''
+        # Distinguish the two production bodies in coverage instead of merging
+        # different functions under their common C identifier.
+        alias = '' if source_path == SAVE else (
+            '#define subghz_scene_save_name_on_event arf_subghz_scene_save_name_on_event\n'
+            '#define subghz_scene_save_name_on_exit arf_subghz_scene_save_name_on_exit\n')
+        native(alias + ('#define CHECK_FAILURE_FIRST\n' if failure_first else '') + r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
