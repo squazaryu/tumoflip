@@ -106,5 +106,25 @@ int main(void){
         for name in ('file_browser_worker_start','file_browser_worker_alloc_deferred','file_browser_worker_set_folder_error_callback'):
             self.assertNotIn('Function,+,'+name+',',api)
 
+    def test_error_callback_drops_stale_rows_and_allows_parent_navigation(self):
+        actual=function((ROOT/'applications/services/gui/modules/file_browser.c').read_text(),
+                        'static void browser_folder_error_cb(void* context) {')
+        native(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#define furi_check assert
+#define with_view_model(v,decl,body,update) do {decl=(v);body;}while(0)
+typedef struct {bool is_root,folder_error,folder_loading,list_loading;
+ uint32_t item_cnt,list_offset;int32_t item_idx;} FileBrowserModel;
+typedef struct {FileBrowserModel* view;} FileBrowser;
+static unsigned resets;
+static void browser_list_load_cb(void* context,uint32_t offset){(void)context;assert(!offset);resets++;}
+''' + actual + r'''
+int main(void){FileBrowserModel m={.item_cnt=99,.item_idx=70,.folder_loading=true,.list_loading=true};FileBrowser b={&m};
+ browser_folder_error_cb(&b);assert(m.folder_error && !m.list_loading && !m.folder_loading && m.item_cnt==1 && m.item_idx==0 && resets==1);
+ m.is_root=true;browser_folder_error_cb(&b);assert(!m.item_cnt && m.folder_error && resets==2);return 0;}
+''')
+
 
 if __name__=='__main__':unittest.main()

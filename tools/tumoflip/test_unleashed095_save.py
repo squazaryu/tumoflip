@@ -10,6 +10,13 @@ SAVE = ROOT / 'applications/main/subghz/scenes/subghz_scene_save_name.c'
 
 
 class SaveSourceTests(unittest.TestCase):
+    def test_release_and_pr_gates_include_the_new_regressions(self):
+        for name in ('pr-build.yml','release.yml'):
+            source=(ROOT/'.github/workflows'/name).read_text()
+            for module in ('test_unleashed095_ir','test_unleashed095_save','test_unleashed095_rename',
+                           'test_unleashed095_browser','test_proteco'):
+                self.assertIn('tools.tumoflip.'+module,source)
+
     def run_save_cases(self, failure_first=False):
         source = SAVE.read_text()
         actual = function(source, 'bool subghz_scene_save_name_on_event(')
