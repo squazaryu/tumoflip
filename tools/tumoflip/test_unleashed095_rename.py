@@ -9,6 +9,50 @@ STORAGE=ROOT/'applications/services/storage/storage_external_api.c'
 
 
 class RenameSafetyTests(unittest.TestCase):
+    def test_failed_archive_rename_does_not_move_its_favorite(self):
+        actual=function((ROOT/'applications/main/archive/helpers/archive_files.c').read_text(),
+                        'FS_Error archive_rename_copy_file_or_dir(')
+        native(r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include <stdarg.h>
+#define furi_assert assert
+#define FURI_LOG_I(...) ((void)0)
+#define FURI_LOG_E(...) ((void)0)
+#define RECORD_STORAGE "storage"
+#define MAX_EXT_LEN 6
+enum {FSE_OK,FSE_EXIST,FSE_INVALID_NAME,FSE_INTERNAL};typedef int FS_Error;typedef int Storage;
+typedef struct {char data[256];} FuriString;
+static unsigned favorites;static FS_Error outcome=FSE_INTERNAL;
+static Storage* furi_record_open(const char* n){(void)n;static Storage s;return &s;}
+static void furi_record_close(const char* n){(void)n;}
+static FuriString* furi_string_alloc(void){return calloc(1,sizeof(FuriString));}
+static FuriString* furi_string_alloc_set(const char* p){FuriString* s=furi_string_alloc();snprintf(s->data,256,"%s",p);return s;}
+static void furi_string_free(FuriString* s){free(s);}
+static const char* furi_string_get_cstr(FuriString* s){return s->data;}
+static void furi_string_cat_printf(FuriString* s,const char* f,...){(void)s;(void)f;}
+static bool path_contains_only_ascii(const char* p){(void)p;return true;}
+static void path_extract_filename(FuriString* p,FuriString* n,bool b){(void)p;(void)n;(void)b;}
+static void path_extract_extension(FuriString* p,char* e,size_t n){(void)p;(void)e;(void)n;}
+static void path_extract_dirname(const char* p,FuriString* n){(void)p;(void)n;}
+static bool storage_common_equivalent_path(Storage* s,const char* a,const char* b){(void)s;return !strcasecmp(a,b);}
+static bool storage_common_exists(Storage* s,const char* p){(void)s;(void)p;return false;}
+static FS_Error storage_common_copy(Storage* s,const char* a,const char* b){(void)s;(void)a;(void)b;return outcome;}
+static FS_Error storage_common_rename(Storage* s,const char* a,const char* b){return storage_common_copy(s,a,b);}
+static void storage_get_next_filename(Storage* s,const char* d,const char* n,const char* e,FuriString* out,unsigned max){(void)s;(void)d;(void)n;(void)e;(void)out;(void)max;}
+static bool archive_is_favorite(const char* f,...){(void)f;return true;}
+static bool archive_favorites_rename(const char* a,const char* b){(void)a;(void)b;favorites++;return true;}
+''' + actual + r'''
+int main(void){int context=0;
+ assert(archive_rename_copy_file_or_dir(&context,"/ext/old.sub","/ext/new.sub",false)!=FSE_OK && !favorites);
+ outcome=FSE_OK;assert(archive_rename_copy_file_or_dir(&context,"/ext/old.sub","/ext/new.sub",false)==FSE_OK && favorites==1);
+ assert(archive_rename_copy_file_or_dir(&context,"/ext/old.sub","/ext/copy.sub",true)==FSE_OK && favorites==1);return 0;}
+''')
+
     def test_case_rename_keeps_payload_on_copy_failure_and_temp_collisions(self):
         source=STORAGE.read_text();helpers=''
         for signature in ('static bool storage_common_is_case_only_rename(',
