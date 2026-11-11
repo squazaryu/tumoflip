@@ -254,6 +254,7 @@ jobs:
         run: toolchain/x86_64-linux/bin/python3 tools/tumoflip/render_weather_native.py /tmp/weather-editor-native-ui --sanitize
 
       - name: Validate updater and package manifest
+        # Keep Stable's source gate at least as broad as the local discovery run.
         shell: bash
         run: |
           set -euo pipefail
@@ -261,6 +262,11 @@ jobs:
             --build-dir build/f7-firmware-C \
             --min-c2-gap 4096 \
             --write-manifest
+
+      - name: Validate selective Unleashed 095 adaptations and full host suite
+        run: |
+          toolchain/x86_64-linux/bin/python3 -m unittest tools.tumoflip.test_unleashed095_ir tools.tumoflip.test_unleashed095_save tools.tumoflip.test_unleashed095_rename tools.tumoflip.test_unleashed095_browser tools.tumoflip.test_proteco
+          PYTHONPATH=.:tools/tumoflip toolchain/x86_64-linux/bin/python3 -m unittest discover -s tools/tumoflip -p 'test_*.py'
 
       - name: Prepare release assets
         id: assets
