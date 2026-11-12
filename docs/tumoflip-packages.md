@@ -63,9 +63,19 @@ while creating `tumoflip-packages.zip` and fails if one leaks into the updater.
 several megabytes larger than ordinary apps.
 
 Every workflow that produces package assets must therefore build both
-`updater_package` and the explicit package-only targets. At present the command
-ends with `updater_package fap_esp_flasher`; omitting the second target is a hard
-validation failure instead of a silent partial release.
+`updater_package` and all explicit package-only targets from the workflow,
+including `fap_esp_flasher`, `fap_device_library`, `fap_field_tools` and
+`fap_tumo_nfc_sniffer`. Missing targets are hard validation failures, not silent
+partial releases. Run `fw_dist`, `fap_dist` and updater packaging as separate
+invocations so distribution cleanup cannot race generated resources.
+
+The unpublished Field Kit candidate adds Field Tools and the experimental
+Passive NFC Sniffer to the Base package. They are excluded from updater
+resources and protected against Community Pack replacement. Field Tools opens
+objects only with Device Library 1.2 or later; importing a portable object
+creates a new card and separate payload files. These files may be private.
+Use an SD reader or USB SD mode to export them; Companion Files can upload
+copies back but does not currently provide generic file download.
 
 When package source comes from a newer branch than the installed firmware,
 `--target-manifest` and `--target-package-zip` preserve the existing release's

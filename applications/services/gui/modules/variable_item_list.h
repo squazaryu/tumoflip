@@ -36,6 +36,9 @@ void variable_item_list_reset(VariableItemList* variable_item_list);
 
 /** Get VariableItemList View instance
  *
+ * The module uses enter/exit callbacks for scrolling lifetime. Wrap the view
+ * in a parent container instead of replacing these internal callbacks.
+ *
  * @param      variable_item_list  VariableItemList instance
  *
  * @return     View instance

@@ -12,6 +12,7 @@ typedef struct TumoSpectrumBandMap TumoSpectrumBandMap;
 typedef enum {
     TumoSpectrumBandMapRadioInternal,
     TumoSpectrumBandMapRadioExternal,
+    TumoSpectrumBandMapRadioDual,
 } TumoSpectrumBandMapRadio;
 
 typedef enum {
@@ -28,6 +29,13 @@ typedef struct {
     uint32_t start_hz;
     uint32_t end_hz;
 } TumoSpectrumBandMapBand;
+
+typedef struct {
+    uint32_t frequency_hz;
+    uint16_t observations;
+    int8_t rssi_dbm;
+    uint8_t radio;
+} TumoSpectrumBandPeak;
 
 typedef struct {
     TumoSpectrumBandMapStatus status;
@@ -47,6 +55,8 @@ typedef struct {
     int8_t bins[TUMOSPECTRUM_BAND_MAP_BINS];
     int8_t peaks[TUMOSPECTRUM_BAND_MAP_BINS];
     int8_t history[TUMOSPECTRUM_BAND_MAP_HISTORY_ROWS][TUMOSPECTRUM_BAND_MAP_BINS];
+    uint8_t peak_count;
+    TumoSpectrumBandPeak observed_peaks[16];
 } TumoSpectrumBandMapSnapshot;
 
 TumoSpectrumBandMap* tumospectrum_band_map_alloc(void);
@@ -66,6 +76,8 @@ void tumospectrum_band_map_move_cursor(TumoSpectrumBandMap* map, int8_t delta);
 void tumospectrum_band_map_cycle_zoom(TumoSpectrumBandMap* map);
 void tumospectrum_band_map_toggle_hold(TumoSpectrumBandMap* map);
 void tumospectrum_band_map_snap_to_peak(TumoSpectrumBandMap* map);
+bool tumospectrum_band_map_select_peak(TumoSpectrumBandMap* map, unsigned index);
+void tumospectrum_band_map_clear_peaks(TumoSpectrumBandMap* map);
 void tumospectrum_band_map_get_snapshot(
     const TumoSpectrumBandMap* map,
     TumoSpectrumBandMapSnapshot* snapshot);

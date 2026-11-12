@@ -12,6 +12,8 @@
 #define TUMOSPECTRUM_SET_DIR           TUMOSPECTRUM_DATA_DIR "/capture_sets"
 #define TUMOSPECTRUM_LATEST_SET        TUMOSPECTRUM_SET_DIR "/latest.tsp"
 #define TUMOSPECTRUM_LATEST_SET_REPORT TUMOSPECTRUM_REPORT_DIR "/latest_set.json"
+#define TUMOSPECTRUM_CAPTURE_SET_VERSION 3U
+#define TUMOSPECTRUM_ARCHIVE_CANCEL_FLAG (1U << 0)
 
 bool tumospectrum_storage_prepare(Storage* storage);
 bool tumospectrum_storage_save(
@@ -24,12 +26,27 @@ bool tumospectrum_storage_save(
 bool tumospectrum_storage_load_latest(Storage* storage, FuriString* output);
 bool tumospectrum_storage_save_set(
     Storage* storage,
-    const TumoSpectrumCaptureSet* capture_set,
+    TumoSpectrumCaptureSet* capture_set,
     char* profile_path,
     size_t profile_path_size,
     char* report_path,
     size_t report_path_size);
+bool tumospectrum_storage_load_set(
+    Storage* storage,
+    const char* path,
+    TumoSpectrumCaptureSet* capture_set);
 bool tumospectrum_storage_load_latest_set(Storage* storage, TumoSpectrumCaptureSet* capture_set);
+bool tumospectrum_storage_check_set_sources(Storage* storage, TumoSpectrumCaptureSet* capture_set);
+bool tumospectrum_storage_hash_source(
+    Storage* storage,
+    const char* path,
+    uint8_t digest[TUMOSPECTRUM_ARCHIVE_DIGEST_SIZE],
+    uint32_t* size);
+bool tumospectrum_storage_export_set_report(
+    Storage* storage,
+    const TumoSpectrumCaptureSet* capture_set,
+    char* report_path,
+    size_t report_path_size);
 void tumospectrum_storage_build_set_text(
     const TumoSpectrumCaptureSet* capture_set,
     FuriString* output);

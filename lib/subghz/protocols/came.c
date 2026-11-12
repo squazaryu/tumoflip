@@ -34,6 +34,7 @@ struct SubGhzProtocolDecoderCame {
 
     SubGhzBlockDecoder decoder;
     SubGhzBlockGeneric generic;
+    uint32_t te_sum;
 };
 SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderCame);
 
@@ -187,6 +188,17 @@ void* subghz_protocol_decoder_came_alloc(SubGhzEnvironment* environment) {
         sizeof(SubGhzProtocolDecoderCame), &subghz_protocol_came);
 }
 
+/* CAME 12-bit repeats at 47Te; FAAC TM uses the same cells at 35Te. Preserve
+ * the older/fast CAME window, and classify slower captures by their own clock. */
+static bool subghz_protocol_came_is_foreign_12bit(
+    SubGhzProtocolDecoderCame* instance, uint32_t gap) {
+    if(instance->decoder.decode_count_bit != CAME_12_COUNT_BIT) return false;
+    uint32_t te = instance->te_sum / 37U;
+    if(te < 340U) return false;
+    uint32_t gap_te = gap / te;
+    return gap_te < 42U || gap_te > 52U;
+}
+
 void subghz_protocol_decoder_came_feed(void* context, bool level, uint32_t duration) {
     furi_assert(context);
     SubGhzProtocolDecoderCame* instance = context;
@@ -211,6 +223,7 @@ void subghz_protocol_decoder_came_feed(void* context, bool level, uint32_t durat
             instance->decoder.parser_step = CameDecoderStepSaveDuration;
             instance->decoder.decode_data = 0;
             instance->decoder.decode_count_bit = 0;
+            instance->te_sum = duration;
         } else {
             instance->decoder.parser_step = CameDecoderStepReset;
         }
@@ -219,12 +232,13 @@ void subghz_protocol_decoder_came_feed(void* context, bool level, uint32_t durat
         if(!level) { //save interval
             if(duration >= (subghz_protocol_came_const.te_short * 4)) {
                 instance->decoder.parser_step = CameDecoderStepFoundStartBit;
-                if((instance->decoder.decode_count_bit ==
+                if(((instance->decoder.decode_count_bit ==
                     subghz_protocol_came_const.min_count_bit_for_found) ||
                    (instance->decoder.decode_count_bit == AIRFORCE_COUNT_BIT) ||
                    (instance->decoder.decode_count_bit == PRASTEL_25_COUNT_BIT) ||
                    /* 42 bit Prastel is a rolling code and lives in prastel.c */
-                   (instance->decoder.decode_count_bit == CAME_24_COUNT_BIT)) {
+                   (instance->decoder.decode_count_bit == CAME_24_COUNT_BIT)) &&
+                   !subghz_protocol_came_is_foreign_12bit(instance, duration)) {
                     instance->generic.serial = 0x0;
                     instance->generic.btn = 0x0;
 
@@ -244,6 +258,10 @@ void subghz_protocol_decoder_came_feed(void* context, bool level, uint32_t durat
         break;
     case CameDecoderStepCheckDuration:
         if(level) {
+            if(instance->decoder.decode_count_bit >= PRASTEL_25_COUNT_BIT) {
+                instance->decoder.parser_step = CameDecoderStepReset;
+                break;
+            }
             if((DURATION_DIFF(instance->decoder.te_last, subghz_protocol_came_const.te_short) <
                 subghz_protocol_came_const.te_delta) &&
                (DURATION_DIFF(duration, subghz_protocol_came_const.te_long) <
@@ -257,8 +275,11 @@ void subghz_protocol_decoder_came_feed(void* context, bool level, uint32_t durat
                  subghz_protocol_came_const.te_delta)) {
                 subghz_protocol_blocks_add_bit(&instance->decoder, 1);
                 instance->decoder.parser_step = CameDecoderStepSaveDuration;
-            } else
+            } else {
                 instance->decoder.parser_step = CameDecoderStepReset;
+                break;
+            }
+            instance->te_sum += instance->decoder.te_last + duration;
         } else {
             instance->decoder.parser_step = CameDecoderStepReset;
         }

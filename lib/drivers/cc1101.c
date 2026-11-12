@@ -1,4 +1,5 @@
 #include "cc1101.h"
+#include "cc1101_channel.h"
 #include <assert.h>
 #include <string.h>
 #include <furi_hal_cortex.h>
@@ -122,6 +123,26 @@ CC1101Status cc1101_flush_rx(const FuriHalSpiBusHandle* handle) {
 
 CC1101Status cc1101_flush_tx(const FuriHalSpiBusHandle* handle) {
     return cc1101_strobe(handle, CC1101_STROBE_SFTX);
+}
+
+void cc1101_set_channel(const FuriHalSpiBusHandle* handle, uint8_t channel) {
+    cc1101_write_reg(handle, CC1101_CHANNR, channel);
+}
+
+uint8_t cc1101_get_channel(const FuriHalSpiBusHandle* handle) {
+    uint8_t value = 0;
+    cc1101_read_reg(handle, CC1101_CHANNR, &value);
+    return value;
+}
+
+uint32_t cc1101_get_channel_frequency(const FuriHalSpiBusHandle* handle, uint8_t channel) {
+    uint8_t regs[5] = {0};
+    const uint8_t addresses[] = {CC1101_FREQ2, CC1101_FREQ1, CC1101_FREQ0, CC1101_MDMCFG0, CC1101_MDMCFG1};
+    for(size_t i = 0; i < 5U; i++) {
+        if(cc1101_read_reg(handle, addresses[i], &regs[i]).CHIP_RDYn) return 0;
+    }
+    uint32_t word = ((uint32_t)regs[0] << 16) | ((uint32_t)regs[1] << 8) | regs[2];
+    return cc1101_channel_frequency(word, regs[3], regs[4], channel);
 }
 
 uint32_t cc1101_set_frequency(const FuriHalSpiBusHandle* handle, uint32_t value) {

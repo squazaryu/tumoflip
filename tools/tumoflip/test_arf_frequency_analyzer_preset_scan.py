@@ -12,7 +12,7 @@ SUBGHZ_APP = REPO_ROOT / "applications/main/subghz/subghz.c"
 
 class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
     def test_scan_is_dynamic_bounded_and_receive_only(self) -> None:
-        worker = (CORE_ROOT / "helpers/subghz_frequency_analyzer_worker.c").read_text(
+        worker = (CORE_ROOT / "plugins/frequency_analyzer/subghz_frequency_analyzer_worker.c").read_text(
             encoding="utf-8"
         )
         probe = (CORE_ROOT / "helpers/subghz_txrx.c").read_text(encoding="utf-8")
@@ -39,7 +39,7 @@ class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
         self.assertIn("SubGhzRadioDeviceTypeInternal", probe)
 
     def test_ranked_result_can_handoff_to_standard_receiver(self) -> None:
-        view = (CORE_ROOT / "views/subghz_frequency_analyzer.c").read_text(
+        view = (CORE_ROOT / "plugins/frequency_analyzer/subghz_frequency_analyzer.c").read_text(
             encoding="utf-8"
         )
         scene = (CORE_ROOT / "scenes/subghz_scene_frequency_analyzer.c").read_text(
@@ -51,7 +51,7 @@ class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
         self.assertIn("subghz_frequency_analyzer_show_preset_rank", view)
         self.assertIn("SubGhzCustomEventViewFreqAnalPresetRx", view)
 
-        self.assertIn("subghz_frequency_analyzer_get_selected_preset", scene)
+        self.assertIn("analyzer_plugin->get_selected_preset", scene)
         self.assertIn("subghz_txrx_set_preset_internal", scene)
         self.assertIn("subghz_scene_frequency_analyzer_open_receiver", scene)
         self.assertIn("SubGhzSceneReceiver", scene)
@@ -69,7 +69,7 @@ class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
         self.assertIn("SubGhzSceneReceiver", subghz_app)
 
     def test_empty_history_slots_do_not_repeat_mhz_suffix(self) -> None:
-        view = (CORE_ROOT / "views/subghz_frequency_analyzer.c").read_text(
+        view = (CORE_ROOT / "plugins/frequency_analyzer/subghz_frequency_analyzer.c").read_text(
             encoding="utf-8"
         )
 
@@ -81,7 +81,7 @@ class ArfFrequencyAnalyzerPresetScanTest(unittest.TestCase):
         self.assertNotIn("const uint8_t icon_x = 119", view)
 
     def test_frequency_scan_restores_radio_boot_state_on_exit(self) -> None:
-        worker = (CORE_ROOT / "helpers/subghz_frequency_analyzer_worker.c").read_text(
+        worker = (CORE_ROOT / "plugins/frequency_analyzer/subghz_frequency_analyzer_worker.c").read_text(
             encoding="utf-8"
         )
         frequency_thread = re.search(

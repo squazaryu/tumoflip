@@ -17,6 +17,7 @@ enum HidSubmenuIndex {
     HidSubmenuIndexPushToTalk,
     HidSubmenuIndexRename,
     HidSubmenuIndexRemovePairing,
+    HidSubmenuIndexDevices,
 };
 
 static void hid_scene_start_submenu_callback(void* context, uint32_t index) {
@@ -27,6 +28,24 @@ static void hid_scene_start_submenu_callback(void* context, uint32_t index) {
 
 void hid_scene_start_on_enter(void* context) {
     Hid* app = context;
+#ifdef HID_TRANSPORT_BLE
+    submenu_set_header(
+        app->submenu,
+        app->peer_connected ? "Connected" : (app->peer_active ? "Waiting" : "Bluetooth Remote"));
+    if(app->peer_store.preferences.selected) {
+        char name[HID_PEER_NAME_SIZE];
+        hid_peer_label(app, &app->peer_store.preferences.peer, name, sizeof(name));
+        snprintf(app->peer_header, sizeof(app->peer_header), "Device: %s", name);
+    } else {
+        snprintf(app->peer_header, sizeof(app->peer_header), "Device");
+    }
+    submenu_add_item(
+        app->submenu,
+        app->peer_header,
+        HidSubmenuIndexDevices,
+        hid_scene_start_submenu_callback,
+        app);
+#endif
     submenu_add_item(
         app->submenu, "Keynote", HidSubmenuIndexKeynote, hid_scene_start_submenu_callback, app);
     submenu_add_item(
@@ -90,7 +109,7 @@ void hid_scene_start_on_enter(void* context) {
         app);
     submenu_add_item(
         app->submenu,
-        "Bluetooth Unpairing",
+        "Forget all devices",
         HidSubmenuIndexRemovePairing,
         hid_scene_start_submenu_callback,
         app);
@@ -106,6 +125,19 @@ bool hid_scene_start_on_event(void* context, SceneManagerEvent event) {
     bool consumed = false;
 
     if(event.type == SceneManagerEventTypeCustom) {
+#ifdef HID_TRANSPORT_BLE
+        if(event.event == HidPeerConnected || event.event == HidPeerDisconnected) {
+            submenu_set_header(
+                app->submenu,
+                app->peer_connected ? "Connected" :
+                                      (app->peer_active ? "Waiting" : "Bluetooth Remote"));
+            return true;
+        }
+        if(event.event == HidSubmenuIndexDevices) {
+            scene_manager_next_scene(app->scene_manager, HidSceneDevices);
+            return true;
+        }
+#endif
         if(event.event == HidSubmenuIndexRemovePairing) {
             scene_manager_next_scene(app->scene_manager, HidSceneUnpair);
         } else if(event.event == HidSubmenuIndexRename) {

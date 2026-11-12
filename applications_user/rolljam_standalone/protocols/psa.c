@@ -24,6 +24,7 @@ static const SubGhzBlockConst subghz_protocol_psa_const = {
 #define PSA_MAX_BITS            0x79
 #define PSA_KEY1_BITS           0x40
 #define PSA_KEY2_BITS           0x50
+#define PSA_AM_ALIGNMENT_BITS  8
 #define PSA_BUFFER_SIZE         48
 #define PSA_TE_LONG_300         0x12c
 #define PSA_UPLOAD_CAPACITY     325U
@@ -1213,17 +1214,31 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
                    (ManchesterEvent)manchester_input,
                    &instance->manchester_state,
                    &decoded_bit)) {
-                uint32_t carry = (instance->decode_data_low >> 31) & 1;
-                instance->decode_data_low = (instance->decode_data_low << 1) |
-                                            (decoded_bit ? 1 : 0);
-                instance->decode_data_high = (instance->decode_data_high << 1) | carry;
-                instance->decode_count_bit++;
+                if(instance->decode_count_bit < PSA_KEY2_BITS) {
+                    uint32_t carry = (instance->decode_data_low >> 31) & 1;
+                    instance->decode_data_low = (instance->decode_data_low << 1) |
+                                                (decoded_bit ? 1 : 0);
+                    instance->decode_data_high = (instance->decode_data_high << 1) | carry;
+                    instance->decode_count_bit++;
 
-                if(instance->decode_count_bit == PSA_KEY1_BITS) {
-                    instance->key1_low = instance->decode_data_low;
-                    instance->key1_high = instance->decode_data_high;
+                    if(instance->decode_count_bit == PSA_KEY1_BITS) {
+                        instance->key1_low = instance->decode_data_low;
+                        instance->key1_high = instance->decode_data_high;
+                        instance->decode_data_low = 0;
+                        instance->decode_data_high = 0;
+                    }
+                } else if(
+                    instance->decode_count_bit >=
+                    PSA_KEY2_BITS + PSA_AM_ALIGNMENT_BITS) {
                     instance->decode_data_low = 0;
                     instance->decode_data_high = 0;
+                    instance->decode_count_bit = 0;
+                    new_state = PSADecoderState0;
+                    instance->state = new_state;
+                    return;
+                } else {
+                    // Count, but keep alignment bits out of the 80-bit PSA payload.
+                    instance->decode_count_bit++;
                 }
             }
         } else if(level) {
@@ -1234,7 +1249,13 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
                 end_diff = duration - PSA_TE_END_500;
             }
             if(end_diff <= 99) {
-                if(instance->decode_count_bit != PSA_KEY2_BITS) {
+                if(instance->decode_count_bit != PSA_KEY2_BITS &&
+                   instance->decode_count_bit != PSA_KEY2_BITS + PSA_AM_ALIGNMENT_BITS) {
+                    instance->decode_data_low = 0;
+                    instance->decode_data_high = 0;
+                    instance->decode_count_bit = 0;
+                    new_state = PSADecoderState0;
+                    instance->state = new_state;
                     return;
                 }
 

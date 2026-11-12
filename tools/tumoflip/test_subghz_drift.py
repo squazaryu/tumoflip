@@ -51,7 +51,7 @@ class SubGhzDriftTest(unittest.TestCase):
         self.assertIn("views/subghz_read_raw.c", entries)
         self.assertIn("helpers/subghz_frequency_analyzer_worker.c", entries)
         self.assertIn("helpers/subghz_frequency_analyzer_worker.h", entries)
-        self.assertIn("scenes/subghz_scene_frequency_analyzer.c", entries)
+        self.assertNotIn("scenes/subghz_scene_frequency_analyzer.c", entries)
         self.assertIn("views/subghz_frequency_analyzer.c", entries)
         self.assertIn("views/subghz_frequency_analyzer.h", entries)
         self.assertNotIn("application.fam", entries)

@@ -1,4 +1,5 @@
 #include "ibutton_i.h"
+#include "../saved_file_inspect.h"
 
 #include <toolbox/path.h>
 #include <dolphin/dolphin.h>
@@ -123,6 +124,8 @@ iButton* ibutton_alloc(void) {
     view_dispatcher_add_view(
         ibutton->view_dispatcher, iButtonViewWidget, widget_get_view(ibutton->widget));
 
+    ibutton->variable_item_list = NULL;
+
     ibutton->loading = loading_alloc();
     view_dispatcher_add_view(
         ibutton->view_dispatcher, iButtonViewLoading, loading_get_view(ibutton->loading));
@@ -132,6 +135,11 @@ iButton* ibutton_alloc(void) {
 
 void ibutton_free(iButton* ibutton) {
     furi_assert(ibutton);
+
+    if(ibutton->variable_item_list) {
+        view_dispatcher_remove_view(ibutton->view_dispatcher, iButtonViewVariableItemList);
+        variable_item_list_free(ibutton->variable_item_list);
+    }
 
     view_dispatcher_remove_view(ibutton->view_dispatcher, iButtonViewLoading);
     loading_free(ibutton->loading);
@@ -271,6 +279,7 @@ int32_t ibutton_app(void* arg) {
     ibutton_make_app_folder(ibutton);
 
     bool key_loaded = false;
+    bool inspect = false;
 
     if((arg != NULL) && (strlen(arg) != 0)) {
         if(sscanf(arg, "RPC %lX", (uint32_t*)&ibutton->rpc) == 1) {
@@ -280,8 +289,11 @@ int32_t ibutton_app(void* arg) {
             rpc_system_app_send_started(ibutton->rpc);
 
         } else {
-            furi_string_set(ibutton->file_path, (const char*)arg);
-            key_loaded = ibutton_load_key(ibutton, true);
+            const char* path = saved_file_inspect_path(arg, &inspect);
+            if(path) {
+                furi_string_set(ibutton->file_path, path);
+                key_loaded = ibutton_load_key(ibutton, true);
+            }
         }
     }
 
@@ -295,8 +307,11 @@ int32_t ibutton_app(void* arg) {
         view_dispatcher_attach_to_gui(
             ibutton->view_dispatcher, ibutton->gui, ViewDispatcherTypeFullscreen);
         if(key_loaded) { //-V547
-            scene_manager_next_scene(ibutton->scene_manager, iButtonSceneEmulate);
-            dolphin_deed(DolphinDeedIbuttonEmulate);
+            scene_manager_next_scene(
+                ibutton->scene_manager, inspect ? iButtonSceneSavedKeyMenu : iButtonSceneEmulate);
+            if(!inspect) dolphin_deed(DolphinDeedIbuttonEmulate);
+        } else if(inspect) {
+            view_dispatcher_stop(ibutton->view_dispatcher);
         } else {
             scene_manager_next_scene(ibutton->scene_manager, iButtonSceneStart);
         }

@@ -64,13 +64,16 @@ static void BrowserItem_t_init_set(BrowserItem_t* obj, const BrowserItem_t* src)
 }
 
 static void BrowserItem_t_set(BrowserItem_t* obj, const BrowserItem_t* src) {
+    if(obj == src) return;
     obj->unsorted_idx = src->unsorted_idx;
     obj->type = src->type;
     furi_string_set(obj->name, src->name);
     furi_string_set(obj->display_name, src->display_name);
     if(src->custom_icon_data) {
+        if(!obj->custom_icon_data) obj->custom_icon_data = malloc(CUSTOM_ICON_MAX_SIZE);
         memcpy(obj->custom_icon_data, src->custom_icon_data, CUSTOM_ICON_MAX_SIZE);
     } else {
+        free(obj->custom_icon_data);
         obj->custom_icon_data = NULL;
     }
 }
@@ -139,6 +142,7 @@ typedef struct {
     bool is_root;
     bool folder_loading;
     bool list_loading;
+    bool folder_error;
     uint32_t item_cnt;
     int32_t item_idx;
     int32_t array_offset;
@@ -163,6 +167,7 @@ static bool file_browser_view_input_callback(InputEvent* event, void* context);
 
 static void
     browser_folder_open_cb(void* context, uint32_t item_cnt, int32_t file_idx, bool is_root);
+static void browser_folder_error_cb(void* context);
 static void browser_list_load_cb(void* context, uint32_t list_load_offset);
 static void browser_list_item_cb(
     void* context,
@@ -259,7 +264,13 @@ void file_browser_configure(
 
 void file_browser_start(FileBrowser* browser, FuriString* path) {
     furi_check(browser);
-    browser->worker = file_browser_worker_alloc(
+
+    // The worker queues its own first scan, so raise this before the callbacks go in:
+    // until the folder callback lands, the list on screen is stale and takes input
+    with_view_model(
+        browser->view, FileBrowserModel * model, { model->folder_loading = true; }, false);
+
+    browser->worker = file_browser_worker_alloc_deferred(
         path,
         browser->base_path,
         browser->ext_filter,
@@ -267,9 +278,11 @@ void file_browser_start(FileBrowser* browser, FuriString* path) {
         browser->hide_dot_files);
     file_browser_worker_set_callback_context(browser->worker, browser);
     file_browser_worker_set_folder_callback(browser->worker, browser_folder_open_cb);
+    file_browser_worker_set_folder_error_callback(browser->worker, browser_folder_error_cb);
     file_browser_worker_set_list_callback(browser->worker, browser_list_load_cb);
     file_browser_worker_set_item_callback(browser->worker, browser_list_item_cb);
     file_browser_worker_set_long_load_callback(browser->worker, browser_long_load_cb);
+    file_browser_worker_start(browser->worker);
 }
 
 void file_browser_stop(FileBrowser* browser) {
@@ -284,6 +297,9 @@ void file_browser_stop(FileBrowser* browser) {
             model->item_idx = 0;
             model->array_offset = 0;
             model->list_offset = 0;
+            model->folder_loading = false;
+            model->list_loading = false;
+            model->folder_error = false;
         },
         false);
 }
@@ -391,11 +407,35 @@ static void
             model->is_root = is_root;
             model->list_loading = true;
             model->folder_loading = false;
+            model->folder_error = false;
         },
         false);
     browser_update_offset(browser);
 
     file_browser_worker_load(browser->worker, load_offset, ITEM_LIST_LEN_MAX);
+}
+
+static void browser_folder_error_cb(void* context) {
+    furi_check(context);
+    FileBrowser* browser = (FileBrowser*)context;
+
+    // Drop stale/partial rows and retain only the real parent row, if any.
+    browser_list_load_cb(browser, 0);
+
+    with_view_model(
+        browser->view,
+        FileBrowserModel * model,
+        {
+            model->folder_error = true;
+            model->folder_loading = false;
+            model->list_loading = false;
+            // Drop the count the failed listing was going to fill: the rows it promises
+            // can never arrive, and a row that is not in the array cannot be selected
+            model->item_cnt = (model->is_root) ? 0 : 1;
+            model->item_idx = 0;
+            model->list_offset = 0;
+        },
+        true);
 }
 
 static void browser_list_load_cb(void* context, uint32_t list_load_offset) {
@@ -486,7 +526,8 @@ static void browser_list_item_cb(
             {
                 if(model->item_cnt <= BROWSER_SORT_THRESHOLD) {
                     FuriString* selected = NULL;
-                    if(model->item_idx > 0) {
+                    if((model->item_idx > 0) &&
+                       ((size_t)model->item_idx < items_array_size(model->items))) {
                         selected = furi_string_alloc_set(
                             items_array_get(model->items, model->item_idx)->name);
                     }
@@ -629,7 +670,7 @@ static void browser_draw_list(Canvas* canvas, FileBrowserModel* model) {
             canvas_height(canvas) / 2,
             AlignCenter,
             AlignCenter,
-            "<Empty>");
+            model->folder_error ? "Cannot read folder" : "<Empty>");
     }
 
     furi_string_free(filename);

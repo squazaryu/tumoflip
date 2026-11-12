@@ -77,6 +77,8 @@ const SubGhzDeviceInterconnect subghz_device_cc1101_ext_interconnect = {
     .is_frequency_valid = subghz_device_cc1101_ext_is_frequency_valid,
     .set_async_mirror_pin = subghz_device_cc1101_ext_set_async_mirror_pin,
     .get_data_gpio = subghz_device_cc1101_ext_get_data_gpio,
+    .set_channel = subghz_device_cc1101_ext_set_channel,
+    .get_channel = subghz_device_cc1101_ext_get_channel,
 
     .set_tx = subghz_device_cc1101_ext_tx,
     .flush_tx = subghz_device_cc1101_ext_flush_tx,

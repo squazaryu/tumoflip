@@ -1,0 +1,55 @@
+"""Check each FAL against the resolver actually used by its host."""
+import argparse
+import csv
+from pathlib import Path
+import re
+import subprocess
+
+try:
+    from .validate_release import PROTOCOL_PACKS
+except ImportError:
+    from validate_release import PROTOCOL_PACKS
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def validate(build, nm):
+    table = (ROOT / "applications/main/subghz/api/subghz_app_api_table_i.h").read_text()
+    private = set(re.findall(r"API_(?:METHOD|VARIABLE)\(\s*(\w+)\s*,", table))
+    with (ROOT / "targets/f7/api_symbols.csv").open() as stream:
+        public = {row[2] for row in csv.reader(stream)
+                  if len(row) >= 3 and row[0] in ("Function", "Variable") and row[1] == "+"}
+    defined = subprocess.check_output([nm, "--defined-only", str(build / "firmware.elf")], text=True)
+    definitions = {line.split()[-1] for line in defined.splitlines() if line.split()}
+    missing_exports = private - definitions
+    if missing_exports:
+        raise ValueError(f"Host declarations missing from resident ELF: {sorted(missing_exports)}")
+    for app in ("subghz_frequency_analyzer", "subghz_add_manually", "subghz_workspaces"):
+        output = subprocess.check_output(
+            [nm, "-u", str(build / ".extapps" / (app + ".fal"))], text=True)
+        imports = {line.split()[-1] for line in output.splitlines() if line.split()}
+        missing = imports - public - private
+        if missing:
+            raise ValueError(f"{app}: unresolved imports {sorted(missing)}")
+        print(f"{app}: {len(imports)} imports resolved, {len(imports & private)} via Sub-GHz host")
+
+    # ProtocolPackRegistry passes only firmware_api_interface, not the feature
+    # host's composite resolver. Private feature exports cannot satisfy a FAL here.
+    for filename in sorted(PROTOCOL_PACKS):
+        artifact = build / ".extapps" / filename
+        if not artifact.is_file():
+            raise ValueError(f"Missing protocol artifact: {filename}")
+        output = subprocess.check_output([nm, "-u", str(artifact)], text=True)
+        imports = {line.split()[-1] for line in output.splitlines() if line.split()}
+        missing = imports - public
+        if missing:
+            raise ValueError(f"{filename}: imports outside public firmware resolver {sorted(missing)}")
+        print(f"{filename}: {len(imports)} imports resolved by public firmware API")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--build", type=Path, default=ROOT / "build/f7-firmware-C")
+    parser.add_argument("--nm", default=str(ROOT / "toolchain/current/bin/arm-none-eabi-nm"))
+    args = parser.parse_args()
+    validate(args.build, args.nm)

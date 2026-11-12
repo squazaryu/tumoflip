@@ -6,7 +6,11 @@
 #include <lib/subghz/subghz_keystore.h>
 #include <lib/subghz/subghz_file_encoder_worker.h>
 #include <lib/subghz/protocols/protocol_items.h>
+#include <lib/subghz/protocols/faac_slh.h>
+#include <lib/subghz/protocols/keeloq_common.h>
 #include <lib/subghz/protocols/kia_v1.h>
+#include <lib/subghz/environment.h>
+#include <gui/modules/loading.h>
 #include <flipper_format/flipper_format_i.h>
 #include <lib/subghz/devices/devices.h>
 #include <lib/subghz/devices/cc1101_configs.h>
@@ -66,10 +70,14 @@ static void subghz_test_deinit(void) {
 
 static bool subghz_decoder_test(const char* path, const char* name_decoder) {
     subghz_test_decoder_count = 0;
+    subghz_receiver_reset(receiver_handler);
     uint32_t test_start = furi_get_tick();
 
     SubGhzProtocolDecoderBase* decoder =
         subghz_receiver_search_decoder_base_by_name(receiver_handler, name_decoder);
+    if(!decoder) {
+        printf("Test decoder %s: not among the receiver's decodable protocols\r\n", name_decoder);
+    }
 
     if(decoder) {
         file_worker_encoder_handler = subghz_file_encoder_worker_alloc();
@@ -77,19 +85,18 @@ static bool subghz_decoder_test(const char* path, const char* name_decoder) {
             // the worker needs a file in order to open and read part of the file
             furi_delay_ms(100);
 
-            LevelDuration level_duration;
             while(furi_get_tick() - test_start < TEST_TIMEOUT) {
-                level_duration =
+                LevelDuration level_duration =
                     subghz_file_encoder_worker_get_level_duration(file_worker_encoder_handler);
-                if(!level_duration_is_reset(level_duration)) {
-                    bool level = level_duration_get_level(level_duration);
-                    uint32_t duration = level_duration_get_duration(level_duration);
-                    // Yield, to load data inside the worker
-                    furi_thread_yield();
-                    decoder->protocol->decoder->feed(decoder, level, duration);
-                } else {
-                    break;
-                }
+                // Let the worker refill: a wait means this loop drained its buffer first, and
+                // leaves the duration field uninitialised. End of file arrives as a reset.
+                furi_thread_yield();
+                if(level_duration_is_wait(level_duration)) continue;
+                if(level_duration_is_reset(level_duration)) break;
+
+                bool level = level_duration_get_level(level_duration);
+                uint32_t duration = level_duration_get_duration(level_duration);
+                decoder->protocol->decoder->feed(decoder, level, duration);
             }
             furi_delay_ms(10);
         }
@@ -102,9 +109,12 @@ static bool subghz_decoder_test(const char* path, const char* name_decoder) {
     if(furi_get_tick() - test_start > TEST_TIMEOUT) {
         printf("Test decoder %s ERROR TimeOut\r\n", name_decoder);
         return false;
-    } else {
-        return subghz_test_decoder_count ? true : false;
     }
+    if(subghz_test_decoder_count == 0) {
+        printf("Test decoder %s decoded nothing\r\n", name_decoder);
+        return false;
+    }
+    return true;
 }
 
 static bool subghz_decode_random_test(const char* path) {
@@ -117,19 +127,18 @@ static bool subghz_decode_random_test(const char* path) {
         // the worker needs a file in order to open and read part of the file
         furi_delay_ms(100);
 
-        LevelDuration level_duration;
         while(furi_get_tick() - test_start < TEST_TIMEOUT * 10) {
-            level_duration =
+            LevelDuration level_duration =
                 subghz_file_encoder_worker_get_level_duration(file_worker_encoder_handler);
-            if(!level_duration_is_reset(level_duration)) {
-                bool level = level_duration_get_level(level_duration);
-                uint32_t duration = level_duration_get_duration(level_duration);
-                // Yield, to load data inside the worker
-                furi_thread_yield();
-                subghz_receiver_decode(receiver_handler, level, duration);
-            } else {
-                break;
-            }
+            // Let the worker refill: a wait leaves its duration field uninitialised, and feeding
+            // that garbage would move this count, which is the whole result of this test
+            furi_thread_yield();
+            if(level_duration_is_wait(level_duration)) continue;
+            if(level_duration_is_reset(level_duration)) break;
+
+            bool level = level_duration_get_level(level_duration);
+            uint32_t duration = level_duration_get_duration(level_duration);
+            subghz_receiver_decode(receiver_handler, level, duration);
         }
         furi_delay_ms(10);
         if(subghz_file_encoder_worker_is_running(file_worker_encoder_handler)) {
@@ -141,15 +150,22 @@ static bool subghz_decode_random_test(const char* path) {
     if(furi_get_tick() - test_start > TEST_TIMEOUT * 10) {
         printf("Random test ERROR TimeOut\r\n");
         return false;
-    } else if(subghz_test_decoder_count == TEST_RANDOM_COUNT_PARSE) {
-        return true;
-    } else {
-        return false;
     }
+    if(subghz_test_decoder_count == TEST_RANDOM_COUNT_PARSE) {
+        return true;
+    }
+    // On stdout like the other failures here: the FURI_LOG_D above is off at the default log
+    // level anyway, and TEST_RANDOM_COUNT_PARSE cannot be retuned without seeing this number
+    printf(
+        "Random test decoded %d signals, expected %d\r\n",
+        subghz_test_decoder_count,
+        TEST_RANDOM_COUNT_PARSE);
+    return false;
 }
 
 static bool subghz_encoder_test(const char* path) {
     subghz_test_decoder_count = 0;
+    subghz_receiver_reset(receiver_handler);
     uint32_t test_start = furi_get_tick();
     FuriString* temp_str;
     temp_str = furi_string_alloc();
@@ -175,28 +191,68 @@ static bool subghz_encoder_test(const char* path) {
         }
         file_load = true;
     } while(false);
+    SubGhzTransmitter* transmitter = NULL;
     if(file_load) {
-        SubGhzTransmitter* transmitter =
+        transmitter =
             subghz_transmitter_alloc_init(environment_handler, furi_string_get_cstr(temp_str));
-        subghz_transmitter_deserialize(transmitter, fff_data_file);
+        if(!transmitter) {
+            // Guarded, not asserted: the deserialize below furi_checks it, which would take the
+            // rest of the suite down with this one test
+            printf(
+                "Test encoder %s: no encoder for this protocol\r\n",
+                furi_string_get_cstr(temp_str));
+        }
+    }
+    if(transmitter) {
+        SubGhzProtocolStatus status = subghz_transmitter_deserialize(transmitter, fff_data_file);
+        if(status != SubGhzProtocolStatusOk) {
+            // Leaves is_running false, so the transmitter yields nothing and the round trip
+            // fails without saying that the fixture, not the encoder, is what broke
+            printf(
+                "Test encoder %s: deserialize failed, status %d\r\n",
+                furi_string_get_cstr(temp_str),
+                status);
+        }
 
         SubGhzProtocolDecoderBase* decoder = subghz_receiver_search_decoder_base_by_name(
             receiver_handler, furi_string_get_cstr(temp_str));
+        if(!decoder) {
+            printf(
+                "Test encoder %s: not among the receiver's decodable protocols\r\n",
+                furi_string_get_cstr(temp_str));
+        }
 
         if(decoder) {
-            LevelDuration level_duration;
+            // Mirror furi_hal_subghz_async_tx_middleware_get_duration(): same-level durations
+            // reach the radio merged. Legrand's sync low runs straight into the leading low of
+            // its first key bit, and dooya and revers_rb2 end a frame on the low that the next
+            // repeat's first low continues - none of the three sync without the merge.
+            // Its dropping of a leading and a trailing low is not mirrored: the carrier is off
+            // either side of a burst anyway, so a receiver sees both.
+            bool pending_level = false;
+            uint32_t pending_duration = 0;
             while(furi_get_tick() - test_start < TEST_TIMEOUT) {
-                level_duration = subghz_transmitter_yield(transmitter);
-                if(!level_duration_is_reset(level_duration)) {
-                    bool level = level_duration_get_level(level_duration);
-                    uint32_t duration = level_duration_get_duration(level_duration);
-                    decoder->protocol->decoder->feed(decoder, level, duration);
-                } else {
+                LevelDuration level_duration = subghz_transmitter_yield(transmitter);
+                if(level_duration_is_reset(level_duration)) {
                     break;
                 }
+
+                bool level = level_duration_get_level(level_duration);
+                if((pending_duration != 0) && (level != pending_level)) {
+                    decoder->protocol->decoder->feed(decoder, pending_level, pending_duration);
+                    pending_duration = 0;
+                }
+                pending_level = level;
+                pending_duration += level_duration_get_duration(level_duration);
+            }
+
+            if(pending_duration != 0) {
+                decoder->protocol->decoder->feed(decoder, pending_level, pending_duration);
             }
             furi_delay_ms(10);
         }
+    }
+    if(transmitter) {
         subghz_transmitter_free(transmitter);
     }
     flipper_format_free(fff_data_file);
@@ -204,6 +260,10 @@ static bool subghz_encoder_test(const char* path) {
     if(furi_get_tick() - test_start > TEST_TIMEOUT) {
         printf("Test encoder %s ERROR TimeOut\r\n", furi_string_get_cstr(temp_str));
         subghz_test_decoder_count = 0;
+    } else if(subghz_test_decoder_count == 0) {
+        printf(
+            "Test encoder %s: its own decoder read nothing back\r\n",
+            furi_string_get_cstr(temp_str));
     }
     furi_string_free(temp_str);
 
@@ -396,6 +456,155 @@ MU_TEST(subghz_decoder_faac_slh_test) {
         subghz_decoder_test(
             EXT_PATH("unit_tests/subghz/faac_slh_raw.sub"), SUBGHZ_PROTOCOL_FAAC_SLH_NAME),
         "Test decoder " SUBGHZ_PROTOCOL_FAAC_SLH_NAME " error\r\n");
+}
+
+static void
+    subghz_test_add_faac_learning_key(SubGhzKeystore* keystore, const char* name, uint64_t key) {
+    SubGhzKey* entry = SubGhzKeyArray_push_raw(*subghz_keystore_get_data(keystore));
+    entry->name = furi_string_alloc_set(name);
+    entry->key = key;
+    entry->type = KEELOQ_LEARNING_FAAC;
+}
+
+static FlipperFormat* subghz_test_faac_slh_file(
+    SubGhzEnvironment* environment,
+    const char* key_manufacturer,
+    const char* file_manufacturer,
+    uint32_t counter) {
+    const uint32_t seed = 0x89ABCDEF;
+    uint8_t seed_data[sizeof(seed)] = {0};
+    for(size_t i = 0; i < sizeof(seed_data); i++) {
+        seed_data[sizeof(seed_data) - i - 1] = (uint8_t)(seed >> (i * 8));
+    }
+
+    SubGhzRadioPreset preset = {
+        .name = furi_string_alloc_set("AM650"),
+        .frequency = 433920000,
+    };
+    SubGhzTransmitter* transmitter =
+        subghz_transmitter_alloc_init(environment, SUBGHZ_PROTOCOL_FAAC_SLH_NAME);
+    FlipperFormat* file = flipper_format_string_alloc();
+    bool allow_zero_seed = true;
+    bool valid = transmitter && file &&
+                 subghz_protocol_faac_slh_create_data(
+                     subghz_transmitter_get_protocol_instance(transmitter),
+                     file,
+                     0x0123456,
+                     0x08,
+                     counter,
+                     seed,
+                     key_manufacturer,
+                     &preset);
+    if(valid) {
+        valid = flipper_format_write_hex(file, "Seed", seed_data, sizeof(seed_data)) &&
+                flipper_format_write_bool(file, "AllowZeroSeed", &allow_zero_seed, 1);
+    }
+    if(valid && file_manufacturer) {
+        valid = flipper_format_write_string_cstr(file, "Manufacture", file_manufacturer);
+    }
+
+    furi_string_free(preset.name);
+    if(transmitter) subghz_transmitter_free(transmitter);
+    if(!valid) {
+        flipper_format_free(file);
+        return NULL;
+    }
+
+    return file;
+}
+
+MU_TEST(subghz_decoder_faac_slh_manufacturer_metadata_test) {
+    const uint64_t faac_test_key = 0x0123456789ABCDEF;
+    const uint32_t test_counter = 0x12344;
+
+    SubGhzEnvironment* environment = subghz_environment_alloc();
+    subghz_environment_set_protocol_registry(environment, &subghz_protocol_registry);
+    SubGhzKeystore* keystore = subghz_environment_get_keystore(environment);
+    subghz_test_add_faac_learning_key(keystore, "FAAC_SLH", faac_test_key);
+
+    SubGhzReceiver* receiver = subghz_receiver_alloc_init(environment);
+    subghz_receiver_set_filter(receiver, SubGhzProtocolFlag_Decodable);
+    SubGhzProtocolDecoderBase* decoder =
+        subghz_receiver_search_decoder_base_by_name(receiver, SUBGHZ_PROTOCOL_FAAC_SLH_NAME);
+    mu_check(decoder != NULL);
+
+    FuriString* output = furi_string_alloc();
+    FlipperFormat* input =
+        subghz_test_faac_slh_file(environment, "Genius", "Genius", test_counter);
+    mu_check(input != NULL);
+    mu_assert_int_eq(
+        SubGhzProtocolStatusOk, subghz_protocol_decoder_base_deserialize(decoder, input));
+
+    mu_check(subghz_protocol_decoder_base_get_string(decoder, output));
+    mu_check(furi_string_search_str(output, "Genius") != FURI_STRING_FAILURE);
+    mu_check(furi_string_search_str(output, "Cnt:12344") != FURI_STRING_FAILURE);
+
+    FlipperFormat* saved = flipper_format_string_alloc();
+    FuriString* saved_manufacturer = furi_string_alloc();
+    SubGhzRadioPreset preset = {
+        .name = furi_string_alloc_set("AM650"),
+        .frequency = 433920000,
+    };
+    mu_assert_int_eq(
+        SubGhzProtocolStatusOk, subghz_protocol_decoder_base_serialize(decoder, saved, &preset));
+    mu_check(flipper_format_rewind(saved));
+    mu_check(flipper_format_read_string(saved, "Manufacture", saved_manufacturer));
+    mu_assert_string_eq("Genius", furi_string_get_cstr(saved_manufacturer));
+
+    FlipperFormat* legacy_input =
+        subghz_test_faac_slh_file(environment, "FAAC_SLH", NULL, test_counter);
+    mu_check(legacy_input != NULL);
+    mu_assert_int_eq(
+        SubGhzProtocolStatusOk, subghz_protocol_decoder_base_deserialize(decoder, legacy_input));
+    furi_string_reset(output);
+    mu_check(subghz_protocol_decoder_base_get_string(decoder, output));
+    mu_check(furi_string_search_str(output, "Genius") == FURI_STRING_FAILURE);
+    mu_check(furi_string_search_str(output, "Cnt:12344") != FURI_STRING_FAILURE);
+
+    FlipperFormat* legacy_saved = flipper_format_string_alloc();
+    mu_assert_int_eq(
+        SubGhzProtocolStatusOk,
+        subghz_protocol_decoder_base_serialize(decoder, legacy_saved, &preset));
+    mu_check(flipper_format_rewind(legacy_saved));
+    mu_check(!flipper_format_read_string(legacy_saved, "Manufacture", saved_manufacturer));
+
+    SubGhzTransmitter* valid_encoder =
+        subghz_transmitter_alloc_init(environment, SUBGHZ_PROTOCOL_FAAC_SLH_NAME);
+    mu_assert_int_eq(SubGhzProtocolStatusOk, subghz_transmitter_deserialize(valid_encoder, input));
+    subghz_transmitter_free(valid_encoder);
+
+    furi_string_free(preset.name);
+    furi_string_free(saved_manufacturer);
+    flipper_format_free(legacy_saved);
+    flipper_format_free(legacy_input);
+    flipper_format_free(saved);
+    flipper_format_free(input);
+    subghz_receiver_free(receiver);
+
+    SubGhzTransmitter* unknown_encoder =
+        subghz_transmitter_alloc_init(environment, SUBGHZ_PROTOCOL_FAAC_SLH_NAME);
+    FlipperFormat* unknown_manufacturer =
+        subghz_test_faac_slh_file(environment, "Genius", "Unavailable manufacturer", test_counter);
+    mu_check(unknown_manufacturer != NULL);
+    mu_assert_int_not_eq(
+        SubGhzProtocolStatusOk,
+        subghz_transmitter_deserialize(unknown_encoder, unknown_manufacturer));
+    subghz_transmitter_free(unknown_encoder);
+    flipper_format_free(unknown_manufacturer);
+
+    furi_string_free(output);
+    subghz_environment_free(environment);
+}
+
+MU_TEST(subghz_loading_label_api_export_test) {
+    Loading* loading = loading_alloc();
+    mu_check(loading != NULL);
+
+    loading_set_text(loading, "Testing public loading label");
+    loading_set_progress(loading, 0.5f);
+    loading_reset_progress(loading);
+
+    loading_free(loading);
 }
 
 MU_TEST(subghz_decoder_gate_tx_test) {
@@ -968,6 +1177,8 @@ MU_TEST_SUITE(subghz) {
     MU_RUN_TEST(subghz_decoder_came_test);
     MU_RUN_TEST(subghz_decoder_came_twee_test);
     MU_RUN_TEST(subghz_decoder_faac_slh_test);
+    MU_RUN_TEST(subghz_decoder_faac_slh_manufacturer_metadata_test);
+    MU_RUN_TEST(subghz_loading_label_api_export_test);
     MU_RUN_TEST(subghz_decoder_gate_tx_test);
     MU_RUN_TEST(subghz_decoder_hormann_hsm_test);
     MU_RUN_TEST(subghz_decoder_ido_test);

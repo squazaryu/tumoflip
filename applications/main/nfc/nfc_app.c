@@ -194,12 +194,12 @@ NfcApp* nfc_app_alloc(void) {
     view_dispatcher_add_view(
         instance->view_dispatcher, NfcViewLoading, loading_get_view(instance->loading));
 
-    // Loading with label
-    instance->loading_label = loading_label_alloc();
+    // Separate Loading instance keeps a labelled progress state isolated from the plain spinner.
+    instance->loading_label = loading_alloc();
     view_dispatcher_add_view(
         instance->view_dispatcher,
         NfcViewLoadingLabel,
-        loading_label_get_view(instance->loading_label));
+        loading_get_view(instance->loading_label));
 
     // Text Input
     instance->text_input = text_input_alloc();
@@ -284,7 +284,7 @@ void nfc_app_free(NfcApp* instance) {
 
     // Loading with label
     view_dispatcher_remove_view(instance->view_dispatcher, NfcViewLoadingLabel);
-    loading_label_free(instance->loading_label);
+    loading_free(instance->loading_label);
 
     // TextInput
     view_dispatcher_remove_view(instance->view_dispatcher, NfcViewTextInput);
@@ -593,8 +593,16 @@ void nfc_show_loading_popup(void* context, bool show) {
 
 void nfc_show_loading_label_popup(void* context, const char* text, bool show) {
     NfcApp* nfc = context;
-    if(show) loading_label_set_text(nfc->loading_label, text);
+    if(show) {
+        loading_reset_progress(nfc->loading_label);
+        loading_set_text(nfc->loading_label, text);
+    }
     nfc_show_loading_view(nfc, NfcViewLoadingLabel, show);
+}
+
+void nfc_set_loading_label_progress(void* context, float progress) {
+    NfcApp* nfc = context;
+    loading_set_progress(nfc->loading_label, progress);
 }
 
 void nfc_append_filename_string_when_present(NfcApp* instance, FuriString* string) {
@@ -624,17 +632,23 @@ static bool nfc_is_hal_ready(void) {
     }
 }
 
-static void nfc_show_initial_scene_for_device(NfcApp* nfc) {
+static void nfc_show_initial_scene_for_device(NfcApp* nfc, bool inspect_only) {
     NfcProtocol prot = nfc_device_get_protocol(nfc->nfc_device);
-    uint32_t scene = nfc_protocol_support_has_feature(
-                         prot, nfc, NfcProtocolFeatureEmulateFull | NfcProtocolFeatureEmulateUid) ?
-                         NfcSceneEmulate :
-                         NfcSceneSavedMenu;
+    uint32_t scene =
+        !inspect_only &&
+                nfc_protocol_support_has_feature(
+                    prot, nfc, NfcProtocolFeatureEmulateFull | NfcProtocolFeatureEmulateUid) ?
+            NfcSceneEmulate :
+            NfcSceneSavedMenu;
     // Load plugins (parsers) in case if we are in the saved menu
     if(scene == NfcSceneSavedMenu) {
         nfc_show_loading_popup(nfc, true);
         nfc_supported_cards_load_cache(nfc->nfc_supported_cards);
         nfc_show_loading_popup(nfc, false);
+    } else {
+        // Launching straight into emulation skips the saved menu, and with it the only
+        // place this deed was recorded
+        dolphin_deed(DolphinDeedNfcEmulate);
     }
     scene_manager_next_scene(nfc->scene_manager, scene);
 }
@@ -681,9 +695,10 @@ int32_t nfc_app(void* p) {
             view_dispatcher_attach_to_gui(
                 nfc->view_dispatcher, nfc->gui, ViewDispatcherTypeFullscreen);
 
-            furi_string_set(nfc->file_path, args);
+            const bool inspect_only = strncmp(args, "inspect:", 8) == 0;
+            furi_string_set(nfc->file_path, inspect_only ? args + 8 : args);
             if(nfc_load_file(nfc, nfc->file_path, true)) {
-                nfc_show_initial_scene_for_device(nfc);
+                nfc_show_initial_scene_for_device(nfc, inspect_only);
             } else {
                 view_dispatcher_stop(nfc->view_dispatcher);
             }

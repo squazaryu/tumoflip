@@ -1,4 +1,5 @@
 #include "infrared_remote.h"
+#include <toolbox/file_history.h>
 
 #include <m-array.h>
 
@@ -222,6 +223,10 @@ static InfraredErrorCode infrared_remote_batch_start(
             break;
         }
 
+        if(!file_history_before_write(storage, path_in)) {
+            error = InfraredErrorCodeFileOperationFailed;
+            break;
+        }
         const FS_Error status = storage_common_rename(storage, path_out, path_in);
         error = (status == FSE_OK || status == FSE_EXIST) ? InfraredErrorCodeNone :
                                                             InfraredErrorCodeFileOperationFailed;
@@ -387,6 +392,7 @@ InfraredErrorCode infrared_remote_create(InfraredRemote* remote, const char* pat
     bool success = false;
 
     do {
+        if(!file_history_before_write(storage, path)) break;
         if(!flipper_format_file_open_always(ff, path)) break;
         if(!flipper_format_write_header_cstr(ff, INFRARED_FILE_HEADER, INFRARED_FILE_VERSION))
             break;

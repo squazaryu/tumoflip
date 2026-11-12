@@ -8,6 +8,26 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReleaseWorkflowTest(unittest.TestCase):
+    def test_stable_publisher_pins_metadata_to_the_checked_out_tag_commit(self) -> None:
+        workflow=(REPO_ROOT / ".github/workflows/release.yml").read_text()
+        publish=workflow.split("- name: Publish GitHub release",1)[1]
+        self.assertIn('SOURCE_COMMIT="$(git rev-parse HEAD)"',publish)
+        self.assertIn('--target "$SOURCE_COMMIT"',publish)
+
+    def test_pr_firmware_build_uses_bounded_parallelism(self) -> None:
+        workflow = (REPO_ROOT / ".github/workflows/pr-build.yml").read_text()
+        self.assertIn("./fbt -j2 COMPACT=1 DEBUG=0", workflow)
+
+    def test_all_package_producers_build_device_library_and_history(self) -> None:
+        for name in ("pr-build.yml", "release.yml"):
+            workflow = (REPO_ROOT / ".github/workflows" / name).read_text()
+            self.assertIn("fap_device_library", workflow, name)
+            self.assertIn("fap_file_history", workflow, name)
+            self.assertIn("fap_field_tools", workflow, name)
+            self.assertIn("fap_tumo_nfc_sniffer", workflow, name)
+            self.assertIn("test_nfc_field_owner", workflow, name)
+            self.assertIn("test_field_inventory", workflow, name)
+
     def test_release_workflow_publishes_companion_packages(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text(
             encoding="utf-8"
@@ -20,8 +40,14 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("sync_readme_version.py", workflow)
         self.assertIn("heatshrink2==0.13.0", workflow)
         self.assertIn("./fbt -j2 COMPACT=1 DEBUG=0", workflow)
-        self.assertIn("updater_package fap_esp_flasher", workflow)
+        self.assertIn("updater_package fap_speaker_debug fap_esp_flasher", workflow)
+        self.assertIn("fap_lfrfid_hitags", workflow)
+        self.assertIn("test_lfrfid_bplm", workflow)
+        self.assertIn("test_lto_build", workflow)
+        self.assertIn("test_upstream_1149_rfid", workflow)
+        self.assertIn("test_arf_converter_packages", workflow)
         self.assertIn("fap_nearby_files", workflow)
+        self.assertIn("fap_lfrfid_hitags", workflow)
         self.assertIn("validate_release.py", workflow)
         self.assertIn("--write-manifest", workflow)
         self.assertIn("test_readme_version_sync.py", workflow)
@@ -32,6 +58,9 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("test_subghz_drift.py", workflow)
         self.assertIn("test_subghz_protocol_capabilities.py", workflow)
         self.assertIn("test_subghz_protocol_packs.py", workflow)
+        self.assertIn("test_desfire_light_native.py", workflow)
+        self.assertIn("test_subghz_sensor_protocols.py", workflow)
+        self.assertIn("test_embedded_plugin_stale_assets.py", workflow)
         self.assertIn("test_subghz_raw_worker_startup.py", workflow)
         self.assertIn("test_subghz_raw_profiles.py", workflow)
         self.assertIn("test_hardware_acceptance_suite.py", workflow)
@@ -66,8 +95,17 @@ class ReleaseWorkflowTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("updater_package fap_esp_flasher", workflow)
+        self.assertIn("updater_package fap_speaker_debug fap_esp_flasher", workflow)
         self.assertIn("fap_nearby_files", workflow)
+
+    def test_speaker_debug_private_dependency_is_tested_and_built(self) -> None:
+        for name in ("pr-build.yml", "release.yml"):
+            workflow = (REPO_ROOT / ".github/workflows" / name).read_text(
+                encoding="utf-8"
+            )
+            with self.subTest(workflow=name):
+                self.assertIn("fap_speaker_debug", workflow)
+                self.assertIn("test_speaker_debug_linkage", workflow)
 
     def test_subghz_architecture_is_documented_as_core_first(self) -> None:
         doc = (REPO_ROOT / "docs/subghz-architecture.md").read_text(
@@ -98,10 +136,11 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn("CI must not mark hardware-only checks as passed", workflow)
         self.assertIn("docs/hardware-regression-checklist.md", workflow)
 
-        self.assertIn("Checklist version: 2", doc)
+        self.assertIn("Checklist version: 3", doc)
         self.assertIn("Do not mark a hardware-only item as passed", doc)
         self.assertIn("Install And Identity", doc)
         self.assertIn("System Sub-GHz Internal CC1101", doc)
+        self.assertIn("TumoSpectrum Capture Sets (Dev 009-023)", doc)
         self.assertIn("External CC1101 And Module One", doc)
         self.assertIn("Protocol Packs", doc)
         self.assertIn("BLE App Bridge And Runtime", doc)

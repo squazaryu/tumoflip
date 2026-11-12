@@ -2,6 +2,8 @@
 
 #include <furi.h>
 #include <furi_hal.h>
+#include "action_duration.h"
+#include "action_wait.h"
 
 #define ACTION_SET_ERROR(_msg_fmt, ...) furi_string_printf(error, _msg_fmt, ##__VA_ARGS__)
 

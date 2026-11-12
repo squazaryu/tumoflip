@@ -1,10 +1,12 @@
 #include <bt/bt_service/bt_i.h>
 #include <cli/cli.h>
+#include <loader/loader.h>
 #include <furi.h>
 #include <furi_hal_info.h>
 #include <furi_hal_power.h>
 #include <furi_hal_version.h>
 #include <tumoflip_runtime/tumoflip_runtime.h>
+#include <tumoflip_crash_journal/crash_journal.h>
 #include "tumofabric_core.h"
 #include <storage/storage.h>
 #include <subghz_radio_broker/subghz_radio_broker.h>
@@ -22,8 +24,8 @@
 #define TUMOFLIP_RUNTIME_FABRIC_MAX         160U
 #define TUMOFLIP_RUNTIME_SESSION_OWNER_MAX  24U
 #define TUMOFLIP_RUNTIME_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
-#define TUMOFLIP_RUNTIME_CAPABILITIES                                       \
-    "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;pkg=1;radio=2;sd=1;" \
+#define TUMOFLIP_RUNTIME_CAPABILITIES                                            \
+    "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;pkg=1;radio=2;sd=1;ld=1;" \
     "fabric=1;time=1;gps=1;net=1;feat=pkg,radio,trace,twin,transfer,fabric,time,gps,net"
 
 typedef struct {
@@ -90,6 +92,61 @@ static void tumoflip_runtime_cli_print_snapshot(TumoflipRuntime* runtime) {
         snapshot.active ? snapshot.owner : "none",
         (unsigned long)snapshot.last_sequence,
         snapshot.counter);
+}
+
+static void tumoflip_runtime_format_crash(char* output, size_t output_size) {
+    if(!output || !output_size) return;
+    TumoflipCrashReport report;
+    if(!tumoflip_crash_journal_read(&report)) {
+        snprintf(output, output_size, "schema=1;status=none");
+        return;
+    }
+    int used = snprintf(
+        output,
+        output_size,
+        "schema=1;status=ok;kind=%s;app=%s;seq=%u;build=%08lX%s",
+        report.kind == TumoflipCrashKindOutOfMemory ?
+            "other" :
+            tumoflip_crash_journal_kind_name(report.kind),
+        report.app_id[0] ? report.app_id : "unknown",
+        (unsigned)report.sequence,
+        (unsigned long)report.commit,
+        report.kind == TumoflipCrashKindOutOfMemory ? ";reason=oom" : "");
+    if(used < 0 || (size_t)used >= output_size) {
+        output[0] = '\0';
+    } else if(report.has_oom_context) {
+        // Schema 1 clients accept `other` and ignore these optional fields.
+        int extra = snprintf(
+            output + used,
+            output_size - used,
+            ";thread=%s;req=%lu;free=%lu;largest=%lu;uptime_s=%lu",
+            report.oom.thread[0] ? report.oom.thread : "unknown",
+            (unsigned long)report.oom.requested,
+            (unsigned long)report.oom.free_heap,
+            (unsigned long)report.oom.largest_block,
+            (unsigned long)report.oom.uptime_s);
+        if(extra < 0 || (size_t)extra >= output_size - used) output[used] = '\0';
+    }
+}
+
+static void tumoflip_runtime_crash_cli(PipeSide* pipe, FuriString* args, void* context) {
+    UNUSED(pipe);
+    UNUSED(context);
+    FuriString* verb = furi_string_alloc();
+    const bool has_verb = args_read_string_and_trim(args, verb);
+    if(args_length(args) != 0U) {
+        printf("CRASH schema=1;status=error;error=args\r\n");
+    } else if(!has_verb || furi_string_cmp_str(verb, "show") == 0) {
+        char report[192];
+        tumoflip_runtime_format_crash(report, sizeof(report));
+        printf("CRASH %s\r\n", report);
+    } else if(furi_string_cmp_str(verb, "clear") == 0) {
+        tumoflip_crash_journal_ack();
+        printf("CRASH schema=1;status=cleared\r\n");
+    } else {
+        printf("CRASH schema=1;status=error;error=verb\r\n");
+    }
+    furi_string_free(verb);
 }
 
 static void tumoflip_runtime_cli(PipeSide* pipe, FuriString* args, void* context) {
@@ -494,10 +551,25 @@ static void
         char payload[TUMOFLIP_RUNTIME_STATUS_MAX];
         tumoflip_runtime_make_status_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "status", payload, false);
+    } else if(strcmp(command, "loader_diag") == 0) {
+        Loader* loader = furi_record_open(RECORD_LOADER);
+        FuriString* diagnostic = furi_string_alloc();
+        loader_get_last_diagnostic(loader, diagnostic);
+        tumoflip_runtime_reply(
+            runtime, event->request_id, "loader_diag", furi_string_get_cstr(diagnostic), false);
+        furi_string_free(diagnostic);
+        furi_record_close(RECORD_LOADER);
     } else if(strcmp(command, "trace") == 0) {
         char payload[TUMOFLIP_RUNTIME_TRACE_MAX];
         tumoflip_runtime_make_trace_payload(runtime, payload, sizeof(payload));
         tumoflip_runtime_reply(runtime, event->request_id, "trace", payload, false);
+    } else if(strcmp(command, "crash_report") == 0) {
+        char report[192];
+        tumoflip_runtime_format_crash(report, sizeof(report));
+        tumoflip_runtime_reply(runtime, event->request_id, "crash_report", report, false);
+    } else if(strcmp(command, "crash_ack") == 0) {
+        tumoflip_crash_journal_ack();
+        tumoflip_runtime_reply(runtime, event->request_id, "crash_ack", "ok", false);
     } else if(strcmp(command, "twin") == 0) {
         char payload[TUMOFLIP_RUNTIME_TWIN_MAX];
         tumoflip_runtime_make_twin_payload(runtime, payload, sizeof(payload));
@@ -576,6 +648,8 @@ int32_t tumoflip_runtime_srv(void* context) {
     CliRegistry* cli = furi_record_open(RECORD_CLI);
     cli_registry_add_command_ex(
         cli, "tumofabric", CliCommandFlagParallelSafe, tumoflip_runtime_cli, runtime, 1536U);
+    cli_registry_add_command_ex(
+        cli, "tumocrash", CliCommandFlagParallelSafe, tumoflip_runtime_crash_cli, runtime, 1024U);
     furi_record_close(RECORD_CLI);
 
     runtime->subscription = furi_pubsub_subscribe(

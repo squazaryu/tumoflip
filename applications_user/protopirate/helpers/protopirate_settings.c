@@ -1,5 +1,6 @@
 // helpers/protopirate_settings.c
 #include "protopirate_settings.h"
+#include "protopirate_settings_plugin.h"
 #include "protopirate_storage.h"
 #include <storage/storage.h>
 #include <flipper_format/flipper_format.h>
@@ -136,7 +137,8 @@ void protopirate_settings_load(ProtoPirateSettings* settings) {
     furi_record_close(RECORD_STORAGE);
 }
 
-void protopirate_settings_save(ProtoPirateSettings* settings) {
+static void protopirate_settings_save_plugin(
+    ProtoPirateSettings* settings, ProtoPirateSettingsCommit commit) {
     Storage* storage = furi_record_open(RECORD_STORAGE);
 
     // Ensure directory exists
@@ -220,7 +222,7 @@ void protopirate_settings_save(ProtoPirateSettings* settings) {
     flipper_format_free(ff);
 
     if(write_ok) {
-        if(!protopirate_storage_commit_temp_file(storage, tmp_path, PROTOPIRATE_SETTINGS_FILE)) {
+        if(!commit(storage, tmp_path, PROTOPIRATE_SETTINGS_FILE)) {
             FURI_LOG_E(TAG, "Failed to commit settings file");
         }
     } else if(storage_file_exists(storage, tmp_path)) {
@@ -228,4 +230,20 @@ void protopirate_settings_save(ProtoPirateSettings* settings) {
     }
 
     furi_record_close(RECORD_STORAGE);
+}
+
+static const ProtoPirateSettingsPlugin settings_plugin = {
+    .settings_size = sizeof(ProtoPirateSettings),
+    .load = protopirate_settings_load,
+    .save = protopirate_settings_save_plugin,
+};
+
+static const FlipperAppPluginDescriptor settings_plugin_descriptor = {
+    .appid = PP_SETTINGS_PLUGIN_ID,
+    .ep_api_version = PP_SETTINGS_PLUGIN_VERSION,
+    .entry_point = &settings_plugin,
+};
+
+const FlipperAppPluginDescriptor* protopirate_settings_plugin_ep(void) {
+    return &settings_plugin_descriptor;
 }

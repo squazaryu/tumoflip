@@ -1,4 +1,5 @@
 #include "check.h"
+#include "check_i.h"
 #include "common_defines.h"
 
 #include <stm32wbxx.h>
@@ -7,6 +8,8 @@
 #include <furi_hal_debug.h>
 #include <furi_hal_bt.h>
 #include <furi_hal_interrupt.h>
+#include <tumoflip_crash_journal/crash_journal.h>
+#include <toolbox/version.h>
 #include <stdio.h>
 
 #include <FreeRTOS.h>
@@ -16,6 +19,7 @@
 
 PLACE_IN_SECTION("MB_MEM2") const char* __furi_check_message = NULL;
 PLACE_IN_SECTION("MB_MEM2") uint32_t __furi_check_registers[13] = {0};
+static TumoflipOOMContext __furi_oom_context;
 
 /** Load r12 value to __furi_check_message and store registers to __furi_check_registers */
 #define GET_MESSAGE_AND_STORE_REGISTERS()               \
@@ -82,6 +86,7 @@ static void __furi_print_register_info(void) {
 }
 
 static void __furi_print_stack_info(void) {
+    if(!xTaskGetCurrentTaskHandle()) return;
     furi_log_puts("\r\n\tstack watermark: ");
     __furi_put_uint32_as_text(uxTaskGetStackHighWaterMark(NULL) * 4);
 }
@@ -123,7 +128,7 @@ static void __furi_print_name(bool isr) {
         }
         furi_log_puts("] ");
     } else {
-        const char* name = pcTaskGetName(NULL);
+        const char* name = xTaskGetCurrentTaskHandle() ? pcTaskGetName(NULL) : NULL;
         if(name == NULL) {
             furi_log_puts("[main] ");
         } else {
@@ -132,6 +137,19 @@ static void __furi_print_name(bool isr) {
             furi_log_puts("] ");
         }
     }
+}
+
+FURI_NORETURN void __furi_crash_oom(size_t requested) {
+    __disable_irq();
+    HeapStats_t stats;
+    vPortGetHeapStats(&stats);
+    __furi_oom_context.requested = requested;
+    __furi_oom_context.free_heap = stats.xAvailableHeapSpaceInBytes;
+    __furi_oom_context.largest_block = stats.xSizeOfLargestFreeBlockInBytes;
+    __furi_oom_context.uptime_s = xTaskGetTickCount() / configTICK_RATE_HZ;
+    const char* name = xTaskGetCurrentTaskHandle() ? pcTaskGetName(NULL) : NULL;
+    strncpy(__furi_oom_context.thread, name ? name : "main", TUMOFLIP_CRASH_JOURNAL_THREAD_LENGTH);
+    furi_crash("out of memory");
 }
 
 FURI_NORETURN void __furi_crash_implementation(void) {
@@ -148,6 +166,17 @@ FURI_NORETURN void __furi_crash_implementation(void) {
         __furi_check_message = "furi_check failed";
     }
 
+    bool debug = CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk;
+#ifdef FURI_NDEBUG
+    if(!debug) {
+        TumoflipCrashKind kind = tumoflip_crash_journal_classify(__furi_check_message);
+        if(kind == TumoflipCrashKindOutOfMemory && __furi_oom_context.requested)
+            tumoflip_crash_journal_record_oom(version_get_githash(NULL), &__furi_oom_context);
+        else
+            tumoflip_crash_journal_record(kind, version_get_githash(NULL));
+    }
+#endif
+
     furi_log_puts("\r\n\033[0;31m[CRASH]");
     __furi_print_name(isr);
     furi_log_puts(__furi_check_message);
@@ -161,7 +190,6 @@ FURI_NORETURN void __furi_crash_implementation(void) {
 
     // Check if debug enabled by DAP
     // https://developer.arm.com/documentation/ddi0403/d/Debug-Architecture/ARMv7-M-Debug/Debug-register-support-in-the-SCS/Debug-Halting-Control-and-Status-Register--DHCSR?lang=en
-    bool debug = CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk;
 #ifdef FURI_NDEBUG
     if(debug) {
 #endif

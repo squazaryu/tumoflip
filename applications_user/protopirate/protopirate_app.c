@@ -4,6 +4,7 @@
 #include <furi.h>
 #include <furi_hal.h>
 #include "helpers/protopirate_settings.h"
+#include <lib/subghz/subghz_rx_profiles.h>
 #include "helpers/protopirate_storage.h"
 #include "helpers/protopirate_psa_bf_host.h"
 #include "helpers/protopirate_views.h"
@@ -102,6 +103,7 @@ ProtoPirateApp* protopirate_app_alloc() {
     app->loaded_file_path = NULL;
     app->start_tx_time = 0;
     subghz_setting_load(app->setting, APP_ASSETS_PATH("setting_user"));
+    subghz_rx_profiles_init(app->setting);
 
     // Apply loaded frequency and preset, with validation
     uint32_t frequency = settings.frequency;

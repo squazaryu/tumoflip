@@ -1,6 +1,12 @@
 #include "storage_settings.h"
 
-const SubmenuSettingsHelperDescriptor descriptor_template = {
+typedef struct {
+    const char* app_name;
+    size_t options_cnt;
+    SubmenuSettingsHelperOption options[6];
+} StorageSettingsDescriptorTemplate;
+
+static const StorageSettingsDescriptorTemplate descriptor_template = {
     .app_name = "Storage",
     .options_cnt = 6,
     .options =
@@ -54,9 +60,7 @@ static StorageSettings* storage_settings_alloc(void) {
     view_dispatcher_add_view(
         app->view_dispatcher, StorageSettingsViewDialogEx, dialog_ex_get_view(app->dialog_ex));
 
-    size_t descriptor_size =
-        sizeof(SubmenuSettingsHelperDescriptor) +
-        (descriptor_template.options_cnt * sizeof(SubmenuSettingsHelperOption));
+    size_t descriptor_size = sizeof(descriptor_template);
     app->helper_descriptor = malloc(descriptor_size);
     memcpy(app->helper_descriptor, &descriptor_template, descriptor_size);
     app->settings_helper = submenu_settings_helpers_alloc(app->helper_descriptor);

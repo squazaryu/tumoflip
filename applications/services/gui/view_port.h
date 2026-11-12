@@ -92,6 +92,7 @@ void view_port_input_callback_set(
 /** Emit update signal to GUI system.
  *
  * Rendering will happen later after GUI system process signal.
+ * Requests from a covered view port are coalesced until it is drawn again.
  *
  * @param      view_port  ViewPort instance
  */

@@ -43,6 +43,11 @@ CC1101Status cc1101_read_reg(const FuriHalSpiBusHandle* handle, uint8_t reg, uin
 
 /* High level API */
 
+/** Raw channel access; caller owns SPI and validates the effective RF frequency. */
+void cc1101_set_channel(const FuriHalSpiBusHandle* handle, uint8_t channel);
+uint8_t cc1101_get_channel(const FuriHalSpiBusHandle* handle);
+uint32_t cc1101_get_channel_frequency(const FuriHalSpiBusHandle* handle, uint8_t channel);
+
 /** Reset
  *
  * @param      handle  - pointer to FuriHalSpiHandle

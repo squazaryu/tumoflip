@@ -9,4 +9,5 @@ enum SubmenuIndex {
     SubmenuIndexReadRAW,
     SubmenuIndexExtSettings,
     SubmenuIndexRadioSetting,
+    SubmenuIndexWorkspaces,
 };

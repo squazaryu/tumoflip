@@ -3,6 +3,7 @@
 #include <nfc/protocols/nfc_poller_base.h>
 
 #include <furi.h>
+#include <string.h>
 
 #define TAG "MfDesfirePoller"
 
@@ -19,7 +20,14 @@ const MfDesfireData* mf_desfire_poller_get_data(MfDesfirePoller* instance) {
 
 static MfDesfirePoller* mf_desfire_poller_alloc(Iso14443_4aPoller* iso14443_4a_poller) {
     MfDesfirePoller* instance = malloc(sizeof(MfDesfirePoller));
+    furi_check(instance);
+    memset(instance, 0, sizeof(MfDesfirePoller));
+
     instance->iso14443_4a_poller = iso14443_4a_poller;
+    instance->command_mode = NxpNativeCommandModePlain;
+    instance->session_state = MfDesfirePollerSessionStateIdle;
+    instance->state = MfDesfirePollerStateIdle;
+    instance->error = MfDesfireErrorNone;
     instance->data = mf_desfire_alloc();
     instance->tx_buffer = bit_buffer_alloc(MF_DESFIRE_BUF_SIZE);
     instance->rx_buffer = bit_buffer_alloc(MF_DESFIRE_BUF_SIZE);
@@ -52,6 +60,8 @@ static NfcCommand mf_desfire_poller_handler_idle(MfDesfirePoller* instance) {
     bit_buffer_reset(instance->tx_buffer);
     bit_buffer_reset(instance->rx_buffer);
 
+    mf_desfire_reset(instance->data);
+    instance->error = MfDesfireErrorNone;
     iso14443_4a_copy(
         instance->data->iso14443_4a_data,
         iso14443_4a_poller_get_data(instance->iso14443_4a_poller));
@@ -61,7 +71,8 @@ static NfcCommand mf_desfire_poller_handler_idle(MfDesfirePoller* instance) {
 }
 
 static NfcCommand mf_desfire_poller_handler_read_version(MfDesfirePoller* instance) {
-    instance->error = mf_desfire_poller_read_version(instance, &instance->data->version);
+    instance->error =
+        mf_desfire_poller_read_version_any_mode(instance, &instance->data->version);
     if(instance->error == MfDesfireErrorNone) {
         FURI_LOG_D(TAG, "Read version success");
         instance->state = MfDesfirePollerStateReadFreeMemory;
@@ -85,8 +96,8 @@ static NfcCommand mf_desfire_poller_handler_read_free_memory(MfDesfirePoller* in
         FURI_LOG_D(TAG, "Read free memory is not present");
         instance->state = MfDesfirePollerStateReadMasterKeySettings;
         command = NfcCommandReset;
-    } else if(instance->error == MfDesfireErrorCommandNotSupported) {
-        FURI_LOG_D(TAG, "Read free memory is unsupported");
+    } else if(mf_desfire_error_is_refusal(instance->error)) {
+        FURI_LOG_W(TAG, "Read free memory refused: %d", instance->error);
         instance->state = MfDesfirePollerStateReadMasterKeySettings;
     } else {
         FURI_LOG_E(TAG, "Failed to read free memory");
@@ -103,8 +114,8 @@ static NfcCommand mf_desfire_poller_handler_read_master_key_settings(MfDesfirePo
     if(instance->error == MfDesfireErrorNone) {
         FURI_LOG_D(TAG, "Read master key settings success");
         instance->state = MfDesfirePollerStateReadMasterKeyVersion;
-    } else if(instance->error == MfDesfireErrorAuthentication) {
-        FURI_LOG_D(TAG, "Auth is required to read master key settings and app ids");
+    } else if(mf_desfire_error_is_refusal(instance->error)) {
+        FURI_LOG_W(TAG, "Read master key settings refused: %d", instance->error);
         instance->data->master_key_settings.is_free_directory_list = false;
         instance->data->master_key_settings.max_keys = 1;
         instance->state = MfDesfirePollerStateReadMasterKeyVersion;
@@ -124,16 +135,20 @@ static NfcCommand mf_desfire_poller_handler_read_master_key_version(MfDesfirePol
         instance->data->master_key_settings.max_keys);
     if(instance->error == MfDesfireErrorNone) {
         FURI_LOG_D(TAG, "Read master key version success");
-        if(instance->data->master_key_settings.is_free_directory_list) {
-            instance->state = MfDesfirePollerStateReadApplicationIds;
-        } else {
-            instance->state = MfDesfirePollerStateReadSuccess;
-        }
+    } else if(mf_desfire_error_is_refusal(instance->error)) {
+        FURI_LOG_W(TAG, "Read master key version refused: %d", instance->error);
+        simple_array_reset(instance->data->master_key_versions);
+        instance->data->master_key_settings.max_keys = 0;
     } else {
         FURI_LOG_E(TAG, "Failed to read master key version");
         iso14443_4a_poller_halt(instance->iso14443_4a_poller);
         instance->state = MfDesfirePollerStateReadFailed;
+        return NfcCommandContinue;
     }
+
+    instance->state = instance->data->master_key_settings.is_free_directory_list ?
+                          MfDesfirePollerStateReadApplicationIds :
+                          MfDesfirePollerStateReadSuccess;
 
     return NfcCommandContinue;
 }
@@ -184,6 +199,8 @@ static NfcCommand mf_desfire_poller_handler_read_success(MfDesfirePoller* instan
     FURI_LOG_D(TAG, "Read success.");
     iso14443_4a_poller_halt(instance->iso14443_4a_poller);
     instance->mf_desfire_event.type = MfDesfirePollerEventTypeReadSuccess;
+    instance->error = MfDesfireErrorNone;
+    instance->mf_desfire_event.data->error = MfDesfireErrorNone;
     NfcCommand command = instance->callback(instance->general_event, instance->context);
     return command;
 }
@@ -247,14 +264,8 @@ static bool mf_desfire_poller_detect(NfcGenericEvent event, void* context) {
 
     if(iso14443_4a_event->type == Iso14443_4aPollerEventTypeReady) {
         do {
-            MfDesfireKeyVersion key_version = 0;
-            MfDesfireError error = mf_desfire_poller_read_key_version(instance, 0, &key_version);
-            if(error != MfDesfireErrorNone) break;
-
-            error = mf_desfire_poller_read_version(instance, &instance->data->version);
-            if(error != MfDesfireErrorNone) break;
-
-            protocol_detected = true;
+            protocol_detected = mf_desfire_poller_read_version_any_mode(
+                                    instance, &instance->data->version) == MfDesfireErrorNone;
         } while(false);
     }
 

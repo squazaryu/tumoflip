@@ -15,16 +15,19 @@ def source(relative_path: str) -> str:
 class NfcCuidLoadingTest(unittest.TestCase):
     def test_loading_label_has_balanced_app_lifecycle(self) -> None:
         app = source("applications/main/nfc/nfc_app.c")
-        allocation = app.index("instance->loading_label = loading_label_alloc();")
+        allocation = app.index("instance->loading_label = loading_alloc();")
         registration = app.index("NfcViewLoadingLabel", allocation)
+        view = app.index("loading_get_view(instance->loading_label)", registration)
         removal = app.index(
             "view_dispatcher_remove_view(instance->view_dispatcher, "
-            "NfcViewLoadingLabel);"
+            "NfcViewLoadingLabel);",
+            view,
         )
-        release = app.index("loading_label_free(instance->loading_label);")
+        release = app.index("loading_free(instance->loading_label);", removal)
 
         self.assertLess(allocation, registration)
-        self.assertLess(registration, removal)
+        self.assertLess(registration, view)
+        self.assertLess(view, removal)
         self.assertLess(removal, release)
 
     def test_cuid_scan_shows_and_hides_label_around_prepare(self) -> None:

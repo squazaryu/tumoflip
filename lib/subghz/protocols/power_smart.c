@@ -84,35 +84,15 @@ const SubGhzProtocol subghz_protocol_power_smart = {
 void* subghz_protocol_encoder_power_smart_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
     return subghz_protocol_encoder_common_alloc(
-        sizeof(SubGhzProtocolEncoderPowerSmart), &subghz_protocol_power_smart, 3, 1024);
+        sizeof(SubGhzProtocolEncoderPowerSmart), &subghz_protocol_power_smart, 3, 1040);
 }
 
 static LevelDuration
     subghz_protocol_encoder_power_smart_add_duration_to_upload(ManchesterEncoderResult result) {
-    LevelDuration data = {.duration = 0, .level = 0};
-    switch(result) {
-    case ManchesterEncoderResultShortLow:
-        data.duration = subghz_protocol_power_smart_const.te_short;
-        data.level = false;
-        break;
-    case ManchesterEncoderResultLongLow:
-        data.duration = subghz_protocol_power_smart_const.te_long;
-        data.level = false;
-        break;
-    case ManchesterEncoderResultLongHigh:
-        data.duration = subghz_protocol_power_smart_const.te_long;
-        data.level = true;
-        break;
-    case ManchesterEncoderResultShortHigh:
-        data.duration = subghz_protocol_power_smart_const.te_short;
-        data.level = true;
-        break;
-
-    default:
-        furi_crash("SubGhz: ManchesterEncoderResult is incorrect.");
-        break;
-    }
-    return level_duration_make(data.level, data.duration);
+    return subghz_protocol_encoder_common_manchester_duration(
+        result,
+        subghz_protocol_power_smart_const.te_short,
+        subghz_protocol_power_smart_const.te_long);
 }
 
 /**

@@ -6,6 +6,17 @@ import textwrap
 import unittest
 from pathlib import Path
 
+if __package__:
+    from .validate_release import (
+        PACKAGE_RELEASE_OVERLAY_FILES,
+        PACKAGE_RELEASE_OVERLAY_GROUPS,
+    )
+else:
+    from validate_release import (
+        PACKAGE_RELEASE_OVERLAY_FILES,
+        PACKAGE_RELEASE_OVERLAY_GROUPS,
+    )
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = REPO_ROOT / "applications_user/signal_workbench"
@@ -19,6 +30,9 @@ BAND_MAP_SOURCE = APP_DIR / "tumospectrum_band_map.c"
 BAND_MAP_HEADER = APP_DIR / "tumospectrum_band_map.h"
 BAND_SESSION_SOURCE = APP_DIR / "tumospectrum_band_session.c"
 STORAGE_SOURCE = APP_DIR / "tumospectrum_storage.c"
+STORAGE_HEADER = APP_DIR / "tumospectrum_storage.h"
+ARCHIVE_MODEL_SOURCE = APP_DIR / "tumospectrum_archive_model.c"
+ARCHIVE_MODEL_HEADER = APP_DIR / "tumospectrum_archive_model.h"
 APP_MANIFEST = APP_DIR / "application.fam"
 SUBGHZ_SOURCE = REPO_ROOT / "applications/main/subghz/subghz.c"
 INFRARED_SOURCE = REPO_ROOT / "applications/main/infrared/infrared_app.c"
@@ -48,6 +62,9 @@ class TumoSpectrumTest(unittest.TestCase):
         cls.band_map_header = BAND_MAP_HEADER.read_text(encoding="utf-8")
         cls.band_session = BAND_SESSION_SOURCE.read_text(encoding="utf-8")
         cls.storage = STORAGE_SOURCE.read_text(encoding="utf-8")
+        cls.storage_header = STORAGE_HEADER.read_text(encoding="utf-8")
+        cls.archive_model = ARCHIVE_MODEL_SOURCE.read_text(encoding="utf-8")
+        cls.archive_model_header = ARCHIVE_MODEL_HEADER.read_text(encoding="utf-8")
         cls.manifest = APP_MANIFEST.read_text(encoding="utf-8")
         cls.subghz = SUBGHZ_SOURCE.read_text(encoding="utf-8")
         cls.infrared = INFRARED_SOURCE.read_text(encoding="utf-8")
@@ -66,8 +83,8 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_app_migrates_in_place_without_duplicate_fap(self) -> None:
         self.assertIn('appid="signal_workbench"', self.manifest)
         self.assertIn('name="TumoSpectrum"', self.manifest)
-        self.assertIn('fap_version="3.0.0"', self.manifest)
-        self.assertIn('"TumoSpectrum 3.0"', self.source)
+        self.assertIn('fap_version="3.6.0"', self.manifest)
+        self.assertIn('"TumoSpectrum 3.6"', self.source)
         self.assertIn('fap_category="Module One/Signals"', self.manifest)
         self.assertIn(
             'fap_dist_path="apps/Module One/Signals/signal_workbench.fap"', self.manifest
@@ -100,6 +117,8 @@ class TumoSpectrumTest(unittest.TestCase):
             "gap_threshold_us",
             "histogram_similarity",
             "overall_similarity",
+            "preset_changed",
+            "protocol_changed",
             "tumospectrum_types_compatible",
         ):
             self.assertIn(required, self.analysis)
@@ -130,7 +149,8 @@ class TumoSpectrumTest(unittest.TestCase):
             '"Open Saved Infrared"',
             '"New Sub-GHz Set"',
             '"New Infrared Set"',
-            '"Latest Capture Set"',
+            '"Capture Sets"',
+            '"Browse archive"',
             '"Open TumoScope"',
             '"Protocol Profiles"',
             '"Compare Capture"',
@@ -139,6 +159,7 @@ class TumoSpectrumTest(unittest.TestCase):
             'elements_button_center(canvas, capture->status == TumoSpectrumStatusOk ? "Actions" : "Menu")',
             'elements_button_right(canvas, compare_page ? "Compare" : "Next")',
             'tumospectrum_compare_capture(app);',
+            '"Configuration differs"',
             'return tumospectrum_type_has_timings(capture->type) ? 4U : 1U;',
             "dialog_file_browser_show",
             "I_sub1_10px",
@@ -153,6 +174,12 @@ class TumoSpectrumTest(unittest.TestCase):
             "TumoSpectrumReplayStaticLike",
             "TUMOSPECTRUM_LATEST_SET_ARG",
             "TUMOSPECTRUM_PROFILES_ARG",
+            "TumoSpectrumMenuCaptureSets",
+            "TumoSpectrumCaptureSetsBrowse",
+            "tumospectrum_storage_load_set",
+            "tumospectrum_storage_check_set_sources",
+            "view_dispatcher_show_loading",
+            "furi_thread_alloc_ex(\"TumoArchive\"",
             'elements_button_center(canvas, listening ? "Stop" : "Start")',
             '"Demo" : "Delete"',
             "protocol_profile_package_delete",
@@ -160,6 +187,87 @@ class TumoSpectrumTest(unittest.TestCase):
             'if(!tumospectrum_protocol_has_demo(package)) elements_button_right(canvas, "Delete")',
         ):
             self.assertIn(required, self.source)
+
+    def test_capture_set_archive_supports_legacy_and_source_statuses(self) -> None:
+        combined = self.source + self.storage + self.storage_header + self.archive_model
+        for required in (
+            "tumospectrum_storage_load_set",
+            "tumospectrum_archive_source_status",
+            "tumospectrum_capture_set_fingerprint_source",
+            "tumospectrum_storage_hash_source",
+            "tumospectrum_storage_check_set_sources",
+            "tumospectrum_archive_path_valid",
+            "tumospectrum_archive_paths_unique",
+            "tumospectrum_storage_export_set_report",
+            "tumospectrum_write_new_file",
+            "TUMOSPECTRUM_CAPTURE_SET_VERSION 3U",
+            '"Source SHA256 1"',
+            '"Source size 1"',
+            "version != 1U && version != 2U && version != TUMOSPECTRUM_CAPTURE_SET_VERSION",
+            '"Sources: unverified"',
+            "capture_set->sources[index].status = TumoSpectrumArchiveSourceUnverified",
+        ):
+            self.assertIn(required, combined)
+
+    def test_archive_source_status_model_executes_on_host(self) -> None:
+        harness = textwrap.dedent(
+            """
+            #include "tumospectrum_archive_model.h"
+            #include <assert.h>
+            #include <stdint.h>
+
+            int main(void) {
+                uint8_t expected[TUMOSPECTRUM_ARCHIVE_DIGEST_SIZE] = {0};
+                uint8_t actual[TUMOSPECTRUM_ARCHIVE_DIGEST_SIZE] = {0};
+                expected[0] = actual[0] = 0xA5U;
+                assert(tumospectrum_archive_source_status(
+                           false, true, true, 10U, 10U, NULL, NULL) ==
+                       TumoSpectrumArchiveSourceUnverified);
+                assert(tumospectrum_archive_source_status(
+                           true, false, false, 10U, 0U, expected, NULL) ==
+                       TumoSpectrumArchiveSourceMissing);
+                assert(tumospectrum_archive_source_status(
+                           true, true, false, 10U, 10U, expected, NULL) ==
+                       TumoSpectrumArchiveSourceReadError);
+                assert(tumospectrum_archive_source_status(
+                           true, true, true, 10U, 10U, expected, actual) ==
+                       TumoSpectrumArchiveSourceUnchanged);
+                assert(tumospectrum_archive_source_status(
+                           true, true, true, 10U, 11U, expected, actual) ==
+                       TumoSpectrumArchiveSourceChanged);
+                actual[1] = 0x01U;
+                assert(tumospectrum_archive_source_status(
+                           true, true, true, 10U, 10U, expected, actual) ==
+                       TumoSpectrumArchiveSourceChanged);
+                return 0;
+            }
+            """
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source = tmp_path / "archive_model_test.c"
+            binary = tmp_path / "archive_model_test"
+            source.write_text(harness, encoding="utf-8")
+            result = subprocess.run(
+                [
+                    "clang",
+                    "-std=c11",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    "-I",
+                    str(APP_DIR),
+                    str(source),
+                    str(ARCHIVE_MODEL_SOURCE),
+                    "-o",
+                    str(binary),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            subprocess.run([str(binary)], check=True, capture_output=True, text=True)
 
     def test_profile_delete_is_bounded_and_demo_is_protected(self) -> None:
         profile_storage = (
@@ -346,13 +454,16 @@ class TumoSpectrumTest(unittest.TestCase):
     def test_reports_have_json_notebook_and_fab2_contract(self) -> None:
         for required in (
             '"schema\\\":1',
-            '"schema\\\":2',
+            '"schema\\\":3',
             '"app\\\":\\\"TumoSpectrum',
             '"kind\\\":\\\"capture_set',
             '"bitstream\\\":{',
             '"fields\\\":[',
             '"counter\\\":{',
             '"checksum\\\":{',
+            r'\"preset_changed\":%s',
+            r'\"protocol_changed\":%s',
+            'Signal similarity: %u%%',
             "TUMOSPECTRUM_NOTEBOOK_CSV",
             "tumospectrum_write_file",
             "storage_common_rename",
@@ -369,6 +480,11 @@ class TumoSpectrumTest(unittest.TestCase):
             self.assertIn("signal_workbench.fap", text)
         self.assertIn('"apps/Module One/Signals/signal_workbench.fap"', self.validator)
 
+    def test_updated_fap_can_be_released_through_module_one_packages(self) -> None:
+        package_file = "apps/Module One/Signals/signal_workbench.fap"
+        self.assertIn(package_file, PACKAGE_RELEASE_OVERLAY_FILES)
+        self.assertEqual(PACKAGE_RELEASE_OVERLAY_GROUPS[package_file], "module_one")
+
     def test_analysis_core_executes_on_host(self) -> None:
         harness = textwrap.dedent(
             """
@@ -381,6 +497,8 @@ class TumoSpectrumTest(unittest.TestCase):
                 first.status = TumoSpectrumStatusOk;
                 first.type = TumoSpectrumCaptureSubGhzRaw;
                 first.frequency_hz = 433920000U;
+                strcpy(first.preset, "AM650");
+                strcpy(first.protocol, "RAW");
                 const int32_t values[] = {
                     400, -400, 1200, -1200, 400, -8000,
                     400, -400, 1200, -1200, 400, -8000,
@@ -398,6 +516,16 @@ class TumoSpectrumTest(unittest.TestCase):
                 assert(comparison.compatible);
                 assert(comparison.likely_same);
                 assert(comparison.overall_similarity == 100U);
+                assert(!comparison.preset_changed);
+                assert(!comparison.protocol_changed);
+
+                strcpy(second.preset, "FM476");
+                strcpy(second.protocol, "Candidate A");
+                comparison = tumospectrum_compare(&first, &second);
+                assert(comparison.compatible);
+                assert(comparison.preset_changed);
+                assert(comparison.protocol_changed);
+                assert(!comparison.likely_same);
 
                 second.type = TumoSpectrumCaptureInfraredRaw;
                 comparison = tumospectrum_compare(&first, &second);
@@ -411,7 +539,7 @@ class TumoSpectrumTest(unittest.TestCase):
             source = tmp_path / "analysis_test.c"
             binary = tmp_path / "analysis_test"
             source.write_text(harness, encoding="utf-8")
-            subprocess.run(
+            result = subprocess.run(
                 [
                     "clang",
                     "-std=c11",
@@ -425,10 +553,11 @@ class TumoSpectrumTest(unittest.TestCase):
                     "-o",
                     str(binary),
                 ],
-                check=True,
+                check=False,
                 capture_output=True,
                 text=True,
             )
+            self.assertEqual(result.returncode, 0, result.stderr)
             subprocess.run([str(binary)], check=True, capture_output=True, text=True)
 
     def test_inference_core_executes_on_host(self) -> None:

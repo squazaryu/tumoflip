@@ -9,8 +9,9 @@ App(
     icon="A_Plugins_14",
     fap_icon="icon.png",
     fap_category="Module One/Diagnostics",
-    fap_version="0.2.0",
+    fap_version="0.3.0",
     fap_author="squazaryu/tumoflip",
     fap_weburl="https://github.com/squazaryu/tumoflip",
     fap_description="Safe Tumoflip release self-test and versioned report exporter.",
+    fap_libs=["mbedtls"],
 )

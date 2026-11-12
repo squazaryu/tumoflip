@@ -1,4 +1,5 @@
 import itertools
+import os
 import pathlib
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -10,6 +11,7 @@ from fbt.elfmanifest import assemble_manifest_data
 from fbt.fapassets import FileBundler
 from fbt.sdk.cache import SdkCache
 from fbt.util import resolve_real_dir_node
+from flipper.utils import is_macos_junk
 from SCons.Action import Action
 from SCons.Builder import Builder
 from SCons.Errors import UserError
@@ -17,6 +19,39 @@ from SCons.Node.FS import Entry, File
 
 _FAP_META_SECTION = ".fapmeta"
 _FAP_FILEASSETS_SECTION = ".fapassets"
+
+
+def _plugin_fal_name(app):
+    return f"{app.appid}.fal"
+
+
+def _embedded_plugin_fal_dependencies(plugins, plugin_assets_dir, hardware_target):
+    return [
+        plugin_assets_dir.File(_plugin_fal_name(plugin))
+        for plugin in plugins
+        if plugin.fal_embedded and plugin.supports_hardware_target(hardware_target)
+    ]
+
+
+def _collect_asset_tree(asset_root):
+    """Return current non-Finder file paths and the tree shape for FAP asset deps."""
+    root = pathlib.Path(asset_root)
+    files = []
+    entries = []
+
+    for directory, dirs, names in os.walk(root):
+        dirs[:] = [name for name in dirs if not is_macos_junk(name)]
+        names = [name for name in names if not is_macos_junk(name)]
+        for name in dirs:
+            relative = pathlib.Path(directory, name).relative_to(root).as_posix()
+            entries.append(("dir", relative))
+        for name in names:
+            path = pathlib.Path(directory, name)
+            relative = path.relative_to(root).as_posix()
+            files.append(str(path))
+            entries.append(("file", relative))
+
+    return sorted(files), sorted(entries)
 
 
 @dataclass
@@ -208,7 +243,7 @@ class AppBuilder:
                     )
                 else:
                     fal_path = f"apps_data/{parent_app_id}/plugins/{app_artifacts.compact.name}"
-                    deployable = True
+                    deployable = self.app.is_default_deployable
                     # If it's a plugin for a non-deployable app, don't include it in the resources
                     if parent_app := self.app._appmanager.get(parent_app_id):
                         if not parent_app.is_default_deployable:
@@ -262,12 +297,31 @@ class AppBuilder:
                 self.app_env.File(f"{self.app._apppath}/{self.app.fap_icon}"),
             )
 
-        # Add dependencies on file assets
-        for assets_dir in self.app._assets_dirs:
-            glob_res = self.app_env.GlobRecursive("*", assets_dir)
+        # The staging directory contains only installed embedded plugins.
+        # Depend on each current plugin target directly; stale .fals must not
+        # become source dependencies without a producing builder.
+        plugin_assets_root = self.app_work_dir.Dir("assets")
+        if self.app.embeds_plugins:
+            plugin_assets_dir = plugin_assets_root.Dir("plugins")
+            hardware_target = self.app_env.subst("f${TARGET_HW}")
             self.app_env.Depends(
                 app_artifacts.compact,
-                (*glob_res, assets_dir),
+                _embedded_plugin_fal_dependencies(
+                    self.app._plugins, plugin_assets_dir, hardware_target
+                ),
+            )
+
+        # Add dependencies on file assets. A sorted directory/file manifest
+        # also invalidates the FAP when an entry is added or removed.
+        for assets_dir in self.app._assets_dirs:
+            if self.app.embeds_plugins and assets_dir == plugin_assets_root:
+                asset_files, asset_entries = [], []
+            else:
+                asset_files, asset_entries = _collect_asset_tree(assets_dir.abspath)
+            asset_nodes = [self.app_env.File(path) for path in asset_files]
+            self.app_env.Depends(
+                app_artifacts.compact,
+                (*asset_nodes, self.app_env.Value(asset_entries), assets_dir),
             )
 
         # Always run the validator for the app's binary when building the app
@@ -359,7 +413,7 @@ def _embed_app_metadata_emitter(target, source, env):
 
     # Hack: change extension for fap libs
     if app.apptype == FlipperAppType.PLUGIN:
-        target[0].name = target[0].name.replace(".fap", ".fal")
+        target[0].name = _plugin_fal_name(app)
 
     app_work_dir = AppBuilder.get_app_work_dir(env, app)
     app._section_fapmeta = app_work_dir.File(_FAP_META_SECTION)

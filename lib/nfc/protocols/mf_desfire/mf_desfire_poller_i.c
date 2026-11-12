@@ -28,9 +28,17 @@ MfDesfireError mf_desfire_process_status_code(uint8_t status_code) {
         return MfDesfireErrorAuthentication;
     case NXP_NATIVE_COMMAND_STATUS_ILLEGAL_COMMAND_CODE:
         return MfDesfireErrorCommandNotSupported;
-    default:
+    case NXP_NATIVE_COMMAND_STATUS_LENGTH_ERROR:
+        // This status is also used locally when a response frame is malformed.
         return MfDesfireErrorProtocol;
+    default:
+        return MfDesfireErrorRejected;
     }
+}
+
+bool mf_desfire_error_is_refusal(MfDesfireError error) {
+    return error == MfDesfireErrorAuthentication || error == MfDesfireErrorCommandNotSupported ||
+           error == MfDesfireErrorRejected;
 }
 
 void mf_desfire_poller_set_command_mode(
@@ -64,6 +72,32 @@ MfDesfireError mf_desfire_poller_send_chunks(
     }
 
     return mf_desfire_process_status_code(status_code);
+}
+
+MfDesfireError
+    mf_desfire_poller_read_version_any_mode(MfDesfirePoller* instance, MfDesfireVersion* data) {
+    furi_check(instance);
+    furi_check(data);
+
+    const NxpNativeCommandMode original_mode = instance->command_mode;
+    MfDesfireError error = mf_desfire_poller_read_version(instance, data);
+
+    // Retry only after the card returned a deterministic refusal. Transport faults, malformed
+    // responses and parse failures do not imply that the command mode was wrong.
+    if(error != MfDesfireErrorRejected && error != MfDesfireErrorCommandNotSupported) return error;
+
+    const NxpNativeCommandMode fallback_mode =
+        original_mode == NxpNativeCommandModePlain ? NxpNativeCommandModeIsoWrapped :
+                                                     NxpNativeCommandModePlain;
+    instance->command_mode = fallback_mode;
+    error = mf_desfire_poller_read_version(instance, data);
+    if(error == MfDesfireErrorNone) {
+        FURI_LOG_I(TAG, "Command mode %d", fallback_mode);
+    } else {
+        instance->command_mode = original_mode;
+    }
+
+    return error;
 }
 
 MfDesfireError mf_desfire_poller_read_version(MfDesfirePoller* instance, MfDesfireVersion* data) {

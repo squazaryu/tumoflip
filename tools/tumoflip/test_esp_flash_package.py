@@ -103,9 +103,9 @@ class EspFlashPackageTests(unittest.TestCase):
             "app->turbospeed = (index == SubmenuIndexFlashTurbo)", manual
         )
         self.assertIn("app->turbospeed = true;", quick)
-        self.assertIn("fap_version=(1, 13)", manifest)
+        self.assertIn("fap_version=(1, 14)", manifest)
         self.assertIn(
-            '#define ESP_FLASHER_APP_VERSION "v1.13-tumoflip"',
+            '#define ESP_FLASHER_APP_VERSION "v1.14-tumoflip"',
             (APP_ROOT / "esp_flasher_app.h").read_text(encoding="utf-8"),
         )
 

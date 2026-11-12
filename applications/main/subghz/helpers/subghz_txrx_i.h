@@ -67,4 +67,14 @@ struct SubGhzTxRx {
     SubGhzProtocolFlag receiver_filter;
 
     bool debug_pin_state;
+    // Remember successful built-in registration; later TX power edits are not
+    // evidence that a user-defined preset replaced the app-owned RX profile.
+    bool rx_profile_preset_owned;
 };
+
+_Static_assert(
+    sizeof(SubGhzTxRx) ==
+        ((offsetof(SubGhzTxRx, debug_pin_state) + sizeof(bool) + _Alignof(SubGhzTxRx) - 1) /
+         _Alignof(SubGhzTxRx)) *
+            _Alignof(SubGhzTxRx),
+    "RX profile ownership must fit the existing private tail padding");

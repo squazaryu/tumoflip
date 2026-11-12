@@ -1,0 +1,17 @@
+App(
+    appid="servo_tester_plus",
+    name="Servo Tester+",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="servo_tester_plus_app",
+    requires=["gui", "dialogs", "subghz_radio_broker"],
+    stack_size=3 * 1024,
+    fap_package_only=True,
+    fap_file_assets="assets",
+    fap_dist_path="apps/GPIO/servo_tester_plus.fap",
+    fap_category="GPIO",
+    fap_icon="icon.png",
+    fap_version="1.0",
+    fap_author="M. Hasbini, Enlighten Tech, squazaryu/tumoflip",
+    fap_description="Explicitly armed 50Hz servo pulse tester with bounded session calibration and owned GPIO power.",
+)

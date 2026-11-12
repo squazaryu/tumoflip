@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <lib/toolbox/manchester_encoder.h>
 
 #include "base.h"
 
@@ -11,6 +12,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/** Private shared Manchester timing conversion; not an SDK/plugin export. */
+LevelDuration subghz_protocol_encoder_common_manchester_duration(
+    ManchesterEncoderResult result,
+    uint32_t te_short,
+    uint32_t te_long);
 
 /**
  * Shared implementations of the protocol vtable entries that are identical across protocols.
@@ -168,6 +175,9 @@ void subghz_protocol_decoder_common_reset(void* context);
  * @return hash Hash sum
  */
 uint8_t subghz_protocol_decoder_common_get_hash_data(void* context);
+
+/** Fingerprint decoded serial/counter/button for rotating-parcel protocols. */
+uint8_t subghz_protocol_decoder_common_get_hash_data_serial(void* context);
 
 /**
  * Serialize decoder data.

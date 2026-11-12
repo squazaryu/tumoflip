@@ -35,6 +35,17 @@ uint8_t subghz_custom_btn_get_original(void) {
     return custom_btn_original;
 }
 
+uint8_t subghz_custom_btn_lookup(const uint8_t (*rows)[5], size_t count) {
+    const uint8_t original = subghz_custom_btn_get_original();
+    const uint8_t direction = subghz_custom_btn_get();
+    if(direction >= SUBGHZ_CUSTOM_BTN_UP && direction <= SUBGHZ_CUSTOM_BTN_RIGHT) {
+        for(size_t i = 0; i < count; i++) {
+            if(rows[i][0] == original) return rows[i][direction];
+        }
+    }
+    return original;
+}
+
 void subghz_custom_btn_set_max(uint8_t b) {
     custom_btn_max_btns = b;
 }

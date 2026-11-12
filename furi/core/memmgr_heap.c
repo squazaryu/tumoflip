@@ -36,7 +36,9 @@
  */
 
 #include "memmgr_heap.h"
+#include "memmgr_heap_i.h"
 #include "check.h"
+#include "check_i.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -308,7 +310,7 @@ void memmgr_heap_printf_free_blocks(void) {
 
 /*-----------------------------------------------------------*/
 
-void* pvPortMalloc(size_t xWantedSize) {
+void* memmgr_heap_alloc_optional(size_t xWantedSize) {
     BlockLink_t* pxBlock;
     BlockLink_t* pxPreviousBlock;
     BlockLink_t* pxNewBlockLink;
@@ -444,13 +446,19 @@ void* pvPortMalloc(size_t xWantedSize) {
             mtCOVERAGE_TEST_MARKER();
         }
 
-        traceMALLOC(pvReturn, xAllocatedBlockSize);
+        if(pvReturn) traceMALLOC(pvReturn, xAllocatedBlockSize);
 
         /* Prevent compiler warnings when trace macros are not used. */
         (void)xAllocatedBlockSize;
     }
     (void)xTaskResumeAll();
 
+    configASSERT((((size_t)pvReturn) & (size_t)portBYTE_ALIGNMENT_MASK) == 0);
+    return pvReturn ? memset(pvReturn, 0, xToWipe) : NULL;
+}
+
+void* pvPortMalloc(size_t xToWipe) {
+    void* pvReturn = memmgr_heap_alloc_optional(xToWipe);
 #if(configUSE_MALLOC_FAILED_HOOK == 1)
     {
         if(pvReturn == NULL) {
@@ -461,10 +469,8 @@ void* pvPortMalloc(size_t xWantedSize) {
     }
 #endif /* if ( configUSE_MALLOC_FAILED_HOOK == 1 ) */
 
-    configASSERT((((size_t)pvReturn) & (size_t)portBYTE_ALIGNMENT_MASK) == 0);
-
-    furi_check(pvReturn, xWantedSize ? "out of memory" : "malloc(0)");
-    pvReturn = memset(pvReturn, 0, xToWipe);
+    if(!pvReturn && xToWipe) __furi_crash_oom(xToWipe);
+    furi_check(pvReturn, "malloc(0)");
     return pvReturn;
 }
 /*-----------------------------------------------------------*/

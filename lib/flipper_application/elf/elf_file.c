@@ -475,11 +475,15 @@ static ELFLoadSectionResult
         return ELFLoadSectionResultSuccess;
     }
 
+    if(section_header->sh_size > SIZE_MAX - 1024U) return ELFLoadSectionResultError;
     size_t safe_size = section_header->sh_size + 1024;
 
     furi_kernel_lock();
 
     if(memmgr_heap_get_max_free_block() < safe_size) {
+        elf->failed_allocation_size = safe_size;
+        elf->failure_free_heap = memmgr_get_free_heap();
+        elf->failure_max_block = memmgr_heap_get_max_free_block();
         furi_kernel_unlock();
         FURI_LOG_E(TAG, "Not enough memory to load section data");
         return ELFLoadSectionResultNoMemory;
@@ -814,7 +818,19 @@ ELFFile* elf_file_alloc(Storage* storage, const ElfApiInterface* api_interface) 
     ELFSectionDict_init(elf->sections);
     AddressCache_init(elf->trampoline_cache);
     elf->init_array_called = false;
+    elf->failed_allocation_size = 0;
+    elf->failure_free_heap = 0;
+    elf->failure_max_block = 0;
     return elf;
+}
+
+bool elf_file_get_memory_failure(
+    const ELFFile* elf, size_t* required, size_t* free_heap, size_t* max_block) {
+    if(!elf->failed_allocation_size) return false;
+    *required = elf->failed_allocation_size;
+    *free_heap = elf->failure_free_heap;
+    *max_block = elf->failure_max_block;
+    return true;
 }
 
 void elf_file_free(ELFFile* elf) {

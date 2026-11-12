@@ -429,6 +429,35 @@ uint32_t furi_hal_subghz_set_frequency(uint32_t value) {
     return real_frequency;
 }
 
+bool furi_hal_subghz_set_channel_checked(uint8_t channel) {
+    if(furi_hal_subghz.state != SubGhzStateIdle) return false;
+    furi_hal_spi_acquire(&furi_hal_spi_bus_handle_subghz);
+    uint32_t frequency = cc1101_get_channel_frequency(&furi_hal_spi_bus_handle_subghz, channel);
+    bool ok = furi_hal_subghz_is_frequency_valid(frequency) &&
+              furi_hal_subghz_is_tx_allowed(frequency);
+    if(ok) {
+        uint8_t old = cc1101_get_channel(&furi_hal_spi_bus_handle_subghz);
+        cc1101_switch_to_idle(&furi_hal_spi_bus_handle_subghz);
+        cc1101_set_channel(&furi_hal_spi_bus_handle_subghz, channel);
+        cc1101_calibrate(&furi_hal_spi_bus_handle_subghz);
+        ok = cc1101_wait_status_state(&furi_hal_spi_bus_handle_subghz, CC1101StateIDLE, 10000);
+        if(!ok) {
+            cc1101_switch_to_idle(&furi_hal_spi_bus_handle_subghz);
+            cc1101_set_channel(&furi_hal_spi_bus_handle_subghz, old);
+        }
+    }
+    furi_hal_spi_release(&furi_hal_spi_bus_handle_subghz);
+    return ok;
+}
+
+bool furi_hal_subghz_get_channel_checked(uint8_t* channel) {
+    if(!channel || furi_hal_subghz.state != SubGhzStateIdle) return false;
+    furi_hal_spi_acquire(&furi_hal_spi_bus_handle_subghz);
+    *channel = cc1101_get_channel(&furi_hal_spi_bus_handle_subghz);
+    furi_hal_spi_release(&furi_hal_spi_bus_handle_subghz);
+    return true;
+}
+
 void furi_hal_subghz_set_path(FuriHalSubGhzPath path) {
     furi_hal_spi_acquire(&furi_hal_spi_bus_handle_subghz);
     if(path == FuriHalSubGhzPath433) {

@@ -1,6 +1,7 @@
 #include "subghz_file_encoder_worker.h"
 
 #include <toolbox/stream/stream.h>
+#include <toolbox/stream/file_stream.h>
 #include <flipper_format/flipper_format.h>
 #include <flipper_format/flipper_format_i.h>
 #include <lib/subghz/devices/devices.h>
@@ -131,8 +132,11 @@ static int32_t subghz_file_encoder_worker_thread(void* context) {
     instance->is_storage_slow = false;
     Stream* stream = flipper_format_get_raw_stream(instance->flipper_format);
     do {
-        if(!flipper_format_file_open_existing(
-               instance->flipper_format, furi_string_get_cstr(instance->file_path))) {
+        const char* path = furi_string_get_cstr(instance->file_path);
+        const bool opened = instance->is_decoding ?
+                                file_stream_open(stream, path, FSAM_READ, FSOM_OPEN_EXISTING) :
+                                flipper_format_file_open_existing(instance->flipper_format, path);
+        if(!opened) {
             FURI_LOG_E(
                 TAG,
                 "Unable to open file for read: %s",

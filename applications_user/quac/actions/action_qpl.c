@@ -79,9 +79,14 @@ void action_qpl_tx(void* context, const FuriString* action_path, FuriString* err
                 if(furi_string_cmpi_str(args_tmp, "pause") == 0) {
                     processed_special_command = true;
                     uint32_t pause_length = 0;
-                    if(sscanf(furi_string_get_cstr(buffer), "%lu", &pause_length) == 1) {
+                    if(quac_duration_parse(furi_string_get_cstr(buffer), true, &pause_length)) {
                         FURI_LOG_I(TAG, "Pausing playlist for %lu ms", pause_length);
-                        furi_delay_ms(pause_length);
+                        if(pause_length) {
+                            QuacActionWait* wait = quac_action_wait_alloc(app);
+                            if(!quac_action_wait_run(wait, pause_length) && !app->action_cancelled)
+                                ACTION_SET_ERROR("Playlist: Wait failed");
+                            quac_action_wait_free(wait);
+                        }
                     } else {
                         ACTION_SET_ERROR("Playlist: Invalid or missing pause time");
                     }
@@ -103,22 +108,28 @@ void action_qpl_tx(void* context, const FuriString* action_path, FuriString* err
                 if(!strcmp(ext, ".sub")) {
                     uint32_t subghz_duration = 0;
                     // FURI_LOG_I(TAG, "SubGhz file with duration");
-                    if(sscanf(furi_string_get_cstr(buffer), "%lu", &subghz_duration) == 1) {
+                    if(quac_duration_parse(furi_string_get_cstr(buffer), false, &subghz_duration)) {
                         FURI_LOG_I(TAG, "SubGhz duration = %lu", subghz_duration);
                         app->settings.subghz_duration = subghz_duration;
+                    } else {
+                        ACTION_SET_ERROR("Playlist: Invalid Sub-GHz duration");
                     }
                 } else if(!strcmp(ext, ".rfid")) {
                     uint32_t rfid_duration = 0;
                     // FURI_LOG_I(TAG, "RFID file with duration");
-                    if(sscanf(furi_string_get_cstr(buffer), "%lu", &rfid_duration) == 1) {
+                    if(quac_duration_parse(furi_string_get_cstr(buffer), false, &rfid_duration)) {
                         FURI_LOG_I(TAG, "RFID duration = %lu", rfid_duration);
                         app->settings.rfid_duration = rfid_duration;
+                    } else {
+                        ACTION_SET_ERROR("Playlist: Invalid RFID duration");
                     }
                 } else if(!strcmp(ext, ".nfc")) {
                     uint32_t nfc_duration = 0;
-                    if(sscanf(furi_string_get_cstr(buffer), "%lu", &nfc_duration) == 1) {
+                    if(quac_duration_parse(furi_string_get_cstr(buffer), false, &nfc_duration)) {
                         FURI_LOG_I(TAG, "NFC duration = %lu", nfc_duration);
                         app->settings.nfc_duration = nfc_duration;
+                    } else {
+                        ACTION_SET_ERROR("Playlist: Invalid NFC duration");
                     }
                 } else if(!strcmp(ext, ".picopass")) {
                     uint32_t picopass_duration = 0;
@@ -130,9 +141,11 @@ void action_qpl_tx(void* context, const FuriString* action_path, FuriString* err
                     }
                 } else if(!strcmp(ext, ".ibtn")) {
                     uint32_t ibutton_duration = 0;
-                    if(sscanf(furi_string_get_cstr(buffer), "%lu", &ibutton_duration) == 1) {
+                    if(quac_duration_parse(furi_string_get_cstr(buffer), false, &ibutton_duration)) {
                         FURI_LOG_I(TAG, "iButton duration = %lu", ibutton_duration);
                         app->settings.ibutton_duration = ibutton_duration;
+                    } else {
+                        ACTION_SET_ERROR("Playlist: Invalid iButton duration");
                     }
                 }
 
@@ -142,6 +155,7 @@ void action_qpl_tx(void* context, const FuriString* action_path, FuriString* err
             furi_string_free(args_tmp);
 
             if(furi_string_size(error)) break;
+            if(app->action_cancelled) break;
 
             if(processed_special_command) {
                 continue;

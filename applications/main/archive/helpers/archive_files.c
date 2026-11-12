@@ -37,7 +37,8 @@ void archive_set_file_type(ArchiveFile_t* file, const char* path, bool is_folder
         if(is_folder) {
             file->type = ArchiveFileTypeFolder;
         } else {
-            char tmp_extension[MAX_EXT_LEN];
+            // Zeroed: path_extract_extension leaves the buffer untouched for a dotless name
+            char tmp_extension[MAX_EXT_LEN] = {0};
             path_extract_extension(file->path, tmp_extension, MAX_EXT_LEN);
             if((strcmp(tmp_extension, ".txt") == 0) || (strcmp(tmp_extension, ".md") == 0)) {
                 file->is_text_file = true;
@@ -98,11 +99,13 @@ void archive_delete_file(void* context, const char* format, ...) {
     Storage* fs_api = furi_record_open(RECORD_STORAGE);
 
     FileInfo fileinfo;
-    storage_common_stat(fs_api, furi_string_get_cstr(filename), &fileinfo);
+    const bool is_dir =
+        (storage_common_stat(fs_api, furi_string_get_cstr(filename), &fileinfo) == FSE_OK) &&
+        file_info_is_dir(&fileinfo);
 
     bool res = false;
 
-    if(file_info_is_dir(&fileinfo)) {
+    if(is_dir) {
         res = storage_simply_remove_recursive(fs_api, furi_string_get_cstr(filename));
     } else {
         res = (storage_common_remove(fs_api, furi_string_get_cstr(filename)) == FSE_OK);
@@ -110,11 +113,10 @@ void archive_delete_file(void* context, const char* format, ...) {
 
     furi_record_close(RECORD_STORAGE);
 
-    if(archive_is_favorite("%s", furi_string_get_cstr(filename))) {
-        archive_favorites_delete("%s", furi_string_get_cstr(filename));
-    }
-
     if(res) {
+        if(archive_is_favorite("%s", furi_string_get_cstr(filename))) {
+            archive_favorites_delete("%s", furi_string_get_cstr(filename));
+        }
         archive_file_array_rm_selected(browser);
     }
 
@@ -134,15 +136,17 @@ FS_Error archive_rename_copy_file_or_dir(
 
     FuriString* temp_str = furi_string_alloc_set(dst_path);
 
-    FileInfo fileinfo;
-    storage_common_stat(fs_api, src_path, &fileinfo);
-
     FS_Error error = FSE_OK;
 
     if(!path_contains_only_ascii(dst_path)) {
         error = FSE_INVALID_NAME;
     } else if(!copy && !strcmp(src_path, dst_path)) {
         error = FSE_EXIST;
+    } else if(!copy && storage_common_equivalent_path(fs_api, src_path, dst_path)) {
+        // Same entry under a different spelling, as when only the case of the name changes:
+        // the free-name search below would see the entry itself as a collision and rename to
+        // a numbered name instead, so the rename goes straight to storage.
+        error = storage_common_rename(fs_api, src_path, dst_path);
     } else {
         if(storage_common_exists(fs_api, dst_path)) {
             FuriString* filename = furi_string_alloc();
@@ -178,7 +182,7 @@ FS_Error archive_rename_copy_file_or_dir(
     }
     furi_record_close(RECORD_STORAGE);
 
-    if(!copy && archive_is_favorite("%s", src_path)) {
+    if(error == FSE_OK && !copy && archive_is_favorite("%s", src_path)) {
         archive_favorites_rename(src_path, dst_path);
     }
 

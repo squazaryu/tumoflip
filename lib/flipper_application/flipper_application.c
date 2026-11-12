@@ -63,6 +63,7 @@ FlipperApplication*
     app->ep_thread_args = NULL;
     app->assets_progress = NULL;
     app->assets_progress_context = NULL;
+    memset(&app->manifest, 0, sizeof(app->manifest));
 
     return app;
 }
@@ -139,7 +140,7 @@ static bool flipper_application_process_manifest_section(
     }
 
     return storage_file_seek(file, offset, true) &&
-           storage_file_read(file, manifest, size) == size;
+           storage_file_read(file, manifest, sizeof(*manifest)) == sizeof(*manifest);
 }
 
 // we can't use const char* as context because we will lose the const qualifier
@@ -199,7 +200,7 @@ static FlipperApplicationPreloadStatus
     if(elf_process_section(
            app->elf, ".fapmeta", flipper_application_process_manifest_section, &app->manifest) !=
        ElfProcessSectionResultSuccess) {
-        return FlipperApplicationPreloadStatusInvalidFile;
+        return FlipperApplicationPreloadStatusInvalidManifest;
     }
 
     return flipper_application_validate_manifest(app);
@@ -235,6 +236,12 @@ FlipperApplicationPreloadStatus
 const FlipperApplicationManifest* flipper_application_get_manifest(FlipperApplication* app) {
     furi_check(app);
     return &app->manifest;
+}
+
+bool flipper_application_get_memory_failure(
+    const FlipperApplication* app, size_t* required, size_t* free_heap, size_t* max_block) {
+    furi_check(app && required && free_heap && max_block);
+    return elf_file_get_memory_failure(app->elf, required, free_heap, max_block);
 }
 
 FlipperApplicationLoadStatus flipper_application_map_to_memory(FlipperApplication* app) {

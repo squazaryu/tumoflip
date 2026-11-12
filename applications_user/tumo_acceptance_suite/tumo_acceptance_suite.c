@@ -17,13 +17,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "corpus_ui.h"
 
 #define TUMO_ACCEPTANCE_DATA_DIR EXT_PATH("apps_data/tumo_acceptance_suite")
 #define TUMO_ACCEPTANCE_STORAGE_PROBE_PATH \
     EXT_PATH("apps_data/tumo_acceptance_suite/.storage_probe.tmp")
 #define TUMO_ACCEPTANCE_PACKAGE_STATE_PATH EXT_PATH(".tumoflip/package-state.txt")
 #define TUMO_ACCEPTANCE_REPORT_SCHEMA      "tumoflip.acceptance/1"
-#define TUMO_ACCEPTANCE_SUITE_VERSION      "0.2.0"
+#define TUMO_ACCEPTANCE_SUITE_VERSION      "0.3.0"
 #define TUMO_ACCEPTANCE_REPORT_PATH_SIZE   128U
 #define TUMO_ACCEPTANCE_MAX_THREAD_LINES   12U
 #define TUMO_ACCEPTANCE_DETAIL_SIZE        96U
@@ -37,6 +38,7 @@ typedef enum {
     TumoAcceptanceActionRun,
     TumoAcceptanceActionExport,
     TumoAcceptanceActionAbout,
+    TumoAcceptanceActionCorpus,
 } TumoAcceptanceAction;
 
 typedef enum {
@@ -61,6 +63,7 @@ typedef struct {
     bool self_test_ran;
     TumoAcceptanceResult storage_result;
     char storage_detail[TUMO_ACCEPTANCE_DETAIL_SIZE];
+    CorpusUi* corpus;
 } TumoAcceptanceApp;
 
 static const TumoAcceptancePathCheck tumo_acceptance_paths[] = {
@@ -551,10 +554,14 @@ static void tumo_acceptance_build_about(TumoAcceptanceApp* app) {
         "No IR/Sub-GHz TX, NFC writes, GPIO drive, OTG enable, or child app launch.");
 }
 
-static void tumo_acceptance_menu_callback(void* context, uint32_t index) {
+static bool tumo_acceptance_custom_callback(void* context, uint32_t index) {
     TumoAcceptanceApp* app = context;
+    if(corpus_ui_event(app->corpus, index)) return true;
 
     switch(index) {
+    case TumoAcceptanceActionCorpus:
+        corpus_ui_show(app->corpus);
+        return true;
     case TumoAcceptanceActionRun:
         app->self_test_ran = true;
         app->storage_result = tumo_acceptance_run_storage_test(app);
@@ -573,6 +580,16 @@ static void tumo_acceptance_menu_callback(void* context, uint32_t index) {
     }
 
     tumo_acceptance_show_text(app);
+    return true;
+}
+
+static void tumo_acceptance_menu_callback(void* context, uint32_t index) {
+    TumoAcceptanceApp* app = context;
+    view_dispatcher_send_custom_event(app->view_dispatcher, index);
+}
+
+static void tumo_acceptance_tick(void* context) {
+    corpus_ui_tick(((TumoAcceptanceApp*)context)->corpus);
 }
 
 static bool tumo_acceptance_back_callback(void* context) {
@@ -599,6 +616,10 @@ static TumoAcceptanceApp* tumo_acceptance_alloc(void) {
     strlcpy(app->storage_detail, "run safe test first", sizeof(app->storage_detail));
 
     view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
+    app->corpus = corpus_ui_alloc(app->storage, app->view_dispatcher, TumoAcceptanceViewMenu);
+    view_dispatcher_set_custom_event_callback(
+        app->view_dispatcher, tumo_acceptance_custom_callback);
+    view_dispatcher_set_tick_event_callback(app->view_dispatcher, tumo_acceptance_tick, 10);
     view_dispatcher_set_navigation_event_callback(
         app->view_dispatcher, tumo_acceptance_back_callback);
 
@@ -613,6 +634,12 @@ static TumoAcceptanceApp* tumo_acceptance_alloc(void) {
         app);
     submenu_add_item(
         app->submenu, "About", TumoAcceptanceActionAbout, tumo_acceptance_menu_callback, app);
+    submenu_add_item(
+        app->submenu,
+        "Decoder References",
+        TumoAcceptanceActionCorpus,
+        tumo_acceptance_menu_callback,
+        app);
 
     text_box_set_font(app->text_box, TextBoxFontText);
     text_box_set_focus(app->text_box, TextBoxFocusStart);
@@ -629,6 +656,7 @@ static TumoAcceptanceApp* tumo_acceptance_alloc(void) {
 }
 
 static void tumo_acceptance_free(TumoAcceptanceApp* app) {
+    corpus_ui_free(app->corpus);
     view_dispatcher_remove_view(app->view_dispatcher, TumoAcceptanceViewText);
     view_dispatcher_remove_view(app->view_dispatcher, TumoAcceptanceViewMenu);
     text_box_free(app->text_box);

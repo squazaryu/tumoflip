@@ -1,5 +1,6 @@
 #include <core/log.h>
 #include <core/record.h>
+#include <strings.h>
 #include "storage.h"
 #include "storage_i.h" // IWYU pragma: keep
 #include "storage_message.h"
@@ -481,6 +482,65 @@ FS_Error storage_common_remove(Storage* storage, const char* path) {
     return storage_path_command(storage, path, StorageCommandCommonRemove);
 }
 
+static bool storage_common_is_case_only_rename(const char* old_path, const char* new_path) {
+    const char* old_name = strrchr(old_path, '/');
+    const char* new_name = strrchr(new_path, '/');
+    old_name = old_name ? old_name + 1 : old_path;
+    new_name = new_name ? new_name + 1 : new_path;
+
+    // The directory part must be identical byte-wise, otherwise this is a move, not a case change
+    const size_t old_dir_len = old_name - old_path;
+    const size_t new_dir_len = new_name - new_path;
+    if(old_dir_len != new_dir_len || strncmp(old_path, new_path, old_dir_len) != 0) {
+        return false;
+    }
+
+    if(strcmp(old_name, new_name) == 0) {
+        return false;
+    }
+
+    return strcasecmp(old_name, new_name) == 0;
+}
+
+static FS_Error
+    storage_common_rename_case_only(Storage* storage, const char* old_path, const char* new_path) {
+    FuriString* temp_path = furi_string_alloc();
+    FS_Error error = FSE_INTERNAL;
+
+    // Case-insensitive filesystems consider both names to be the same entry, so the rename
+    // has to go through a free temporary name in the same directory.
+    for(size_t i = 0; i < 16; i++) {
+        furi_string_printf(temp_path, "%s.rnm%zu", old_path, i);
+        if(storage_common_stat(storage, furi_string_get_cstr(temp_path), NULL) == FSE_NOT_EXIST) {
+            error = FSE_OK;
+            break;
+        }
+    }
+
+    do {
+        if(error != FSE_OK) break;
+
+        error = storage_common_rename(storage, old_path, furi_string_get_cstr(temp_path));
+        if(error != FSE_OK) break;
+
+        error = storage_common_rename(storage, furi_string_get_cstr(temp_path), new_path);
+        if(error != FSE_OK) {
+            // Restore the original name if the second step failed
+            FS_Error restored =
+                storage_common_rename(storage, furi_string_get_cstr(temp_path), old_path);
+            if(restored != FSE_OK) {
+                FURI_LOG_E(
+                    TAG,
+                    "Rename restore failed; copy retained at %s",
+                    furi_string_get_cstr(temp_path));
+            }
+        }
+    } while(false);
+
+    furi_string_free(temp_path);
+    return error;
+}
+
 FS_Error storage_common_rename(Storage* storage, const char* old_path, const char* new_path) {
     furi_check(storage);
     FS_Error error;
@@ -488,6 +548,15 @@ FS_Error storage_common_rename(Storage* storage, const char* old_path, const cha
     do {
         if(!storage_common_exists(storage, old_path)) {
             error = FSE_INVALID_NAME;
+            break;
+        }
+
+        // Equivalent paths are the same entry for the filesystem, so they must be handled
+        // before the file/directory branching below
+        if(storage_common_equivalent_path(storage, old_path, new_path)) {
+            error = storage_common_is_case_only_rename(old_path, new_path) ?
+                        storage_common_rename_case_only(storage, old_path, new_path) :
+                        FSE_OK;
             break;
         }
 
@@ -503,11 +572,6 @@ FS_Error storage_common_rename(Storage* storage, const char* old_path, const cha
                 error = FSE_INVALID_NAME;
                 break;
             }
-
-            // Renaming a regular file to itself does nothing and always succeeds
-        } else if(storage_common_equivalent_path(storage, old_path, new_path)) {
-            error = FSE_OK;
-            break;
         }
 
         if(storage_file_exists(storage, new_path)) {
@@ -596,17 +660,22 @@ FS_Error storage_common_copy(Storage* storage, const char* old_path, const char*
         } else {
             Stream* stream_from = file_stream_alloc(storage);
             Stream* stream_to = file_stream_alloc(storage);
+            bool complete = false;
 
             do {
                 if(!file_stream_open(stream_from, old_path, FSAM_READ, FSOM_OPEN_EXISTING)) break;
                 if(!file_stream_open(stream_to, new_path, FSAM_WRITE, FSOM_CREATE_NEW)) break;
-                stream_copy_full(stream_from, stream_to);
+                // A short/silent write or failed sync must never authorize a
+                // rename caller to remove its still-valid source.
+                complete = stream_copy_full(stream_from, stream_to) == fileinfo.size &&
+                           file_stream_close(stream_to);
             } while(false);
 
             error = file_stream_get_error(stream_from);
             if(error == FSE_OK) {
                 error = file_stream_get_error(stream_to);
             }
+            if(error == FSE_OK && !complete) error = FSE_INTERNAL;
 
             stream_free(stream_from);
             stream_free(stream_to);

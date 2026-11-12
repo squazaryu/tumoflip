@@ -1,3 +1,115 @@
+## Tumoflip Dev 009-032
+- Nice O-Code: correct the asymmetric counter conversion, preserve old saved payloads, and accept upstream `No_IC` without overriding explicit unknown-state protection. Existing 52/72-bit scope remains unchanged.
+- Sub-GHz: add ten lazy receive-only protocol leaves selected from ARF, including X10 and Urmet; preserve complete long saved payloads. Existing Toyota/Mazda equivalents are not duplicated. No new automotive encoder, enrollment or key/seed brute force is added.
+- TumoSpectrum 3.4: bounded peak history and broker-owned internal/external dual-radio sweeps, with loss/error cleanup and single-radio fallback. Physical RF acceptance remains pending.
+- FW Packages candidate: Device Library 1.2 opens saved objects by a validated route; separate Field Tools adds manual object rounds, verified copy-only object import/export, and explicit read-only capture inventory comparison. Original captures are not deleted or overwritten. Copy exports off the SD using a reader or USB SD mode; Companion Files supports uploading a copy back, not generic download.
+- Experimental package-only Passive NFC Sniffer: bounded ISO14443-A candidate-frame capture, explicit resource reservation/cancellation, and verified create-new trace saving. No RF field generation, relay or key recovery. Hardware acceptance is pending.
+- Local F7 API advances to 88.23 for one new nonfatal IRQ-reservation function. This is not upstream API parity. New managed FAPs need matching firmware and FW Packages; existing stored cards remain readable. No release, installation or stable promotion is implied by this entry.
+
+## Tumoflip Dev 009-023
+- TumoSpectrum 3.3: browse timestamped capture-set analyses, reopen saved snapshots, and verify source files by SHA-256. Legacy schema 1/2 sets remain readable but are explicitly marked unverified. Source captures are read-only and exports use new filenames.
+
+## Tumoflip Dev 009-022
+- Sub-GHz: Add Manually supports Nice O-Code at 433.92 MHz. Advanced entry asks for the 16-bit installer code and stores it in the `.sub` file; the reserved plain FloR-S value and a missing rainbow table fail closed. Existing FloR-S and Nice One generation remain unchanged.
+- F7 API: add a dedicated Nice O-Code file-generation symbol; API advances to 88.18.
+
+## Tumoflip Dev 009-019
+- NFC: passively identify and read DESFire Light cards. Retry GetVersion in the other command mode only after a deterministic card refusal; transport and malformed-frame errors still fail. Refused optional fields no longer abort the read, stale key counts are cleared before saving, and successful events clear prior optional-field errors.
+- Sub-GHz: add static KeyFinder2 and Doorbell32 decoders/encoders at 433 MHz AM. They are classified as Sensors and remain covered by the existing Ignore Sensors receiver setting.
+- Build: ignore only unbuilt stale `.fal` dependencies inside the embedded-plugin staging tree; regular assets and unrelated `plugins/` paths remain tracked.
+- F7 API remains 88.15; FW Packages Dev 024 remains compatible. Hardware acceptance is still pending.
+
+## Tumoflip Dev 009-017
+- Fiat V2: report all capture-format write failures and preserve the previously loaded frame when a saved capture is invalid. ProtoPirate FAP version advances to 3.2.1.
+- Sub-GHz: add receive-only Renault V1 to the Europe Protocol Pack with bounded Manchester decoding, header/length/XOR validation, duplicate filtering, complete saved payloads and legacy Key_2 compatibility. ARF Status 0.4.1 tracks the new protocol plugin.
+- F7 API remains 88.14; FW Packages Dev 023 remains compatible. No encoder, key-recovery feature, saved-file migration or recording cleanup is added. Physical reception and save/open acceptance remain pending.
+
+## Tumoflip Dev 009-016
+- NFC/iButton/SD: bound nested NDEF records and DESFire access-right data, reject unknown iButton protocol IDs, and fail TAR extraction on read errors or partial writes.
+- RPC: reject caller-supplied reserved app-context arguments and validate callback contexts against live sessions. F7 API remains 88.14; existing LF RFID enum IDs and FW Packages compatibility are unchanged.
+
+## Tumoflip Dev 009-015
+- Runtime: retain one redacted last-crash record across reboot and expose it through `tumocrash` and the FAB2 Runtime App Bridge. The record contains only a fault class, sanitized app-id prefix, sequence, and build prefix; clearing is explicit.
+- F7 public API remains 88.14. No FW Packages API rebuild is needed. Physical fault and watchdog acceptance is still pending; this is a Dev build for testing, not a stable promotion.
+
+## Tumoflip Dev 009-014
+- Sub-GHz: restore TX validation for saved recordings in Standard Sub-GHz and ARF. Saved preset names are already normalized on load; TX validation now uses that short preset directly instead of converting it a second time and passing an empty modulation to the radio broker.
+- No frequency/protocol capability restrictions were relaxed and no F7 API change is required. Playback on hardware still needs acceptance.
+
+## Tumoflip Dev 009-013
+- NFC: add a parse-only supported-card FAL that identifies possible Onity or VingCard systems from keys already found in a saved MIFARE Classic read. It does not add a card read/auth/write flow; the existing detailed Saflok parser remains in use.
+- F7 public API remains 88.14; the NFC supported-card plugin ABI is unchanged.
+
+## Tumoflip Dev 009-012
+- Sub-GHz: add `KL: KEY 433MHz` to Add Manually using the existing KeeLoq generator and KEY keystore entry.
+- ARF Renault review: do not copy the `Renault V1` FM flag; that ARF decoder is absent here. The local Renault/Dacia protocol is a different AM implementation. Keep Toyota enabled.
+- Capture Inspector 1.1: compare stored `.sub`/`.psf` fields across two or three files and export a series report with stable, changed, and missing values plus original paths. Source captures remain read-only; RAW timing analysis stays in TumoSpectrum.
+- TumoSpectrum 3.2: surface preset/protocol differences in capture comparison and reports. Waveforms with differing configuration are no longer classified as “Likely same”; existing bounded RAW-series inference and its retained source captures remain the regression evidence.
+- Sub-GHz: expose Genius SLH-compatible remotes as separate 433/868 MHz Add Manually aliases of the existing FAAC SLH implementation. They use the FAAC SLH keystore entry and tag new files `Manufacture: Genius`; legacy untagged captures retain the FAAC default. Unknown explicit manufacturers fail closed.
+- F7 API 88.14 exports Loading text/progress/reset helpers for FAPs. Existing NFC CUID progress remains unchanged.
+- ESP Flasher 1.14 bundles Momentum Marauder 1.14.3 images for S2/S3/WROOM; the C5 image and explicit Quick Flash address map are retained. The separate FW Packages catalog still needs a matching Dev revision after firmware acceptance.
+
+## Tumoflip Dev 009-010
+- Sub-GHz: accept PSA AM frames only at 80 or 88 decoded bits, keeping the 8 alignment bits out of the payload; this avoids claiming continuous Fiat V1 frames as PSA. Add FM modulation support to the existing Fiat V1 implementations in ProtoPirate and RollJam. Toyota remains enabled; Renault V1 is not included because Tumoflip has no matching decoder.
+- Sub-GHz: update Nord ICE to normalize the paired frames, emulate the complete pair, map the four buttons, and support Add Manually at 433.92 MHz AM650.
+- NFC: show CUID-dictionary scan progress on the shared Loading view while keeping plain and labeled loading state independent.
+- F7 API stays at 88.13; no FW Packages API refresh is required. Physical-device acceptance is still needed for PSA/Fiat captures, Nord ICE, and a large CUID dictionary.
+
+## Tumoflip Dev 009-008
+- Sub-GHz: load Frequency Analyzer view/worker and Add Manually from checked feature FALs; retain notebook, preset handoff, radio ownership and creation behavior. Stop worker/callbacks before unmapping.
+- Loader: expose structured launch diagnostics, distinguish fragmented/insufficient RAM, add stack preflight and bound manifest reads. F7 API advances additively to 88.13.
+- Marauder Companion 7.13-tumo: add Recon/list/Protocol Info/SPIFFS status and backup, fix command-specific Back behavior and offer Wardrive POI via long OK in the running console. Hardware acceptance remains pending.
+
+## Tumoflip Dev 009-007
+- Specter FW Package 3.2: adapt upstream 3.0.1 survey/fingerprint spacing, suppress the reader ring during calibration, report TOO SHORT for empty surveys under 10 seconds, and wrap text log entries while retaining checked SD writes and rollback.
+- Sub-GHz: allow existing PSA/PSA2 receivers through AM as well as FM filtering; add a bounded Honda 315 MHz RX profile shared by Standard/Read RAW and ProtoPirate. Existing profile indices and independent settings remain stable.
+
+## Tumoflip Dev 009-006
+- Sub-GHz: keep the profile-owned `TumoHonda` receiver preset out of the generic Core modulation choices. The Honda RX profile still selects it and displays it as `Honda RX Custom`; saved actual preset indices remain stable. The Honda/Acura protocol remains in the Shuka Auto pack.
+
+## Tumoflip Dev 009-005
+- Bluetooth Remote 1.3: fix the cold-start `Cannot select peer` failure by using one invalid GAP connection handle; valid handle zero is never confused with disconnection. Show readable temporary device labels, ask for a local name before first connection, and preserve existing names and pairing keys. Update both firmware and FW Packages to receive this fix.
+- Bluetooth/USB Remote: stop and drain Mouse Jiggler timers on Stop/Back, reset the running state, use one-shot Stealth scheduling, and wait for BLE connection. Keep Tumoflip device selection and package-only Bluetooth Remote (upstream #1112).
+- Sub-GHz: free Security+ 2.0 scratch transmitters, use local ownership in all 15 existing generators, clear the live pointer on TX stop, and log missing encoders. No new generation or transmission functionality (upstream #1104, follow-ups #1159/#1160).
+- RFID: show an in-range numeric starting value, use consistent manual-format labels and simplify field restoration without losing location sidecars. Existing HID/Casi formats remain unchanged; S10401/Casi hardware edge cases remain pending (upstream #1149/#1158).
+- iButton: select permitted blank types, show the current write target and handle an empty/inapplicable selection. Preserve Full Writing and legacy FAP callback values; unreadable settings disable Write ID targets, and opening settings without edits does not overwrite a file (upstream #1153).
+- Local F7 API 88.12 adds five iButton functions without removing existing exports. Install this firmware first, then FW Packages Dev 019 for Bluetooth Remote 1.3. Existing independent package updates remain cumulative. Upstream RW1990.1 issue #1143 is not resolved by these changes.
+- Hardware acceptance remains pending. The reverted loader relaunch series, new menu layouts, Community Pack refresh and monitoring changes are excluded. No reset or re-pairing is required by the migration.
+
+## Tumoflip Dev 009-004
+- Bluetooth Remote: choose a bonded device before advertising, keep only that identity allowed, and never fall back to the phone when the chosen host is unavailable. Add local device labels, individual unpairing and explicit host-side pairing.
+- Keep existing HID keys/config paths. Selection preferences are separately journalled; missing key stores are initialized independently of Companion, while corrupt/oversized stores fail closed.
+- Move only `hid_ble.fap` into FW Packages Base. USB Remote stays bundled; BadUSB and the Kodi remote are unchanged. Install Companion 1.11.23 first, this firmware second, and FW Packages Dev 018 last.
+- Toyota: add receive-only Variant C alongside A/B. Preserve the variant and trailing bits in saved captures; reject malformed metadata and incomplete/oversized frames. No new encoder or secret-recovery behavior.
+- F7 API advances additively to `88.11` for the four Bluetooth peer-selection service calls. Existing public profile layout is unchanged. Hardware acceptance remains pending.
+
+## Tumoflip Dev 009-003
+- NFC: compare complete FeliCa/DESFire results and stop completed MIFARE Classic reads without changing the CUID/Skip paths.
+- Sub-GHz: add receive-only Monarch/KEY metadata, per-receiver AM/FM filtering, and bounded Manual/seven-profile frequency/modulation choices; Standard and Read RAW retain independent settings.
+- ARF: add the package-only Capture Inspector/Compare for saved captures and a bounded Status probe that distinguishes header compatibility from unverified integrity/imports.
+- Quac 0.11.0: validate action durations and playlist pauses, preserve millisecond timing, and handle Back/cancellation without releasing RAW worker context early.
+- Specter 3.1.0-tumo: package-only passive NFC field diagnostics with checked log writes, sync/close failures, capacity checks and best-effort rollback. The adapted app has explicit protected source ownership.
+- API advances additively from `88.9` to `88.10`. Rebuilt paired packages are attached; use the matching FW Packages channel for separately installed applications.
+- No factory reset, new protocol encoder or secret-recovery feature. Hardware acceptance remains pending.
+
+## Tumoflip Dev 009-002
+- RFID: add manual FC/ID entry and app-side renderers for HID H10302/H10304/H10306, AMAG S10401, Corporate 1000 35-bit and Casi-Rusco C10106; Generic HIDProx rendering now reports frame length without duplicating raw data.
+- GUI: an empty bounded NumberInput field now resolves to the nearest valid value around zero when submitted.
+- ARF packages: add a file-only Capture converter in the ARF hub. It copies canonical `.psf` ↔ `.sub` captures without rewriting protocol names or dropping metadata. Originals and existing destination files are never overwritten; success requires sync, close and byte-for-byte readback.
+- Converter: allow cancellation while scanning or copying; report invalid files, SD errors and cancellation separately. No cryptographic recovery or new protocol encoder is added.
+- API remains `88.9`; no user-data migration is required. Hardware acceptance is still pending.
+
+## Tumoflip Dev 009-001
+- LFRFID: harden Keri PSK decoding against slicer skew by checking two complete frames for matching IDs before accepting a read; include regression vectors for clean and mismatched frames.
+- NFC: award the existing Dolphin deed when launching directly into card emulation, matching the saved-card path.
+- LFRFID: choose which writable chips the app and CLI may try (T5577, EM4305, and each Hitag micro variant); all targets remain enabled by default and writes still verify the result.
+- LFRFID: add an opt-in `8268` target for writing EM4100 RF/64 frames to ID8268 / Hitag S clone chips; UID confirmation is required before the two data pages are written, and the target stays disabled by default to protect genuine Hitag S application data. The Hitag S implementation is delivered as a lazy `lfrfid_hitags.fal` package, so its reader/writer is loaded only when that target is selected.
+- Build: enable resident-image LTO while keeping FAPs on the normal symbol-table pipeline; the F7 C1 image shrinks by about 8.3 KiB and now leaves an 8 KiB physical C2 gap. `LTO=0` remains available for A/B diagnostics.
+- LFRFID: keep Hitag Micro and Hitag S BPLM cell timings in one shared header; this is a source-drift guard with no behavioral or binary change.
+- Core correctness: align startup-hook signatures with `FlipperInternalOnStartHook` and make Storage Settings copy a concrete descriptor with its full option array, removing LTO diagnostics without changing behavior.
+- Core audit: review the resident LFRFID/Sub-GHz symbols and public API exports; no safe dead-code removal was found without cutting Standard/ARF or third-party FAP functionality.
+- API: F7 advances from `88.8` to `88.9` for the default write-target accessor; existing API 88 FAPs remain major-compatible.
+
 ## Tumoflip Dev 008-027
 - GUI: **Expose `view_dispatcher_check_id()`** so FAPs can test view-ID availability without mutating the dispatcher or tripping the duplicate-ID guard. Adapted from official Flipper firmware PR #4422.
 - API: F7 advances from `88.6` to `88.7`; the maintained F18 compatibility target advances from `88.0` to `88.1`. Existing FAPs are rebuilt from the same release tree.

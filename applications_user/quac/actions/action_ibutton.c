@@ -12,6 +12,10 @@
 
 void action_ibutton_tx(void* context, const FuriString* action_path, FuriString* error) {
     App* app = context;
+    if(!quac_duration_valid(app->settings.ibutton_duration)) {
+        ACTION_SET_ERROR("iButton: Duration must be 100..60000 ms");
+        return;
+    }
     const char* cpath = furi_string_get_cstr(action_path);
 
     FURI_LOG_I(TAG, "iButton: Tx %s", cpath);
@@ -28,19 +32,17 @@ void action_ibutton_tx(void* context, const FuriString* action_path, FuriString*
         iButtonWorker* worker = ibutton_worker_alloc(protocols);
         ibutton_worker_start_thread(worker);
 
+        QuacActionWait* wait = quac_action_wait_alloc(app);
         ibutton_worker_emulate_start(worker, key);
 
-        int16_t time_ms = app->settings.ibutton_duration;
-        const int16_t interval_ms = 100;
-        while(time_ms > 0) {
-            furi_delay_ms(interval_ms);
-            time_ms -= interval_ms;
-        }
+        if(!quac_action_wait_run(wait, app->settings.ibutton_duration) && !app->action_cancelled)
+            ACTION_SET_ERROR("iButton: Wait failed");
 
         FURI_LOG_I(TAG, "iButton: Done");
         ibutton_worker_stop(worker);
         ibutton_worker_stop_thread(worker);
         ibutton_worker_free(worker);
+        quac_action_wait_free(wait);
     }
 
     ibutton_key_free(key);

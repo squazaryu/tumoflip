@@ -51,6 +51,12 @@ typedef enum {
     NfcDataGeneratorTypeMfUltralightC,
     NfcDataGeneratorTypeMfUltralightAES,
 
+    // Append after existing public IDs. TK15 shares TK13 frame bytes but has different timings;
+    // a generated frame would therefore be TK13 when read back.
+    NfcDataGeneratorTypeTexkomTk13,
+    NfcDataGeneratorTypeTexkomTk17,
+    NfcDataGeneratorTypeTexkomMmbit,
+
     NfcDataGeneratorTypeNum,
 
 } NfcDataGeneratorType;

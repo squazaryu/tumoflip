@@ -1,0 +1,168 @@
+{
+  "label": "Quac, Specter and RX profiles - unreleased",
+  "source_commit": "095d0ef2e08d3c135bffebc940a08f139c8bffaf",
+  "api": "88.10",
+  "toolchain": "Flipper 39, GCC 12.3",
+  "options": {
+    "COMPACT": 1,
+    "DEBUG": 0,
+    "LTO": 1,
+    "WORKFLOW_BRANCH_OR_TAG": "HEAD",
+    "SOURCE_DATE_EPOCH": 1789670251
+  },
+  "firmware_elf_sha256": "8da3c210cf44e407c85138ece4c90c0d5450043083498d9301d59481dd15fe2e",
+  "sections": {
+    ".isr_vector": 316,
+    ".text": 692472,
+    ".rodata": 177200,
+    ".ARM": 8,
+    ".init_array": 4,
+    ".fini_array": 4,
+    ".data": 736,
+    ".bss": 7564,
+    "._user_heap_stack": 188300,
+    ".free_flash": 177832,
+    ".ARM.attributes": 48,
+    "._sram2a_start": 0,
+    "._sram2a_free": 1,
+    "._sram2b_start": 0,
+    ".comment": 27,
+    ".debug_aranges": 60976,
+    ".debug_info": 4251979,
+    ".debug_abbrev": 563497,
+    ".debug_line": 1482239,
+    ".debug_frame": 235472,
+    ".debug_str": 676039,
+    ".debug_line_str": 26779,
+    ".debug_loclists": 1135343,
+    ".debug_rnglists": 120232
+  },
+  "safety": {
+    "dfu_gap_bytes": 9587,
+    "dfuse_flash_end": "0x080D4958",
+    "erase_aligned_flash_end": "0x080D5000",
+    "minimum_c2_gap_bytes": 4096,
+    "physical_c2_gap_bytes": 8192,
+    "section_gap_bytes": 9896,
+    "updater_bytes": 119073,
+    "updater_limit_bytes": 131072
+  },
+  "package_files_verified": 116,
+  "package_zip_sha256": "9c13cbd8071f0a6ff1e41bd7cca1152aea46ee64b2f67ffd254b695e2700ded1",
+  "manifest_sha256": "19973ce02b7fdb8e1647dc363f7a3d76d00d7d09966ce1004fe4f4cd8815206f",
+  "delta_flash_from_inspector_candidate": 904,
+  "delta_flash_from_published_009_002": 2112,
+  "tests": {
+    "firmware_release_suite": 389,
+    "control_plane_suite": 277
+  },
+  "hardware_tested": false,
+  "published": false,
+  "protected_decisions_changed": false,
+  "control_commit": "1d8abc0b99af361e205fdf73c2146b18a7c354f0",
+  "quac": {
+    "sd_bytes": 81160,
+    "sha256": "6e9fbb7d73aad467598e08dd3eb901a2ed694111191d964fe905cc4b7ebee5d4",
+    "sections": {
+      ".text": 24308,
+      ".rodata": 7893,
+      ".debug_aranges": 1928,
+      ".debug_info": 129488,
+      ".debug_abbrev": 19634,
+      ".debug_line": 50990,
+      ".debug_frame": 5444,
+      ".debug_str": 84697,
+      ".debug_line_str": 172,
+      ".debug_loclists": 25271,
+      ".debug_rnglists": 3086,
+      ".ARM.attributes": 52
+    }
+  },
+  "specter": {
+    "sd_bytes": 59940,
+    "sha256": "f23ad0c73f2625155253fcbc63cec71aa418d8bdd3131cc9125eb7a197cd1f8d",
+    "sections": {
+      ".text": 20344,
+      ".rodata": 6528,
+      ".ARM.exidx": 8,
+      ".bss": 40,
+      ".debug_aranges": 1752,
+      ".debug_info": 81353,
+      ".debug_abbrev": 15060,
+      ".debug_line": 36732,
+      ".debug_frame": 4528,
+      ".debug_str": 52990,
+      ".debug_line_str": 338,
+      ".debug_loclists": 19065,
+      ".debug_rnglists": 2434,
+      ".ARM.attributes": 52
+    }
+  },
+  "community_abi": {
+    "api": "88.10",
+    "archives": [
+      {
+        "bytes": 1723798,
+        "pack": "base",
+        "path": "/tmp/tumoflip-community-review.s7N6ni/19sep2026/all-the-apps-base.zip",
+        "sha256": "741a1616ba8ffd43aec0ba2dcfd350c00e5a1cf1ea46f0ccf5db6835b3c15e7f"
+      },
+      {
+        "bytes": 12732973,
+        "pack": "extra",
+        "path": "/tmp/tumoflip-community-review.s7N6ni/19sep2026/all-the-apps-extra.zip",
+        "sha256": "4b0e21dfd733847d1948c3ebfaec887289e3f94ff7edc04e9f57ff54f60fb5d6"
+      }
+    ],
+    "findings": [
+      {
+        "archive_member": "base_pack_build/artifacts-base/GPIO/GPS/nearby_files.fap",
+        "host": null,
+        "kind": "fap",
+        "missing_symbols": [
+          "gps_request_stream",
+          "gps_set_location_callback",
+          "gps_stop_stream"
+        ],
+        "pack": "base",
+        "reasons": []
+      },
+      {
+        "archive_member": "base_pack_build/artifacts-base/Sub-GHz/subghz_wardriving.fap",
+        "host": null,
+        "kind": "fap",
+        "missing_symbols": [
+          "gps_request_stream",
+          "gps_set_location_callback",
+          "gps_stop_stream"
+        ],
+        "pack": "base",
+        "reasons": []
+      },
+      {
+        "archive_member": "extra_pack_build/artifacts-extra/Tools/gps_rpc.fap",
+        "host": null,
+        "kind": "fap",
+        "missing_symbols": [
+          "gps_request_stream",
+          "gps_set_location_callback",
+          "gps_stop_stream"
+        ],
+        "pack": "extra",
+        "reasons": []
+      }
+    ],
+    "kind": "communityPackAbiAudit",
+    "schema": 1,
+    "status": "needsReview",
+    "summary": {
+      "asset_bundles": 33,
+      "binaries": 418,
+      "compatible": 415,
+      "embedded": 43,
+      "fal": 57,
+      "fap": 361,
+      "needs_review": 3
+    }
+  }
+}

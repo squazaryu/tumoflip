@@ -1,4 +1,5 @@
 #include "nfc_device_i.h"
+#include <toolbox/file_history.h>
 
 #include <storage/storage.h>
 #include <flipper_format/flipper_format.h>
@@ -167,6 +168,7 @@ bool nfc_device_save(NfcDevice* instance, const char* path) {
 
     do {
         // Open file
+        if(!file_history_before_write(storage, path)) break;
         if(!flipper_format_buffered_file_open_always(ff, path)) break;
 
         // Write header
@@ -296,7 +298,9 @@ static bool nfc_device_load_legacy(NfcDevice* instance, FlipperFormat* ff, uint3
             instance->protocol_data = nfc_devices[protocol]->alloc();
 
             // Verify protocol
-            if(nfc_devices[protocol]->verify(instance->protocol_data, temp_str)) {
+            // The field is deprecated and new protocols leave it out.
+            if(nfc_devices[protocol]->verify &&
+               nfc_devices[protocol]->verify(instance->protocol_data, temp_str)) {
                 uint8_t uid[NFC_DEVICE_UID_MAX_LEN];
                 uint32_t uid_len;
 

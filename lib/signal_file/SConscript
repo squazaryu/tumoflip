@@ -1,0 +1,8 @@
+Import("env")
+
+env.Append(LINT_SOURCES=[Dir(".")], CPPPATH=["#/lib"], SDK_HEADERS=[File("signal_file.h")])
+libenv = env.Clone(FW_LIB_NAME="signal_file")
+libenv.ApplyLibFlags()
+lib = libenv.StaticLibrary("${FW_LIB_NAME}", libenv.GlobRecursive("*.c"))
+libenv.Install("${LIB_DIST_DIR}", lib)
+Return("lib")

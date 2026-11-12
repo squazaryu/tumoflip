@@ -96,9 +96,24 @@ class SubGhzCommonHandlersTest(unittest.TestCase):
             )
         )
 
+        resident = (PROTOCOL_DIR / "protocol_items.c").read_text(encoding="utf-8")
+        # External-only protocols may link these private bodies locally. Already
+        # resident implementations must remain single-copy and cannot do so.
+        for manifest in sorted((REPO_ROOT / "applications_user").rglob("application.fam")):
+            contents = manifest.read_text()
+            if "../../lib/subghz/protocols/common.c" in contents:
+                blocks = re.split(r"\nApp\(", "\n" + contents)
+                owners = [block for block in blocks if "../../lib/subghz/protocols/common.c" in block]
+                self.assertEqual(
+                    {re.search(r'appid="([^"]+)"', owner).group(1) for owner in owners},
+                    {"protocol_freezer", "protocol_faac_tm", "protocol_proteco"},
+                )
         for source in protocol_sources_using(COMMON_HANDLERS):
             relative = source.relative_to(REPO_ROOT).as_posix()
-            self.assertNotIn(relative, manifests, relative)
+            descriptor = re.search(r"const SubGhzProtocol (\w+) =", source.read_text())
+            self.assertIsNotNone(descriptor, source.name)
+            if "&" + descriptor.group(1) in resident:
+                self.assertNotIn(relative, manifests, relative)
 
     def test_common_implementations_preserve_protocol_semantics(self) -> None:
         for required in (

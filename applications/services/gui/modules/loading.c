@@ -16,6 +16,7 @@ struct Loading {
 
 typedef struct {
     IconAnimation* icon;
+    FuriString* text;
     bool progress_shown;
     float progress;
 } LoadingModel;
@@ -26,6 +27,33 @@ typedef struct {
 //keeps the pair centred as a block once the bar joins the animation
 #define LOADING_BAR_GAP    4
 #define LOADING_BAR_BLOCK  (LOADING_ICON_SIZE + LOADING_BAR_GAP + LOADING_BAR_HEIGHT)
+#define LOADING_LABEL_ICON_X      12
+#define LOADING_LABEL_LEFT        (LOADING_LABEL_ICON_X + LOADING_ICON_SIZE)
+#define LOADING_LABEL_HALF_HEIGHT 10
+#define LOADING_LABEL_BAR_SHIFT   ((LOADING_BAR_GAP + LOADING_BAR_HEIGHT) / 2)
+#define LOADING_LABEL_BAR_Y       (LOADING_LABEL_HALF_HEIGHT + LOADING_BAR_GAP)
+
+static void loading_draw_label(Canvas* canvas, LoadingModel* model) {
+    const uint8_t center_x = (LOADING_LABEL_LEFT + canvas_width(canvas)) / 2;
+    const uint8_t icon_y = canvas_height(canvas) / 2 - LOADING_ICON_SIZE / 2;
+    canvas_draw_icon(canvas, LOADING_LABEL_ICON_X, icon_y, &A_Loading_24);
+    canvas_draw_icon_animation(canvas, LOADING_LABEL_ICON_X, icon_y, model->icon);
+
+    const uint8_t text_y =
+        canvas_height(canvas) / 2 - (model->progress_shown ? LOADING_LABEL_BAR_SHIFT : 0);
+    canvas_set_font(canvas, FontPrimary);
+    elements_multiline_text_aligned(
+        canvas, center_x, text_y, AlignCenter, AlignCenter, furi_string_get_cstr(model->text));
+
+    if(model->progress_shown) {
+        elements_progress_bar(
+            canvas,
+            center_x - LOADING_BAR_WIDTH / 2,
+            text_y + LOADING_LABEL_BAR_Y,
+            LOADING_BAR_WIDTH,
+            model->progress);
+    }
+}
 
 static void loading_draw_callback(Canvas* canvas, void* _model) {
     LoadingModel* model = (LoadingModel*)_model;
@@ -33,6 +61,11 @@ static void loading_draw_callback(Canvas* canvas, void* _model) {
     canvas_set_color(canvas, ColorWhite);
     canvas_draw_box(canvas, 0, 0, canvas_width(canvas), canvas_height(canvas));
     canvas_set_color(canvas, ColorBlack);
+
+    if(!furi_string_empty(model->text)) {
+        loading_draw_label(canvas, model);
+        return;
+    }
 
     const uint8_t x = canvas_width(canvas) / 2 - LOADING_ICON_SIZE / 2;
     const uint8_t block = model->progress_shown ? LOADING_BAR_BLOCK : LOADING_ICON_SIZE;
@@ -85,6 +118,7 @@ Loading* loading_alloc(void) {
     view_allocate_model(instance->view, ViewModelTypeLocking, sizeof(LoadingModel));
     LoadingModel* model = view_get_model(instance->view);
     model->icon = icon_animation_alloc(&A_Loading_24);
+    model->text = furi_string_alloc();
     model->progress_shown = false;
     model->progress = 0.0f;
     view_tie_icon_animation(instance->view, model->icon);
@@ -104,6 +138,7 @@ void loading_free(Loading* instance) {
 
     LoadingModel* model = view_get_model(instance->view);
     icon_animation_free(model->icon);
+    furi_string_free(model->text);
     view_commit_model(instance->view, false);
 
     furi_assert(instance);
@@ -143,6 +178,21 @@ void loading_reset_progress(Loading* instance) {
             changed = model->progress_shown;
             model->progress_shown = false;
             model->progress = 0.0f;
+        },
+        changed);
+}
+
+void loading_set_text(Loading* instance, const char* text) {
+    furi_check(instance);
+    if(!text) text = "";
+
+    bool changed = false;
+    with_view_model(
+        instance->view,
+        LoadingModel * model,
+        {
+            changed = !furi_string_equal_str(model->text, text);
+            furi_string_set(model->text, text);
         },
         changed);
 }

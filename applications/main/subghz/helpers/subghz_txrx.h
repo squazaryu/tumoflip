@@ -11,6 +11,10 @@
 #include <lib/subghz/devices/devices.h>
 #include <subghz_radio_broker/subghz_radio_broker.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct SubGhzTxRx SubGhzTxRx;
 
 /** Detect a lost external radio. Stop async RX before switching and resume it
@@ -485,3 +489,7 @@ const char* subghz_txrx_set_preset_internal(
     uint32_t frequency,
     uint8_t index,
     uint8_t tx_power);
+
+#ifdef __cplusplus
+}
+#endif

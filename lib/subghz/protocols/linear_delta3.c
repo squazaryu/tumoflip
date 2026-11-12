@@ -81,7 +81,7 @@ const SubGhzProtocol subghz_protocol_linear_delta3 = {
 void* subghz_protocol_encoder_linear_delta3_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
     return subghz_protocol_encoder_common_alloc(
-        sizeof(SubGhzProtocolEncoderLinearDelta3), &subghz_protocol_linear_delta3, 3, 16);
+        sizeof(SubGhzProtocolEncoderLinearDelta3), &subghz_protocol_linear_delta3, 4, 16);
 }
 
 /**
@@ -211,6 +211,9 @@ void subghz_protocol_decoder_linear_delta3_feed(void* context, bool level, uint3
                     }
                     instance->decoder.parser_step = LinearDecoderStepSaveDuration;
                     instance->last_data = instance->decoder.decode_data;
+                    // This branch bypasses Reset: start the next complete key from zero.
+                    instance->decoder.decode_data = 0;
+                    instance->decoder.decode_count_bit = 0;
                 }
                 break;
             }

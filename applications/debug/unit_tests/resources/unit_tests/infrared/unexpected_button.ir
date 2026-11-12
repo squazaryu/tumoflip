@@ -1,0 +1,8 @@
+Filetype: IR library file
+Version: 1
+#
+name: UnexpectedButton
+type: parsed
+protocol: NEC
+address: 00 00 00 00
+command: 00 00 00 00

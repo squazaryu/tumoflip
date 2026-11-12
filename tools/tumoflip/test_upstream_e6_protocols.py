@@ -33,7 +33,7 @@ class UpstreamE6ProtocolsTest(unittest.TestCase):
             self.assertIn(required, source + api)
         self.assertRegex(source, re.compile(r"NICE_O_MIN_SAMPLES\s+4"))
         self.assertIn("static char nice_flor_s_table_path[64]", source)
-        self.assertIn("flipper_format_read_hex(flipper_format, \"IC\"", source)
+        self.assertRegex(source, r'flipper_format_read_hex\(\w+,\s*"IC"')
 
     def test_security_plus_keypad_has_bounded_86_bit_path_and_pin(self) -> None:
         source = self.read("lib/subghz/protocols/secplus_v2.c")
@@ -85,11 +85,13 @@ class UpstreamE6ProtocolsTest(unittest.TestCase):
         ):
             self.assertIn(required, header + source + keeloq)
         self.assertIn("Encryption: 1", keystore)
-        self.assertIn("IV: 54 65 72 72 61 69 6E 21 20 50 75 6C 6C 20 55 70", keystore)
-        self.assertEqual(len(keystore.splitlines()), 128)
+        # Reviewed encrypted supplemental store from immutable Unleashed 094.
+        # The primary and user stores are not replaced.
+        self.assertIn("IV: 47 65 74 41 77 61 79 46 72 6F 6D 48 65 72 65 21", keystore)
+        self.assertEqual(len(keystore.splitlines()), 129)
         self.assertEqual(
             hashlib.sha256(keystore.encode()).hexdigest(),
-            "8dbc0959233af4411cf4fa10e0ce09208c30a5b272d48fd5a6189f54dba0372e",
+            "a2f5bb2294671c7e73cefe4a20d011e86d6a9aaa609582f0431ecae9a76cea68",
         )
 
     def test_new_apps_and_api_contract_are_present(self) -> None:
@@ -101,7 +103,7 @@ class UpstreamE6ProtocolsTest(unittest.TestCase):
         self.assertIn('entry_point="nice_o_code_app"', nice_manifest)
         self.assertIn("Nice O-Code", self.read("applications/system/nice_o_code/nice_o_code.c"))
         self.assertIn("Security+ PIN", self.read("applications/system/secplus_pin/secplus_pin.c"))
-        self.assertRegex(api, r"(?m)^Version,\+,88\.7,,$")
+        self.assertEqual(api.splitlines()[1], "Version,+,88.23,,")
         for symbol in (
             "subghz_protocol_nice_o_mask",
             "subghz_protocol_nice_o_get_parcel",
@@ -128,6 +130,20 @@ class UpstreamE6ProtocolsTest(unittest.TestCase):
         for label in ("16-JCM Gen2", "17-Stagnoli", "18-Telcoma hi", "19-Telcoma lo"):
             self.assertIn(label, source)
         self.assertIn("COUNT_OF(kl_type_options)", source)
+
+    def test_key_manually_creates_a_keeloq_capture(self) -> None:
+        events = self.read("applications/main/subghz/helpers/subghz_custom_event.h")
+        menu = self.read("applications/main/subghz/plugins/add_manually/subghz_scene_set_type.c")
+        generator = self.read("applications/main/subghz/plugins/add_manually/subghz_gen_info.c")
+
+        self.assertIn("SetTypeKEY433", events)
+        self.assertIn('[SetTypeKEY433] = "KL: KEY 433MHz"', menu)
+        self.assertIn("[SetTypeKEY433] = 52", generator)
+        self.assertIn(
+            '[51] = SUBGHZ_KEELOQ_PRESET(KEELOQ_MASK_28, KEELOQ_PREFIX_NONE, '
+            'KEELOQ_FREQUENCY_433_920, KEELOQ_MODULATION_AM650, 0x01, 0x03, "KEY")',
+            generator,
+        )
 
 
 if __name__ == "__main__":

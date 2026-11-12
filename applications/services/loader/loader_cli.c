@@ -16,6 +16,7 @@ static void loader_cli_print_usage(void) {
     printf("\tlist\t - List available applications\r\n");
     printf("\topen <Application Name:string>\t - Open application by name\r\n");
     printf("\tinfo\t - Show loader state\r\n");
+    printf("\tdiag\t - Last app launch diagnostic (schema 1)\r\n");
     printf("\tclose\t - Close the current application\r\n");
     printf("\tsignal <signal:number> [arg:hex]\t - Send a signal with an optional argument\r\n");
 }
@@ -148,6 +149,11 @@ static void loader_cli(PipeSide* pipe, FuriString* args, void* context) {
         loader_cli_open(args, loader);
     } else if(furi_string_equal(cmd, "info")) {
         loader_cli_info(loader);
+    } else if(furi_string_equal(cmd, "diag")) {
+        FuriString* diagnostic = furi_string_alloc();
+        loader_get_last_diagnostic(loader, diagnostic);
+        printf("%s\r\n", furi_string_get_cstr(diagnostic));
+        furi_string_free(diagnostic);
     } else if(furi_string_equal(cmd, "close")) {
         loader_cli_close(loader);
     } else if(furi_string_equal(cmd, "signal")) {

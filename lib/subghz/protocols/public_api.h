@@ -1,6 +1,9 @@
 #pragma once
 
+#define SUBGHZ_PRESS_IDENTITY_WORDS 5
+
 #include "../types.h"
+#include "base.h"
 
 #define SUBGHZ_PROTOCOL_PUBLIC_API_H
 
@@ -177,6 +180,39 @@ bool subghz_protocol_nice_flor_s_create_data(
     bool nice_one);
 
 /**
+ * Create one Nice O-Code file frame for a known installer code.
+ * The installer code is stored in the file as the `IC` field so the decoder can
+ * distinguish O-Code from plain FloR-S. The receiver may still require the
+ * remote to be enrolled through its normal pairing procedure.
+ * @param context Pointer to a SubGhzProtocolEncoderNiceFlorS instance
+ * @param flipper_format Pointer to a FlipperFormat instance
+ * @param serial 28-bit serial number
+ * @param btn 4-bit button number
+ * @param cnt 16-bit counter
+ * @param ic 16-bit installer code (0xFFFF is reserved for plain FloR-S)
+ * @param preset Modulation, SubGhzRadioPreset
+ * @return true On success, false if input is invalid or the rainbow table is missing
+ */
+bool subghz_protocol_nice_o_create_data(
+    void* context,
+    FlipperFormat* flipper_format,
+    uint32_t serial,
+    uint8_t btn,
+    uint16_t cnt,
+    uint16_t ic,
+    SubGhzRadioPreset* preset);
+
+/** Create the 72-bit O-Code / Nice One variant with the same known IC. */
+bool subghz_protocol_nice_o_one_create_data(
+    void* context,
+    FlipperFormat* flipper_format,
+    uint32_t serial,
+    uint8_t btn,
+    uint16_t cnt,
+    uint16_t ic,
+    SubGhzRadioPreset* preset);
+
+/**
  * Key generation from simple data.
  * @param context Pointer to a SubGhzProtocolEncoderSomfyTelis instance
  * @param flipper_format Pointer to a FlipperFormat instance
@@ -298,9 +334,32 @@ void subghz_protocol_decoder_bin_raw_data_input_rssi(
 bool subghz_protocol_secplus_v1_check_fixed(uint32_t fixed);
 
 /** Nice O-Code helpers used by the installer-code recovery app. */
+/* Source-only SDK helpers. c66f01dce7 corrected the old involution: wire->plain
+ * and plain->wire are different affine maps. No binary export is added. */
+static inline uint16_t subghz_protocol_nice_o_cnt_swap(uint16_t count) {
+    const uint16_t bits = count & 0x2222U;
+    return count ^ (uint16_t)((bits >> 1) ^ (bits << 1)) ^ 0x8B89U;
+}
+static inline uint16_t subghz_protocol_nice_o_cnt_encode(uint16_t count) {
+    return subghz_protocol_nice_o_cnt_swap(count ^ 0x8B89U) ^ 0x8B89U;
+}
 void subghz_protocol_nice_o_mask(uint8_t n, uint32_t* mask_32, uint16_t* mask_16);
 uint8_t subghz_protocol_nice_o_get_parcel(uint64_t data);
 void subghz_protocol_decoder_nice_flor_s_set_skip_o_code(void* context, bool skip);
+
+/** Return true for a received O-Code frame without a known installer code. */
+bool subghz_protocol_decoder_nice_flor_s_is_o_code_no_ic(void* context);
+
+/** Only supported short frames with known IC (where required) can be encoded. */
+bool subghz_protocol_decoder_nice_flor_s_can_transmit(void* context);
+
+/** Fill five words of exact press identity for supported rotating-parcel decoders.
+ * Call after get_hash_data, which extracts the decoded fields. No allocation or I/O.
+ * Returns false for other protocol layouts; never cast arbitrary plugin decoders.
+ */
+bool subghz_protocol_decoder_get_press_identity(
+    SubGhzProtocolDecoderBase* decoder,
+    uint32_t* identity);
 #define SUBGHZ_NO_NICE_FLOR_S_RAINBOW_TABLE 0
 uint64_t subghz_protocol_nice_flor_s_decrypt_ic(
     uint64_t data,

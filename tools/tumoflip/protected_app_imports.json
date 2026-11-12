@@ -2,16 +2,24 @@
   "schema": 1,
   "implementation": {
     "repository": "squazaryu/tumoflip",
-    "commit": "e2d03acda01a8f71f9b80719fc788f2cf6a42f6a"
+    "commit": "90c636a0c9d1bbce13b9bdfe5ebf83878454fd93"
   },
   "imports": [
     {
+      "appId": "specter",
+      "localSourcePath": "applications_user/specter",
+      "implementationCommit": "113dca1600f0bb23cb7034b21485e336e581d160",
+      "upstreamRepository": "https://github.com/xMasterX/all-the-plugins.git",
+      "upstreamRef": "release-source",
+      "upstreamCommit": "8970b6ba0e48a9c63b4bfaf07ca121f5b08e5b34"
+    },
+    {
       "appId": "esp32_wifi_marauder",
       "localSourcePath": "applications_user/esp32_wifi_marauder",
-      "implementationCommit": "38f117ad1f0312617e26bb9d32255aad96814c0e",
+      "implementationCommit": "31edc73900e9c1b2df05012970d98ecdaef66fa2",
       "upstreamRepository": "https://github.com/0xchocolate/flipperzero-wifi-marauder.git",
       "upstreamRef": "refs/heads/feature_wifi_marauder_app",
-      "upstreamCommit": "ed6d2b814768e811cacd24c928813248fcaf95a4"
+      "upstreamCommit": "b39a2cb6c8ec13670ee0268fb803f747a1757482"
     },
     {
       "appId": "esp_flasher",

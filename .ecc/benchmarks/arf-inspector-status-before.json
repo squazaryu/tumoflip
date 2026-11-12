@@ -1,0 +1,65 @@
+{
+  "label": "Dev 009-002 baseline",
+  "commit": "4aef0d0cf0842a94b41f0242a1d7ef157e9658bf",
+  "toolchain": "Flipper 39, GCC 12.3",
+  "options": {
+    "COMPACT": 1,
+    "DEBUG": 0,
+    "LTO": 1,
+    "WORKFLOW_BRANCH_OR_TAG": "HEAD",
+    "SOURCE_DATE_EPOCH": 1789670251
+  },
+  "elf_sha256": "7b88ae084952aaafe0c71f36fe87e5844c452613cda49483132736cc93b7e74d",
+  "sections": {
+    ".isr_vector": 316,
+    ".text": 690780,
+    ".rodata": 176776,
+    ".ARM": 8,
+    ".init_array": 4,
+    ".fini_array": 4,
+    ".data": 736,
+    ".bss": 7564,
+    "._user_heap_stack": 188300,
+    ".free_flash": 179944,
+    ".ARM.attributes": 48,
+    "._sram2a_start": 0,
+    "._sram2a_free": 1,
+    "._sram2b_start": 0,
+    ".comment": 27,
+    ".debug_aranges": 60944,
+    ".debug_info": 4244938,
+    ".debug_abbrev": 563112,
+    ".debug_line": 1480022,
+    ".debug_frame": 235184,
+    ".debug_str": 675470,
+    ".debug_line_str": 26730,
+    ".debug_loclists": 1133277,
+    ".debug_rnglists": 120060
+  },
+  "safety": {
+    "dfu_gap_bytes": 11699,
+    "dfuse_flash_end": "0x080D4118",
+    "erase_aligned_flash_end": "0x080D5000",
+    "minimum_c2_gap_bytes": 4096,
+    "physical_c2_gap_bytes": 8192,
+    "section_gap_bytes": 12008,
+    "updater_bytes": 119073,
+    "updater_limit_bytes": 131072
+  },
+  "arf_status": {
+    "sd_bytes": 6740,
+    "sections": {
+      ".text": 1320,
+      ".rodata": 1103,
+      ".debug_aranges": 96,
+      ".debug_info": 6720,
+      ".debug_abbrev": 1004,
+      ".debug_line": 2082,
+      ".debug_frame": 304,
+      ".debug_str": 4999,
+      ".debug_loclists": 1401,
+      ".debug_rnglists": 166,
+      ".ARM.attributes": 52
+    }
+  }
+}

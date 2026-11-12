@@ -147,6 +147,15 @@ void furi_hal_interrupt_set_isr(FuriHalInterruptId index, FuriHalInterruptISR is
     furi_hal_interrupt_set_isr_ex(index, FuriHalInterruptPriorityNormal, isr, context);
 }
 
+bool furi_hal_interrupt_try_set_isr(FuriHalInterruptId index, FuriHalInterruptISR isr, void* context) {
+    if((unsigned)index >= FuriHalInterruptIdMax || !isr) return false;
+    FURI_CRITICAL_ENTER();
+    const bool available = furi_hal_interrupt.isr[index].isr == NULL;
+    if(available) furi_hal_interrupt_set_isr(index, isr, context);
+    FURI_CRITICAL_EXIT();
+    return available;
+}
+
 void furi_hal_interrupt_set_isr_ex(
     FuriHalInterruptId index,
     FuriHalInterruptPriority priority,

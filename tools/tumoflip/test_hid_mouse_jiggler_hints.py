@@ -39,7 +39,8 @@ class MouseJigglerStealthHintsTest(unittest.TestCase):
         self.assertIn("#include <stdint.h>", view)
         self.assertIn("int8_t move_x", view)
         self.assertIn("int8_t move_y", view)
-        self.assertIn("2 * INT8_MAX + 1", view)
+        self.assertIn("hid_mouse_jiggler_stealth_random_move()", view)
+        self.assertIn("2 * INT8_MAX", view)
         self.assertNotIn("rand() % 2001", view)
 
 

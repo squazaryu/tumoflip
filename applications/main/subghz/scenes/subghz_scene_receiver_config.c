@@ -1,6 +1,7 @@
 #include "../subghz_i.h"
 #include "../helpers/subghz_txrx_i.h"
 #include <lib/toolbox/value_index.h>
+#include <lib/subghz/subghz_rx_profiles.h>
 
 #define TAG "SubGhzSceneReceiverConfig"
 
@@ -116,15 +117,66 @@ uint8_t subghz_scene_receiver_config_next_frequency(const uint32_t value, void* 
     return index;
 }
 
+// TumoHonda is owned by the Honda RX profile, not by the generic Core
+// modulation picker. Keep its real setting index internal and expose only
+// visible modulation indices to the UI.
+static bool subghz_scene_receiver_config_is_profile_preset(const char* name) {
+    return strcmp(name, SUBGHZ_RX_CUSTOM_NAME) == 0;
+}
+
+static size_t subghz_scene_receiver_config_modulation_count(SubGhzSetting* setting) {
+    size_t count = 0;
+    for(size_t i = 0; i < subghz_setting_get_preset_count(setting); i++) {
+        if(!subghz_scene_receiver_config_is_profile_preset(
+               subghz_setting_get_preset_name(setting, i))) {
+            count++;
+        }
+    }
+    return count;
+}
+
+static int
+    subghz_scene_receiver_config_modulation_index(SubGhzSetting* setting, size_t visible_index) {
+    size_t visible = 0;
+    for(size_t actual = 0; actual < subghz_setting_get_preset_count(setting); actual++) {
+        if(subghz_scene_receiver_config_is_profile_preset(
+               subghz_setting_get_preset_name(setting, actual))) {
+            continue;
+        }
+        if(visible++ == visible_index) return actual;
+    }
+    return -1;
+}
+
+static uint8_t
+    subghz_scene_receiver_config_visible_preset_index(SubGhzSetting* setting, size_t actual_index) {
+    size_t visible = 0;
+    for(size_t actual = 0; actual < subghz_setting_get_preset_count(setting); actual++) {
+        if(subghz_scene_receiver_config_is_profile_preset(
+               subghz_setting_get_preset_name(setting, actual))) {
+            continue;
+        }
+        if(actual == actual_index) return visible <= UINT8_MAX ? (uint8_t)visible : 0;
+        visible++;
+    }
+    return 0;
+}
+
+static const char*
+    subghz_scene_receiver_config_preset_label(SubGhzSetting* setting, size_t actual_index) {
+    const char* name = subghz_setting_get_preset_name(setting, actual_index);
+    return subghz_scene_receiver_config_is_profile_preset(name) ? "Honda RX Custom" : name;
+}
+
 uint8_t subghz_scene_receiver_config_next_preset(const char* preset_name, void* context) {
     furi_assert(context);
     SubGhz* subghz = context;
     uint8_t index = 0;
     SubGhzSetting* setting = subghz_txrx_get_setting(subghz->txrx);
 
-    for(size_t i = 0; i < subghz_setting_get_preset_count(setting); i++) {
-        if(!strcmp(subghz_setting_get_preset_name(setting, i), preset_name)) {
-            index = i;
+    for(size_t actual = 0; actual < subghz_setting_get_preset_count(setting); actual++) {
+        if(!strcmp(subghz_setting_get_preset_name(setting, actual), preset_name)) {
+            index = subghz_scene_receiver_config_visible_preset_index(setting, actual);
             break;
         } else {
             //  index = subghz_setting_get_frequency_default_index(setting);
@@ -146,13 +198,16 @@ static bool subghz_scene_receiver_config_is_raw(const SubGhz* subghz) {
 
 static void subghz_scene_receiver_config_set_frequency(VariableItem* item) {
     SubGhz* subghz = variable_item_get_context(item);
+    if(subghz->rx_profile_item) {
+        variable_item_set_current_value_index(subghz->rx_profile_item, 0);
+        variable_item_set_current_value_text(subghz->rx_profile_item, "Manual");
+    }
     uint8_t index = variable_item_get_current_value_index(item);
     SubGhzSetting* setting = subghz_txrx_get_setting(subghz->txrx);
     const bool is_raw = subghz_scene_receiver_config_is_raw(subghz);
 
-    if(is_raw ||
-       (subghz->last_settings->hopping_mode != SubGhzHoppingModeFrequency &&
-        subghz->last_settings->hopping_mode != SubGhzHoppingModeCombined)) {
+    if(is_raw || (subghz->last_settings->hopping_mode != SubGhzHoppingModeFrequency &&
+                  subghz->last_settings->hopping_mode != SubGhzHoppingModeCombined)) {
         char text_buf[10] = {0};
         uint32_t frequency = subghz_setting_get_frequency(setting, index);
         SubGhzRadioPreset preset = subghz_txrx_get_preset(subghz->txrx);
@@ -192,27 +247,32 @@ static void subghz_scene_receiver_config_set_frequency(VariableItem* item) {
 
 static void subghz_scene_receiver_config_set_preset(VariableItem* item) {
     SubGhz* subghz = variable_item_get_context(item);
-    uint8_t index = variable_item_get_current_value_index(item);
+    if(subghz->rx_profile_item) {
+        variable_item_set_current_value_index(subghz->rx_profile_item, 0);
+        variable_item_set_current_value_text(subghz->rx_profile_item, "Manual");
+    }
+    uint8_t visible_index = variable_item_get_current_value_index(item);
     SubGhzSetting* setting = subghz_txrx_get_setting(subghz->txrx);
+    const int actual_index = subghz_scene_receiver_config_modulation_index(setting, visible_index);
+    if(actual_index < 0) return;
     const bool is_raw = subghz_scene_receiver_config_is_raw(subghz);
 
-    if(is_raw ||
-       (subghz->last_settings->hopping_mode != SubGhzHoppingModePreset &&
-        subghz->last_settings->hopping_mode != SubGhzHoppingModeCombined)) {
-        const char* preset_name = subghz_setting_get_preset_name(setting, index);
+    if(is_raw || (subghz->last_settings->hopping_mode != SubGhzHoppingModePreset &&
+                  subghz->last_settings->hopping_mode != SubGhzHoppingModeCombined)) {
+        const char* preset_name = subghz_setting_get_preset_name(setting, actual_index);
         variable_item_set_current_value_text(item, preset_name);
         SubGhzRadioPreset preset = subghz_txrx_get_preset(subghz->txrx);
-        uint8_t* preset_data = subghz_setting_get_preset_data(setting, index);
-        size_t preset_data_size = subghz_setting_get_preset_data_size(setting, index);
+        uint8_t* preset_data = subghz_setting_get_preset_data(setting, actual_index);
+        size_t preset_data_size = subghz_setting_get_preset_data_size(setting, actual_index);
 
         subghz_txrx_set_tx_power(preset_data, preset_data_size, subghz->tx_power);
 
         subghz_txrx_set_preset(
             subghz->txrx, preset_name, preset.frequency, preset_data, preset_data_size);
         if(is_raw) {
-            subghz->last_settings->raw_preset_index = index;
+            subghz->last_settings->raw_preset_index = actual_index;
         } else {
-            subghz->last_settings->preset_index = index;
+            subghz->last_settings->preset_index = actual_index;
         }
     } else {
         variable_item_set_current_value_index(item, subghz->last_settings->preset_index);
@@ -413,8 +473,64 @@ static void subghz_scene_receiver_config_var_list_enter_callback(void* context, 
     }
 }
 
+static void subghz_scene_receiver_config_set_rx_profile(VariableItem* item) {
+    SubGhz* subghz = variable_item_get_context(item);
+    const unsigned index = variable_item_get_current_value_index(item);
+    const SubGhzRxProfile* profile = subghz_rx_profile_get(index);
+    const bool is_raw = subghz_scene_receiver_config_is_raw(subghz);
+    if(!profile) {
+        variable_item_set_current_value_text(item, "Manual");
+        return;
+    }
+    if(!is_raw && subghz->last_settings->hopping_mode != SubGhzHoppingModeOff) {
+        variable_item_set_current_value_index(item, 0);
+        variable_item_set_current_value_text(item, "Stop hopping");
+        return;
+    }
+    SubGhzSetting* setting = subghz_txrx_get_setting(subghz->txrx);
+    const int preset_index = subghz_rx_profile_preset_index(setting, index);
+    if(preset_index < 0 || preset_index > UINT8_MAX ||
+       !furi_hal_subghz_is_frequency_valid(profile->frequency)) {
+        variable_item_set_current_value_index(item, 0);
+        variable_item_set_current_value_text(item, "Unavailable");
+        return;
+    }
+    if(!strcmp(profile->preset, SUBGHZ_RX_CUSTOM_NAME)) {
+        subghz->txrx->rx_profile_preset_owned = true;
+    }
+    subghz_txrx_set_preset_internal(
+        subghz->txrx, profile->frequency, preset_index, subghz->tx_power);
+    if(is_raw) {
+        subghz->last_settings->raw_frequency = profile->frequency;
+        subghz->last_settings->raw_preset_index = preset_index;
+    } else {
+        subghz->last_settings->frequency = profile->frequency;
+        subghz->last_settings->preset_index = preset_index;
+    }
+    VariableItem* frequency =
+        variable_item_list_get(subghz->variable_item_list, SubGhzSettingIndexFrequency);
+    char text[12];
+    snprintf(
+        text,
+        sizeof(text),
+        "%lu.%02lu",
+        (unsigned long)(profile->frequency / 1000000),
+        (unsigned long)((profile->frequency % 1000000) / 10000));
+    variable_item_set_current_value_text(frequency, text);
+    variable_item_set_current_value_index(
+        frequency, subghz_scene_receiver_config_next_frequency(profile->frequency, subghz));
+    VariableItem* modulation =
+        variable_item_list_get(subghz->variable_item_list, SubGhzSettingIndexModulation);
+    variable_item_set_current_value_index(
+        modulation, subghz_scene_receiver_config_visible_preset_index(setting, preset_index));
+    variable_item_set_current_value_text(
+        modulation, subghz_scene_receiver_config_preset_label(setting, preset_index));
+    variable_item_set_current_value_text(item, profile->label);
+}
+
 void subghz_scene_receiver_config_on_enter(void* context) {
     SubGhz* subghz = context;
+    subghz->rx_profile_item = NULL;
     VariableItem* item;
     uint8_t value_index;
     SubGhzSetting* setting = subghz_txrx_get_setting(subghz->txrx);
@@ -443,14 +559,16 @@ void subghz_scene_receiver_config_on_enter(void* context) {
     item = variable_item_list_add(
         subghz->variable_item_list,
         "Modulation",
-        subghz_setting_get_preset_count(setting),
+        subghz_scene_receiver_config_modulation_count(setting),
         subghz_scene_receiver_config_set_preset,
         subghz);
-    value_index =
-        subghz_scene_receiver_config_next_preset(furi_string_get_cstr(preset.name), subghz);
-    variable_item_set_current_value_index(item, value_index);
+    const int actual_preset_index =
+        subghz_setting_get_inx_preset_by_name(setting, furi_string_get_cstr(preset.name));
+    const size_t safe_preset_index = actual_preset_index >= 0 ? (size_t)actual_preset_index : 0;
+    variable_item_set_current_value_index(
+        item, subghz_scene_receiver_config_visible_preset_index(setting, safe_preset_index));
     variable_item_set_current_value_text(
-        item, subghz_setting_get_preset_name(setting, value_index));
+        item, subghz_scene_receiver_config_preset_label(setting, safe_preset_index));
 
     if(scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneReadRAW) !=
        SubGhzCustomEventManagerSet) {
@@ -498,7 +616,8 @@ void subghz_scene_receiver_config_on_enter(void* context) {
             variable_item_set_current_value_text(item, "All ON");
         } else {
             static char filter_count_text[8];
-            snprintf(filter_count_text, sizeof(filter_count_text), "%u OFF", protocol_filter_count);
+            snprintf(
+                filter_count_text, sizeof(filter_count_text), "%u OFF", protocol_filter_count);
             variable_item_set_current_value_text(item, filter_count_text);
         }
 
@@ -651,6 +770,13 @@ void subghz_scene_receiver_config_on_enter(void* context) {
         variable_item_set_current_value_index(item, value_index);
         variable_item_set_current_value_text(item, raw_threshold_rssi_text[value_index]);
     }
+    subghz->rx_profile_item = variable_item_list_add(
+        subghz->variable_item_list,
+        "RX profile",
+        SUBGHZ_RX_PROFILE_COUNT,
+        subghz_scene_receiver_config_set_rx_profile,
+        subghz);
+    variable_item_set_current_value_text(subghz->rx_profile_item, "Manual");
     view_dispatcher_switch_to_view(subghz->view_dispatcher, SubGhzViewIdVariableItemList);
 }
 
@@ -673,6 +799,7 @@ bool subghz_scene_receiver_config_on_event(void* context, SceneManagerEvent even
 
 void subghz_scene_receiver_config_on_exit(void* context) {
     SubGhz* subghz = context;
+    subghz->rx_profile_item = NULL;
     variable_item_list_set_selected_item(subghz->variable_item_list, 0);
     variable_item_list_reset(subghz->variable_item_list);
 

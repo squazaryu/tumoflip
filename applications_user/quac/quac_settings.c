@@ -2,6 +2,7 @@
 
 #include <flipper_format/flipper_format.h>
 #include "actions/picopass/quac_picopass.h"
+#include "actions/action_duration.h"
 
 // Quac Settings File Info
 #define QUAC_SETTINGS_FILE_TYPE           "Quac Settings File"
@@ -79,19 +80,19 @@ void quac_load_settings(App* app) {
 
         if(!flipper_format_read_uint32(fff_settings, "SubGhz Duration", &temp_data32, 1)) {
             FURI_LOG_W(TAG, "SETTINGS: Missing 'SubGhz Duration'");
-        } else {
+        } else if(quac_duration_valid(temp_data32)) {
             app->settings.subghz_duration = temp_data32;
         }
 
         if(!flipper_format_read_uint32(fff_settings, "RFID Duration", &temp_data32, 1)) {
             FURI_LOG_W(TAG, "SETTINGS: Missing 'RFID Duration'");
-        } else {
+        } else if(quac_duration_valid(temp_data32)) {
             app->settings.rfid_duration = temp_data32;
         }
 
         if(!flipper_format_read_uint32(fff_settings, "NFC Duration", &temp_data32, 1)) {
             FURI_LOG_W(TAG, "SETTINGS: Missing 'NFC Duration'");
-        } else {
+        } else if(quac_duration_valid(temp_data32)) {
             app->settings.nfc_duration = temp_data32;
         }
 
@@ -109,7 +110,7 @@ void quac_load_settings(App* app) {
 
         if(!flipper_format_read_uint32(fff_settings, "iButton Duration", &temp_data32, 1)) {
             FURI_LOG_W(TAG, "SETTINGS: Missing 'iButton Duration'");
-        } else {
+        } else if(quac_duration_valid(temp_data32)) {
             app->settings.ibutton_duration = temp_data32;
         }
 

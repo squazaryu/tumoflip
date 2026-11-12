@@ -5,7 +5,10 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from .measure_fap_libgcc import build_report, parse_nm_output
+if __package__:
+    from .measure_fap_libgcc import build_report, parse_nm_output
+else:
+    from measure_fap_libgcc import build_report, parse_nm_output
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -40,7 +43,7 @@ class MeasureFapLibgccTest(unittest.TestCase):
             )
 
         self.assertEqual(report["schema"], 1)
-        self.assertEqual(report["api_version"], "88.7")
+        self.assertEqual(report["api_version"], "88.23")
         self.assertEqual(report["artifacts"][0]["bytes"], 7)
 
 

@@ -141,6 +141,7 @@ const SubGhzProtocol fiat_v1_protocol = {
     .name = FIAT_V1_PROTOCOL_NAME,
     .type = SubGhzProtocolTypeDynamic,
     .flag = SubGhzProtocolFlag_315 | SubGhzProtocolFlag_433 | SubGhzProtocolFlag_AM |
+            SubGhzProtocolFlag_FM |
             SubGhzProtocolFlag_Decodable | SubGhzProtocolFlag_Load | SubGhzProtocolFlag_Save
     #if PROTOPIRATE_WITH_ENCODER
             | SubGhzProtocolFlag_Send

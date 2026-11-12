@@ -14,6 +14,7 @@ ARRAY_DEF(SubGhzReceiverSlotArray, SubGhzReceiverSlot, M_POD_OPLIST); //-V658
 struct SubGhzReceiver {
     SubGhzReceiverSlotArray_t slots;
     SubGhzProtocolFlag filter;
+    SubGhzProtocolFlag modulation_filter;
 
     SubGhzReceiverCallback callback;
     void* context;
@@ -37,6 +38,7 @@ SubGhzReceiver* subghz_receiver_alloc_init(SubGhzEnvironment* environment) {
 
     instance->callback = NULL;
     instance->context = NULL;
+    instance->modulation_filter = 0;
     return instance;
 }
 
@@ -64,6 +66,12 @@ void subghz_receiver_decode(SubGhzReceiver* instance, bool level, uint32_t durat
     for
         M_EACH(slot, instance->slots, SubGhzReceiverSlotArray_t) {
             if((slot->base->protocol->flag & instance->filter) != 0) {
+                const SubGhzProtocolFlag modulation =
+                    slot->base->protocol->flag & (SubGhzProtocolFlag_AM | SubGhzProtocolFlag_FM);
+                // RAW/unspecified modulation and legacy callers retain the old behavior.
+                if(instance->modulation_filter && modulation &&
+                   !(modulation & instance->modulation_filter))
+                    continue;
                 slot->base->protocol->decoder->feed(slot->base, level, duration);
             }
         }
@@ -105,6 +113,14 @@ void subghz_receiver_set_rx_callback(
 void subghz_receiver_set_filter(SubGhzReceiver* instance, SubGhzProtocolFlag filter) {
     furi_check(instance);
     instance->filter = filter;
+}
+
+void subghz_receiver_set_modulation_filter(
+    SubGhzReceiver* instance,
+    SubGhzProtocolFlag modulation_filter) {
+    furi_check(instance);
+    instance->modulation_filter =
+        modulation_filter & (SubGhzProtocolFlag_AM | SubGhzProtocolFlag_FM);
 }
 
 SubGhzProtocolDecoderBase* subghz_receiver_search_decoder_base_by_name(

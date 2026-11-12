@@ -1,6 +1,10 @@
 #pragma once
 #include "base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define SUBGHZ_PROTOCOL_SUPERROLLO_NAME "Superrollo"
 
 typedef struct SubGhzProtocolDecoderSuperrollo SubGhzProtocolDecoderSuperrollo;
@@ -114,3 +118,7 @@ SubGhzProtocolStatus
  * @param output Resulting text
  */
 void subghz_protocol_decoder_superrollo_get_string(void* context, FuriString* output);
+
+#ifdef __cplusplus
+}
+#endif

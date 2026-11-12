@@ -193,6 +193,28 @@ Depends(
     fap_dist,
     list(app_artifact.validator for app_artifact in external_app_list),
 )
+# Distribution clears the output directory behind SCons's cached directory state.
+# Recreate every app destination after all selected dist commands, and use a real
+# dependency so unchanged app targets are copied again after their removal.
+selected_dist_commands = [
+    command
+    for name, target, command in distenv["DIST_COMMANDS"]
+    if name in BUILD_TARGETS or target in BUILD_TARGETS
+]
+if selected_dist_commands and any(fap_dist):
+    def prepare_fap_dist_directories(target, source, env):
+        for directory in env["FAP_DIST_DIRECTORIES"]:
+            os.makedirs(directory, exist_ok=True)
+        return 0
+
+    prepared_directories = distenv.Command(
+        "dist_prepare_fap_directories",
+        selected_dist_commands,
+        prepare_fap_dist_directories,
+        FAP_DIST_DIRECTORIES=tuple(sorted({str(node.dir) for nodes in fap_dist for node in nodes})),
+    )
+    distenv.Pseudo(prepared_directories)
+    Depends(fap_dist, prepared_directories)
 Alias("fap_dist", fap_dist)
 
 # Copy all faps to device

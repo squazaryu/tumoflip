@@ -12,6 +12,7 @@ struct ViewPort {
     Gui* gui;
     FuriMutex* mutex;
     bool is_enabled;
+    bool was_drawn;
     ViewPortOrientation orientation;
 
     uint8_t width;

@@ -94,6 +94,7 @@ typedef void (*FelicaCommanReadBlockHandler)(
 struct FelicaListener {
     Nfc* nfc;
     FelicaData* data;
+    FelicaPMm pmm; // Listener timings must not modify the saved dump's PMm.
     FelicaListenerState state;
     FelicaAuthentication auth;
     FelicaBlockData mc_shadow;
@@ -131,14 +132,14 @@ void felica_listener_reset(FelicaListener* instance);
  */
 void felica_wcnt_increment(FelicaData* data);
 
-/** Compares IDm of card loaded for emulation with IDm from request.
+/** Selects a captured System matching the request IDm.
  *
  * @param      instance     pointer to the listener instance to be used.
  * @param      request_idm  pointer to IDm block from request structure.
  *
- * @return     True if IDms' are equal, otherwise false.
+ * @return     True for a saved System's IDm, otherwise false without changing selection.
  */
-bool felica_listener_check_idm(const FelicaListener* instance, const FelicaIDm* request_idm);
+bool felica_listener_select_system_by_idm(FelicaListener* instance, const FelicaIDm* request_idm);
 
 /** Computes the IDm for the currently selected System (instance->current_system_idx),
  * derived from the card's base IDm by encoding the System index into the upper

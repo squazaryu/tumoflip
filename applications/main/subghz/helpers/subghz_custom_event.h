@@ -66,11 +66,14 @@ typedef enum {
     SubGhzCustomEventViewFreqAnalPresetRx,
 
     SubGhzCustomEventByteInputDone,
+    SubGhzCustomEventSceneFeaturePluginMissing,
 } SubGhzCustomEvent;
 
 typedef enum {
     SetTypeFaacSLH_868,
     SetTypeFaacSLH_433,
+    SetTypeGeniusSLH_433,
+    SetTypeGeniusSLH_868,
     SetTypeBFTMitto,
     SetTypeErreka433,
     SetTypeSomfyTelis,
@@ -94,6 +97,7 @@ typedef enum {
     SetTypeAllmatic868,
     SetTypeCenturion433,
     SetTypeMonarch433,
+    SetTypeKEY433,
     SetTypeJollyMotors433,
     SetTypeMotorline433,
     SetTypeSommer_FM_434,
@@ -134,6 +138,7 @@ typedef enum {
     SetTypeNiceSmilo_433_92,
     SetTypeNiceFlorS_433_92,
     SetTypeNiceOne_433_92,
+    SetTypeNiceOCode_433_92,
     SetTypeNiceFlo12bit,
     SetTypeNiceFlo24bit,
     SetTypeCAME12bit,
@@ -150,6 +155,7 @@ typedef enum {
     SetTypeBETT_433,
     SetTypeGangQi_433,
     SetTypeHollarm_433,
+    SetTypeNordIce_433,
     SetTypeReversRB2_433,
     SetTypeMarantec24_868,
     SetTypeMarantec_433,
@@ -168,5 +174,10 @@ typedef enum {
     SetTypeSecPlus_v2_390_00,
     SetTypeSecPlus_v2_433_00,
 
+    // Append new selections to preserve the IDs shared with loadable scenes.
+    SetTypeErreka868,
+    SetTypeHomeGate433,
+
+    SetTypeNiceOCodeOne_433_92,
     SetTypeMAX,
 } SetType;

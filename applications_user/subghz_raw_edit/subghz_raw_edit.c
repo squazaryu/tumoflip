@@ -4,6 +4,7 @@
  */
 
 #include <furi.h>
+#include <furi/core/memmgr_heap.h>
 #include <gui/gui.h>
 #include <input/input.h>
 #include <storage/storage.h>
@@ -17,9 +18,13 @@
 
 #include <lib/toolbox/level_duration.h>
 #include <lib/flipper_format/flipper_format.h>
+#include <lib/flipper_format/flipper_format_i.h>
+#include <lib/toolbox/stream/stream.h>
+#include <lib/toolbox/stream/file_stream.h>
 #include <lib/subghz/environment.h>
 #include <lib/subghz/transmitter.h>
 #include <lib/subghz/subghz_protocol_registry.h>
+#include <lib/subghz/protocols/plugin_registry.h>
 
 #include "subghz_raw_edit_icons.h"
 
@@ -30,6 +35,7 @@
 #define SUBGHZ_DIR "/ext/subghz"
 #define MAX_SAMPLES 24000
 #define SYNTH_YIELD_CAP 4096
+#define MAX_KEY_FILE_BYTES 16384
 #define DUR_CLAMP 32000
 #define LOAD_HEAP_RESERVE 12288
 
@@ -45,7 +51,7 @@
 #define MERGE_PATH_LEN 128
 #define MERGE_BUF_CHUNK 512
 
-#define APP_VERSION "1.7"
+#define APP_VERSION "1.8"
 #define APP_REPO "github.com/Lechnio/SubGHz-RAW-Edit"
 #define APP_NAME "Sub-GHz RAW Edit"
 
@@ -599,6 +605,36 @@ static bool push_duration(SubData *sd, int32_t value)
     return true;
 }
 
+/* Encoders may update Key/Counter in their FlipperFormat. Never hand them the
+ * original file stream. Bound both the copy and its allocation/growth headroom. */
+static FlipperFormat *fff_load_copy(Storage *storage, const char *path)
+{
+    Stream *source = file_stream_alloc(storage);
+    if (!source)
+        return NULL;
+    FlipperFormat *format = NULL;
+    bool ok = false;
+    if (file_stream_open(source, path, FSAM_READ, FSOM_OPEN_EXISTING))
+    {
+        const size_t bytes = stream_size(source);
+        if (bytes > 0 && bytes <= MAX_KEY_FILE_BYTES &&
+            memmgr_get_free_heap() >= bytes * 2 + LOAD_HEAP_RESERVE &&
+            memmgr_heap_get_max_free_block() >= bytes * 2 + 512)
+        {
+            format = flipper_format_string_alloc();
+            if (format)
+            {
+                Stream *copy = flipper_format_get_raw_stream(format);
+                ok = stream_copy_full(source, copy) == bytes && stream_rewind(copy);
+            }
+        }
+    }
+    stream_free(source);
+    if (!ok && format)
+        flipper_format_free(format);
+    return ok ? format : NULL;
+}
+
 static bool synthesize_via_transmitter(
     Storage *storage, const char *path, const char *protocol, SubData *sd)
 {
@@ -616,16 +652,31 @@ static bool synthesize_via_transmitter(
         subghz_environment_load_keystore(env, "/ext/subghz/assets/keeloq_mfcodes_user");
     }
 
-    FlipperFormat *fff = flipper_format_file_alloc(storage);
+    FlipperFormat *fff = fff_load_copy(storage, path);
     SubGhzTransmitter *tx = NULL;
+    SubGhzProtocolPackRegistry *packs = NULL;
     bool ok = false;
 
     do
     {
-        if (!flipper_format_file_open_existing(fff, path))
+        if (!fff)
             break;
 
         tx = subghz_transmitter_alloc_init(env, protocol);
+        if (!tx && memmgr_get_free_heap() >= LOAD_HEAP_RESERVE + 8192 &&
+            memmgr_heap_get_max_free_block() >= 8192)
+        {
+            // Load external Core protocols only when the built-in registry cannot
+            // serve this explicit file. Never change the user's active pack setting.
+            packs = subghz_protocol_pack_registry_alloc(
+                &subghz_protocol_registry, "/ext/apps_data/subghz/plugins",
+                SubGhzProtocolPackGroupCore);
+            if (packs)
+            {
+                subghz_environment_set_protocol_registry(env, subghz_protocol_pack_registry_get(packs));
+                tx = subghz_transmitter_alloc_init(env, protocol);
+            }
+        }
         if (!tx)
             break;
 
@@ -687,9 +738,11 @@ static bool synthesize_via_transmitter(
     if (tx)
         subghz_transmitter_free(tx);
 
-    flipper_format_file_close(fff);
-    flipper_format_free(fff);
+    if (fff)
+        flipper_format_free(fff);
     subghz_environment_free(env);
+    if (packs)
+        subghz_protocol_pack_registry_free(packs);
     return ok;
 }
 
@@ -1144,6 +1197,8 @@ static bool fill_sub_into(
         }
 
         ok = ok && appended_signal;
+        if (ok)
+            dst->synthesized |= tmp.synthesized;
     }
 
     if (tmp.data)

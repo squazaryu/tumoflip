@@ -30,13 +30,16 @@ struct TumoSpectrumBandMap {
     SubGhzRadioBroker* broker;
     SubGhzRadioBrokerLease lease;
     const SubGhzDevice* device;
+    const SubGhzDevice* second_device;
     TumoSpectrumBandMapSnapshot snapshot;
     uint8_t scan_bin;
     bool devices_initialized;
     bool device_begun;
+    bool second_begun;
 };
 
 static int8_t tumospectrum_band_map_clamp_rssi(float value) {
+    if(value != value) return TUMOSPECTRUM_BAND_MAP_RSSI_MIN;
     if(value < (float)TUMOSPECTRUM_BAND_MAP_RSSI_MIN) {
         return TUMOSPECTRUM_BAND_MAP_RSSI_MIN;
     }
@@ -119,9 +122,38 @@ static void tumospectrum_band_map_finish_sweep(TumoSpectrumBandMap* map) {
         }
     }
     map->snapshot.selected_rssi_dbm = map->snapshot.bins[map->snapshot.selected_bin];
+    // Only distinct peaks measurably above this sweep's noise enter the bounded
+    // session history. This is RSSI evidence, never protocol identification.
+    if(map->snapshot.peak_rssi_dbm > -95 &&
+       map->snapshot.peak_rssi_dbm - map->snapshot.noise_floor_dbm >= 10) {
+        unsigned target = map->snapshot.peak_count;
+        for(unsigned i = 0; i < map->snapshot.peak_count; i++) {
+            uint32_t f = map->snapshot.observed_peaks[i].frequency_hz;
+            uint32_t p = map->snapshot.peak_frequency_hz;
+            if((f > p ? f - p : p - f) <= 200000U) { target = i; break; }
+        }
+        if(target == 16) {
+            unsigned weakest = 0;
+            for(unsigned i = 1; i < 16; i++)
+                if(map->snapshot.observed_peaks[i].rssi_dbm < map->snapshot.observed_peaks[weakest].rssi_dbm) weakest = i;
+            if(map->snapshot.observed_peaks[weakest].rssi_dbm >= map->snapshot.peak_rssi_dbm) return;
+            target = weakest;
+            map->snapshot.observed_peaks[target].observations = 0;
+        } else if(target == map->snapshot.peak_count) {
+            map->snapshot.peak_count++;
+            map->snapshot.observed_peaks[target].observations = 0;
+        }
+        TumoSpectrumBandPeak* peak = &map->snapshot.observed_peaks[target];
+        if(!peak->observations || peak->rssi_dbm < map->snapshot.peak_rssi_dbm) {
+            peak->frequency_hz = map->snapshot.peak_frequency_hz;
+            peak->rssi_dbm = map->snapshot.peak_rssi_dbm;
+            peak->radio = map->snapshot.radio;
+        }
+        if(peak->observations < UINT16_MAX) peak->observations++;
+    }
 }
 
-static bool tumospectrum_band_map_begin_device(TumoSpectrumBandMap* map, bool prefer_external) {
+static bool tumospectrum_band_map_begin_device(TumoSpectrumBandMap* map, TumoSpectrumBandMapRadio requested) {
     map->broker = furi_record_open(RECORD_SUBGHZ_RADIO_BROKER);
     if(!subghz_radio_broker_acquire(
            map->broker,
@@ -144,11 +176,12 @@ static bool tumospectrum_band_map_begin_device(TumoSpectrumBandMap* map, bool pr
         map->snapshot.external_available = subghz_devices_is_connect(external);
     }
 
-    if(prefer_external && map->snapshot.external_available) {
+    if(requested == TumoSpectrumBandMapRadioExternal && map->snapshot.external_available) {
         map->device = external;
         map->snapshot.radio = TumoSpectrumBandMapRadioExternal;
     } else {
-        subghz_radio_broker_external_power_off(map->broker, &map->lease);
+        if(requested != TumoSpectrumBandMapRadioDual || !map->snapshot.external_available)
+            subghz_radio_broker_external_power_off(map->broker, &map->lease);
         map->device = subghz_devices_get_by_name(TUMOSPECTRUM_BAND_MAP_INTERNAL_NAME);
         map->snapshot.radio = TumoSpectrumBandMapRadioInternal;
     }
@@ -171,9 +204,23 @@ static bool tumospectrum_band_map_begin_device(TumoSpectrumBandMap* map, bool pr
         return false;
     }
     map->device_begun = true;
+    if(requested == TumoSpectrumBandMapRadioDual && map->snapshot.external_available && map->device == subghz_devices_get_by_name(TUMOSPECTRUM_BAND_MAP_INTERNAL_NAME)) {
+        if(subghz_devices_begin(external)) {
+            map->second_device = external;
+            map->second_begun = true;
+            map->snapshot.radio = TumoSpectrumBandMapRadioDual;
+            subghz_devices_reset(external);
+            subghz_devices_load_preset(external, FuriHalSubGhzPresetOok650Async, NULL);
+        } else {
+            subghz_devices_end(external);
+            subghz_radio_broker_external_power_off(map->broker, &map->lease);
+            map->snapshot.external_available = false;
+        }
+    }
     subghz_radio_broker_set_selected_device(
         map->broker,
         &map->lease,
+        map->snapshot.radio == TumoSpectrumBandMapRadioDual ? SubGhzRadioBrokerDeviceDual :
         map->snapshot.radio == TumoSpectrumBandMapRadioExternal ?
             SubGhzRadioBrokerDeviceExternalCC1101 :
             SubGhzRadioBrokerDeviceInternal);
@@ -213,8 +260,10 @@ bool tumospectrum_band_map_start(TumoSpectrumBandMap* map, bool prefer_external)
     tumospectrum_band_map_stop(map);
     map->snapshot.hold = false;
     tumospectrum_band_map_reset_samples(map);
-    if(!tumospectrum_band_map_begin_device(map, prefer_external)) {
+    if(!tumospectrum_band_map_begin_device(map, prefer_external ? TumoSpectrumBandMapRadioExternal : TumoSpectrumBandMapRadioInternal)) {
+        TumoSpectrumBandMapStatus status = map->snapshot.status;
         tumospectrum_band_map_stop(map);
+        map->snapshot.status = status;
         return false;
     }
     return true;
@@ -231,6 +280,13 @@ void tumospectrum_band_map_stop(TumoSpectrumBandMap* map) {
         subghz_devices_end(map->device);
         map->device_begun = false;
     }
+    if(map->second_begun && map->second_device) {
+        subghz_devices_idle(map->second_device);
+        subghz_devices_sleep(map->second_device);
+        subghz_devices_end(map->second_device);
+    }
+    map->second_begun = false;
+    map->second_device = NULL;
     if(map->devices_initialized) {
         subghz_devices_deinit();
         map->devices_initialized = false;
@@ -250,21 +306,47 @@ void tumospectrum_band_map_tick(TumoSpectrumBandMap* map) {
         return;
     }
 
+    if(map->snapshot.radio != TumoSpectrumBandMapRadioInternal) {
+        const SubGhzDevice* external = map->second_device ? map->second_device : map->device;
+        if(!subghz_devices_is_connect(external)) {
+            // Stop both under the existing lease before attempting internal-only
+            // restart. Never leave a detached external driver/power context live.
+            tumospectrum_band_map_stop(map);
+            if(!tumospectrum_band_map_begin_device(map, TumoSpectrumBandMapRadioInternal)) {
+                tumospectrum_band_map_stop(map);
+                map->snapshot.status = TumoSpectrumBandMapStatusError;
+                return;
+            }
+            tumospectrum_band_map_reset_samples(map);
+        }
+    }
+    const uint8_t radios = map->second_begun ? 2U : 1U;
+    const uint8_t limit = TUMOSPECTRUM_BAND_MAP_BINS / radios;
     for(uint8_t sample = 0U; sample < TUMOSPECTRUM_BAND_MAP_BINS_PER_TICK; sample++) {
         const uint8_t bin = map->scan_bin;
-        const uint32_t frequency = tumospectrum_band_map_frequency_for_bin(&map->snapshot, bin);
-        if(subghz_devices_is_frequency_valid(map->device, frequency)) {
-            subghz_devices_idle(map->device);
-            if(subghz_devices_set_frequency(map->device, frequency) != 0U) {
-                subghz_devices_set_rx(map->device);
-                furi_delay_ms(TUMOSPECTRUM_BAND_MAP_SAMPLE_DELAY_MS);
-                map->snapshot.bins[bin] =
-                    tumospectrum_band_map_clamp_rssi(subghz_devices_get_rssi(map->device));
+        const SubGhzDevice* devices[2] = {map->device, map->second_device};
+        bool ready = true;
+        for(uint8_t r = 0; r < radios; r++) {
+            const uint32_t frequency = tumospectrum_band_map_frequency_for_bin(&map->snapshot, bin + r * limit);
+            subghz_devices_idle(devices[r]);
+            if(!subghz_devices_is_frequency_valid(devices[r], frequency) ||
+               !subghz_devices_set_frequency(devices[r], frequency)) {
+                ready = false;
+                break;
             }
+            subghz_devices_set_rx(devices[r]);
         }
+        if(!ready) {
+            tumospectrum_band_map_stop(map);
+            map->snapshot.status = TumoSpectrumBandMapStatusError;
+            return;
+        }
+        furi_delay_ms(TUMOSPECTRUM_BAND_MAP_SAMPLE_DELAY_MS);
+        for(uint8_t r = 0; r < radios; r++)
+            map->snapshot.bins[bin + r * limit] = tumospectrum_band_map_clamp_rssi(subghz_devices_get_rssi(devices[r]));
 
         map->scan_bin++;
-        if(map->scan_bin >= TUMOSPECTRUM_BAND_MAP_BINS) {
+        if(map->scan_bin >= limit) {
             map->scan_bin = 0U;
             tumospectrum_band_map_finish_sweep(map);
         }
@@ -287,10 +369,10 @@ bool tumospectrum_band_map_set_band(TumoSpectrumBandMap* map, size_t index) {
 
 bool tumospectrum_band_map_cycle_radio(TumoSpectrumBandMap* map) {
     if(!map) return false;
-    const bool request_external = map->snapshot.radio == TumoSpectrumBandMapRadioInternal;
+    const TumoSpectrumBandMapRadio request = (map->snapshot.radio + 1) % 3;
     tumospectrum_band_map_stop(map);
     map->snapshot.hold = false;
-    const bool started = tumospectrum_band_map_begin_device(map, request_external);
+    const bool started = tumospectrum_band_map_begin_device(map, request);
     if(!started) {
         tumospectrum_band_map_stop(map);
         return false;
@@ -342,6 +424,7 @@ void tumospectrum_band_map_toggle_hold(TumoSpectrumBandMap* map) {
     map->snapshot.status = map->snapshot.hold ? TumoSpectrumBandMapStatusHold :
                                                 TumoSpectrumBandMapStatusScanning;
     if(map->snapshot.hold) subghz_devices_idle(map->device);
+    if(map->snapshot.hold && map->second_begun) subghz_devices_idle(map->second_device);
 }
 
 void tumospectrum_band_map_snap_to_peak(TumoSpectrumBandMap* map) {
@@ -351,6 +434,26 @@ void tumospectrum_band_map_snap_to_peak(TumoSpectrumBandMap* map) {
     map->snapshot.selected_frequency_hz =
         tumospectrum_band_map_frequency_for_bin(&map->snapshot, map->snapshot.selected_bin);
     map->snapshot.selected_rssi_dbm = map->snapshot.bins[map->snapshot.selected_bin];
+}
+
+void tumospectrum_band_map_clear_peaks(TumoSpectrumBandMap* map) {
+    if(!map) return;
+    map->snapshot.peak_count = 0;
+    memset(map->snapshot.observed_peaks, 0, sizeof(map->snapshot.observed_peaks));
+}
+bool tumospectrum_band_map_select_peak(TumoSpectrumBandMap* map, unsigned index) {
+    if(!map || index >= map->snapshot.peak_count) return false;
+    uint32_t frequency = map->snapshot.observed_peaks[index].frequency_hz;
+    for(unsigned i = 0; i < COUNT_OF(tumospectrum_band_map_bands); i++) {
+        const TumoSpectrumBandMapBand* band = &tumospectrum_band_map_bands[i];
+        if(frequency >= band->start_hz && frequency <= band->end_hz) {
+            tumospectrum_band_map_set_band(map, i);
+            map->snapshot.selected_bin = tumospectrum_band_map_bin_for_frequency(&map->snapshot, frequency);
+            map->snapshot.selected_frequency_hz = tumospectrum_band_map_frequency_for_bin(&map->snapshot, map->snapshot.selected_bin);
+            return true;
+        }
+    }
+    return false;
 }
 
 void tumospectrum_band_map_get_snapshot(

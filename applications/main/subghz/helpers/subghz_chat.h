@@ -1,9 +1,12 @@
 #pragma once
+#include <applications/services/subghz_radio_broker/subghz_radio_broker.h>
 #include "../subghz_i.h"
 #include <lib/subghz/devices/devices.h>
 #include <toolbox/pipe.h>
 
 typedef struct SubGhzChatWorker SubGhzChatWorker;
+bool subghz_chat_worker_set_radio_lease(
+    SubGhzChatWorker* worker, SubGhzRadioBroker* broker, const SubGhzRadioBrokerLease* lease);
 
 typedef enum {
     SubGhzChatEventNoEvent,

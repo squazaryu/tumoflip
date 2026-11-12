@@ -25,6 +25,9 @@ const GapRootSecurityKeys* bt_keys_storage_get_root_keys(BtKeysStorage* instance
 
 bool bt_keys_storage_load(BtKeysStorage* instance);
 
+/** Strict load for opt-in profile switching; create only a genuinely absent file. */
+bool bt_keys_storage_load_or_create(BtKeysStorage* instance);
+
 bool bt_keys_storage_update(BtKeysStorage* instance, uint8_t* start_addr, uint32_t size);
 
 bool bt_keys_storage_delete(BtKeysStorage* instance);

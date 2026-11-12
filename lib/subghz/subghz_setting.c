@@ -73,6 +73,7 @@ static const uint32_t subghz_frequency_list[] = {
 
     /* 779 - 928 */
     779000000,
+    868000000,
     868350000,
     868400000,
     868460000,
@@ -394,6 +395,7 @@ const char* subghz_setting_get_preset_name(SubGhzSetting* instance, size_t idx) 
 
 int subghz_setting_get_inx_preset_by_name(SubGhzSetting* instance, const char* preset_name) {
     furi_check(instance);
+    if(!preset_name || !preset_name[0]) return -1;
     size_t idx = 0;
     for
         M_EACH(item, instance->preset->data, SubGhzSettingCustomPresetItemArray_t) {
@@ -411,31 +413,24 @@ bool subghz_setting_load_custom_preset(
     FlipperFormat* fff_data_file) {
     furi_check(instance);
     furi_check(preset_name);
-    uint32_t temp_data32;
+    uint32_t size = 0;
+    if(!flipper_format_get_value_count(fff_data_file, "Custom_preset_data", &size) ||
+       !size || (size % 2))
+        return false;
+    uint8_t* data = malloc(size);
+    if(!data) return false;
+    if(!flipper_format_read_hex(fff_data_file, "Custom_preset_data", data, size)) {
+        free(data);
+        return false;
+    }
+    // Publish ownership only after the entire preset is read successfully.
     SubGhzSettingCustomPresetItem* item =
         SubGhzSettingCustomPresetItemArray_push_raw(instance->preset->data);
     item->custom_preset_name = furi_string_alloc();
     furi_string_set(item->custom_preset_name, preset_name);
-    do {
-        if(!flipper_format_get_value_count(fff_data_file, "Custom_preset_data", &temp_data32))
-            break;
-        if(!temp_data32 || (temp_data32 % 2)) {
-            FURI_LOG_E(TAG, "Integrity error Custom_preset_data");
-            break;
-        }
-        item->custom_preset_data_size = sizeof(uint8_t) * temp_data32;
-        item->custom_preset_data = malloc(item->custom_preset_data_size);
-        if(!flipper_format_read_hex(
-               fff_data_file,
-               "Custom_preset_data",
-               item->custom_preset_data,
-               item->custom_preset_data_size)) {
-            FURI_LOG_E(TAG, "Missing Custom_preset_data");
-            break;
-        }
-        return true;
-    } while(true);
-    return false;
+    item->custom_preset_data_size = size;
+    item->custom_preset_data = data;
+    return true;
 }
 
 bool subghz_setting_delete_custom_preset(SubGhzSetting* instance, const char* preset_name) {
@@ -472,8 +467,10 @@ size_t subghz_setting_get_preset_data_size(SubGhzSetting* instance, size_t idx) 
 
 uint8_t* subghz_setting_get_preset_data_by_name(SubGhzSetting* instance, const char* preset_name) {
     furi_check(instance);
-    SubGhzSettingCustomPresetItem* item = SubGhzSettingCustomPresetItemArray_get(
-        instance->preset->data, subghz_setting_get_inx_preset_by_name(instance, preset_name));
+    const int index = subghz_setting_get_inx_preset_by_name(instance, preset_name);
+    if(index < 0) return NULL;
+    SubGhzSettingCustomPresetItem* item =
+        SubGhzSettingCustomPresetItemArray_get(instance->preset->data, (size_t)index);
     return item->custom_preset_data;
 }
 

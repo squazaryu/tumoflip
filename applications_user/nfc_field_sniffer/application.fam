@@ -1,0 +1,16 @@
+App(
+    appid="tumo_nfc_sniffer",
+    name="Tumo NFC Sniffer",
+    apptype=FlipperAppType.EXTERNAL,
+    targets=["f7"],
+    entry_point="nfc_field_sniffer_app",
+    sources=["nfc_field_sniffer.c", "nfc_field_capture.c", "nfc_field_decoder.c", "nfc_field_format.c", "nfc_field_lease.c"],
+    requires=["gui", "storage"],
+    stack_size=4096,
+    fap_icon="../../applications/main/nfc/icon.png",
+    fap_category="NFC",
+    fap_version="1.0",
+    fap_author="squazaryu/tumoflip; ARF / @thedoctorz passive demodulation",
+    fap_description="Experimental passive ISO14443-A106k candidate-frame sniffer. Bounded memory, exclusive resources, explicit save. No relay or key recovery.",
+    fap_package_only=True,
+)

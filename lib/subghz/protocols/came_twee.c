@@ -16,6 +16,9 @@
 
 #define TAG "SubGhzProtocolCameTwee"
 
+// A bit count alone also matches unrelated Manchester-like signals.
+#define CAME_TWEE_FRAME_PREFIX 0x3FFF72UL
+
 #define DIP_PATTERN "%c%c%c%c%c%c%c%c%c%c"
 #define CNT_TO_DIP(dip)                                                                     \
     (dip & 0x0200 ? '1' : '0'), (dip & 0x0100 ? '1' : '0'), (dip & 0x0080 ? '1' : '0'),     \
@@ -113,30 +116,8 @@ void* subghz_protocol_encoder_came_twee_alloc(SubGhzEnvironment* environment) {
 
 static LevelDuration
     subghz_protocol_encoder_came_twee_add_duration_to_upload(ManchesterEncoderResult result) {
-    LevelDuration data = {.duration = 0, .level = 0};
-    switch(result) {
-    case ManchesterEncoderResultShortLow:
-        data.duration = subghz_protocol_came_twee_const.te_short;
-        data.level = false;
-        break;
-    case ManchesterEncoderResultLongLow:
-        data.duration = subghz_protocol_came_twee_const.te_long;
-        data.level = false;
-        break;
-    case ManchesterEncoderResultLongHigh:
-        data.duration = subghz_protocol_came_twee_const.te_long;
-        data.level = true;
-        break;
-    case ManchesterEncoderResultShortHigh:
-        data.duration = subghz_protocol_came_twee_const.te_short;
-        data.level = true;
-        break;
-
-    default:
-        furi_crash("SubGhz: ManchesterEncoderResult is incorrect.");
-        break;
-    }
-    return level_duration_make(data.level, data.duration);
+    return subghz_protocol_encoder_common_manchester_duration(
+        result, subghz_protocol_came_twee_const.te_short, subghz_protocol_came_twee_const.te_long);
 }
 
 /**
@@ -181,7 +162,7 @@ static void subghz_protocol_encoder_came_twee_get_upload(SubGhzProtocolEncoderCa
  * Analysis of received data
  * @param instance Pointer to a SubGhzBlockGeneric* instance
  */
-static void subghz_protocol_came_twee_remote_controller(SubGhzBlockGeneric* instance) {
+static bool subghz_protocol_came_twee_remote_controller(SubGhzBlockGeneric* instance) {
     /*      Came Twee 54 bit, rolling code 15 parcels with
     *       a decreasing counter from 0xE to 0x0
     *       with originally coded dip switches on the console 10 bit code
@@ -218,6 +199,8 @@ static void subghz_protocol_came_twee_remote_controller(SubGhzBlockGeneric* inst
     */
 
     uint8_t cnt_parcel = (uint8_t)(instance->data & 0xF);
+    // Only parcels 0..14 exist. Do not reinterpret malformed input as parcel 14.
+    if(cnt_parcel >= COUNT_OF(came_twee_magic_numbers_xor)) return false;
     uint32_t data = (uint32_t)(instance->data & 0x0FFFFFFFF);
 
     data = (data ^ came_twee_magic_numbers_xor[cnt_parcel]);
@@ -227,6 +210,7 @@ static void subghz_protocol_came_twee_remote_controller(SubGhzBlockGeneric* inst
     data >>= 16;
     data = (uint16_t)subghz_protocol_blocks_reverse_key(data, 16);
     instance->cnt = data >> 6;
+    return true;
 }
 
 SubGhzProtocolStatus
@@ -246,7 +230,10 @@ SubGhzProtocolStatus
         flipper_format_read_uint32(
             flipper_format, "Repeat", (uint32_t*)&instance->encoder.repeat, 1);
 
-        subghz_protocol_came_twee_remote_controller(&instance->generic);
+        if(!subghz_protocol_came_twee_remote_controller(&instance->generic)) {
+            res = SubGhzProtocolStatusErrorParserOthers;
+            break;
+        }
         subghz_protocol_encoder_came_twee_get_upload(instance);
         instance->encoder.front = 0; // reset position before start
         instance->encoder.is_running = true;
@@ -324,7 +311,10 @@ void subghz_protocol_decoder_came_twee_feed(void* context, bool level, uint32_t 
                 duration >= ((uint32_t)subghz_protocol_came_twee_const.te_long * 2 +
                              subghz_protocol_came_twee_const.te_delta)) {
                 if(instance->decoder.decode_count_bit ==
-                   subghz_protocol_came_twee_const.min_count_bit_for_found) {
+                       subghz_protocol_came_twee_const.min_count_bit_for_found &&
+                   ((instance->decoder.decode_data >> 32) & 0x3FFFFFUL) ==
+                       CAME_TWEE_FRAME_PREFIX &&
+                   (instance->decoder.decode_data & 0xF) < COUNT_OF(came_twee_magic_numbers_xor)) {
                     instance->generic.data = instance->decoder.decode_data;
                     instance->generic.data_count_bit = instance->decoder.decode_count_bit;
 
@@ -381,16 +371,21 @@ SubGhzProtocolStatus
     subghz_protocol_decoder_came_twee_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_assert(context);
     SubGhzProtocolDecoderCameTwee* instance = context;
-    return subghz_block_generic_deserialize_check_count_bit(
+    SubGhzProtocolStatus res = subghz_block_generic_deserialize_check_count_bit(
         &instance->generic,
         flipper_format,
         subghz_protocol_came_twee_const.min_count_bit_for_found);
+    if(res == SubGhzProtocolStatusOk &&
+       !subghz_protocol_came_twee_remote_controller(&instance->generic)) {
+        res = SubGhzProtocolStatusErrorParserOthers;
+    }
+    return res;
 }
 
 void subghz_protocol_decoder_came_twee_get_string(void* context, FuriString* output) {
     furi_assert(context);
     SubGhzProtocolDecoderCameTwee* instance = context;
-    subghz_protocol_came_twee_remote_controller(&instance->generic);
+    if(!subghz_protocol_came_twee_remote_controller(&instance->generic)) return;
     uint32_t code_found_hi = instance->generic.data >> 32;
     uint32_t code_found_lo = instance->generic.data & 0x00000000ffffffff;
 

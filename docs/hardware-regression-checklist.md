@@ -1,6 +1,6 @@
 # Hardware Regression Checklist
 
-Checklist version: 2
+Checklist version: 3
 
 Use this checklist for tumoflip release candidates before marking a release as
 hardware-validated. CI can build firmware, validate packages, run unit tests,
@@ -20,7 +20,7 @@ hardware cases as unverified.
 ```text
 Hardware validation
 - status: not run | partial | passed | failed
-- checklist version: 2
+- checklist version: 3
 - firmware version:
 - release tag:
 - firmware commit:
@@ -101,6 +101,32 @@ are legally allowed to test.
   frequency or preset. Confirm TX is rejected with a concrete reason before
   the CC1101 enters transmit mode.
 - Exit Sub-GHz and reopen it three times without a radio lock or crash.
+
+### Erreka Add Manually (Dev 009-024)
+
+- On a disposable test file, confirm Erreka offers both 433.92 MHz and
+  868.35 MHz with AM650. Save and reopen each choice; verify frequency, preset,
+  seed and serial remain unchanged.
+- Test generated-file behavior only on your own compatible Erreka receiver;
+  check the selected frequency against its hardware and local radio rules.
+- With a safe test setup, confirm a failed save reports an error instead of
+  reporting success. Never remove the SD card during a write to user data.
+
+### Nice O-Code Add Manually (Dev 009-022)
+
+- Use only a Nice O-Code system you own or are authorized to test.
+- In Standard Sub-GHz -> Add Manually -> Advanced, enter a 28-bit serial,
+  button, counter, and the known 16-bit installer code.
+- Confirm IC `FFFF` is rejected as the plain FloR-S marker, and invalid serial or
+  button widths are rejected with a specific error.
+- Save the generated signal, reopen it, and confirm the file contains the `IC`
+  field and decodes as Nice O-Code.
+- Cancel during IC entry and confirm no incomplete signal is saved.
+- Generate and reopen ordinary FloR-S and Nice One samples; confirm they still
+  use the existing path and are not tagged as O-Code.
+- On your own receiver, use its normal enrollment procedure before checking that
+  the generated signal behaves as intended. This build does not add the separate
+  Nice O-Code recovery app's New-remote action.
 
 ### External CC1101 And Module One
 
@@ -240,11 +266,54 @@ are legally allowed to test.
   Mac app and confirm qFlipper can immediately reopen the serial connection.
 - Disconnect and reconnect without rebooting the Flipper.
 
+### TumoSpectrum Capture Sets (Dev 009-023)
+
+- Back up `/ext/apps_data/signal_workbench/` and use copies of your own `.sub`
+  or `.ir` captures for the checks below.
+- Open `Apps -> Module One -> Signals -> TumoSpectrum -> Capture Sets`; confirm
+  `Latest set` remains available and `Browse archive` lists saved timestamped
+  sets without hiding older timestamp-only entries.
+- Open a saved set and confirm its saved analysis is readable. Run `Check
+  source files`; unchanged inputs must show `Unchanged`. Missing or modified
+  *copies* must be identified as `Missing` or `Changed`, without altering the
+  capture or replacing the saved analysis.
+- Open a legacy schema-1/2 set; confirm it remains readable and is explicitly
+  `Unverified` when its source exists. Do not treat path/size equality as proof
+  that its source is unchanged.
+- Export the set report twice. Each export must have a distinct name and the
+  first report must remain unchanged.
+- Start source verification on a large test file and press Back; confirm the
+  operation cancels before any archive write, the UI returns cleanly, and a
+  subsequent check succeeds.
+- Confirm opening, browsing, checking, and exporting an archive does not start
+  radio transmission, delete/rename source captures, or change Standard
+  Sub-GHz and Read RAW settings.
+
 ### NFC
 
 - Read a MIFARE Ultralight/NTAG card with PWD/PACK data and confirm the read
   success screen displays the values.
 - Read a Bambu Lab filament spool tag and confirm parser output.
+- With your own Texkom fobs (TK13, TK15, TK17, and MMBIT), confirm NFC Read
+  reports the detected type, UID, and checksum state. Save each read, reopen it,
+  and confirm it still emulates. Test emulation only against your own compatible
+  reader; do not write to or alter a physical fob.
+- Open Add Manually and confirm TK13, TK17, and MMBIT generate a frame with a
+  valid checksum and random UID. TK15 should not be offered as a separate
+  generator because it shares TK13 frame data and differs only in timing.
+- On your own FeliCa Standard card where available, confirm the system key
+  version is independent from the key version of Area 0000. Save and reopen the
+  dump. Load a legacy format-v3 dump and confirm its system key version is
+  Unknown while area and service key versions remain intact.
+- If a FeliCa card does not answer the optional system-node version request,
+  confirm the read still completes with the already-read services, areas, and
+  public blocks preserved.
+- With your own Standard and Lite-S cards/dumps, read, save and reopen, then
+  emulate repeatedly. Confirm the saved PMm and system codes do not change
+  after emulation; Standard must not advertise systems absent from its dump.
+- On your own compatible reader, confirm emulation keeps receiving after a
+  rejected or unsupported request and selects a saved system addressed by its
+  IDm. Unsupported extended block addresses must not access a low-byte alias.
 - Exit NFC and reopen it without lag, crash, or stuck storage activity.
 
 ### Sleep/Wake And Repeated Launch

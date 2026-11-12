@@ -788,30 +788,10 @@ static void subghz_protocol_secplus_v2_encode(SubGhzProtocolEncoderSecPlus_v2* i
 
 static LevelDuration
     subghz_protocol_encoder_secplus_v2_add_duration_to_upload(ManchesterEncoderResult result) {
-    LevelDuration data = {.duration = 0, .level = 0};
-    switch(result) {
-    case ManchesterEncoderResultShortLow:
-        data.duration = subghz_protocol_secplus_v2_const.te_short;
-        data.level = false;
-        break;
-    case ManchesterEncoderResultLongLow:
-        data.duration = subghz_protocol_secplus_v2_const.te_long;
-        data.level = false;
-        break;
-    case ManchesterEncoderResultLongHigh:
-        data.duration = subghz_protocol_secplus_v2_const.te_long;
-        data.level = true;
-        break;
-    case ManchesterEncoderResultShortHigh:
-        data.duration = subghz_protocol_secplus_v2_const.te_short;
-        data.level = true;
-        break;
-
-    default:
-        furi_crash("SubGhz: ManchesterEncoderResult is incorrect.");
-        break;
-    }
-    return level_duration_make(data.level, data.duration);
+    return subghz_protocol_encoder_common_manchester_duration(
+        result,
+        subghz_protocol_secplus_v2_const.te_short,
+        subghz_protocol_secplus_v2_const.te_long);
 }
 
 /**
@@ -1319,101 +1299,15 @@ SubGhzProtocolStatus
 }
 
 static uint8_t subghz_protocol_secplus_v2_get_btn_code(void) {
-    uint8_t custom_btn_id = subghz_custom_btn_get();
-    uint8_t original_btn_code = subghz_custom_btn_get_original();
-    uint8_t btn = original_btn_code;
-
-    // Set custom button
-    if((custom_btn_id == SUBGHZ_CUSTOM_BTN_OK) && (original_btn_code != 0)) {
-        // Restore original button code
-        btn = original_btn_code;
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_UP) {
-        switch(original_btn_code) {
-        case 0x68:
-            btn = 0x80;
-            break;
-        case 0x80:
-            btn = 0x68;
-            break;
-        case 0x81:
-            btn = 0x80;
-            break;
-        case 0xE2:
-            btn = 0x80;
-            break;
-        case 0x78:
-            btn = 0x80;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_DOWN) {
-        switch(original_btn_code) {
-        case 0x68:
-            btn = 0x81;
-            break;
-        case 0x80:
-            btn = 0x81;
-            break;
-        case 0x81:
-            btn = 0x68;
-            break;
-        case 0xE2:
-            btn = 0x81;
-            break;
-        case 0x78:
-            btn = 0x81;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_LEFT) {
-        switch(original_btn_code) {
-        case 0x68:
-            btn = 0xE2;
-            break;
-        case 0x80:
-            btn = 0xE2;
-            break;
-        case 0x81:
-            btn = 0xE2;
-            break;
-        case 0xE2:
-            btn = 0x68;
-            break;
-        case 0x78:
-            btn = 0xE2;
-            break;
-
-        default:
-            break;
-        }
-    } else if(custom_btn_id == SUBGHZ_CUSTOM_BTN_RIGHT) {
-        switch(original_btn_code) {
-        case 0x68:
-            btn = 0x78;
-            break;
-        case 0x80:
-            btn = 0x78;
-            break;
-        case 0x81:
-            btn = 0x78;
-            break;
-        case 0xE2:
-            btn = 0x78;
-            break;
-        case 0x78:
-            btn = 0x68;
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    return btn;
+    // Original, Up, Down, Left, Right. Unknown values remain unchanged.
+    static const uint8_t rows[][5] = {
+        {0x68, 0x80, 0x81, 0xE2, 0x78},
+        {0x78, 0x80, 0x81, 0xE2, 0x68},
+        {0x80, 0x68, 0x81, 0xE2, 0x78},
+        {0x81, 0x80, 0x68, 0xE2, 0x78},
+        {0xE2, 0x80, 0x81, 0x68, 0x78},
+    };
+    return subghz_custom_btn_lookup(rows, sizeof(rows) / sizeof(rows[0]));
 }
 
 void subghz_protocol_decoder_secplus_v2_get_string(void* context, FuriString* output) {

@@ -8,6 +8,10 @@ extern "C" {
 
 typedef struct SubGhzDevice SubGhzDevice;
 
+/** Set a channel only when its effective frequency is valid/allowed by the driver. */
+bool subghz_devices_set_channel_checked(const SubGhzDevice* device, uint8_t channel);
+bool subghz_devices_get_channel_checked(const SubGhzDevice* device, uint8_t* channel);
+
 void subghz_devices_init(void);
 void subghz_devices_deinit(void);
 

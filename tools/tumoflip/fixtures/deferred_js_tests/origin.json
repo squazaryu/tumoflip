@@ -1,0 +1,14 @@
+{
+  "sourceCommit": "e3a2c66bb275076db0af7109c6ac9034d3892e6a",
+  "status": "source-only-excluded-js-host",
+  "files": [
+    {"original": "applications/debug/unit_tests/tests/js/js_test.c", "saved": "src/js_test.c", "sha256": "a75ec62758383a76a8d14d2c543fe41874deccda06530699155959e7ad817672"},
+    {"original": "applications/debug/unit_tests/resources/unit_tests/js/basic.js", "saved": "resources/basic.js", "sha256": "921f498ec5fa491ba5e44da79e2b4f05d7dc3f481c9a0bffe7a2f73295c1dc04"},
+    {"original": "applications/debug/unit_tests/resources/unit_tests/js/event_loop.js", "saved": "resources/event_loop.js", "sha256": "e0bebcca5cbdbcd2d4dca0a3e3e3235f8cf5478b06038c01b14f7aeb57d1c22a"},
+    {"original": "applications/debug/unit_tests/resources/unit_tests/js/math.js", "saved": "resources/math.js", "sha256": "640285260a5488f5901603383dd9413de6aa7a87d5f5f0d383ff3a797153f52b"},
+    {"original": "applications/debug/unit_tests/resources/unit_tests/js/storage.js", "saved": "resources/storage.js", "sha256": "6251b3aea6cf02a4f6af287e1e00622ae01b044b5a3b72feee8df3668d22f2ef"},
+    {"original": "applications/system/js_app/modules/js_tests.c", "saved": "src/js_tests.c", "sha256": "1d9693a4442922c3f361362ed65203e5f954f6e7177920ef3fad6d698df84252"},
+    {"original": "applications/system/js_app/modules/js_tests.h", "saved": "src/js_tests.h", "sha256": "96604185e8a5431064c6c60c360d6b10a29a9db788a951695aadb9ff5332ad75"},
+    {"original": "applications/system/js_app/packages/fz-sdk/tests/index.d.ts", "saved": "sdk/index.d.ts", "sha256": "ff6a42151d5d23090efc73936bff2237ceb8da10dc015e40cb7ff4866c5e79c2"}
+  ]
+}

@@ -46,6 +46,14 @@ typedef enum {
 LoaderStatus
     loader_start(Loader* instance, const char* name, const char* args, FuriString* error_message);
 
+/** Atomic launch result in schema-1 key/value form; arguments are never logged. */
+LoaderStatus loader_start_with_diagnostics(
+    Loader* instance, const char* name, const char* args,
+    FuriString* error_message, FuriString* diagnostic);
+
+/** Copy the latest attempt's schema-1 snapshot through the loader queue. */
+void loader_get_last_diagnostic(Loader* instance, FuriString* diagnostic);
+
 /**
  * @brief Start application with GUI error message
  * @param[in] instance loader instance

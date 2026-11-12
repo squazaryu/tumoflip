@@ -1,4 +1,5 @@
 #include "wifi_marauder_app_i.h"
+#include "wifi_marauder_console_policy.h"
 
 #include <furi.h>
 #include <furi_hal.h>
@@ -20,6 +21,15 @@ static void wifi_marauder_app_tick_event_callback(void* context) {
     furi_assert(context);
     WifiMarauderApp* app = context;
     scene_manager_handle_tick_event(app->scene_manager);
+}
+
+static bool wifi_marauder_console_input(InputEvent* event, void* context) {
+    WifiMarauderApp* app = context;
+    if(event->key != InputKeyOk || !app->is_command || app->script ||
+       !wifi_marauder_console_can_mark_poi(app->selected_tx_string)) return false;
+    if(event->type == InputTypeLong)
+        view_dispatcher_send_custom_event(app->view_dispatcher, WifiMarauderEventMarkPoi);
+    return true;
 }
 
 WifiMarauderApp* wifi_marauder_app_alloc() {
@@ -60,8 +70,14 @@ WifiMarauderApp* wifi_marauder_app_alloc() {
     app->special_case_input_step = 0;
 
     app->text_box = text_box_alloc();
+    app->console_stack = view_stack_alloc();
+    app->console_input = view_alloc();
+    view_set_context(app->console_input, app);
+    view_set_input_callback(app->console_input, wifi_marauder_console_input);
+    view_stack_add_view(app->console_stack, text_box_get_view(app->text_box));
+    view_stack_add_view(app->console_stack, app->console_input);
     view_dispatcher_add_view(
-        app->view_dispatcher, WifiMarauderAppViewConsoleOutput, text_box_get_view(app->text_box));
+        app->view_dispatcher, WifiMarauderAppViewConsoleOutput, view_stack_get_view(app->console_stack));
     app->text_box_store = furi_string_alloc();
     furi_string_reserve(app->text_box_store, WIFI_MARAUDER_TEXT_BOX_STORE_SIZE);
 
@@ -155,6 +171,10 @@ void wifi_marauder_app_free(WifiMarauderApp* app) {
     view_dispatcher_remove_view(app->view_dispatcher, WifiMarauderAppViewSubmenu);
 
     widget_free(app->widget);
+    view_stack_remove_view(app->console_stack, app->console_input);
+    view_stack_remove_view(app->console_stack, text_box_get_view(app->text_box));
+    view_free(app->console_input);
+    view_stack_free(app->console_stack);
     text_box_free(app->text_box);
     furi_string_free(app->text_box_store);
     wifi_text_input_free(app->text_input);

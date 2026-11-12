@@ -199,8 +199,6 @@ static bool felica_listener_validate_standard_request(
         const size_t item_size = short_block_number ? 2U : 3U;
         if(item_size > request_size - offset) return false;
 
-        // The Standard backend currently stores block indices as uint8_t.
-        if(!short_block_number && raw[offset + 2U] != 0U) return false;
         offset += item_size;
     }
 
@@ -279,7 +277,8 @@ bool felica_listener_validate_request(
     return valid;
 }
 
-FelicaIDm felica_listener_get_current_idm(const FelicaListener* instance) {
+static FelicaIDm
+    felica_listener_get_system_idm(const FelicaListener* instance, uint32_t system_idx) {
     furi_assert(instance);
 
     FelicaIDm idm = instance->data->idm;
@@ -288,18 +287,37 @@ FelicaIDm felica_listener_get_current_idm(const FelicaListener* instance) {
     // would corrupt the base IDm's real upper nibble for cards where it isn't already
     // zero, making the emulated card report an IDm inconsistent with what the reader
     // saw during the initial (hardware-handled) wildcard Polling.
-    if(instance->current_system_idx != 0) {
-        idm.data[0] = (uint8_t)((idm.data[0] & 0x0F) | (instance->current_system_idx << 4));
+    if(system_idx != 0) {
+        idm.data[0] = (uint8_t)((idm.data[0] & 0x0F) | (system_idx << 4));
     }
     return idm;
 }
 
-bool felica_listener_check_idm(const FelicaListener* instance, const FelicaIDm* request_idm) {
+FelicaIDm felica_listener_get_current_idm(const FelicaListener* instance) {
+    furi_assert(instance);
+
+    return felica_listener_get_system_idm(instance, instance->current_system_idx);
+}
+
+bool felica_listener_select_system_by_idm(FelicaListener* instance, const FelicaIDm* request_idm) {
     furi_assert(instance);
     furi_assert(request_idm);
 
     const FelicaIDm idm = felica_listener_get_current_idm(instance);
-    return memcmp(idm.data, request_idm->data, 8) == 0;
+    if(memcmp(idm.data, request_idm->data, sizeof(idm.data)) == 0) return true;
+
+    if(instance->data->workflow_type != FelicaStandard) return false;
+
+    uint32_t system_count = simple_array_get_count(instance->data->systems);
+    for(uint32_t i = 0; i < system_count; i++) {
+        const FelicaIDm system_idm = felica_listener_get_system_idm(instance, i);
+        if(memcmp(system_idm.data, request_idm->data, sizeof(system_idm.data)) == 0) {
+            instance->current_system_idx = i;
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void felica_listener_reset(FelicaListener* instance) {

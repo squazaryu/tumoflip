@@ -128,6 +128,15 @@ class FlipperApplication:
             raise FlipperManifestException(
                 f"Invalid appid '{self.appid}'. Must match regex '{self.APP_ID_REGEX}'"
             )
+        # Floats cannot safely represent manifest versions: Python evaluates
+        # 1.10 as 1.1 before we can inspect it, silently dropping a component.
+        if isinstance(self.fap_version, float):
+            raise FlipperManifestException(
+                f"Invalid fap_version {self.fap_version!r}: floats are not accepted "
+                f"because Python drops trailing zeros (1.10 becomes 1.1). "
+                f'Write the version as a string ("1.0") or a tuple ((1, 0)).'
+            )
+
         if isinstance(self.fap_version, str):
             try:
                 self.fap_version = tuple(int(v) for v in self.fap_version.split("."))
@@ -137,6 +146,11 @@ class FlipperApplication:
                 )
             if len(self.fap_version) < 2:
                 raise ValueError("Not enough version components")
+        elif not isinstance(self.fap_version, tuple):
+            raise FlipperManifestException(
+                f"Invalid fap_version {self.fap_version!r}: expected a string like "
+                f'"1.2" or a tuple like (1, 2), got {type(self.fap_version).__name__}'
+            )
 
 
 class AppManager:

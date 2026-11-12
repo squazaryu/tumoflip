@@ -339,6 +339,11 @@ uint8_t subghz_protocol_decoder_fiat_v2_get_hash_data(void* context) {
            instance->button;
 }
 
+static bool fiat_v2_write_u32(FlipperFormat* format, const char* key, uint32_t value) {
+    return flipper_format_rewind(format) &&
+           flipper_format_insert_or_update_uint32(format, key, &value, 1U);
+}
+
 SubGhzProtocolStatus subghz_protocol_decoder_fiat_v2_serialize(
     void* context,
     FlipperFormat* flipper_format,
@@ -352,20 +357,15 @@ SubGhzProtocolStatus subghz_protocol_decoder_fiat_v2_serialize(
         return ret;
     }
 
-    flipper_format_rewind(flipper_format);
-    flipper_format_insert_or_update_hex(
-        flipper_format, FIAT_V2_RAW_FIELD, instance->raw_data, FIAT_V2_WIRE_BYTES);
-
-    uint32_t hop = instance->hop;
-    uint32_t button = instance->button;
-    if(!flipper_format_write_uint32(flipper_format, FIAT_V2_HOP_FIELD, &hop, 1) ||
-       !flipper_format_write_uint32(flipper_format, FIAT_V2_BTN_FIELD, &button, 1)) {
+    if(!fiat_v2_write_u32(flipper_format, FF_SERIAL, instance->generic.serial) ||
+       !fiat_v2_write_u32(flipper_format, FF_CNT, instance->generic.cnt) ||
+       !fiat_v2_write_u32(flipper_format, FIAT_V2_HOP_FIELD, instance->hop) ||
+       !fiat_v2_write_u32(flipper_format, FIAT_V2_BTN_FIELD, instance->button) ||
+       !flipper_format_rewind(flipper_format) ||
+       !flipper_format_insert_or_update_hex(
+           flipper_format, FIAT_V2_RAW_FIELD, instance->raw_data, FIAT_V2_WIRE_BYTES)) {
         return SubGhzProtocolStatusErrorParserOthers;
     }
-
-    pp_flipper_update_or_insert_u32(flipper_format, FF_SERIAL, instance->generic.serial);
-    pp_flipper_update_or_insert_u32(flipper_format, FF_BTN, instance->generic.btn);
-    pp_flipper_update_or_insert_u32(flipper_format, FF_CNT, instance->generic.cnt);
     return SubGhzProtocolStatusOk;
 }
 
@@ -374,26 +374,26 @@ SubGhzProtocolStatus
     furi_check(context);
     SubGhzProtocolDecoderFiatV2* instance = context;
 
+    SubGhzBlockGeneric candidate = instance->generic;
     SubGhzProtocolStatus ret = subghz_block_generic_deserialize_check_count_bit(
-        &instance->generic, flipper_format, subghz_protocol_fiat_v2_const.min_count_bit_for_found);
+        &candidate, flipper_format, subghz_protocol_fiat_v2_const.min_count_bit_for_found);
     if(ret != SubGhzProtocolStatusOk) {
         return ret;
     }
-    if(instance->generic.data_count_bit != FIAT_V2_LOGICAL_BITS) {
+    if(candidate.data_count_bit != FIAT_V2_LOGICAL_BITS) {
         return SubGhzProtocolStatusErrorValueBitCount;
     }
 
-    flipper_format_rewind(flipper_format);
-    if(flipper_format_read_hex(
-           flipper_format, FIAT_V2_RAW_FIELD, instance->raw_data, FIAT_V2_WIRE_BYTES)) {
-        if(!fiat_v2_frame_valid(instance->raw_data)) {
-            return SubGhzProtocolStatusErrorParserOthers;
-        }
-        fiat_v2_decode_fields(instance);
-        return SubGhzProtocolStatusOk;
+    uint8_t raw[FIAT_V2_WIRE_BYTES];
+    if(!flipper_format_rewind(flipper_format) ||
+       !flipper_format_read_hex(flipper_format, FIAT_V2_RAW_FIELD, raw, sizeof(raw)) ||
+       !fiat_v2_frame_valid(raw)) {
+        return SubGhzProtocolStatusErrorParserOthers;
     }
-
-    return SubGhzProtocolStatusErrorParserOthers;
+    instance->generic = candidate;
+    memcpy(instance->raw_data, raw, sizeof(raw));
+    fiat_v2_decode_fields(instance);
+    return SubGhzProtocolStatusOk;
 }
 
 void subghz_protocol_decoder_fiat_v2_get_string(void* context, FuriString* output) {

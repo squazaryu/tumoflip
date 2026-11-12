@@ -7,6 +7,7 @@
 #include "common.h"
 
 #define TAG "SubGhzProtocolAnsonic"
+#define ANSONIC_TE_SUM_DELTA 110U
 
 #define DIP_PATTERN "%c%c%c%c%c%c%c%c%c%c"
 #define CNT_TO_DIP(dip)                                                                     \
@@ -208,6 +209,13 @@ void subghz_protocol_decoder_ansonic_feed(void* context, bool level, uint32_t du
         break;
     case AnsonicDecoderStepCheckDuration:
         if(level) {
+            const uint64_t period = (uint64_t)instance->decoder.te_last + duration;
+            const uint32_t expected = subghz_protocol_ansonic_const.te_short +
+                                      subghz_protocol_ansonic_const.te_long;
+            if(DURATION_DIFF(period, expected) >= ANSONIC_TE_SUM_DELTA) {
+                instance->decoder.parser_step = AnsonicDecoderStepReset;
+                break;
+            }
             if((DURATION_DIFF(instance->decoder.te_last, subghz_protocol_ansonic_const.te_short) <
                 subghz_protocol_ansonic_const.te_delta) &&
                (DURATION_DIFF(duration, subghz_protocol_ansonic_const.te_long) <

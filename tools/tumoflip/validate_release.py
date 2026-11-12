@@ -37,6 +37,19 @@ DFUSE_VENDOR_ID = 0x0483
 DFUSE_SUFFIX_VERSION = 0x011A
 DFUSE_WHOLE_FILE_CRC = 0xFFFFFFFF
 PROTOCOL_PACKS = {
+    "protocol_freezer.fal",
+    "protocol_faac_tm.fal",
+    "protocol_proteco.fal",
+    "protocol_rx_x10.fal",
+    "protocol_rx_urmet.fal",
+    "protocol_rx_gm0.fal",
+    "protocol_rx_gm1.fal",
+    "protocol_rx_ty0.fal",
+    "protocol_rx_mz2.fal",
+    "protocol_rx_mb0.fal",
+    "protocol_rx_mb1.fal",
+    "protocol_rx_op1.fal",
+    "protocol_rx_bmw.fal",
     "protocol_chrysler.fal",
     "protocol_fiat_marelli.fal",
     "protocol_ford_v0.fal",
@@ -61,6 +74,7 @@ PROTOCOL_PACKS = {
     "protocol_porsche_cayenne.fal",
     "protocol_psa.fal",
     "protocol_renault.fal",
+    "protocol_renault_v1.fal",
     "protocol_scher_khan.fal",
     "protocol_sheriff_cfm.fal",
     "protocol_star_line.fal",
@@ -107,6 +121,7 @@ MODULE_ONE_PACKAGE_FILES = (
     "apps/Module One/Diagnostics/runtime_trace_viewer.fap",
     "apps/Module One/Field/field_logger.fap",
     "apps/Module One/Signals/signal_workbench.fap",
+    "apps/Module One/Signals/tumo_rx_link.fap",
     "apps/Module One/Signals/tumoscope.fap",
     "apps/Module One/Network/tumonet_gateway.fap",
     "apps/Module One/Sub-GHz/tumonet_bench.fap",
@@ -138,12 +153,40 @@ MODULE_ONE_PACKAGE_FILES = (
 QUAC_PACKAGE_FILE = "apps/Tools/quac.fap"
 NEARBY_FILES_PACKAGE_FILE = "apps/GPIO/nearby_files.fap"
 WEATHER_EDITOR_PACKAGE_FILE = "apps/Sub-GHz/weather_editor.fap"
+LFRFID_HITAGS_PACKAGE_FILE = "apps_data/lfrfid/plugins/lfrfid_hitags.fal"
+PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE = "apps_data/arf_subghz_full/packages/protopirate_to_subghz.fap"
+CAPTURE_INSPECTOR_PACKAGE_FILE = "apps_data/arf_subghz_full/packages/capture_inspector.fap"
+SIGNAL_WORKBENCH_PACKAGE_FILE = "apps/Module One/Signals/signal_workbench.fap"
+SPECTER_PACKAGE_FILE = "apps/NFC/specter.fap"
+BLE_REMOTE_PACKAGE_FILE = "apps/Bluetooth/hid_ble.fap"
+DEVICE_LIBRARY_PACKAGE_FILE = "apps/Tools/device_library.fap"
+FIELD_TOOLS_PACKAGE_FILE = "apps/Tools/field_tools.fap"
+NFC_FIELD_PACKAGE_FILE = "apps/NFC/tumo_nfc_sniffer.fap"
+FILE_HISTORY_PACKAGE_FILE = "apps_data/device_library/plugins/file_history.fal"
+FIELD_BATCH_PACKAGE_FILES = {
+    "usb_cdrom.fap": "apps/USB/usb_cdrom.fap",
+    "servo_tester_plus.fap": "apps/GPIO/servo_tester_plus.fap",
+    "power_journal.fap": "apps/Tools/Diagnostics/power_journal.fap",
+    "tumo_uhf_inventory.fap": "apps/GPIO/tumo_uhf_inventory.fap",
+    "sensor_watch.fap": "apps/Sub-GHz/sensor_watch.fap",
+    "tumo_varta.fap": "apps/RFID/tumo_varta.fap",
+}
 PACKAGE_ONLY_PACKAGE_FILES = frozenset(
     {
+        *FIELD_BATCH_PACKAGE_FILES.values(),
         "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
         QUAC_PACKAGE_FILE,
         NEARBY_FILES_PACKAGE_FILE,
         WEATHER_EDITOR_PACKAGE_FILE,
+        LFRFID_HITAGS_PACKAGE_FILE,
+        PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
+        CAPTURE_INSPECTOR_PACKAGE_FILE,
+        SPECTER_PACKAGE_FILE,
+        BLE_REMOTE_PACKAGE_FILE,
+        DEVICE_LIBRARY_PACKAGE_FILE,
+        FIELD_TOOLS_PACKAGE_FILE,
+        NFC_FIELD_PACKAGE_FILE,
+        FILE_HISTORY_PACKAGE_FILE,
     }
 )
 TOTP_CLI_PLUGIN_APP_IDS = (
@@ -170,25 +213,46 @@ MORSE_PLAYER_PACKAGE_FILE = "apps/Tools/morse_player.fap"
 # Independent FW Packages revisions may replace files that are also bundled in
 # updater resources. This is intentionally broader than PACKAGE_ONLY_PACKAGE_FILES:
 # the latter remains reserved for artifacts that must never inflate resources.ths.
+FIELD_RX_PACKAGE_FILES = tuple(
+    f"apps_data/subghz/plugins/protocol_rx_{stem}.fal"
+    for stem in ("x10", "urmet", "gm0", "gm1", "ty0", "mz2", "mb0", "mb1", "op1", "bmw")
+)
+ARF_STATUS_PACKAGE_FILE = "apps_data/arf_subghz_full/modules/arf_status.fap"
 PACKAGE_RELEASE_OVERLAY_FILES = frozenset(
     {
         *PACKAGE_ONLY_PACKAGE_FILES,
         "apps/ARF Tools/subghz_raw_edit.fap",
+        SIGNAL_WORKBENCH_PACKAGE_FILE,
         MORSE_PLAYER_PACKAGE_FILE,
         *TOTP_CLI_PLUGIN_PACKAGE_FILES,
+        *FIELD_RX_PACKAGE_FILES,
+        ARF_STATUS_PACKAGE_FILE,
     }
 )
 PACKAGE_ONLY_PACKAGE_GROUPS = {
+    **{path: "base" for path in FIELD_BATCH_PACKAGE_FILES.values()},
     "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap": "module_one",
     QUAC_PACKAGE_FILE: "base",
     NEARBY_FILES_PACKAGE_FILE: "base",
     WEATHER_EDITOR_PACKAGE_FILE: "base",
+    LFRFID_HITAGS_PACKAGE_FILE: "base",
+    PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE: "arf",
+    CAPTURE_INSPECTOR_PACKAGE_FILE: "arf",
+    SPECTER_PACKAGE_FILE: "base",
+    BLE_REMOTE_PACKAGE_FILE: "base",
+    DEVICE_LIBRARY_PACKAGE_FILE: "base",
+    FIELD_TOOLS_PACKAGE_FILE: "base",
+    NFC_FIELD_PACKAGE_FILE: "base",
+    FILE_HISTORY_PACKAGE_FILE: "base",
 }
 PACKAGE_RELEASE_OVERLAY_GROUPS = {
     **PACKAGE_ONLY_PACKAGE_GROUPS,
     "apps/ARF Tools/subghz_raw_edit.fap": "arf",
+    SIGNAL_WORKBENCH_PACKAGE_FILE: "module_one",
     MORSE_PLAYER_PACKAGE_FILE: "base",
     **{relative: "base" for relative in TOTP_CLI_PLUGIN_PACKAGE_FILES},
+    **{relative: "protocol_packs" for relative in FIELD_RX_PACKAGE_FILES},
+    ARF_STATUS_PACKAGE_FILE: "arf",
 }
 MODULE_ONE_PACKAGE_DATA_FILES = (
     "apps_data/tumoflow/workflows/field_demo.tflow",
@@ -340,10 +404,20 @@ def release_cleanup_entries() -> list[dict[str, str]]:
 
 def package_extapp_exports() -> dict[str, str]:
     exports = {Path(relative).name: relative for relative in MODULE_ONE_PACKAGE_FILES}
+    exports.update(FIELD_BATCH_PACKAGE_FILES)
     exports["morse_player.fap"] = MORSE_PLAYER_PACKAGE_FILE
     exports["quac.fap"] = QUAC_PACKAGE_FILE
     exports["nearby_files.fap"] = NEARBY_FILES_PACKAGE_FILE
     exports["weather_editor.fap"] = WEATHER_EDITOR_PACKAGE_FILE
+    exports["lfrfid_hitags.fal"] = LFRFID_HITAGS_PACKAGE_FILE
+    exports["protopirate_to_subghz.fap"] = PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE
+    exports["capture_inspector.fap"] = CAPTURE_INSPECTOR_PACKAGE_FILE
+    exports["specter.fap"] = SPECTER_PACKAGE_FILE
+    exports["hid_ble.fap"] = BLE_REMOTE_PACKAGE_FILE
+    exports["device_library.fap"] = DEVICE_LIBRARY_PACKAGE_FILE
+    exports["field_tools.fap"] = FIELD_TOOLS_PACKAGE_FILE
+    exports["tumo_nfc_sniffer.fap"] = NFC_FIELD_PACKAGE_FILE
+    exports["file_history.fal"] = FILE_HISTORY_PACKAGE_FILE
     exports["module_one_cockpit.fap"] = "apps/Module One/Diagnostics/cockpit.fap"
     exports.update(
         {
@@ -357,6 +431,7 @@ def package_extapp_exports() -> dict[str, str]:
             for relative in TOTP_CLI_PLUGIN_PACKAGE_FILES
         }
     )
+    exports.update({Path(relative).name: relative for relative in FIELD_RX_PACKAGE_FILES})
     return exports
 
 
@@ -862,6 +937,27 @@ def validate_resources_archive(
                 raise ValidationError(f"Package entry differs in resources.ths: {relative}")
 
 
+def validate_cli_command_resources(repo_root: Path, resources: Path, archive_path: Path) -> None:
+    """Lazy commands are useful only if their exact modules reach native resources."""
+    hashes = resources_archive_hashes(repo_root, archive_path)
+    for name in ("gpio", "led", "vibro", "i2c"):
+        relative = f"apps_data/cli/plugins/cli_{name}.fal"
+        payload = require_file(resources / relative, f"CLI command module {name}")
+        if hashes.get(relative) != sha256(payload):
+            raise ValidationError(f"Native resources omit or change CLI command module: {relative}")
+
+
+def validate_subghz_feature_resources(repo_root: Path, resources: Path, archive_path: Path) -> None:
+    archive_hashes = resources_archive_hashes(repo_root, archive_path)
+    required = ["apps_data/subghz/plugins/" + name for name in (
+        "subghz_frequency_analyzer.fal", "subghz_add_manually.fal", "subghz_workspaces.fal")]
+    required.append("apps_data/archive/plugins/archive_favorites.fal")
+    for relative in required:
+        path = require_file(resources / relative, "Native feature plugin")
+        if archive_hashes.get(relative) != sha256(path):
+            raise ValidationError(f"Native feature differs or is absent in updater: {relative}")
+
+
 def prune_legacy_resource_exports(resources: Path) -> None:
     for legacy, canonical in RELEASE_CLEANUP_PATHS.items():
         if legacy == canonical:
@@ -888,6 +984,14 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             resources / "apps/Tools/quac.fap",
             resources / "apps/GPIO/nearby_files.fap",
             resources / WEATHER_EDITOR_PACKAGE_FILE,
+            resources / SPECTER_PACKAGE_FILE,
+            resources / BLE_REMOTE_PACKAGE_FILE,
+            resources / DEVICE_LIBRARY_PACKAGE_FILE,
+            resources / FIELD_TOOLS_PACKAGE_FILE,
+            resources / NFC_FIELD_PACKAGE_FILE,
+            resources / FILE_HISTORY_PACKAGE_FILE,
+            *[resources / path for path in FIELD_BATCH_PACKAGE_FILES.values()],
+            resources / LFRFID_HITAGS_PACKAGE_FILE,
             resources / "apps/Tools/tumoflip_packages.fap",
             resources / "apps/Tools/totp.fap",
         ]
@@ -897,7 +1001,11 @@ def package_entries(resources: Path) -> dict[str, list[dict[str, object]]]:
             for relative in (*MODULE_ONE_PACKAGE_FILES, *MODULE_ONE_PACKAGE_DATA_FILES)
         ],
         "arf": sorted((resources / "apps/ARF Tools").glob("*.fap"))
-        + sorted((resources / "apps_data/arf_subghz_full/modules").glob("*.fap")),
+        + sorted((resources / "apps_data/arf_subghz_full/modules").glob("*.fap"))
+        + [
+            resources / PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
+            resources / CAPTURE_INSPECTOR_PACKAGE_FILE,
+        ],
         "protocol_packs": sorted(
             (resources / "apps_data/subghz/plugins").glob("protocol_*.fal")
         ),
@@ -1024,6 +1132,8 @@ def validate_release(
         build_dir / "resources/Manifest", "resource manifest"
     ).parent
     validate_static_sd_resources(repo_root, resources)
+    validate_subghz_feature_resources(repo_root, resources, referenced["Resources"])
+    validate_cli_command_resources(repo_root, resources, referenced["Resources"])
     validate_layout(resources)
     unexpectedly_bundled = sorted(
         relative

@@ -31,7 +31,6 @@
     "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
-    "prompts": "^2.4.2",
-    "replace-in-file": "8.4.0"
+    "prompts": "^2.4.2"
   }
 }

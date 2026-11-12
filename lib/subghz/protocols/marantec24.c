@@ -15,6 +15,11 @@ static const SubGhzBlockConst subghz_protocol_marantec24_const = {
     .min_count_bit_for_found = 24,
 };
 
+// Share the actual inter-frame gap between the encoder and both RX sync points.
+#define MARANTEC24_GAP_DURATION \
+    (subghz_protocol_marantec24_const.te_long * 9U + subghz_protocol_marantec24_const.te_short)
+#define MARANTEC24_GAP_DELTA (subghz_protocol_marantec24_const.te_delta * 4U)
+
 struct SubGhzProtocolDecoderMarantec24 {
     SubGhzProtocolDecoderBase base;
 
@@ -97,10 +102,8 @@ static bool subghz_protocol_encoder_marantec24_get_upload(void* context) {
                 level_duration_make(true, (uint32_t)subghz_protocol_marantec24_const.te_short);
             if(i == 1) {
                 //Send gap if bit was last
-                instance->encoder.upload[index++] = level_duration_make(
-                    false,
-                    (uint32_t)subghz_protocol_marantec24_const.te_long * 9 +
-                        subghz_protocol_marantec24_const.te_short);
+                instance->encoder.upload[index++] =
+                    level_duration_make(false, MARANTEC24_GAP_DURATION);
             } else {
                 instance->encoder.upload[index++] = level_duration_make(
                     false, (uint32_t)subghz_protocol_marantec24_const.te_long * 2);
@@ -111,10 +114,8 @@ static bool subghz_protocol_encoder_marantec24_get_upload(void* context) {
                 level_duration_make(true, (uint32_t)subghz_protocol_marantec24_const.te_long);
             if(i == 1) {
                 //Send gap if bit was last
-                instance->encoder.upload[index++] = level_duration_make(
-                    false,
-                    (uint32_t)subghz_protocol_marantec24_const.te_long * 9 +
-                        subghz_protocol_marantec24_const.te_short);
+                instance->encoder.upload[index++] =
+                    level_duration_make(false, MARANTEC24_GAP_DURATION);
             } else {
                 instance->encoder.upload[index++] = level_duration_make(
                     false, (uint32_t)subghz_protocol_marantec24_const.te_short * 3);
@@ -170,8 +171,7 @@ void subghz_protocol_decoder_marantec24_feed(void* context, bool level, volatile
 
     switch(instance->decoder.parser_step) {
     case Marantec24DecoderStepReset:
-        if((!level) && (DURATION_DIFF(duration, subghz_protocol_marantec24_const.te_long * 9) <
-                        subghz_protocol_marantec24_const.te_delta * 4)) {
+        if((!level) && (DURATION_DIFF(duration, MARANTEC24_GAP_DURATION) < MARANTEC24_GAP_DELTA)) {
             //Found GAP
             instance->decoder.decode_data = 0;
             instance->decoder.decode_count_bit = 0;
@@ -206,8 +206,7 @@ void subghz_protocol_decoder_marantec24_feed(void* context, bool level, volatile
                 instance->decoder.parser_step = Marantec24DecoderStepSaveDuration;
             } else if(
                 // End of the key
-                DURATION_DIFF(duration, subghz_protocol_marantec24_const.te_long * 9) <
-                subghz_protocol_marantec24_const.te_delta * 4) {
+                DURATION_DIFF(duration, MARANTEC24_GAP_DURATION) < MARANTEC24_GAP_DELTA) {
                 //Found next GAP and add bit 0 or 1 (only bit 0 was found on the remotes)
                 if((DURATION_DIFF(
                         instance->decoder.te_last, subghz_protocol_marantec24_const.te_long) <

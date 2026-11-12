@@ -34,6 +34,9 @@
 #include "views/hid_ptt_menu.h"
 
 #include "scenes/hid_scene.h"
+#ifdef HID_TRANSPORT_BLE
+#include "helpers/hid_peer_store.h"
+#endif
 
 #define HID_BT_KEYS_STORAGE_NAME ".bt_hid.keys"
 
@@ -64,10 +67,46 @@ struct Hid {
     HidTikTok* hid_tiktok;
     HidPushToTalk* hid_ptt;
     HidPushToTalkMenu* hid_ptt_menu;
+#ifdef HID_TRANSPORT_BLE
+    HidPeerStore peer_store;
+    GapBondedDevices peer_list;
+    bool peer_connected;
+    bool peer_active;
+    bool peer_dialog;
+    bool peer_confirm_forget;
+    bool peer_pairing_dialog;
+    bool peer_connect_after_name;
+    GapBondedDevice peer_name_target;
+    char peer_name[HID_PEER_NAME_SIZE];
+    char peer_header[32];
+#endif
 };
+
+#ifdef HID_TRANSPORT_BLE
+enum {
+    HidPeerConnected = 0x7000,
+    HidPeerDisconnected,
+    HidPeerNameDone,
+    HidPeerDialogBack,
+    HidPeerDialogConfirm
+};
+bool hid_peer_restart(Hid* app);
+bool hid_peer_name_valid(const char* name);
+bool hid_peer_has_name(Hid* app, const GapBondedDevice* peer);
+void hid_peer_label(Hid* app, const GapBondedDevice* peer, char* out, size_t size);
+void hid_peer_show_error(Hid* app, const char* text);
+void hid_peer_devices_refresh(Hid* app);
+#endif
 
 void bt_hid_remove_pairing(Hid* app);
 void bt_hid_save_cfg(Hid* app);
+
+// USB has no BLE connection state; both views share this transport policy.
+#ifdef HID_TRANSPORT_BLE
+#define hid_model_connected(model) ((model)->connected)
+#else
+#define hid_model_connected(model) (true)
+#endif
 
 void hid_hal_keyboard_press(Hid* instance, uint16_t event);
 void hid_hal_keyboard_release(Hid* instance, uint16_t event);

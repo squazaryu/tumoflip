@@ -502,7 +502,11 @@ NfcCommand felica_poller_state_handler_read_standard_blocks(FelicaPoller* instan
     if(error == FelicaErrorNone) {
         instance->systems_read++;
         if(instance->systems_read == instance->systems_total) {
-            instance->state = FelicaPollerStateReadSuccess;
+            // Query the optional system-node versions only after every system's services,
+            // areas, and readable blocks have been collected. Some cards ignore node FFFF;
+            // that must not discard data already read or stop traversal of later systems.
+            instance->systems_read = 0;
+            instance->state = FelicaPollerStateReadSystemKeyVersions;
         } else {
             instance->state = FelicaPollerStateSelectSystemIndex;
         }
@@ -518,6 +522,48 @@ NfcCommand felica_poller_state_handler_read_standard_blocks(FelicaPoller* instan
     }
 
     felica_public_block_array_clear(public_block_buffer);
+
+    return NfcCommandContinue;
+}
+
+NfcCommand felica_poller_state_handler_read_system_key_versions(FelicaPoller* instance) {
+    FURI_LOG_D(TAG, "Read System Key Versions");
+
+    FelicaSystem* system = simple_array_get(instance->data->systems, instance->systems_read);
+    const FelicaPollerPollingCommand polling_cmd = {
+        .system_code = __builtin_bswap16(system->system_code),
+        .request_code = 0,
+        .time_slot = FELICA_TIME_SLOT_1,
+    };
+    FelicaPollerPollingResponse polling_resp = {};
+    FelicaError error = felica_poller_polling(instance, &polling_cmd, &polling_resp);
+
+    uint16_t key_version = FELICA_KEY_VERSION_UNKNOWN;
+    if(error == FelicaErrorNone) {
+        instance->data->idm = polling_resp.idm;
+        instance->data->pmm = polling_resp.pmm;
+
+        const uint16_t system_node = FELICA_SYSTEM_NODE_CODE;
+        error = felica_poller_request_service(instance, &system_node, 1, &key_version);
+    }
+
+    // This is optional metadata. A timeout or unsupported system node leaves the key version
+    // unknown, while the areas, services, and blocks collected earlier remain valid.
+    if(error == FelicaErrorNone) {
+        system->key_version = key_version;
+    } else {
+        system->key_version = FELICA_KEY_VERSION_UNKNOWN;
+        FURI_LOG_W(
+            TAG,
+            "Request system key version failed for system %04X: %d",
+            system->system_code,
+            error);
+    }
+
+    instance->systems_read++;
+    if(instance->systems_read == instance->systems_total) {
+        instance->state = FelicaPollerStateReadSuccess;
+    }
 
     return NfcCommandContinue;
 }
@@ -618,6 +664,8 @@ static const FelicaPollerReadHandler felica_poller_handler[FelicaPollerStateNum]
     [FelicaPollerStateTraverseStandardSystem] =
         felica_poller_state_handler_traverse_standard_system,
     [FelicaPollerStateReadStandardBlocks] = felica_poller_state_handler_read_standard_blocks,
+    [FelicaPollerStateReadSystemKeyVersions] =
+        felica_poller_state_handler_read_system_key_versions,
     [FelicaPollerStateReadLiteBlocks] = felica_poller_state_handler_read_lite_blocks,
     [FelicaPollerStateReadSuccess] = felica_poller_state_handler_read_success,
     [FelicaPollerStateReadFailed] = felica_poller_state_handler_read_failed,

@@ -42,3 +42,16 @@ on your use case.
 
 ## Documentation
 Check out the [JavaScript section in the Flipper Developer Documentation](https://developer.flipper.net/flipperzero/doxygen/js.html).
+
+To build this repository's documentation, use Node 22 and the pinned
+`pnpm@10.34.5`, then run `pnpm install --frozen-lockfile` and `pnpm run docs`
+in this directory. The development-only TypeDoc dependency has a small checked-in
+adapter for the patched minimatch 11 API; behavioral tests cover directory
+pruning, negated patterns, brace alternatives and `node_modules` handling.
+Do not remove the adapter without rerunning those tests and the documentation build.
+
+SDK and project-wizard runtime support remains Node `>=18.12`. Documentation
+parsers and their development-only overrides are not part of the installed
+SDK runtime. CI also packs both packages and installs them into fresh production
+consumers on Node 18.12.0 and 22, with strict engine and vulnerability checks.
+Repository fixes do not by themselves publish a new npm package.

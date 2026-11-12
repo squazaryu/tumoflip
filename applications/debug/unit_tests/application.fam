@@ -119,7 +119,11 @@ App(
 
 App(
     appid="test_subghz",
-    sources=["tests/common/*.c", "tests/subghz/*.c"],
+    sources=[
+        "tests/common/*.c",
+        "tests/subghz/*.c",
+        "../../lib/subghz/protocols/kia_v1.c",
+    ],
     apptype=FlipperAppType.PLUGIN,
     entry_point="get_api",
     requires=["unit_tests"],
@@ -136,10 +140,15 @@ App(
 
 App(
     appid="test_nfc",
-    sources=["tests/common/*.c", "tests/nfc/*.c"],
+    sources=[
+        "tests/common/*.c",
+        "tests/nfc/*.c",
+        "../../lib/nfc/protocols/mf_ultralight/mf_ultralight_aes_crypto.c",
+    ],
     apptype=FlipperAppType.PLUGIN,
     entry_point="get_api",
     requires=["unit_tests"],
+    fap_libs=["mbedtls"],
 )
 
 App(
@@ -223,14 +232,6 @@ App(
 )
 
 App(
-    appid="test_js",
-    sources=["tests/common/*.c", "tests/js/*.c"],
-    apptype=FlipperAppType.PLUGIN,
-    entry_point="get_api",
-    requires=["unit_tests", "js_app"],
-)
-
-App(
     appid="test_strint",
     sources=["tests/common/*.c", "tests/strint/*.c"],
     apptype=FlipperAppType.PLUGIN,
@@ -258,6 +259,14 @@ App(
 App(
     appid="test_notification",
     sources=["tests/common/*.c", "tests/notification/*.c"],
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="get_api",
+    requires=["unit_tests"],
+)
+
+App(
+    appid="test_loading_api",
+    sources=["tests/common/*.c", "tests/loading/*.c"],
     apptype=FlipperAppType.PLUGIN,
     entry_point="get_api",
     requires=["unit_tests"],

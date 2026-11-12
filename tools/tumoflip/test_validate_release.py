@@ -17,6 +17,9 @@ try:
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         MODULE_ONE_LEGACY_PATHS,
+        LFRFID_HITAGS_PACKAGE_FILE,
+        PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
+        CAPTURE_INSPECTOR_PACKAGE_FILE,
         PACKAGE_ONLY_PACKAGE_FILES,
         PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
@@ -46,6 +49,9 @@ except ImportError:
         MODULE_ONE_PACKAGE_DATA_FILES,
         MODULE_ONE_PACKAGE_FILES,
         MODULE_ONE_LEGACY_PATHS,
+        LFRFID_HITAGS_PACKAGE_FILE,
+        PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE,
+        CAPTURE_INSPECTOR_PACKAGE_FILE,
         PACKAGE_ONLY_PACKAGE_FILES,
         PACKAGE_ONLY_PACKAGE_GROUPS,
         PROTOCOL_PACKS,
@@ -101,7 +107,10 @@ def make_dfuse(elements: list[tuple[int, bytes]]) -> bytes:
 
 class ValidateReleaseTest(unittest.TestCase):
     def test_protocol_pack_inventory_covers_active_arf_registry(self) -> None:
-        self.assertEqual(len(PROTOCOL_PACKS), 31)
+        self.assertEqual(len(PROTOCOL_PACKS), 45)
+        self.assertIn("protocol_faac_tm.fal", PROTOCOL_PACKS)
+        self.assertIn("protocol_freezer.fal", PROTOCOL_PACKS)
+        self.assertIn("protocol_renault_v1.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_ford_v3.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_gm_rolling.fal", PROTOCOL_PACKS)
         self.assertIn("protocol_kia_v7.fal", PROTOCOL_PACKS)
@@ -275,8 +284,21 @@ class ValidateReleaseTest(unittest.TestCase):
         quac = "apps/Tools/quac.fap"
         nearby = "apps/GPIO/nearby_files.fap"
         weather = "apps/Sub-GHz/weather_editor.fap"
+        hitags = LFRFID_HITAGS_PACKAGE_FILE
+        converter = PROTOPIRATE_TO_SUBGHZ_PACKAGE_FILE
+        inspector = CAPTURE_INSPECTOR_PACKAGE_FILE
+        specter = "apps/NFC/specter.fap"
+        ble_remote = "apps/Bluetooth/hid_ble.fap"
+        device_library = "apps/Tools/device_library.fap"
+        field_tools = "apps/Tools/field_tools.fap"
+        nfc_field = "apps/NFC/tumo_nfc_sniffer.fap"
+        file_history = "apps_data/device_library/plugins/file_history.fal"
         self.assertEqual(
-            PACKAGE_ONLY_PACKAGE_FILES, {package_only, quac, nearby, weather}
+            PACKAGE_ONLY_PACKAGE_FILES,
+            {package_only, quac, nearby, weather, hitags, converter, inspector, specter, ble_remote, device_library, field_tools, nfc_field, file_history,
+             "apps/GPIO/servo_tester_plus.fap", "apps/Tools/Diagnostics/power_journal.fap",
+             "apps/Sub-GHz/sensor_watch.fap", "apps/RFID/tumo_varta.fap", "apps/GPIO/tumo_uhf_inventory.fap",
+             "apps/USB/usb_cdrom.fap"},
         )
         self.assertEqual(
             PACKAGE_ONLY_PACKAGE_GROUPS,
@@ -285,6 +307,21 @@ class ValidateReleaseTest(unittest.TestCase):
                 quac: "base",
                 nearby: "base",
                 weather: "base",
+                hitags: "base",
+                converter: "arf",
+                inspector: "arf",
+                specter: "base",
+                ble_remote: "base",
+                device_library: "base",
+                field_tools: "base",
+                nfc_field: "base",
+                file_history: "base",
+                "apps/GPIO/servo_tester_plus.fap": "base",
+                "apps/Tools/Diagnostics/power_journal.fap": "base",
+                "apps/Sub-GHz/sensor_watch.fap": "base",
+                "apps/RFID/tumo_varta.fap": "base",
+                "apps/GPIO/tumo_uhf_inventory.fap": "base",
+                "apps/USB/usb_cdrom.fap": "base",
             },
         )
         regular = "apps/Tools/clock.fap"

@@ -1,0 +1,182 @@
+{
+  "label": "Unreleased Inspector/Status plus September upstream adaptation",
+  "built_commit": "e280237b861a1dd1492d6c3faad520f4973a2c61",
+  "published": false,
+  "api": "88.10",
+  "comparison_baseline": "4aef0d0cf0842a94b41f0242a1d7ef157e9658bf",
+  "toolchain": "Flipper 39, GCC 12.3",
+  "options": {
+    "COMPACT": 1,
+    "DEBUG": 0,
+    "LTO": 1,
+    "WORKFLOW_BRANCH_OR_TAG": "HEAD",
+    "SOURCE_DATE_EPOCH": 1789670251
+  },
+  "elf_sha256": "016ba7061d2d5be1e2d84250086c0caeb2034b03ce7edfa857d97c4c7dad77cd",
+  "sections": {
+    ".isr_vector": 316,
+    ".text": 691804,
+    ".rodata": 176960,
+    ".ARM": 8,
+    ".init_array": 4,
+    ".fini_array": 4,
+    ".data": 736,
+    ".bss": 7564,
+    "._user_heap_stack": 188300,
+    ".free_flash": 178736,
+    ".ARM.attributes": 48,
+    "._sram2a_start": 0,
+    "._sram2a_free": 1,
+    "._sram2b_start": 0,
+    ".comment": 27,
+    ".debug_aranges": 60976,
+    ".debug_info": 4248267,
+    ".debug_abbrev": 563454,
+    ".debug_line": 1481437,
+    ".debug_frame": 235368,
+    ".debug_str": 675901,
+    ".debug_line_str": 26758,
+    ".debug_loclists": 1134524,
+    ".debug_rnglists": 120184
+  },
+  "safety": {
+    "dfu_gap_bytes": 10491,
+    "dfuse_flash_end": "0x080D45D0",
+    "erase_aligned_flash_end": "0x080D5000",
+    "minimum_c2_gap_bytes": 4096,
+    "physical_c2_gap_bytes": 8192,
+    "section_gap_bytes": 10800,
+    "updater_bytes": 119073,
+    "updater_limit_bytes": 131072
+  },
+  "paired_zip_sha256": "e7e5eb5437cf8a6750ba2cbbd8fb31e73681bfbe47d79324f82836e712ddf66e",
+  "paired_manifest_sha256": "99d208b88b88e4fd8a0eede0a2d1548fd0c7b33bda17496fabbbf20e3a473296",
+  "verified_package_files": 115,
+  "release_tests": {
+    "run": 374,
+    "failed": 0
+  },
+  "native_gui_fixture_frames": 12,
+  "hardware_acceptance": false,
+  "arf_status": {
+    "sd_bytes": 13232,
+    "sha256": "dcbabdb532c5f9f0413afd972ae45edf4862d2c94c802608f6732077adf6b8ee",
+    "sections": {
+      ".text": 2736,
+      ".rodata": 2936,
+      ".debug_aranges": 200,
+      ".debug_info": 12621,
+      ".debug_abbrev": 2330,
+      ".debug_line": 5200,
+      ".debug_frame": 588,
+      ".debug_str": 8926,
+      ".debug_loclists": 2906,
+      ".debug_rnglists": 340,
+      ".ARM.attributes": 52
+    }
+  },
+  "capture_inspector": {
+    "sd_bytes": 14432,
+    "sha256": "9bd64acbd7d17f80984f471703bdf3a9d5de89ef8081b8fb9164a0d4f304e6f0",
+    "sections": {
+      ".text": 4512,
+      ".rodata": 1788,
+      ".debug_aranges": 264,
+      ".debug_info": 14156,
+      ".debug_abbrev": 2636,
+      ".debug_line": 7108,
+      ".debug_frame": 1000,
+      ".debug_str": 6682,
+      ".debug_loclists": 4762,
+      ".debug_rnglists": 760,
+      ".ARM.attributes": 52
+    }
+  },
+  "delta": {
+    "core_flash_bytes": 1208,
+    "section_gap_bytes": -1208,
+    "physical_c2_gap_bytes": 0,
+    "bss_bytes": 0,
+    "arf_status_sd_bytes": 6492
+  },
+  "inspector_struct_sizes_arm": {
+    "CiApp": 9696,
+    "CiSnapshot": 4820,
+    "runtime_peak_measured": false
+  },
+  "coverage": {
+    "scope": "native capture and ELF parsers only; not GUI/hardware",
+    "files": {
+      "applications/system/capture_inspector/capture_model.c": {
+        "branches": {
+          "count": 150,
+          "covered": 133,
+          "notcovered": 17,
+          "percent": 88.66666666666667
+        },
+        "functions": {
+          "count": 12,
+          "covered": 12,
+          "percent": 100
+        },
+        "instantiations": {
+          "count": 12,
+          "covered": 12,
+          "percent": 100
+        },
+        "lines": {
+          "count": 158,
+          "covered": 158,
+          "percent": 100
+        },
+        "mcdc": {
+          "count": 0,
+          "covered": 0,
+          "notcovered": 0,
+          "percent": 0
+        },
+        "regions": {
+          "count": 225,
+          "covered": 220,
+          "notcovered": 5,
+          "percent": 97.77777777777777
+        }
+      },
+      "applications_user/arf_tools/arf_elf_metadata.c": {
+        "branches": {
+          "count": 66,
+          "covered": 63,
+          "notcovered": 3,
+          "percent": 95.45454545454545
+        },
+        "functions": {
+          "count": 4,
+          "covered": 4,
+          "percent": 100
+        },
+        "instantiations": {
+          "count": 4,
+          "covered": 4,
+          "percent": 100
+        },
+        "lines": {
+          "count": 60,
+          "covered": 60,
+          "percent": 100
+        },
+        "mcdc": {
+          "count": 0,
+          "covered": 0,
+          "notcovered": 0,
+          "percent": 0
+        },
+        "regions": {
+          "count": 97,
+          "covered": 96,
+          "notcovered": 1,
+          "percent": 98.96907216494846
+        }
+      }
+    }
+  }
+}

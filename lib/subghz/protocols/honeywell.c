@@ -121,30 +121,10 @@ uint16_t subghz_protocol_honeywell_crc16(
 
 static LevelDuration
     subghz_protocol_encoder_honeywell_add_duration_to_upload(ManchesterEncoderResult result) {
-    LevelDuration data = {.duration = 0, .level = 0};
-    switch(result) {
-    case ManchesterEncoderResultShortLow:
-        data.duration = subghz_protocol_honeywell_const.te_short;
-        data.level = false;
-        break;
-    case ManchesterEncoderResultLongLow:
-        data.duration = subghz_protocol_honeywell_const.te_long;
-        data.level = false;
-        break;
-    case ManchesterEncoderResultLongHigh:
-        data.duration = subghz_protocol_honeywell_const.te_long;
-        data.level = true;
-        break;
-    case ManchesterEncoderResultShortHigh:
-        data.duration = subghz_protocol_honeywell_const.te_short;
-        data.level = true;
-        break;
-
-    default:
-        furi_crash("SubGhz: ManchesterEncoderResult is incorrect.");
-        break;
-    }
-    return level_duration_make(data.level, data.duration);
+    return subghz_protocol_encoder_common_manchester_duration(
+        result,
+        subghz_protocol_honeywell_const.te_short,
+        subghz_protocol_honeywell_const.te_long);
 }
 
 static void

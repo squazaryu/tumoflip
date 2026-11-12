@@ -1,4 +1,5 @@
 #include "../lfrfid_i.h"
+#include <toolbox/path.h>
 
 // Set once a warning popup (cannot-write / still-trying) is shown, so later write-progress
 // events stop overwriting its message and layout.
@@ -12,34 +13,56 @@ static void lfrfid_write_callback(LFRFIDWorkerWriteResult result, void* context)
         event = LfRfidEventWriteOK;
     } else if(result == LFRFIDWorkerWriteProtocolCannotBeWritten) {
         event = LfRfidEventWriteProtocolCannotBeWritten;
+    } else if(result == LFRFIDWorkerWriteNoEnabledTarget) {
+        event = LfRfidEventWriteNoEnabledTarget;
     } else if(result == LFRFIDWorkerWriteFobCannotBeWritten) {
         event = LfRfidEventWriteFobCannotBeWritten;
     } else if(result == LFRFIDWorkerWriteTooLongToWrite) {
         event = LfRfidEventWriteTooLongToWrite;
     } else if(result == LFRFIDWorkerWriteStartTarget) {
         event = LfRfidEventWriteProgress;
+    } else {
+        // Every result has a branch above, so a new one must get one too rather than reach the
+        // dispatcher as custom event 0, which no scene handles.
+        FURI_LOG_E("LfRfid", "Unhandled write result %d", result);
+        return;
     }
 
     view_dispatcher_send_custom_event(app->view_dispatcher, event);
 }
 
-// Compose the "Writing" popup text: "[<proto>]\n<source>", with "\n(<target>)" appended while a
+// Compose the "Writing" popup text: "<proto>\n<source>", with "\n(<target>)" appended while a
 // specific chip is being attempted. <source> is the file name, or "Unsaved Tag" when there is no
 // file (mid-attempt with no file, only the protocol and target are shown - no source line).
 static void lfrfid_scene_write_set_status(LfRfid* app, const char* target) {
     const char* proto = protocol_dict_get_name(app->dict, app->protocol_id);
     const char* file = furi_string_empty(app->file_name) ? NULL :
                                                            furi_string_get_cstr(app->file_name);
+    // The secondary LCD font has no full Unicode coverage. Keep the real path
+    // untouched and show a readable fallback rather than invisible glyphs.
+    if(file && !path_contains_only_ascii(file)) file = "Saved Tag";
     if(file && target) {
-        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "[%s]\n%s\n(%s)", proto, file, target);
+        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "%s\n%s\n(%s)", proto, file, target);
     } else if(file) {
-        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "[%s]\n%s", proto, file);
+        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "%s\n%s", proto, file);
     } else if(target) {
-        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "[%s]\n(%s)", proto, target);
+        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "%s\n(%s)", proto, target);
     } else {
-        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "[%s]\nUnsaved Tag", proto);
+        snprintf(app->text_store, LFRFID_TEXT_STORE_SIZE, "%s\nUnsaved Tag", proto);
     }
-    popup_set_text(app->popup, app->text_store, 94, 29, AlignCenter, AlignTop);
+    popup_set_text(app->popup, app->text_store, 94, 14, AlignCenter, AlignTop);
+}
+
+// Replace the "Writing" popup with a final error. Only for the two results the worker returns
+// on - it has given up by then, so the message stays until the user backs out.
+static void lfrfid_scene_write_show_error(LfRfid* app, const char* text) {
+    lfrfid_write_warning_shown = true;
+    popup_set_text_width(app->popup, 80);
+
+    popup_set_icon(app->popup, 83, 22, &I_WarningDolphinFlip_45x42);
+    popup_set_header(app->popup, "Error", 64, 3, AlignCenter, AlignTop);
+    popup_set_text(app->popup, text, 3, 17, AlignLeft, AlignTop);
+    notification_message(app->notifications, &sequence_blink_start_red);
 }
 
 void lfrfid_scene_write_on_enter(void* context) {
@@ -49,7 +72,8 @@ void lfrfid_scene_write_on_enter(void* context) {
     lfrfid_write_warning_shown = false;
 
     popup_set_icon(popup, 0, 8, &I_NFC_manual_60x50);
-    popup_set_header(popup, "Writing", 94, 16, AlignCenter, AlignTop);
+    popup_set_header(popup, "Writing", 94, 1, AlignCenter, AlignTop);
+    popup_set_text_width(popup, 64);
 
     lfrfid_scene_write_set_status(app, NULL);
 
@@ -58,6 +82,12 @@ void lfrfid_scene_write_on_enter(void* context) {
     size_t size = protocol_dict_get_data_size(app->dict, app->protocol_id);
     protocol_dict_get_data(app->dict, app->protocol_id, app->old_key_data, size);
 
+    // Kept as scene state so the no-target message can tell "none enabled at all" from "none
+    // that fit this protocol" without re-reading the settings file.
+    LFRFIDWriteTargetMask enabled = lfrfid_settings_get_write_targets();
+    scene_manager_set_scene_state(app->scene_manager, LfRfidSceneWrite, enabled);
+
+    lfrfid_worker_set_write_targets(app->lfworker, enabled);
     lfrfid_worker_start_thread(app->lfworker);
     lfrfid_worker_write_start(
         app->lfworker, (LFRFIDProtocol)app->protocol_id, lfrfid_write_callback, app);
@@ -83,16 +113,23 @@ bool lfrfid_scene_write_on_event(void* context, SceneManagerEvent event) {
             scene_manager_next_scene(app->scene_manager, LfRfidSceneWriteSuccess);
             consumed = true;
         } else if(event.event == LfRfidEventWriteProtocolCannotBeWritten) {
-            lfrfid_write_warning_shown = true;
-            popup_set_icon(popup, 83, 22, &I_WarningDolphinFlip_45x42);
-            popup_set_header(popup, "Error", 64, 3, AlignCenter, AlignTop);
-            popup_set_text(popup, "This protocol\ncannot be written", 3, 17, AlignLeft, AlignTop);
-            notification_message(app->notifications, &sequence_blink_start_red);
+            lfrfid_scene_write_show_error(app, "This protocol\ncannot be written");
+            consumed = true;
+        } else if(event.event == LfRfidEventWriteNoEnabledTarget) {
+            // Same remedy either way, but naming the emptier case saves a puzzled trip to a
+            // settings screen the user may have switched fully off on purpose.
+            bool none_enabled =
+                scene_manager_get_scene_state(app->scene_manager, LfRfidSceneWrite) == 0;
+            lfrfid_scene_write_show_error(
+                app,
+                none_enabled ? "No write chips\nenabled. Enable\none in Settings" :
+                               "No enabled chip\ncan write this\nprotocol");
             consumed = true;
         } else if(
             (event.event == LfRfidEventWriteFobCannotBeWritten) ||
             (event.event == LfRfidEventWriteTooLongToWrite)) {
             lfrfid_write_warning_shown = true;
+            popup_set_text_width(popup, 80);
             popup_set_icon(popup, 83, 22, &I_WarningDolphinFlip_45x42);
             popup_set_header(popup, "Still Trying to Write...", 64, 0, AlignCenter, AlignTop);
             popup_set_text(
@@ -116,6 +153,7 @@ void lfrfid_scene_write_on_exit(void* context) {
     LfRfid* app = context;
     notification_message(app->notifications, &sequence_blink_stop);
     popup_reset(app->popup);
+
     lfrfid_worker_stop(app->lfworker);
     lfrfid_worker_stop_thread(app->lfworker);
 

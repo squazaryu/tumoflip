@@ -18,11 +18,17 @@ def run_c(body):
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory)
         (path / "test.c").write_text(body)
-        subprocess.run(
+        compiled = subprocess.run(
             ["cc", "-std=c11", "-Wall", "-Werror", str(path / "test.c"), "-o", str(path / "test")],
-            check=True, capture_output=True, text=True,
+            capture_output=True, text=True,
         )
-        subprocess.run([str(path / "test")], check=True, capture_output=True, text=True)
+        if compiled.returncode:
+            raise AssertionError(f"C fixture compilation failed:\n{compiled.stdout}{compiled.stderr}")
+        executed = subprocess.run([str(path / "test")], capture_output=True, text=True)
+        if executed.returncode:
+            raise AssertionError(
+                f"C fixture exited {executed.returncode}:\n{executed.stdout}{executed.stderr}"
+            )
 
 
 class HotplugAssetsTests(unittest.TestCase):
@@ -43,11 +49,17 @@ class HotplugAssetsTests(unittest.TestCase):
 enum { ColorBlack,FontPrimary,FontSecondary };
 typedef struct { const char* text;int x,y,horizontal,vertical; } TextElement;
 typedef struct { int x,y;void* icon; } IconElement;
-typedef struct { TextElement header,text;IconElement icon; } PopupModel;
+typedef struct { TextElement header,text;IconElement icon;uint8_t text_width; } PopupModel;
 typedef struct { void* view;void* callback;void* context;bool timer_enabled;int timer_period_in_ms; } Popup;
 typedef struct { Popup* popup;void* widget;void* notifications; } NfcApp;
 typedef int Canvas;
 static int icons,texts,widget_resets,sequence_reset_green;
+// Bounded rendering has its own native-font fixture; this regression exercises
+// the legacy width-zero reuse path after reset, not font measurement.
+typedef const char FuriString;
+static FuriString* popup_fit_text(Canvas* c,const char* t,uint8_t w){(void)c;(void)w;return t;}
+static const char* furi_string_get_cstr(FuriString* s){return s;}
+static void furi_string_free(FuriString* s){(void)s;}
 static void canvas_clear(Canvas* c) { (void)c; }
 static void canvas_set_color(Canvas* c,int v) { (void)c;(void)v; }
 static void canvas_set_font(Canvas* c,int v) { (void)c;(void)v; }
@@ -59,12 +71,12 @@ static void widget_reset(void* w) { (void)w;widget_resets++; }
 static void notification_message_block(void* n,void* s) { (void)n;(void)s; }
 """ + production + r"""
 int main(void) {
- PopupModel m={.header={.text="Parsing"},.icon={12,23,(void*)1}};
+ PopupModel m={.header={.text="Parsing"},.icon={12,23,(void*)1},.text_width=64};
  Popup p={.view=&m,.callback=(void*)1,.context=(void*)1,.timer_enabled=true,.timer_period_in_ms=100};
  NfcApp app={.popup=&p};Canvas c=0;
  popup_view_draw_callback(&c,&m);assert(icons==1);
  nfc_protocol_support_scene_read_success_on_exit(&app);
- assert(widget_resets==1 && !p.callback && !p.context && !p.timer_enabled);
+ assert(widget_resets==1 && !p.callback && !p.context && !p.timer_enabled && m.text_width==0);
  m.header.text="Keys Saved";m.text.text="New keys: 2\nAlready known: 3";
  icons=texts=0;popup_view_draw_callback(&c,&m);assert(icons==0 && texts==2);
  m.header.text="Field is on";icons=0;popup_view_draw_callback(&c,&m);assert(icons==0);
@@ -118,6 +130,7 @@ int main(void) {
 enum { SubGhzRadioDeviceTypeInternal, SubGhzRadioDeviceTypeExternalCC1101, SubGhzRadioDeviceTypeAuto };
 enum { SubGhzTxRxStateIDLE, SubGhzTxRxStateSleep, SubGhzTxRxStateRx, SubGhzTxRxStateTx };
 enum { SubGhzProtocolFlag_RAW = 8 };
+#define FURI_LOG_E(...) ((void)0)
 typedef struct { const char* name; uint32_t frequency; } Preset;
 typedef struct { int radio_device_type, preferred_radio_device_type, txrx_state;
  uint32_t radio_device_probe_tick; int receiver_filter;
@@ -133,7 +146,8 @@ static void subghz_txrx_radio_device_fallback_internal(SubGhzTxRx* s) {
 }
 static void subghz_txrx_receiver_reset(SubGhzTxRx* s) { (void)s; resets++; }
 static const char* furi_string_get_cstr(const char* s) { return s; }
-static void* subghz_setting_get_preset_data_by_name(void* s,const char* n) { (void)n; return s; }
+static uint8_t preset_bytes;
+static void* subghz_setting_get_preset_data_by_name(void* s,const char* n) { (void)s;(void)n;return &preset_bytes; }
 static void subghz_txrx_begin(SubGhzTxRx* s,void* p) { (void)s;(void)p; assert(!running); }
 static void subghz_txrx_rx(SubGhzTxRx* s,uint32_t f) { assert(f==433920000);resumes++;running=true;s->txrx_state=SubGhzTxRxStateRx; }
 static uint32_t furi_get_tick(void) { return tick; }

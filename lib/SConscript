@@ -48,6 +48,8 @@ libs = env.BuildModules(
         "ieee754_parse_wrap",
         "usb_mass_storage",
         "tumoflip_device_services",
+        "signal_file",
+        "fap_metadata",
     ],
 )
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "tumospectrum_types.h"
+#include "tumospectrum_archive_model.h"
+#include "sensor_fit.h"
 
 #define TUMOSPECTRUM_SET_MIN_SAMPLES  3U
 #define TUMOSPECTRUM_SET_MAX_SAMPLES  4U
@@ -89,6 +91,8 @@ typedef struct {
     char control_label[TUMOSPECTRUM_SET_LABEL_SIZE];
     TumoSpectrumCaptureType type;
     TumoSpectrumCapture samples[TUMOSPECTRUM_SET_MAX_SAMPLES];
+    TumoSpectrumArchiveSource sources[TUMOSPECTRUM_SET_MAX_SAMPLES];
+    char created_at[32];
     size_t sample_count;
     TumoSpectrumInference inference;
     bool inferred;
@@ -104,3 +108,7 @@ const char* tumospectrum_counter_direction_name(TumoSpectrumCounterDirection dir
 void tumospectrum_format_checksum_candidates(uint8_t candidates, char* output, size_t output_size);
 bool tumospectrum_bitset_get(const uint8_t* bitset, size_t index);
 void tumospectrum_inference_rebuild_fields(TumoSpectrumInference* inference);
+bool tumospectrum_sensor_decode(
+    const TumoSpectrumCaptureSet* set,
+    SensorObservation samples[4],
+    uint8_t* bit_count);

@@ -1,5 +1,6 @@
 """Host execution of receive-only Toyota framing and VAG diagnostic extraction."""
 from pathlib import Path
+import re
 import unittest
 from tools.tumoflip.test_hotplug_assets import run_c
 
@@ -7,7 +8,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def function(source, signature):
-    start = source.index(signature)
+    match = re.search(r"\s+".join(re.escape(part) for part in signature.split()), source)
+    if match is None:
+        raise ValueError(f"missing production function: {signature}")
+    start = match.start()
     brace = source.index("{", start)
     depth = 1
     end = brace + 1
@@ -28,6 +32,7 @@ class ToyotaVagTests(unittest.TestCase):
             "static void toyota_decode_and_fire(",
             "void subghz_protocol_decoder_toyota_reset(",
             "static void toyota_feed_variant_a(", "static void toyota_feed_variant_b(",
+            "static void toyota_feed_variant_c(",
             "void subghz_protocol_decoder_toyota_feed(",
         ]
         run_c(r"""
@@ -40,14 +45,16 @@ class ToyotaVagTests(unittest.TestCase):
 typedef struct { const uint16_t te_long,te_short,te_delta;const uint8_t min_count_bit_for_found; } SubGhzBlockConst;
 typedef struct Base { void (*callback)(struct Base*,void*);void* context; } SubGhzProtocolDecoderBase;
 typedef struct { int parser_step;uint32_t te_last;uint64_t decode_data;uint16_t decode_count_bit; } SubGhzBlockDecoder;
-typedef struct { uint64_t data;uint16_t data_count_bit;uint32_t serial,btn,cnt; } SubGhzBlockGeneric;
+typedef struct { uint64_t data,data_2;uint16_t data_count_bit;uint32_t serial,btn,cnt; } SubGhzBlockGeneric;
 """ + declarations + "\n".join(function(source, s) for s in signatures) + r"""
 static int found;
 static uint16_t bits;
 static uint32_t variant;
+static uint64_t key;
 static void receive(SubGhzProtocolDecoderBase* b,void* c) {
  (void)c;SubGhzProtocolDecoderToyota* s=(void*)b;
  found++;bits=s->generic.data_count_bit;variant=s->generic.cnt;
+ key=s->generic.data;
 }
 static void feed(SubGhzProtocolDecoderToyota* s,bool l,uint32_t d) {
  subghz_protocol_decoder_toyota_feed(s,l,d);
@@ -82,6 +89,22 @@ int main(void){
  feed(&s,true,900);payload(&s,1,66);assert(found==0);
  // A bad stream does not poison a later valid variant.
  preamble(&s,1);payload(&s,1,67);assert(found==1);
+ // C is selected by its sync gap, not by stealing A's initial short pulse.
+ const uint64_t expected=UINT64_C(0x123456781234567B);
+ for(int n=65;n<=69;n++){
+  subghz_protocol_decoder_toyota_reset(&s);found=0;
+  preamble(&s,0);feed(&s,true,400);feed(&s,false,1200);
+  for(int i=0;i<n;i++){
+   bool bit=i<64?((expected>>(63-i))&1):true;
+   feed(&s,true,bit?800:400);feed(&s,false,bit?400:800);
+  }
+  feed(&s,false,2000);
+  if(n>=66&&n<=68)assert(found==1&&variant==2&&bits==n&&key==expected);
+  else assert(found==0);
+ }
+ // C and the original A/B coexist on the same receiver after reset.
+ for(int v=0;v<2;v++){subghz_protocol_decoder_toyota_reset(&s);found=0;
+  preamble(&s,v);payload(&s,v,v?67:68);assert(found==1&&variant==(unsigned)v);}
  return 0;
 }
 """)

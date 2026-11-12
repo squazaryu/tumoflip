@@ -1,6 +1,7 @@
 #include "subghz_history.h"
 #include "subghz_diversity.h"
 #include <lib/subghz/receiver.h>
+#include <lib/subghz/protocols/public_api.h>
 
 #include <furi.h>
 
@@ -31,12 +32,43 @@ struct SubGhzHistory {
     uint16_t last_index_write;
     uint8_t code_last_hash_data;
     bool code_last_hash_data_set;
+    bool code_last_identity_set;
+    uint32_t code_last_identity[SUBGHZ_PRESS_IDENTITY_WORDS];
+    const SubGhzProtocol* code_last_protocol;
+    uint32_t code_last_frequency;
     FuriString* tmp_string;
     SubGhzHistoryStruct* history;
 };
 
+static bool subghz_history_is_duplicate(
+    SubGhzHistory* instance,
+    SubGhzProtocolDecoderBase* decoder,
+    SubGhzRadioPreset* preset,
+    uint8_t code_hash_data,
+    uint32_t air_time_ms) {
+    uint32_t identity[SUBGHZ_PRESS_IDENTITY_WORDS];
+    const bool identity_set = subghz_protocol_decoder_get_press_identity(decoder, identity);
+    const bool same_value =
+        identity_set ?
+            (instance->code_last_identity_set &&
+             memcmp(identity, instance->code_last_identity, sizeof(identity)) == 0) :
+            (!instance->code_last_identity_set && instance->code_last_hash_data == code_hash_data);
+    const bool duplicate = instance->code_last_hash_data_set &&
+                           instance->code_last_protocol == decoder->protocol &&
+                           instance->code_last_frequency == preset->frequency && same_value &&
+                           ((air_time_ms - instance->last_update_air_time) < 500);
+    instance->code_last_hash_data = code_hash_data;
+    instance->code_last_hash_data_set = true;
+    instance->code_last_identity_set = identity_set;
+    instance->code_last_protocol = decoder->protocol;
+    instance->code_last_frequency = preset->frequency;
+    instance->last_update_air_time = air_time_ms;
+    if(identity_set) memcpy(instance->code_last_identity, identity, sizeof(identity));
+    return duplicate;
+}
+
 SubGhzHistory* subghz_history_alloc(void) {
-    SubGhzHistory* instance = malloc(sizeof(SubGhzHistory));
+    SubGhzHistory* instance = calloc(1, sizeof(SubGhzHistory));
     instance->tmp_string = furi_string_alloc();
     instance->history = malloc(sizeof(SubGhzHistoryStruct));
     SubGhzHistoryItemArray_init(instance->history->data);
@@ -214,8 +246,7 @@ SubGhzHistoryAddResult subghz_history_add_to_history_with_source(
     uint8_t code_hash_data = subghz_protocol_decoder_base_get_hash_data(decoder_base);
     //the "have we seen anything at all" flag matters: without it a signal whose hash is
     //zero would match the value the filter starts out with and never reach the history
-    if(instance->code_last_hash_data_set && (instance->code_last_hash_data == code_hash_data) &&
-       ((air_time_ms - instance->last_update_air_time) < 500)) {
+    if(subghz_history_is_duplicate(instance, decoder_base, preset, code_hash_data, air_time_ms)) {
         SubGhzHistoryAddResult result = SubGhzHistoryAddResultDuplicate;
         if(instance->last_index_write > 0) {
             SubGhzHistoryItem* item = SubGhzHistoryItemArray_get(
@@ -226,13 +257,8 @@ SubGhzHistoryAddResult subghz_history_add_to_history_with_source(
                 result = SubGhzHistoryAddResultUpdated;
             }
         }
-        instance->last_update_air_time = air_time_ms;
         return result;
     }
-
-    instance->code_last_hash_data = code_hash_data;
-    instance->code_last_hash_data_set = true;
-    instance->last_update_air_time = air_time_ms;
 
     FuriString* text = furi_string_alloc();
     SubGhzHistoryItem* item = SubGhzHistoryItemArray_push_raw(instance->history->data);

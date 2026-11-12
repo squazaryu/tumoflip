@@ -1,0 +1,6 @@
+{
+  "frames": 16,
+  "hardware_test": false,
+  "renderer": "production Envelope Check callback, stock GUI and U8g2 fonts",
+  "bounds_and_same_row_overlap_assertions": true
+}

@@ -8,7 +8,7 @@
 
 [![Stable release](https://img.shields.io/github/v/release/squazaryu/tumoflip?label=stable&color=brightgreen)](https://github.com/squazaryu/tumoflip/releases/latest)
 [![Release workflow](https://img.shields.io/github/actions/workflow/status/squazaryu/tumoflip/release.yml?branch=main&label=build)](https://github.com/squazaryu/tumoflip/actions/workflows/release.yml)
-![Firmware API](https://img.shields.io/badge/Dev%20API-88.7-8b5cf6)
+![Firmware API](https://img.shields.io/badge/Dev%20source%20API-88.23-8b5cf6)
 ![Target](https://img.shields.io/badge/Target-Flipper%20Zero%20F7-f97316)
 [![License](https://img.shields.io/badge/License-GPLv3-2563eb)](LICENSE)
 
@@ -29,7 +29,9 @@ The project is independent. We selectively integrate upstream improvements and
 keep Tumoflip-specific changes, release identities, and package contracts in
 this repository.
 
-> **Current stable:** `t-flppr-fw-008` (`v1.0.8`) · API `88.4` · Flipper Zero F7
+> **Current stable:** `t-flppr-fw-009` (`v1.0.9`) · API `88.23` · Flipper Zero F7
+>
+> Previous immutable rollback: `t-flppr-fw-008` (`v1.0.8`) · API `88.7`.
 >
 > Dev builds are for testing. Stable releases are immutable and are promoted
 > only after the agreed software checks and physical-device validation.
@@ -66,7 +68,7 @@ control. This table is a practical orientation, not a benchmark.
 | 🧭 | **Desktop** | Custom Wii, Wii Vertical, DSi, and Vertical layouts; Module One and ARF Tools folders; favorites for apps, scripts, and folders. |
 | 📱 | **Companion** | BLE App Bridge, RTC sync, package and firmware transfer activity, device verification, and iOS-first workflows. |
 | 🧩 | **Packages** | Separate Base, ARF, Module One, and Protocol Packs catalogs with content-addressed manifests and independent releases. Nearby Files is delivered as a Base package. |
-| 🛠️ | **Developer** | Dev API 88.7, JS Runner as an FAP, SDK archives, release validation, acceptance telemetry, and reproducible build metadata. |
+| 🛠️ | **Developer** | Dev source API 88.23, JS Runner as an FAP, SDK archives, release validation, acceptance telemetry, and reproducible build metadata. |
 
 ## Architecture at a glance
 
@@ -192,12 +194,28 @@ rollback rules, checksums, and catalog baseline policy.
 
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
-| **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-008-028` | Hardware checks and feature validation | [All releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Stable** | `t-flppr-fw-009` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
+| **Dev** | `t-dev-009-039` | External FAAC TM, read-only RAW Edit imports and Archive/CLI reliability | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
+
+Stable `t-flppr-fw-009` / `v1.0.9` promotes the Dev 009 line with selective
+Unleashed 095 improvements: external Core Proteco, defensive IR parsing,
+recoverable case-only renames, failed-folder navigation and correct Standard/ARF
+save ownership. The firmware keeps local API 88.23 and the full 4096-byte C2
+reserve; it does not claim upstream API 88.26 parity. Existing timing, hopping,
+radio, NFC, memory/diagnostic and field-tool improvements remain.
+
+Back up important data, install Stable 009 with matching native resources, then
+install **FW Packages Stable 007** after its separate catalog activation.
+Stable 008 uses API 88.7; old native feature FALs must not be reused across the
+private 1004 contract. **TumoCompanion 1.11.35** supports the new snapshot; no
+new IPA or ESP32 flash is required. The published Dev 009-039 and Dev catalog
+031 remain unchanged for rollback. No factory reset, automatic SD cleanup or
+Bluetooth re-pairing is needed. Hardware checks remain explicit; this is not
+proof of a fix for the historic idle OOM symptom. Older releases stay immutable.
 
 ## Install
 
@@ -205,8 +223,8 @@ new firmware release does not rewrite an older package catalog.
 
 1. Install or update [TumoCompanion](https://github.com/squazaryu/TumoCompanion).
 2. Connect the Flipper Zero over BLE.
-3. Open **Updates → Firmware → Stable** and select `t-flppr-fw-007`.
-4. Install FW Packages separately from **Updates → FW Packages** when needed.
+3. Open **Updates → Firmware → Stable** and select `t-flppr-fw-009` with native resources.
+4. Then install **FW Packages → Stable 007** after catalog activation.
 
 Back up `/int` and important SD-card files before flashing. Custom apps,
 settings, IR files, and Sub-GHz files should be copied somewhere safe.
@@ -218,13 +236,16 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-flppr-fw-008.tgz
+flipper-z-f7-update-t-flppr-fw-009.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: Dev `88.7`; immutable stable `v1.0.7` remains `88.4`.
+- Firmware API: Stable `v1.0.9` and published Dev `t-dev-009-039` use `88.23`;
+  immutable stable `v1.0.8` remains `88.7`.
+  Each release manifest records its compatible package API. API numbers are
+  local to this fork.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or
   rebuilt from the matching FW Packages catalog.
 - The JS Runner is an application (`js_app.fap`); it is not required by the

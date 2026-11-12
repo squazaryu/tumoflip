@@ -22,7 +22,7 @@ resources/subghz/assets/nice_flor_s
 resources/subghz/assets/vag
 scenes/subghz_scene.c
 scenes/subghz_scene.h
-scenes/subghz_scene_frequency_analyzer.c
+# Analyzer lifecycle is app-specific: core unloads its FAL; ARF stays bundled.
 scenes/subghz_scene_delete.c
 scenes/subghz_scene_delete_raw.c
 scenes/subghz_scene_protocol_pack_info.c

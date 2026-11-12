@@ -386,11 +386,10 @@ SubGhzTxRxStartTxState
         if(instance->transmitter) {
             if(subghz_transmitter_deserialize(instance->transmitter, flipper_format) ==
                SubGhzProtocolStatusOk) {
-                if(strcmp(furi_string_get_cstr(preset->name), "") != 0) {
-                    subghz_wardriving_txrx_begin(
-                        instance,
-                        subghz_setting_get_preset_data_by_name(
-                            instance->setting, furi_string_get_cstr(preset->name)));
+                uint8_t* preset_data = subghz_setting_get_preset_data_by_name(
+                    instance->setting, furi_string_get_cstr(preset->name));
+                if(preset_data) {
+                    subghz_wardriving_txrx_begin(instance, preset_data);
                     if(preset->frequency) {
                         if(!subghz_wardriving_txrx_tx(instance, preset->frequency)) {
                             FURI_LOG_E(TAG, "Only Rx");
@@ -435,11 +434,14 @@ void subghz_wardriving_txrx_rx_start(SubGhzWarDrivingTxRx* instance) {
     furi_assert(instance);
     subghz_wardriving_txrx_stop(instance);
     subghz_wardriving_txrx_rx_pipeline_alloc(instance);
-    subghz_wardriving_txrx_begin(
-        instance,
-        subghz_setting_get_preset_data_by_name(
-            subghz_wardriving_txrx_get_setting(instance),
-            furi_string_get_cstr(instance->preset->name)));
+    uint8_t* preset_data = subghz_setting_get_preset_data_by_name(
+        subghz_wardriving_txrx_get_setting(instance),
+        furi_string_get_cstr(instance->preset->name));
+    if(!preset_data) {
+        FURI_LOG_E(TAG, "Unknown preset; radio remains stopped");
+        return;
+    }
+    subghz_wardriving_txrx_begin(instance, preset_data);
     subghz_wardriving_txrx_rx(instance, instance->preset->frequency);
 }
 

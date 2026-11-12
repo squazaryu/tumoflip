@@ -39,6 +39,9 @@ typedef enum {
     BtMessageTypeAppBridgeSendV2,
     BtMessageTypeTransferActivity,
     BtMessageTypeTransferTick,
+    BtMessageTypeGetBondedDevices,
+    BtMessageTypeSetConnectionPeer,
+    BtMessageTypeForgetBondedDevice,
 } BtMessageType;
 
 typedef struct {
@@ -71,6 +74,7 @@ typedef union {
     struct {
         const FuriHalBleProfileTemplate* template;
         FuriHalBleProfileParams params;
+        bool start_idle;
     } profile;
     FuriHalBleProfileParams profile_params;
     BtKeyStorageUpdateData key_storage_data;
@@ -79,6 +83,8 @@ typedef union {
     BtAppBridgeSendData app_bridge;
     BtAppBridgeSendV2Data app_bridge_v2;
     bool transfer_active;
+    GapBondedDevices* bonded_devices;
+    const GapBondedDevice* peer;
 } BtMessageData;
 
 typedef struct {

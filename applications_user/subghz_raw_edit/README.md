@@ -12,7 +12,23 @@ Built for cleaning up `Read RAW` captures before decoding or replaying them -
 a long recording full of repeats and noise becomes a single tidy frame.
 
 > **Receive/analysis only.** This app never transmits. It only reads, displays
-> and rewrites files you already have on the SD card.
+> and explicitly saves a new RAW output. Input files are never modified by import.
+
+### Tumoflip 1.8 adaptation
+
+Recognized key files are opened read-only and copied into a bounded RAM format
+before invoking an encoder. Any Key/Counter updates therefore affect only that
+copy. Imports over 16 KiB, insufficient contiguous memory, short reads and failed
+rewinds are refused. Built-in formats do not load extra protocol modules;
+an explicitly selected external Core format (including Freezer/FAAC TM) loads
+its Core registry temporarily and releases it after synthesis. Matching native
+protocol resources are required. No protocol-pack setting is changed.
+
+Merge retains synthesized-frame metadata so its leading synchronization guard
+is not cropped as noise. Zero-gap merge and bounded NumberInput controls were
+already part of the Tumoflip fork. This selective adaptation of author
+`593991914861e7ffc31f6c3b78a31332ab5c057a` is not a wholesale source sync:
+the upstream custom-button picker remains a separate lifecycle/UI review.
 
 ## Supported protocols
 Sub-GHz-RAW-Edit allows you to view RAW signals and any other `.sub` protocols supported by your firmware. For all protocols other than RAW capture, this app uses the device's internal decoder.

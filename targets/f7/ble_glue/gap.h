@@ -8,6 +8,18 @@
 #define GAP_MAC_ADDR_SIZE (6)
 #define GAP_KEY_SIZE      (0x10)
 
+// Maximum number of seven-byte entries in one HCI command-complete payload.
+#define GAP_BONDED_DEVICES_MAX 35
+typedef struct {
+    uint8_t address_type;
+    uint8_t address[GAP_MAC_ADDR_SIZE];
+} GapBondedDevice;
+
+typedef struct {
+    uint8_t count;
+    GapBondedDevice devices[GAP_BONDED_DEVICES_MAX];
+} GapBondedDevices;
+
 /*
  * GAP helpers - background thread that handles BLE GAP events and advertising.
  */
@@ -98,9 +110,22 @@ bool gap_init(
     GapEventCallback on_event_cb,
     void* context);
 
+/** Firmware-internal startup; does not change GapConfig or the FAP ABI. */
+bool gap_init_with_peer_selection(
+    GapConfig* config,
+    const GapRootSecurityKeys* root_keys,
+    GapEventCallback on_event_cb,
+    void* context,
+    bool peer_selection);
+
 void gap_start_advertising(void);
 
 void gap_stop_advertising(void);
+
+bool gap_get_bonded_devices(GapBondedDevices* devices);
+/** Change the allowed bonded peer while idle. NULL explicitly opens pairing. */
+bool gap_set_connection_peer(const GapBondedDevice* peer);
+bool gap_forget_bonded_device(const GapBondedDevice* peer);
 
 GapState gap_get_state(void);
 

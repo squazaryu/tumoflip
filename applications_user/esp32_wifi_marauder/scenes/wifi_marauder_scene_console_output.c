@@ -1,4 +1,5 @@
 #include "../wifi_marauder_app_i.h"
+#include "../wifi_marauder_console_policy.h"
 
 char* _wifi_marauder_get_prefix_from_cmd(const char* command) {
     int end = strcspn(command, " ");
@@ -97,8 +98,16 @@ void wifi_marauder_scene_console_output_on_enter(void* context) {
             app->text_box_store_strlen += strlen(help_msg);
         }
         // Stopscan message
-        if(app->show_stopscan_tip) {
-            const char* help_msg = "Press BACK to send stopscan\n";
+        if(wifi_marauder_console_can_mark_poi(app->selected_tx_string)) {
+            const char* hint = "Hold OK: mark POI\n";
+            furi_string_cat_str(app->text_box_store, hint);
+            app->text_box_store_strlen += strlen(hint);
+        }
+        const char* stop = wifi_marauder_console_stop_command(app->selected_tx_string);
+        if(app->show_stopscan_tip && stop) {
+            const char* help_msg =
+                !strcmp(stop, "recon stop\n") ?
+                    "Press BACK to stop Recon\n" : "Press BACK to send stopscan\n";
             furi_string_cat_str(app->text_box_store, help_msg);
             app->text_box_store_strlen += strlen(help_msg);
         }
@@ -216,6 +225,12 @@ bool wifi_marauder_scene_console_output_on_event(void* context, SceneManagerEven
     bool consumed = false;
 
     if(event.type == SceneManagerEventTypeCustom) {
+        if(event.event == WifiMarauderEventMarkPoi && app->is_command && !app->script &&
+           wifi_marauder_console_can_mark_poi(app->selected_tx_string)) {
+            // Keep Wardrive running; its firmware validates GPS/session state.
+            wifi_marauder_uart_tx(app->uart, (uint8_t*)"wardrivepoi\n", strlen("wardrivepoi\n"));
+            return true;
+        }
         text_box_set_text(app->text_box, furi_string_get_cstr(app->text_box_store));
         consumed = true;
     } else if(event.type == SceneManagerEventTypeTick) {
@@ -230,8 +245,11 @@ void wifi_marauder_scene_console_output_on_exit(void* context) {
 
     // Automatically stop the scan when exiting view
     if(app->is_command) {
-        wifi_marauder_uart_tx(app->uart, (uint8_t*)("stopscan\n"), strlen("stopscan\n"));
-        furi_delay_ms(50);
+        const char* stop = wifi_marauder_console_stop_command(app->selected_tx_string);
+        if(stop) {
+            wifi_marauder_uart_tx(app->uart, (uint8_t*)stop, strlen(stop));
+            furi_delay_ms(50);
+        }
     }
 
     // Unregister rx callback

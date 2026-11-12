@@ -41,11 +41,22 @@ View* loading_get_view(Loading* instance);
  */
 void loading_set_progress(Loading* instance, float progress);
 
-/** Go back to showing the animation on its own
+/** Hide the progress bar
  *
  * @param      instance  Loading instance
  */
 void loading_reset_progress(Loading* instance);
+
+/** Name the work in progress next to the animation
+ *
+ * With a label, the animation moves left and the label is centered in the remaining width.
+ * A progress bar, when enabled, sits under the label. The text is copied into the view model.
+ * NULL or an empty string restores the centered animation; progress state is unchanged.
+ *
+ * @param      instance  Loading instance
+ * @param      text      Label; may be multiline
+ */
+void loading_set_text(Loading* instance, const char* text);
 
 #ifdef __cplusplus
 }

@@ -93,6 +93,14 @@ void popup_set_text(
     Align horizontal,
     Align vertical);
 
+/** Limit each text line to a pixel width, shortening with an ellipsis.
+ *
+ * Zero (default, also restored by popup_reset) keeps the legacy wrapping.
+ * Nonzero widths are clamped to128. UTF-8 characters are not split. Header
+ * rendering is unchanged; this changes presentation, never the source text.
+ */
+void popup_set_text_width(Popup* popup, uint8_t width);
+
 /** Set popup icon
  *
  * If icon position is negative, popup icon will not be rendered

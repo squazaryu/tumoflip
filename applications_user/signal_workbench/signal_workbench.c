@@ -2,6 +2,7 @@
 #include "tumospectrum_band_map.h"
 #include "tumospectrum_band_session.h"
 #include "tumospectrum_capture_flow.h"
+#include "tumospectrum_envelope.h"
 #include "tumospectrum_inference.h"
 #include "tumospectrum_parser.h"
 #include "tumospectrum_profile_builder.h"
@@ -18,6 +19,8 @@
 #include <gui/modules/submenu.h>
 #include <gui/modules/text_box.h>
 #include <gui/modules/text_input.h>
+#include <gui/modules/number_input.h>
+#include "sensor_fit.h"
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
 #include <loader/loader.h>
@@ -41,17 +44,23 @@
 
 typedef enum {
     TumoSpectrumViewMenu,
+    TumoSpectrumViewCaptureSets,
     TumoSpectrumViewBandMap,
     TumoSpectrumViewResult,
     TumoSpectrumViewActions,
     TumoSpectrumViewText,
     TumoSpectrumViewNote,
+    TumoSpectrumViewSourceCheck,
     TumoSpectrumViewCaptureSet,
     TumoSpectrumViewSetActions,
     TumoSpectrumViewSetInput,
     TumoSpectrumViewProfileName,
     TumoSpectrumViewProfileMenu,
     TumoSpectrumViewProtocol,
+    TumoSpectrumViewSensorMenu,
+    TumoSpectrumViewSensorInput,
+    TumoSpectrumViewBandPeaks,
+    TumoSpectrumViewEnvelope,
 } TumoSpectrumView;
 
 typedef enum {
@@ -62,12 +71,14 @@ typedef enum {
     TumoSpectrumMenuOpenInfrared,
     TumoSpectrumMenuNewSubGhzSet,
     TumoSpectrumMenuNewInfraredSet,
-    TumoSpectrumMenuLatestSet,
+    TumoSpectrumMenuCaptureSets,
     TumoSpectrumMenuOpenScope,
     TumoSpectrumMenuImportAnalyzer,
     TumoSpectrumMenuProtocolProfiles,
     TumoSpectrumMenuNotebook,
     TumoSpectrumMenuAbout,
+    TumoSpectrumMenuEnvelope,
+    TumoSpectrumMenuSensorWatch,
 } TumoSpectrumMenuAction;
 
 typedef enum {
@@ -85,7 +96,22 @@ typedef enum {
     TumoSpectrumSetActionHandoff,
     TumoSpectrumSetActionDetails,
     TumoSpectrumSetActionClearSession,
+    TumoSpectrumSetActionSensorHelper,
+    TumoSpectrumSetActionCheckSources,
+    TumoSpectrumSetActionExportReport,
 } TumoSpectrumSetAction;
+
+typedef enum {
+    TumoSpectrumArchiveJobNone,
+    TumoSpectrumArchiveJobSave,
+    TumoSpectrumArchiveJobLoad,
+    TumoSpectrumArchiveJobCheck,
+} TumoSpectrumArchiveJob;
+
+typedef enum {
+    TumoSpectrumCaptureSetsLatest,
+    TumoSpectrumCaptureSetsBrowse,
+} TumoSpectrumCaptureSetsAction;
 
 typedef enum {
     TumoSpectrumSetInputDevice,
@@ -111,6 +137,10 @@ typedef struct {
     TumoSpectrumApp* app;
 } TumoSpectrumBandMapModel;
 
+typedef struct {
+    TumoEnvelopeSnapshot snapshot;
+} TumoSpectrumEnvelopeModel;
+
 struct TumoSpectrumApp {
     Gui* gui;
     Storage* storage;
@@ -120,13 +150,17 @@ struct TumoSpectrumApp {
     NotificationApp* notification;
     ViewDispatcher* view_dispatcher;
     Submenu* menu;
+    Submenu* capture_sets_menu;
+    Submenu* source_menu;
     Submenu* actions;
     Submenu* set_actions;
     Submenu* profile_menu;
+    Submenu* peak_menu;
     View* result_view;
     View* capture_set_view;
     View* protocol_view;
     View* band_map_view;
+    View* envelope_view;
     TextBox* text_box;
     TextInput* note_input;
     TextInput* set_input;
@@ -138,6 +172,12 @@ struct TumoSpectrumApp {
     char note_buffer[TUMOSPECTRUM_NOTE_SIZE];
     char report_path[TUMOSPECTRUM_PATH_SIZE];
     TumoSpectrumCaptureSet capture_set;
+    FuriThread* archive_worker;
+    TumoSpectrumArchiveJob archive_job;
+    bool archive_job_success;
+    bool archive_cancel_requested;
+    char archive_path[TUMOSPECTRUM_PATH_SIZE];
+    uint32_t capture_set_return_view;
     TumoSpectrumSetInputStage set_input_stage;
     char set_input_buffer[TUMOSPECTRUM_SET_LABEL_SIZE];
     char profile_name_buffer[ProtocolProfileNameSize];
@@ -145,6 +185,7 @@ struct TumoSpectrumApp {
     char set_report_path[TUMOSPECTRUM_PATH_SIZE];
     TumoSpectrumProtocolRuntime* protocol_runtime;
     TumoSpectrumBandMap* band_map;
+    TumoSpectrumEnvelope* envelope;
     ProtocolProfilePackage protocol_packages[ProtocolProfileMaximumProfiles];
     TumoSpectrumProtocolObservation protocol_observation;
     size_t protocol_package_count;
@@ -161,6 +202,14 @@ struct TumoSpectrumApp {
     FuriMutex* device_services_mutex;
     TumoflipDeviceLocation phone_location;
     bool phone_location_valid;
+    Submenu* sensor_menu;
+    NumberInput* sensor_input;
+    int32_t sensor_values[4];
+    uint8_t sensor_entered;
+    uint8_t sensor_selected;
+    char sensor_header[32];
+    FuriString* sensor_report;
+    SensorFitResult sensor_result;
 };
 
 static const NotificationSequence tumospectrum_sequence_ok = {
@@ -229,6 +278,14 @@ static void tumospectrum_refresh_protocol(TumoSpectrumApp* app) {
 static void tumospectrum_refresh_band_map(TumoSpectrumApp* app) {
     with_view_model(
         app->band_map_view, TumoSpectrumBandMapModel * model, { model->app = app; }, true);
+}
+
+static void tumospectrum_refresh_envelope(TumoSpectrumApp* app) {
+    with_view_model(
+        app->envelope_view,
+        TumoSpectrumEnvelopeModel * model,
+        { tumospectrum_envelope_snapshot(app->envelope, &model->snapshot); },
+        true);
 }
 
 static const char* tumospectrum_badge(TumoSpectrumCaptureType type) {
@@ -334,12 +391,16 @@ static void tumospectrum_draw_comparison(Canvas* canvas, const TumoSpectrumApp* 
         canvas_draw_str(canvas, 2, 41, "Select second RAW");
         return;
     }
-    snprintf(
-        line,
-        sizeof(line),
-        "%s  Similarity %u%%",
-        app->comparison.likely_same ? "Likely same" : "Different",
-        app->comparison.overall_similarity);
+    if(app->comparison.preset_changed || app->comparison.protocol_changed) {
+        snprintf(line, sizeof(line), "Configuration differs");
+    } else {
+        snprintf(
+            line,
+            sizeof(line),
+            "%s  Signal %u%%",
+            app->comparison.likely_same ? "Likely same" : "Different",
+            app->comparison.overall_similarity);
+    }
     canvas_draw_str(canvas, 2, 25, line);
     snprintf(
         line,
@@ -348,12 +409,21 @@ static void tumospectrum_draw_comparison(Canvas* canvas, const TumoSpectrumApp* 
         app->comparison.histogram_similarity,
         (long)app->comparison.frequency_delta_hz);
     canvas_draw_str(canvas, 2, 36, line);
-    snprintf(
-        line,
-        sizeof(line),
-        "dPulse %+ld  dTime %+ld%%",
-        (long)app->comparison.pulse_delta,
-        (long)app->comparison.duration_delta_percent);
+    if(app->comparison.preset_changed || app->comparison.protocol_changed) {
+        const char* config_label = app->comparison.preset_changed &&
+                                           app->comparison.protocol_changed ?
+                                       "Preset + protocol differ" :
+                                   app->comparison.preset_changed ? "Preset differs" :
+                                                                    "Protocol differs";
+        snprintf(line, sizeof(line), "%s", config_label);
+    } else {
+        snprintf(
+            line,
+            sizeof(line),
+            "dPulse %+ld  dTime %+ld%%",
+            (long)app->comparison.pulse_delta,
+            (long)app->comparison.duration_delta_percent);
+    }
     canvas_draw_str(canvas, 2, 47, line);
 }
 
@@ -394,6 +464,11 @@ static uint8_t tumospectrum_page_count(const TumoSpectrumCapture* capture) {
 static void tumospectrum_build_actions(TumoSpectrumApp* app);
 static void tumospectrum_compare_capture(TumoSpectrumApp* app);
 static void tumospectrum_start_smart_capture(TumoSpectrumApp* app, uint32_t frequency_hz);
+static void tumospectrum_show_text(
+    TumoSpectrumApp* app,
+    const char* title,
+    const char* body,
+    uint32_t return_view);
 
 static bool tumospectrum_result_input(InputEvent* event, void* context) {
     TumoSpectrumApp* app = context;
@@ -425,6 +500,120 @@ static bool tumospectrum_result_input(InputEvent* event, void* context) {
 static uint8_t tumospectrum_band_map_rssi_y(int8_t rssi) {
     const int16_t clamped = rssi < -110 ? -110 : rssi > -35 ? -35 : rssi;
     return (uint8_t)(40 - ((clamped + 110) * 20) / 75);
+}
+
+static const char* tumospectrum_envelope_status_name(const TumoEnvelopeSnapshot* snapshot) {
+    switch(snapshot->status) {
+    case TumoEnvelopeRunning:
+        return snapshot->calibrated ? tumo_envelope_kind_name(snapshot->kind) : "Release TX";
+    case TumoEnvelopeBusy:
+        return "Radio busy";
+    case TumoEnvelopeMissing:
+        return "No radio";
+    case TumoEnvelopeError:
+        return "Read error";
+    default:
+        return "Stopped";
+    }
+}
+
+static void tumospectrum_envelope_draw(Canvas* canvas, void* context) {
+    const TumoSpectrumEnvelopeModel* model = context;
+    const TumoEnvelopeSnapshot* snapshot = &model->snapshot;
+    char text[32];
+    canvas_clear(canvas);
+    canvas_set_font(canvas, FontSecondary);
+    snprintf(
+        text,
+        sizeof(text),
+        "%lu.%03lu MHz",
+        (unsigned long)(snapshot->frequency_hz / 1000000U),
+        (unsigned long)((snapshot->frequency_hz % 1000000U) / 1000U));
+    canvas_draw_str(canvas, 1, 8, text);
+    canvas_draw_str_aligned(
+        canvas, 127, 8, AlignRight, AlignBottom, snapshot->external ? "EXT" : "INT");
+    canvas_draw_line(canvas, 0, 10, 127, 10);
+    canvas_set_font(canvas, FontPrimary);
+    canvas_draw_str(canvas, 1, 22, tumospectrum_envelope_status_name(snapshot));
+    canvas_set_font(canvas, FontSecondary);
+    if(snapshot->agreement) {
+        snprintf(text, sizeof(text), "%u%%", snapshot->agreement);
+        canvas_draw_str_aligned(canvas, 127, 22, AlignRight, AlignBottom, text);
+    }
+
+    if(snapshot->status == TumoEnvelopeRunning && snapshot->calibrated) {
+        for(unsigned x = 0; x < TUMO_ENVELOPE_SAMPLES; x++) {
+            const int16_t value = snapshot->samples[x] < TUMO_ENVELOPE_RSSI_MIN ? TUMO_ENVELOPE_RSSI_MIN :
+                                 snapshot->samples[x] > -25 ? -25 : snapshot->samples[x];
+            const unsigned y = 40 - ((value - TUMO_ENVELOPE_RSSI_MIN) * 14) /
+                                        (-25 - TUMO_ENVELOPE_RSSI_MIN);
+            canvas_draw_line(canvas, x, 40, x, y);
+        }
+        snprintf(text, sizeof(text), "R%d N%d", snapshot->high_dbm, snapshot->floor_dbm);
+        canvas_draw_str(canvas, 1, 50, text);
+        canvas_draw_str_aligned(canvas, 127, 50, AlignRight, AlignBottom, "RX only");
+    } else {
+        canvas_draw_str_aligned(
+            canvas,
+            64,
+            39,
+            AlignCenter,
+            AlignBottom,
+            snapshot->status == TumoEnvelopeRunning ? "CAL with TX off" : "OK: retry / Back: exit");
+    }
+    elements_button_left(canvas, "Tune");
+    elements_button_center(canvas, "CAL");
+    elements_button_right(canvas, "Tune");
+}
+
+static uint32_t tumospectrum_envelope_previous(void* context) {
+    TumoSpectrumApp* app = context;
+    tumospectrum_envelope_free(app->envelope);
+    app->envelope = NULL;
+    return TumoSpectrumViewMenu;
+}
+
+static bool tumospectrum_envelope_input(InputEvent* event, void* context) {
+    TumoSpectrumApp* app = context;
+    if(event->type != InputTypeShort || event->key == InputKeyBack) return false;
+    if(event->key == InputKeyLeft || event->key == InputKeyRight) {
+        tumospectrum_envelope_tune(app->envelope, event->key == InputKeyRight ? 1 : -1);
+    } else if(event->key == InputKeyUp) {
+        tumospectrum_envelope_cycle_radio(app->envelope);
+    } else if(event->key == InputKeyDown) {
+        tumospectrum_envelope_next_band(app->envelope);
+    } else if(event->key == InputKeyOk) {
+        TumoEnvelopeSnapshot snapshot;
+        tumospectrum_envelope_snapshot(app->envelope, &snapshot);
+        if(snapshot.status == TumoEnvelopeRunning) {
+            tumospectrum_envelope_calibrate(app->envelope);
+        } else {
+            tumospectrum_envelope_start(
+                app->envelope, snapshot.frequency_hz, snapshot.external);
+        }
+    } else {
+        return false;
+    }
+    tumospectrum_refresh_envelope(app);
+    return true;
+}
+
+static void tumospectrum_open_envelope(TumoSpectrumApp* app) {
+    if(!app->envelope) app->envelope = tumospectrum_envelope_alloc();
+    if(!app->envelope) {
+        tumospectrum_show_text(app, "Envelope Check", "Not enough memory.", TumoSpectrumViewMenu);
+        return;
+    }
+    TumoSpectrumBandMapSnapshot snapshot;
+    tumospectrum_band_map_get_snapshot(app->band_map, &snapshot);
+    tumospectrum_band_map_stop(app->band_map);
+    tumospectrum_protocol_runtime_stop(app->protocol_runtime);
+    tumospectrum_envelope_start(
+        app->envelope,
+        snapshot.selected_frequency_hz,
+        snapshot.radio == TumoSpectrumBandMapRadioExternal);
+    tumospectrum_refresh_envelope(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewEnvelope);
 }
 
 static const char* tumospectrum_band_map_status_name(TumoSpectrumBandMapStatus status) {
@@ -463,11 +652,12 @@ static void tumospectrum_band_map_draw(Canvas* canvas, void* context) {
         "%03lu.%03lu",
         (unsigned long)(snapshot.selected_frequency_hz / 1000000U),
         (unsigned long)((snapshot.selected_frequency_hz % 1000000U) / 1000U));
-    canvas_draw_str_aligned(canvas, 64, 8, AlignCenter, AlignBottom, text);
+    canvas_draw_str_aligned(canvas, 62, 8, AlignCenter, AlignBottom, text);
     snprintf(
         text,
         sizeof(text),
         "%s",
+        snapshot.radio == TumoSpectrumBandMapRadioDual ? "INT+EXT" :
         snapshot.radio == TumoSpectrumBandMapRadioExternal ? "EXT" : "INT");
     canvas_draw_str_aligned(canvas, 127, 8, AlignRight, AlignBottom, text);
     canvas_draw_line(canvas, 0, 10, 127, 10);
@@ -480,7 +670,7 @@ static void tumospectrum_band_map_draw(Canvas* canvas, void* context) {
         tumospectrum_band_map_status_name(snapshot.status));
     canvas_draw_str(canvas, 1, 18, text);
     snprintf(text, sizeof(text), "R%d N%d", snapshot.selected_rssi_dbm, snapshot.noise_floor_dbm);
-    canvas_draw_str_aligned(canvas, 72, 18, AlignCenter, AlignBottom, text);
+    canvas_draw_str_aligned(canvas, 78, 18, AlignCenter, AlignBottom, text);
     snprintf(text, sizeof(text), "%u/4", app->smart_capture_sample_count);
     canvas_draw_str_aligned(canvas, 127, 18, AlignRight, AlignBottom, text);
 
@@ -519,6 +709,36 @@ static void tumospectrum_band_map_draw(Canvas* canvas, void* context) {
     elements_button_right(canvas, "Tune");
 }
 
+static void tumospectrum_peak_selected(void* context, uint32_t index) {
+    TumoSpectrumApp* app = context;
+    if(index == 16) tumospectrum_band_map_clear_peaks(app->band_map);
+    else tumospectrum_band_map_select_peak(app->band_map, index);
+    tumospectrum_refresh_band_map(app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewBandMap);
+}
+static uint32_t tumospectrum_peaks_previous(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewBandMap;
+}
+static void tumospectrum_open_peak_history(TumoSpectrumApp* app) {
+    TumoSpectrumBandMapSnapshot snapshot;
+    tumospectrum_band_map_get_snapshot(app->band_map, &snapshot);
+    submenu_reset(app->peak_menu);
+    submenu_set_header(app->peak_menu, "Peak history");
+    if(!snapshot.peak_count)
+        submenu_add_item(app->peak_menu, "No peaks yet", 17, tumospectrum_peak_selected, app);
+    for(unsigned i = 0; i < snapshot.peak_count && i < 16; i++) {
+        const TumoSpectrumBandPeak* peak = &snapshot.observed_peaks[i];
+        char label[32];
+        snprintf(label, sizeof(label), "%03lu.%03lu  %d dBm",
+                 (unsigned long)(peak->frequency_hz / 1000000U),
+                 (unsigned long)((peak->frequency_hz % 1000000U) / 1000U), peak->rssi_dbm);
+        submenu_add_item(app->peak_menu, label, i, tumospectrum_peak_selected, app);
+    }
+    if(snapshot.peak_count)
+        submenu_add_item(app->peak_menu, "Clear peak history", 16, tumospectrum_peak_selected, app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewBandPeaks);
+}
 static bool tumospectrum_band_map_input(InputEvent* event, void* context) {
     TumoSpectrumApp* app = context;
     if(event->type == InputTypeShort || event->type == InputTypeRepeat) {
@@ -557,6 +777,9 @@ static bool tumospectrum_band_map_input(InputEvent* event, void* context) {
             tumospectrum_band_map_cycle_zoom(app->band_map);
         } else if(event->key == InputKeyDown) {
             tumospectrum_band_map_snap_to_peak(app->band_map);
+        } else if(event->key == InputKeyRight) {
+            tumospectrum_open_peak_history(app);
+            return true;
         } else {
             return false;
         }
@@ -567,16 +790,80 @@ static bool tumospectrum_band_map_input(InputEvent* event, void* context) {
 }
 
 static void tumospectrum_capture_set_add_sample(TumoSpectrumApp* app);
+static bool tumospectrum_capture_set_fingerprint_source(
+    Storage* storage,
+    const TumoSpectrumCapture* sample,
+    TumoSpectrumArchiveSource* source);
 static void tumospectrum_capture_set_infer(TumoSpectrumApp* app);
 static void tumospectrum_capture_set_show_details(TumoSpectrumApp* app);
 static void tumospectrum_capture_set_send(TumoSpectrumApp* app);
 static void tumospectrum_capture_set_build_actions(TumoSpectrumApp* app);
+static void tumospectrum_capture_set_build_source_menu(TumoSpectrumApp* app);
+static void tumospectrum_archive_job_finish(TumoSpectrumApp* app);
+static bool tumospectrum_archive_job_start(
+    TumoSpectrumApp* app,
+    TumoSpectrumArchiveJob job,
+    const char* path,
+    uint32_t return_view);
+static void tumospectrum_open_latest_set(TumoSpectrumApp* app, uint32_t return_view);
+static void tumospectrum_open_archive(TumoSpectrumApp* app);
+static void tumospectrum_capture_sets_callback(void* context, uint32_t action);
 static void tumospectrum_capture_set_begin_profile(TumoSpectrumApp* app);
 static void tumospectrum_open_protocol_profiles(TumoSpectrumApp* app);
 static void tumospectrum_handoff_capture(
     TumoSpectrumApp* app,
     const TumoSpectrumCapture* capture,
     const char* return_argument);
+
+static void tumospectrum_capture_set_source_summary(
+    const TumoSpectrumCaptureSet* capture_set,
+    char* output,
+    size_t output_size) {
+    unsigned unchanged = 0U;
+    unsigned changed = 0U;
+    unsigned missing = 0U;
+    unsigned unverified = 0U;
+    unsigned read_error = 0U;
+    for(size_t index = 0U; index < capture_set->sample_count; index++) {
+        switch(capture_set->sources[index].status) {
+        case TumoSpectrumArchiveSourceUnchanged:
+            unchanged++;
+            break;
+        case TumoSpectrumArchiveSourceChanged:
+            changed++;
+            break;
+        case TumoSpectrumArchiveSourceMissing:
+            missing++;
+            break;
+        case TumoSpectrumArchiveSourceReadError:
+            read_error++;
+            break;
+        case TumoSpectrumArchiveSourceUnverified:
+        default:
+            unverified++;
+            break;
+        }
+    }
+    if(read_error) {
+        snprintf(output, output_size, "Sources: %u read error", read_error);
+    } else if(missing) {
+        snprintf(output, output_size, "Sources: %u missing", missing);
+    } else if(changed) {
+        snprintf(output, output_size, "Sources: %u changed", changed);
+    } else if(unverified) {
+        strlcpy(output, "Sources: unverified", output_size);
+    } else {
+        snprintf(output, output_size, "Sources: %u/%u OK", unchanged, (unsigned)capture_set->sample_count);
+    }
+}
+
+static bool tumospectrum_capture_set_sources_verified(const TumoSpectrumCaptureSet* capture_set) {
+    if(!capture_set || capture_set->sample_count == 0U) return false;
+    for(size_t index = 0U; index < capture_set->sample_count; index++) {
+        if(capture_set->sources[index].status != TumoSpectrumArchiveSourceUnchanged) return false;
+    }
+    return true;
+}
 
 static void tumospectrum_capture_set_draw(Canvas* canvas, void* context) {
     const TumoSpectrumSetModel* model = context;
@@ -596,14 +883,7 @@ static void tumospectrum_capture_set_draw(Canvas* canvas, void* context) {
     snprintf(line, sizeof(line), "Control: %.17s", capture_set->control_label);
     canvas_draw_str(canvas, 2, 35, line);
     if(capture_set->inferred) {
-        snprintf(
-            line,
-            sizeof(line),
-            "%u bits  S%u C%u ?%u",
-            capture_set->inference.bit_count,
-            capture_set->inference.stable_bits,
-            capture_set->inference.changing_bits,
-            capture_set->inference.unknown_bits);
+        tumospectrum_capture_set_source_summary(capture_set, line, sizeof(line));
         canvas_draw_str(canvas, 2, 45, line);
         canvas_draw_str(
             canvas, 2, 53, tumospectrum_replay_class_name(capture_set->inference.replay_class));
@@ -635,7 +915,7 @@ static bool tumospectrum_capture_set_input(InputEvent* event, void* context) {
     TumoSpectrumApp* app = context;
     if(event->type != InputTypeShort) return false;
     if(event->key == InputKeyLeft || event->key == InputKeyBack) {
-        view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewMenu);
+        view_dispatcher_switch_to_view(app->view_dispatcher, app->capture_set_return_view);
         return true;
     }
     if(event->key == InputKeyOk) {
@@ -978,6 +1258,11 @@ static void tumospectrum_open_protocol_profiles(TumoSpectrumApp* app) {
 
 static void tumospectrum_tick(void* context) {
     TumoSpectrumApp* app = context;
+    tumospectrum_archive_job_finish(app);
+    if(app->envelope) {
+        tumospectrum_envelope_tick(app->envelope);
+        tumospectrum_refresh_envelope(app);
+    }
     if(tumospectrum_band_map_is_running(app->band_map)) {
         tumospectrum_band_map_tick(app->band_map);
         tumospectrum_refresh_band_map(app);
@@ -1009,9 +1294,34 @@ static uint32_t tumospectrum_set_actions_previous(void* context) {
     return TumoSpectrumViewCaptureSet;
 }
 
+static uint32_t tumospectrum_capture_set_previous(void* context) {
+    const TumoSpectrumApp* app = context;
+    return app->capture_set_return_view;
+}
+
+static uint32_t tumospectrum_capture_sets_previous(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewMenu;
+}
+
+static uint32_t tumospectrum_source_check_previous(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewCaptureSet;
+}
+
 static uint32_t tumospectrum_text_previous_menu(void* context) {
     UNUSED(context);
     return TumoSpectrumViewMenu;
+}
+
+static uint32_t tumospectrum_text_previous_capture_sets(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewCaptureSets;
+}
+
+static uint32_t tumospectrum_text_previous_source_check(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewSourceCheck;
 }
 
 static uint32_t tumospectrum_text_previous_result(void* context) {
@@ -1041,6 +1351,12 @@ static uint32_t tumospectrum_profile_name_previous(void* context) {
 
 static bool tumospectrum_back(void* context) {
     TumoSpectrumApp* app = context;
+    if(app->archive_worker) {
+        app->archive_cancel_requested = true;
+        furi_thread_flags_set(
+            furi_thread_get_id(app->archive_worker), TUMOSPECTRUM_ARCHIVE_CANCEL_FLAG);
+        return true;
+    }
     tumospectrum_band_map_stop(app->band_map);
     tumospectrum_protocol_runtime_stop(app->protocol_runtime);
     view_dispatcher_stop(app->view_dispatcher);
@@ -1060,6 +1376,8 @@ static void tumospectrum_show_text(
     view_set_previous_callback(
         text_box_get_view(app->text_box),
         return_view == TumoSpectrumViewMenu       ? tumospectrum_text_previous_menu :
+        return_view == TumoSpectrumViewCaptureSets ? tumospectrum_text_previous_capture_sets :
+        return_view == TumoSpectrumViewSourceCheck ? tumospectrum_text_previous_source_check :
         return_view == TumoSpectrumViewCaptureSet ? tumospectrum_text_previous_set :
                                                     tumospectrum_text_previous_result);
     view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewText);
@@ -1240,6 +1558,18 @@ static void tumospectrum_capture_set_add_sample(TumoSpectrumApp* app) {
         }
     }
 
+    if(!tumospectrum_capture_set_fingerprint_source(
+           app->storage, sample, &capture_set->sources[capture_set->sample_count])) {
+        notification_message(app->notification, &tumospectrum_sequence_error);
+        tumospectrum_show_text(
+            app,
+            "Capture Changed",
+            "Could not verify the selected file. It was not added to this set.",
+            TumoSpectrumViewCaptureSet);
+        memset(sample, 0, sizeof(*sample));
+        return;
+    }
+
     capture_set->sample_count++;
     capture_set->inferred = false;
     memset(&capture_set->inference, 0, sizeof(capture_set->inference));
@@ -1248,6 +1578,28 @@ static void tumospectrum_capture_set_add_sample(TumoSpectrumApp* app) {
     tumospectrum_refresh_set(app);
     notification_message(app->notification, &tumospectrum_sequence_ok);
     view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewCaptureSet);
+}
+
+static bool tumospectrum_capture_set_fingerprint_source(
+    Storage* storage,
+    const TumoSpectrumCapture* sample,
+    TumoSpectrumArchiveSource* source) {
+    if(!storage || !sample || !source || sample->status != TumoSpectrumStatusOk ||
+       !sample->path[0]) {
+        return false;
+    }
+    uint32_t actual_size = 0U;
+    uint8_t digest[TUMOSPECTRUM_ARCHIVE_DIGEST_SIZE];
+    if(!tumospectrum_storage_hash_source(storage, sample->path, digest, &actual_size) ||
+       actual_size != sample->file_size) {
+        return false;
+    }
+    memset(source, 0, sizeof(*source));
+    source->fingerprinted = true;
+    source->size = actual_size;
+    memcpy(source->sha256, digest, sizeof(digest));
+    source->status = TumoSpectrumArchiveSourceUnchanged;
+    return true;
 }
 
 static void tumospectrum_capture_set_infer(TumoSpectrumApp* app) {
@@ -1265,26 +1617,19 @@ static void tumospectrum_capture_set_infer(TumoSpectrumApp* app) {
     }
 
     capture_set->inferred = true;
-    if(!tumospectrum_storage_save_set(
-           app->storage,
-           capture_set,
-           app->set_profile_path,
-           sizeof(app->set_profile_path),
-           app->set_report_path,
-           sizeof(app->set_report_path))) {
+    if(!tumospectrum_archive_job_start(
+           app,
+           TumoSpectrumArchiveJobSave,
+           NULL,
+           app->capture_set_return_view)) {
         capture_set->inferred = false;
         notification_message(app->notification, &tumospectrum_sequence_error);
         tumospectrum_show_text(
             app,
             "Save Failed",
-            "Inference completed, but the capture set could not be saved. Check the SD card and try again.",
+            "The archive save could not start. Check the SD card and try again.",
             TumoSpectrumViewCaptureSet);
-        return;
     }
-    tumospectrum_write_report_sidecar(app, app->set_report_path, "signal_set");
-
-    tumospectrum_refresh_set(app);
-    notification_message(app->notification, &tumospectrum_sequence_ok);
 }
 
 static void tumospectrum_capture_set_show_details(TumoSpectrumApp* app) {
@@ -1296,8 +1641,15 @@ static void tumospectrum_capture_set_show_details(TumoSpectrumApp* app) {
 }
 
 static void tumospectrum_capture_set_send(TumoSpectrumApp* app) {
-    const char* report_path = app->set_report_path[0] ? app->set_report_path :
-                                                        TUMOSPECTRUM_LATEST_SET_REPORT;
+    if(!app->set_report_path[0] || !storage_file_exists(app->storage, app->set_report_path)) {
+        tumospectrum_show_text(
+            app,
+            "Companion",
+            "No JSON report is available for this set. Export its text report or create a new analysis.",
+            TumoSpectrumViewCaptureSet);
+        return;
+    }
+    const char* report_path = app->set_report_path;
     const char* filename = strrchr(report_path, '/');
     filename = filename ? filename + 1U : report_path;
     char payload[BT_APP_BRIDGE_V2_PAYLOAD_LEN_MAX + 1U];
@@ -1351,9 +1703,221 @@ static void tumospectrum_capture_set_clear_session(TumoSpectrumApp* app) {
     }
 }
 
+enum {
+    SensorBegin = 0x5000,
+    SensorValue,
+    SensorAnalyze = 0x5010,
+    SensorExport,
+    SensorAbout,
+    SensorDone,
+    SensorEdit,
+    SensorCandidateBase = 0x5100,
+};
+static uint32_t tumospectrum_sensor_previous(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewSensorMenu;
+}
+static uint32_t tumospectrum_sensor_parent(void* context) {
+    UNUSED(context);
+    return TumoSpectrumViewSetActions;
+}
+static void tumospectrum_sensor_action(void* context, uint32_t event) {
+    view_dispatcher_send_custom_event(((TumoSpectrumApp*)context)->view_dispatcher, event);
+}
+static void tumospectrum_sensor_menu(TumoSpectrumApp* app) {
+    submenu_reset(app->sensor_menu);
+    submenu_set_header(app->sensor_menu, "Sensor Helper");
+    for(unsigned i = 0; i < 4; i++) {
+        char label[48];
+        int32_t mag = abs(app->sensor_values[i]);
+        if(app->sensor_entered & (1U << i))
+            snprintf(
+                label,
+                sizeof(label),
+                "%u %s: %s%ld.%ld",
+                i + 1,
+                i == 3 ? "Check" : "Train",
+                app->sensor_values[i] < 0 ? "-" : "",
+                (long)(mag / 10),
+                (long)(mag % 10));
+        else
+            snprintf(label, sizeof(label), "%u %s: not set", i + 1, i == 3 ? "Check" : "Train");
+        submenu_add_item(
+            app->sensor_menu, label, SensorValue + i, tumospectrum_sensor_action, app);
+    }
+    submenu_add_item(
+        app->sensor_menu, "Find hypotheses", SensorAnalyze, tumospectrum_sensor_action, app);
+    submenu_add_item(
+        app->sensor_menu, "Export report", SensorExport, tumospectrum_sensor_action, app);
+    submenu_add_item(
+        app->sensor_menu, "How to measure", SensorAbout, tumospectrum_sensor_action, app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewSensorMenu);
+}
+static void tumospectrum_sensor_results_menu(TumoSpectrumApp* app) {
+    submenu_reset(app->sensor_menu);
+    submenu_set_header(app->sensor_menu, "Hypotheses");
+    for(unsigned i = 0; i < app->sensor_result.count; i++) {
+        const SensorCandidate* c = &app->sensor_result.candidates[i];
+        char label[48];
+        snprintf(
+            label,
+            sizeof(label),
+            "%u %s / %u..%u",
+            i + 1,
+            c->holdout_match ? "MATCH" : "FAIL",
+            c->start,
+            c->start + c->width - 1);
+        submenu_add_item(
+            app->sensor_menu, label, SensorCandidateBase + i, tumospectrum_sensor_action, app);
+    }
+    submenu_add_item(
+        app->sensor_menu, "Measurements", SensorEdit, tumospectrum_sensor_action, app);
+    submenu_add_item(
+        app->sensor_menu, "Export full report", SensorExport, tumospectrum_sensor_action, app);
+    submenu_add_item(
+        app->sensor_menu, "Scope / limits", SensorAbout, tumospectrum_sensor_action, app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewSensorMenu);
+}
+static void tumospectrum_sensor_text(TumoSpectrumApp* app, const char* text) {
+    if(text != furi_string_get_cstr(app->text)) furi_string_set(app->text, text);
+    text_box_reset(app->text_box);
+    text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
+    view_set_previous_callback(text_box_get_view(app->text_box), tumospectrum_sensor_previous);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewText);
+}
+static void tumospectrum_sensor_number(void* context, int32_t value) {
+    TumoSpectrumApp* app = context;
+    app->sensor_values[app->sensor_selected] = value;
+    view_dispatcher_send_custom_event(app->view_dispatcher, SensorDone);
+}
+static bool tumospectrum_sensor_event(void* context, uint32_t event) {
+    TumoSpectrumApp* app = context;
+    if(event == SensorBegin) {
+        app->sensor_entered = 0;
+        app->sensor_result.count = 0;
+        memset(app->sensor_values, 0, sizeof(app->sensor_values));
+        furi_string_reset(app->sensor_report);
+        tumospectrum_sensor_menu(app);
+    } else if(event >= SensorValue && event < SensorValue + 4) {
+        app->sensor_selected = event - SensorValue;
+        snprintf(
+            app->sensor_header,
+            sizeof(app->sensor_header),
+            "Sample %u: value x10",
+            app->sensor_selected + 1);
+        number_input_set_header_text(app->sensor_input, app->sensor_header);
+        number_input_set_result_callback(
+            app->sensor_input,
+            tumospectrum_sensor_number,
+            app,
+            app->sensor_values[app->sensor_selected],
+            -1000000,
+            1000000);
+        view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewSensorInput);
+    } else if(event == SensorDone) {
+        app->sensor_entered |= 1U << app->sensor_selected;
+        app->sensor_result.count = 0;
+        furi_string_reset(app->sensor_report);
+        tumospectrum_sensor_menu(app);
+    } else if(event == SensorAnalyze) {
+        SensorObservation samples[4] = {0};
+        uint8_t bits = 0;
+        if(app->sensor_entered != 15 ||
+           !tumospectrum_sensor_decode(&app->capture_set, samples, &bits)) {
+            tumospectrum_sensor_text(
+                app,
+                "Need four short, complete\nRAW files from one sensor,\nsame frequency / preset,\nand four measured values.\nNo hypothesis generated.");
+            return true;
+        }
+        for(unsigned i = 0; i < 4; i++)
+            samples[i].measured10 = app->sensor_values[i];
+        SensorFitResult result;
+        if(!sensor_fit(samples, bits, &result)) {
+            tumospectrum_sensor_text(
+                app,
+                "No matching hypothesis.\nNeed distinct training\nvalues or another encoding.");
+            return true;
+        }
+        furi_string_printf(
+            app->sensor_report,
+            "Sensor hypotheses v1\n%lu fits; showing %u\n\nNot a proven decoder.\nFirst 3 samples train;\n4th is held out.\n\n",
+            result.total,
+            result.count);
+        for(unsigned i = 0; i < 4; i++)
+            furi_string_cat_printf(
+                app->sensor_report,
+                "Sample %u (x10): %ld\n%s\n",
+                i + 1,
+                (long)app->sensor_values[i],
+                app->capture_set.samples[i].path);
+        for(unsigned i = 0; i < result.count; i++) {
+            const SensorCandidate* c = &result.candidates[i];
+            char description[192];
+            if(sensor_candidate_text(
+                   c, i + 1, app->sensor_values[3], description, sizeof(description)))
+                furi_string_cat_printf(app->sensor_report, "\n%s", description);
+        }
+        app->sensor_result = result;
+        tumospectrum_sensor_results_menu(app);
+    } else if(event >= SensorCandidateBase && event < (uint32_t)SensorCandidateBase + app->sensor_result.count) {
+        char description[192];
+        unsigned index = event - SensorCandidateBase;
+        if(sensor_candidate_text(
+               &app->sensor_result.candidates[index],
+               index + 1,
+               app->sensor_values[3],
+               description,
+               sizeof(description)))
+            tumospectrum_sensor_text(app, description);
+    } else if(event == SensorEdit) {
+        tumospectrum_sensor_menu(app);
+    } else if(event == SensorExport) {
+        if(furi_string_empty(app->sensor_report)) {
+            tumospectrum_sensor_text(app, "Analyze measurements first.");
+            return true;
+        }
+        FuriString* path = furi_string_alloc();
+        File* file = storage_file_alloc(app->storage);
+        bool ok = false;
+        for(unsigned i = 0; i < 1000; i++) {
+            furi_string_printf(path, TUMOSPECTRUM_REPORT_DIR "/sensor_%03u.txt", i);
+            if(storage_file_open(file, furi_string_get_cstr(path), FSAM_WRITE, FSOM_CREATE_NEW)) {
+                ok = storage_file_write(
+                         file,
+                         furi_string_get_cstr(app->sensor_report),
+                         furi_string_size(app->sensor_report)) ==
+                         furi_string_size(app->sensor_report) &&
+                     storage_file_sync(file);
+                ok = storage_file_close(file) && ok;
+                if(!ok) storage_common_remove(app->storage, furi_string_get_cstr(path));
+                break;
+            }
+            FS_Error error = storage_file_get_error(file);
+            storage_file_close(file);
+            if(error != FSE_EXIST) break;
+        }
+        storage_file_free(file);
+        if(ok) furi_string_printf(app->text, "Report saved:\n%s", furi_string_get_cstr(path));
+        tumospectrum_sensor_text(
+            app,
+            ok ? furi_string_get_cstr(app->text) :
+                 "Report save failed.\nCheck SD / report limit.");
+        furi_string_free(path);
+    } else if(event == SensorAbout)
+        tumospectrum_sensor_text(
+            app,
+            "Sensor Helper\n\nUse four recordings of one sensor with known measurements in the same unit.\n\nEnter value x10: 24.5 C -> 245. First three must differ. The fourth validates, never trains.\n\nSearch: 4..16-bit fields, signed/unsigned, 16-bit byte order, scales 0.1 / 1 / 10 with an offset.\n\nFits can be accidental. Confirm with more recordings. No TX or automatic protocol installation.");
+    else
+        return false;
+    return true;
+}
+
 static void tumospectrum_capture_set_action_callback(void* context, uint32_t index) {
     TumoSpectrumApp* app = context;
     switch(index) {
+    case TumoSpectrumSetActionSensorHelper:
+        view_dispatcher_send_custom_event(app->view_dispatcher, SensorBegin);
+        break;
     case TumoSpectrumSetActionCreateProfile:
         tumospectrum_capture_set_begin_profile(app);
         break;
@@ -1373,6 +1937,37 @@ static void tumospectrum_capture_set_action_callback(void* context, uint32_t ind
     case TumoSpectrumSetActionClearSession:
         tumospectrum_capture_set_clear_session(app);
         break;
+    case TumoSpectrumSetActionCheckSources:
+        if(!tumospectrum_archive_job_start(
+               app,
+               TumoSpectrumArchiveJobCheck,
+               NULL,
+               app->capture_set_return_view)) {
+            notification_message(app->notification, &tumospectrum_sequence_error);
+        }
+        break;
+    case TumoSpectrumSetActionExportReport:
+        {
+            char exported_path[TUMOSPECTRUM_PATH_SIZE];
+            if(tumospectrum_storage_export_set_report(
+                   app->storage,
+                   &app->capture_set,
+                   exported_path,
+                   sizeof(exported_path))) {
+                furi_string_printf(app->text, "Report saved:\n%s", exported_path);
+            tumospectrum_show_text(
+                app, "Report Export", furi_string_get_cstr(app->text), TumoSpectrumViewCaptureSet);
+            notification_message(app->notification, &tumospectrum_sequence_ok);
+            } else {
+                notification_message(app->notification, &tumospectrum_sequence_error);
+                tumospectrum_show_text(
+                    app,
+                    "Report Export",
+                    "Could not create a new report. Existing files were not overwritten.",
+                    TumoSpectrumViewCaptureSet);
+            }
+        }
+        break;
     default:
         break;
     }
@@ -1381,6 +1976,13 @@ static void tumospectrum_capture_set_action_callback(void* context, uint32_t ind
 static void tumospectrum_capture_set_build_actions(TumoSpectrumApp* app) {
     submenu_reset(app->set_actions);
     submenu_set_header(app->set_actions, "Capture Set Actions");
+    if(app->capture_set.type == TumoSpectrumCaptureSubGhzRaw && app->capture_set.sample_count == 4)
+        submenu_add_item(
+            app->set_actions,
+            "Sensor Helper",
+            TumoSpectrumSetActionSensorHelper,
+            tumospectrum_capture_set_action_callback,
+            app);
     if(app->capture_set.type == TumoSpectrumCaptureSubGhzRaw && app->capture_set.inferred &&
        app->capture_set.inference.compatible &&
        app->capture_set.sample_count >= TUMOSPECTRUM_SET_MIN_SAMPLES) {
@@ -1413,6 +2015,18 @@ static void tumospectrum_capture_set_build_actions(TumoSpectrumApp* app) {
         TumoSpectrumSetActionDetails,
         tumospectrum_capture_set_action_callback,
         app);
+    submenu_add_item(
+        app->set_actions,
+        "Check source files",
+        TumoSpectrumSetActionCheckSources,
+        tumospectrum_capture_set_action_callback,
+        app);
+    submenu_add_item(
+        app->set_actions,
+        "Export report",
+        TumoSpectrumSetActionExportReport,
+        tumospectrum_capture_set_action_callback,
+        app);
     if(app->smart_capture_set) {
         submenu_add_item(
             app->set_actions,
@@ -1421,6 +2035,55 @@ static void tumospectrum_capture_set_build_actions(TumoSpectrumApp* app) {
             tumospectrum_capture_set_action_callback,
             app);
     }
+}
+
+static void tumospectrum_source_check_callback(void* context, uint32_t index) {
+    TumoSpectrumApp* app = context;
+    if(index < app->capture_set.sample_count) {
+        const TumoSpectrumCapture* sample = &app->capture_set.samples[index];
+        const TumoSpectrumArchiveSource* source = &app->capture_set.sources[index];
+        furi_string_printf(
+            app->text,
+            "Source %u\nStatus: %s\n\n%s\n\nThe saved analysis remains available.",
+            (unsigned int)index + 1U,
+            tumospectrum_archive_source_status_name(source->status),
+            sample->path);
+        text_box_set_text(app->text_box, furi_string_get_cstr(app->text));
+        text_box_set_focus(app->text_box, TextBoxFocusStart);
+        view_set_previous_callback(
+            text_box_get_view(app->text_box), tumospectrum_text_previous_source_check);
+        view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewText);
+    } else {
+        view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewCaptureSet);
+    }
+}
+
+static void tumospectrum_capture_set_build_source_menu(TumoSpectrumApp* app) {
+    submenu_reset(app->source_menu);
+    submenu_set_header(app->source_menu, "Source Check");
+    for(size_t index = 0U; index < app->capture_set.sample_count; index++) {
+        char label[48];
+        snprintf(
+            label,
+            sizeof(label),
+            "%u %.12s %s",
+            (unsigned int)index + 1U,
+            app->capture_set.samples[index].name[0] ? app->capture_set.samples[index].name :
+                                                        "Source",
+            tumospectrum_archive_source_status_name(app->capture_set.sources[index].status));
+        submenu_add_item(
+            app->source_menu,
+            label,
+            (uint32_t)index,
+            tumospectrum_source_check_callback,
+            app);
+    }
+    submenu_add_item(
+        app->source_menu,
+        "Back to set",
+        TUMOSPECTRUM_SET_MAX_SAMPLES + 1U,
+        tumospectrum_source_check_callback,
+        app);
 }
 
 static void tumospectrum_capture_set_profile_done(void* context) {
@@ -1540,9 +2203,11 @@ static void tumospectrum_set_input_done(void* context) {
 
 static void tumospectrum_begin_capture_set(TumoSpectrumApp* app, TumoSpectrumCaptureType type) {
     memset(&app->capture_set, 0, sizeof(app->capture_set));
+    app->capture_set_return_view = TumoSpectrumViewMenu;
     app->smart_capture_set = false;
     app->smart_capture_frequency_hz = 0U;
     app->capture_set.type = type;
+    app->capture_set_return_view = TumoSpectrumViewMenu;
     app->set_profile_path[0] = '\0';
     app->set_report_path[0] = '\0';
     app->set_input_stage = TumoSpectrumSetInputDevice;
@@ -1559,19 +2224,238 @@ static void tumospectrum_begin_capture_set(TumoSpectrumApp* app, TumoSpectrumCap
     view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewSetInput);
 }
 
-static void tumospectrum_open_latest_set(TumoSpectrumApp* app) {
-    if(!tumospectrum_storage_load_latest_set(app->storage, &app->capture_set)) {
-        notification_message(app->notification, &tumospectrum_sequence_error);
-        tumospectrum_show_text(
-            app, "Latest Set", "No valid capture set is available yet.", TumoSpectrumViewMenu);
+static int32_t tumospectrum_archive_worker(void* context) {
+    TumoSpectrumApp* app = context;
+    switch(app->archive_job) {
+    case TumoSpectrumArchiveJobSave:
+        app->archive_job_success = tumospectrum_storage_save_set(
+            app->storage,
+            &app->capture_set,
+            app->set_profile_path,
+            sizeof(app->set_profile_path),
+            app->set_report_path,
+            sizeof(app->set_report_path));
+        if(app->archive_job_success) {
+            tumospectrum_storage_check_set_sources(app->storage, &app->capture_set);
+        }
+        break;
+    case TumoSpectrumArchiveJobLoad:
+        app->archive_job_success = tumospectrum_storage_load_set(
+            app->storage, app->archive_path, &app->capture_set);
+        if(app->archive_job_success) {
+            // Source identity is checked after the archived analysis has been read.
+            // Missing or changed source files do not invalidate the saved snapshot.
+            tumospectrum_storage_check_set_sources(app->storage, &app->capture_set);
+            app->archive_job_success =
+                (furi_thread_flags_get() & TUMOSPECTRUM_ARCHIVE_CANCEL_FLAG) == 0U;
+        }
+        break;
+    case TumoSpectrumArchiveJobCheck:
+        app->archive_job_success =
+            tumospectrum_storage_check_set_sources(app->storage, &app->capture_set);
+        break;
+    case TumoSpectrumArchiveJobNone:
+    default:
+        app->archive_job_success = false;
+        break;
+    }
+    return 0;
+}
+
+static bool tumospectrum_archive_job_start(
+    TumoSpectrumApp* app,
+    TumoSpectrumArchiveJob job,
+    const char* path,
+    uint32_t return_view) {
+    if(!app || app->archive_worker || job == TumoSpectrumArchiveJobNone) return false;
+    if(job == TumoSpectrumArchiveJobLoad) {
+        if(!path || strlcpy(app->archive_path, path, sizeof(app->archive_path)) >=
+                        sizeof(app->archive_path)) {
+            return false;
+        }
+    }
+    app->capture_set_return_view = return_view;
+    app->archive_job = job;
+    app->archive_job_success = false;
+    app->archive_cancel_requested = false;
+    app->archive_worker =
+        furi_thread_alloc_ex("TumoArchive", 3072U, tumospectrum_archive_worker, app);
+    if(!app->archive_worker) {
+        app->archive_job = TumoSpectrumArchiveJobNone;
+        return false;
+    }
+    furi_thread_set_priority(app->archive_worker, FuriThreadPriorityLow);
+    view_dispatcher_show_loading(app->view_dispatcher);
+    furi_thread_start(app->archive_worker);
+    return true;
+}
+
+static void tumospectrum_archive_report_path(TumoSpectrumApp* app) {
+    app->set_report_path[0] = '\0';
+    if(strcmp(app->archive_path, TUMOSPECTRUM_LATEST_SET) == 0) {
+        strlcpy(
+            app->set_report_path,
+            TUMOSPECTRUM_LATEST_SET_REPORT,
+            sizeof(app->set_report_path));
         return;
     }
-    app->smart_capture_set = false;
-    app->smart_capture_frequency_hz = 0U;
-    strlcpy(app->set_profile_path, TUMOSPECTRUM_LATEST_SET, sizeof(app->set_profile_path));
-    strlcpy(app->set_report_path, TUMOSPECTRUM_LATEST_SET_REPORT, sizeof(app->set_report_path));
-    tumospectrum_refresh_set(app);
-    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewCaptureSet);
+    const char* filename = strrchr(app->archive_path, '/');
+    filename = filename ? filename + 1U : app->archive_path;
+    const size_t length = strlen(filename);
+    if(length <= 4U || strcmp(filename + length - 4U, ".tsp") != 0) return;
+    const int written = snprintf(
+        app->set_report_path,
+        sizeof(app->set_report_path),
+        TUMOSPECTRUM_REPORT_DIR "/%.*s.json",
+        (int)(length - 4U),
+        filename);
+    if(written <= 0 || (size_t)written >= sizeof(app->set_report_path) ||
+       !storage_file_exists(app->storage, app->set_report_path)) {
+        app->set_report_path[0] = '\0';
+    }
+}
+
+static void tumospectrum_archive_job_finish(TumoSpectrumApp* app) {
+    if(!app || !app->archive_worker ||
+       furi_thread_get_state(app->archive_worker) != FuriThreadStateStopped) {
+        return;
+    }
+    const TumoSpectrumArchiveJob job = app->archive_job;
+    const bool success = app->archive_job_success;
+    const bool cancelled = app->archive_cancel_requested;
+    furi_thread_join(app->archive_worker);
+    furi_thread_free(app->archive_worker);
+    app->archive_worker = NULL;
+    app->archive_job = TumoSpectrumArchiveJobNone;
+    app->archive_cancel_requested = false;
+
+    if(cancelled && !success) {
+        if(job == TumoSpectrumArchiveJobCheck) tumospectrum_refresh_set(app);
+        if(job == TumoSpectrumArchiveJobLoad) {
+            tumospectrum_show_text(
+                app,
+                "Check Cancelled",
+                "The saved analysis and source files were not changed.",
+                app->capture_set_return_view);
+        } else if(job == TumoSpectrumArchiveJobSave) {
+            app->capture_set.inferred = false;
+            tumospectrum_show_text(
+                app,
+                "Save Cancelled",
+                "No archive entry was created. Source files were not changed.",
+                TumoSpectrumViewCaptureSet);
+        } else {
+            view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewCaptureSet);
+        }
+        notification_message(app->notification, &tumospectrum_sequence_error);
+        return;
+    }
+
+    if(job == TumoSpectrumArchiveJobSave) {
+        if(!success) {
+            app->capture_set.inferred = false;
+            notification_message(app->notification, &tumospectrum_sequence_error);
+            tumospectrum_show_text(
+                app,
+                "Save Failed",
+                "The set could not be archived. Check the SD card and source files.",
+                TumoSpectrumViewCaptureSet);
+            return;
+        }
+        strlcpy(app->archive_path, app->set_profile_path, sizeof(app->archive_path));
+        tumospectrum_write_report_sidecar(app, app->set_report_path, "signal_set");
+        notification_message(
+            app->notification,
+            tumospectrum_capture_set_sources_verified(&app->capture_set) ?
+                &tumospectrum_sequence_ok :
+                &tumospectrum_sequence_error);
+        tumospectrum_refresh_set(app);
+        view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewCaptureSet);
+        return;
+    }
+
+    if(job == TumoSpectrumArchiveJobLoad) {
+        if(!success) {
+            notification_message(app->notification, &tumospectrum_sequence_error);
+            tumospectrum_show_text(
+                app,
+                "Set Unavailable",
+                "The archive record is invalid or unsupported. Other saved sets are untouched.",
+                app->capture_set_return_view);
+            return;
+        }
+        app->smart_capture_set = false;
+        app->smart_capture_frequency_hz = 0U;
+        app->smart_capture_sample_count = 0U;
+        strlcpy(app->set_profile_path, app->archive_path, sizeof(app->set_profile_path));
+        tumospectrum_archive_report_path(app);
+        tumospectrum_capture_set_build_actions(app);
+        tumospectrum_refresh_set(app);
+        notification_message(
+            app->notification,
+            tumospectrum_capture_set_sources_verified(&app->capture_set) ?
+                &tumospectrum_sequence_ok :
+                &tumospectrum_sequence_error);
+        view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewCaptureSet);
+        return;
+    }
+
+    if(job == TumoSpectrumArchiveJobCheck) {
+        tumospectrum_capture_set_build_source_menu(app);
+        tumospectrum_refresh_set(app);
+        notification_message(app->notification, success ? &tumospectrum_sequence_ok :
+                                                           &tumospectrum_sequence_error);
+        view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewSourceCheck);
+    }
+}
+
+static void tumospectrum_open_latest_set(TumoSpectrumApp* app, uint32_t return_view) {
+    tumospectrum_archive_job_start(
+        app, TumoSpectrumArchiveJobLoad, TUMOSPECTRUM_LATEST_SET, return_view);
+}
+
+static void tumospectrum_open_archive(TumoSpectrumApp* app) {
+    FuriString* path = furi_string_alloc_set(TUMOSPECTRUM_SET_DIR);
+    DialogsFileBrowserOptions options;
+    dialog_file_browser_set_basic_options(&options, ".tsp", &I_file_10px);
+    options.base_path = TUMOSPECTRUM_SET_DIR;
+    options.hide_ext = true;
+    const bool selected = dialog_file_browser_show(app->dialogs, path, path, &options);
+    if(selected && !tumospectrum_archive_job_start(
+                       app,
+                       TumoSpectrumArchiveJobLoad,
+                       furi_string_get_cstr(path),
+                       TumoSpectrumViewCaptureSets)) {
+        notification_message(app->notification, &tumospectrum_sequence_error);
+    }
+    furi_string_free(path);
+}
+
+static void tumospectrum_open_capture_sets(TumoSpectrumApp* app) {
+    submenu_reset(app->capture_sets_menu);
+    submenu_set_header(app->capture_sets_menu, "Capture Sets");
+    submenu_add_item(
+        app->capture_sets_menu,
+        "Latest set",
+        TumoSpectrumCaptureSetsLatest,
+        tumospectrum_capture_sets_callback,
+        app);
+    submenu_add_item(
+        app->capture_sets_menu,
+        "Browse archive",
+        TumoSpectrumCaptureSetsBrowse,
+        tumospectrum_capture_sets_callback,
+        app);
+    view_dispatcher_switch_to_view(app->view_dispatcher, TumoSpectrumViewCaptureSets);
+}
+
+static void tumospectrum_capture_sets_callback(void* context, uint32_t action) {
+    TumoSpectrumApp* app = context;
+    if(action == TumoSpectrumCaptureSetsLatest) {
+        tumospectrum_open_latest_set(app, TumoSpectrumViewCaptureSets);
+    } else if(action == TumoSpectrumCaptureSetsBrowse) {
+        tumospectrum_open_archive(app);
+    }
 }
 
 static bool tumospectrum_load_band_session_set(
@@ -1583,6 +2467,7 @@ static bool tumospectrum_load_band_session_set(
 
     memset(&app->capture_set, 0, sizeof(app->capture_set));
     app->capture_set.type = TumoSpectrumCaptureSubGhzRaw;
+    app->capture_set_return_view = TumoSpectrumViewMenu;
     strlcpy(app->capture_set.device_label, "Band Map", sizeof(app->capture_set.device_label));
     snprintf(
         app->capture_set.control_label,
@@ -1599,7 +2484,9 @@ static bool tumospectrum_load_band_session_set(
             app, TumoSpectrumCaptureSubGhzRaw, session->sample_paths[index], sample);
         if(sample->status == TumoSpectrumStatusOk &&
            sample->type == TumoSpectrumCaptureSubGhzRaw &&
-           tumospectrum_type_has_timings(sample->type)) {
+           tumospectrum_type_has_timings(sample->type) &&
+           tumospectrum_capture_set_fingerprint_source(
+               app->storage, sample, &app->capture_set.sources[app->capture_set.sample_count])) {
             app->capture_set.sample_count++;
         } else {
             memset(sample, 0, sizeof(*sample));
@@ -1713,8 +2600,28 @@ static bool tumospectrum_resume_capture(TumoSpectrumApp* app) {
 static void tumospectrum_menu_callback(void* context, uint32_t index) {
     TumoSpectrumApp* app = context;
     switch(index) {
+    case TumoSpectrumMenuSensorWatch: {
+        const char* target = "/ext/apps/Sub-GHz/sensor_watch.fap";
+        if(!storage_file_exists(app->storage, target)) {
+            tumospectrum_show_text(app, "Sensor Watch", "Install Sensor Watch\nfrom FW Packages first.", TumoSpectrumViewMenu);
+            break;
+        }
+        tumospectrum_band_map_stop(app->band_map);
+        tumospectrum_protocol_runtime_stop(app->protocol_runtime);
+        loader_clear_launch_queue(app->loader);
+        loader_enqueue_launch(app->loader, target, NULL, LoaderDeferredLaunchFlagGui);
+        FuriString* self = furi_string_alloc();
+        if(loader_get_application_launch_path(app->loader, self))
+            loader_enqueue_launch(app->loader, furi_string_get_cstr(self), NULL, LoaderDeferredLaunchFlagGui);
+        furi_string_free(self);
+        view_dispatcher_stop(app->view_dispatcher);
+        break;
+    }
     case TumoSpectrumMenuBandMap:
         tumospectrum_open_band_map(app);
+        break;
+    case TumoSpectrumMenuEnvelope:
+        tumospectrum_open_envelope(app);
         break;
     case TumoSpectrumMenuCaptureSubGhz:
         tumospectrum_start_capture(app, TumoSpectrumCaptureSubGhzRaw);
@@ -1734,8 +2641,8 @@ static void tumospectrum_menu_callback(void* context, uint32_t index) {
     case TumoSpectrumMenuNewInfraredSet:
         tumospectrum_begin_capture_set(app, TumoSpectrumCaptureInfraredRaw);
         break;
-    case TumoSpectrumMenuLatestSet:
-        tumospectrum_open_latest_set(app);
+    case TumoSpectrumMenuCaptureSets:
+        tumospectrum_open_capture_sets(app);
         break;
     case TumoSpectrumMenuOpenScope:
         tumospectrum_open_capture(app, TumoSpectrumCaptureTumoScope);
@@ -1770,10 +2677,13 @@ static void tumospectrum_menu_callback(void* context, uint32_t index) {
     case TumoSpectrumMenuAbout:
         tumospectrum_show_text(
             app,
-            "TumoSpectrum 3.0",
+            "TumoSpectrum 3.6",
             "Autonomous receive-only Band Map, Smart Capture, profile building and multi-capture signal research workspace.\n\n"
             "Band Map: Left/Right tunes, Up changes band, Down selects radio. Long Up zooms, long Down snaps to peak and long OK holds the scan.\n\n"
+            "Envelope Check:\nRelease TX before open\nor OK CAL (quiet floor).\n\nLeft/Right: tune 25 kHz\nUp: INT/EXT CC1101\nDown: next common band\nBack: release radio.\n\n"
+            "RSSI envelope only:\nPulsed / Flat / Unclear\nis NOT AM/FM or protocol\nidentification. Percent\nmeans window agreement,\nnot confidence. Flat may\nbe FM, CW or interference.\nFast bursts may be missed.\n\n"
             "Protocol Profiles performs bounded receive-only decoding on Flipper and logs changed observations to SD.\n\n"
+            "Capture Sets opens the latest analysis or browses saved sessions. Source files are checked by content digest and never modified.\n\n"
             "A Sub-GHz capture set can build a receive-only live profile from three or four RAW recordings without a computer.\n\n"
             "Source files are never modified. Static-like is not a cryptographic or replay guarantee. Any handoff stays in stock apps and their regional TX gate.\n\n"
             "github.com/squazaryu/tumoflip\nIssues #123 / #153 / #155 / #170",
@@ -2018,18 +2928,35 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
         tumoflip_device_services_client_alloc(tumospectrum_device_services_callback, app);
     app->view_dispatcher = view_dispatcher_alloc();
     app->menu = submenu_alloc();
+    app->capture_sets_menu = submenu_alloc();
+    app->source_menu = submenu_alloc();
     app->actions = submenu_alloc();
     app->set_actions = submenu_alloc();
     app->profile_menu = submenu_alloc();
+    app->peak_menu = submenu_alloc();
     app->result_view = view_alloc();
     app->capture_set_view = view_alloc();
     app->protocol_view = view_alloc();
     app->band_map_view = view_alloc();
+    app->envelope_view = view_alloc();
     app->text_box = text_box_alloc();
     app->note_input = text_input_alloc();
     app->set_input = text_input_alloc();
     app->profile_name_input = text_input_alloc();
     app->text = furi_string_alloc();
+    app->sensor_report = furi_string_alloc();
+    app->sensor_menu = submenu_alloc();
+    app->sensor_input = number_input_alloc();
+    view_set_previous_callback(submenu_get_view(app->sensor_menu), tumospectrum_sensor_parent);
+    view_set_previous_callback(
+        number_input_get_view(app->sensor_input), tumospectrum_sensor_previous);
+    view_dispatcher_add_view(
+        app->view_dispatcher, TumoSpectrumViewSensorMenu, submenu_get_view(app->sensor_menu));
+    view_dispatcher_add_view(
+        app->view_dispatcher,
+        TumoSpectrumViewSensorInput,
+        number_input_get_view(app->sensor_input));
+    view_dispatcher_set_custom_event_callback(app->view_dispatcher, tumospectrum_sensor_event);
 
     view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
     view_dispatcher_set_navigation_event_callback(app->view_dispatcher, tumospectrum_back);
@@ -2039,6 +2966,10 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     submenu_set_header(app->menu, "TumoSpectrum");
     submenu_add_item(
         app->menu, "Band Map", TumoSpectrumMenuBandMap, tumospectrum_menu_callback, app);
+    submenu_add_item(
+        app->menu, "Sensor Watch", TumoSpectrumMenuSensorWatch, tumospectrum_menu_callback, app);
+    submenu_add_item(
+        app->menu, "Envelope Check", TumoSpectrumMenuEnvelope, tumospectrum_menu_callback, app);
     submenu_add_item(
         app->menu,
         "Capture Sub-GHz RAW",
@@ -2077,8 +3008,8 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
         app);
     submenu_add_item(
         app->menu,
-        "Latest Capture Set",
-        TumoSpectrumMenuLatestSet,
+        "Capture Sets",
+        TumoSpectrumMenuCaptureSets,
         tumospectrum_menu_callback,
         app);
     submenu_add_item(
@@ -2108,7 +3039,7 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     view_set_context(app->capture_set_view, app);
     view_set_draw_callback(app->capture_set_view, tumospectrum_capture_set_draw);
     view_set_input_callback(app->capture_set_view, tumospectrum_capture_set_input);
-    view_set_previous_callback(app->capture_set_view, tumospectrum_text_previous_menu);
+    view_set_previous_callback(app->capture_set_view, tumospectrum_capture_set_previous);
     view_set_previous_callback(submenu_get_view(app->actions), tumospectrum_actions_previous);
     view_set_previous_callback(
         submenu_get_view(app->set_actions), tumospectrum_set_actions_previous);
@@ -2126,6 +3057,12 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
     view_set_draw_callback(app->band_map_view, tumospectrum_band_map_draw);
     view_set_input_callback(app->band_map_view, tumospectrum_band_map_input);
     view_set_previous_callback(app->band_map_view, tumospectrum_band_map_previous);
+    view_allocate_model(
+        app->envelope_view, ViewModelTypeLocking, sizeof(TumoSpectrumEnvelopeModel));
+    view_set_context(app->envelope_view, app);
+    view_set_draw_callback(app->envelope_view, tumospectrum_envelope_draw);
+    view_set_input_callback(app->envelope_view, tumospectrum_envelope_input);
+    view_set_previous_callback(app->envelope_view, tumospectrum_envelope_previous);
 
     text_box_set_font(app->text_box, TextBoxFontText);
     text_box_set_focus(app->text_box, TextBoxFocusStart);
@@ -2138,7 +3075,19 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
 
     view_dispatcher_add_view(
         app->view_dispatcher, TumoSpectrumViewMenu, submenu_get_view(app->menu));
+    view_set_previous_callback(
+        submenu_get_view(app->capture_sets_menu), tumospectrum_capture_sets_previous);
+    view_dispatcher_add_view(
+        app->view_dispatcher,
+        TumoSpectrumViewCaptureSets,
+        submenu_get_view(app->capture_sets_menu));
+    view_set_previous_callback(submenu_get_view(app->source_menu), tumospectrum_source_check_previous);
+    view_dispatcher_add_view(
+        app->view_dispatcher, TumoSpectrumViewSourceCheck, submenu_get_view(app->source_menu));
     view_dispatcher_add_view(app->view_dispatcher, TumoSpectrumViewBandMap, app->band_map_view);
+    view_dispatcher_add_view(app->view_dispatcher, TumoSpectrumViewEnvelope, app->envelope_view);
+    view_set_previous_callback(submenu_get_view(app->peak_menu), tumospectrum_peaks_previous);
+    view_dispatcher_add_view(app->view_dispatcher, TumoSpectrumViewBandPeaks, submenu_get_view(app->peak_menu));
     view_dispatcher_add_view(app->view_dispatcher, TumoSpectrumViewResult, app->result_view);
     view_dispatcher_add_view(
         app->view_dispatcher, TumoSpectrumViewActions, submenu_get_view(app->actions));
@@ -2173,10 +3122,23 @@ static TumoSpectrumApp* tumospectrum_alloc(void) {
 }
 
 static void tumospectrum_free(TumoSpectrumApp* app) {
+    if(app->archive_worker) {
+        furi_thread_flags_set(
+            furi_thread_get_id(app->archive_worker), TUMOSPECTRUM_ARCHIVE_CANCEL_FLAG);
+        furi_thread_join(app->archive_worker);
+        furi_thread_free(app->archive_worker);
+        app->archive_worker = NULL;
+    }
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewSensorInput);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewSensorMenu);
+    number_input_free(app->sensor_input);
+    submenu_free(app->sensor_menu);
+    furi_string_free(app->sensor_report);
     tumoflip_device_services_client_free(app->device_services);
     furi_mutex_free(app->device_services_mutex);
     tumospectrum_band_map_stop(app->band_map);
     tumospectrum_protocol_runtime_stop(app->protocol_runtime);
+    tumospectrum_envelope_free(app->envelope);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewProtocol);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewProfileMenu);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewProfileName);
@@ -2188,6 +3150,10 @@ static void tumospectrum_free(TumoSpectrumApp* app) {
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewActions);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewResult);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewBandMap);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewEnvelope);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewBandPeaks);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewCaptureSets);
+    view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewSourceCheck);
     view_dispatcher_remove_view(app->view_dispatcher, TumoSpectrumViewMenu);
     text_input_free(app->profile_name_input);
     text_input_free(app->set_input);
@@ -2195,11 +3161,15 @@ static void tumospectrum_free(TumoSpectrumApp* app) {
     text_box_free(app->text_box);
     view_free(app->protocol_view);
     view_free(app->band_map_view);
+    view_free(app->envelope_view);
     view_free(app->capture_set_view);
     view_free(app->result_view);
     submenu_free(app->set_actions);
     submenu_free(app->actions);
     submenu_free(app->profile_menu);
+    submenu_free(app->peak_menu);
+    submenu_free(app->capture_sets_menu);
+    submenu_free(app->source_menu);
     submenu_free(app->menu);
     view_dispatcher_free(app->view_dispatcher);
     furi_string_free(app->text);
@@ -2218,7 +3188,7 @@ int32_t signal_workbench_app(void* context) {
     TumoSpectrumApp* app = tumospectrum_alloc();
     if(!app) return -1;
     if(context && strcmp(context, TUMOSPECTRUM_LATEST_SET_ARG) == 0) {
-        tumospectrum_open_latest_set(app);
+        tumospectrum_open_latest_set(app, TumoSpectrumViewMenu);
     } else if(context && strcmp(context, TUMOSPECTRUM_PROFILES_ARG) == 0) {
         tumospectrum_open_protocol_profiles(app);
     } else {

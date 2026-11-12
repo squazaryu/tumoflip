@@ -141,10 +141,10 @@ bool weather_lab_start_rx(WeatherStationApp* app) {
     if(!app || !weather_station_ensure_radio_core(app) || !app->txrx->receiver) return false;
     subghz_receiver_set_rx_callback(app->txrx->receiver, weather_lab_rx_callback, app);
     if(app->txrx->txrx_state == WSTxRxStateRx) ws_rx_end(app);
-    ws_begin(
-        app,
-        subghz_setting_get_preset_data_by_name(
-            app->setting, furi_string_get_cstr(app->txrx->preset->name)));
+    uint8_t* preset_data = subghz_setting_get_preset_data_by_name(
+        app->setting, furi_string_get_cstr(app->txrx->preset->name));
+    if(!preset_data) return false;
+    ws_begin(app, preset_data);
     ws_rx(app, app->txrx->preset->frequency);
     return app->txrx->txrx_state == WSTxRxStateRx;
 }

@@ -5,6 +5,7 @@
 #include "storage/storage_glue.h"
 #include "storages/storage_ext.h"
 #include <assets_icons.h>
+#include <toolbox/file_history.h>
 
 #define STORAGE_TICK 1000
 
@@ -45,6 +46,7 @@ Storage* storage_app_alloc(void) {
 
     // sd icon gui
     app->sd_gui.enabled = (app->storage[ST_EXT].status != StorageStatusNotReady);
+    app->sd_gui.icon_status = app->storage[ST_EXT].status;
     app->sd_gui.view_port = view_port_alloc();
     view_port_set_width(app->sd_gui.view_port, icon_get_width(ICON_SD_MOUNTED));
     view_port_draw_callback_set(app->sd_gui.view_port, storage_app_sd_icon_draw_callback, app);
@@ -95,12 +97,18 @@ void storage_tick(Storage* app) {
             furi_pubsub_publish(app->pubsub, &event);
         }
     }
+    if(app->sd_gui.icon_status != app->storage[ST_EXT].status) {
+        app->sd_gui.icon_status = app->storage[ST_EXT].status;
+        if(app->sd_gui.enabled) view_port_update(app->sd_gui.view_port);
+    }
 }
 
 int32_t storage_srv(void* p) {
     UNUSED(p);
     Storage* app = storage_app_alloc();
     furi_record_create(RECORD_STORAGE, app);
+    static const uint32_t history_capability = FILE_HISTORY_CORE_CAPABILITY;
+    furi_record_create(RECORD_FILE_HISTORY, (void*)&history_capability);
 
     if(furi_hal_rtc_is_flag_set(FuriHalRtcFlagStorageFormatInternal)) {
         FURI_LOG_W(TAG, "Format Internal not supported, clearing flag");
