@@ -8,6 +8,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReleaseWorkflowTest(unittest.TestCase):
+    def test_full_host_suite_runs_before_a_stable_tag_in_pr_ci(self) -> None:
+        workflow=(REPO_ROOT / ".github/workflows/pr-build.yml").read_text()
+        self.assertIn("-m unittest discover -s tools/tumoflip -p 'test_*.py'",workflow)
     def test_stable_publisher_pins_metadata_to_the_checked_out_tag_commit(self) -> None:
         workflow=(REPO_ROOT / ".github/workflows/release.yml").read_text()
         publish=workflow.split("- name: Publish GitHub release",1)[1]

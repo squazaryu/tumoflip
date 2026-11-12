@@ -252,6 +252,7 @@ class TumoSpectrumTest(unittest.TestCase):
                 [
                     "clang",
                     "-std=c11",
+                    "-D_DEFAULT_SOURCE",
                     "-Wall",
                     "-Wextra",
                     "-Werror",
@@ -543,6 +544,7 @@ class TumoSpectrumTest(unittest.TestCase):
                 [
                     "clang",
                     "-std=c11",
+                    "-D_DEFAULT_SOURCE",
                     "-Wall",
                     "-Wextra",
                     "-Werror",
@@ -674,6 +676,7 @@ class TumoSpectrumTest(unittest.TestCase):
                 [
                     "clang",
                     "-std=c11",
+                    "-D_DEFAULT_SOURCE",
                     "-Wall",
                     "-Wextra",
                     "-Werror",

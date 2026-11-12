@@ -240,6 +240,9 @@ jobs:
       - name: Validate selective Unleashed 095 adaptations
         run: python3 -m unittest tools.tumoflip.test_unleashed095_ir tools.tumoflip.test_unleashed095_save tools.tumoflip.test_unleashed095_rename tools.tumoflip.test_unleashed095_browser tools.tumoflip.test_proteco
 
+      - name: Run full native host suite before release tagging
+        run: PYTHONPATH=.:tools/tumoflip toolchain/x86_64-linux/bin/python3 -m unittest discover -s tools/tumoflip -p 'test_*.py'
+
       - name: Validate field-batch data and hardware ownership contracts
         run: python3 -m unittest tools.tumoflip.test_servo_plus tools.tumoflip.test_power_history tools.tumoflip.test_uhf_inventory tools.tumoflip.test_sensor_cards tools.tumoflip.test_varta_inspect tools.tumoflip.test_field_report tools.tumoflip.test_field_batch_packages
 
