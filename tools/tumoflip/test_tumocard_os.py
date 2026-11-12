@@ -78,8 +78,8 @@ static size_t select_applet(
 int main(void) {
     TumoCardRegistry registry;
     tumocard_registry_init(&registry);
-    uint8_t counter_state[8] = {'C', 'O', 'U', 'N', 'T', 0, 0, 0};
-    uint8_t notes_state[8] = {'N', 'O', 'T', 'E', 'S', 0, 0, 0};
+    uint8_t counter_state[TUMOVM_STATE_MAX] = {'C', 'O', 'U', 'N', 'T', 0, 0, 0};
+    uint8_t notes_state[TUMOVM_STATE_MAX] = {'N', 'O', 'T', 'E', 'S', 0, 0, 0};
     TumoVmProgram counter = make_program(0x01, "Counter Token");
     TumoVmProgram notes = make_program(0x02, "Notes Token");
 
@@ -172,6 +172,7 @@ class TumoCardOsTest(unittest.TestCase):
                 [
                     str(compiler),
                     "-std=c11",
+                    "-D_DEFAULT_SOURCE",
                     "-Wall",
                     "-Wextra",
                     "-Werror",
