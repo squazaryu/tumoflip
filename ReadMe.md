@@ -29,7 +29,9 @@ The project is independent. We selectively integrate upstream improvements and
 keep Tumoflip-specific changes, release identities, and package contracts in
 this repository.
 
-> **Current stable:** `t-flppr-fw-008` (`v1.0.8`) · API `88.7` · Flipper Zero F7
+> **Current stable:** `t-flppr-fw-009` (`v1.0.9`) · API `88.23` · Flipper Zero F7
+>
+> Previous immutable rollback: `t-flppr-fw-008` (`v1.0.8`) · API `88.7`.
 >
 > Dev builds are for testing. Stable releases are immutable and are promoted
 > only after the agreed software checks and physical-device validation.
@@ -192,30 +194,28 @@ rollback rules, checksums, and catalog baseline policy.
 
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
-| **Stable** | `t-flppr-fw-008` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
+| **Stable** | `t-flppr-fw-009` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
 | **Dev** | `t-dev-009-039` | External FAAC TM, read-only RAW Edit imports and Archive/CLI reliability | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
 
-Dev `t-dev-009-038` retains local API 88.23 and the full 4096-byte physical C2
-reserve. Static 12-DIP FAAC TM is an external Core module, with CAME timing
-disambiguation and an explicit 868.000 MHz choice; default hopping is unchanged.
-RAW Edit 1.8 synthesizes from bounded read-only input copies and retains merge
-guard metadata. Archive bounds empty/windowed list edits and retains favorites
-after failed deletion. GPIO/LED/vibro/I2C CLI handlers load from matching native
-SD resources; Bluetooth, crypto and recovery servicing stay resident. Repeated
-distribution reliably reinstalls FAP files. All 009-038 timing/decoder fixes and
-earlier functionality remain; no new public API or irreversible write mode is added.
-Install firmware with native resources. **FW Packages Dev 031** and
-**TumoCompanion 1.11.35** remain compatible; these changes require no
-new independent package or iOS release. The published iOS version includes
-Community Apps protection for `usb_cdrom` and `archive_favorites`. No ESP32
-update is required. Check release pages for publication status. Hardware
-acceptance remains for Dev testing; this is not proof of a fix for the historic
-idle OOM symptom. Older catalogs and Stable remain immutable; the emulator
-remains deferred.
+Stable `t-flppr-fw-009` / `v1.0.9` promotes the Dev 009 line with selective
+Unleashed 095 improvements: external Core Proteco, defensive IR parsing,
+recoverable case-only renames, failed-folder navigation and correct Standard/ARF
+save ownership. The firmware keeps local API 88.23 and the full 4096-byte C2
+reserve; it does not claim upstream API 88.26 parity. Existing timing, hopping,
+radio, NFC, memory/diagnostic and field-tool improvements remain.
+
+Back up important data, install Stable 009 with matching native resources, then
+install **FW Packages Stable 007** after its separate catalog activation.
+Stable 008 uses API 88.7; old native feature FALs must not be reused across the
+private 1004 contract. **TumoCompanion 1.11.35** supports the new snapshot; no
+new IPA or ESP32 flash is required. The published Dev 009-039 and Dev catalog
+031 remain unchanged for rollback. No factory reset, automatic SD cleanup or
+Bluetooth re-pairing is needed. Hardware checks remain explicit; this is not
+proof of a fix for the historic idle OOM symptom. Older releases stay immutable.
 
 ## Install
 
@@ -223,8 +223,8 @@ remains deferred.
 
 1. Install or update [TumoCompanion](https://github.com/squazaryu/TumoCompanion).
 2. Connect the Flipper Zero over BLE.
-3. Open **Updates → Firmware → Stable** and select `t-flppr-fw-008`.
-4. Install FW Packages separately from **Updates → FW Packages** when needed.
+3. Open **Updates → Firmware → Stable** and select `t-flppr-fw-009` with native resources.
+4. Then install **FW Packages → Stable 007** after catalog activation.
 
 Back up `/int` and important SD-card files before flashing. Custom apps,
 settings, IR files, and Sub-GHz files should be copied somewhere safe.
@@ -236,13 +236,14 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-009-039.tgz
+flipper-z-f7-update-t-flppr-fw-009.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: Dev `t-dev-009-038` uses `88.23`; immutable stable `v1.0.8` remains `88.7`.
+- Firmware API: Stable `v1.0.9` and published Dev `t-dev-009-039` use `88.23`;
+  immutable stable `v1.0.8` remains `88.7`.
   Each release manifest records its compatible package API. API numbers are
   local to this fork.
 - FAP/FAL files built for older or incompatible APIs may need to be replaced or

@@ -381,8 +381,10 @@ jobs:
             "dist/f7-C/f7-update-${VERSION}/tumoflip-packages.zip"
           )
 
+          SOURCE_COMMIT="$(git rev-parse HEAD)"
           gh release create "$TAG" "${assets[@]}" \
             --verify-tag \
+            --target "$SOURCE_COMMIT" \
             --title "$VERSION" \
             --notes-file release-notes.md \
             --latest \
