@@ -12,6 +12,12 @@ PLUGIN = ROOT / "applications/main/subghz/plugins/add_manually"
 
 
 class ManualParametersTests(unittest.TestCase):
+    def test_guard_time_storage_getter_is_exported_only_by_the_feature_host(self):
+        private = (ROOT / "applications/main/subghz/api/subghz_app_api_table_i.h").read_text()
+        public = (ROOT / "targets/f7/api_symbols.csv").read_text()
+        self.assertRegex(private, r"API_METHOD\(subghz_txrx_get_fff_data,\s*FlipperFormat\*,\s*\(SubGhzTxRx\*\)\)")
+        self.assertNotIn("Function,+,subghz_txrx_get_fff_data,", public)
+
     def test_selected_guard_time_is_persisted_and_write_failures_abort(self):
         source = (PLUGIN / "subghz_scene_set_type.c").read_text()
         generate = function(source, "bool subghz_scene_set_type_generate_protocol_from_infos(")
