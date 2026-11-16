@@ -17,6 +17,7 @@ FUNCTIONS = {
     "subghz_scene_set_manual_params_on_event", "subghz_scene_set_manual_params_on_exit",
     "subghz_scene_set_type_proceed_advanced", "subghz_scene_set_type_on_event",
     "subghz_scene_set_key_on_enter", "subghz_scene_set_key_on_event", "subghz_scene_set_key_on_exit",
+    "subghz_txrx_gen_data_protocol_and_te",
     "subghz_protocol_belkorn_frame_valid", "subghz_protocol_belkorn_metadata",
     "subghz_protocol_decoder_belkorn_reset", "subghz_protocol_decoder_belkorn_feed",
     "subghz_protocol_decoder_belkorn_serialize", "subghz_protocol_decoder_belkorn_deserialize",

@@ -13,6 +13,7 @@
 #include <flipper_format/flipper_format_i.h>
 #include <lib/toolbox/stream/stream.h>
 #include <lib/subghz/protocols/raw.h>
+#include <lib/subghz/protocols/faac_tm.h>
 
 #define TAG "SubGhzCreateProtocolKey"
 
@@ -84,7 +85,8 @@ bool subghz_txrx_gen_data_protocol_and_te(
             ret = true;
         }
     }
-    if(ret) {
+    // FAAC TM has a protocol-fixed gap and serializes TE only.
+    if(ret && strcmp(protocol_name, SUBGHZ_PROTOCOL_FAAC_TM_NAME) != 0) {
         uint32_t guard_time = 30;
         if(!flipper_format_update_uint32(
                instance->fff_data, "Guard_time", (uint32_t*)&guard_time, 1)) {
