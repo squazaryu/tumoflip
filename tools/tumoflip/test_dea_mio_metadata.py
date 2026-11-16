@@ -42,9 +42,9 @@ int main(void){
     def test_existing_encoder_retains_nonzero_captured_flags_and_legacy_fallback(self):
         source = PATH.read_text()
         generator = function(source, "static bool subghz_protocol_keeloq_gen_data(")
-        branch = re.search(
+        branch = re.findall(
             r'else if\(strcmp\(instance->manufacture_name, "Dea_Mio"\) == 0\) \{(.*?)\n            \}',
-            generator, re.S).group(1)
+            generator, re.S)[-1]
         actual = "\n".join(re.findall(r"(?m)^#define KEELOQ_DEA_MIO_.*$", source))
         if "static inline uint16_t subghz_protocol_keeloq_dea_mio_disc(" in source:
             actual += "\n" + function(source, "static inline uint16_t subghz_protocol_keeloq_dea_mio_disc(")
