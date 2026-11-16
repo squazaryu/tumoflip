@@ -19,4 +19,5 @@ static const char* const arf_expected_packs[] = {
     "protocol_freezer.fal",
     "protocol_faac_tm.fal",
     "protocol_proteco.fal",
+    "protocol_belkorn.fal",
 };

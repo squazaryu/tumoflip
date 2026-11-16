@@ -370,6 +370,5 @@ App(
     sources=[
         "belkorn_plugin.c",
         "../../lib/subghz/protocols/belkorn.c",
-        "../../lib/subghz/protocols/common.c",
     ],
 )

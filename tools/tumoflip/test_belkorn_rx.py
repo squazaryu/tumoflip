@@ -18,7 +18,9 @@ class BelKornReceiveTests(unittest.TestCase):
         return PATH.read_text()
 
     def context(self, source):
-        return (PRELUDE + "typedef struct SubGhzProtocolDecoderBelKorn SubGhzProtocolDecoderBelKorn;\n"
+        header = (ROOT / "lib/subghz/protocols/belkorn.h").read_text()
+        alias = "\n".join(re.findall(r"typedef struct SubGhzProtocolDecoderBelKorn SubGhzProtocolDecoderBelKorn;", header))
+        return (PRELUDE + alias + "\n"
                 + declarations(source, "belkorn") + "\n"
                 + "\n".join(re.findall(r"(?m)^#define BELKORN_.*$", source)) + "\n")
 

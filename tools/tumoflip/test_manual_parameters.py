@@ -108,12 +108,12 @@ enum{SceneManagerEventTypeCustom,SceneManagerEventTypeBack};
 enum{SubGhzSceneShowError,SubGhzViewIdWidget,SubGhzViewIdVariableItemList,SubGhzViewIdNumberInput};
 typedef unsigned View;
 typedef struct {View view;void(*callback)(void*,int32_t);void*ctx;int32_t min,max,value;}NumberInput;
-typedef struct {unsigned index;char text[32];void*ctx;}VariableItem;
+typedef struct Item {unsigned index;char text[32];void*ctx;void(*change)(struct Item*);}VariableItem;
 typedef struct {VariableItem items[4];unsigned count;void(*enter)(void*,uint32_t);void*ctx;}VariableItemList;
 typedef struct {GenInfo*gen_info;VariableItemList*variable_item_list;void*view_dispatcher,*scene_manager,*txrx,*error_str;}SubGhz;
 static unsigned current_view,added,removed,freed,last_event,last_scene,proceeded;
 static bool alloc_ok=true,preset_ok=true;
-static VariableItem* variable_item_list_add(VariableItemList*l,const char*n,uint8_t count,void(*cb)(VariableItem*),void*ctx){(void)n;(void)count;(void)cb;assert(l->count<4);VariableItem*i=&l->items[l->count++];i->ctx=ctx;return i;}
+static VariableItem* variable_item_list_add(VariableItemList*l,const char*n,uint8_t count,void(*cb)(VariableItem*),void*ctx){(void)n;(void)count;assert(l->count<4);VariableItem*i=&l->items[l->count++];i->ctx=ctx;i->change=cb;return i;}
 static void variable_item_list_reset(VariableItemList*l){l->count=0;}
 static VariableItem* variable_item_list_get(VariableItemList*l,uint8_t index){assert(index<l->count);return &l->items[index];}
 static void variable_item_list_set_enter_callback(VariableItemList*l,void(*cb)(void*,uint32_t),void*ctx){l->enter=cb;l->ctx=ctx;}
@@ -142,7 +142,10 @@ int main(void){
  GenInfo g={.type=GenData,.mod="AM650",.freq=433920000,.data={"Princeton",400,30}};
  VariableItemList list={0};SubGhz s={.gen_info=&g,.variable_item_list=&list};
  subghz_scene_set_manual_params_on_enter(&s);assert(list.count==4&&list.enter);
+ list.items[0].index=12;list.items[0].change(&list.items[0]);assert(g.freq==315000000&&!strcmp(g.mod,"AM650"));
+ list.items[0].index=255;list.items[0].change(&list.items[0]);assert(g.freq==315000000);
  list.enter(&s,1);assert(added==1&&current_view==SubGhzViewIdNumberInput);
+ assert(subghz_manual_number_back(&s)==SubGhzViewIdVariableItemList);
  manual_input->callback(manual_input->ctx,108);assert(g.data.te==400&&last_event==0);
  manual_input->callback(manual_input->ctx,689);assert(last_event==SubGhzManualEventNumberDone);
  assert(subghz_scene_set_manual_params_on_event(&s,(SceneManagerEvent){SceneManagerEventTypeCustom,last_event}));assert(g.data.te==689);
@@ -157,6 +160,10 @@ int main(void){
  subghz_scene_set_manual_params_on_enter(&s);list.enter(&s,1);preset_ok=false;
  subghz_scene_set_manual_params_on_event(&s,(SceneManagerEvent){SceneManagerEventTypeCustom,SubGhzManualEventContinue});assert(last_scene==SubGhzSceneShowError&&proceeded==1);
  subghz_scene_set_manual_params_on_exit(&s);preset_ok=true;
+ g.type=GenKeeloq;subghz_scene_set_manual_params_on_enter(&s);list.enter(&s,1);assert(!manual_input);
+ subghz_scene_set_manual_params_on_exit(&s);g.type=GenData;
+ g.data.name="Faac TM";subghz_scene_set_manual_params_on_enter(&s);list.enter(&s,2);assert(!manual_input);
+ subghz_scene_set_manual_params_on_exit(&s);g.data.name="Princeton";
  alloc_ok=false;subghz_scene_set_manual_params_on_enter(&s);list.enter(&s,1);assert(!manual_input&&last_scene==SubGhzSceneShowError);
  subghz_scene_set_manual_params_on_exit(&s);
  return 0;

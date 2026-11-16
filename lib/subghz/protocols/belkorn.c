@@ -8,6 +8,7 @@
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
 #include "common.h"
+#include <stdlib.h>
 
 #define BELKORN_SYNC    0x801ULL
 #define BELKORN_GAP_MIN 2500U
@@ -38,7 +39,7 @@ SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderBelKorn);
 
 static const SubGhzProtocolDecoder subghz_protocol_belkorn_decoder = {
     .alloc = subghz_protocol_decoder_belkorn_alloc,
-    .free = subghz_protocol_decoder_common_free,
+    .free = subghz_protocol_decoder_belkorn_free,
     .feed = subghz_protocol_decoder_belkorn_feed,
     .reset = subghz_protocol_decoder_belkorn_reset,
     .get_hash_data = subghz_protocol_decoder_belkorn_get_hash_data,
@@ -82,10 +83,17 @@ void subghz_protocol_decoder_belkorn_reset(void* context) {
 
 void* subghz_protocol_decoder_belkorn_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    SubGhzProtocolDecoderBelKorn* instance = subghz_protocol_decoder_common_alloc(
-        sizeof(SubGhzProtocolDecoderBelKorn), &subghz_protocol_belkorn);
+    // Self-contained FAL: do not copy the resident common.c helper library.
+    SubGhzProtocolDecoderBelKorn* instance = calloc(1, sizeof(SubGhzProtocolDecoderBelKorn));
+    furi_check(instance);
+    instance->base.protocol = &subghz_protocol_belkorn;
+    instance->generic.protocol_name = subghz_protocol_belkorn.name;
     subghz_protocol_decoder_belkorn_reset(instance);
     return instance;
+}
+
+void subghz_protocol_decoder_belkorn_free(void* context) {
+    free(context);
 }
 
 void subghz_protocol_decoder_belkorn_feed(void* context, bool level, uint32_t duration) {
