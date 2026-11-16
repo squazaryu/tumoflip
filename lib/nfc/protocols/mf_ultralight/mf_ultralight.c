@@ -43,8 +43,8 @@ typedef struct {
     uint32_t auth_attempts;
 } MfUltralightDataUpstreamLayout;
 
-#define MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(field)                                         \
-    _Static_assert(                                                                       \
+#define MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(field)                                           \
+    _Static_assert(                                                                           \
         offsetof(MfUltralightData, field) == offsetof(MfUltralightDataUpstreamLayout, field), \
         "MfUltralightData." #field " moved: breaks precompiled FAPs")
 

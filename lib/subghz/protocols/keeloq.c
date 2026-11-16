@@ -1885,6 +1885,8 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
     }
     if(strcmp(instance->manufacture_name, "Dea_Mio") == 0) {
         furi_string_cat_printf(
-            output, " Ds:%03lX", (unsigned long)(instance->generic.seed & KEELOQ_DEA_MIO_DISC_MASK));
+            output,
+            " Ds:%03lX",
+            (unsigned long)(instance->generic.seed & KEELOQ_DEA_MIO_DISC_MASK));
     }
 }
