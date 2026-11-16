@@ -12,6 +12,51 @@ PLUGIN = ROOT / "applications/main/subghz/plugins/add_manually"
 
 
 class ManualParametersTests(unittest.TestCase):
+    def test_advanced_editor_preserves_quick_routing_and_protocol_steps(self):
+        source = (PLUGIN / "subghz_scene_set_type.c").read_text()
+        actual = function(source, "bool subghz_scene_set_type_proceed_advanced(")
+        actual += "\n" + function(source, "bool subghz_scene_set_type_on_event(")
+        native(r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
+typedef unsigned SetType;
+''' + without_includes((ROOT / 'applications/main/subghz/helpers/subghz_gen_info.h').read_text()) + r'''
+enum{SceneManagerEventTypeCustom,SceneManagerEventTypeBack,SetTypeMAX=128};
+enum{SubGhzSceneSetType,SubGhzSceneStart,SubGhzSceneSetKey,SubGhzSceneSetSerial,SubGhzSceneSetManualParams};
+enum{SubmenuIndexAddManually,SubmenuIndexAddManuallyAdvanced};
+typedef struct{unsigned type,event;}SceneManagerEvent;
+typedef struct{GenInfo*gen_info;void*scene_manager;}SubGhz;
+static unsigned states[5],next_scene,generated,unsupported,type;
+static unsigned scene_manager_get_scene_state(void*s,unsigned id){(void)s;return states[id];}
+static void scene_manager_set_scene_state(void*s,unsigned id,unsigned value){(void)s;states[id]=value;}
+static void scene_manager_next_scene(void*s,unsigned id){(void)s;next_scene=id;}
+static bool subghz_scene_set_type_generate_protocol_from_infos(SubGhz*s){(void)s;generated++;return true;}
+static void subghz_scene_show_unsupported(SubGhz*s){(void)s;unsupported++;}
+void subghz_gen_info_reset(GenInfo*g){memset(g,0,sizeof(*g));}
+void subghz_scene_set_type_fill_generation_infos(GenInfo*g,SetType row){(void)row;g->type=type;}
+''' + actual + r'''
+int main(void){GenInfo g={0};SubGhz s={.gen_info=&g};
+ states[SubGhzSceneStart]=SubmenuIndexAddManuallyAdvanced;
+ for(type=GenData;type<=GenUnsupported;type++){
+  next_scene=99;generated=unsupported=0;
+  assert(subghz_scene_set_type_on_event(&s,(SceneManagerEvent){SceneManagerEventTypeCustom,10}));
+  assert(next_scene==SubGhzSceneSetManualParams&&!generated&&!unsupported&&states[SubGhzSceneSetType]==10);
+  assert(subghz_scene_set_type_proceed_advanced(&s));
+  if(type==GenData)assert(next_scene==SubGhzSceneSetKey);
+  else if(type==GenSecPlus1)assert(generated==1);
+  else if(type==GenUnsupported)assert(unsupported==1);
+  else assert(next_scene==SubGhzSceneSetSerial);
+ }
+ states[SubGhzSceneStart]=SubmenuIndexAddManually;generated=0;
+ assert(subghz_scene_set_type_on_event(&s,(SceneManagerEvent){SceneManagerEventTypeCustom,10}));assert(generated==1);
+ assert(!subghz_scene_set_type_on_event(&s,(SceneManagerEvent){SceneManagerEventTypeCustom,SetTypeMAX}));
+ assert(!subghz_scene_set_type_on_event(&s,(SceneManagerEvent){SceneManagerEventTypeBack,10}));
+ return 0;
+}
+''')
+
     def test_canceling_key_edit_retains_original_numeric_key(self):
         source = (PLUGIN / "subghz_scene_set_key.c").read_text()
         state = "\n".join(re.findall(r"(?m)^static (?:bool|uint64_t) subghz_set_key_.*;$", source))
@@ -107,17 +152,18 @@ typedef struct {unsigned type,event;}SceneManagerEvent;
 enum{SceneManagerEventTypeCustom,SceneManagerEventTypeBack};
 enum{SubGhzSceneShowError,SubGhzViewIdWidget,SubGhzViewIdVariableItemList,SubGhzViewIdNumberInput};
 typedef unsigned View;
-typedef struct {View view;void(*callback)(void*,int32_t);void*ctx;int32_t min,max,value;}NumberInput;
-typedef struct Item {unsigned index;char text[32];void*ctx;void(*change)(struct Item*);}VariableItem;
+typedef struct {View view;void(*callback)(void*,int32_t);void*ctx;int32_t min,max,value;const char*header;}NumberInput;
+typedef struct Item {unsigned index,count;const char*label;char text[32];void*ctx;void(*change)(struct Item*);}VariableItem;
 typedef struct {VariableItem items[4];unsigned count;void(*enter)(void*,uint32_t);void*ctx;}VariableItemList;
 typedef struct {GenInfo*gen_info;VariableItemList*variable_item_list;void*view_dispatcher,*scene_manager,*txrx,*error_str;}SubGhz;
 static unsigned current_view,added,removed,freed,last_event,last_scene,proceeded;
 static bool alloc_ok=true,preset_ok=true;
-static VariableItem* variable_item_list_add(VariableItemList*l,const char*n,uint8_t count,void(*cb)(VariableItem*),void*ctx){(void)n;(void)count;assert(l->count<4);VariableItem*i=&l->items[l->count++];i->ctx=ctx;i->change=cb;return i;}
+static VariableItem* variable_item_list_add(VariableItemList*l,const char*n,uint8_t count,void(*cb)(VariableItem*),void*ctx){assert(l->count<4);VariableItem*i=&l->items[l->count++];i->ctx=ctx;i->change=cb;i->label=n;i->count=count;return i;}
 static void variable_item_list_reset(VariableItemList*l){l->count=0;}
 static VariableItem* variable_item_list_get(VariableItemList*l,uint8_t index){assert(index<l->count);return &l->items[index];}
 static void variable_item_list_set_enter_callback(VariableItemList*l,void(*cb)(void*,uint32_t),void*ctx){l->enter=cb;l->ctx=ctx;}
 static void variable_item_set_current_value_index(VariableItem*i,uint8_t n){i->index=n;}
+static void variable_item_set_item_label(VariableItem*i,const char*t){i->label=t;}
 static uint8_t variable_item_get_current_value_index(VariableItem*i){return i->index;}
 static void* variable_item_get_context(VariableItem*i){return i->ctx;}
 static void variable_item_set_current_value_text(VariableItem*i,const char*t){snprintf(i->text,sizeof(i->text),"%s",t);}
@@ -125,7 +171,7 @@ static void variable_item_list_set_selected_item(VariableItemList*l,uint8_t i){(
 static NumberInput* number_input_alloc(void){return alloc_ok?calloc(1,sizeof(NumberInput)):NULL;}
 static void number_input_free(NumberInput*i){freed++;free(i);}
 static View* number_input_get_view(NumberInput*i){return &i->view;}
-static void number_input_set_header_text(NumberInput*i,const char*t){(void)i;(void)t;}
+static void number_input_set_header_text(NumberInput*i,const char*t){i->header=t;}
 static void number_input_set_result_callback(NumberInput*i,void(*cb)(void*,int32_t),void*ctx,int32_t v,int32_t lo,int32_t hi){i->callback=cb;i->ctx=ctx;i->value=v;i->min=lo;i->max=hi;}
 static void view_set_previous_callback(View*v,uint32_t(*cb)(void*)){(void)v;(void)cb;}
 static void view_dispatcher_add_view(void*d,unsigned id,View*v){(void)d;(void)id;(void)v;added++;}
@@ -142,6 +188,9 @@ int main(void){
  GenInfo g={.type=GenData,.mod="AM650",.freq=433920000,.data={"Princeton",400,30}};
  VariableItemList list={0};SubGhz s={.gen_info=&g,.variable_item_list=&list};
  subghz_scene_set_manual_params_on_enter(&s);assert(list.count==4&&list.enter);
+ assert(!strcmp(list.items[0].label,"AM650")&&!strcmp(list.items[0].text,"433.92"));
+ list.items[0].index=8;list.items[0].change(&list.items[0]);
+ assert(!strcmp(list.items[0].label,"FM476")&&!strcmp(list.items[0].text,"868.80"));
  list.items[0].index=12;list.items[0].change(&list.items[0]);assert(g.freq==315000000&&!strcmp(g.mod,"AM650"));
  list.items[0].index=255;list.items[0].change(&list.items[0]);assert(g.freq==315000000);
  list.enter(&s,1);assert(added==1&&current_view==SubGhzViewIdNumberInput);
