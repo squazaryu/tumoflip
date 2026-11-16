@@ -11,6 +11,7 @@ static constexpr auto subghz_app_api_table = sort(create_array_t<sym_entry>(
     API_METHOD(subghz_txrx_get_protocol_pack_group, SubGhzProtocolPackGroup, (SubGhzTxRx*)),
     API_METHOD(subghz_txrx_get_protocol_pack_report, const SubGhzProtocolPackReport*, (SubGhzTxRx*)),
     API_METHOD(subghz_txrx_get_setting, SubGhzSetting*, (SubGhzTxRx*)),
+    API_METHOD(subghz_txrx_get_fff_data, FlipperFormat*, (SubGhzTxRx*)),
     API_METHOD(subghz_txrx_get_preset, SubGhzRadioPreset, (SubGhzTxRx*)),
     API_METHOD(subghz_txrx_radio_device_get, SubGhzRadioDeviceType, (SubGhzTxRx*)),
     API_METHOD(subghz_txrx_radio_device_get_rssi, float, (SubGhzTxRx*)),
