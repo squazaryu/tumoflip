@@ -2,6 +2,8 @@
 #include "subghz_types.h"
 #include "subghz_custom_event.h"
 
+#define SUBGHZ_MANUAL_PARAMETERS 1
+
 typedef enum {
     GenData,
     GenFaacSLH,
@@ -33,6 +35,7 @@ typedef struct {
             uint64_t key;
             uint8_t bits;
             uint32_t te;
+            uint32_t gt;
         } data;
         struct {
             uint32_t serial;

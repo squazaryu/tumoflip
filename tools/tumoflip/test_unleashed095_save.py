@@ -118,7 +118,7 @@ int main(void){
             self.assertRegex(source, r'scene_manager_set_scene_state\(\s*subghz->scene_manager,\s*'
                              r'SubGhzSceneSaveName,\s*SubGhzCustomEventManagerSet\)')
             self.assertNotRegex(source, r'SubGhzSceneSetType,\s*SubGhzCustomEventManagerSet\)')
-        self.assertIn('SUBGHZ_FEATURE_PLUGIN_API_VERSION 1004',
+        self.assertIn('SUBGHZ_FEATURE_PLUGIN_API_VERSION 1005',
             (ROOT/'applications/main/subghz/helpers/subghz_feature_plugin.h').read_text())
 
 

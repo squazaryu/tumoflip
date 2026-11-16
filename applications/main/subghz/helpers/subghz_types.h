@@ -84,6 +84,7 @@ typedef enum {
     SubGhzViewIdVariableItemList,
     SubGhzViewIdFrequencyAnalyzer,
     SubGhzViewIdReadRAW,
+    SubGhzViewIdNumberInput,
 
 } SubGhzViewId;
 

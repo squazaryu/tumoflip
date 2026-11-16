@@ -360,3 +360,15 @@ App(
         "../../lib/subghz/protocols/common.c",
     ],
 )
+
+App(
+    appid="protocol_belkorn",
+    apptype=FlipperAppType.PLUGIN,
+    targets=["f7"],
+    entry_point="subghz_protocol_belkorn_plugin_ep",
+    requires=["subghz"],
+    sources=[
+        "belkorn_plugin.c",
+        "../../lib/subghz/protocols/belkorn.c",
+    ],
+)

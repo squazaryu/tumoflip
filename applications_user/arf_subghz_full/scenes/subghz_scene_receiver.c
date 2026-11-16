@@ -137,7 +137,9 @@ static void subghz_scene_add_to_history_callback(
         SubGhzRadioPreset preset = subghz_txrx_get_preset(subghz->txrx);
         if(subghz->last_settings->delete_old_signals) {
             if(subghz_history_get_last_index(subghz->history) >= 54) {
-                subghz->state_notifications = SubGhzNotificationStateRx;
+                if(subghz->state_notifications == SubGhzNotificationStateIDLE) {
+                    subghz->state_notifications = SubGhzNotificationStateRx;
+                }
 
                 subghz_view_receiver_disable_draw_callback(subghz->subghz_receiver);
 
