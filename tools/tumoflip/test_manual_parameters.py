@@ -12,6 +12,45 @@ PLUGIN = ROOT / "applications/main/subghz/plugins/add_manually"
 
 
 class ManualParametersTests(unittest.TestCase):
+    def test_selected_guard_time_is_persisted_and_write_failures_abort(self):
+        source = (PLUGIN / "subghz_scene_set_type.c").read_text()
+        generate = function(source, "bool subghz_scene_set_type_generate_protocol_from_infos(")
+        branch = generate[generate.index("case GenData:"):generate.index("case GenFaacSLH:")]
+        native(r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+typedef unsigned SetType;
+''' + without_includes((ROOT / 'applications/main/subghz/helpers/subghz_gen_info.h').read_text()) + self.policy() + r'''
+typedef struct{void*txrx;}SubGhz;
+static unsigned writes,with_te,without_te;
+static bool gen_ok=true,write_ok=true;
+static uint32_t saved_gt;
+static bool subghz_txrx_gen_data_protocol_and_te(void*t,const char*m,uint32_t f,const char*n,uint64_t k,unsigned b,uint32_t te){(void)t;assert(!strcmp(m,"AM650")&&f==433920000&&n&&k==0x123&&b==24&&te>0);with_te++;return gen_ok;}
+static bool subghz_txrx_gen_data_protocol(void*t,const char*m,uint32_t f,const char*n,uint64_t k,unsigned b){(void)t;(void)m;(void)f;(void)n;(void)k;(void)b;without_te++;return gen_ok;}
+static void*subghz_txrx_get_fff_data(void*t){return t;}
+static bool flipper_format_update_uint32(void*f,const char*k,const uint32_t*v,unsigned n){(void)f;assert(!strcmp(k,"Guard_time")&&n==1);writes++;saved_gt=*v;return write_ok;}
+static bool generate(SubGhz*subghz,GenInfo gen_info){bool generated_protocol=false;switch(gen_info.type){
+''' + branch + r'''
+default:break;}return generated_protocol;}
+int main(void){
+ SubGhz s={0};GenInfo g={.type=GenData,.mod="AM650",.freq=433920000,.data={.name="Princeton",.key=0x123,.bits=24,.te=400,.gt=72}};
+ assert(subghz_manual_band_get(0)&&subghz_manual_band_index(g.freq,g.mod)==0);
+ assert(generate(&s,g)&&saved_gt==72&&writes==1&&with_te==1);
+ write_ok=false;assert(!generate(&s,g)&&writes==2);write_ok=true;
+ gen_ok=false;assert(!generate(&s,g)&&writes==2);gen_ok=true;
+ g.data.gt=14;assert(!generate(&s,g)&&writes==2);
+ g.data.gt=73;assert(!generate(&s,g)&&writes==2);
+ g.data.gt=0;assert(generate(&s,g)&&writes==2);
+ g.data.name="Faac TM";g.data.te=999;assert(generate(&s,g)&&writes==2);
+ g.data.gt=30;assert(!generate(&s,g)&&writes==2);
+ g.data.gt=0;g.data.te=0;assert(generate(&s,g)&&without_te==1);
+ return 0;
+}
+''')
+
     def test_advanced_editor_preserves_quick_routing_and_protocol_steps(self):
         source = (PLUGIN / "subghz_scene_set_type.c").read_text()
         actual = function(source, "bool subghz_scene_set_type_proceed_advanced(")
@@ -61,6 +100,7 @@ int main(void){GenInfo g={0};SubGhz s={.gen_info=&g};
         source = (PLUGIN / "subghz_scene_set_key.c").read_text()
         state = "\n".join(re.findall(r"(?m)^static (?:bool|uint64_t) subghz_set_key_.*;$", source))
         actual = function(source, "void subghz_scene_set_key_on_enter(")
+        actual += "\n" + function(source, "bool subghz_scene_set_key_on_event(")
         actual += "\n" + function(source, "void subghz_scene_set_key_on_exit(")
         native(r'''
 #include <stdint.h>
@@ -69,11 +109,20 @@ int main(void){GenInfo g={0};SubGhz s={.gen_info=&g};
 #include <assert.h>
 #define furi_assert assert
 #define __bswap64 __builtin_bswap64
-enum{GenData,GenKeeloq,SubGhzViewIdByteInput};
+#define SUBGHZ_MANUAL_PARAMETERS 1
+enum{GenData,GenKeeloq,SubGhzViewIdByteInput,SubGhzCustomEventByteInputDone,SubGhzSceneShowError,SubGhzSceneSaveName,SubGhzCustomEventManagerSet};
+enum{SceneManagerEventTypeCustom,SceneManagerEventTypeBack};
+typedef struct{unsigned type,event;}SceneManagerEvent;
 typedef struct{unsigned type;struct{uint64_t key;}data;}GenInfo;
-typedef struct{GenInfo*gen_info;void*byte_input,*view_dispatcher;}SubGhz;
+typedef struct{GenInfo*gen_info;void*byte_input,*view_dispatcher,*error_str,*scene_manager;}SubGhz;
 typedef void ByteInput;
 static uint8_t* writable;
+static unsigned generated;
+static bool subghz_scene_set_type_generate_protocol_from_infos(SubGhz*s){(void)s;generated++;return true;}
+static void furi_string_set(void*s,const char*t){(void)s;(void)t;}
+static void scene_manager_next_scene(void*s,unsigned n){(void)s;(void)n;}
+static void scene_manager_set_scene_state(void*s,unsigned n,unsigned v){(void)s;(void)n;(void)v;}
+static void subghz_file_name_clear(SubGhz*s){(void)s;}
 static void subghz_scene_set_key_byte_input_callback(void*c){(void)c;}
 static void subghz_scene_show_unsupported(SubGhz*s){(void)s;}
 static void byte_input_set_header_text(void*i,const char*t){(void)i;(void)t;}
@@ -86,6 +135,15 @@ int main(void){
   subghz_scene_set_key_on_enter(&s);assert(writable);writable[0]^=0x80;
   subghz_scene_set_key_on_exit(&s);assert(g.data.key==original&&!writable);
  }
+ subghz_scene_set_key_on_enter(&s);writable[0]=0xFE;
+ assert(!subghz_scene_set_key_on_event(&s,(SceneManagerEvent){SceneManagerEventTypeBack,0}));
+ assert(!subghz_scene_set_key_on_event(&s,(SceneManagerEvent){SceneManagerEventTypeCustom,999}));
+ assert(subghz_scene_set_key_on_event(&s,(SceneManagerEvent){SceneManagerEventTypeCustom,SubGhzCustomEventByteInputDone}));
+ assert(generated==1&&g.data.key==0xFE23456789ABCDEFULL);
+ subghz_scene_set_key_on_exit(&s);assert(g.data.key==0xFE23456789ABCDEFULL);
+ g.type=GenKeeloq;subghz_scene_set_key_on_enter(&s);
+ assert(subghz_scene_set_key_on_event(&s,(SceneManagerEvent){SceneManagerEventTypeCustom,SubGhzCustomEventByteInputDone}));
+ subghz_scene_set_key_on_exit(&s);assert(generated==1);
  return 0;
 }
 ''')

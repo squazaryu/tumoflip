@@ -18,6 +18,8 @@ static void subghz_manual_refresh(SubGhz* subghz) {
     VariableItemList* list = subghz->variable_item_list;
     int band = subghz_manual_band_index(subghz->gen_info->freq, subghz->gen_info->mod);
     if(band >= 0) {
+        variable_item_set_item_label(
+            variable_item_list_get(list, 0), subghz_manual_band_get((unsigned)band)->mod);
         variable_item_set_current_value_index(variable_item_list_get(list, 0), (uint8_t)band);
         variable_item_set_current_value_text(
             variable_item_list_get(list, 0), subghz_manual_band_get((unsigned)band)->name);
@@ -45,6 +47,7 @@ static void subghz_manual_radio_changed(VariableItem* item) {
     if(!band) return;
     subghz->gen_info->freq = band->frequency;
     subghz->gen_info->mod = band->mod;
+    variable_item_set_item_label(item, band->mod);
     variable_item_set_current_value_text(item, band->name);
 }
 
