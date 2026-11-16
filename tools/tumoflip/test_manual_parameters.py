@@ -12,6 +12,57 @@ PLUGIN = ROOT / "applications/main/subghz/plugins/add_manually"
 
 
 class ManualParametersTests(unittest.TestCase):
+    def test_te_factory_accepts_faac_without_princeton_only_guard_time(self):
+        common = function((ROOT / "lib/subghz/protocols/common.c").read_text(),
+                          "SubGhzProtocolStatus subghz_protocol_decoder_common_serialize_te(")
+        princeton = function((ROOT / "lib/subghz/protocols/princeton.c").read_text(),
+                             "SubGhzProtocolStatus subghz_protocol_decoder_princeton_serialize(")
+        faac = (ROOT / "lib/subghz/protocols/faac_tm.c").read_text()
+        self.assertIn(".serialize = subghz_protocol_decoder_common_serialize_te,", faac)
+        for relative in ("applications/main/subghz/plugins/add_manually/subghz_txrx_create_protocol_key.c",
+                         "applications_user/arf_subghz_full/helpers/subghz_txrx_create_protocol_key.c"):
+            helper = function((ROOT / relative).read_text(), "bool subghz_txrx_gen_data_protocol_and_te(")
+            native(r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+#define furi_assert assert
+#define FURI_LOG_E(...) ((void)0)
+#define SUBGHZ_PROTOCOL_FAAC_TM_NAME "Faac TM"
+typedef enum{SubGhzProtocolStatusOk,SubGhzProtocolStatusErrorParserTe,SubGhzProtocolStatusErrorParserOthers}SubGhzProtocolStatus;
+typedef struct{const char*protocol_name;}SubGhzBlockGeneric;
+typedef struct{SubGhzBlockGeneric generic;}SubGhzProtocolDecoderCommon;
+typedef struct{SubGhzProtocolDecoderCommon common;uint32_t te;}SubGhzProtocolDecoderCommonTe;
+typedef struct{SubGhzProtocolDecoderCommon common;uint32_t te,last_data,guard_time;}SubGhzProtocolDecoderPrinceton;
+typedef void SubGhzRadioPreset;
+typedef struct{bool has_te,has_guard,fail_gen,fail_te,fail_guard;uint32_t te,guard;unsigned guard_updates;}FlipperFormat;
+typedef struct{FlipperFormat*fff_data;}SubGhzTxRx;
+static SubGhzProtocolStatus subghz_block_generic_serialize(SubGhzBlockGeneric*g,FlipperFormat*f,SubGhzRadioPreset*p){(void)g;(void)p;f->has_te=f->has_guard=false;return f->fail_gen?SubGhzProtocolStatusErrorParserOthers:SubGhzProtocolStatusOk;}
+static bool flipper_format_write_uint32(FlipperFormat*f,const char*k,const uint32_t*v,unsigned n){assert(n==1);if(!strcmp(k,"TE")){f->has_te=true;f->te=*v;}else{assert(!strcmp(k,"Guard_time"));f->has_guard=true;f->guard=*v;}return true;}
+static bool flipper_format_update_uint32(FlipperFormat*f,const char*k,const uint32_t*v,unsigned n){assert(n==1);if(!strcmp(k,"TE")){if(!f->has_te||f->fail_te)return false;f->te=*v;}else{assert(!strcmp(k,"Guard_time"));f->guard_updates++;if(!f->has_guard||f->fail_guard)return false;f->guard=*v;}return true;}
+''' + common + princeton + r'''
+static bool subghz_txrx_gen_data_protocol(SubGhzTxRx*s,const char*m,uint32_t freq,const char*name,uint64_t key,uint32_t bits){(void)m;(void)freq;(void)key;(void)bits;
+ SubGhzProtocolDecoderPrinceton decoder={.common.generic.protocol_name=name,.te=400,.guard_time=30};
+ return (!strcmp(name,SUBGHZ_PROTOCOL_FAAC_TM_NAME)?subghz_protocol_decoder_common_serialize_te(&decoder,s->fff_data,NULL):subghz_protocol_decoder_princeton_serialize(&decoder,s->fff_data,NULL))==SubGhzProtocolStatusOk;
+}
+''' + helper + r'''
+int main(void){
+ FlipperFormat f={0};SubGhzTxRx s={&f};
+ assert(subghz_txrx_gen_data_protocol_and_te(&s,"AM650",433920000,"Faac TM",0x123,12,999));
+ assert(f.has_te&&f.te==999&&!f.has_guard&&!f.guard_updates);
+ assert(subghz_txrx_gen_data_protocol_and_te(&s,"AM650",433920000,"Princeton",0x123,24,689));
+ assert(f.has_guard&&f.te==689&&f.guard==30&&f.guard_updates==1);
+ f.fail_guard=true;assert(!subghz_txrx_gen_data_protocol_and_te(&s,"AM650",433920000,"Princeton",0x123,24,400));
+ assert(subghz_txrx_gen_data_protocol_and_te(&s,"AM650",433920000,"Faac TM",0x123,12,101));
+ assert(!f.has_guard&&f.te==101&&f.guard_updates==2);
+ f.fail_te=true;assert(!subghz_txrx_gen_data_protocol_and_te(&s,"AM650",433920000,"Faac TM",0x123,12,400));
+ f.fail_gen=true;f.fail_te=false;assert(!subghz_txrx_gen_data_protocol_and_te(&s,"AM650",433920000,"Faac TM",0x123,12,400));
+ return 0;
+}
+''')
+
     def test_guard_time_storage_getter_is_exported_only_by_the_feature_host(self):
         private = (ROOT / "applications/main/subghz/api/subghz_app_api_table_i.h").read_text()
         public = (ROOT / "targets/f7/api_symbols.csv").read_text()
