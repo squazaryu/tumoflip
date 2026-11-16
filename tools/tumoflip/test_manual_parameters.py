@@ -4,12 +4,47 @@ import unittest
 
 from tools.tumoflip.test_nfc_completion_equality import native
 from tools.tumoflip.test_erreka_868_add_manually import without_includes
+from tools.tumoflip.test_hotplug_assets import function
+import re
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN = ROOT / "applications/main/subghz/plugins/add_manually"
 
 
 class ManualParametersTests(unittest.TestCase):
+    def test_canceling_key_edit_retains_original_numeric_key(self):
+        source = (PLUGIN / "subghz_scene_set_key.c").read_text()
+        state = "\n".join(re.findall(r"(?m)^static (?:bool|uint64_t) subghz_set_key_.*;$", source))
+        actual = function(source, "void subghz_scene_set_key_on_enter(")
+        actual += "\n" + function(source, "void subghz_scene_set_key_on_exit(")
+        native(r'''
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <assert.h>
+#define furi_assert assert
+#define __bswap64 __builtin_bswap64
+enum{GenData,GenKeeloq,SubGhzViewIdByteInput};
+typedef struct{unsigned type;struct{uint64_t key;}data;}GenInfo;
+typedef struct{GenInfo*gen_info;void*byte_input,*view_dispatcher;}SubGhz;
+typedef void ByteInput;
+static uint8_t* writable;
+static void subghz_scene_set_key_byte_input_callback(void*c){(void)c;}
+static void subghz_scene_show_unsupported(SubGhz*s){(void)s;}
+static void byte_input_set_header_text(void*i,const char*t){(void)i;(void)t;}
+static void byte_input_set_result_callback(void*i,void(*cb)(void*),void*x,void*c,uint8_t*p,uint8_t n){(void)i;(void)cb;(void)x;(void)c;(void)n;writable=p;}
+static void view_dispatcher_switch_to_view(void*v,unsigned id){(void)v;(void)id;}
+''' + state + actual + r'''
+int main(void){
+ const uint64_t original=0x0123456789ABCDEFULL;GenInfo g={.type=GenData,.data={original}};SubGhz s={.gen_info=&g};
+ for(unsigned n=0;n<3;n++){
+  subghz_scene_set_key_on_enter(&s);assert(writable);writable[0]^=0x80;
+  subghz_scene_set_key_on_exit(&s);assert(g.data.key==original&&!writable);
+ }
+ return 0;
+}
+''')
+
     def policy(self):
         path = PLUGIN / "subghz_manual_params.h"
         if not path.exists():
@@ -73,18 +108,19 @@ enum{SceneManagerEventTypeCustom,SceneManagerEventTypeBack};
 enum{SubGhzSceneShowError,SubGhzViewIdWidget,SubGhzViewIdVariableItemList,SubGhzViewIdNumberInput};
 typedef unsigned View;
 typedef struct {View view;void(*callback)(void*,int32_t);void*ctx;int32_t min,max,value;}NumberInput;
-typedef struct {unsigned index;const char*text;void*ctx;}VariableItem;
+typedef struct {unsigned index;char text[32];void*ctx;}VariableItem;
 typedef struct {VariableItem items[4];unsigned count;void(*enter)(void*,uint32_t);void*ctx;}VariableItemList;
 typedef struct {GenInfo*gen_info;VariableItemList*variable_item_list;void*view_dispatcher,*scene_manager,*txrx,*error_str;}SubGhz;
 static unsigned current_view,added,removed,freed,last_event,last_scene,proceeded;
 static bool alloc_ok=true,preset_ok=true;
 static VariableItem* variable_item_list_add(VariableItemList*l,const char*n,uint8_t count,void(*cb)(VariableItem*),void*ctx){(void)n;(void)count;(void)cb;assert(l->count<4);VariableItem*i=&l->items[l->count++];i->ctx=ctx;return i;}
 static void variable_item_list_reset(VariableItemList*l){l->count=0;}
+static VariableItem* variable_item_list_get(VariableItemList*l,uint8_t index){assert(index<l->count);return &l->items[index];}
 static void variable_item_list_set_enter_callback(VariableItemList*l,void(*cb)(void*,uint32_t),void*ctx){l->enter=cb;l->ctx=ctx;}
 static void variable_item_set_current_value_index(VariableItem*i,uint8_t n){i->index=n;}
 static uint8_t variable_item_get_current_value_index(VariableItem*i){return i->index;}
 static void* variable_item_get_context(VariableItem*i){return i->ctx;}
-static void variable_item_set_current_value_text(VariableItem*i,const char*t){i->text=t;}
+static void variable_item_set_current_value_text(VariableItem*i,const char*t){snprintf(i->text,sizeof(i->text),"%s",t);}
 static void variable_item_list_set_selected_item(VariableItemList*l,uint8_t i){(void)l;(void)i;}
 static NumberInput* number_input_alloc(void){return alloc_ok?calloc(1,sizeof(NumberInput)):NULL;}
 static void number_input_free(NumberInput*i){freed++;free(i);}
