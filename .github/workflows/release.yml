@@ -268,6 +268,9 @@ jobs:
           toolchain/x86_64-linux/bin/python3 -m unittest tools.tumoflip.test_unleashed095_ir tools.tumoflip.test_unleashed095_save tools.tumoflip.test_unleashed095_rename tools.tumoflip.test_unleashed095_browser tools.tumoflip.test_proteco
           PYTHONPATH=.:tools/tumoflip toolchain/x86_64-linux/bin/python3 -m unittest discover -s tools/tumoflip -p 'test_*.py'
 
+      - name: Validate November 16 radio, timing editor and NFC guards
+        run: toolchain/x86_64-linux/bin/python3 -m unittest tools.tumoflip.test_upstream_20261116 tools.tumoflip.test_manual_parameters tools.tumoflip.test_belkorn_rx tools.tumoflip.test_dea_mio_metadata tools.tumoflip.test_rx_labels_20261116
+
       - name: Prepare release assets
         id: assets
         shell: bash
