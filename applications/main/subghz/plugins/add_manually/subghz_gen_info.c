@@ -2,6 +2,7 @@
 #include <subghz/helpers/subghz_txrx_create_protocol_key.h>
 #include <lib/subghz/protocols/protocol_items.h>
 #include <lib/subghz/blocks/math.h>
+#include <lib/subghz/protocols/faac_tm.h>
 
 typedef struct {
     uint8_t mask;
@@ -278,6 +279,16 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
     }
 
     switch(type) {
+    case SetTypeFaacTm:
+        gen_info = (GenInfo){
+            .type = GenData,
+            .mod = "AM650",
+            .freq = 433920000,
+            .data.name = SUBGHZ_PROTOCOL_FAAC_TM_NAME,
+            .data.key = key & 0xFFF,
+            .data.bits = 12,
+            .data.te = 400};
+        break;
     case SetTypePricenton433:
         gen_info = (GenInfo){
             .type = GenData,
@@ -286,7 +297,8 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.name = subghz_protocol_princeton.name,
             .data.key = (key & 0x00FFFFF0) | 0x4, // btn 0x1, 0x2, 0x4, 0x8
             .data.bits = 24,
-            .data.te = 400};
+            .data.te = 400,
+            .data.gt = 30};
         break;
     case SetTypeTelcomaEdge433:
         gen_info = (GenInfo){
@@ -307,7 +319,8 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.name = subghz_protocol_princeton.name,
             .data.key = (key & 0x00FFFFF0) | 0x4, // btn 0x1, 0x2, 0x4, 0x8
             .data.bits = 24,
-            .data.te = 400};
+            .data.te = 400,
+            .data.gt = 30};
         break;
     case SetTypeZKTeco430:
         gen_info = (GenInfo){
@@ -317,7 +330,8 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.name = subghz_protocol_princeton.name,
             .data.key = (key & 0x00FFFF00) | 0x30, // btn 0x30(UP), 0x03(STOP), 0x0C(DOWN)
             .data.bits = 24,
-            .data.te = 357};
+            .data.te = 357,
+            .data.gt = 30};
         break;
     case SetTypeNiceFlo12bit:
         gen_info = (GenInfo){

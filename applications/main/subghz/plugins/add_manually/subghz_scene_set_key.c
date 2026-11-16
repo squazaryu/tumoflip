@@ -5,6 +5,13 @@
 
 #define TAG "SubGhzSetKey"
 
+static uint64_t subghz_set_key_original;
+static bool subghz_set_key_pending;
+
+#ifdef SUBGHZ_MANUAL_PARAMETERS
+bool subghz_scene_set_type_generate_protocol_from_infos(SubGhz* subghz);
+#endif
+
 void subghz_scene_set_key_byte_input_callback(void* context) {
     SubGhz* subghz = context;
 
@@ -18,6 +25,8 @@ void subghz_scene_set_key_on_enter(void* context) {
     uint8_t byte_count = 0;
 
     if(subghz->gen_info->type == GenData) {
+        subghz_set_key_original = subghz->gen_info->data.key;
+        subghz_set_key_pending = true;
         byte_ptr = (uint8_t*)&subghz->gen_info->data.key;
         byte_count = sizeof(subghz->gen_info->data.key);
     } else {
@@ -47,7 +56,12 @@ bool subghz_scene_set_key_on_event(void* context, SceneManagerEvent event) {
         if(event.event == SubGhzCustomEventByteInputDone) {
             if(subghz->gen_info->type == GenData) {
                 subghz->gen_info->data.key = __bswap64(subghz->gen_info->data.key);
+                subghz_set_key_pending = false;
 
+#ifdef SUBGHZ_MANUAL_PARAMETERS
+                (void)subghz_scene_set_type_generate_protocol_from_infos(subghz);
+                return true;
+#else
                 if(subghz->gen_info->data.te) {
                     generated_protocol = subghz_txrx_gen_data_protocol_and_te(
                         subghz->txrx,
@@ -66,6 +80,7 @@ bool subghz_scene_set_key_on_event(void* context, SceneManagerEvent event) {
                         subghz->gen_info->data.key,
                         subghz->gen_info->data.bits);
                 }
+#endif
             } else {
                 subghz_scene_show_unsupported(subghz);
                 return true;
@@ -91,6 +106,11 @@ bool subghz_scene_set_key_on_event(void* context, SceneManagerEvent event) {
 
 void subghz_scene_set_key_on_exit(void* context) {
     SubGhz* subghz = context;
+
+    if(subghz_set_key_pending && subghz->gen_info->type == GenData) {
+        subghz->gen_info->data.key = subghz_set_key_original;
+    }
+    subghz_set_key_pending = false;
 
     // Clear view
     byte_input_set_result_callback(subghz->byte_input, NULL, NULL, NULL, NULL, 0);

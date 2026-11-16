@@ -179,5 +179,6 @@ typedef enum {
     SetTypeHomeGate433,
 
     SetTypeNiceOCodeOne_433_92,
+    SetTypeFaacTm,
     SetTypeMAX,
 } SetType;

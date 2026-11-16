@@ -1,0 +1,13 @@
+#include "../subghz_i.h"
+#include "../helpers/subghz_add_manually_plugin.h"
+
+void subghz_scene_set_manual_params_on_enter(void* context) {
+    subghz_add_manually_scene_on_enter(context, SubGhzAddManuallySceneSetManualParams);
+}
+bool subghz_scene_set_manual_params_on_event(void* context, SceneManagerEvent event) {
+    return subghz_add_manually_scene_on_event(
+        context, SubGhzAddManuallySceneSetManualParams, event);
+}
+void subghz_scene_set_manual_params_on_exit(void* context) {
+    subghz_add_manually_scene_on_exit(context, SubGhzAddManuallySceneSetManualParams);
+}
