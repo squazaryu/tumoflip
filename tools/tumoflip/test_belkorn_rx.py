@@ -86,7 +86,7 @@ static bool flipper_format_write_hex(FlipperFormat*f,const char*k,const uint8_t*
 static bool flipper_format_get_value_count(FlipperFormat*f,const char*k,uint32_t*n){*n=f->count;return !strcmp(k,"Data")?f->has_data:f->has_key2;}
 static bool flipper_format_read_hex(FlipperFormat*f,const char*k,uint8_t*b,size_t n){if(f->fail_read||n!=8)return false;bool ok=!strcmp(k,"Data")?f->has_data:f->has_key2;if(ok)memcpy(b,!strcmp(k,"Data")?f->data:f->key2,8);return ok;}
 ''' + actual + r'''
-int main(void){(void)received;(void)expected;
+int main(void){(void)received;(void)expected;(void)subghz_protocol_belkorn_const;
  SubGhzProtocolDecoderBelKorn d={.generic={.data=0x801A12345678CC55ULL,.data_2=0x123456789ABC01ULL,.data_count_bit=118}};
  FlipperFormat f={0};assert(subghz_protocol_decoder_belkorn_serialize(&d,&f,NULL)==SubGhzProtocolStatusOk&&f.has_data);
  SubGhzProtocolDecoderBelKorn restored={0};assert(subghz_protocol_decoder_belkorn_deserialize(&restored,&f)==SubGhzProtocolStatusOk);

@@ -42,6 +42,7 @@ static const SubGhzProtocolPackEntry subghz_protocol_pack_entries[] = {
     {PACK_GROUP(SubGhzProtocolPackGroupCore), "freezer"},
     {PACK_GROUP(SubGhzProtocolPackGroupCore), "faac_tm"},
     {PACK_GROUP(SubGhzProtocolPackGroupCore), "proteco"},
+    {PACK_GROUP(SubGhzProtocolPackGroupCore), "belkorn"},
     {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_gm0"},
     {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_gm1"},
     {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_ty0"},
