@@ -28,7 +28,9 @@ const char* subghz_devices_get_name(const SubGhzDevice* device) {
 
 bool subghz_devices_begin(const SubGhzDevice* device) {
     furi_check(device);
-    bool ret = false;
+    // The internal radio is initialized by HAL and has no begin hook. An absent
+    // hook is a successful no-op; external hardware still returns its self-test.
+    bool ret = true;
     if(device->interconnect->begin) {
         SubGhzDeviceConf conf = {
             .ver = 1,
