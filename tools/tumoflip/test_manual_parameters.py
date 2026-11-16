@@ -163,7 +163,7 @@ static void variable_item_list_reset(VariableItemList*l){l->count=0;}
 static VariableItem* variable_item_list_get(VariableItemList*l,uint8_t index){assert(index<l->count);return &l->items[index];}
 static void variable_item_list_set_enter_callback(VariableItemList*l,void(*cb)(void*,uint32_t),void*ctx){l->enter=cb;l->ctx=ctx;}
 static void variable_item_set_current_value_index(VariableItem*i,uint8_t n){i->index=n;}
-static void variable_item_set_item_label(VariableItem*i,const char*t){i->label=t;}
+static void __attribute__((unused)) variable_item_set_item_label(VariableItem*i,const char*t){i->label=t;}
 static uint8_t variable_item_get_current_value_index(VariableItem*i){return i->index;}
 static void* variable_item_get_context(VariableItem*i){return i->ctx;}
 static void variable_item_set_current_value_text(VariableItem*i,const char*t){snprintf(i->text,sizeof(i->text),"%s",t);}
