@@ -818,10 +818,45 @@ MU_TEST(test_lfrfid_protocol_em_write_hitags) {
     protocol_dict_free(dict);
 }
 
+MU_TEST(test_lfrfid_protocol_gallagher_write_em4305) {
+    ProtocolDict* dict = protocol_dict_alloc(lfrfid_protocols, LFRFIDProtocolMax);
+    const uint8_t samples[][8] = {
+        {0x4A, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE},
+        {0},
+        {0xFF, 0x00, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF},
+    };
+
+    for(size_t sample = 0; sample < COUNT_OF(samples); sample++) {
+        LFRFIDWriteRequest via_t5577 = {.write_type = LFRFIDWriteTypeT5577};
+        protocol_dict_set_data(dict, LFRFIDProtocolGallagher, samples[sample], 8);
+        mu_check(protocol_dict_get_write_data(dict, LFRFIDProtocolGallagher, &via_t5577));
+
+        LFRFIDWriteRequest via_em4305 = {.write_type = LFRFIDWriteTypeEM4305};
+        protocol_dict_set_data(dict, LFRFIDProtocolGallagher, samples[sample], 8);
+        mu_check(protocol_dict_get_write_data(dict, LFRFIDProtocolGallagher, &via_em4305));
+        mu_assert_int_eq(0xF0, via_em4305.em4305.mask);
+        mu_assert_int_eq(
+            EM4x05_MODULATION_MANCHESTER | EM4x05_SET_BITRATE(32) |
+                (7 << EM4x05_MAXBLOCK_SHIFT),
+            via_em4305.em4305.word[4]);
+        for(uint8_t word = 0; word < 3; word++) {
+            uint32_t expected = 0;
+            const uint32_t source = via_t5577.t5577.block[word + 1];
+            for(uint8_t bit = 0; bit < 32; bit++) {
+                expected = (expected << 1) | ((source >> bit) & 1);
+            }
+            mu_assert_int_eq(expected, via_em4305.em4305.word[word + 5]);
+        }
+    }
+
+    protocol_dict_free(dict);
+}
+
 MU_TEST_SUITE(test_lfrfid_protocols_suite) {
     MU_RUN_TEST(test_lfrfid_protocol_em_read_simple);
     MU_RUN_TEST(test_lfrfid_protocol_em_emulate_simple);
     MU_RUN_TEST(test_lfrfid_protocol_em_write_hitags);
+    MU_RUN_TEST(test_lfrfid_protocol_gallagher_write_em4305);
     MU_RUN_TEST(test_lfrfid_hitags_write_target);
 
     MU_RUN_TEST(test_lfrfid_protocol_h10301_read_simple);
