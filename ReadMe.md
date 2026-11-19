@@ -195,13 +195,22 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-010` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-011-001` | BelKorn RX, Advanced radio/timing editor and NFC/radio reliability | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-011-002` | Gallagher EM4305, Feron RX and Sub-GHz filter compatibility | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
 new firmware release does not rewrite an older package catalog.
 
-Dev `t-dev-011-001` starts the next line targeting Stable `v1.0.11`. It adds
+Dev `t-dev-011-002` corrects the existing Gallagher EM4305 write frame, rejects
+corrupted or overlong Feron receive frames, and prevents foreign ignore-filter
+bits from hiding decoders in Standard and ARF. Feron transmit bytes and saved
+signals are unchanged. Public API remains `88.23` and the private Sub-GHz
+feature ABI remains `1005`. Install matching **FW Packages Dev033** after that
+separate catalog is published and activated; ARF's external host has changed.
+Physical EM4305 and Feron hardware acceptance is still pending. See
+[the upstream review and test scope](documentation/Upstream20261119.md).
+
+The preceding Dev `t-dev-011-001` starts the line targeting Stable `v1.0.11`. It adds
 bounded Advanced frequency/modulation/TE/GT editing and FAAC TM creation,
 receive-only BelKorn, retained DEA Mio metadata, correct history labels and
 RX notifications, internal radio startup and NFC layout/logging guards.
@@ -247,13 +256,13 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-011-001.tgz
+flipper-z-f7-update-t-dev-011-002.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: Stable `v1.0.10`, Dev `t-dev-011-001` and rollback Dev `t-dev-009-039` use `88.23`;
+- Firmware API: Stable `v1.0.10`, Dev `t-dev-011-002` and rollback Dev `t-dev-009-039` use `88.23`;
   immutable stable `v1.0.8` remains `88.7`.
   Each release manifest records its compatible package API. API numbers are
   local to this fork.
