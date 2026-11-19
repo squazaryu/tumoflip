@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -31,8 +32,20 @@ FUNCTIONS = {
 
 
 def llvm_tool(name):
-    return shutil.which(name) or subprocess.check_output(
-        ["xcrun", "--find", name], text=True).strip()
+    tool = shutil.which(name)
+    if tool:
+        return tool
+    # Ubuntu exposes versioned LLVM tools beside the real clang binary, not
+    # necessarily as unversioned names in PATH. Resolve its symlink so coverage
+    # uses the matching installed toolchain instead of guessing a version.
+    compiler = shutil.which("clang")
+    if compiler:
+        sibling = Path(compiler).resolve().parent / name
+        if sibling.is_file() and os.access(sibling, os.X_OK):
+            return str(sibling)
+    if sys.platform == "darwin":
+        return subprocess.check_output(["xcrun", "--find", name], text=True).strip()
+    raise FileNotFoundError(f"LLVM tool {name} is unavailable; install the tools matching clang")
 
 
 def measure(modules, functions):

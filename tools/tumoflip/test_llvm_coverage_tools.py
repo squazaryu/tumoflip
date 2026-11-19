@@ -16,7 +16,7 @@ class LlvmCoverageToolTests(unittest.TestCase):
 
     def test_linux_resolves_tools_beside_the_actual_versioned_compiler(self):
         with tempfile.TemporaryDirectory(prefix="tumoflip-llvm-discovery-") as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             compiler_bin = root / "lib/llvm-22/bin"
             compiler_bin.mkdir(parents=True)
             for name in ("clang", "llvm-profdata", "llvm-cov"):
