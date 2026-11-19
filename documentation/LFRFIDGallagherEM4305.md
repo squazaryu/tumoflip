@@ -6,11 +6,11 @@ in that PR. The source remains under the repository's existing GPL-3.0 license.
 
 ## Scope
 
-Gallagher writes previously consumed encoded bits1 through96 instead of0
-through95. That shifted all three EM4305 data words by one bit and allowed the
+Gallagher writes previously consumed encoded bits 1 through 96 instead of 0
+through 95. That shifted all three EM4305 data words by one bit and allowed the
 unused next-preamble byte to affect the result. The existing shared builder now
-fills words5–7 from exactly the same 96-bit frame as T5577, reversing each word
-for EM4305 transmission. Configuration word4, RF/32 Manchester, mask0xF0 and the
+fills words 5–7 from exactly the same 96-bit frame as T5577, reversing each word
+for EM4305 transmission. Configuration word 4, RF/32 Manchester, mask 0xF0 and the
 request's other fields are unchanged. Gallagher does not request inversion.
 
 This changes only the image prepared by the existing explicit EM4305 write
@@ -22,14 +22,14 @@ data migration is needed.
 ## Verification
 
 - RED: compiled actual callbacks reproduced the shifted data words. GREEN:
-  independent byte/bit oracles accept every one of96 single-bit inputs, constant
+  independent byte/bit oracles accept every one of 96 single-bit inputs, constant
   and alternating frames, both tail-byte polarities, request guards and refusal
   of an unsupported target.
-- Actual Gallagher encoder/write/CRC/decode code is compiled on host for259
+- Actual Gallagher encoder/write/CRC/decode code is compiled on host for 259
   fixed and deterministic synthetic credentials. EM4305 words match the T5577
   frame and reconstruct the same normalized credential; CRC corruption is
   rejected. No RF transport or physical card is involved in this test.
-- Differential testing retains the frozen pre-refactor fixture for20 protocols;
+- Differential testing retains the frozen pre-refactor fixture for 20 protocols;
   only the three intentionally corrected Gallagher EM4305 data words use a new
   independent oracle. Other request/protocol bytes and unsupported targets must
   still match the old implementation. The historical fixture is not rewritten.
