@@ -11,7 +11,7 @@ import unittest
 from tools.tumoflip.test_hotplug_assets import function
 from tools.tumoflip.test_lfrfid_write_fill import source
 from tools.tumoflip.test_nfc_completion_equality import native as run_c
-from tools.tumoflip.test_upstream_20261104 import PRELUDE, declarations
+from tools.tumoflip.test_upstream_20261104 import PRELUDE, body, declarations
 
 ROOT = Path(__file__).resolve().parents[2]
 SETTINGS = {
@@ -29,6 +29,7 @@ def feron_support():
         function((ROOT / "lib/subghz/blocks/decoder.c").read_text(),
                  "void subghz_protocol_blocks_add_bit("))
     return (prelude + "typedef struct SubGhzProtocolDecoderFeron SubGhzProtocolDecoderFeron;\n"
+            + "typedef struct SubGhzProtocolEncoderFeron SubGhzProtocolEncoderFeron;\n"
             + declarations(text, "feron")
             + function(text, "void subghz_protocol_decoder_feron_feed(") + r'''
 static void capture(SubGhzProtocolDecoderBase* base,void* context){
@@ -143,6 +144,7 @@ def settings_support(stem):
     return (SETTINGS_PRELUDE
             + enum_source("lib/subghz/types.h", "SubGhzProtocolFlag")
             + enum_source("lib/subghz/protocols/plugin_registry.h", "SubGhzProtocolPackGroup")
+            + source("lib/subghz/ignore_filter.h") + "\n"
             + source(f"{directory}/subghz_last_settings.h") + "\n" + definitions
             + f"\n#define subghz_last_settings_load subghz_last_settings_load_{stem}\n"
             + function(body, "void subghz_last_settings_load(") + r'''
@@ -152,6 +154,32 @@ static void load(SubGhzLastSettings*s){subghz_last_settings_load(s,5);balanced()
 
 
 class November19ReceiveTests(unittest.TestCase):
+    def test_feron_transmit_preserves_saved_bytes_including_bad_check_byte(self):
+        text = (ROOT / "lib/subghz/protocols/feron.c").read_text()
+        encoder = (body(text, "subghz_protocol_feron_check_remote_controller") + "\n"
+                   + body(text, "subghz_protocol_encoder_feron_get_upload"))
+        run_c(feron_support() + encoder + r'''
+int main(void){
+ LevelDuration upload[128];SubGhzProtocolEncoderFeron e={.encoder={.upload=upload}};
+ for(unsigned command=0;command<256;command++)for(unsigned corrupt=0;corrupt<9;corrupt++){
+  uint32_t data=0x63380000u|(command<<8)|(command^0xffu);
+  if(corrupt)data^=1u<<(corrupt-1);
+  e.generic.data=data;e.generic.data_count_bit=32;
+  assert(subghz_protocol_encoder_feron_get_upload(&e));
+  assert(e.generic.data==data&&e.generic.data_count_bit==32&&e.generic.serial==0x6338);
+  assert(e.encoder.size_upload==66);
+  for(unsigned bit=0;bit<32;bit++){
+   bool one=(data>>(31-bit))&1u;
+   assert(upload[bit*2].level&&upload[bit*2].duration==(one?750:350));
+   assert(!upload[bit*2+1].level&&upload[bit*2+1].duration==(bit==31?500:one?350:750));
+  }
+  assert(upload[64].level&&upload[64].duration==500);
+  assert(!upload[65].level&&upload[65].duration==4500);
+ }
+ return 0;
+}
+''')
+
     def test_feron_keeps_all_commands_but_rejects_corrupt_command_and_inverse(self):
         run_c(feron_support() + r'''
 int main(void){
@@ -249,6 +277,7 @@ int main(void){
  load(&reused);assert(reused.frequency==433920000&&reused.preset_index==1);
  assert(reused.raw_frequency==reused.frequency&&reused.raw_preset_index==reused.preset_index);
  entries[6].value=UINT32_MAX;load(&reused);assert(reused.protocol_pack_group==SubGhzProtocolPackGroupCore);
+ entries[5].value=UINT32_MAX;load(&reused);
  return 0;
 }
 ''')
