@@ -154,7 +154,7 @@ size_t storage_file_read(File* f,void* buffer,size_t size){
 }
 int storage_file_get_error(File* f){assert(f->opened);return read_error?FSE_INTERNAL:FSE_OK;}
 void* safe_malloc(size_t n){return alloc_ok?malloc(n):NULL;}
-void* safe_realloc(void* p,size_t n){return realloc(p,n);}
+void* safe_realloc(void* p,size_t old_size,size_t n){assert(old_size>=n);return realloc(p,n);}
 bool next_raw_value(const char** s,int32_t* d){
     char* end;long v=strtol(*s,&end,10);if(end==*s)return false;*d=(int32_t)v;*s=end;return true;
 }

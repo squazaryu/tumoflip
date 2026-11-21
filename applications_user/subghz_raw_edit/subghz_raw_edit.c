@@ -41,6 +41,7 @@
 #define MAX_KEY_FILE_BYTES 16384
 #define DUR_CLAMP 32000
 #define LOAD_HEAP_RESERVE 12288
+#define RAW_EDIT_ALLOC_MARGIN 32
 
 #define GAP_KEEP_MAX_US 1500
 
@@ -509,19 +510,23 @@ typedef enum
 static void *safe_malloc(size_t size)
 {
     if (size == 0 || size > SIZE_MAX - LOAD_HEAP_RESERVE ||
-        memmgr_get_free_heap() < size + LOAD_HEAP_RESERVE)
+        memmgr_get_free_heap() < size + LOAD_HEAP_RESERVE ||
+        memmgr_heap_get_max_free_block() < size + RAW_EDIT_ALLOC_MARGIN)
         return NULL;
 
     return malloc(size);
 }
 
-static void *safe_realloc(void *ptr, size_t size)
+static void *safe_realloc(void *ptr, size_t old_size, size_t size)
 {
-    if (size == 0 || size > SIZE_MAX - LOAD_HEAP_RESERVE ||
-        memmgr_get_free_heap() < size + LOAD_HEAP_RESERVE)
-        return NULL;
-
-    return realloc(ptr, size);
+    // The editor knows the old capacity. Only copy bytes that belonged to it.
+    void *replacement = safe_malloc(size);
+    if (replacement && ptr)
+    {
+        memcpy(replacement, ptr, old_size < size ? old_size : size);
+        free(ptr);
+    }
+    return replacement;
 }
 
 /* Decoded protocols are synthesized by the firmware's own SubGhz encoder: the
@@ -570,7 +575,7 @@ static bool synth_grow(SubData *sd, size_t need)
     if (ncap < need)
         return false;
 
-    int16_t *grown = safe_realloc(sd->data, ncap * sizeof(int16_t));
+    int16_t *grown = safe_realloc(sd->data, sd->cap * sizeof(int16_t), ncap * sizeof(int16_t));
     if (!grown)
     {
         sd->out_of_memory = true;
@@ -975,7 +980,8 @@ static bool load_sub(Storage *storage, const char *path, SubData *sd, bool raw_o
 
     if (sd->data && sd->count > 0 && sd->count < sd->cap)
     {
-        int16_t *shrunk = safe_realloc(sd->data, sd->count * sizeof(int16_t));
+        int16_t *shrunk =
+            safe_realloc(sd->data, sd->cap * sizeof(int16_t), sd->count * sizeof(int16_t));
         if (shrunk)
         {
             sd->data = shrunk;
@@ -2422,7 +2428,7 @@ static void run_merge(Storage *storage, DialogsApp *dialogs)
             while (newcap < need)
                 newcap *= 2;
 
-            uint8_t *np = safe_realloc(pbuf, newcap);
+            uint8_t *np = safe_realloc(pbuf, pcap, newcap);
             if (!np)
             {
                 DialogMessage *m = dialog_message_alloc();

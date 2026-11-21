@@ -107,7 +107,7 @@ class SubGhzRawEditTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("uint8_t *pbuf = safe_malloc(pcap);", source)
-        self.assertIn("uint8_t *np = safe_realloc(pbuf, newcap);", source)
+        self.assertIn("uint8_t *np = safe_realloc(pbuf, pcap, newcap);", source)
         self.assertIn("free(pbuf);", source)
         self.assertNotIn("MERGE_MAX_FILES", source)
 
