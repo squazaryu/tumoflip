@@ -173,6 +173,35 @@ def optional_functions(source, *signatures):
 
 
 class SavedRawEditLaunchTests(unittest.TestCase):
+    def test_resize_preserves_existing_data_and_accounts_for_largest_free_block(self):
+        source = EDITOR.read_text()
+        actual = optional_functions(source, "static void *safe_malloc(", "static void *safe_realloc(")
+        run_c(r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#define LOAD_HEAP_RESERVE 12288
+#define RAW_EDIT_ALLOC_MARGIN 32
+static size_t heap=32768,largest=32768;
+size_t memmgr_get_free_heap(void){return heap;}
+size_t memmgr_heap_get_max_free_block(void){return largest;}
+''' + actual + r'''
+int main(void){
+    uint8_t* data=safe_malloc(4);assert(data);
+    memset(data,77,4);
+    largest=16;assert(!safe_realloc(data,4,64));assert(data[3]==77);
+    largest=32768;heap=16;assert(!safe_realloc(data,4,64));assert(data[0]==77);
+    heap=32768;assert(!safe_realloc(data,4,SIZE_MAX));
+    uint8_t* grown=safe_realloc(data,4,64);assert(grown&&grown[0]==77&&grown[3]==77);
+    uint8_t* shrunk=safe_realloc(grown,64,2);assert(shrunk&&shrunk[1]==77);free(shrunk);
+    assert(!safe_realloc(NULL,0,0));
+    uint8_t* allocated=safe_realloc(NULL,0,12);assert(allocated);free(allocated);
+    return 0;
+}
+''')
+
     def test_saved_menu_gates_editor_compatibility_and_preserves_existing_actions(self):
         source = SCENE.read_text()
         definitions = source[source.index("enum SubmenuIndex"):
