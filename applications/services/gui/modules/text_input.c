@@ -3,6 +3,8 @@
 #include <assets_icons.h>
 #include <furi.h>
 
+#include <string.h>
+
 struct TextInput {
     View* view;
     FuriTimer* timer;
@@ -39,6 +41,10 @@ typedef struct {
 static const uint8_t keyboard_origin_x = 1;
 static const uint8_t keyboard_origin_y = 29;
 static const uint8_t keyboard_row_count = 3;
+
+// The line is at most 120 px wide. Keep a bounded window on either side of
+// the cursor instead of making the GUI stack depend on the input length.
+#define TEXT_INPUT_DRAW_WINDOW 120
 
 #define ENTER_KEY     '\r'
 #define BACKSPACE_KEY '\b'
@@ -160,62 +166,78 @@ static void text_input_backspace_cb(TextInputModel* model) {
     }
 }
 
+static size_t text_input_length(const TextInputModel* model) {
+    return model->text_buffer ? strnlen(model->text_buffer, model->text_buffer_size) : 0;
+}
+
+static void text_input_draw_line(Canvas* canvas, const TextInputModel* model, size_t text_length) {
+    const size_t width = canvas_width(canvas);
+    if(width <= 8) return;
+    const size_t available = width - 8;
+    const bool selected = model->clear_default_text;
+    const size_t caret_size = selected ? 0 : 1;
+    const size_t cursor = selected ? 0 : MIN(model->cursor_pos, text_length);
+    size_t before = MIN(cursor, (size_t)TEXT_INPUT_DRAW_WINDOW);
+    const size_t after = MIN(text_length - cursor, (size_t)TEXT_INPUT_DRAW_WINDOW);
+    const char* text = model->text_buffer ? model->text_buffer : "";
+
+    char buffer[2 * TEXT_INPUT_DRAW_WINDOW + 2];
+    memcpy(buffer, text + (cursor - before), before);
+    if(caret_size) buffer[before] = '|';
+    memcpy(buffer + before + caret_size, text + cursor, after);
+    size_t length = before + caret_size + after;
+    buffer[length] = '\0';
+
+    const size_t dots = canvas_string_width(canvas, "...");
+    const size_t caret_width = selected ? 0 : canvas_string_width(canvas, "|");
+    const bool markers_fit = (selected ? dots : 2 * dots + caret_width) <= available;
+    bool clipped_left = before < cursor;
+    bool clipped_right = after < text_length - cursor;
+    char* line = buffer;
+    size_t line_width;
+    size_t left_width;
+    size_t right_width;
+    // Scroll toward the cursor before trimming the end. Never crop the
+    // cursor itself, and measure the entire selected box after clipping.
+    while(true) {
+        left_width = markers_fit && clipped_left ? dots : 0;
+        right_width = markers_fit && clipped_right ? dots : 0;
+        line_width = canvas_string_width(canvas, line);
+        if(left_width + line_width + right_width <= available) break;
+        if(before > 0) {
+            line++;
+            before--;
+            length--;
+            clipped_left = true;
+        } else if(length > caret_size) {
+            line[--length] = '\0';
+            clipped_right = true;
+        } else {
+            return; // Extremely narrow viewport: no glyph fits.
+        }
+    }
+
+    const size_t start = 4;
+    if(selected) {
+        elements_slightly_rounded_box(
+            canvas, start - 1, 14, left_width + line_width + right_width + 2, 10);
+        canvas_set_color(canvas, ColorWhite);
+    }
+    if(left_width) canvas_draw_str(canvas, start, 22, "...");
+    canvas_draw_str(canvas, start + left_width, 22, line);
+    if(right_width) canvas_draw_str(canvas, start + left_width + line_width, 22, "...");
+}
+
 static void text_input_view_draw_callback(Canvas* canvas, void* _model) {
     TextInputModel* model = _model;
-    uint8_t text_length = model->text_buffer ? strlen(model->text_buffer) : 0;
-    uint8_t needed_string_width = canvas_width(canvas) - 8;
-    uint8_t start_pos = 4;
-
-    model->cursor_pos = model->cursor_pos > text_length ? text_length : model->cursor_pos;
-    size_t cursor_pos = model->cursor_pos;
+    const size_t text_length = text_input_length(model);
+    model->cursor_pos = MIN(model->cursor_pos, text_length);
 
     canvas_clear(canvas);
     canvas_set_color(canvas, ColorBlack);
-
     canvas_draw_str(canvas, 2, 8, model->header);
     elements_slightly_rounded_frame(canvas, 1, 12, 126, 15);
-
-    // The draw copy may insert a cursor and append an ellipsis, in addition
-    // to the terminating NUL. Keep the caller's input buffer unchanged.
-    char buf[text_length + 5];
-    buf[0] = '\0';
-    if(model->text_buffer) {
-        strlcpy(buf, model->text_buffer, sizeof(buf));
-    }
-    char* str = buf;
-
-    if(model->clear_default_text) {
-        elements_slightly_rounded_box(
-            canvas, start_pos - 1, 14, canvas_string_width(canvas, str) + 2, 10);
-        canvas_set_color(canvas, ColorWhite);
-    } else {
-        char* move = str + cursor_pos;
-        memmove(move + 1, move, strlen(move) + 1);
-        str[cursor_pos] = '|';
-    }
-
-    if(cursor_pos > 0 && canvas_string_width(canvas, str) > needed_string_width) {
-        canvas_draw_str(canvas, start_pos, 22, "...");
-        start_pos += 6;
-        needed_string_width -= 8;
-        for(uint32_t off = 0;
-            strlen(str) && canvas_string_width(canvas, str) > needed_string_width &&
-            off < cursor_pos;
-            off++) {
-            str++;
-        }
-    }
-
-    if(canvas_string_width(canvas, str) > needed_string_width) {
-        needed_string_width -= 4;
-        size_t len = strlen(str);
-        while(len && canvas_string_width(canvas, str) > needed_string_width) {
-            str[len--] = '\0';
-        }
-        strcat(str, "...");
-    }
-
-    canvas_draw_str(canvas, start_pos, 22, str);
+    text_input_draw_line(canvas, model, text_length);
 
     canvas_set_font(canvas, FontKeyboard);
 
@@ -405,6 +427,10 @@ static bool text_input_view_input_callback(InputEvent* event, void* context) {
 
     // Acquire model
     TextInputModel* model = view_get_model(text_input->view);
+    if(!model->text_buffer) {
+        view_commit_model(text_input->view, false);
+        return false;
+    }
 
     if((!(event->type == InputTypePress) && !(event->type == InputTypeRelease)) &&
        model->validator_message_visible) {
@@ -589,17 +615,19 @@ void text_input_set_result_callback(
         {
             model->callback = callback;
             model->callback_context = callback_context;
-            model->text_buffer = text_buffer;
-            model->text_buffer_size = text_buffer_size;
+            model->text_buffer = text_buffer_size ? text_buffer : NULL;
+            model->text_buffer_size = model->text_buffer ? text_buffer_size : 0;
             model->clear_default_text = clear_default_text;
             model->cursor_select = false;
-            if(text_buffer && text_buffer[0] != '\0') {
-                model->cursor_pos = strlen(text_buffer);
+            size_t length = text_input_length(model);
+            if(length && length == model->text_buffer_size) {
+                model->text_buffer[--length] = '\0';
+            }
+            model->cursor_pos = length;
+            if(length) {
                 // Set focus on Save
                 model->selected_row = 2;
                 model->selected_column = 8;
-            } else {
-                model->cursor_pos = 0;
             }
         },
         true);

@@ -59,13 +59,16 @@ void canvas_draw_str(Canvas* c,int x,int y,const char* s){
 '''
 
 
-def text_source():
+def text_source(include_draw=False):
     source = TEXT_INPUT.read_text()
     model = re.search(r"typedef struct \{\s+const char\* header;.*?\} TextInputModel;",
                       source, re.S).group()
     defines = "\n".join(re.findall(r"(?m)^#define TEXT_INPUT_DRAW_[^\n]+", source))
     helpers = ""
-    for signature in ("static size_t text_input_length(", "static void text_input_draw_line("):
+    signatures = ["static size_t text_input_length("]
+    if include_draw:
+        signatures.append("static void text_input_draw_line(")
+    for signature in signatures:
         if signature in source:
             helpers += function(source, signature) + "\n"
     return (TEXT_SUPPORT + model + "\n" + defines + "\n" + helpers
@@ -155,7 +158,7 @@ class UpstreamNovember21Tests(unittest.TestCase):
     def test_bounded_draw_keeps_caret_and_selected_box_in_frame(self):
         # The new private renderer is an intentional missing-definition RED.
         # The old unbounded display routine is never invoked by this fixture.
-        run_c(text_source() + r'''
+        run_c(text_source(include_draw=True) + r'''
 void text_input_draw_line(Canvas*,const TextInputModel*,size_t);
 int main(void){
  char text[430];TextInputModel model={.text_buffer=text,.text_buffer_size=sizeof(text)};

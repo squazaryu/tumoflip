@@ -320,6 +320,9 @@ def build_source(ref, skip_text_input=False):
     chunks.extend(number_input_chunks(number))
     text_input=read("applications/services/gui/modules/text_input.c",ref).replace("keyboard_","text_keyboard_")
     chunks.append(text_input[text_input.index("typedef struct"):text_input.index("static uint8_t get_row_size(")])
+    for name in ["static size_t text_input_length(", "static void text_input_draw_line("]:
+        if name in text_input:
+            chunks.append(function(text_input,name))
     for name in ["static uint8_t get_row_size(","static const TextInputKey* get_row(","static bool char_is_lowercase(","static char char_to_uppercase(","static void text_input_view_draw_callback("]:
         chunks.append(function(text_input,name))
     scroll=read("applications/services/gui/modules/widget_elements/widget_element_text_scroll.c",ref)
