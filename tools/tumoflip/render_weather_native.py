@@ -30,6 +30,7 @@ def read(path, ref=None):
 
 
 SUPPORT = r'''
+#define _POSIX_C_SOURCE 200809L
 #include "u8g2.h"
 #include "m-array.h"
 #include <assert.h>

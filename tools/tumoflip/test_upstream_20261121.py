@@ -90,15 +90,20 @@ typedef struct {char text[384];} FuriString;
 typedef int TextInput,DateTime,ValidatorIsFile;
 typedef struct {const char* name;} Protocol;
 typedef struct {Protocol* protocol;} SubGhzProtocolDecoderBase;
+typedef struct {bool protocol_file_names;} LastSettings;
 enum {SubGhzSceneSaveName=1,SubGhzSceneReadRAW,SubGhzCustomEventManagerNoSet=0,
       SubGhzCustomEventManagerSetRAW=3,SubGhzViewIdTextInput=1};
 typedef struct {
  TextInput* text_input;FuriString *file_path,*file_path_tmp;bool save_datetime_set;
  DateTime save_datetime;void *txrx,*scene_manager,*view_dispatcher;
- struct {bool protocol_file_names;}* last_settings;
+ LastSettings* last_settings;
  char file_name_tmp[SUBGHZ_MAX_LEN_NAME];unsigned guard;
 } SubGhz;
-static unsigned entered,copied;
+static unsigned entered,copied,raw_state,save_state;
+static const char* expected_prefill;
+static Protocol protocol={.name="Demo"};
+static SubGhzProtocolDecoderBase decoder={.protocol=&protocol};
+static bool protocol_available;
 static char original[384];
 FuriString* furi_string_alloc(void){return calloc(1,sizeof(FuriString));}
 void furi_string_free(FuriString* s){free(s);}
@@ -108,10 +113,14 @@ void set_text(FuriString* s,const char* t){snprintf(s->text,sizeof(s->text),"%s"
 void set_string(FuriString* s,const FuriString* t){set_text(s,t->text);}
 #define furi_string_set(s,t) _Generic((t),FuriString*:set_string,default:set_text)(s,t)
 bool subghz_path_is_file(FuriString* s){return strstr(s->text,".sub")!=NULL;}
-SubGhzProtocolDecoderBase* subghz_txrx_get_decoder(void* txrx){(void)txrx;return NULL;}
-unsigned scene_manager_get_scene_state(void* scene,unsigned id){(void)scene;(void)id;return 0;}
+SubGhzProtocolDecoderBase* subghz_txrx_get_decoder(void* txrx){
+ (void)txrx;return protocol_available?&decoder:NULL;
+}
+unsigned scene_manager_get_scene_state(void* scene,unsigned id){
+ (void)scene;return id==SubGhzSceneReadRAW?raw_state:save_state;
+}
 void name_generator_make_auto_datetime(char* s,size_t n,const char* prefix,DateTime* time){
- (void)prefix;(void)time;snprintf(s,n,"New signal");
+ (void)time;snprintf(s,n,"%s",prefix?prefix:"New signal");
 }
 void path_extract_dirname(const char* s,FuriString* d){(void)s;set_text(d,SUBGHZ_APP_FOLDER);}
 void path_extract_filename(FuriString* s,FuriString* n,bool no_ext){
@@ -124,19 +133,21 @@ size_t strlcpy(char* d,const char* s,size_t n){
 }
 void subghz_scene_save_name_text_input_callback(void* context){(void)context;assert(false);}
 void text_input_set_header_text(TextInput* input,const char* s){(void)input;assert(!strcmp(s,"Name signal"));}
-void text_input_set_result_callback(TextInput* input,void (*cb)(void*),void* context,char* name,size_t cap,bool clear){
+#define text_input_set_result_callback record_text_input
+void record_text_input(TextInput* input,void (*cb)(void*),void* context,char* name,size_t cap,bool clear){
  (void)input;(void)cb;SubGhz* s=context;
  assert(cap==sizeof(s->file_name_tmp)&&name==s->file_name_tmp);
  /* Only inspect the bounded copy: don't pass an unverified buffer to a reader. */
  assert(memchr(name,0,cap)!=NULL);
  assert(!strcmp(s->file_path->text,SUBGHZ_APP_FOLDER));
- if(original[0]){
-  assert(!clear&&!strcmp(s->file_path_tmp->text,original));
+ if(original[0])assert(!strcmp(s->file_path_tmp->text,original));
+ if(expected_prefill){
+  assert(clear&&!strcmp(name,expected_prefill));
+ }else{
+  assert(original[0]&&!clear);
   size_t len=strlen(strrchr(original,'/')+1)-4;
   if(len>=cap)len=cap-1;
   assert(strlen(name)==len&&!memcmp(name,strrchr(original,'/')+1,len));
- }else{
-  assert(clear&&!strcmp(name,"New signal"));
  }
  assert(s->guard==0x1471);copied++;
 }
@@ -205,6 +216,14 @@ int main(void){
  text_input_set_result_callback(&input,NULL,NULL,label,0,false);
  assert(!model.text_buffer&&!model.text_buffer_size&&!model.cursor_pos);
  assert(!strcmp(label,"Entry"));
+ char limited[4]={'A','B','C','D'};
+ text_input_set_result_callback(&input,NULL,NULL,limited,sizeof(limited),false);
+ assert(model.cursor_pos==3 && !strcmp(limited,"ABC"));
+ char single='A';
+ text_input_set_result_callback(&input,NULL,NULL,&single,1,false);
+ assert(!model.cursor_pos && !single);
+ text_input_set_result_callback(&input,NULL,NULL,NULL,8,false);
+ assert(!model.text_buffer && !model.text_buffer_size && !model.cursor_pos);
  return 0;
 }
 ''')
@@ -219,11 +238,15 @@ int main(void){
         source = (ROOT / directory / "scenes/subghz_scene_save_name.c").read_text()
         header = (ROOT / directory / "subghz_i.h").read_text()
         limit = re.search(r"(?m)^#define SUBGHZ_MAX_LEN_NAME\s+(\d+)$", header).group(1)
+        variant = "arf" if directory.startswith("applications_user") else "standard"
         run_c("#define SUBGHZ_MAX_LEN_NAME " + limit + "\n" + RENAME_SUPPORT
+              + f"\n#define RENAME_ARF {int(variant == 'arf')}\n"
+              + f"\n#define subghz_scene_save_name_on_enter subghz_save_name_{variant}\n"
               + function(source, "void subghz_scene_save_name_on_enter(") + r'''
 int main(void){
- FuriString path={0},backup={0};TextInput input=0;
- SubGhz s={.text_input=&input,.file_path=&path,.file_path_tmp=&backup,.guard=0x1471};
+ FuriString path={0},backup={0};TextInput input=0;LastSettings settings={0};
+ SubGhz s={.text_input=&input,.file_path=&path,.file_path_tmp=&backup,.guard=0x1471,
+           .last_settings=&settings};
  const size_t lengths[]={5,SUBGHZ_MAX_LEN_NAME-1,SUBGHZ_MAX_LEN_NAME,SUBGHZ_MAX_LEN_NAME+11};
  for(size_t i=0;i<sizeof(lengths)/sizeof(lengths[0]);i++){
   char filename[192];memset(filename,'A',lengths[i]);filename[lengths[i]]=0;
@@ -231,8 +254,19 @@ int main(void){
   set_text(&path,original);memset(s.file_name_tmp,'!',sizeof(s.file_name_tmp));
   subghz_scene_save_name_on_enter(&s);
  }
- original[0]=0;set_text(&path,SUBGHZ_APP_FOLDER);subghz_scene_save_name_on_enter(&s);
- assert(entered==5&&copied==5);return 0;
+ raw_state=SubGhzCustomEventManagerSetRAW;expected_prefill="RAW";
+ set_text(&path,original);subghz_scene_save_name_on_enter(&s);
+ raw_state=1;expected_prefill=NULL;
+ set_text(&path,original);subghz_scene_save_name_on_enter(&s);
+ raw_state=0;original[0]=0;
+ for(unsigned i=0;i<5;i++){
+  protocol_available=i>0;settings.protocol_file_names=i>1;
+  protocol.name=i==2?"":"Demo";save_state=i==4?1:0;
+  expected_prefill=i==3||(RENAME_ARF&&i==4)?"Demo":"New signal";s.save_datetime_set=i==3;
+  set_text(&path,SUBGHZ_APP_FOLDER);subghz_scene_save_name_on_enter(&s);
+  assert(!s.save_datetime_set);
+ }
+ assert(entered==11&&copied==11);return 0;
 }
 ''')
 

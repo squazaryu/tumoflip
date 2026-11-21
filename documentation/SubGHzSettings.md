@@ -30,10 +30,12 @@ if you need your custom one, make sure it doesn't listed here
     314350000,
     314980000,
     315000000,
+    317000000,
     318000000,
     320000000,
     320150000,
     330000000,
+    336100000,
     345000000,
     348000000,
     350000000,
@@ -67,6 +69,7 @@ if you need your custom one, make sure it doesn't listed here
 
     /* 779 - 928 */
     779000000,
+    868000000,
     868350000,
     868400000,
     868460000,
