@@ -108,6 +108,13 @@ visually, on the device.
 
 ## Controls
 
+In Tumoflip, open a saved RAW capture in Sub-GHz and choose **More → Edit RAW**.
+The matching FW Packages editor 1.9 opens that exact capture without a second
+file picker. This shortcut is for saved RAW captures under `/ext/subghz`, not
+unsaved recordings or decoded key files. It opens the source for reading only;
+**Save** writes a new file, and **Back** closes the editor and returns to
+Sub-GHz. Launching the app directly still opens the same menu and file browser.
+
 | Button       | Action                                          |
 |--------------|-------------------------------------------------|
 | Left / Right | Move the active cut marker (hold = move faster) |
