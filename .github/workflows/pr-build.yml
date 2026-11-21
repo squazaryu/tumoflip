@@ -253,6 +253,9 @@ jobs:
           python3 -m unittest tools.tumoflip.test_upstream_20261119
           python3 -m tools.tumoflip.measure_upstream_20261119
 
+      - name: Validate bounded text entry and ordered receive presets
+        run: python3 -m tools.tumoflip.measure_upstream_20261121
+
       - name: Validate November 16 radio, timing editor and NFC guards
         run: python3 -m unittest tools.tumoflip.test_upstream_20261116 tools.tumoflip.test_manual_parameters tools.tumoflip.test_belkorn_rx tools.tumoflip.test_dea_mio_metadata tools.tumoflip.test_rx_labels_20261116
 
