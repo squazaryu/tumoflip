@@ -55,8 +55,9 @@ void field_links_report(Storage* storage, const DeviceCard* card, FuriString* re
     static const char* const labels[] = {
         "Present", "Missing", "Empty", "Folder", "Not checked",
     };
-    furi_string_printf(report, "Linked files\n%s\n%u/%lu present\n\n", card->name, present,
-                       (unsigned long)card->link_count);
+    furi_string_printf(
+        report, "Linked files\n%s\n%u/%lu present\n", card->name, present,
+        (unsigned long)card->link_count);
     for(unsigned i = 0; i < card->link_count; i++) {
         char label[32] = {0};
         library_action_label(card, i, label, sizeof(label));

@@ -133,7 +133,7 @@ typedef int Storage;
 typedef enum {FSE_OK,FSE_NOT_READY,FSE_NOT_EXIST,FSE_INTERNAL} FS_Error;
 typedef struct {bool directory;uint64_t size;} FileInfo;
 typedef char FuriString[1024];
-static bool sd=true,remove_mid_scan=false;
+static bool sd=true,remove_mid_scan=false,remove_after_scan=false;
 static unsigned stats,status_reads;
 FS_Error storage_sd_status(Storage* storage){assert(storage);status_reads++;return sd?FSE_OK:FSE_NOT_READY;}
 FS_Error storage_common_stat(Storage* storage,const char* path,FileInfo* meta){
@@ -142,6 +142,7 @@ FS_Error storage_common_stat(Storage* storage,const char* path,FileInfo* meta){
     if(strstr(path,"missing"))return FSE_NOT_EXIST;
     if(strstr(path,"error"))return FSE_INTERNAL;
     *meta=(FileInfo){.directory=strstr(path,"folder")!=NULL,.size=strstr(path,"empty")?0:123};
+    if(remove_after_scan&&stats==8)sd=false;
     return FSE_OK;
 }
 bool file_info_is_dir(const FileInfo* meta){return meta->directory;}
@@ -171,13 +172,17 @@ int main(void){
     DeviceCard before=c;
     field_links_report(&storage,&c,&text);
     assert(stats==8&&!memcmp(&c,&before,sizeof(c)));
-    assert(strstr(text,"4/8 present")&&strstr(text,"Present\nLamp")&&strstr(text,"Missing\nmissing.sub"));
+    const char* first_screen="Linked files\nWorkshop\n4/8 present\n1. Present\nLamp\n";
+    assert(!strncmp(text,first_screen,strlen(first_screen))&&strstr(text,"Missing\nmissing.sub"));
     assert(strstr(text,"Empty\nempty.ir")&&strstr(text,"Folder\nfolder")&&strstr(text,"Not checked\nerror.nfc"));
     assert(strstr(text,"Contents not checked")&&strstr(text,"Round unchanged"));
     sd=false;stats=0;field_links_report(&storage,&c,&text);
     assert(!stats&&strstr(text,"SD unavailable")&&!strstr(text,"Missing"));
     sd=true;remove_mid_scan=true;field_links_report(&storage,&c,&text);
     assert(stats==2&&strstr(text,"SD unavailable")&&!strstr(text,"present"));
+    stats=0;sd=true;remove_mid_scan=false;remove_after_scan=true;
+    field_links_report(&storage,&c,&text);
+    assert(stats==8&&strstr(text,"SD unavailable")&&!strstr(text,"present"));
     c.link_count=9;stats=0;field_links_report(&storage,&c,&text);assert(!stats&&strstr(text,"Invalid object"));
     field_links_report(NULL,&c,&text);assert(!stats&&strstr(text,"SD unavailable"));
     field_links_report(&storage,&c,NULL);assert(!stats);
@@ -211,10 +216,81 @@ int main(void){
     field_menu_build(&menu,&s,NULL,NULL);
     assert(menu.action_count==0&&!field_menu_allows(&s,action));
     round.count=1;
+    s.round=NULL;assert(!field_menu_allows(&s,action));s.round=&round;
     for(unsigned p=FieldPageHome;p<=FieldPageInput;p++){
         if(p==FieldPageItem)continue;
         s.page=(FieldPage)p;assert(!field_menu_allows(&s,action));
     }
+    return 0;
+}
+''')
+
+    def test_check_uses_selected_card_and_back_preserves_round(self):
+        source = (APP / "field_tools.c").read_text()
+        event = function(source, "static bool field_tools_event(")
+        self.assertRegex(
+            event, r"else if\(event == FieldCheckLinkedFiles\)\s*\{\s*field_tools_check_links\(app\);"
+        )
+        self.assertLess(event.index("if(!field_menu_allows("), event.index("event == FieldCheckLinkedFiles"))
+        run_c(INCLUDES + "\ntypedef int Storage;\n"
+              + app_source("library_model.h") + app_source("field_round.h") + r'''
+typedef void Submenu;
+''' + app_source("field_menu.h") + r'''
+typedef char FuriString[128];
+typedef struct {
+    Storage* storage;
+    void *text,*thread,*dispatcher;
+    FuriString* message;
+    FieldMenuState state;
+    FieldPage back;
+    FieldRound round;
+    DeviceCard card;
+} FieldTools;
+enum {FieldTextView=1};
+static unsigned reads,reports,views;
+static bool card_available=true;
+static const char* displayed;
+static void field_tools_show(FieldTools* app,FieldPage page){app->state.page=page;}
+static bool library_card_load(Storage* storage,const char* name,DeviceCard* c){
+    assert(storage&&!strcmp(name,"Workshop"));reads++;
+    if(!card_available)return false;
+    strcpy(c->name,name);return true;
+}
+static void field_links_report(Storage* storage,const DeviceCard* c,FuriString* m){
+    assert(storage&&!strcmp(c->name,"Workshop"));reports++;strcpy(*m,"New report");
+}
+static const char* furi_string_get_cstr(const FuriString* s){return *s;}
+static void furi_string_set(FuriString* s,const char* text){assert(text!=*s);strcpy(*s,text);}
+static void text_box_reset(void* text){assert(text);displayed=NULL;}
+static void text_box_set_text(void* text,const char* value){assert(text&&!displayed);displayed=value;}
+static void view_dispatcher_switch_to_view(void* dispatcher,unsigned view){
+    assert(dispatcher&&view==FieldTextView);views++;
+}
+static void view_dispatcher_stop(void* dispatcher){(void)dispatcher;assert(false);}
+static void* furi_thread_get_id(void* thread){(void)thread;return NULL;}
+static void furi_thread_flags_set(void* thread,unsigned flags){(void)thread;(void)flags;assert(false);}
+''' + "\n".join(function(source, sig) for sig in (
+                  "static void field_tools_message(", "static void field_tools_check_links(",
+                  "static bool field_tools_back(",
+              )) + r'''
+int main(void){
+    Storage storage=0;FuriString message={"Stale report"};
+    FieldTools app={.storage=&storage,.text=&storage,.dispatcher=&storage,.message=&message,
+        .state={.page=FieldPageItem,.selected=1},
+        .round={.count=2,.items={{.object="Other"},{.object="Workshop",.result=FieldRoundProblem}}}};
+    app.state.round=&app.round;
+    const FieldRound original=app.round;
+    field_tools_check_links(&app);
+    assert(reads==1&&reports==1&&views==1&&!strcmp(displayed,"New report"));
+    assert(app.state.page==FieldPageMessage&&field_tools_back(&app));
+    assert(app.state.page==FieldPageItem&&app.state.selected==1);
+    card_available=false;
+    field_tools_check_links(&app);
+    assert(reads==2&&reports==1&&views==2&&strstr(displayed,"No files checked"));
+    assert(!strstr(displayed,"New report"));
+    assert(app.state.page==FieldPageMessage&&field_tools_back(&app));
+    assert(app.state.page==FieldPageItem&&app.state.selected==1);
+    assert(!memcmp(&app.round,&original,sizeof(original)));
     return 0;
 }
 ''')

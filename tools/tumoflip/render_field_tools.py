@@ -1,4 +1,4 @@
-"""Production stock-menu constructors at native128x64, not LCD acceptance."""
+"""Production menus and linked-file report at 128x64, not LCD acceptance."""
 import argparse
 from pathlib import Path
 import re
@@ -22,6 +22,25 @@ def build_source():
     source += function((APP / "field_menu.c").read_text(), "static bool field_menu_has_item(")
     source += function((APP / "field_menu.c").read_text(), "void field_menu_build(")
     source += r'''
+enum {FSE_NOT_READY=2,FSE_INTERNAL};
+typedef struct{bool directory;uint64_t size;} FileInfo;
+static bool links_sd_ready=true;
+static FS_Error storage_sd_status(void* storage){assert(storage);return links_sd_ready?FSE_OK:FSE_NOT_READY;}
+static FS_Error field_render_stat(void* storage,const char* path,FileInfo* info){
+ assert(storage&&info);
+ if(strstr(path,"Missing"))return FSE_NOT_EXIST;
+ if(strstr(path,"Read_error"))return FSE_INTERNAL;
+ *info=(FileInfo){.directory=strstr(path,"Folder")!=NULL,.size=strstr(path,"Empty")?0:64};
+ return FSE_OK;
+}
+static bool file_info_is_dir(const FileInfo* info){return info->directory;}
+#define Storage void
+#define storage_common_stat field_render_stat
+'''
+    source += re.sub(r"^#include.*\n", "", (APP / "field_links.c").read_text(), flags=re.M)
+    source += r'''
+#undef storage_common_stat
+#undef Storage
 int main(int argc,char**argv){assert(argc==2);Canvas c={0};screen=&c;static uint8_t buf[1024];
  static const u8x8_display_info_t info={.tile_width=16,.tile_height=8,.pixel_width=128,.pixel_height=64};
  c.fb.u8x8.display_info=&info;u8g2_SetupBuffer(&c.fb,buf,8,u8g2_ll_hvline_vertical_top_lsb,U8G2_R0);canvas_set_color(&c,ColorBlack);
@@ -32,7 +51,7 @@ int main(int argc,char**argv){assert(argc==2);Canvas c={0};screen=&c;static uint
  state.page=FieldPageHome;field_menu_build(&menu,&state,NULL,NULL);render_menu(&c,argv[1],"01-home",&menu,0,0);render_menu(&c,argv[1],"02-home-bottom",&menu,7,5);
  state.page=FieldPageNewConfirm;field_menu_build(&menu,&state,NULL,NULL);render_menu(&c,argv[1],"03-new-round",&menu,1,0);
  state.page=FieldPageRound;field_menu_build(&menu,&state,NULL,NULL);render_menu(&c,argv[1],"04-round",&menu,0,0);render_menu(&c,argv[1],"05-round-bottom",&menu,4,2);
- state.page=FieldPageItem;field_menu_build(&menu,&state,NULL,NULL);render_menu(&c,argv[1],"06-check",&menu,2,0);render_menu(&c,argv[1],"07-check-note",&menu,5,3);
+ state.page=FieldPageItem;field_menu_build(&menu,&state,NULL,NULL);render_menu(&c,argv[1],"06-check",&menu,2,0);render_menu(&c,argv[1],"07-check-note",&menu,6,4);
  strcpy(round.items[0].object,"WWWWWWWWWWWWWWWWWWWWWWWW");state.page=FieldPageRound;field_menu_build(&menu,&state,NULL,NULL);render_menu(&c,argv[1],"08-long-object",&menu,0,0);
  state.page=FieldPageCards;state.count=32;state.more=true;field_menu_build(&menu,&state,NULL,NULL);render_menu(&c,argv[1],"09-export",&menu,0,0);render_menu(&c,argv[1],"10-export-bottom",&menu,32,30);
  state.page=FieldPageBundle;field_menu_build(&menu,&state,NULL,NULL);render_menu(&c,argv[1],"11-verified-package",&menu,1,0);
@@ -48,6 +67,24 @@ int main(int argc,char**argv){assert(argc==2);Canvas c={0};screen=&c;static uint
  strcpy(input,"Office copy");note.header="New object name";note.text_buffer_size=25;note.minimum_length=1;note.cursor_pos=11;
  text_input_view_draw_callback(&c,&note);save(&c,argv[1],"20-import-name");
  text_page(&c,argv[1],"21-old-library","Need Device Library 1.2\nand a readable object.\nUpdate FW Packages.\nRound result unchanged.",0);
+ const char* links[]={"/ext/infrared/Lamp.ir","/ext/nfc/Missing.nfc","/ext/lfrfid/Empty.rfid",
+                      "/ext/nfc/Folder","/ext/infrared/Read_error.ir"};
+ card.link_count=5;
+ for(unsigned i=0;i<card.link_count;i++)strcpy(card.links[i],links[i]);
+ strcpy(card.labels[0],"Office lamp");
+ strcpy(card.labels[1],"Very long selected capture name");
+ FuriString report={0};
+ field_links_report(&card,&card,&report);
+ const char* text=furi_string_get_cstr(&report);
+ text_page(&c,argv[1],"22-links-summary",text,0);
+ text_page(&c,argv[1],"23-links-missing",text,5);
+ text_page(&c,argv[1],"24-links-last",text,100);
+ links_sd_ready=false;
+ field_links_report(&card,&card,&report);
+ text_page(&c,argv[1],"25-sd-unavailable",furi_string_get_cstr(&report),0);
+ links_sd_ready=true;card.link_count=0;
+ field_links_report(&card,&card,&report);
+ text_page(&c,argv[1],"26-no-links",furi_string_get_cstr(&report),0);
  return 0;}
 '''
     return source
@@ -70,8 +107,8 @@ def main():
             raise RuntimeError(built.stderr)
         subprocess.run([str(work / "render"), str(args.output)], check=True)
     frames = sorted(args.output.glob("*.pgm"))
-    if len(frames) != 21:
-        raise RuntimeError(f"Expected 21 frames, got {len(frames)}")
+    if len(frames) != 26:
+        raise RuntimeError(f"Expected 26 frames, got {len(frames)}")
     sheet = Image.new("RGB", (3 * 270, ((len(frames) + 2) // 3) * 155), "#e6e6e6")
     draw = ImageDraw.Draw(sheet)
     for index, path in enumerate(frames):
