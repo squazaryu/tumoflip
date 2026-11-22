@@ -19,6 +19,7 @@ def build_source():
                            ("field_menu.h", "void field_menu_build")):
         source += re.sub(r"^#(?:include|pragma).*\n", "\n", (APP / name).read_text().split(boundary, 1)[0], flags=re.M)
     source += function((APP / "field_round.c").read_text(), "const char* field_round_result_name(")
+    source += function((APP / "field_menu.c").read_text(), "static bool field_menu_has_item(")
     source += function((APP / "field_menu.c").read_text(), "void field_menu_build(")
     source += r'''
 int main(int argc,char**argv){assert(argc==2);Canvas c={0};screen=&c;static uint8_t buf[1024];

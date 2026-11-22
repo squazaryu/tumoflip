@@ -29,6 +29,9 @@
 typedef struct {
     FuriMutex* core2_mtx;
     FuriHalBtStack stack;
+    // The BT service outlives each BleGlue instance.
+    BleGlueKeyStorageChangedCallback key_storage_callback;
+    void* key_storage_context;
 } FuriHalBt;
 
 static FuriHalBt furi_hal_bt = {
@@ -57,6 +60,10 @@ void furi_hal_bt_init(void) {
 
     // Start Core2
     ble_glue_init();
+    if(furi_hal_bt.key_storage_callback) {
+        ble_glue_set_key_storage_changed_callback(
+            furi_hal_bt.key_storage_callback, furi_hal_bt.key_storage_context);
+    }
 }
 
 void furi_hal_bt_lock_core2(void) {
@@ -306,6 +313,8 @@ void furi_hal_bt_set_key_storage_change_callback(
     BleGlueKeyStorageChangedCallback callback,
     void* context) {
     furi_check(callback);
+    furi_hal_bt.key_storage_callback = callback;
+    furi_hal_bt.key_storage_context = context;
     ble_glue_set_key_storage_changed_callback(callback, context);
 }
 

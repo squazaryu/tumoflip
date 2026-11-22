@@ -1,6 +1,11 @@
 #include "field_menu.h"
 #include <stdio.h>
 
+static bool field_menu_has_item(const FieldMenuState* state) {
+    return state->round && state->round->count <= LIBRARY_PINS &&
+           state->selected < state->round->count;
+}
+
 bool field_menu_allows(const FieldMenuState* state, uint32_t action) {
     if(!state || !action) return false;
     switch(state->page) {
@@ -20,9 +25,9 @@ bool field_menu_allows(const FieldMenuState* state, uint32_t action) {
                ((action >= FieldRoundBase && action < FieldRoundBase + state->round->count) ||
                 action == FieldExportRound);
     case FieldPageItem:
-        return state->round && state->selected < state->round->count &&
-               state->round->count <= LIBRARY_PINS && action >= FieldPass &&
-               action <= FieldOpenObject;
+        return field_menu_has_item(state) &&
+               ((action >= FieldPass && action <= FieldOpenObject) ||
+                action == FieldCheckLinkedFiles);
     default:
         return false;
     }
@@ -70,9 +75,13 @@ void field_menu_build(
         break;
     case FieldPageItem:
         submenu_set_header(menu, "Object check");
-        if(state->round && state->selected < state->round->count)
-            FIELD_ROW(state->round->items[state->selected].object, 0);
+        if(!field_menu_has_item(state)) {
+            FIELD_ROW("No selected object", 0);
+            break;
+        }
+        FIELD_ROW(state->round->items[state->selected].object, 0);
         FIELD_ROW("Open object actions", FieldOpenObject);
+        FIELD_ROW("Check linked files", FieldCheckLinkedFiles);
         FIELD_ROW("Mark PASS", FieldPass);
         FIELD_ROW("Mark PROBLEM", FieldProblem);
         FIELD_ROW("Mark SKIPPED", FieldSkip);
