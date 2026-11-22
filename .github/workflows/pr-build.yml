@@ -259,6 +259,9 @@ jobs:
       - name: Validate saved RAW editor handoff and read-only input
         run: python3 -m tools.tumoflip.measure_saved_raw_edit_launch
 
+      - name: Validate BLE key persistence and read-only field link checks
+        run: UBSAN_OPTIONS=halt_on_error=1 python3 -m tools.tumoflip.measure_tumoflip_20261122
+
       - name: Validate November 16 radio, timing editor and NFC guards
         run: python3 -m unittest tools.tumoflip.test_upstream_20261116 tools.tumoflip.test_manual_parameters tools.tumoflip.test_belkorn_rx tools.tumoflip.test_dea_mio_metadata tools.tumoflip.test_rx_labels_20261116
 
