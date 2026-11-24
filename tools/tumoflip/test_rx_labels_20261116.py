@@ -45,11 +45,15 @@ int main(void){
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
+#define KEELOQ_TE_FAST 200u
 typedef struct{char text[64];}FuriString;
 typedef struct{unsigned bits,no_ic;const char*manufacturer;bool ic,has_no_ic,bad_rewind;}FlipperFormat;
 static const char*furi_string_get_cstr(FuriString*s){return s->text;}
 static void furi_string_set_str(FuriString*s,const char*t){snprintf(s->text,sizeof(s->text),"%s",t);}
 static void furi_string_set(FuriString*s,FuriString*t){*s=*t;}
+static bool furi_string_empty(FuriString*s){return !s->text[0];}
+static void furi_string_printf(FuriString*s,const char*fmt,...){va_list ap;va_start(ap,fmt);vsnprintf(s->text,sizeof(s->text),fmt,ap);va_end(ap);}
 static bool flipper_format_rewind(FlipperFormat*f){return !f->bad_rewind;}
 static bool flipper_format_read_uint32(FlipperFormat*f,const char*k,uint32_t*v,unsigned n){assert(n==1);if(!strcmp(k,"Bit")){*v=f->bits;return true;}*v=f->no_ic;return f->has_no_ic;}
 static bool flipper_format_read_string(FlipperFormat*f,const char*k,FuriString*s){assert(!strcmp(k,"Manufacture"));if(!f->manufacturer)return false;furi_string_set_str(s,f->manufacturer);return true;}

@@ -2,6 +2,7 @@
 #include <furi.h>
 #include <flipper_format/flipper_format.h>
 #include <string.h>
+#include "keeloq.h"
 
 // Source-private display adaptation. Stored Protocol/Key and decoder IDs do not
 // change, and no additional resident SDK exports are required by ARF's history.
@@ -9,6 +10,18 @@ static inline void
     subghz_history_name_variant(FuriString* name, FlipperFormat* format, FuriString* scratch) {
     if(!name || !format || !scratch || !flipper_format_rewind(format)) return;
     const char* protocol = furi_string_get_cstr(name);
+    if(strcmp(protocol, "KeeLoq") == 0 || strncmp(protocol, "KL ", 3) == 0) {
+        // Both histories already shorten KeeLoq to "KL <manufacturer>"
+        // before calling this helper. Keep the stored protocol and data intact.
+        uint32_t te = 0;
+        if(flipper_format_read_uint32(format, "TE", &te, 1) && te == KEELOQ_TE_FAST &&
+           flipper_format_rewind(format) &&
+           flipper_format_read_string(format, "Manufacture", scratch) &&
+           !furi_string_empty(scratch)) {
+            furi_string_printf(name, "KL HR %s", furi_string_get_cstr(scratch));
+        }
+        return;
+    }
     if(strcmp(protocol, "Faac SLH") == 0) {
         if(flipper_format_read_string(format, "Manufacture", scratch)) {
             const char* manufacturer = furi_string_get_cstr(scratch);
