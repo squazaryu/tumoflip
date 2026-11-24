@@ -79,7 +79,8 @@ static struct {bool btn_is_available,cnt_is_available;unsigned current_btn,btn_l
 static const struct {uint32_t te_short;} subghz_protocol_keeloq_const={400u};
 static uint32_t subghz_protocol_keeloq_check_remote_controller(Generic*g,void*k,const char**m){(void)g;(void)k;(void)m;return 0;}
 static uint64_t subghz_protocol_blocks_reverse_key(uint64_t v,unsigned n){(void)v;(void)n;return 0;}
-static ProgMode subghz_custom_btn_get_prog_mode(void){return 0;}
+static ProgMode fixture_mode;
+static ProgMode subghz_custom_btn_get_prog_mode(void){return fixture_mode;}
 static void furi_string_cat_printf(FuriString*s,const char*fmt,...){
  va_list ap;va_start(ap,fmt);size_t at=strlen(s->text);vsnprintf(s->text+at,sizeof(s->text)-at,fmt,ap);va_end(ap);
 }
@@ -87,13 +88,15 @@ static void furi_string_cat_printf(FuriString*s,const char*fmt,...){
 int main(void){
  (void)subghz_protocol_keeloq_te_nominal;
  const char* manufacturers[]={"AN-Motors","HCS101","BFT","Erreka","Unknown","Demo","Dea_Mio"};
- for(unsigned i=0;i<sizeof(manufacturers)/sizeof(*manufacturers);i++){
+ for(unsigned mode=0;mode<2;mode++)for(unsigned i=0;i<sizeof(manufacturers)/sizeof(*manufacturers);i++){
+  fixture_mode=mode;
   SubGhzProtocolDecoderKeeloq instance={.generic={.protocol_name="KeeLoq",.data_count_bit=66},.manufacture_name=manufacturers[i]};
   FuriString normal={0},fast={0};
   instance.te=400;subghz_protocol_decoder_keeloq_get_string(&instance,&normal);
   instance.te=200;subghz_protocol_decoder_keeloq_get_string(&instance,&fast);
   assert(strstr(normal.text,"KeeLoq 66bit\r\n")==normal.text);
   assert(strstr(fast.text,"KeeLoq 66b HR\r\n")==fast.text);
+  assert(!strcmp(strchr(normal.text,'\n'),strchr(fast.text,'\n')));
  }
  return 0;
 }
