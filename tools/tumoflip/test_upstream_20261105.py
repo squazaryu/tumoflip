@@ -28,7 +28,8 @@ def timing_helpers(source, selected):
 
 
 def keeloq_declarations(source, helpers):
-    macros = "\n".join(re.findall(r"(?m)^#define KEELOQ_TE_.*$", source))
+    constants = (PROTOCOLS / "keeloq.h").read_text() + "\n" + source
+    macros = "\n".join(re.findall(r"(?m)^#define KEELOQ_TE_.*$", constants))
     return (PRELUDE.replace("uint32_t serial,btn,cnt;", "uint32_t serial,btn,cnt,seed;")
             .replace("unsigned repeat;", "unsigned repeat,front;bool is_running;") + r'''
 #define FURI_LOG_D(...) ((void)0)

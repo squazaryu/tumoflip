@@ -24,6 +24,7 @@ class KeeLoqDisplayTests(unittest.TestCase):
 typedef struct { char text[80]; } FuriString;
 typedef struct { uint32_t te; bool has_te,bad_rewind; const char* manufacturer; } FlipperFormat;
 static const char* furi_string_get_cstr(FuriString* s){return s->text;}
+static bool furi_string_empty(FuriString* s){return !s->text[0];}
 static void furi_string_set_str(FuriString* s,const char* text){snprintf(s->text,sizeof(s->text),"%s",text);}
 static void furi_string_set(FuriString* s,FuriString* value){*s=*value;}
 static void furi_string_printf(FuriString* s,const char* fmt,...){va_list ap;va_start(ap,fmt);vsnprintf(s->text,sizeof(s->text),fmt,ap);va_end(ap);}
