@@ -27,6 +27,7 @@
 #include <lib/subghz/protocols/plugin_registry.h>
 #include <lib/subghz/types.h>
 
+#include "raw_edit_filename_layout.h"
 #include "subghz_raw_edit_icons.h"
 
 #include <stdio.h>
@@ -55,7 +56,7 @@
 #define MERGE_PATH_LEN 128
 #define MERGE_BUF_CHUNK 512
 
-#define APP_VERSION "1.9"
+#define APP_VERSION "1.10"
 #define APP_REPO "github.com/Lechnio/SubGHz-RAW-Edit"
 #define APP_NAME "Sub-GHz RAW Edit"
 
@@ -103,6 +104,8 @@ typedef struct
 {
     SubData sd;
     char basename[48];
+    // Borrowed from the live picker/launch argument until the viewport is removed.
+    const char *display_path;
 
     int32_t view_start;
     int32_t view_end;
@@ -1591,6 +1594,11 @@ static void draw_marker(Canvas *c, int x, bool active)
     }
 }
 
+static size_t raw_edit_measure_label(void *context, const char *text)
+{
+    return canvas_string_width(context, text);
+}
+
 static void draw_cb(Canvas *c, void *ctx)
 {
     App *a = ctx;
@@ -1600,13 +1608,14 @@ static void draw_cb(Canvas *c, void *ctx)
     canvas_set_color(c, ColorBlack);
     canvas_set_font(c, FontSecondary);
 
+    char name_label[64];
     if (a->loading)
     {
-        canvas_draw_str_aligned(c, SCREEN_H_PX, 28, AlignCenter, AlignCenter, "Loading...");
-        char ln[20];
-        strncpy(ln, a->basename, sizeof(ln) - 1);
-        ln[sizeof(ln) - 1] = '\0';
-        canvas_draw_str_aligned(c, 64, 40, AlignCenter, AlignCenter, ln);
+        raw_edit_fit_filename(
+            name_label, sizeof(name_label), a->display_path, SCREEN_W_PX - 8,
+            raw_edit_measure_label, c);
+        canvas_draw_str_aligned(c, SCREEN_W_PX / 2, 28, AlignCenter, AlignCenter, "Loading...");
+        canvas_draw_str_aligned(c, SCREEN_W_PX / 2, 40, AlignCenter, AlignCenter, name_label);
         furi_mutex_release(a->mutex);
         return;
     }
@@ -1618,13 +1627,13 @@ static void draw_cb(Canvas *c, void *ctx)
         return;
     }
 
-    char nm[15];
-    strncpy(nm, a->basename, sizeof(nm) - 1);
-    nm[sizeof(nm) - 1] = '\0';
-    canvas_draw_str(c, 0, FONT_SIZE_PX, nm);
-
     char total_time_str[14];
     fmt_time(a->sd.total_us, total_time_str, sizeof(total_time_str));
+    const size_t name_width =
+        raw_edit_filename_width(SCREEN_W_PX, canvas_string_width(c, total_time_str));
+    raw_edit_fit_filename(
+        name_label, sizeof(name_label), a->display_path, name_width, raw_edit_measure_label, c);
+    canvas_draw_str(c, 0, FONT_SIZE_PX, name_label);
     canvas_draw_str_aligned(c, SCREEN_W_PX - 1, FONT_SIZE_PX, AlignRight, AlignBottom, total_time_str);
 
     for (int x = 0; x < SCREEN_W_PX; x++)
@@ -1987,7 +1996,6 @@ static void run_editor_session(
     App *app,
     bool auto_select)
 {
-    app->loading = false;
     if (auto_select)
     {
         auto_detect(app);
@@ -2003,6 +2011,9 @@ static void run_editor_session(
     recompute_overview(app);
     recompute_activity(app);
     furi_message_queue_reset(queue);
+    furi_mutex_acquire(app->mutex, FuriWaitForever);
+    app->loading = false;
+    furi_mutex_release(app->mutex);
     view_port_update(vp);
 
     bool running = true;
@@ -2184,6 +2195,7 @@ static void run_editor(Storage *storage, DialogsApp *dialogs, const char *reques
         full = furi_string_get_cstr(path);
     }
 
+    app->display_path = full;
     {
         const char *slash = strrchr(full, '/');
         const char *nm = slash ? slash + 1 : full;
@@ -2546,11 +2558,13 @@ static void run_merge(Storage *storage, DialogsApp *dialogs)
 
     recompute_total_us(&app->sd);
     strncpy(app->basename, "merged", sizeof(app->basename) - 1);
+    app->display_path = app->basename;
 
     ViewPort *vp = view_port_alloc();
     FuriMessageQueue *queue = furi_message_queue_alloc(8, sizeof(InputEvent));
     view_port_draw_callback_set(vp, draw_cb, app);
     view_port_input_callback_set(vp, input_cb, queue);
+    app->loading = true;
     gui_add_view_port(gui, vp, GuiLayerFullscreen);
 
     run_editor_session(gui, vp, queue, storage, dialogs, app, false);
