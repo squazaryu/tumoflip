@@ -55,7 +55,11 @@ class Port:
 
     @property
     def in_waiting(self):
-        return len(self.chunks[0][1]) if self.chunks and self.chunks[0][0] <= self.clock.now else 0
+        return (
+            len(self.chunks[0][1])
+            if self.chunks and self.chunks[0][0] <= self.clock.now
+            else 0
+        )
 
     def open(self):
         self.opened = True
@@ -92,22 +96,40 @@ class Port:
 
 def testops_main(clock, factory, resolve):
     tree = ast.parse((ROOT / "scripts/testops.py").read_text())
-    original = next(item for item in tree.body if isinstance(item, ast.ClassDef) and item.name == "Main")
+    original = next(
+        item
+        for item in tree.body
+        if isinstance(item, ast.ClassDef) and item.name == "Main"
+    )
     members = [
-        item for item in original.body
-        if (isinstance(item, ast.FunctionDef) and item.name in {"_get_flipper", "await_flipper"})
-        or (isinstance(item, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == "START_TIMEOUT"
-            for target in item.targets))
+        item
+        for item in original.body
+        if (
+            isinstance(item, ast.FunctionDef)
+            and item.name in {"_get_flipper", "await_flipper"}
+        )
+        or (
+            isinstance(item, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "START_TIMEOUT"
+                for target in item.targets
+            )
+        )
     ]
-    harness = ast.ClassDef(name="Harness", bases=[], keywords=[], body=members, decorator_list=[])
+    harness = ast.ClassDef(
+        name="Harness", bases=[], keywords=[], body=members, decorator_list=[]
+    )
     code = ast.fix_missing_locations(ast.Module(body=[harness], type_ignores=[]))
     namespace = {
-        "time": clock, "FlipperStorage": factory, "resolve_port": resolve,
+        "__name__": "isolated_testops_wait",
+        "__file__": str(ROOT / "scripts/testops.py"),
+        "time": clock,
+        "FlipperStorage": factory,
+        "resolve_port": resolve,
         "FlipperStorageException": storage_module().FlipperStorageException,
         "Optional": __import__("typing").Optional,
     }
-    exec(compile(code, "isolated_testops_wait", "exec"), namespace)
+    exec(compile(code, str(ROOT / "scripts/testops.py"), "exec"), namespace)
     app = namespace["Harness"]()
     app.args = SimpleNamespace(port="fixture-port", timeout=3)
     app.logger = logging.getLogger("deadline-tests")
@@ -126,7 +148,9 @@ class CLIStartDeadlineTests(unittest.TestCase):
         return self.storage.FlipperStorage("fixture-port"), port
 
     def test_default_start_still_accepts_the_existing_three_phase_handshake(self):
-        flipper, port = self.flipper([(0, b">: "), (0, b"hardware_model: fixture\r\n>: ")])
+        flipper, port = self.flipper(
+            [(0, b">: "), (0, b"hardware_model: fixture\r\n>: ")]
+        )
         flipper.start()
         self.assertTrue(port.opened)
         self.assertEqual(port.writes, [b"device_info\r"])
@@ -142,9 +166,13 @@ class CLIStartDeadlineTests(unittest.TestCase):
         self.assertEqual(port.write_timeout, 60)
 
     def test_all_three_reads_share_one_budget(self):
-        flipper, port = self.flipper([
-            (0.6, b">: "), (1.2, b"hardware_model"), (1.7, b"\r\n>: "),
-        ])
+        flipper, port = self.flipper(
+            [
+                (0.6, b">: "),
+                (1.2, b"hardware_model"),
+                (1.7, b"\r\n>: "),
+            ]
+        )
         with self.assertRaises(self.storage.FlipperStorageException):
             flipper.start(timeout=1.5)
         self.assertAlmostEqual(self.clock.now, 1.5)
@@ -181,6 +209,39 @@ class CLIStartDeadlineTests(unittest.TestCase):
         self.assertEqual(reader.until(">", timeout=0.075), b"ab")
         self.assertAlmostEqual(self.clock.now, 0.15)
 
+    def test_legacy_idle_timeout_still_reports_silence(self):
+        port = Port(self.clock)
+        port.timeout = 0.05
+        with self.assertRaises(self.storage.FlipperStorageException):
+            self.storage.BufferedRead(port).until(">", timeout=0.075)
+        self.assertLessEqual(self.clock.now, 0.1 + 1e-9)
+
+    def test_absolute_deadline_bounds_and_restores_a_none_read_timeout(self):
+        flipper, port = self.flipper()
+        port.timeout = None
+        with self.assertRaises(self.storage.FlipperStorageException):
+            flipper.start(timeout=0.7)
+        self.assertAlmostEqual(self.clock.now, 0.7)
+        self.assertIsNone(port.timeout)
+
+    def test_expired_deadline_does_not_read_the_port(self):
+        port = Port(self.clock)
+        with self.assertRaises(self.storage.FlipperStorageException):
+            self.storage.BufferedRead(port).until(">", deadline=0.0)
+        self.assertEqual(port.read_count, 0)
+
+    def test_write_failure_restores_the_write_timeout(self):
+        flipper, port = self.flipper([(0.6, b">: ")])
+
+        def fail_write(_):
+            self.assertLess(port.write_timeout, 2)
+            raise IOError("fixture write failure")
+
+        port.write = fail_write
+        with self.assertRaises(IOError):
+            flipper.start(timeout=2)
+        self.assertEqual(port.write_timeout, 60)
+
     def test_missing_port_waits_only_the_requested_seconds(self):
         app, _ = testops_main(self.clock, deny_port, lambda *_: None)
         self.assertIsNone(app._get_flipper(timeout=3))
@@ -188,7 +249,9 @@ class CLIStartDeadlineTests(unittest.TestCase):
 
     def test_retries_start_with_a_fresh_port_and_close_each_failure(self):
         created = []
-        app, failure = testops_main(self.clock, lambda *_: None, lambda *_: "fixture-port")
+        app, failure = testops_main(
+            self.clock, lambda *_: None, lambda *_: "fixture-port"
+        )
 
         class Connection:
             def __init__(inner, _):
@@ -216,7 +279,9 @@ class CLIStartDeadlineTests(unittest.TestCase):
     def test_one_silent_attempt_cannot_exceed_the_outer_budget(self):
         closed = []
         budgets = []
-        app, failure = testops_main(self.clock, lambda *_: None, lambda *_: "fixture-port")
+        app, failure = testops_main(
+            self.clock, lambda *_: None, lambda *_: "fixture-port"
+        )
 
         class Connection:
             def __init__(inner, _):
@@ -240,6 +305,28 @@ class CLIStartDeadlineTests(unittest.TestCase):
         app, _ = testops_main(self.clock, deny_port, deny_port)
         self.assertIsNone(app._get_flipper(timeout=0))
         self.assertEqual(self.clock.now, 0)
+
+    def test_await_flipper_closes_successful_connection_and_returns_zero(self):
+        stopped = []
+
+        class Connection:
+            def __init__(self, _):
+                pass
+
+            def start(self, timeout):
+                assert timeout == 3
+
+            def stop(self):
+                stopped.append(True)
+
+        app, _ = testops_main(self.clock, Connection, lambda *_: "fixture-port")
+        self.assertEqual(app.await_flipper(), 0)
+        self.assertEqual(stopped, [True])
+
+    def test_await_flipper_returns_one_after_timeout(self):
+        app, _ = testops_main(self.clock, deny_port, lambda *_: None)
+        self.assertEqual(app.await_flipper(), 1)
+        self.assertAlmostEqual(self.clock.now, 3)
 
 
 if __name__ == "__main__":

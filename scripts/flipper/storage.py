@@ -69,11 +69,22 @@ class BufferedRead:
         self.buffer = bytearray()
         self.stream = stream
 
-    def until(self, eol: str = "\n", cut_eol: bool = True, timeout: float = None):
+    def until(
+        self,
+        eol: str = "\n",
+        cut_eol: bool = True,
+        timeout: float = None,
+        *,
+        deadline: float = None,
+    ):
         eol = eol.encode("ascii")
         # timeout=None keeps the original behavior for reboot/update paths.
-        deadline = None if timeout is None else time.monotonic() + timeout
+        idle_deadline = None if timeout is None else time.monotonic() + timeout
         while True:
+            # An optional absolute CLI-start deadline does not slide when
+            # unrelated log bytes arrive. Existing copy timeouts remain idle based.
+            if deadline is not None and time.monotonic() >= deadline:
+                raise FlipperStorageException("Timed out waiting for Flipper CLI")
             # search in buffer
             i = self.buffer.find(eol)
             if i >= 0:
@@ -86,13 +97,26 @@ class BufferedRead:
 
             # read and append to buffer
             i = max(1, self.stream.in_waiting)
-            data = self.stream.read(i)
-            self.buffer.extend(data)
             if deadline is None:
+                data = self.stream.read(i)
+            else:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise FlipperStorageException("Timed out waiting for Flipper CLI")
+                read_timeout = self.stream.timeout
+                self.stream.timeout = (
+                    remaining if read_timeout is None else min(read_timeout, remaining)
+                )
+                try:
+                    data = self.stream.read(i)
+                finally:
+                    self.stream.timeout = read_timeout
+            self.buffer.extend(data)
+            if idle_deadline is None:
                 continue
             if data:
-                deadline = time.monotonic() + timeout
-            elif time.monotonic() > deadline:
+                idle_deadline = time.monotonic() + timeout
+            elif time.monotonic() > idle_deadline:
                 raise FlipperStorageException(
                     f"Timed out after {timeout:.0f}s waiting for "
                     f"{eol!r} from Flipper (CLI/RPC hung)"
@@ -120,16 +144,35 @@ class FlipperStorage:
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
 
-    def start(self):
+    def start(self, timeout: float = None):
+        if timeout is not None and (not math.isfinite(timeout) or timeout <= 0):
+            raise ValueError("CLI start timeout must be finite and positive")
+        deadline = None if timeout is None else time.monotonic() + timeout
         self.port.open()
-        time.sleep(0.5)
-        self.read.until(self.CLI_PROMPT)
+        settle = (
+            0.5 if deadline is None else min(0.5, max(0.0, deadline - time.monotonic()))
+        )
+        time.sleep(settle)
+        self.read.until(self.CLI_PROMPT, deadline=deadline)
         self.port.reset_input_buffer()
         # Send a command with a known syntax to make sure the buffer is flushed
-        self.send("device_info\r")
-        self.read.until("hardware_model")
-        # And read buffer until we get prompt
-        self.read.until(self.CLI_PROMPT)
+        write_timeout = self.port.write_timeout
+        try:
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise FlipperStorageException("Timed out waiting for Flipper CLI")
+                self.port.write_timeout = (
+                    remaining
+                    if write_timeout is None
+                    else min(write_timeout, remaining)
+                )
+            self.send("device_info\r")
+            self.read.until("hardware_model", deadline=deadline)
+            # And read buffer until we get prompt
+            self.read.until(self.CLI_PROMPT, deadline=deadline)
+        finally:
+            self.port.write_timeout = write_timeout
 
     def stop(self) -> None:
         self.port.close()
