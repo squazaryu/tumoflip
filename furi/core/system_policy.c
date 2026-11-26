@@ -53,53 +53,75 @@ TumoSystemState furi_system_policy_snapshot(void) {
     return snapshot;
 }
 
-bool furi_system_policy_acquire(TumoSystemActivity activity) {
+typedef enum {
+    PolicyAcquire,
+    PolicyRelease,
+    PolicyTransfer,
+    PolicyApplication,
+    PolicyDisplay,
+    PolicyAllowPreview,
+    PolicyQuiesce,
+} PolicyChange;
+
+/* Share the transaction boundary, including exactly one out-of-lock notification.
+ * Keeping this out of line avoids seven copies of the same core bookkeeping. */
+static __attribute__((noinline)) bool policy_change(PolicyChange change, uint32_t value) {
     FURI_CRITICAL_ENTER();
     ensure_initialized();
     uint32_t before = signature();
-    tumo_system_model_expire(&policy, furi_get_tick());
-    bool result = tumo_system_model_acquire(&policy, activity);
+    bool result = true;
+    switch(change) {
+    case PolicyAcquire:
+        tumo_system_model_expire(&policy, furi_get_tick());
+        result = tumo_system_model_acquire(&policy, value);
+        break;
+    case PolicyRelease:
+        tumo_system_model_release(&policy, value);
+        break;
+    case PolicyTransfer:
+        result =
+            tumo_system_model_transfer(&policy, value, furi_get_tick(), furi_ms_to_ticks(30000));
+        break;
+    case PolicyApplication:
+        policy.foreground = value;
+        break;
+    case PolicyDisplay:
+        policy.display_on = value;
+        break;
+    case PolicyAllowPreview:
+        tumo_system_model_expire(&policy, furi_get_tick());
+        result = policy.closing == TumoSystemNotClosing;
+        if(result) policy.phone_allowed = true;
+        break;
+    case PolicyQuiesce:
+        result =
+            tumo_system_model_quiesce(&policy, value, furi_get_tick(), furi_ms_to_ticks(5000));
+        if(result && value == TumoSystemRestart) tumoflip_crash_journal_clear_boot_streak();
+        break;
+    }
     FURI_CRITICAL_EXIT();
     notify(before);
     return result;
+}
+
+bool furi_system_policy_acquire(TumoSystemActivity activity) {
+    return policy_change(PolicyAcquire, activity);
 }
 
 void furi_system_policy_release(TumoSystemActivity activity) {
-    FURI_CRITICAL_ENTER();
-    ensure_initialized();
-    uint32_t before = signature();
-    tumo_system_model_release(&policy, activity);
-    FURI_CRITICAL_EXIT();
-    notify(before);
+    policy_change(PolicyRelease, activity);
 }
 
 bool furi_system_policy_transfer(bool active) {
-    FURI_CRITICAL_ENTER();
-    ensure_initialized();
-    uint32_t before = signature();
-    bool result =
-        tumo_system_model_transfer(&policy, active, furi_get_tick(), furi_ms_to_ticks(30000));
-    FURI_CRITICAL_EXIT();
-    notify(before);
-    return result;
+    return policy_change(PolicyTransfer, active);
 }
 
 void furi_system_policy_application(bool active) {
-    FURI_CRITICAL_ENTER();
-    ensure_initialized();
-    uint32_t before = signature();
-    policy.foreground = active;
-    FURI_CRITICAL_EXIT();
-    notify(before);
+    policy_change(PolicyApplication, active);
 }
 
 void furi_system_policy_display(bool on) {
-    FURI_CRITICAL_ENTER();
-    ensure_initialized();
-    uint32_t before = signature();
-    policy.display_on = on;
-    FURI_CRITICAL_EXIT();
-    notify(before);
+    policy_change(PolicyDisplay, on);
 }
 
 void furi_system_policy_listen(void (*callback)(void*), void* context) {
@@ -110,36 +132,16 @@ void furi_system_policy_listen(void (*callback)(void*), void* context) {
     FURI_CRITICAL_EXIT();
 }
 
-static bool quiesce(TumoSystemBarrier reason) {
-    FURI_CRITICAL_ENTER();
-    ensure_initialized();
-    uint32_t before = signature();
-    bool result =
-        tumo_system_model_quiesce(&policy, reason, furi_get_tick(), furi_ms_to_ticks(5000));
-    if(result && reason == TumoSystemRestart) tumoflip_crash_journal_clear_boot_streak();
-    FURI_CRITICAL_EXIT();
-    notify(before);
-    return result;
-}
-
 bool furi_system_policy_pause_phone_preview(void) {
-    return quiesce(TumoSystemPhoneDisconnect);
+    return policy_change(PolicyQuiesce, TumoSystemPhoneDisconnect);
 }
 
 bool furi_system_policy_prepare_normal_restart(void) {
-    return quiesce(TumoSystemRestart);
+    return policy_change(PolicyQuiesce, TumoSystemRestart);
 }
 
 bool furi_system_policy_allow_phone_preview(void) {
-    FURI_CRITICAL_ENTER();
-    ensure_initialized();
-    uint32_t before = signature();
-    tumo_system_model_expire(&policy, furi_get_tick());
-    bool result = policy.closing == TumoSystemNotClosing;
-    if(result) policy.phone_allowed = true;
-    FURI_CRITICAL_EXIT();
-    notify(before);
-    return result;
+    return policy_change(PolicyAllowPreview, 0);
 }
 
 bool furi_system_policy_is_recovery(void) {

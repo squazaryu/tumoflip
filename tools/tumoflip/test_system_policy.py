@@ -168,6 +168,12 @@ int main(int argc,char**argv) {
         assert(tumoflip_crash_journal_read(&report) && report.sequence==2);
     } else {
         furi_system_policy_listen(changed,&callbacks);
+        furi_system_policy_application(true);
+        assert(furi_system_policy_snapshot().foreground);
+        furi_system_policy_application(false);
+        assert(!furi_system_policy_snapshot().foreground);
+        assert(furi_system_policy_transfer(true) && furi_system_policy_snapshot().transfer);
+        assert(furi_system_policy_transfer(false) && !furi_system_policy_snapshot().transfer);
         assert(furi_system_policy_acquire(TumoSystemPhonePreview));
         furi_system_policy_display(false);
         assert(!tumo_system_model_quiet(&(TumoSystemState){.phone_previews=1}));
