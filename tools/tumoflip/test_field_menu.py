@@ -21,7 +21,8 @@ int main(void){
  assert(field_menu_allows(&state,FieldStartRound));assert(!field_menu_allows(&state,FieldPass));
  state.page=FieldPageRound;field_menu_build(&menu,&state,NULL,NULL);
  assert(field_menu_allows(&state,FieldRoundBase));assert(!field_menu_allows(&state,FieldRoundBase+1));
- assert(!field_menu_allows(&state,FieldImport));assert(strstr(menu.rows[0],"PENDING"));
+ assert(!field_menu_allows(&state,FieldImport));assert(menu.actions[0]==FieldNextPending);
+ assert(strstr(menu.rows[1],"PENDING"));
  state.page=FieldPageItem;state.selected=0;field_menu_build(&menu,&state,NULL,NULL);
  assert(field_menu_allows(&state,FieldPass)&&field_menu_allows(&state,FieldProblem)&&field_menu_allows(&state,FieldSkip));
  state.selected=1;assert(!field_menu_allows(&state,FieldPass));
