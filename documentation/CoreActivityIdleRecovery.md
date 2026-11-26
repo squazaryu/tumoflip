@@ -84,6 +84,21 @@ persistent streak but keeps this boot in recovery until an explicit restart.
   Section gap 80 bytes, erase-aligned gap **0**, below the release workflow's
   unchanged 4096-byte minimum. It must not be published as release-ready.
 
+The same checkout was also built at the pre-feature source `532eb8ea1c`
+without altering that branch: 876512 binary bytes, 4128 section-gap bytes,
+4096 erase-aligned gap bytes and 7624 BSS bytes. The initial feature version
+therefore adds 4048 flash bytes and 40 static-RAM bytes. Dynamic View/queue
+allocations require later hardware measurement; they are not included in BSS.
+
+Two isolated compiler experiments (`-Oz`, then `-Oz` plus
+`-fno-inline-small-functions` at LTO link) produced the same section sizes as
+the feature `-Os` build. They do **not** constitute a size fix. Their option,
+build-script changes and temporary flag-contract tests were removed; normal
+compiler flags, FAP/updater policy and the 4096-byte release gate are unchanged.
+The functional work is implemented, but another measured size reduction is
+needed before a release candidate can pass all gates. No installable release
+is claimed by this document.
+
 No hardware was connected/tested, installed or flashed; no external branch,
 PR, issue, tag, catalogue, release or simulator was changed by this task.
 
