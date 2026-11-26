@@ -141,9 +141,17 @@ static void edges_case(void){
  panel.mode=DesktopModeDashboard;assert(desktop_panel_store(&panel)&&panel.generation==1);
  assert(desktop_panel_load(&read)&&read.generation==1&&read.mode==DesktopModeDashboard);
 }
+static void confirm_case(void){
+ DesktopSettings old=wallpaper();DesktopPanelSettings panel,stale;
+ desktop_panel_defaults(&panel,&old);assert(desktop_panel_store(&panel));
+ unsigned count=writes;assert(desktop_panel_store(&panel)&&writes==count&&panel.generation==1);
+ panel.mode=DesktopModeDashboard;stale=panel;assert(desktop_panel_store(&panel)&&panel.generation==2);
+ count=writes;assert(desktop_panel_store(&stale)&&stale.generation==2&&writes==count);
+}
 int main(int argc,char**argv){assert(argc==2);
  if(!strcmp(argv[1],"defaults"))defaults_case();else if(!strcmp(argv[1],"banks"))banks_case();
- else if(!strcmp(argv[1],"cuts"))cuts_case();else if(!strcmp(argv[1],"edges"))edges_case();else motion_case();
+ else if(!strcmp(argv[1],"cuts"))cuts_case();else if(!strcmp(argv[1],"edges"))edges_case();
+ else if(!strcmp(argv[1],"confirm"))confirm_case();else motion_case();
  return 0;
 }
 '''
@@ -183,6 +191,9 @@ class DesktopPanelTests(unittest.TestCase):
 
     def test_crc_schema_validation_and_generation_wraparound(self):
         self.run_case("edges")
+
+    def test_retry_confirms_identical_data_without_another_write(self):
+        self.run_case("confirm")
 
 
 if __name__ == "__main__":
