@@ -23,6 +23,9 @@ bool field_round_mark(
     const char* note,
     uint32_t timestamp);
 bool field_round_complete(const FieldRound* round);
+/** Read-only navigation. Invalid input leaves the output parameter unchanged. */
+bool field_round_pending_count(const FieldRound* round, unsigned* pending);
+bool field_round_next_pending(const FieldRound* round, unsigned start, unsigned* selected);
 bool field_round_load(Storage* storage, FieldRound* round);
 bool field_round_save(Storage* storage, const FieldRound* round);
 bool field_round_export(Storage* storage, const FieldRound* round, char* path, size_t size);

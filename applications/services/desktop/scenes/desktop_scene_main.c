@@ -178,6 +178,11 @@ void desktop_scene_main_callback(DesktopEvent event, void* context) {
     view_dispatcher_send_custom_event(desktop->view_dispatcher, event);
 }
 
+static void desktop_scene_main_start_shortcut(Desktop* desktop, FavoriteAppShortcut shortcut) {
+    FavoriteApp* target = desktop_favorite(desktop, shortcut);
+    if(target) desktop_scene_main_start_favorite(desktop, target);
+}
+
 void desktop_scene_main_on_enter(void* context) {
     Desktop* desktop = (Desktop*)context;
     DesktopMainView* main_view = desktop->main_view;
@@ -194,6 +199,7 @@ void desktop_scene_main_on_enter(void* context) {
     desktop_main_set_callback(main_view, desktop_scene_main_callback, desktop);
 
     view_dispatcher_switch_to_view(desktop->view_dispatcher, DesktopViewIdMain);
+    desktop_policy_changed(desktop);
 }
 
 bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
@@ -241,28 +247,23 @@ bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
         }
 
         case DesktopMainEventOpenFavoriteLeftShort:
-            desktop_scene_main_start_favorite(
-                desktop, &desktop->settings.favorite_apps[FavoriteAppLeftShort]);
+            desktop_scene_main_start_shortcut(desktop, FavoriteAppLeftShort);
             consumed = true;
             break;
         case DesktopMainEventOpenFavoriteLeftLong:
-            desktop_scene_main_start_favorite(
-                desktop, &desktop->settings.favorite_apps[FavoriteAppLeftLong]);
+            desktop_scene_main_start_shortcut(desktop, FavoriteAppLeftLong);
             consumed = true;
             break;
         case DesktopMainEventOpenFavoriteRightShort:
-            desktop_scene_main_start_favorite(
-                desktop, &desktop->settings.favorite_apps[FavoriteAppRightShort]);
+            desktop_scene_main_start_shortcut(desktop, FavoriteAppRightShort);
             consumed = true;
             break;
         case DesktopMainEventOpenFavoriteRightLong:
-            desktop_scene_main_start_favorite(
-                desktop, &desktop->settings.favorite_apps[FavoriteAppRightLong]);
+            desktop_scene_main_start_shortcut(desktop, FavoriteAppRightLong);
             consumed = true;
             break;
         case DesktopMainEventOpenFavoriteOkLong:
-            desktop_scene_main_start_favorite(
-                desktop, &desktop->settings.favorite_apps[FavoriteAppOkLong]);
+            desktop_scene_main_start_shortcut(desktop, FavoriteAppOkLong);
             consumed = true;
             break;
 
@@ -275,7 +276,8 @@ bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
             consumed = true;
             break;
         case DesktopAnimationEventInteractAnimation:
-            if(!animation_manager_interact_process(desktop->animation_manager)) {
+            if(desktop->panel.mode == DesktopModeWallpaper &&
+               !animation_manager_interact_process(desktop->animation_manager)) {
                 desktop_scene_main_open_app_or_profile(
                     desktop, &desktop->settings.favorite_apps[FavoriteAppRightShort]);
             }
@@ -302,4 +304,5 @@ void desktop_scene_main_on_exit(void* context) {
     animation_manager_set_check_callback(desktop->animation_manager, NULL);
     animation_manager_set_interact_callback(desktop->animation_manager, NULL);
     animation_manager_set_context(desktop->animation_manager, desktop);
+    desktop_policy_changed(desktop);
 }

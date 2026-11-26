@@ -1,6 +1,7 @@
 #include <gui/view_stack.h>
 #include <stdint.h>
 #include <furi.h>
+#include <furi/core/system_policy_i.h>
 #include <furi_hal.h>
 #include <dolphin/dolphin.h>
 #include <power/power_service/power.h>
@@ -53,6 +54,8 @@ struct AnimationManager {
     ViewStack* view_stack;
     DesktopProfile* desktop_profile;
     size_t profile_sequential_index;
+    uint32_t paused_idle_ticks;
+    bool quiet;
 
     bool blocking_shown_url       : 1;
     bool blocking_shown_sd_bad    : 1;
@@ -89,6 +92,33 @@ static uint32_t animation_manager_get_idle_duration(
     const BubbleAnimation* animation);
 static void animation_manager_switch_to_one_shot_view(AnimationManager* animation_manager);
 static void animation_manager_switch_to_animation_view(AnimationManager* animation_manager);
+
+static void animation_manager_idle_start(AnimationManager* manager, uint32_t ticks) {
+    manager->paused_idle_ticks = ticks ? ticks : 1;
+    if(!manager->quiet)
+        furi_timer_start(manager->idle_animation_timer, manager->paused_idle_ticks);
+}
+
+void animation_manager_set_quiet(AnimationManager* manager, bool quiet) {
+    if(manager->quiet == quiet) return;
+    manager->quiet = quiet;
+    bubble_animation_set_quiet(manager->animation_view, quiet);
+    if(quiet) {
+        if(furi_timer_is_running(manager->idle_animation_timer)) {
+            const int32_t left =
+                furi_timer_get_expire_time(manager->idle_animation_timer) - furi_get_tick();
+            manager->paused_idle_ticks = left > 0 ? (uint32_t)left : 1;
+        }
+        furi_timer_stop(manager->idle_animation_timer);
+        furi_timer_stop(manager->profile_reload_timer);
+    } else {
+        if(manager->state == AnimationManagerStateIdle)
+            animation_manager_idle_start(manager, manager->paused_idle_ticks);
+        if(manager->profile_reload_pending)
+            furi_timer_start(
+                manager->profile_reload_timer, furi_ms_to_ticks(PROFILE_RELOAD_DEBOUNCE_MS));
+    }
+}
 
 void animation_manager_set_context(AnimationManager* animation_manager, void* context) {
     furi_assert(animation_manager);
@@ -137,8 +167,10 @@ static void animation_manager_storage_callback(const void* message, void* contex
             break;
         }
         animation_manager->profile_reload_pending = true;
-        furi_timer_start(
-            animation_manager->profile_reload_timer, furi_ms_to_ticks(PROFILE_RELOAD_DEBOUNCE_MS));
+        if(!animation_manager->quiet)
+            furi_timer_start(
+                animation_manager->profile_reload_timer,
+                furi_ms_to_ticks(PROFILE_RELOAD_DEBOUNCE_MS));
         break;
 
     default:
@@ -189,6 +221,7 @@ static void animation_manager_interact_callback(void* context) {
 /* reaction to animation_manager->check_blocking_callback() */
 void animation_manager_check_blocking_process(AnimationManager* animation_manager) {
     furi_assert(animation_manager);
+    if(animation_manager->quiet) return;
 
     const bool profile_changed = animation_manager_reload_profile(animation_manager);
 
@@ -214,6 +247,7 @@ void animation_manager_check_blocking_process(AnimationManager* animation_manage
 /* reaction to animation_manager->new_idle_callback() */
 void animation_manager_new_idle_process(AnimationManager* animation_manager) {
     furi_assert(animation_manager);
+    if(animation_manager->quiet) return;
 
     if(animation_manager->state == AnimationManagerStateIdle) {
         animation_manager_reload_profile(animation_manager);
@@ -258,13 +292,14 @@ static void animation_manager_start_new_idle(AnimationManager* animation_manager
     const BubbleAnimation* bubble_animation =
         animation_storage_get_bubble_animation(animation_manager->current_animation);
     animation_manager->state = AnimationManagerStateIdle;
-    furi_timer_start(
-        animation_manager->idle_animation_timer,
+    animation_manager_idle_start(
+        animation_manager,
         animation_manager_get_idle_duration(animation_manager, bubble_animation) * 1000);
 }
 
 static bool animation_manager_check_blocking(AnimationManager* animation_manager) {
     furi_assert(animation_manager);
+    if(furi_system_policy_is_recovery()) return false;
 
     StorageAnimation* blocking_animation = NULL;
     Storage* storage = furi_record_open(RECORD_STORAGE);
@@ -339,7 +374,9 @@ static void animation_manager_replace_current_animation(
 
 AnimationManager* animation_manager_alloc(void) {
     AnimationManager* animation_manager = malloc(sizeof(AnimationManager));
-    animation_manager->desktop_profile = desktop_profile_load();
+    animation_manager->quiet = furi_system_policy_is_recovery();
+    animation_manager->paused_idle_ticks = 1;
+    animation_manager->desktop_profile = animation_manager->quiet ? NULL : desktop_profile_load();
     animation_manager->profile_sequential_index = 0;
     animation_manager->profile_read_in_progress = false;
     animation_manager->profile_reload_pending = false;
@@ -347,6 +384,7 @@ AnimationManager* animation_manager_alloc(void) {
     animation_manager->retained_animation = false;
     animation_manager->freezed_animation = NULL;
     animation_manager->animation_view = bubble_animation_view_alloc();
+    bubble_animation_set_quiet(animation_manager->animation_view, animation_manager->quiet);
     animation_manager->view_stack = view_stack_alloc();
     View* animation_view = bubble_animation_get_view(animation_manager->animation_view);
     view_stack_add_view(animation_manager->view_stack, animation_view);
@@ -465,6 +503,7 @@ static bool animation_manager_is_idle_candidate(
 
 static bool animation_manager_reload_profile(AnimationManager* animation_manager) {
     furi_assert(animation_manager);
+    if(animation_manager->quiet || furi_system_policy_is_recovery()) return false;
 
     if(!animation_manager->profile_reload_pending) return false;
 
@@ -616,6 +655,8 @@ static StorageAnimation* animation_manager_select_weighted(
 
 static StorageAnimation*
     animation_manager_select_idle_animation(AnimationManager* animation_manager) {
+    if(furi_system_policy_is_recovery())
+        return animation_storage_find_animation(HARDCODED_ANIMATION_NAME);
     StorageAnimationList_t animation_list;
     StorageAnimationList_init(animation_list);
     animation_storage_fill_animation_list(&animation_list);
@@ -819,12 +860,11 @@ void animation_manager_load_and_continue_animation(AnimationManager* animation_m
                     animation_manager->state = AnimationManagerStateIdle;
 
                     if(animation_manager->freezed_animation_time_left) {
-                        furi_timer_start(
-                            animation_manager->idle_animation_timer,
-                            animation_manager->freezed_animation_time_left);
+                        animation_manager_idle_start(
+                            animation_manager, animation_manager->freezed_animation_time_left);
                     } else {
-                        furi_timer_start(
-                            animation_manager->idle_animation_timer,
+                        animation_manager_idle_start(
+                            animation_manager,
                             animation_manager_get_idle_duration(animation_manager, animation) *
                                 1000);
                     }

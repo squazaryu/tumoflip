@@ -59,6 +59,7 @@ if ENV["LTO"]:
         CCFLAGS=["-flto"],
         LINKFLAGS=["-flto"],
     )
+    ENV.AppendUnique(LINKFLAGS=["-ffunction-sections", "-fdata-sections"])
 
 
 if ENV["FIRMWARE_BUILD_CFG"] == "updater":

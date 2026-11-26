@@ -62,7 +62,7 @@ class DesktopAnimationResumeTest(unittest.TestCase):
             1
         ].split("static size_t bubble_animation_frame_data_size", 1)[0]
         self.assertIn("frame_count > 1U", preview)
-        self.assertIn("furi_timer_start", preview)
+        self.assertIn("bubble_animation_timer_start", preview)
         self.assertIn("model->freeze_frame_index = 0U", preview)
         self.assertIn("model->freeze_frame_index + 1U", timer)
         self.assertIn("++model->freeze_frame_index", timer)
@@ -291,7 +291,7 @@ class DesktopAnimationResumeTest(unittest.TestCase):
             "View* bubble_animation_get_view", 1
         )[0]
         self.assertIn("model->current->icon_animation.frame_rate", resume)
-        self.assertIn("furi_timer_start", resume)
+        self.assertIn("bubble_animation_timer_start", resume)
         self.assertNotIn("model->current_frame =", resume)
 
         restore = manager_source.split(

@@ -55,6 +55,25 @@ bool field_round_complete(const FieldRound* round) {
         if(round->items[i].result == FieldRoundPending) return false;
     return true;
 }
+bool field_round_pending_count(const FieldRound* round, unsigned* pending) {
+    if(!pending || !field_round_valid(round)) return false;
+    unsigned count = 0;
+    for(unsigned i = 0; i < round->count; i++)
+        if(round->items[i].result == FieldRoundPending) count++;
+    *pending = count;
+    return true;
+}
+bool field_round_next_pending(const FieldRound* round, unsigned start, unsigned* selected) {
+    if(!selected || !field_round_valid(round) || start >= round->count) return false;
+    for(unsigned offset = 0; offset < round->count; offset++) {
+        const unsigned index = (start + offset) % round->count;
+        if(round->items[index].result == FieldRoundPending) {
+            *selected = index;
+            return true;
+        }
+    }
+    return false;
+}
 bool field_round_load(Storage* storage, FieldRound* round) {
     return field_record_load(storage, FIELD_ROUNDS, FIELD_ROUND_MAGIC, round, sizeof(*round)) &&
            field_round_valid(round);

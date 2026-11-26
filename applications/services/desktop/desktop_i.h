@@ -2,6 +2,7 @@
 
 #include "desktop.h"
 #include "desktop_settings.h"
+#include "desktop_panel_i.h"
 
 #include "animations/animation_manager.h"
 #include "views/desktop_view_pin_timeout.h"
@@ -10,6 +11,7 @@
 #include "views/desktop_view_main.h"
 #include "views/desktop_view_lock_menu.h"
 #include "views/desktop_view_quick_settings.h"
+#include "views/desktop_view_activity.h"
 #include "views/desktop_view_debug.h"
 #include "views/desktop_view_slideshow.h"
 
@@ -28,6 +30,7 @@ typedef enum {
     DesktopViewIdMain,
     DesktopViewIdLockMenu,
     DesktopViewIdQuickSettings,
+    DesktopViewIdActivity,
     DesktopViewIdLocked,
     DesktopViewIdDebug,
     DesktopViewIdPopup,
@@ -53,6 +56,12 @@ struct Desktop {
     Popup* popup;
     DesktopLockMenuView* lock_menu;
     DesktopQuickSettingsView* quick_settings;
+    DesktopActivityView* activity;
+    DesktopActivityView* dashboard;
+    FuriTimer* dashboard_timer;
+    uint32_t dashboard_period;
+    bool dashboard_mounted;
+    FuriMessageQueue* policy_events;
     DesktopDebugView* debug_view;
     DesktopViewLocked* locked_view;
     DesktopMainView* main_view;
@@ -83,12 +92,19 @@ struct Desktop {
 
     DesktopClock clock;
     DesktopSettings settings;
+    DesktopPanelSettings panel;
 
     bool in_transition;
     bool app_running;
     bool locked;
     bool shortcut_animation_retain_pending;
+    bool quiet;
+    bool recovery_notice_pending;
 };
+
+void desktop_activity_callback(DesktopActivityAction action, void* context);
+void desktop_policy_changed(void* context);
+FavoriteApp* desktop_favorite(Desktop* desktop, FavoriteAppShortcut shortcut);
 
 void desktop_lock(Desktop* desktop);
 void desktop_unlock(Desktop* desktop);

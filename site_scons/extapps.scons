@@ -7,6 +7,14 @@ from SCons.Warnings import warn, WarningOnByDefault
 Import("ENV")
 
 
+def configure_native_fap_lto(env):
+    # GCC otherwise auto-detects LTO even in a fat SDK archive. The FAP loader
+    # and validator need normal machine code/symbols, never compiler IR.
+    env.Replace(**{key: [flag for flag in env[key] if flag not in ("-flto", "-ffat-lto-objects")]
+                   for key in ("CCFLAGS", "CXXFLAGS", "LINKFLAGS")})
+    env.AppendUnique(CCFLAGS=["-fno-lto"], CXXFLAGS=["-fno-lto"], LINKFLAGS=["-fno-lto"])
+
+
 appenv = ENV["APPENV"] = ENV.Clone(
     tools=[
         "fbt_extapps",
@@ -28,6 +36,7 @@ if appenv["LTO"]:
         CXXFLAGS=[flag for flag in appenv["CXXFLAGS"] if flag != "-flto"],
         LINKFLAGS=[flag for flag in appenv["LINKFLAGS"] if flag != "-flto"],
     )
+configure_native_fap_lto(appenv)
 
 appenv.AppendUnique(
     CCFLAGS=[

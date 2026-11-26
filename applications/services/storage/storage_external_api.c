@@ -1,5 +1,6 @@
 #include <core/log.h>
 #include <core/record.h>
+#include <furi/core/system_policy_i.h>
 #include <strings.h>
 #include "storage.h"
 #include "storage_i.h" // IWYU pragma: keep
@@ -76,6 +77,8 @@ static uint64_t storage_file_command_uint64(File* file, StorageCommand command) 
 
 static FS_Error storage_path_command(Storage* storage, const char* path, StorageCommand command) {
     furi_check(storage);
+    /* Both users of this dispatcher mutate directory entries. */
+    if(!furi_system_policy_acquire(TumoSystemWrite)) return FSE_NOT_READY;
 
     S_API_PROLOGUE;
     SAData data = {
@@ -85,16 +88,20 @@ static FS_Error storage_path_command(Storage* storage, const char* path, Storage
         }};
     S_API_MESSAGE(command);
     S_API_EPILOGUE;
+    furi_system_policy_release(TumoSystemWrite);
     return S_RETURN_ERROR;
 }
 
 static FS_Error storage_sd_command(Storage* storage, StorageCommand command) {
     furi_check(storage);
+    const bool mutation = command != StorageCommandSDStatus;
+    if(mutation && !furi_system_policy_acquire(TumoSystemWrite)) return FSE_NOT_READY;
 
     S_API_PROLOGUE;
     SAData data = {};
     S_API_MESSAGE(command);
     S_API_EPILOGUE;
+    if(mutation) furi_system_policy_release(TumoSystemWrite);
     return S_RETURN_ERROR;
 }
 
@@ -143,6 +150,16 @@ bool storage_file_open(
     FS_OpenMode open_mode) {
     furi_check(file);
 
+    if(file->write_tracked) {
+        file->error_id = FSE_ALREADY_OPEN;
+        return false;
+    }
+    const bool writing = access_mode & FSAM_WRITE;
+    if(writing && !furi_system_policy_acquire(TumoSystemWrite)) {
+        file->error_id = FSE_NOT_READY;
+        return false;
+    }
+
     bool result;
     FuriEventFlag* event = furi_event_flag_alloc();
     FuriPubSubSubscription* subscription = furi_pubsub_subscribe(
@@ -161,6 +178,9 @@ bool storage_file_open(
 
     furi_pubsub_unsubscribe(storage_get_pubsub(file->storage), subscription);
     furi_event_flag_free(event);
+
+    file->write_tracked = writing && result;
+    if(writing && !result) furi_system_policy_release(TumoSystemWrite);
 
     FURI_LOG_T(
         TAG,
@@ -186,6 +206,12 @@ bool storage_file_close(File* file) {
         (void*)((uint32_t)file - SRAM_BASE),
         (void*)(file->file_id - SRAM_BASE));
     file->type = FileTypeClosed;
+
+    /* The backend removes the handle even when close reports an I/O error. */
+    if(file->write_tracked) {
+        file->write_tracked = false;
+        furi_system_policy_release(TumoSystemWrite);
+    }
 
     return S_RETURN_BOOL;
 }
@@ -543,6 +569,7 @@ static FS_Error
 
 FS_Error storage_common_rename(Storage* storage, const char* old_path, const char* new_path) {
     furi_check(storage);
+    if(!furi_system_policy_acquire(TumoSystemWrite)) return FSE_NOT_READY;
     FS_Error error;
 
     do {
@@ -588,6 +615,7 @@ FS_Error storage_common_rename(Storage* storage, const char* old_path, const cha
         }
     } while(false);
 
+    furi_system_policy_release(TumoSystemWrite);
     return error;
 }
 
@@ -648,6 +676,7 @@ static FS_Error
 
 FS_Error storage_common_copy(Storage* storage, const char* old_path, const char* new_path) {
     furi_check(storage);
+    if(!furi_system_policy_acquire(TumoSystemWrite)) return FSE_NOT_READY;
 
     FS_Error error;
 
@@ -682,6 +711,7 @@ FS_Error storage_common_copy(Storage* storage, const char* old_path, const char*
         }
     }
 
+    furi_system_policy_release(TumoSystemWrite);
     return error;
 }
 
@@ -748,6 +778,7 @@ static FS_Error
 
 FS_Error storage_common_merge(Storage* storage, const char* old_path, const char* new_path) {
     furi_check(storage);
+    if(!furi_system_policy_acquire(TumoSystemWrite)) return FSE_NOT_READY;
 
     FS_Error error;
     const char* new_path_tmp = NULL;
@@ -813,6 +844,7 @@ FS_Error storage_common_merge(Storage* storage, const char* old_path, const char
 
     furi_string_free(new_path_next);
 
+    furi_system_policy_release(TumoSystemWrite);
     return error;
 }
 
@@ -969,6 +1001,7 @@ File* storage_file_alloc(Storage* storage) {
     File* file = malloc(sizeof(File));
     file->type = FileTypeClosed;
     file->storage = storage;
+    file->write_tracked = false;
 
     FURI_LOG_T(TAG, "File/Dir %p alloc", (void*)((uint32_t)file - SRAM_BASE));
 

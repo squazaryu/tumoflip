@@ -1,5 +1,6 @@
 #include "rpc_i.h"
 #include <gui/gui_i.h>
+#include <furi/core/system_policy_i.h>
 #include <assets_icons.h>
 
 #include <flipper.pb.h>
@@ -67,6 +68,7 @@ typedef struct {
 
     bool virtual_display_not_empty;
     bool is_streaming;
+    TumoSystemActivity stream_activity;
 
     uint32_t input_key_counter[InputKeyMAX];
     uint32_t input_counter;
@@ -143,7 +145,14 @@ static void rpc_system_gui_start_screen_stream_process(const PB_Main* request, v
     if(rpc_gui->is_streaming) {
         rpc_send_and_release_empty(
             session, request->command_id, PB_CommandStatus_ERROR_VIRTUAL_DISPLAY_ALREADY_STARTED);
+    } else if(!furi_system_policy_acquire(
+                  rpc_session_get_owner(session) == RpcOwnerBle ? TumoSystemPhonePreview :
+                                                                  TumoSystemPreview)) {
+        rpc_send_and_release_empty(session, request->command_id, PB_CommandStatus_ERROR_BUSY);
     } else {
+        rpc_gui->stream_activity = rpc_session_get_owner(session) == RpcOwnerBle ?
+                                       TumoSystemPhonePreview :
+                                       TumoSystemPreview;
         rpc_send_and_release_empty(session, request->command_id, PB_CommandStatus_OK);
 
         rpc_gui->is_streaming = true;
@@ -188,6 +197,7 @@ static void rpc_system_gui_stop_screen_stream_process(const PB_Main* request, vo
         pb_release(&PB_Main_msg, rpc_gui->transmit_frame);
         free(rpc_gui->transmit_frame);
         rpc_gui->transmit_frame = NULL;
+        furi_system_policy_release(rpc_gui->stream_activity);
     }
 
     rpc_send_and_release_empty(session, request->command_id, PB_CommandStatus_OK);
@@ -485,6 +495,7 @@ void rpc_system_gui_free(void* context) {
         pb_release(&PB_Main_msg, rpc_gui->transmit_frame);
         free(rpc_gui->transmit_frame);
         rpc_gui->transmit_frame = NULL;
+        furi_system_policy_release(rpc_gui->stream_activity);
     }
     furi_record_close(RECORD_INPUT_EVENTS);
     furi_record_close(RECORD_GUI);

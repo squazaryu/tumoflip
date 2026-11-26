@@ -44,6 +44,8 @@ typedef void (*AnimationManagerInteractCallback)(void*);
  * @return animation manager instance
  */
 AnimationManager* animation_manager_alloc(void);
+/** Pause desktop timers only. Existing frame ownership/handoff stays unchanged. */
+void animation_manager_set_quiet(AnimationManager* animation_manager, bool quiet);
 
 /**
  * Free Animation Manager

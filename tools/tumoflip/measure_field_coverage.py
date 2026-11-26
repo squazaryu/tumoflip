@@ -14,7 +14,8 @@ APP = ROOT / "applications/system/device_library"
 def measure(output):
     output.mkdir(parents=True, exist_ok=True)
     subprocess.run([sys.executable, "-m", "unittest", "tools.tumoflip.test_field_rounds",
-                    "tools.tumoflip.test_field_bundle", "tools.tumoflip.test_field_inventory"],
+                    "tools.tumoflip.test_field_bundle", "tools.tumoflip.test_field_inventory",
+                    "tools.tumoflip.test_field_pending", "tools.tumoflip.test_field_menu"],
                    check=True, cwd=ROOT, env={**os.environ, "TUMO_FIELD_COVERAGE_DIR": str(output.resolve())})
     profile = output / "total.profdata"
     subprocess.run(["xcrun", "llvm-profdata", "merge", "-sparse", *map(str, output.glob("*.profraw")), "-o", str(profile)], check=True)
@@ -30,7 +31,8 @@ def measure(output):
             number, count = map(int, line[3:].split(",")[:2])
             measured_lines[number] = count
     summary = {}
-    for filename in ("field_io.c", "field_round.c", "field_bundle.c", "field_inventory.c"):
+    for filename in ("field_io.c", "field_round.c", "field_bundle.c", "field_inventory.c",
+                     "field_menu.c"):
         production = (APP / filename).read_text()
         functions = [item for item in report["data"][0]["functions"] if re.search(
             r"\b" + re.escape(item["name"].rsplit(":", 1)[-1]) + r"\s*\([^;{}]*\)\s*\{", production)]

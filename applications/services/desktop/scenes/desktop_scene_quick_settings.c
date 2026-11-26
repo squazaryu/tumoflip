@@ -91,6 +91,10 @@ bool desktop_scene_quick_settings_on_event(void* context, SceneManagerEvent even
             scene_manager_previous_scene(desktop->scene_manager);
             consumed = true;
             break;
+        case DesktopQuickSettingsEventActivity:
+            scene_manager_next_scene(desktop->scene_manager, DesktopSceneActivity);
+            consumed = true;
+            break;
         default:
             break;
         }
