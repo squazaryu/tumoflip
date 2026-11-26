@@ -30,8 +30,7 @@ FavoriteApp* desktop_favorite(Desktop* desktop, FavoriteAppShortcut shortcut) {
                &desktop->settings.favorite_apps[shortcut];
 }
 
-static void desktop_reload_panel(Desktop* desktop) {
-    desktop_panel_load(&desktop->panel);
+static void desktop_dashboard_mount(Desktop* desktop) {
     bool dashboard = desktop->panel.mode == DesktopModeDashboard;
     if(dashboard != desktop->dashboard_mounted) {
         View* wallpaper = animation_manager_get_animation_view(desktop->animation_manager);
@@ -41,6 +40,10 @@ static void desktop_reload_panel(Desktop* desktop) {
         view_stack_add_view(desktop->main_view_stack, dashboard ? panel : wallpaper);
         desktop->dashboard_mounted = dashboard;
     }
+}
+
+static void desktop_reload_panel(Desktop* desktop) {
+    desktop_panel_load(&desktop->panel);
     desktop_policy_changed(desktop);
 }
 
@@ -50,8 +53,10 @@ static void desktop_dashboard_callback(DesktopActivityAction action, void* conte
 
 static void
     desktop_dashboard_refresh(Desktop* desktop, const TumoSystemState* state, uint32_t scene) {
-    bool alive = desktop->panel.mode == DesktopModeDashboard && scene == DesktopSceneMain &&
-                 !desktop->locked && !desktop->app_running;
+    const bool main = scene == DesktopSceneMain && !desktop->locked && !desktop->app_running;
+    /* Only swap the shared wallpaper view when Main actually owns its callbacks. */
+    if(main) desktop_dashboard_mount(desktop);
+    bool alive = main && desktop->panel.mode == DesktopModeDashboard;
     if(alive) desktop_activity_update(desktop->dashboard, state, furi_hal_power_insomnia_level());
     uint32_t period = desktop_activity_home_tick(
         desktop->dashboard,

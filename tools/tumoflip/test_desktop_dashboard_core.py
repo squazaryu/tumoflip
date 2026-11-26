@@ -42,6 +42,7 @@ static inline void furi_timer_start(void*p,unsigned n){assert(p&&n==250);starts+
 static inline void furi_timer_stop(void*p){assert(p);stops++;}
 FavoriteApp* desktop_favorite(Desktop*,FavoriteAppShortcut);
 static void desktop_reload_panel(Desktop*);
+static void desktop_dashboard_mount(Desktop*);
 static void desktop_dashboard_refresh(Desktop*,const TumoSystemState*,uint32_t);
 '''
 
@@ -54,12 +55,16 @@ int main(void){
  assert(!desktop_favorite(&d,(FavoriteAppShortcut)-1)&&!desktop_favorite(&d,FavoriteAppNumber));
  desktop_reload_panel(&d);assert(!swaps&&!d.dashboard_mounted);
  disk=d.panel;disk.mode=DesktopModeDashboard;strcpy(disk.held[0].name_or_path,"Panel app");readable=true;
- desktop_reload_panel(&d);assert(swaps==1&&mounted==(void*)0x20&&decoration_quiet&&d.dashboard_mounted);
+ d.locked=true;desktop_reload_panel(&d);assert(!swaps&&!d.dashboard_mounted);
+ TumoSystemState state={.display_on=true};
+ desktop_dashboard_refresh(&d,&state,DesktopSceneLocked);assert(!swaps);
+ d.locked=false;d.app_running=true;desktop_dashboard_refresh(&d,&state,DesktopSceneMain);assert(!swaps);
+ d.app_running=false;desktop_dashboard_refresh(&d,&state,DesktopSceneMain);
+ assert(swaps==1&&mounted==(void*)0x20&&decoration_quiet&&d.dashboard_mounted);
  assert(!desktop_favorite(&d,FavoriteAppLeftShort)&&!desktop_favorite(&d,FavoriteAppRightShort));
  assert(!strcmp(desktop_favorite(&d,FavoriteAppLeftLong)->name_or_path,"Panel app"));
  assert(!memcmp(&d.settings,&before,sizeof(before)));
- TumoSystemState state={.display_on=true};
- desktop_dashboard_refresh(&d,&state,DesktopSceneMain);assert(last_alive&&last_animate&&starts==1&&updates==1);
+ desktop_dashboard_refresh(&d,&state,DesktopSceneMain);assert(last_alive&&last_animate&&starts==1&&updates==2);
  desktop_dashboard_refresh(&d,&state,DesktopSceneMain);assert(starts==1);
  d.locked=true;desktop_dashboard_refresh(&d,&state,DesktopSceneLocked);assert(!last_alive&&stops==1);
  d.locked=false;d.app_running=true;desktop_dashboard_refresh(&d,&state,DesktopSceneMain);assert(!last_alive);
@@ -67,7 +72,8 @@ int main(void){
  d.panel.motion=1;desktop_dashboard_refresh(&d,&state,DesktopSceneMain);assert(starts==2);
  state.display_on=false;desktop_dashboard_refresh(&d,&state,DesktopSceneMain);assert(!last_animate&&stops==2);
  state.display_on=true;state.recovery=true;desktop_dashboard_refresh(&d,&state,DesktopSceneMain);assert(!last_animate);
- disk.mode=DesktopModeWallpaper;desktop_reload_panel(&d);assert(swaps==2&&mounted==(void*)0x10);
+ disk.mode=DesktopModeWallpaper;desktop_reload_panel(&d);assert(swaps==1);
+ desktop_dashboard_refresh(&d,&state,DesktopSceneMain);assert(swaps==2&&mounted==(void*)0x10);
  assert(desktop_favorite(&d,FavoriteAppLeftLong)==&d.settings.favorite_apps[FavoriteAppLeftLong]);
  readable=false;desktop_reload_panel(&d);assert(swaps==2&&!memcmp(&d.settings,&before,sizeof(before)));
  assert(signals>=3);
@@ -80,7 +86,7 @@ class DesktopDashboardCoreTests(unittest.TestCase):
     def test_profile_routing_stack_swap_pin_and_timer_lifecycle(self):
         source = (ROOT / "applications/services/desktop/desktop.c").read_text()
         functions = []
-        for name in ("desktop_favorite", "desktop_reload_panel", "desktop_dashboard_refresh"):
+        for name in ("desktop_favorite", "desktop_dashboard_mount", "desktop_reload_panel", "desktop_dashboard_refresh"):
             match = re.search(r"(?:static )?(?:void|FavoriteApp\*)\s+"+name+r"\([^;]+?\)\s*\{", source)
             if match:
                 start = source.index("{", match.start()); end = start + 1; depth = 1
