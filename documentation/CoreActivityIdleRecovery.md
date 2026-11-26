@@ -120,6 +120,41 @@ in this change. Such a mode must preserve the normal wallpaper alternative,
 define the changed short-left/right gestures, stop decorative timers while
 idle, and pass the same flash/RAM and PIN/transfer checks before publication.
 
+## Final checked source and receipt
+
+Code commit `0d63992c5d58e5d0c470d82c9e258ab5fcc2790e`, clean build
+(`BUILD_DIRTY 0`), normal `-Os` / LTO flags, API 88.23:
+
+- Full native host discovery: **1459 tests, all passed**, 70.436 seconds.
+  The serial-start timeout messages are expected synthetic negative cases,
+  not attempts to open a connected Flipper.
+- All ten native-style GUI/input states passed ASan/UBSan and text bounds.
+- F7 compilation succeeded: text 702588, rodata 176880, data 736, BSS 7664
+  bytes. Binary length 880544 bytes, +4032 versus the measured pre-feature
+  source. Shared policy transactions remove duplicated bookkeeping without
+  changing the tested admission/notification behaviour.
+- DfuSe format/CRC and C1 end match the ELF: `0x080D6FA0`.
+  Radio begins at `0x080D7000`; section gap 96 bytes, erase-aligned end
+  `0x080D7000`, physical spare page count **zero**.
+- Strict release-layout check with **4096** required bytes fails as expected.
+  The negative DfuSe-container gap (-213) includes non-flashed metadata; it
+  is not a C1/radio overlap. No minimum was lowered and no failure was hidden.
+- No updater/resources archive, complete package acceptance, independent review
+  or hardware acceptance was performed. The build still carries the existing
+  development default version string; it is not a new `011-004` release.
+
+Diagnostic hashes before generated-output cleanup:
+
+```text
+firmware.bin dce3dea61b88435bbf521965e0684fa64d304ecc69961226ab938c4ec6e199d9
+firmware.dfu f0c9207635619600fe9d8e91ad1913680de60eb7c92b0ba215e96461c56ae560
+```
+
+Only the code and compact GUI preview are to be retained; generated build
+outputs can be reproduced from the checked commit with
+`FBT_NO_SYNC=1 ./fbt -j2 firmware_all`. They must pass the unchanged release
+gate before any installation/publication, including any future Dashboard mode.
+
 Run focused checks:
 
 ```sh
