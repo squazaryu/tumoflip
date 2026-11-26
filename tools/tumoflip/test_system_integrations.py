@@ -146,7 +146,9 @@ int main(void){
 
 DESKTOP = r"""
 enum {DesktopSceneMain,DesktopSceneLocked,DesktopSceneActivity,DesktopSceneQuickSettings};
+enum {DesktopModeDashboard=1};
 typedef struct {bool quiet,locked,app_running,recovery_notice_pending;
+ struct{unsigned mode;}panel;
  void*animation_manager,*scene_manager,*view_dispatcher,*activity;} Desktop;
 static TumoSystemState state;
 static unsigned tick_period,notices,clock_updates,activity_updates;
@@ -160,6 +162,7 @@ static void furi_event_loop_tick_set(void*loop,unsigned period,void(*cb)(void*),
 static unsigned furi_hal_power_insomnia_level(void){return 7;}
 static void desktop_activity_update(void*a,const TumoSystemState*s,unsigned holds){assert(a&&s&&holds==7);activity_updates++;}
 static void scene_manager_next_scene(void*m,unsigned scene){assert(scene==DesktopSceneActivity);*(unsigned*)m=scene;notices++;}
+static void desktop_dashboard_refresh(Desktop*d,const TumoSystemState*s,unsigned scene){(void)d;(void)s;(void)scene;}
 """
 
 DESKTOP_MAIN = r"""

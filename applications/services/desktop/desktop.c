@@ -1,4 +1,5 @@
 #include "desktop_i.h"
+#include "desktop_panel_io_i.h"
 
 #include <cli/cli_vcp.h>
 
@@ -21,6 +22,50 @@ static void desktop_auto_lock_inhibit(Desktop*);
 static void desktop_start_auto_lock_timer(Desktop*);
 static void desktop_apply_settings(Desktop*);
 static void desktop_tick_event_callback(void* context);
+
+FavoriteApp* desktop_favorite(Desktop* desktop, FavoriteAppShortcut shortcut) {
+    if((unsigned)shortcut >= FavoriteAppNumber) return NULL;
+    return desktop->panel.mode == DesktopModeDashboard ?
+               desktop_panel_held(&desktop->panel, shortcut) :
+               &desktop->settings.favorite_apps[shortcut];
+}
+
+static void desktop_reload_panel(Desktop* desktop) {
+    desktop_panel_load(&desktop->panel);
+    bool dashboard = desktop->panel.mode == DesktopModeDashboard;
+    if(dashboard != desktop->dashboard_mounted) {
+        View* wallpaper = animation_manager_get_animation_view(desktop->animation_manager);
+        View* panel = desktop_activity_get_view(desktop->dashboard);
+        animation_manager_set_quiet(desktop->animation_manager, true);
+        view_stack_remove_view(desktop->main_view_stack, dashboard ? wallpaper : panel);
+        view_stack_add_view(desktop->main_view_stack, dashboard ? panel : wallpaper);
+        desktop->dashboard_mounted = dashboard;
+    }
+    desktop_policy_changed(desktop);
+}
+
+static void desktop_dashboard_callback(DesktopActivityAction action, void* context) {
+    if(action == DesktopActivityHomeChanged) desktop_policy_changed(context);
+}
+
+static void
+    desktop_dashboard_refresh(Desktop* desktop, const TumoSystemState* state, uint32_t scene) {
+    bool alive = desktop->panel.mode == DesktopModeDashboard && scene == DesktopSceneMain &&
+                 !desktop->locked && !desktop->app_running;
+    if(alive) desktop_activity_update(desktop->dashboard, state, furi_hal_power_insomnia_level());
+    uint32_t period = desktop_activity_home_tick(
+        desktop->dashboard,
+        furi_get_tick(),
+        alive,
+        desktop->panel.motion && state->display_on && !state->recovery);
+    if(period != desktop->dashboard_period) {
+        if(period)
+            furi_timer_start(desktop->dashboard_timer, furi_ms_to_ticks(period));
+        else
+            furi_timer_stop(desktop->dashboard_timer);
+        desktop->dashboard_period = period;
+    }
+}
 
 static void desktop_loader_callback(const void* message, void* context) {
     furi_assert(context);
@@ -88,10 +133,13 @@ static void desktop_update_policy(Desktop* desktop) {
     const bool quiet = tumo_system_model_quiet(&state);
     if(desktop->quiet != quiet) {
         desktop->quiet = quiet;
-        animation_manager_set_quiet(desktop->animation_manager, quiet);
         desktop_clock_reconfigure(desktop);
     }
+    animation_manager_set_quiet(
+        desktop->animation_manager,
+        quiet || desktop->panel.mode == DesktopModeDashboard || desktop->app_running);
     const uint32_t scene = scene_manager_get_current_scene(desktop->scene_manager);
+    desktop_dashboard_refresh(desktop, &state, scene);
     const bool slow = quiet && (scene == DesktopSceneMain || scene == DesktopSceneLocked);
     /* This is Desktop's owned loop; changing the dispatcher default alone would
      * not reconfigure an already-running tick source. */
@@ -107,7 +155,7 @@ static void desktop_update_policy(Desktop* desktop) {
         scene_manager_next_scene(desktop->scene_manager, DesktopSceneActivity);
 }
 
-static void desktop_policy_changed(void* context) {
+void desktop_policy_changed(void* context) {
     Desktop* desktop = context;
     const uint8_t changed = 1;
     /* Producers may be Storage/Notification. Never block them on Desktop. */
@@ -184,6 +232,7 @@ static bool desktop_custom_event_callback(void* context, uint32_t event) {
         animation_manager_load_and_continue_animation(desktop->animation_manager);
         desktop_auto_lock_arm(desktop);
         desktop->app_running = false;
+        desktop_update_policy(desktop);
 
     } else if(event == DesktopGlobalAutoLock) {
         if(!desktop->app_running && !desktop->locked) {
@@ -197,10 +246,12 @@ static bool desktop_custom_event_callback(void* context, uint32_t event) {
     } else if(event == DesktopGlobalSaveSettings) {
         desktop_settings_save(&desktop->settings);
         desktop_apply_settings(desktop);
+        desktop_reload_panel(desktop);
 
     } else if(event == DesktopGlobalReloadSettings) {
         desktop_settings_load(&desktop->settings);
         desktop_apply_settings(desktop);
+        desktop_reload_panel(desktop);
 
     } else {
         return scene_manager_handle_custom_event(desktop->scene_manager, event);
@@ -306,6 +357,10 @@ static void desktop_init_settings(Desktop* desktop) {
 
 static Desktop* desktop_alloc(void) {
     Desktop* desktop = malloc(sizeof(Desktop));
+    memset(&desktop->settings, 0, sizeof(desktop->settings));
+    memset(&desktop->panel, 0, sizeof(desktop->panel));
+    desktop->dashboard_mounted = false;
+    desktop->dashboard_period = 0;
     desktop->quiet = false;
     desktop->locked = false;
     desktop->recovery_notice_pending = furi_system_policy_is_recovery();
@@ -331,6 +386,8 @@ static Desktop* desktop_alloc(void) {
     desktop->lock_menu = desktop_lock_menu_alloc();
     desktop->quick_settings = desktop_quick_settings_alloc();
     desktop->activity = desktop_activity_alloc(desktop_activity_callback, desktop);
+    desktop->dashboard = desktop_activity_alloc(desktop_dashboard_callback, desktop);
+    desktop_activity_set_home(desktop->dashboard, true);
     desktop->debug_view = desktop_debug_alloc();
     desktop->popup = popup_alloc();
     desktop->locked_view = desktop_view_locked_alloc();
@@ -437,6 +494,8 @@ static Desktop* desktop_alloc(void) {
     desktop->shortcut_animation_retain_pending = false;
 
     desktop->policy_events = furi_message_queue_alloc(1, sizeof(uint8_t));
+    desktop->dashboard_timer =
+        furi_timer_alloc(desktop_policy_changed, FuriTimerTypePeriodic, desktop);
     furi_event_loop_subscribe_message_queue(
         view_dispatcher_get_event_loop(desktop->view_dispatcher),
         desktop->policy_events,
@@ -572,6 +631,8 @@ int32_t desktop_srv(void* p) {
     Desktop* desktop = desktop_alloc();
 
     desktop_init_settings(desktop);
+    desktop_panel_defaults(&desktop->panel, &desktop->settings);
+    desktop_reload_panel(desktop);
 
     scene_manager_next_scene(desktop->scene_manager, DesktopSceneMain);
 

@@ -2,6 +2,7 @@
 
 #include "desktop.h"
 #include "desktop_settings.h"
+#include "desktop_panel_i.h"
 
 #include "animations/animation_manager.h"
 #include "views/desktop_view_pin_timeout.h"
@@ -56,6 +57,10 @@ struct Desktop {
     DesktopLockMenuView* lock_menu;
     DesktopQuickSettingsView* quick_settings;
     DesktopActivityView* activity;
+    DesktopActivityView* dashboard;
+    FuriTimer* dashboard_timer;
+    uint32_t dashboard_period;
+    bool dashboard_mounted;
     FuriMessageQueue* policy_events;
     DesktopDebugView* debug_view;
     DesktopViewLocked* locked_view;
@@ -87,6 +92,7 @@ struct Desktop {
 
     DesktopClock clock;
     DesktopSettings settings;
+    DesktopPanelSettings panel;
 
     bool in_transition;
     bool app_running;
@@ -97,6 +103,8 @@ struct Desktop {
 };
 
 void desktop_activity_callback(DesktopActivityAction action, void* context);
+void desktop_policy_changed(void* context);
+FavoriteApp* desktop_favorite(Desktop* desktop, FavoriteAppShortcut shortcut);
 
 void desktop_lock(Desktop* desktop);
 void desktop_unlock(Desktop* desktop);

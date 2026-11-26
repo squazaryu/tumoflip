@@ -13,6 +13,7 @@ HARNESS = r'''
 #include "applications/services/desktop/desktop_panel_i.h"
 #include "furi/core/system_policy_i.h"
 #define furi_assert assert
+typedef void View;
 enum {DesktopSceneMain,DesktopSceneLocked,DesktopSceneActivity,DesktopSceneQuickSettings};
 typedef struct {
  DesktopSettings settings;DesktopPanelSettings panel;bool dashboard_mounted,locked,app_running;
@@ -50,6 +51,7 @@ int main(void){
  for(unsigned i=0;i<FavoriteAppNumber;i++)strcpy(d.settings.favorite_apps[i].name_or_path,"Wallpaper app");
  DesktopSettings before=d.settings;desktop_panel_defaults(&d.panel,&d.settings);
  assert(desktop_favorite(&d,FavoriteAppLeftShort)==&d.settings.favorite_apps[FavoriteAppLeftShort]);
+ assert(!desktop_favorite(&d,(FavoriteAppShortcut)-1)&&!desktop_favorite(&d,FavoriteAppNumber));
  desktop_reload_panel(&d);assert(!swaps&&!d.dashboard_mounted);
  disk=d.panel;disk.mode=DesktopModeDashboard;strcpy(disk.held[0].name_or_path,"Panel app");readable=true;
  desktop_reload_panel(&d);assert(swaps==1&&mounted==(void*)0x20&&decoration_quiet&&d.dashboard_mounted);
