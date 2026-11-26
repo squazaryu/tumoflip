@@ -29,6 +29,14 @@ def build_helper(path, name):
 
 
 class LibraryLtoTests(unittest.TestCase):
+    def test_crash_register_capture_stays_native_and_out_of_lto(self):
+        configure = build_helper("furi/SConscript", "configure_crash_capture_native")
+        original = ["-Os", "-flto", "-ffat-lto-objects"]
+        env = Environment(CCFLAGS=original)
+        configure(env)
+        self.assertEqual(original, ["-Os", "-flto", "-ffat-lto-objects"])
+        self.assertEqual(env["CCFLAGS"], ["-Os", "-fno-lto"])
+
     def test_resident_libraries_keep_native_fallback_and_updater_is_unchanged(self):
         configure = build_helper("firmware.scons", "configure_resident_library_lto")
         for resident, enabled in ((True, True), (False, True), (True, False)):
