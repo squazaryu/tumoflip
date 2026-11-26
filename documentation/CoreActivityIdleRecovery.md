@@ -1,5 +1,10 @@
 # Core activity, quiet idle and crash-loop recovery
 
+Historical implementation receipt. The subsequent Classic / Panel home-mode
+integration and restored flash reserve are documented in `DesktopDashboard.md`.
+The former "Dashboard not implemented" and open size-gate notes below describe
+the earlier checked commit, not the subsequent implementation.
+
 Local implementation, 26 November 2026. Not published or installed on a device.
 These are core services/Desktop changes, not a new FAP. Public SDK API remains
 88.23; existing FW Packages and TumoCompanion do not need a new API.
