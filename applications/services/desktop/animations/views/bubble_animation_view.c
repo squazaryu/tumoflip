@@ -36,7 +36,12 @@ struct BubbleAnimationView {
     FuriTimer* timer;
     BubbleAnimationInteractCallback interact_callback;
     void* interact_callback_context;
+    bool visible, quiet;
 };
+
+static void bubble_animation_timer_start(BubbleAnimationView* view, uint8_t rate) {
+    if(view->visible && !view->quiet && rate) furi_timer_start(view->timer, 1000U / rate);
+}
 
 static void bubble_animation_activate(BubbleAnimationView* view, bool force);
 static void bubble_animation_activate_right_now(BubbleAnimationView* view);
@@ -205,7 +210,7 @@ static void bubble_animation_activate_right_now(BubbleAnimationView* view) {
     view_commit_model(view->view, true);
 
     if(frame_rate) {
-        furi_timer_start(view->timer, 1000 / frame_rate);
+        bubble_animation_timer_start(view, frame_rate);
     }
 }
 
@@ -344,6 +349,7 @@ static void bubble_animation_release_frame(Icon** icon) {
 static void bubble_animation_enter(void* context) {
     furi_assert(context);
     BubbleAnimationView* view = context;
+    view->visible = true;
     bubble_animation_activate(view, false);
 
     BubbleAnimationViewModel* model = view_get_model(view->view);
@@ -354,13 +360,14 @@ static void bubble_animation_enter(void* context) {
     view_commit_model(view->view, false);
 
     if(frame_rate) {
-        furi_timer_start(view->timer, 1000 / frame_rate);
+        bubble_animation_timer_start(view, frame_rate);
     }
 }
 
 static void bubble_animation_exit(void* context) {
     furi_assert(context);
     BubbleAnimationView* view = context;
+    view->visible = false;
     furi_timer_stop(view->timer);
 }
 
@@ -368,6 +375,7 @@ BubbleAnimationView* bubble_animation_view_alloc(void) {
     BubbleAnimationView* view = malloc(sizeof(BubbleAnimationView));
     view->view = view_alloc();
     view->interact_callback = NULL;
+    view->visible = view->quiet = false;
     view->timer = furi_timer_alloc(bubble_animation_timer_callback, FuriTimerTypePeriodic, view);
 
     view_allocate_model(view->view, ViewModelTypeLocking, sizeof(BubbleAnimationViewModel));
@@ -431,7 +439,7 @@ void bubble_animation_view_set_animation(
     view_commit_model(view->view, true);
 
     if(!frozen) {
-        furi_timer_start(view->timer, 1000 / new_animation->icon_animation.frame_rate);
+        bubble_animation_timer_start(view, new_animation->icon_animation.frame_rate);
     }
 }
 
@@ -477,7 +485,7 @@ void bubble_animation_start_resume_preview(BubbleAnimationView* view) {
     view_commit_model(view->view, true);
 
     if((frame_count > 1U) && frame_rate) {
-        furi_timer_start(view->timer, 1000U / frame_rate);
+        bubble_animation_timer_start(view, frame_rate);
     }
 }
 
@@ -505,7 +513,7 @@ void bubble_animation_unfreeze(BubbleAnimationView* view) {
     frame_rate = model->current->icon_animation.frame_rate;
     view_commit_model(view->view, true);
 
-    furi_timer_start(view->timer, 1000 / frame_rate);
+    bubble_animation_timer_start(view, frame_rate);
     bubble_animation_activate(view, false);
 }
 
@@ -519,7 +527,7 @@ void bubble_animation_resume(BubbleAnimationView* view) {
     view_commit_model(view->view, true);
 
     if(frame_rate) {
-        furi_timer_start(view->timer, 1000U / frame_rate);
+        bubble_animation_timer_start(view, frame_rate);
     }
     bubble_animation_activate(view, false);
 }
@@ -528,4 +536,25 @@ View* bubble_animation_get_view(BubbleAnimationView* view) {
     furi_assert(view);
 
     return view->view;
+}
+
+void bubble_animation_set_quiet(BubbleAnimationView* view, bool quiet) {
+    if(view->quiet == quiet) return;
+    view->quiet = quiet;
+    if(quiet) {
+        furi_timer_stop(view->timer);
+    } else {
+        uint8_t rate = 0;
+        with_view_model(
+            view->view,
+            BubbleAnimationViewModel * model,
+            {
+                if(model->freeze_frame)
+                    rate = model->freeze_frame->frame_rate;
+                else if(model->current)
+                    rate = model->current->icon_animation.frame_rate;
+            },
+            false);
+        bubble_animation_timer_start(view, rate);
+    }
 }

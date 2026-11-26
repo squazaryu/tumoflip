@@ -17,6 +17,8 @@ typedef void (*BubbleAnimationInteractCallback)(void*);
  * @return instance of new bubble animation
  */
 BubbleAnimationView* bubble_animation_view_alloc(void);
+/** Pause only decoration; do not clone, release or replace frames. */
+void bubble_animation_set_quiet(BubbleAnimationView* view, bool quiet);
 
 /**
  * Free bubble animation view.

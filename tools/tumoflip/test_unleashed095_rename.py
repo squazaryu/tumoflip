@@ -8,6 +8,23 @@ ROOT=Path(__file__).resolve().parents[2]
 STORAGE=ROOT/'applications/services/storage/storage_external_api.c'
 
 
+def policy_native(code):
+    """Retain the original rename/copy assertions and require balanced nested leases."""
+    native(r'''
+#include <stdbool.h>
+#include <assert.h>
+#define FSE_NOT_READY (-99)
+enum {TumoSystemWrite};
+static unsigned leases;
+static bool furi_system_policy_acquire(int activity){assert(activity==TumoSystemWrite);leases++;return true;}
+static void furi_system_policy_release(int activity){assert(activity==TumoSystemWrite&&leases);leases--;}
+#define main policy_case
+''' + code + r'''
+#undef main
+int main(void){int result=policy_case();assert(!leases);return result;}
+''')
+
+
 class RenameSafetyTests(unittest.TestCase):
     def test_failed_archive_rename_does_not_move_its_favorite(self):
         actual=function((ROOT/'applications/main/archive/helpers/archive_files.c').read_text(),
@@ -59,7 +76,7 @@ int main(void){int context=0;
                           'static FS_Error\n    storage_common_rename_case_only('):
             if signature in source:helpers+=function(source,signature)+'\n'
         actual=function(source,'FS_Error storage_common_rename(')
-        native(r'''
+        policy_native(r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -120,7 +137,7 @@ int main(void){Storage s=0;reset();
 
     def test_short_or_unsynced_copy_is_not_reported_as_success(self):
         actual=function(STORAGE.read_text(),'FS_Error storage_common_copy(')
-        native(r'''
+        policy_native(r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>

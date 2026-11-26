@@ -37,6 +37,17 @@ def storage_native(program, metadata=False, manager=False):
 
 
 class DesktopOptionalMemoryTests(unittest.TestCase):
+    def test_recovery_selector_never_enumerates_external_animations(self):
+        storage_native(r'''
+int main(int argc,char**argv){
+ assert(argc==2);Storage s={0};setup_storage(&s,argv[1]);metadata_storage=&s;small_bundle(&s);
+ AnimationManager manager={0};recovery_mode=true;
+ StorageAnimation*selected=animation_manager_select_idle_animation(&manager);
+ assert(selected==&builtin&&builtin_selections==1&&!allocation_calls&&!live_frames);
+ return 0;
+}
+''', manager=True)
+
     def test_actual_idle_selector_uses_builtin_after_failed_optional_frames(self):
         storage_native(r'''
 int main(int argc,char**argv){

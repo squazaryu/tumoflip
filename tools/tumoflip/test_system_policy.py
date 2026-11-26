@@ -79,17 +79,6 @@ int main(void) {
     tumo_system_model_expire(&s,10000);
     assert(s.closing==TumoSystemNotClosing && !s.phone_allowed); // Failed stop releases writes.
 
-    uint8_t streak=99;
-    for(unsigned n=0;n<4;n++) {
-        uint32_t word=tumo_system_recovery_word(n);
-        uint32_t sum=tumo_system_recovery_checksum(word);
-        assert(tumo_system_recovery_read(word,sum,&streak) && streak==n);
-        for(unsigned bit=0;bit<32;bit++)
-            assert(!tumo_system_recovery_read(word^(1UL<<bit),sum,&streak));
-    }
-    streak=99;
-    assert(!tumo_system_recovery_read(0,0,&streak) && streak==99);
-    assert(!tumo_system_recovery_read(0,0,NULL));
     return 0;
 }
 """
@@ -114,8 +103,6 @@ typedef enum {
     FuriHalRtcRegisterTumoflipCrashMarker=8,
     FuriHalRtcRegisterTumoflipCrashMeta=9,
     FuriHalRtcRegisterTumoflipCrashChecksum=14,
-    FuriHalRtcRegisterTumoflipRecoveryState=20,
-    FuriHalRtcRegisterTumoflipRecoveryChecksum=21,
 } FuriHalRtcRegister;
 uint32_t furi_hal_rtc_get_register(FuriHalRtcRegister reg);
 void furi_hal_rtc_set_register(FuriHalRtcRegister reg,uint32_t word);
@@ -130,12 +117,12 @@ WRAPPER_TEST = r"""
 #include "lib/tumoflip_crash_journal/crash_journal.h"
 
 unsigned critical_depth;
-static uint32_t registers[32], tick, callbacks;
+static uint32_t registers[20], tick, callbacks;
 uint32_t furi_get_tick(void) { return tick; }
 uint32_t furi_ms_to_ticks(uint32_t ms) { return ms; }
-uint32_t furi_hal_rtc_get_register(FuriHalRtcRegister reg) { assert(reg<32); return registers[reg]; }
+uint32_t furi_hal_rtc_get_register(FuriHalRtcRegister reg) { assert(reg<20); return registers[reg]; }
 void furi_hal_rtc_set_register(FuriHalRtcRegister reg,uint32_t word) {
-    assert(reg<32); registers[reg]=word;
+    assert(reg<20); registers[reg]=word;
 }
 static void changed(void* context) { assert(!critical_depth && context==&callbacks); callbacks++; }
 int main(int argc,char**argv) {
@@ -150,22 +137,35 @@ int main(int argc,char**argv) {
         assert(furi_system_policy_is_recovery());
         TumoflipCrashReport report;
         assert(tumoflip_crash_journal_read(&report) && report.sequence==3);
+        uint32_t meta=registers[9];
+        for(unsigned bit=16;bit<24;bit++) {
+            registers[9]=meta^(1UL<<bit);
+            assert(tumoflip_crash_journal_boot_streak()==0);
+            assert(tumoflip_crash_journal_read(&report) && report.sequence==3);
+        }
+        registers[9]=meta;
+        tumoflip_crash_journal_ack();
+        assert(tumoflip_crash_journal_boot_streak()==3); // Acknowledging the popup cannot reset the guard.
+        tumoflip_crash_journal_record(TumoflipCrashKindOther,"12345678");
+        assert(tumoflip_crash_journal_boot_streak()==3);
+        assert(tumoflip_crash_journal_read(&report) && report.sequence==1);
         assert(furi_system_policy_acquire(TumoSystemWrite));
         assert(!furi_system_policy_prepare_normal_restart());
         furi_system_policy_release(TumoSystemWrite);
         assert(furi_system_policy_prepare_normal_restart());
         assert(!furi_system_policy_acquire(TumoSystemWrite));
-        assert(tumoflip_crash_journal_read(&report) && report.sequence==3);
+        assert(tumoflip_crash_journal_read(&report) && report.sequence==1);
     } else if(!strcmp(argv[1],"healthy")) {
-        furi_system_policy_record_crash();
-        furi_system_policy_record_crash();
+        tumoflip_crash_journal_record(TumoflipCrashKindOther,"12345678");
+        tumoflip_crash_journal_record(TumoflipCrashKindOther,"12345678");
         TumoSystemState s=furi_system_policy_snapshot();
         assert(!s.recovery && s.boot_crashes==2);
         tick=59999; furi_system_policy_snapshot();
-        uint8_t streak=99;
-        assert(tumo_system_recovery_read(registers[20],registers[21],&streak) && streak==2);
+        assert(tumoflip_crash_journal_boot_streak()==2);
         tick=60000; furi_system_policy_snapshot();
-        assert(tumo_system_recovery_read(registers[20],registers[21],&streak) && streak==0);
+        assert(tumoflip_crash_journal_boot_streak()==0);
+        TumoflipCrashReport report;
+        assert(tumoflip_crash_journal_read(&report) && report.sequence==2);
     } else {
         furi_system_policy_listen(changed,&callbacks);
         assert(furi_system_policy_acquire(TumoSystemPhonePreview));
@@ -204,7 +204,7 @@ class SystemPolicyTests(unittest.TestCase):
         result = subprocess.run([
             "cc", "-std=c11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
             "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
-            "-I", str(root), "-I", str(CORE), "-I", str(ROOT), "-I", str(ROOT / "lib"),
+            "-I", str(root), "-iquote", str(CORE), "-I", str(ROOT), "-I", str(ROOT / "lib"),
             str(root / "case.c"), *map(str, sources), "-o", str(binary),
         ], capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)

@@ -10,6 +10,7 @@
 #include "views/desktop_view_main.h"
 #include "views/desktop_view_lock_menu.h"
 #include "views/desktop_view_quick_settings.h"
+#include "views/desktop_view_activity.h"
 #include "views/desktop_view_debug.h"
 #include "views/desktop_view_slideshow.h"
 
@@ -28,6 +29,7 @@ typedef enum {
     DesktopViewIdMain,
     DesktopViewIdLockMenu,
     DesktopViewIdQuickSettings,
+    DesktopViewIdActivity,
     DesktopViewIdLocked,
     DesktopViewIdDebug,
     DesktopViewIdPopup,
@@ -53,6 +55,8 @@ struct Desktop {
     Popup* popup;
     DesktopLockMenuView* lock_menu;
     DesktopQuickSettingsView* quick_settings;
+    DesktopActivityView* activity;
+    FuriMessageQueue* policy_events;
     DesktopDebugView* debug_view;
     DesktopViewLocked* locked_view;
     DesktopMainView* main_view;
@@ -88,7 +92,11 @@ struct Desktop {
     bool app_running;
     bool locked;
     bool shortcut_animation_retain_pending;
+    bool quiet;
+    bool recovery_notice_pending;
 };
+
+void desktop_activity_callback(DesktopActivityAction action, void* context);
 
 void desktop_lock(Desktop* desktop);
 void desktop_unlock(Desktop* desktop);

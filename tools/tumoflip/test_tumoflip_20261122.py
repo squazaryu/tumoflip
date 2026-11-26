@@ -191,8 +191,14 @@ int main(void){
 ''')
 
     def test_check_files_is_available_only_for_a_valid_selected_round_item(self):
+        round_source = app_source("field_round.c")
+        helpers = function(app_source("library_model.c"), "bool library_name_valid(")
+        helpers += function(app_source("field_io.c"), "bool field_text_valid(")
+        for signature in ("static bool field_round_valid(", "bool field_round_pending_count(",
+                          "bool field_round_next_pending("):
+            helpers += function(round_source, signature)
         run_c(INCLUDES + "\ntypedef int Storage;\n"
-              + app_source("library_model.h") + app_source("field_round.h") + r'''
+              + app_source("library_model.h") + app_source("field_round.h") + helpers + r'''
 typedef struct {unsigned action_count;} Submenu;
 static unsigned action=0;
 void submenu_reset(Submenu* menu){menu->action_count=0;}
