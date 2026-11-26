@@ -25,6 +25,7 @@ DesktopProfile* desktop_profile_load(void);
 void desktop_profile_free(DesktopProfile* profile);
 
 bool desktop_profile_equal(const DesktopProfile* left, const DesktopProfile* right);
+/** A profile omitted during recovery is inactive; use the built-in animation timing. */
 bool desktop_profile_is_active(const DesktopProfile* profile);
 bool desktop_profile_selects_all(const DesktopProfile* profile);
 bool desktop_profile_contains(const DesktopProfile* profile, const char* animation_name);

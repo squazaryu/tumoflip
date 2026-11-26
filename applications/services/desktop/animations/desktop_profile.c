@@ -245,8 +245,7 @@ bool desktop_profile_equal(const DesktopProfile* left, const DesktopProfile* rig
 }
 
 bool desktop_profile_is_active(const DesktopProfile* profile) {
-    furi_assert(profile);
-    return profile->enabled && (profile->selection_all || (profile->animation_count > 0U));
+    return profile && profile->enabled && (profile->selection_all || (profile->animation_count > 0U));
 }
 
 bool desktop_profile_contains(const DesktopProfile* profile, const char* animation_name) {
