@@ -102,6 +102,24 @@ is claimed by this document.
 No hardware was connected/tested, installed or flashed; no external branch,
 PR, issue, tag, catalogue, release or simulator was changed by this task.
 
+## Native UI revision
+
+Activity now uses three stock-icon badges instead of a text table: Files
+(writers/mutations), Phone (reported transfer) and Screen (phone/host previews).
+Short values use the standard bold font; long preview pairs use the existing
+5x7 numeric font so `255/255` fits without clipping. Idle and recovery use
+static native clock/face/warning assets and stock confirmation buttons. The
+busy dialog's OK only dismisses that dialog; it does not arm another action.
+All ten synthetic input/render states are checked for text/caption bounds.
+The preview adds stock status-bar artwork, not a live device observation.
+
+These pages currently remain separate system screens, **not** a replacement
+for Desktop wallpaper. The later proposed Wallpaper / Dashboard selection,
+home-screen left/right paging and lightweight transitions are not implemented
+in this change. Such a mode must preserve the normal wallpaper alternative,
+define the changed short-left/right gestures, stop decorative timers while
+idle, and pass the same flash/RAM and PIN/transfer checks before publication.
+
 Run focused checks:
 
 ```sh
