@@ -29,6 +29,21 @@ def build_helper(path, name):
 
 
 class LibraryLtoTests(unittest.TestCase):
+    def test_freertos_exception_port_preserves_native_assembly_abi(self):
+        configure = build_helper("lib/freertos.scons", "configure_freertos_port_native")
+        native_source = build_helper("lib/freertos.scons", "native_freertos_port_source")
+        original = ["-Os", "-flto", "-ffat-lto-objects"]
+        env = Environment(CCFLAGS=original)
+        configure(env)
+        configure(env)
+        self.assertEqual(original, ["-Os", "-flto", "-ffat-lto-objects"])
+        self.assertEqual(env["CCFLAGS"], ["-Os", "-fno-lto"])
+        self.assertTrue(native_source("FreeRTOS-Kernel/portable/GCC/ARM_CM4F/port.c"))
+        self.assertTrue(native_source("lib/FreeRTOS-Kernel/portable/GCC/ARM_CM4F/port.c"))
+        self.assertTrue(native_source("lib\\FreeRTOS-Kernel\\portable\\GCC\\ARM_CM4F\\port.c"))
+        for source in ("FreeRTOS-Kernel/tasks.c", "drivers/port.c", "FreeRTOS-Kernel/portable/GCC/ARM_CM3/port.c"):
+            self.assertFalse(native_source(source))
+
     def test_startup_vector_table_is_native_and_preserved(self):
         configure = build_helper("targets/SConscript", "configure_startup_native")
         native_source = build_helper("targets/SConscript", "native_startup_source")
