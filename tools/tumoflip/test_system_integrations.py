@@ -75,12 +75,15 @@ int main(void){
 BUBBLE = r"""
 typedef struct {uint8_t frame_rate;} Icon;
 typedef struct {Icon icon_animation;} BubbleAnimation;
-typedef struct {const BubbleAnimation*current;Icon*freeze_frame;} BubbleAnimationViewModel;
+typedef struct {const BubbleAnimation*current;Icon*freeze_frame;uint8_t freeze_frame_index,active_shift;} BubbleAnimationViewModel;
 typedef struct {bool running;unsigned starts;} FuriTimer;
 typedef struct {void*view;FuriTimer*timer;bool visible,quiet;} BubbleAnimationView;
 static void furi_timer_start(FuriTimer*t,unsigned ticks){assert(ticks);t->running=true;t->starts++;}
 static void furi_timer_stop(FuriTimer*t){t->running=false;}
 static void bubble_animation_activate(BubbleAnimationView*v,bool force){(void)v;(void)force;}
+static void bubble_animation_activate_right_now(BubbleAnimationView*v){(void)v;assert(0);}
+static void bubble_animation_next_frame(BubbleAnimationViewModel*m){(void)m;assert(0);}
+static uint8_t icon_get_frame_count(Icon*i){assert(i);return 3;}
 static void* view_get_model(void*v){return v;}
 static void view_commit_model(void*v,bool update){(void)v;(void)update;}
 #define with_view_model(v,decl,body,update) do{decl=(v);body;}while(0)
@@ -93,13 +96,17 @@ int main(void){
  bubble_animation_timer_start(&view,10);assert(!timer.running);
  bubble_animation_enter(&view);assert(timer.running&&view.visible);
  bubble_animation_set_quiet(&view,true);assert(!timer.running);
+ bubble_animation_timer_callback(&view); // A callback already queued before stop must be harmless.
  unsigned before=timer.starts;bubble_animation_timer_start(&view,10);assert(timer.starts==before);
  bubble_animation_set_quiet(&view,false);assert(timer.running);
  bubble_animation_exit(&view);assert(!timer.running&&!view.visible);
+ bubble_animation_timer_callback(&view);
  bubble_animation_set_quiet(&view,true);bubble_animation_set_quiet(&view,false);assert(!timer.running);
  frame.icon_animation.frame_rate=0;bubble_animation_enter(&view);assert(!timer.running);
  Icon preview={5};model.freeze_frame=&preview;model.current=NULL;
  bubble_animation_set_quiet(&view,true);bubble_animation_set_quiet(&view,false);assert(timer.running);
+ bubble_animation_timer_callback(&view);assert(model.freeze_frame_index==1);
+ bubble_animation_set_quiet(&view,true);bubble_animation_timer_callback(&view);assert(model.freeze_frame_index==1);
  assert(model.freeze_frame==&preview&&!model.current); // No frame ownership changes.
  return 0;
 }
@@ -198,7 +205,7 @@ class SystemIntegrationTests(unittest.TestCase):
     def test_actual_bubble_timers_respect_visibility_quiet_and_zero_rate(self):
         source = (ROOT / "applications/services/desktop/animations/views/bubble_animation_view.c").read_text()
         self.native(BUBBLE + "\n".join(function(source, name) for name in (
-            "bubble_animation_timer_start", "bubble_animation_enter", "bubble_animation_exit",
+            "bubble_animation_timer_start", "bubble_animation_timer_callback", "bubble_animation_enter", "bubble_animation_exit",
             "bubble_animation_set_quiet")) + BUBBLE_MAIN)
 
     def test_actual_manager_pauses_timers_and_keeps_pending_profile_work(self):

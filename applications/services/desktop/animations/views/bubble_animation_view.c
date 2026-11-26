@@ -247,6 +247,8 @@ static void bubble_animation_next_frame(BubbleAnimationViewModel* model) {
 static void bubble_animation_timer_callback(void* context) {
     furi_assert(context);
     BubbleAnimationView* view = context;
+    /* Timer stop is queued in FreeRTOS; ignore a callback already in flight. */
+    if(!view->visible || view->quiet) return;
     bool activate = false;
 
     BubbleAnimationViewModel* model = view_get_model(view->view);
