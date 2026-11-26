@@ -56,7 +56,14 @@ static inline bool desktop_panel_store(DesktopPanelSettings* panel) {
     DesktopPanelSettings current;
     uint8_t bank = 1;
     if(desktop_panel_latest(&current, &bank)) {
-        if(current.generation != panel->generation) return false;
+        uint32_t generation = current.generation;
+        current.generation = panel->generation;
+        /* A read-back retry may discover the complete write it could not confirm. */
+        if(!memcmp(&current, panel, sizeof(current))) {
+            panel->generation = generation;
+            return true;
+        }
+        if(generation != panel->generation) return false;
     } else if(panel->generation)
         return false;
 

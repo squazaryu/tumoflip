@@ -13,7 +13,22 @@
 #include <desktop/views/desktop_view_pin_input.h>
 
 #include "desktop_settings_app.h"
+#include "../../services/desktop/desktop_panel_io_i.h"
 #include "scenes/desktop_settings_scene.h"
+
+FavoriteApp* desktop_settings_favorite(DesktopSettingsApp* app, FavoriteAppShortcut shortcut) {
+    if((unsigned)shortcut >= FavoriteAppNumber) return NULL;
+    return app->shortcut_profile == DesktopModeDashboard ?
+               desktop_panel_held(&app->panel, shortcut) :
+               &app->settings.favorite_apps[shortcut];
+}
+
+bool desktop_settings_store_panel(DesktopSettingsApp* app) {
+    if(!app->panel_dirty) return true;
+    if(!desktop_panel_store(&app->panel)) return false;
+    app->panel_dirty = false;
+    return true;
+}
 
 static bool desktop_settings_custom_event_callback(void* context, uint32_t event) {
     furi_assert(context);
@@ -152,10 +167,31 @@ extern int32_t desktop_settings_app(void* p) {
     Desktop* desktop = furi_record_open(RECORD_DESKTOP);
 
     desktop_api_get_settings(desktop, &app->settings);
+    desktop_panel_defaults(&app->panel, &app->settings);
+    desktop_panel_load(&app->panel);
+    app->shortcut_profile = app->panel.mode;
+    app->panel_dirty = false;
+    app->menu_idx = 0;
 
     scene_manager_next_scene(app->scene_manager, DesktopSettingsAppSceneStart);
 
     view_dispatcher_run(app->view_dispatcher);
+
+    while(!desktop_settings_store_panel(app)) {
+        DialogMessage* message = dialog_message_alloc();
+        dialog_message_set_header(message, "Save not confirmed", 64, 3, AlignCenter, AlignTop);
+        dialog_message_set_text(
+            message,
+            "Saved state is unknown.\nReopen Desktop to check.",
+            64,
+            25,
+            AlignCenter,
+            AlignTop);
+        dialog_message_set_buttons(message, "Retry", NULL, "Close");
+        DialogMessageButton result = dialog_message_show(app->dialogs, message);
+        dialog_message_free(message);
+        if(result != DialogMessageButtonLeft) break;
+    }
 
     desktop_api_set_settings(desktop, &app->settings);
     furi_record_close(RECORD_DESKTOP);

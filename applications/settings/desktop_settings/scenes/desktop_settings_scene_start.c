@@ -10,6 +10,9 @@
 
 typedef enum {
     DesktopSettingsPinSetup = 0,
+    DesktopSettingsPanelMode,
+    DesktopSettingsShortcutSet,
+    DesktopSettingsPanelMotion,
     DesktopSettingsAutoLockDelay,
     DesktopSettingsAutoPowerOff,
     DesktopSettingsLockAnimation,
@@ -24,6 +27,40 @@ typedef enum {
     DesktopSettingsFavoriteRightLong,
     DesktopSettingsFavoriteOkLong,
 } DesktopSettingsEntry;
+
+static const char* const desktop_mode_text[] = {"Wallpaper", "Dashboard"};
+static const char* const desktop_motion_text[] = {"Off", "On"};
+
+static void desktop_settings_scene_start_mode_changed(VariableItem* item) {
+    DesktopSettingsApp* app = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+    if(index > DesktopModeDashboard) return;
+    if(app->panel.mode != index) app->panel_dirty = true;
+    app->panel.mode = index;
+    app->shortcut_profile = index;
+    app->menu_idx = DesktopSettingsPanelMode;
+    variable_item_set_current_value_text(item, desktop_mode_text[index]);
+    view_dispatcher_send_custom_event(app->view_dispatcher, DESKTOP_PANEL_REFRESH);
+}
+
+static void desktop_settings_scene_start_shortcut_set_changed(VariableItem* item) {
+    DesktopSettingsApp* app = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+    if(index > DesktopModeDashboard) return;
+    app->shortcut_profile = index;
+    app->menu_idx = DesktopSettingsShortcutSet;
+    variable_item_set_current_value_text(item, desktop_mode_text[index]);
+    view_dispatcher_send_custom_event(app->view_dispatcher, DESKTOP_PANEL_REFRESH);
+}
+
+static void desktop_settings_scene_start_panel_motion_changed(VariableItem* item) {
+    DesktopSettingsApp* app = variable_item_get_context(item);
+    uint8_t index = variable_item_get_current_value_index(item);
+    if(index > 1) return;
+    if(app->panel.motion != index) app->panel_dirty = true;
+    app->panel.motion = index;
+    variable_item_set_current_value_text(item, desktop_motion_text[index]);
+}
 
 #define AUTO_LOCK_DELAY_COUNT 9
 const char* const auto_lock_delay_text[AUTO_LOCK_DELAY_COUNT] = {
@@ -81,6 +118,7 @@ const uint32_t displayBatteryPercentage_value[BATTERY_VIEW_COUNT] = {
 
 static void desktop_settings_scene_start_var_list_enter_callback(void* context, uint32_t index) {
     DesktopSettingsApp* app = context;
+    app->menu_idx = index;
     view_dispatcher_send_custom_event(app->view_dispatcher, index);
 }
 
@@ -138,6 +176,27 @@ void desktop_settings_scene_start_on_enter(void* context) {
     uint8_t value_index;
 
     variable_item_list_add(variable_item_list, "PIN Setup", 1, NULL, NULL);
+
+    item = variable_item_list_add(
+        variable_item_list, "Desktop view", 2, desktop_settings_scene_start_mode_changed, app);
+    variable_item_set_current_value_index(item, app->panel.mode);
+    variable_item_set_current_value_text(item, desktop_mode_text[app->panel.mode]);
+    item = variable_item_list_add(
+        variable_item_list,
+        "Edit shortcuts",
+        2,
+        desktop_settings_scene_start_shortcut_set_changed,
+        app);
+    variable_item_set_current_value_index(item, app->shortcut_profile);
+    variable_item_set_current_value_text(item, desktop_mode_text[app->shortcut_profile]);
+    item = variable_item_list_add(
+        variable_item_list,
+        "Panel motion",
+        2,
+        desktop_settings_scene_start_panel_motion_changed,
+        app);
+    variable_item_set_current_value_index(item, app->panel.motion);
+    variable_item_set_current_value_text(item, desktop_motion_text[app->panel.motion]);
 
     item = variable_item_list_add(
         variable_item_list,
@@ -220,14 +279,23 @@ void desktop_settings_scene_start_on_enter(void* context) {
 
     variable_item_list_add(variable_item_list, "Happy Mode", 1, NULL, NULL);
 
-    variable_item_list_add(variable_item_list, "Favorite App - Left Short", 1, NULL, NULL);
-    variable_item_list_add(variable_item_list, "Favorite App - Left Long", 1, NULL, NULL);
-    variable_item_list_add(variable_item_list, "Favorite App - Right Short", 1, NULL, NULL);
-    variable_item_list_add(variable_item_list, "Favorite App - Right Long", 1, NULL, NULL);
-    variable_item_list_add(variable_item_list, "Favorite App - Ok Long", 1, NULL, NULL);
+    const bool panel = app->shortcut_profile == DesktopModeDashboard;
+    item = variable_item_list_add(
+        variable_item_list, panel ? "Left short" : "Favorite App - Left Short", 1, NULL, NULL);
+    if(panel) variable_item_set_current_value_text(item, "Prev page");
+    variable_item_list_add(
+        variable_item_list, panel ? "Left hold" : "Favorite App - Left Long", 1, NULL, NULL);
+    item = variable_item_list_add(
+        variable_item_list, panel ? "Right short" : "Favorite App - Right Short", 1, NULL, NULL);
+    if(panel) variable_item_set_current_value_text(item, "Next page");
+    variable_item_list_add(
+        variable_item_list, panel ? "Right hold" : "Favorite App - Right Long", 1, NULL, NULL);
+    variable_item_list_add(
+        variable_item_list, panel ? "OK hold" : "Favorite App - Ok Long", 1, NULL, NULL);
 
     variable_item_list_set_enter_callback(
         variable_item_list, desktop_settings_scene_start_var_list_enter_callback, app);
+    variable_item_list_set_selected_item(variable_item_list, app->menu_idx);
 
     view_dispatcher_switch_to_view(app->view_dispatcher, DesktopSettingsAppViewVarItemList);
 }
@@ -238,6 +306,10 @@ bool desktop_settings_scene_start_on_event(void* context, SceneManagerEvent even
 
     if(event.type == SceneManagerEventTypeCustom) {
         switch(event.event) {
+        case DESKTOP_PANEL_REFRESH:
+            variable_item_list_reset(app->variable_item_list);
+            desktop_settings_scene_start_on_enter(app);
+            break;
         case DesktopSettingsPinSetup:
             scene_manager_next_scene(app->scene_manager, DesktopSettingsAppScenePinMenu);
             break;
@@ -253,6 +325,7 @@ bool desktop_settings_scene_start_on_event(void* context, SceneManagerEvent even
             break;
 
         case DesktopSettingsFavoriteLeftShort:
+            if(app->shortcut_profile == DesktopModeDashboard) break;
             scene_manager_set_scene_state(
                 app->scene_manager,
                 DesktopSettingsAppSceneFavorite,
@@ -267,6 +340,7 @@ bool desktop_settings_scene_start_on_event(void* context, SceneManagerEvent even
             scene_manager_next_scene(app->scene_manager, DesktopSettingsAppSceneFavorite);
             break;
         case DesktopSettingsFavoriteRightShort:
+            if(app->shortcut_profile == DesktopModeDashboard) break;
             scene_manager_set_scene_state(
                 app->scene_manager,
                 DesktopSettingsAppSceneFavorite,
