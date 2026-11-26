@@ -29,6 +29,15 @@ def build_helper(path, name):
 
 
 class LibraryLtoTests(unittest.TestCase):
+    def test_startup_vector_table_is_native_and_preserved(self):
+        configure = build_helper("targets/SConscript", "configure_startup_native")
+        native_source = build_helper("targets/SConscript", "native_startup_source")
+        env=Environment(CCFLAGS=["-Os","-flto","-ffat-lto-objects"])
+        configure(env)
+        self.assertEqual(env["CCFLAGS"],["-Os","-fno-lto"])
+        self.assertTrue(native_source("targets/f7/src/stm32wb55_startup.c"))
+        self.assertFalse(native_source("targets/f7/furi_hal/furi_hal.c"))
+
     def test_crash_register_capture_stays_native_and_out_of_lto(self):
         configure = build_helper("furi/SConscript", "configure_crash_capture_native")
         original = ["-Os", "-flto", "-ffat-lto-objects"]
@@ -36,6 +45,10 @@ class LibraryLtoTests(unittest.TestCase):
         configure(env)
         self.assertEqual(original, ["-Os", "-flto", "-ffat-lto-objects"])
         self.assertEqual(env["CCFLAGS"], ["-Os", "-fno-lto"])
+        native_source = build_helper("furi/SConscript", "native_core_abi_source")
+        self.assertTrue(native_source("check.c"))
+        self.assertTrue(native_source("memmgr.c"))
+        self.assertFalse(native_source("system_policy.c"))
 
     def test_resident_libraries_keep_native_fallback_and_updater_is_unchanged(self):
         configure = build_helper("firmware.scons", "configure_resident_library_lto")
