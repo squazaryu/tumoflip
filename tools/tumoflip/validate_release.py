@@ -505,6 +505,41 @@ def find_objdump(repo_root: Path) -> Path:
     )
 
 
+def validate_c1_vector_data(data: bytes, code_start: int, code_end: int) -> None:
+    """Validate F7's 16 system + 63 external Cortex-M vector entries."""
+    if len(data) != 79 * 4:
+        raise ValidationError(f"Missing/truncated F7 startup vectors: {len(data)} bytes")
+    words = struct.unpack("<79I", data)
+    if not 0x20000008 <= words[0] <= 0x20030000 or words[0] & 7:
+        raise ValidationError(f"Invalid F7 initial stack pointer: 0x{words[0]:08X}")
+    required = {1, 2, 3, 4, 5, 6, 11, 12, 14, 15}
+    for index, address in enumerate(words[1:], 1):
+        if not address and index not in required:
+            continue
+        if not address & 1 or not code_start <= (address & ~1) < code_end:
+            raise ValidationError(f"Invalid Thumb handler in vector {index}: 0x{address:08X}")
+
+
+def validate_boot_vectors(repo_root: Path, elf_path: Path) -> None:
+    objdump = find_objdump(repo_root)
+    lines = subprocess.check_output([str(objdump), "-h", str(elf_path)], text=True).splitlines()
+    sections = {}
+    for i, line in enumerate(lines[:-1]):
+        match = re.match(r"^\s*\d+\s+(\.\S+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)", line)
+        if match and "LOAD" in lines[i + 1]:
+            sections[match[1]] = (int(match[2], 16), int(match[3], 16))
+    vector_size, vector_start = sections.get(".isr_vector", (0, 0))
+    code_size, code_start = sections.get(".text", (0, 0))
+    if vector_start != FLASH_BASE or vector_size != 79 * 4 or not code_size:
+        raise ValidationError("ELF does not contain a loadable F7 startup vector table")
+    objcopy = objdump.with_name(objdump.name.replace("objdump", "objcopy"))
+    with tempfile.TemporaryDirectory(prefix="boot-vectors-") as directory:
+        vector_file = Path(directory) / "vectors.bin"
+        subprocess.run([str(objcopy), "-O", "binary", "--only-section=.isr_vector",
+                        str(elf_path), str(vector_file)], check=True, capture_output=True)
+        validate_c1_vector_data(vector_file.read_bytes(), code_start, code_start + code_size)
+
+
 def elf_flash_end(repo_root: Path, elf_path: Path, radio_address: int) -> int:
     output = subprocess.run(
         [str(find_objdump(repo_root)), "-h", str(elf_path)],
@@ -1113,6 +1148,7 @@ def validate_release(
     dfu_container_gap = radio_address - FLASH_BASE - firmware.stat().st_size
     elf_path = require_file(build_dir / "firmware.elf", "firmware ELF")
     flash_end = elf_flash_end(repo_root, elf_path, radio_address)
+    validate_boot_vectors(repo_root, elf_path)
     dfuse_flash_end = validate_dfuse_matches_elf(firmware, radio_address, flash_end)
     section_gap = radio_address - flash_end
     erase_aligned_flash_end, physical_c2_gap = validate_c2_safety(
