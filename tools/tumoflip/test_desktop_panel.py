@@ -118,9 +118,31 @@ static void motion_case(void){
  for(unsigned i=0;i<10000;i++)assert(desktop_panel_icon_frame(i,8)<8);
  assert(!desktop_panel_icon_frame(100,0));
 }
+static void edges_case(void){
+ DesktopSettings old=wallpaper();DesktopPanelSettings panel,read;
+ desktop_panel_defaults(&panel,&old);assert(!desktop_panel_valid(NULL)&&!desktop_panel_held(NULL,99));
+ for(unsigned i=0;i<3;i++){
+  panel.reserved[i]=1;assert(!desktop_panel_valid(&panel));panel.reserved[i]=0;
+  memset(panel.held[i].name_or_path,'Z',128);assert(!desktop_panel_valid(&panel));desktop_panel_defaults(&panel,&old);
+ }
+ panel.mode=99;assert(!desktop_panel_store(&panel)&&!writes);panel.mode=0;
+ assert(desktop_panel_store(&panel));uint8_t baseline[sizeof(files)];memcpy(baseline,files,sizeof(files));
+ for(unsigned header=0;header<2;header++){
+  files[0].bytes[header]^=1;assert(!desktop_panel_load(&read));memcpy(files,baseline,sizeof(files));
+ }
+ files[0].size++;assert(!desktop_panel_load(&read));memcpy(files,baseline,sizeof(files));
+ // Compensating changes pass SavedStruct's additive checksum, but not our CRC32.
+ files[0].bytes[16]++;files[0].bytes[17]--;assert(!desktop_panel_load(&read));memcpy(files,baseline,sizeof(files));
+ DesktopPanelRecord record={.settings=panel};record.settings.generation=UINT32_MAX;
+ record.crc=crc32_calc_buffer(0,&record.settings,sizeof(record.settings));
+ assert(saved_struct_save(DESKTOP_PANEL_BANK0,&record,sizeof(record),DESKTOP_PANEL_MAGIC,DESKTOP_PANEL_VERSION));
+ assert(desktop_panel_load(&panel)&&panel.generation==UINT32_MAX);
+ panel.mode=DesktopModeDashboard;assert(desktop_panel_store(&panel)&&panel.generation==1);
+ assert(desktop_panel_load(&read)&&read.generation==1&&read.mode==DesktopModeDashboard);
+}
 int main(int argc,char**argv){assert(argc==2);
  if(!strcmp(argv[1],"defaults"))defaults_case();else if(!strcmp(argv[1],"banks"))banks_case();
- else if(!strcmp(argv[1],"cuts"))cuts_case();else motion_case();
+ else if(!strcmp(argv[1],"cuts"))cuts_case();else if(!strcmp(argv[1],"edges"))edges_case();else motion_case();
  return 0;
 }
 '''
@@ -157,6 +179,9 @@ class DesktopPanelTests(unittest.TestCase):
 
     def test_motion_wraparound_retarget_limits_and_sleep(self):
         self.run_case("motion")
+
+    def test_crc_schema_validation_and_generation_wraparound(self):
+        self.run_case("edges")
 
 
 if __name__ == "__main__":
