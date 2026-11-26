@@ -12,7 +12,39 @@ ROOT = Path(__file__).resolve().parents[2]
 VIEW = ROOT / "applications/services/desktop/views/desktop_view_activity.c"
 
 
-def build_source():
+HOME_DRIVER = r'''
+ tumo_system_model_init(&state);state.phone_previews=1;
+ desktop_activity_reset(&activity,false);desktop_activity_set_home(&activity,true);
+ desktop_activity_update(&activity,&state,3);desktop_activity_home_tick(&activity,0,true,true);
+ desktop_activity_draw(&c,&m);save(&c,argv[1],10);
+ system_view_tick=1000;desktop_activity_input(&right,&activity);
+ for(unsigned i=0;i<3;i++){
+  desktop_activity_home_tick(&activity,1000+i*80,true,true);
+  desktop_activity_draw(&c,&m);assert(!c.offset_x&&!c.offset_y);save(&c,argv[1],11+i);
+ }
+ for(unsigned i=0;i<2;i++){
+  desktop_activity_home_tick(&activity,1410+i*250,true,true);desktop_activity_draw(&c,&m);save(&c,argv[1],14+i);
+ }
+ system_view_tick=2000;desktop_activity_input(&right,&activity);
+ desktop_activity_home_tick(&activity,2080,true,true);desktop_activity_draw(&c,&m);save(&c,argv[1],16);
+ desktop_activity_home_tick(&activity,2160,true,true);desktop_activity_draw(&c,&m);save(&c,argv[1],17);
+ system_view_tick=2500;desktop_activity_input(&right,&activity);
+ desktop_activity_home_tick(&activity,2660,true,true);desktop_activity_draw(&c,&m);save(&c,argv[1],18);
+ state.writes=2;state.transfer=true;desktop_activity_update(&activity,&state,3);
+ for(unsigned i=0;i<2;i++){
+  desktop_activity_home_tick(&activity,2900+i*250,true,true);desktop_activity_draw(&c,&m);save(&c,argv[1],19+i);
+ }
+ state.display_on=false;desktop_activity_update(&activity,&state,3);
+ assert(!desktop_activity_home_tick(&activity,3400,true,true));desktop_activity_draw(&c,&m);save(&c,argv[1],21);
+ state.display_on=true;desktop_activity_update(&activity,&state,3);system_view_tick=3600;
+ desktop_activity_input(&right,&activity);assert(!m.offset);
+ assert(!desktop_activity_home_tick(&activity,3600,true,false));desktop_activity_draw(&c,&m);save(&c,argv[1],22);
+ desktop_activity_input(&left,&activity);
+ assert(!desktop_activity_home_tick(&activity,3700,true,false));desktop_activity_draw(&c,&m);save(&c,argv[1],23);
+'''
+
+
+def build_source(home=False):
     source = VIEW.read_text()
     source = re.sub(r"(static void|uint32_t)\s+(desktop_activity_\w+)\(", r"\1 \2(", source)
     header = (VIEW.with_suffix(".h")).read_text()
@@ -148,14 +180,18 @@ int main(int argc,char**argv){
  return 0;
 }
 '''
+    if home:
+        marker = ' desktop_activity_input(&right,&activity);assert(m.page==0);\n return 0;'
+        assert marker in text
+        text = text.replace(marker, marker.replace(' return 0;', HOME_DRIVER + '\n return 0;'), 1)
     return text
 
 
-def render(output):
+def render(output, home=False):
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="core-activity-ui-") as directory:
         work = Path(directory)
-        (work / "render.c").write_text(build_source())
+        (work / "render.c").write_text(build_source(home))
         compiled = subprocess.run(["cc", "-std=c11", "-O1", "-g", "-w", "-fsanitize=address,undefined",
             "-ffunction-sections", "-Wl,-dead_strip" if sys.platform == "darwin" else "-Wl,--gc-sections", "-I", str(ROOT / "lib/u8g2"),
             "-I", str(ROOT / "lib/mlib"), "-iquote", str(ROOT / "furi/core"),
@@ -168,22 +204,39 @@ def render(output):
             raise RuntimeError(compiled.stderr)
         subprocess.run([str(work / "render"), str(output.resolve())], check=True, timeout=15)
     frames = sorted(output.glob("*.pgm"))
-    assert len(frames) == 10
-    sheet = Image.new("RGB", (548, 5 * 164), "#eee")
+    assert len(frames) == (24 if home else 10)
+    sheet = Image.new("RGB", (548, ((len(frames)+1)//2) * 164), "#eee")
     draw = ImageDraw.Draw(sheet)
     labels = ["Activity", "Pause confirmation", "Idle / sleep", "Busy / denied",
               "Preview paused", "Recovery", "Restart confirmation", "Recovery idle",
               "Maximum counters", "Normal boot"]
+    labels += ["Home: activity", "Slide 0ms", "Slide 80ms", "Home: idle",
+               "Clock frame A", "Clock frame B", "Slide to recovery", "Home: recovery",
+               "Home: activity again", "Transfer frame A", "Transfer frame B", "Screen off: static",
+               "Motion disabled: idle", "Motion disabled: activity"]
     for i, frame in enumerate(frames):
         image = Image.open(frame).convert("RGB")
         x, y = (i % 2) * 274 + 8, (i // 2) * 164 + 22
         draw.text((x, y - 18), labels[i], fill="black")
         sheet.paste(image.resize((256, 128), Image.Resampling.NEAREST), (x, y))
     sheet.save(output / "system-activity.png")
-    print("10 production UI states; input assertions and 128x64 text bounds passed")
+    if home:
+        animated = [Image.open(path).convert("RGB").resize((512,256),Image.Resampling.NEAREST) for path in frames[10:21]]
+        animated[0].save(output / "dashboard.gif", save_all=True, append_images=animated[1:],
+                         duration=[800,80,80,200,250,250,80,800,500,250,250], loop=0)
+        chosen = [10,13,17,19,21,22]
+        summary = Image.new("RGB", (548, 3*164), "#eee"); summary_draw=ImageDraw.Draw(summary)
+        for position,index in enumerate(chosen):
+            x,y=8+(position%2)*274,22+(position//2)*164
+            summary_draw.text((x,y-18),labels[index],fill="black")
+            summary.paste(Image.open(frames[index]).convert("RGB").resize((256,128),Image.Resampling.NEAREST),(x,y))
+        summary.save(output / "dashboard-summary.png")
+    print(f"{len(frames)} production UI states; input assertions and 128x64 text bounds passed")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
-    render(parser.parse_args().output)
+    parser.add_argument("--home", action="store_true")
+    args=parser.parse_args()
+    render(args.output,args.home)

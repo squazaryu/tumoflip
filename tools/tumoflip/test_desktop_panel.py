@@ -1,12 +1,17 @@
 """Independent desktop profiles and bounded motion, actual serializer on fake storage."""
 from pathlib import Path
 import os
+import json
+import sys
 import subprocess
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tools/tumoflip/fixtures/desktop_settings_strings"
+COVERAGE = "--coverage" in sys.argv
+if COVERAGE:
+    sys.argv.remove("--coverage")
 
 HARNESS = r'''
 #include <assert.h>
@@ -165,9 +170,12 @@ class DesktopPanelTests(unittest.TestCase):
         work = Path(cls.temp.name)
         (work / "case.c").write_text(HARNESS)
         cls.binary = work / "test"
+        cls.work = work
+        cls.environment = dict(os.environ, LLVM_PROFILE_FILE=str(work/"run-%p.profraw"))
         compiled = subprocess.run([
             "cc", "-std=c11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
             "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
+            *(["-fprofile-instr-generate", "-fcoverage-mapping"] if COVERAGE else []),
             "-I", str(FIXTURES), "-I", str(ROOT), "-I", str(ROOT / "lib/toolbox"),
             str(work / "case.c"), str(ROOT / "lib/toolbox/saved_struct.c"), "-o", str(cls.binary),
         ], capture_output=True, text=True, timeout=30)
@@ -175,7 +183,22 @@ class DesktopPanelTests(unittest.TestCase):
             raise AssertionError(compiled.stderr)
 
     def run_case(self, name):
-        subprocess.run([str(self.binary), name], check=True, timeout=20)
+        subprocess.run([str(self.binary), name], check=True, timeout=20, env=self.environment)
+
+    @classmethod
+    def tearDownClass(cls):
+        if not COVERAGE:
+            return
+        from tools.tumoflip.test_desktop_settings_strings import llvm_tool
+        profile=cls.work/"coverage.profdata"
+        subprocess.run([llvm_tool("llvm-profdata"),"merge","-sparse",*map(str,cls.work.glob("*.profraw")),"-o",str(profile)],check=True,capture_output=True)
+        coverage=json.loads(subprocess.check_output([llvm_tool("llvm-cov"),"export",str(cls.binary),f"-instr-profile={profile}"],text=True))
+        for name in ("desktop_panel_i.h","desktop_panel_io_i.h"):
+            summary=next(entry["summary"] for entry in coverage["data"][0]["files"] if entry["filename"].endswith("/"+name))
+            for metric in ("lines","regions"):
+                result=summary[metric]
+                print(f"{name} {metric}: {result['covered']}/{result['count']} ({result['percent']:.2f}%)")
+                if result["percent"]<80:raise AssertionError(f"{name}: {metric} coverage below 80%")
 
     def test_wallpaper_abi_defaults_and_profile_independence(self):
         self.run_case("defaults")

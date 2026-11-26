@@ -6,6 +6,9 @@
 #include <stddef.h>
 #include <string.h>
 
+/* Presence denotes the feature, not a specific firmware tag or SDK minor. */
+#define RECORD_DESKTOP_PANEL "tumoflip_desktop_panel_v1"
+
 typedef enum {
     DesktopModeWallpaper,
     DesktopModeDashboard
@@ -47,7 +50,8 @@ static inline void
 }
 
 static inline bool desktop_panel_valid(const DesktopPanelSettings* panel) {
-    if(!panel || panel->mode > DesktopModeDashboard || panel->motion > 1 || panel->reserved[0] || panel->reserved[1])
+    if(!panel || panel->mode > DesktopModeDashboard || panel->motion > 1 || panel->reserved[0] ||
+       panel->reserved[1])
         return false;
     for(size_t i = 0; i < 3; ++i)
         if(!memchr(panel->held[i].name_or_path, '\0', sizeof(panel->held[i].name_or_path)))

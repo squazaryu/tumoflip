@@ -35,6 +35,7 @@ typedef struct {
     DesktopPanelSettings panel;
     DesktopMode shortcut_profile;
     bool panel_dirty;
+    bool supports_panel;
 
     Gui* gui;
     DialogsApp* dialogs;
@@ -62,3 +63,4 @@ typedef struct {
 #define DESKTOP_PANEL_REFRESH 1000
 FavoriteApp* desktop_settings_favorite(DesktopSettingsApp* app, FavoriteAppShortcut shortcut);
 bool desktop_settings_store_panel(DesktopSettingsApp* app);
+uint32_t desktop_settings_entry_for_index(DesktopSettingsApp* app, uint32_t index);

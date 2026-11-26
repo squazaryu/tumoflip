@@ -18,7 +18,7 @@
 
 FavoriteApp* desktop_settings_favorite(DesktopSettingsApp* app, FavoriteAppShortcut shortcut) {
     if((unsigned)shortcut >= FavoriteAppNumber) return NULL;
-    return app->shortcut_profile == DesktopModeDashboard ?
+    return app->supports_panel && app->shortcut_profile == DesktopModeDashboard ?
                desktop_panel_held(&app->panel, shortcut) :
                &app->settings.favorite_apps[shortcut];
 }
@@ -168,7 +168,8 @@ extern int32_t desktop_settings_app(void* p) {
 
     desktop_api_get_settings(desktop, &app->settings);
     desktop_panel_defaults(&app->panel, &app->settings);
-    desktop_panel_load(&app->panel);
+    app->supports_panel = furi_record_exists(RECORD_DESKTOP_PANEL);
+    if(app->supports_panel) desktop_panel_load(&app->panel);
     app->shortcut_profile = app->panel.mode;
     app->panel_dirty = false;
     app->menu_idx = 0;

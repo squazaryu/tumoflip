@@ -28,12 +28,17 @@ typedef enum {
     DesktopSettingsFavoriteOkLong,
 } DesktopSettingsEntry;
 
-static const char* const desktop_mode_text[] = {"Wallpaper", "Dashboard"};
+uint32_t desktop_settings_entry_for_index(DesktopSettingsApp* app, uint32_t index) {
+    return !app->supports_panel && index > 0 ? index + 3 : index;
+}
+
+static const char* const desktop_mode_text[] = {"Classic", "Panel"};
 static const char* const desktop_motion_text[] = {"Off", "On"};
 
 static void desktop_settings_scene_start_mode_changed(VariableItem* item) {
     DesktopSettingsApp* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
+    if(!app->supports_panel) return;
     if(index > DesktopModeDashboard) return;
     if(app->panel.mode != index) app->panel_dirty = true;
     app->panel.mode = index;
@@ -46,6 +51,7 @@ static void desktop_settings_scene_start_mode_changed(VariableItem* item) {
 static void desktop_settings_scene_start_shortcut_set_changed(VariableItem* item) {
     DesktopSettingsApp* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
+    if(!app->supports_panel) return;
     if(index > DesktopModeDashboard) return;
     app->shortcut_profile = index;
     app->menu_idx = DesktopSettingsShortcutSet;
@@ -56,6 +62,7 @@ static void desktop_settings_scene_start_shortcut_set_changed(VariableItem* item
 static void desktop_settings_scene_start_panel_motion_changed(VariableItem* item) {
     DesktopSettingsApp* app = variable_item_get_context(item);
     uint8_t index = variable_item_get_current_value_index(item);
+    if(!app->supports_panel) return;
     if(index > 1) return;
     if(app->panel.motion != index) app->panel_dirty = true;
     app->panel.motion = index;
@@ -119,7 +126,8 @@ const uint32_t displayBatteryPercentage_value[BATTERY_VIEW_COUNT] = {
 static void desktop_settings_scene_start_var_list_enter_callback(void* context, uint32_t index) {
     DesktopSettingsApp* app = context;
     app->menu_idx = index;
-    view_dispatcher_send_custom_event(app->view_dispatcher, index);
+    view_dispatcher_send_custom_event(
+        app->view_dispatcher, desktop_settings_entry_for_index(app, index));
 }
 
 static void desktop_settings_scene_start_battery_view_changed(VariableItem* item) {
@@ -177,26 +185,28 @@ void desktop_settings_scene_start_on_enter(void* context) {
 
     variable_item_list_add(variable_item_list, "PIN Setup", 1, NULL, NULL);
 
-    item = variable_item_list_add(
-        variable_item_list, "Desktop view", 2, desktop_settings_scene_start_mode_changed, app);
-    variable_item_set_current_value_index(item, app->panel.mode);
-    variable_item_set_current_value_text(item, desktop_mode_text[app->panel.mode]);
-    item = variable_item_list_add(
-        variable_item_list,
-        "Edit shortcuts",
-        2,
-        desktop_settings_scene_start_shortcut_set_changed,
-        app);
-    variable_item_set_current_value_index(item, app->shortcut_profile);
-    variable_item_set_current_value_text(item, desktop_mode_text[app->shortcut_profile]);
-    item = variable_item_list_add(
-        variable_item_list,
-        "Panel motion",
-        2,
-        desktop_settings_scene_start_panel_motion_changed,
-        app);
-    variable_item_set_current_value_index(item, app->panel.motion);
-    variable_item_set_current_value_text(item, desktop_motion_text[app->panel.motion]);
+    if(app->supports_panel) {
+        item = variable_item_list_add(
+            variable_item_list, "Desktop view", 2, desktop_settings_scene_start_mode_changed, app);
+        variable_item_set_current_value_index(item, app->panel.mode);
+        variable_item_set_current_value_text(item, desktop_mode_text[app->panel.mode]);
+        item = variable_item_list_add(
+            variable_item_list,
+            "Edit shortcuts",
+            2,
+            desktop_settings_scene_start_shortcut_set_changed,
+            app);
+        variable_item_set_current_value_index(item, app->shortcut_profile);
+        variable_item_set_current_value_text(item, desktop_mode_text[app->shortcut_profile]);
+        item = variable_item_list_add(
+            variable_item_list,
+            "Panel motion",
+            2,
+            desktop_settings_scene_start_panel_motion_changed,
+            app);
+        variable_item_set_current_value_index(item, app->panel.motion);
+        variable_item_set_current_value_text(item, desktop_motion_text[app->panel.motion]);
+    }
 
     item = variable_item_list_add(
         variable_item_list,
@@ -282,12 +292,12 @@ void desktop_settings_scene_start_on_enter(void* context) {
     const bool panel = app->shortcut_profile == DesktopModeDashboard;
     item = variable_item_list_add(
         variable_item_list, panel ? "Left short" : "Favorite App - Left Short", 1, NULL, NULL);
-    if(panel) variable_item_set_current_value_text(item, "Prev page");
+    if(panel) variable_item_set_current_value_text(item, "Prev");
     variable_item_list_add(
         variable_item_list, panel ? "Left hold" : "Favorite App - Left Long", 1, NULL, NULL);
     item = variable_item_list_add(
         variable_item_list, panel ? "Right short" : "Favorite App - Right Short", 1, NULL, NULL);
-    if(panel) variable_item_set_current_value_text(item, "Next page");
+    if(panel) variable_item_set_current_value_text(item, "Next");
     variable_item_list_add(
         variable_item_list, panel ? "Right hold" : "Favorite App - Right Long", 1, NULL, NULL);
     variable_item_list_add(

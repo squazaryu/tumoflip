@@ -10,7 +10,7 @@ typedef struct {
     uint16_t holds;
     uint8_t page;
     bool confirm, blocked;
-    bool home;
+    bool home, motion_enabled;
     uint32_t began;
     int16_t offset;
     int8_t direction;
@@ -120,7 +120,8 @@ static void desktop_activity_draw_page(Canvas* canvas, void* context) {
         desktop_activity_hero(
             canvas,
             &A_Clock_14,
-            tumo_system_model_quiet(s) ? "Quiet idle" : "Desktop live",
+            m->home ? (m->motion_enabled ? "Panel live" : "Panel static") :
+                      (s->display_on ? "Backlight on" : "Backlight off"),
             value,
             s->foreground ? "App: running" : "App: idle",
             m->icon_frame);
@@ -166,7 +167,9 @@ static bool desktop_activity_input(InputEvent* event, void* context) {
                     m->direction = event->key == InputKeyRight ? 1 : -1;
                     m->page = desktop_panel_page(m->page, m->direction);
                     m->began = furi_get_tick();
-                    m->offset = desktop_panel_offset(m->began, m->began, m->direction, true);
+                    m->offset =
+                        desktop_panel_offset(m->began, m->began, m->direction, m->motion_enabled);
+                    if(!m->motion_enabled) m->direction = 0;
                     action = DesktopActivityHomeChanged;
                     notify = true;
                 }
@@ -260,6 +263,7 @@ void desktop_activity_set_home(DesktopActivityView* activity, bool home) {
         DesktopActivityModel * m,
         {
             m->home = home;
+            m->motion_enabled = false;
             m->confirm = m->blocked = false;
             m->offset = m->direction = m->icon_frame = 0;
         },
@@ -279,6 +283,7 @@ uint32_t desktop_activity_home_tick(
         {
             if(m->home) {
                 bool awake = alive && animate && m->state.display_on && !m->state.recovery;
+                m->motion_enabled = awake;
                 int16_t offset = desktop_panel_offset(m->began, now, m->direction, awake);
                 uint8_t frame = awake ? desktop_panel_icon_frame(now, 40) : 0;
                 changed = offset != m->offset || frame != m->icon_frame;

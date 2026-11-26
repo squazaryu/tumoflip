@@ -16,6 +16,7 @@
 #include "furi_hal_power.h"
 
 #define TAG "Desktop"
+static uint8_t desktop_panel_capability = 1;
 
 static void desktop_auto_lock_arm(Desktop*);
 static void desktop_auto_lock_inhibit(Desktop*);
@@ -510,6 +511,7 @@ static Desktop* desktop_alloc(void) {
     furi_system_policy_listen(desktop_policy_changed, desktop);
     furi_system_policy_application(desktop->app_running);
 
+    furi_record_create(RECORD_DESKTOP_PANEL, &desktop_panel_capability);
     furi_record_create(RECORD_DESKTOP, desktop);
 
     return desktop;
