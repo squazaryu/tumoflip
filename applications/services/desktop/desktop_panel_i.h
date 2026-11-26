@@ -14,7 +14,8 @@ typedef enum {
 typedef struct {
     uint32_t generation;
     uint8_t mode;
-    uint8_t reserved[3];
+    uint8_t motion;
+    uint8_t reserved[2];
     FavoriteApp held[3];
 } DesktopPanelSettings;
 
@@ -36,6 +37,7 @@ static inline FavoriteApp*
 static inline void
     desktop_panel_defaults(DesktopPanelSettings* panel, const DesktopSettings* wallpaper) {
     memset(panel, 0, sizeof(*panel));
+    panel->motion = 1;
     static const FavoriteAppShortcut held[] = {
         FavoriteAppLeftLong, FavoriteAppRightLong, FavoriteAppOkLong};
     for(size_t i = 0; i < 3; ++i) {
@@ -45,8 +47,7 @@ static inline void
 }
 
 static inline bool desktop_panel_valid(const DesktopPanelSettings* panel) {
-    if(!panel || panel->mode > DesktopModeDashboard || panel->reserved[0] || panel->reserved[1] ||
-       panel->reserved[2])
+    if(!panel || panel->mode > DesktopModeDashboard || panel->motion > 1 || panel->reserved[0] || panel->reserved[1])
         return false;
     for(size_t i = 0; i < 3; ++i)
         if(!memchr(panel->held[i].name_or_path, '\0', sizeof(panel->held[i].name_or_path)))

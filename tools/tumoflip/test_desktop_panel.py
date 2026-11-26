@@ -61,7 +61,8 @@ static void defaults_case(void){
  _Static_assert(sizeof(DesktopSettings)==648,"Existing public settings ABI must not change");
  DesktopSettings old=wallpaper(), before=old;DesktopPanelSettings panel;
  desktop_panel_defaults(&panel,&old);
- assert(panel.mode==DesktopModeWallpaper&&panel.generation==0&&desktop_panel_valid(&panel));
+ assert(panel.mode==DesktopModeWallpaper&&panel.motion==1&&panel.generation==0&&desktop_panel_valid(&panel));
+ panel.motion=2;assert(!desktop_panel_valid(&panel));panel.motion=0;assert(desktop_panel_valid(&panel));panel.motion=1;
  assert(!memcmp(&old,&before,sizeof(old))&&!writes);
  assert(!strcmp(desktop_panel_held(&panel,FavoriteAppLeftLong)->name_or_path,"Original 1"));
  assert(!strcmp(desktop_panel_held(&panel,FavoriteAppRightLong)->name_or_path,"Original 3"));
@@ -121,7 +122,7 @@ static void motion_case(void){
 static void edges_case(void){
  DesktopSettings old=wallpaper();DesktopPanelSettings panel,read;
  desktop_panel_defaults(&panel,&old);assert(!desktop_panel_valid(NULL)&&!desktop_panel_held(NULL,99));
- for(unsigned i=0;i<3;i++){
+ for(unsigned i=0;i<2;i++){
   panel.reserved[i]=1;assert(!desktop_panel_valid(&panel));panel.reserved[i]=0;
   memset(panel.held[i].name_or_path,'Z',128);assert(!desktop_panel_valid(&panel));desktop_panel_defaults(&panel,&old);
  }

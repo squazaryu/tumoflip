@@ -7,6 +7,7 @@ typedef enum {
     DesktopActivityPausePhone,
     DesktopActivityAllowPhone,
     DesktopActivityRestart,
+    DesktopActivityHomeChanged,
 } DesktopActivityAction;
 
 typedef struct DesktopActivityView DesktopActivityView;
@@ -19,3 +20,9 @@ void desktop_activity_update(
     const TumoSystemState* state,
     uint16_t holds);
 void desktop_activity_blocked(DesktopActivityView* activity);
+void desktop_activity_set_home(DesktopActivityView* activity, bool home);
+uint32_t desktop_activity_home_tick(
+    DesktopActivityView* activity,
+    uint32_t now,
+    bool alive,
+    bool animate);

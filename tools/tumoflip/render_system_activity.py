@@ -14,10 +14,15 @@ VIEW = ROOT / "applications/services/desktop/views/desktop_view_activity.c"
 
 def build_source():
     source = VIEW.read_text()
+    source = re.sub(r"(static void|uint32_t)\s+(desktop_activity_\w+)\(", r"\1 \2(", source)
     header = (VIEW.with_suffix(".h")).read_text()
     canvas = (ROOT / "applications/services/gui/canvas.c").read_text()
     elements = (ROOT / "applications/services/gui/elements.c").read_text()
-    chunks = [gui.SUPPORT, '#include "system_policy_i.h"\n#include <stddef.h>',
+    support = gui.SUPPORT.replace(
+        'typedef struct {size_t width,height;const uint8_t* data;} Icon;',
+        'typedef struct {size_t width,height;const uint8_t* data;uint8_t frame_count;const uint8_t*const*frames;} Icon;')
+    support = support.replace('u8g2_DrawXBMP(&c->fb,x,y,', 'u8g2_DrawXBMP(&c->fb,x+c->offset_x,y+c->offset_y,')
+    chunks = [support, '#include "system_policy_i.h"\n#include <stddef.h>',
               '#include "applications/services/desktop/desktop_panel_i.h"\n'
               'static uint32_t system_view_tick;\nstatic uint32_t furi_get_tick(void){return system_view_tick;}']
     chunks.append(canvas[canvas.index("const CanvasFontParameters canvas_font_params"):canvas.index("Canvas* canvas_init")])
@@ -27,23 +32,33 @@ def build_source():
                  "void canvas_draw_rframe("):
         body = gui.function(canvas, name)
         if name in ("void canvas_draw_str(", "void canvas_draw_str_aligned("):
-            body = body.replace("    u8g2_DrawUTF8", '    if(x<0 || x+u8g2_GetUTF8Width(&canvas->fb,str)>128) fprintf(stderr,"Text bounds: %s x=%d width=%d\\n",str,x,u8g2_GetUTF8Width(&canvas->fb,str));\n'
-                                '    assert(x>=0 && x+u8g2_GetUTF8Width(&canvas->fb,str)<=128);\n'
-                                '    assert(y<=64 && y-u8g2_GetAscent(&canvas->fb)>=13);\n    u8g2_DrawUTF8')
+            body = body.replace("    u8g2_DrawUTF8", '    int32_t lx=x-canvas->offset_x,ly=y-canvas->offset_y;\n'
+                                '    if(lx<0 || lx+u8g2_GetUTF8Width(&canvas->fb,str)>128) fprintf(stderr,"Text bounds: %s x=%d width=%d\\n",str,lx,u8g2_GetUTF8Width(&canvas->fb,str));\n'
+                                '    assert(lx>=0 && lx+u8g2_GetUTF8Width(&canvas->fb,str)<=128);\n'
+                                '    assert(ly<=64 && ly-u8g2_GetAscent(&canvas->fb)>=13);\n    u8g2_DrawUTF8')
         chunks.append(body)
     chunks.append(gui.function(elements, "void elements_button_center("))
     chunks.append(header[header.index("typedef enum"):header.index("typedef struct DesktopActivityView")])
     chunks.append("typedef struct DesktopActivityView DesktopActivityView;")
-    chunks.append(source[source.index("typedef struct"):source.index("static void desktop_activity_badge")])
+    chunks.append(source[source.index("typedef struct"):source.index("static void desktop_activity_icon")])
     chunks.append(r'''
 enum { InputTypeShort, InputTypeRepeat, InputTypeLong,InputKeyBack,InputKeyLeft,InputKeyRight,InputKeyOk };
 typedef struct {int type,key;} InputEvent;
 typedef void View;
 static size_t icon_get_width(const Icon*i){return i->width;}
 static size_t icon_get_height(const Icon*i){return i->height;}
+static uint8_t icon_get_frame_count(const Icon*i){return i->frame_count;}
+static const uint8_t*icon_get_frame_data(const Icon*i,uint8_t n){assert(n<i->frame_count);return i->frames[n];}
+static void canvas_draw_bitmap(Canvas*c,int32_t x,int32_t y,size_t w,size_t h,const uint8_t*data){
+ u8g2_DrawXBMP(&c->fb,x+c->offset_x,y+c->offset_y,w,h,data);
+}
+static void canvas_frame_set(Canvas*c,int32_t x,int32_t y,size_t w,size_t h){
+ assert(w==128&&h==64);c->offset_x=x;c->offset_y=y;
+}
 ''')
     # View is opaque; only the real input/draw/update handlers run here, not hardware allocation.
     chunks[-2] = chunks[-2].replace("View* view;", "void* view;")
+    chunks.append(gui.function(source, "static void desktop_activity_icon("))
     badge = gui.function(source, "static void desktop_activity_badge(")
     badge = badge.replace("    canvas_draw_rframe", '    canvas_set_font(canvas,FontSecondary);\n'
         '    assert(icon_get_width(icon)+2+canvas_string_width(canvas,label)<=38);\n'
@@ -52,7 +67,7 @@ static size_t icon_get_height(const Icon*i){return i->height;}
         '    canvas_draw_str_aligned', 1)
     chunks.append(badge)
     chunks += [gui.function(source, name) for name in (
-        "static void desktop_activity_hero(", "static void desktop_activity_draw(",
+        "static void desktop_activity_hero(", "static void desktop_activity_draw_page(", "static void desktop_activity_draw(",
         "static bool desktop_activity_input(", "void desktop_activity_reset(",
         "void desktop_activity_update(", "void desktop_activity_blocked(")]
     for signature in ("void desktop_activity_set_home(", "uint32_t desktop_activity_home_tick("):
@@ -71,13 +86,16 @@ static void preview_status_bar(Canvas*c){
     for name in sorted(set(re.findall(r"\b(?:I|A)_[A-Za-z0-9_]+", text + preview_bar))):
         path = (next((ROOT / "assets/icons").rglob(name[2:])) / "frame_01.png" if name.startswith("A_")
                 else next((ROOT / "assets/icons").rglob(name[2:] + ".png")))
-        image = Image.open(path).convert("1")
-        width, height = image.size
-        bits = [sum(1 << bit for bit in range(8) if x * 8 + bit < width and
-                    image.getpixel((x * 8 + bit, y)) == 0)
-                for y in range(height) for x in range((width + 7) // 8)]
-        icons.append(f'static const uint8_t {name}_bits[]={{' + ",".join(map(str, bits)) + "};")
-        icons.append(f'static const Icon {name}={{{width},{height},{name}_bits}};')
+        frames = sorted(path.parent.glob("frame_*.png")) if name.startswith("A_") else [path]
+        for index, frame in enumerate(frames):
+            image = Image.open(frame).convert("1")
+            width, height = image.size
+            bits = [sum(1 << bit for bit in range(8) if x * 8 + bit < width and
+                        image.getpixel((x * 8 + bit, y)) == 0)
+                    for y in range(height) for x in range((width + 7) // 8)]
+            icons.append(f'static const uint8_t {name}_bits{index}[]={{' + ",".join(map(str, bits)) + "};")
+        icons.append(f'static const uint8_t*const {name}_frames[]={{' + ",".join(f"{name}_bits{i}" for i in range(len(frames))) + "};")
+        icons.append(f'static const Icon {name}={{{width},{height},{name}_bits0,{len(frames)},{name}_frames}};')
     # Icon is defined in SUPPORT, before any production draw function.
     text = text.replace("const CanvasFontParameters canvas_font_params", "\n".join(icons) + "\nconst CanvasFontParameters canvas_font_params", 1)
     text += preview_bar
