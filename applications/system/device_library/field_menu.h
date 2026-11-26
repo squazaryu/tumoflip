@@ -31,6 +31,7 @@ enum {
     FieldNextCards,
     FieldPreviousCards,
     FieldCheckLinkedFiles,
+    FieldNextPending,
     FieldCardBase = 100,
     FieldRoundBase = 200,
 };
@@ -48,3 +49,5 @@ void field_menu_build(
     void (*callback)(void*, uint32_t),
     void* context);
 bool field_menu_allows(const FieldMenuState* state, uint32_t action);
+/** Move only the in-memory selection; do not launch, mark or save an object. */
+bool field_menu_select_next_pending(FieldMenuState* state);

@@ -18,7 +18,10 @@ def build_source():
     for name, boundary in (("field_round.h", "bool field_round_begin"),
                            ("field_menu.h", "void field_menu_build")):
         source += re.sub(r"^#(?:include|pragma).*\n", "\n", (APP / name).read_text().split(boundary, 1)[0], flags=re.M)
-    source += function((APP / "field_round.c").read_text(), "const char* field_round_result_name(")
+    source += function((APP / "field_io.c").read_text(), "bool field_text_valid(")
+    for signature in ("const char* field_round_result_name(",
+                      "static bool field_round_valid(", "bool field_round_pending_count("):
+        source += function((APP / "field_round.c").read_text(), signature)
     source += function((APP / "field_menu.c").read_text(), "static bool field_menu_has_item(")
     source += function((APP / "field_menu.c").read_text(), "void field_menu_build(")
     source += r'''
@@ -45,7 +48,7 @@ int main(int argc,char**argv){assert(argc==2);Canvas c={0};screen=&c;static uint
  static const u8x8_display_info_t info={.tile_width=16,.tile_height=8,.pixel_width=128,.pixel_height=64};
  c.fb.u8x8.display_info=&info;u8g2_SetupBuffer(&c.fb,buf,8,u8g2_ll_hvline_vertical_top_lsb,U8G2_R0);canvas_set_color(&c,ColorBlack);
  Submenu menu={0};SubmenuItemArray_init(menu.items);menu.header=furi_string_alloc();
- FieldRound round={.started=1,.count=4,.items={{.object="Office",.result=0},{.object="Front gate",.result=1},{.object="Weather sensor",.result=2},{.object="Garage",.result=3}}};
+ FieldRound round={.started=1,.count=4,.items={{.object="Office",.result=0},{.object="Front gate",.result=1,.timestamp=2},{.object="Weather sensor",.result=2,.timestamp=3},{.object="Garage",.result=3,.timestamp=4}}};
  DeviceCard card={.name="Office"};char names[32][32];for(unsigned i=0;i<32;i++)snprintf(names[i],32,"Object %02u",i+1);
  FieldMenuState state={.round=&round,.card=&card,.names=(const char(*)[32])names};
  state.page=FieldPageHome;field_menu_build(&menu,&state,NULL,NULL);render_menu(&c,argv[1],"01-home",&menu,0,0);render_menu(&c,argv[1],"02-home-bottom",&menu,7,5);
@@ -85,6 +88,12 @@ int main(int argc,char**argv){assert(argc==2);Canvas c={0};screen=&c;static uint
  links_sd_ready=true;card.link_count=0;
  field_links_report(&card,&card,&report);
  text_page(&c,argv[1],"26-no-links",furi_string_get_cstr(&report),0);
+ for(unsigned i=0;i<round.count;i++){round.items[i].result=FieldRoundSkipped;round.items[i].timestamp=10;}
+ state.page=FieldPageRound;field_menu_build(&menu,&state,NULL,NULL);render_menu(&c,argv[1],"27-round-no-pending",&menu,0,0);
+ round.count=LIBRARY_PINS+1;field_menu_build(&menu,&state,NULL,NULL);render_menu(&c,argv[1],"28-round-unavailable",&menu,0,0);
+ round.count=LIBRARY_PINS;
+ for(unsigned i=0;i<round.count;i++){memset(&round.items[i],0,sizeof(round.items[i]));snprintf(round.items[i].object,32,"Object %02u",i+1);}
+ field_menu_build(&menu,&state,NULL,NULL);render_menu(&c,argv[1],"29-round-full",&menu,0,0);
  return 0;}
 '''
     return source
@@ -107,8 +116,8 @@ def main():
             raise RuntimeError(built.stderr)
         subprocess.run([str(work / "render"), str(args.output)], check=True)
     frames = sorted(args.output.glob("*.pgm"))
-    if len(frames) != 26:
-        raise RuntimeError(f"Expected 26 frames, got {len(frames)}")
+    if len(frames) != 29:
+        raise RuntimeError(f"Expected 29 frames, got {len(frames)}")
     sheet = Image.new("RGB", (3 * 270, ((len(frames) + 2) // 3) * 155), "#e6e6e6")
     draw = ImageDraw.Draw(sheet)
     for index, path in enumerate(frames):

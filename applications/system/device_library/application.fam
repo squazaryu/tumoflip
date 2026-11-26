@@ -25,8 +25,8 @@ App(
     stack_size=4096,
     fap_icon="../protopirate_to_subghz/icon.png",
     fap_category="Tools",
-    fap_version="1.1",
-    fap_description="Manual object rounds, linked-file checks, verified portable objects and explicit capture inventory. No automatic radio actions or deletion.",
+    fap_version="1.2",
+    fap_description="Manual object rounds with next-pending navigation, linked-file checks, verified portable objects and explicit capture inventory. No automatic radio actions or deletion.",
     fap_package_only=True,
     fap_libs=["mbedtls", "fap_metadata"],
 )

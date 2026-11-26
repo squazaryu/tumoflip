@@ -88,6 +88,7 @@ int main(void) {
         assert(field_round_mark(&round,i,FieldRoundSkipped,"Not visited",101+i));
     assert(!field_menu_allows(&state,FieldNextPending));
     assert(!field_menu_select_next_pending(&state));
+    assert(!field_menu_select_next_pending(NULL));
     field_menu_build(&menu,&state,NULL,NULL);
     assert(!strcmp(menu.header,"Round: 0/3 left"));
     for(unsigned i=0;i<menu.count;i++) assert(menu.actions[i]!=FieldNextPending);
