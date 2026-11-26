@@ -121,6 +121,15 @@ are **not** replacement assets for that published release. A separately
 authorized release needs a fresh version, exact-source CI, normal package
 validation and remote checksum verification. Hardware acceptance remains open.
 
+Cleanup completed after verification: removed only this task's generated
+`build/f7-firmware-C` tree and `build/latest` symlink (304180 KiB allocated,
+including SDK copies, map, diagnostic LTRANS assembly/objects, FAP and firmware
+binaries). No build process was using the tree and it contained no tracked
+files. Filesystem free space increased by 295064 KiB over cleanup; unrelated
+background filesystem activity accounts for differences from the directory's
+allocation. Source, toolchain, previews and all user/device/SD data were retained.
+No large backup archive was created; the checked source can rebuild the outputs.
+
 Rebuild with the bundled toolchain:
 
 ```sh
