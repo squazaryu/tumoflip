@@ -42,7 +42,12 @@ bool storage_file_open(File*f,const char* path,FS_AccessMode access,FS_OpenMode 
 }
 size_t storage_file_read(File*f,void*data,size_t size){
  assert(f->bank>=0);size_t available=files[f->bank].size-f->position;
- if(size>available)size=available;memcpy(data,files[f->bank].bytes+f->position,size);f->position+=size;return size;
+ if(size>available){
+  size=available;
+ }
+ memcpy(data,files[f->bank].bytes+f->position,size);
+ f->position+=size;
+ return size;
 }
 size_t storage_file_write(File*f,const void*data,size_t size){
  assert(f->bank>=0);if(write_budget>=0&&(int)size>write_budget)size=write_budget;
@@ -184,6 +189,15 @@ class DesktopPanelTests(unittest.TestCase):
 
     def run_case(self, name):
         subprocess.run([str(self.binary), name], check=True, timeout=20, env=self.environment)
+
+    def test_fixture_compiles_with_strict_gcc_diagnostics(self):
+        candidates = [ROOT/"toolchain/current/bin",ROOT/"toolchain/x86_64-linux/bin",ROOT/"toolchain/arm64-darwin/bin"]
+        compiler=next((path/"arm-none-eabi-gcc" for path in candidates if (path/"arm-none-eabi-gcc").exists()),None)
+        self.assertIsNotNone(compiler,"The bundled ARM GCC is required for fixture portability")
+        result=subprocess.run([str(compiler),"-std=c11","-Wall","-Wextra","-Werror","-fsyntax-only",
+            "-I",str(FIXTURES),"-I",str(ROOT),"-I",str(ROOT/"lib/toolbox"),str(self.work/"case.c")],
+            capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stderr)
 
     @classmethod
     def tearDownClass(cls):
