@@ -17,7 +17,9 @@ def build_source():
     header = (VIEW.with_suffix(".h")).read_text()
     canvas = (ROOT / "applications/services/gui/canvas.c").read_text()
     elements = (ROOT / "applications/services/gui/elements.c").read_text()
-    chunks = [gui.SUPPORT, '#include "system_policy_i.h"\n#include <stddef.h>']
+    chunks = [gui.SUPPORT, '#include "system_policy_i.h"\n#include <stddef.h>',
+              '#include "applications/services/desktop/desktop_panel_i.h"\n'
+              'static uint32_t system_view_tick;\nstatic uint32_t furi_get_tick(void){return system_view_tick;}']
     chunks.append(canvas[canvas.index("const CanvasFontParameters canvas_font_params"):canvas.index("Canvas* canvas_init")])
     for name in ("void canvas_clear(", "void canvas_set_color(", "void canvas_invert_color(",
                  "void canvas_set_font(", "void canvas_draw_str(", "void canvas_draw_str_aligned(",
@@ -34,7 +36,7 @@ def build_source():
     chunks.append("typedef struct DesktopActivityView DesktopActivityView;")
     chunks.append(source[source.index("typedef struct"):source.index("static void desktop_activity_badge")])
     chunks.append(r'''
-enum { InputTypeShort, InputTypeRepeat, InputKeyBack,InputKeyLeft,InputKeyRight,InputKeyOk };
+enum { InputTypeShort, InputTypeRepeat, InputTypeLong,InputKeyBack,InputKeyLeft,InputKeyRight,InputKeyOk };
 typedef struct {int type,key;} InputEvent;
 typedef void View;
 static size_t icon_get_width(const Icon*i){return i->width;}
@@ -53,6 +55,9 @@ static size_t icon_get_height(const Icon*i){return i->height;}
         "static void desktop_activity_hero(", "static void desktop_activity_draw(",
         "static bool desktop_activity_input(", "void desktop_activity_reset(",
         "void desktop_activity_update(", "void desktop_activity_blocked(")]
+    for signature in ("void desktop_activity_set_home(", "uint32_t desktop_activity_home_tick("):
+        if signature in source:
+            chunks.append(gui.function(source, signature))
     text = "\n".join(chunks)
     preview_bar = r'''
 /* Stock Desktop bar on synthetic states; not an observation of a connected device. */
@@ -136,6 +141,7 @@ def render(output):
         compiled = subprocess.run(["cc", "-std=c11", "-O1", "-g", "-w", "-fsanitize=address,undefined",
             "-ffunction-sections", "-Wl,-dead_strip" if sys.platform == "darwin" else "-Wl,--gc-sections", "-I", str(ROOT / "lib/u8g2"),
             "-I", str(ROOT / "lib/mlib"), "-iquote", str(ROOT / "furi/core"),
+            "-I", str(ROOT),
             str(work / "render.c"), str(ROOT / "furi/core/system_policy_model.c"),
             *[str(path) for path in (ROOT / "lib/u8g2").glob("u8g2_*.c") if path.name != "u8g2_glue.c"],
             *map(str, (ROOT / "lib/u8g2").glob("u8x8_*.c")), "-lm", "-o", str(work / "render")],
