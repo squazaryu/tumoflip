@@ -155,6 +155,16 @@ outputs can be reproduced from the checked commit with
 `FBT_NO_SYNC=1 ./fbt -j2 firmware_all`. They must pass the unchanged release
 gate before any installation/publication, including any future Dashboard mode.
 
+Cleanup completed after the checks: removed the task-created
+`build/f7-firmware-C` tree (129252 KiB allocated before cleanup), including
+objects, libraries, ELF/BIN/DFU/HEX, map, SDK-header copies and compilation DB,
+and its generated `build/latest` symlink. No build process was using it and no
+tracked file was under that tree. Source, toolchain, previews, all other
+branches, user files and SD data were preserved. The filesystem's free space
+increased by 138032 KiB over the cleanup interval; that net figure also includes
+unrelated background filesystem activity. Rebuild from the checked source using
+the command above; no binary backup/archive was made.
+
 Run focused checks:
 
 ```sh
