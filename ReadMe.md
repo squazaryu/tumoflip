@@ -195,7 +195,7 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-010` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-011-004` | Saved RAW editor, bounded text entry and two receive presets | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
+| **Dev** | `t-dev-011-005` | Optional Panel desktop, activity safeguards and Field Tools 1.2 | [Published releases](https://github.com/squazaryu/tumoflip/releases) |
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
@@ -263,7 +263,7 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-011-004.tgz
+flipper-z-f7-update-t-dev-011-005.tgz
 ```
 
 ## Compatibility notes
