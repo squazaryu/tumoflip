@@ -6,12 +6,13 @@
 #include <furi.h>
 #include <stdio.h>
 #include "../defines.h"
-#include "../protocols/protocols_common.h"
 
 #define TAG "ProtoPirateSettings"
 
 #define SETTINGS_FILE_HEADER  "ProtoPirate Settings"
 #define SETTINGS_FILE_VERSION 1
+
+static const char settings_frequency_key[] = "Frequency";
 
 void protopirate_settings_set_defaults(ProtoPirateSettings* settings) {
     settings->frequency = 433920000;
@@ -69,7 +70,7 @@ void protopirate_settings_load(ProtoPirateSettings* settings) {
         furi_string_free(header);
 
         // Read frequency
-        if(!flipper_format_read_uint32(ff, FF_FREQUENCY, &settings->frequency, 1)) {
+        if(!flipper_format_read_uint32(ff, settings_frequency_key, &settings->frequency, 1)) {
             FURI_LOG_W(TAG, "Failed to read frequency, using default");
             settings->frequency = 433920000;
         }
@@ -197,7 +198,7 @@ void protopirate_settings_save(ProtoPirateSettings* settings) {
             break;
         }
 
-        if(!flipper_format_write_uint32(ff, FF_FREQUENCY, &settings->frequency, 1)) {
+        if(!flipper_format_write_uint32(ff, settings_frequency_key, &settings->frequency, 1)) {
             FURI_LOG_E(TAG, "Failed to write frequency");
             break;
         }
