@@ -86,6 +86,10 @@ void desktop_panel_sync(Desktop* desktop) {
         desktop_panel_pause(desktop);
         return;
     }
+    if(desktop->locked) {
+        desktop_panel_prepare_lock(desktop);
+        return;
+    }
     if(desktop->panel_settings.mode != DesktopModeDashboard || desktop->panel_safe_boot) {
         desktop_panel_pause(desktop);
         desktop_panel_bind(desktop, false);
