@@ -191,7 +191,7 @@ static void ble_glue_dump_stack_info(void) {
         c2_info->FusMemorySizeFlash);
     FURI_LOG_I(
         TAG,
-        "Core2: Stack: %d.%d.%d, branch %d, reltype %d, stacktype %d, flash %d pages",
+        "C2 stack %d.%d.%d b%d rel%d type%d flash%dpg",
         c2_info->VersionMajor,
         c2_info->VersionMinor,
         c2_info->VersionSub,
