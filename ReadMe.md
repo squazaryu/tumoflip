@@ -8,7 +8,7 @@
 
 [![Stable release](https://img.shields.io/github/v/release/squazaryu/tumoflip?label=stable&color=brightgreen)](https://github.com/squazaryu/tumoflip/releases/latest)
 [![Release workflow](https://img.shields.io/github/actions/workflow/status/squazaryu/tumoflip/release.yml?branch=main&label=build)](https://github.com/squazaryu/tumoflip/actions/workflows/release.yml)
-![Firmware API](https://img.shields.io/badge/Dev%20source%20API-88.23-8b5cf6)
+![Firmware API](https://img.shields.io/badge/Firmware%20API-88.23-8b5cf6)
 ![Target](https://img.shields.io/badge/Target-Flipper%20Zero%20F7-f97316)
 [![License](https://img.shields.io/badge/License-GPLv3-2563eb)](LICENSE)
 
@@ -29,7 +29,7 @@ The project is independent. We selectively integrate upstream improvements and
 keep Tumoflip-specific changes, release identities, and package contracts in
 this repository.
 
-> **Current stable:** `t-flppr-fw-010` (`v1.0.10`) · API `88.23` · Flipper Zero F7
+> **Current stable:** `t-flppr-fw-011` (`v1.0.11`) · API `88.23` · Flipper Zero F7
 >
 > Previous immutable rollback: `t-flppr-fw-008` (`v1.0.8`) · API `88.7`.
 >
@@ -194,12 +194,13 @@ rollback rules, checksums, and catalog baseline policy.
 
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
-| **Stable** | `t-flppr-fw-010` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-011-007` | Candidate based on 004: receive fixes and file-transfer cleanup | [Candidate status](documentation/Dev011006.md) |
+| **Stable** | `t-flppr-fw-011` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
+| **Dev** | `t-dev-011-006` | Earlier published test snapshot; rollback/testing only | [Dev release](https://github.com/squazaryu/tumoflip/releases/tag/t-dev-011-006) |
 
-Dev 011-006 is being prepared, not published. Dev 011-005 was rejected after
-boot loops and is not its source baseline. Keep using the working 011-004
-until a new release is explicitly published; see the candidate status above.
+Stable 011 promotes the working Dev011-006 baseline and the owner-tested local
+007 UI2 desktop panels. Local 007 was not a separate public Dev release.
+Dev011-005 remains rejected; its mixed runtime/recovery/LTO changes were not
+imported. See [Stable011 notes](docs/releases/t-flppr-fw-011.md).
 
 Stable tags, firmware archives, manifests, and package-only releases are
 immutable. A new package catalog does not overwrite a firmware release, and a
@@ -232,7 +233,16 @@ private feature FALs from Stable010/Dev031 with this build. Existing captured
 files/settings are not migrated, cleaned or deleted by this change; physical
 acceptance remains Dev testing. See [the exact upstream review](docs/upstream-2026-11-16.md).
 
-Stable `t-flppr-fw-010` / `v1.0.10` promotes the Dev 009 line with selective
+Stable `t-flppr-fw-011` / `v1.0.11` adds optional native desktop panels, keeps
+their current page on the lock screen without weakening PIN/unlock controls,
+and fixes the redraw callback/context race. It retains Dev011's receive,
+RAW/file UI, BLE persistence and storage-disconnect fixes, with API88.23 and
+the full4096-byte C2 reserve. Install matching native resources and the separate
+FW Packages Stable008 snapshot after its activation. TumoCompanion1.12.0 can
+use this pair without a new IPA. User capture files and app data are not moved
+or cleaned. See [scope, migration and acceptance](docs/releases/t-flppr-fw-011.md).
+
+Earlier Stable `t-flppr-fw-010` / `v1.0.10` promoted the Dev 009 line with selective
 Unleashed 095 improvements: external Core Proteco, defensive IR parsing,
 recoverable case-only renames, failed-folder navigation and correct Standard/ARF
 save ownership. The firmware keeps local API 88.23 and the full 4096-byte C2
@@ -254,8 +264,8 @@ proof of a fix for the historic idle OOM symptom. Older releases stay immutable.
 
 1. Install or update [TumoCompanion](https://github.com/squazaryu/TumoCompanion).
 2. Connect the Flipper Zero over BLE.
-3. Open **Updates → Firmware → Stable** and select `t-flppr-fw-010` with native resources.
-4. Then install **FW Packages → Stable 007** after catalog activation.
+3. Open **Updates → Firmware → Stable** and select `t-flppr-fw-011` with native resources.
+4. Then install **FW Packages → Stable 008** after catalog activation.
 
 Back up `/int` and important SD-card files before flashing. Custom apps,
 settings, IR files, and Sub-GHz files should be copied somewhere safe.
@@ -267,13 +277,13 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-011-007.tgz
+flipper-z-f7-update-t-flppr-fw-011.tgz
 ```
 
 ## Compatibility notes
 
 - Target: Flipper Zero F7 (`target 7`).
-- Firmware API: Stable `v1.0.10`, Dev `t-dev-011-003` and rollback Dev `t-dev-009-039` use `88.23`;
+- Firmware API: Stable `v1.0.11`/`v1.0.10`, Dev `t-dev-011-006` and rollback Dev `t-dev-009-039` use `88.23`;
   immutable stable `v1.0.8` remains `88.7`.
   Each release manifest records its compatible package API. API numbers are
   local to this fork.

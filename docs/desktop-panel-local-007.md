@@ -1,9 +1,11 @@
 # Local Panel candidate based on Dev 011-006
 
-This is an unpublished local test candidate, not a Stable release. The source
+This records the local 007 UI2 validation that is promoted into Stable011. It was
+not a separate public Dev release. The owner reported successful installation and
+apparently stable use; exhaustive device acceptance is not claimed. The source
 starts at released 006 (`950d58388b5574421c27a733562a671e8ec40b3c`). It deliberately
 does not merge rejected 005 or change its boot, RTOS, recovery, journal or resident
-library compilation policy. Hardware acceptance remains pending.
+library compilation policy. See the Stable release notes for the publication state.
 
 ## Included
 
@@ -60,4 +62,4 @@ Do not retry flashing the same failing candidate repeatedly. Record the visible
 message and stage, and roll back to the working 006. Local/native tests cannot
 prove physical boot, LCD timing, battery drain or long-idle stability.
 
-Nothing in this task publishes a tag/catalog, updates iOS or flashes hardware.
+The original local task did not publish a tag/catalog, update iOS or flash hardware.
