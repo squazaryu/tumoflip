@@ -100,7 +100,7 @@ bool saved_struct_load(const char* path, void* data, size_t size, uint8_t magic,
     if(result && (header.magic != magic || header.version != version)) {
         FURI_LOG_E(
             TAG,
-            "Magic(%d != %d) or Version(%d != %d) mismatch of file \"%s\"",
+            "Bad magic %d/%d or version %d/%d in %s",
             header.magic,
             magic,
             header.version,
