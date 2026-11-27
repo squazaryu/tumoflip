@@ -73,6 +73,7 @@ def build_source():
         "int offset_x,offset_y;", "int offset_x,offset_y;size_t width,height;"
     ).replace("return 128;", "return c->width;").replace("return 64;", "return c->height;")
     support = support.replace("x,y,i->width", "x+c->offset_x,y+c->offset_y,i->width")
+    support = support.replace("#ifndef __APPLE__", "#if 1 /* portable host strlcpy */")
     chunks = [support, r'''
 static unsigned critical_depth,text_calls;
 static bool bounds_check;
@@ -137,7 +138,7 @@ def render(output):
                         str(work / "render.c"), *map(str, u8g2), "-lm", "-o", str(work / "render")],
                        check=True, capture_output=True, text=True)
         subprocess.run([str(work / "render"), str(output)], check=True, capture_output=True, text=True,
-                       env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1",
+                       env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0" if sys.platform == "darwin" else "detect_leaks=1",
                             "LLVM_PROFILE_FILE": str(work / "render.profraw")})
         if flags:
             profile = work / "render.profdata"
