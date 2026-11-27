@@ -59,4 +59,7 @@ typedef enum {
     DesktopGlobalApiUnlock,
     DesktopGlobalSaveSettings,
     DesktopGlobalReloadSettings,
+
+    DesktopPanelEventPrevious,
+    DesktopPanelEventNext,
 } DesktopEvent;

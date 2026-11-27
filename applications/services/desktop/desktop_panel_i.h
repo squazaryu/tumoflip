@@ -22,6 +22,27 @@ typedef struct {
     FavoriteApp held[3];
 } DesktopPanelSettings;
 
+typedef struct {
+    uint16_t heap_kb;
+    uint16_t sleep_holds;
+    uint16_t auto_lock_s;
+    uint8_t sd_state; /* 0 unknown/error, 1 absent, 2 ready. */
+    bool bt_on;
+    bool fault_valid;
+    uint32_t fault_commit;
+    char fault_name[18];
+} DesktopPanelSnapshot;
+
+typedef struct {
+    DesktopPanelSnapshot snapshot;
+    uint32_t began;
+    int16_t offset;
+    int8_t direction;
+    uint8_t page;
+    bool active;
+    bool motion;
+} DesktopPanelModel;
+
 static inline FavoriteApp*
     desktop_panel_held(DesktopPanelSettings* panel, FavoriteAppShortcut shortcut) {
     if(!panel) return NULL;

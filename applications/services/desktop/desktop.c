@@ -1,4 +1,5 @@
 #include "desktop_i.h"
+#include "desktop_panel.h"
 
 #include <cli/cli_vcp.h>
 
@@ -39,6 +40,14 @@ static void desktop_storage_callback(const void* message, void* context) {
     Desktop* desktop = context;
     const StorageEvent* event = message;
 
+    if(event->type == StorageEventTypeCardMount ||
+       event->type == StorageEventTypeCardUnmount ||
+       event->type == StorageEventTypeCardMountError) {
+        FURI_CRITICAL_ENTER();
+        desktop->panel_sd_state = event->type == StorageEventTypeCardMount ? 2 :
+                                  event->type == StorageEventTypeCardUnmount ? 1 : 0;
+        FURI_CRITICAL_EXIT();
+    }
     if(event->type == StorageEventTypeCardMount) {
         view_dispatcher_send_custom_event(desktop->view_dispatcher, DesktopGlobalReloadSettings);
     }
@@ -123,6 +132,7 @@ static bool desktop_custom_event_callback(void* context, uint32_t event) {
     Desktop* desktop = (Desktop*)context;
 
     if(event == DesktopGlobalBeforeAppStarted) {
+        desktop_panel_pause(desktop);
         if(animation_manager_is_animation_loaded(desktop->animation_manager)) {
             if(desktop->shortcut_animation_retain_pending) {
                 animation_manager_retain_and_stall_animation(desktop->animation_manager);
@@ -142,9 +152,8 @@ static bool desktop_custom_event_callback(void* context, uint32_t event) {
         furi_semaphore_release(desktop->animation_semaphore);
 
     } else if(event == DesktopGlobalAfterAppFinished) {
-        animation_manager_load_and_continue_animation(desktop->animation_manager);
+        desktop_panel_after_app(desktop);
         desktop_auto_lock_arm(desktop);
-        desktop->app_running = false;
 
     } else if(event == DesktopGlobalAutoLock) {
         if(!desktop->app_running && !desktop->locked) {
@@ -179,6 +188,7 @@ static bool desktop_back_event_callback(void* context) {
 static void desktop_tick_event_callback(void* context) {
     furi_assert(context);
     Desktop* app = context;
+    desktop_panel_sync(app);
     scene_manager_handle_tick_event(app->scene_manager);
 }
 
@@ -240,6 +250,7 @@ static void desktop_clock_timer_callback(void* context) {
 
 static void desktop_apply_settings(Desktop* desktop) {
     desktop->in_transition = true;
+    desktop_panel_reload(desktop);
 
     desktop_view_locked_set_skip_animation(
         desktop->locked_view, desktop->settings.lockscreen_skip_animation);
@@ -255,8 +266,13 @@ static void desktop_apply_settings(Desktop* desktop) {
 static void desktop_init_settings(Desktop* desktop) {
     furi_pubsub_subscribe(storage_get_pubsub(desktop->storage), desktop_storage_callback, desktop);
 
-    if(storage_sd_status(desktop->storage) != FSE_OK) {
+    const FS_Error sd_status = storage_sd_status(desktop->storage);
+    FURI_CRITICAL_ENTER();
+    desktop->panel_sd_state = sd_status == FSE_OK ? 2 : sd_status == FSE_NOT_READY ? 1 : 0;
+    FURI_CRITICAL_EXIT();
+    if(sd_status != FSE_OK) {
         FURI_LOG_D(TAG, "SD Card not ready, skipping settings");
+        desktop_panel_reload(desktop);
         return;
     }
 
@@ -388,6 +404,7 @@ static Desktop* desktop_alloc(void) {
     desktop->app_running = loader_is_locked(desktop->loader);
     desktop->shortcut_animation_retain_pending = false;
 
+    desktop_panel_init(desktop);
     furi_record_create(RECORD_DESKTOP, desktop);
 
     return desktop;
@@ -399,6 +416,7 @@ static Desktop* desktop_alloc(void) {
 
 void desktop_lock(Desktop* desktop) {
     furi_assert(!desktop->locked);
+    desktop_panel_prepare_lock(desktop);
 
     furi_hal_rtc_set_flag(FuriHalRtcFlagLock);
 
@@ -442,6 +460,7 @@ void desktop_unlock(Desktop* desktop) {
     furi_pubsub_publish(desktop->status_pubsub, &status);
 
     desktop->locked = false;
+    desktop_panel_sync(desktop);
 }
 
 void desktop_set_stealth_mode_state(Desktop* desktop, bool enabled) {
@@ -553,6 +572,9 @@ int32_t desktop_srv(void* p) {
         animation_manager_unload_and_stall_animation(desktop->animation_manager);
     }
 
+    /* No Panel view/timer activity during ordinary boot, PIN or fault setup. */
+    desktop->panel_ready = true;
+    desktop_panel_sync(desktop);
     view_dispatcher_run(desktop->view_dispatcher);
 
     // Should never get here (a service thread will crash automatically if it returns)
