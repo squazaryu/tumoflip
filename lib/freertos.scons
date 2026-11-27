@@ -1,5 +1,18 @@
 Import("env")
 
+
+def configure_freertos_port_native(env):
+    # Exception entry and task startup use naked assembly and references that
+    # are not ordinary C calls. Keep their native boundary visible to LTO.
+    env.Replace(CCFLAGS=[flag for flag in env["CCFLAGS"]
+                        if flag not in ("-flto", "-ffat-lto-objects")])
+    env.AppendUnique(CCFLAGS=["-fno-lto"])
+
+
+def native_freertos_port_source(path):
+    return str(path).replace("\\", "/").endswith(
+        "FreeRTOS-Kernel/portable/GCC/ARM_CM4F/port.c")
+
 env.Append(
     CPPPATH=[
         "#/lib/drivers",
@@ -18,6 +31,12 @@ sources = libenv.Glob("FreeRTOS-Kernel/*.c", source=True)
 sources += [
     "FreeRTOS-Kernel/portable/GCC/ARM_CM4F/port.c",
 ]
+
+if libenv["LTO"] and libenv["IS_BASE_FIRMWARE"]:
+    native = libenv.Clone()
+    configure_freertos_port_native(native)
+    sources = [native.Object(source) if native_freertos_port_source(source) else source
+               for source in sources]
 
 lib = libenv.StaticLibrary("${FW_LIB_NAME}", sources)
 libenv.Install("${LIB_DIST_DIR}", lib)

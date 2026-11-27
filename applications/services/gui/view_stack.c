@@ -18,11 +18,7 @@ static void view_stack_update_callback(View* view_top_or_bottom, void* context) 
     furi_assert(view_top_or_bottom);
     furi_assert(context);
 
-    View* view_stack_view = context;
-    if(view_stack_view->update_callback) {
-        view_stack_view->update_callback(
-            view_stack_view, view_stack_view->update_callback_context);
-    }
+    view_request_update(context);
 }
 
 static void view_stack_enter(void* context) {
@@ -78,8 +74,7 @@ void view_stack_free(ViewStack* view_stack) {
     ViewStackModel* model = view_get_model(&view_stack->view);
     for(int i = 0; i < MAX_VIEWS; ++i) {
         if(model->views[i]) {
-            view_set_update_callback(model->views[i], NULL);
-            view_set_update_callback_context(model->views[i], NULL);
+            view_set_update_handler(model->views[i], NULL, NULL);
         }
     }
     view_commit_model(&view_stack->view, false);
@@ -127,8 +122,7 @@ void view_stack_add_view(ViewStack* view_stack, View* view) {
     for(int i = 0; i < MAX_VIEWS; ++i) {
         if(!model->views[i]) {
             model->views[i] = view;
-            view_set_update_callback(model->views[i], view_stack_update_callback);
-            view_set_update_callback_context(model->views[i], &view_stack->view);
+            view_set_update_handler(model->views[i], view_stack_update_callback, &view_stack->view);
             if(view->enter_callback) {
                 view->enter_callback(view->context);
             }
@@ -153,8 +147,7 @@ void view_stack_remove_view(ViewStack* view_stack, View* view) {
             if(view->exit_callback) {
                 view->exit_callback(view->context);
             }
-            view_set_update_callback(model->views[i], NULL);
-            view_set_update_callback_context(model->views[i], NULL);
+            view_set_update_handler(model->views[i], NULL, NULL);
             model->views[i] = NULL;
             result = true;
             break;
