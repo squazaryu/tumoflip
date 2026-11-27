@@ -64,6 +64,7 @@ jobs:
           RUN_SHA: ${{ github.sha }}
           REF_NAME: ${{ github.ref_name }}
         run: |
+          set -euo pipefail
           if [ "$EVENT_NAME" = "pull_request" ]; then
             SHA="$HEAD_SHA"
             REF="$HEAD_REF"
@@ -78,6 +79,10 @@ jobs:
           echo "sha8=$SHORT"                >> "$GITHUB_OUTPUT"
           echo "ref=$SAFE_REF"              >> "$GITHUB_OUTPUT"
           echo "dist=${SAFE_REF}-${SHORT}"  >> "$GITHUB_OUTPUT"
+          # Stable checks must compile the final release identity before a tag
+          # is consumed; a shorter diagnostic SHA can mask a flash-page overflow.
+          python3 tools/tumoflip/ci_build_identity.py \
+            --sha "$SHA" --ref "$SAFE_REF" >> "$GITHUB_OUTPUT"
 
       - name: Validate main menu layouts and navigation
         shell: bash
@@ -204,7 +209,8 @@ jobs:
         id: build
         shell: bash
         env:
-          DIST_SUFFIX: ${{ steps.vars.outputs.sha8 }}
+          DIST_SUFFIX: ${{ steps.vars.outputs.firmware_dist }}
+          WORKFLOW_BRANCH_OR_TAG: ${{ steps.vars.outputs.workflow_ref }}
         run: |
           rm -rf applications/main/clock_app/resources/apps/ || true
           ./fbt -j2 COMPACT=1 DEBUG=0 FBT_NO_SYNC="${FBT_NO_SYNC}" \
