@@ -1,5 +1,6 @@
 #include "subghz_last_settings.h"
 #include "subghz_i.h"
+#include <lib/subghz/ignore_filter.h>
 
 #define TAG "SubGhzLastSettings"
 
@@ -55,6 +56,7 @@ void subghz_last_settings_load(SubGhzLastSettings* instance, size_t preset_count
     instance->frequency_analyzer_trigger = SUBGHZ_LAST_SETTING_FREQUENCY_ANALYZER_TRIGGER;
     // See bin_raw_value in scenes/subghz_scene_receiver_config.c
     instance->filter = SubGhzProtocolFlag_Decodable;
+    instance->ignore_filter = 0;
     instance->rssi = SUBGHZ_RAW_THRESHOLD_MIN;
     instance->hopping_threshold = -90.0f;
     instance->enable_preset_hopping = false;
@@ -166,11 +168,14 @@ void subghz_last_settings_load(SubGhzLastSettings* instance, size_t preset_count
                     SUBGHZ_LAST_SETTING_DEFAULT_COMBINED_HOPPING_THRESHOLD;
                 flipper_format_rewind(fff_data_file);
             }
-            if(!flipper_format_read_uint32(
+            uint32_t ignore_filter = 0;
+            if(flipper_format_read_uint32(
                    fff_data_file,
                    SUBGHZ_LAST_SETTING_FIELD_IGNORE_FILTER,
-                   &instance->ignore_filter,
+                   &ignore_filter,
                    1)) {
+                instance->ignore_filter = ignore_filter & SUBGHZ_IGNORE_FILTER_MASK;
+            } else {
                 flipper_format_rewind(fff_data_file);
             }
             if(!flipper_format_read_uint32(

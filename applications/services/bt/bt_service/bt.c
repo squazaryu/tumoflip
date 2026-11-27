@@ -369,7 +369,7 @@ static void bt_app_bridge_event_callback(AppBridgeServiceEvent event, void* cont
         if(decoded_ok) {
             furi_pubsub_publish(bt->app_bridge_pubsub, &decoded);
         } else {
-            FURI_LOG_W(TAG, "Invalid app bridge command frame");
+            FURI_LOG_W(TAG, "Bad bridge command frame");
         }
     }
 }
@@ -396,7 +396,7 @@ static uint16_t bt_serial_event_callback(SerialServiceEvent event, void* context
             rpc_session_feed(bt->rpc_session, event.data.buffer, event.data.size, 1000);
         if(bytes_processed != event.data.size) {
             FURI_LOG_E(
-                TAG, "Only %zu of %u bytes processed by RPC", bytes_processed, event.data.size);
+                TAG, "RPC processed %zu/%u bytes", bytes_processed, event.data.size);
         }
         ret = rpc_session_get_available_size(bt->rpc_session);
     } else if(event.event == SerialServiceEventTypeDataSent) {
@@ -479,7 +479,7 @@ static bool bt_on_gap_event_callback(GapEvent event, void* context) {
         ret = true;
     } else if(event.type == GapEventTypeDisconnected) {
         if(current_profile_is_serial && bt->rpc_session) {
-            FURI_LOG_I(TAG, "Close RPC connection");
+            FURI_LOG_I(TAG, "Close RPC link");
             ble_profile_serial_set_rpc_active(
                 bt->current_profile, FuriHalBtSerialRpcStatusNotActive);
             furi_event_flag_set(bt->rpc_event, BT_RPC_EVENT_DISCONNECTED);
@@ -579,7 +579,7 @@ void bt_open_rpc_connection(Bt* bt) {
             // Open RPC session
             bt->rpc_session = rpc_session_open(bt->rpc, RpcOwnerBle);
             if(bt->rpc_session) {
-                FURI_LOG_I(TAG, "Open RPC connection");
+                FURI_LOG_I(TAG, "Open RPC link");
                 rpc_session_set_send_bytes_callback(bt->rpc_session, bt_rpc_send_bytes_callback);
                 rpc_session_set_buffer_is_empty_callback(
                     bt->rpc_session, bt_serial_buffer_is_empty_callback);
@@ -590,7 +590,7 @@ void bt_open_rpc_connection(Bt* bt) {
                     bt->current_profile, FuriHalBtSerialRpcStatusActive);
                 bt_app_bridge_bind(bt);
             } else {
-                FURI_LOG_W(TAG, "RPC is busy, failed to open new session");
+                FURI_LOG_W(TAG, "RPC busy; session not opened");
             }
         }
     }
@@ -599,7 +599,7 @@ void bt_open_rpc_connection(Bt* bt) {
 void bt_close_rpc_connection(Bt* bt) {
     if(furi_hal_bt_check_profile_type(bt->current_profile, ble_profile_serial) &&
        bt->rpc_session) {
-        FURI_LOG_I(TAG, "Close RPC connection");
+        FURI_LOG_I(TAG, "Close RPC link");
         furi_event_flag_set(bt->rpc_event, BT_RPC_EVENT_DISCONNECTED);
         rpc_session_close(bt->rpc_session);
         ble_profile_serial_set_event_callback(bt->current_profile, 0, NULL, NULL);
@@ -616,7 +616,7 @@ static void bt_change_profile(Bt* bt, BtMessage* message) {
         if(message->data.profile.start_idle) {
             furi_hal_bt_stop_advertising();
             if(!bt_keys_storage_load_or_create(bt->keys_storage)) {
-                FURI_LOG_E(TAG, "Cannot load profile pairing data");
+                FURI_LOG_E(TAG, "Pairing data load failed");
                 if(message->profile_instance) *message->profile_instance = NULL;
                 if(message->result) *message->result = false;
                 return;
@@ -641,7 +641,7 @@ static void bt_change_profile(Bt* bt, BtMessage* message) {
             }
             furi_hal_bt_set_key_storage_change_callback(bt_on_key_storage_change_callback, bt);
         } else {
-            FURI_LOG_E(TAG, "Failed to start Bt App");
+            FURI_LOG_E(TAG, "Err: start Bt App");
         }
         if(message->profile_instance) {
             *message->profile_instance = bt->current_profile;
@@ -772,7 +772,7 @@ static void bt_handle_app_bridge_send(Bt* bt, BtMessage* message) {
             message->data.app_bridge.payload,
             message->data.app_bridge.payload_len);
     } else {
-        FURI_LOG_W(TAG, "App bridge unavailable for active BLE profile");
+        FURI_LOG_W(TAG, "BLE profile has no bridge");
     }
 
     if(message->result) {
@@ -799,7 +799,7 @@ static void bt_handle_app_bridge_send_v2(Bt* bt, BtMessage* message) {
             message->data.app_bridge_v2.payload,
             message->data.app_bridge_v2.payload_len);
     } else {
-        FURI_LOG_W(TAG, "App bridge unavailable for active BLE profile");
+        FURI_LOG_W(TAG, "BLE profile has no bridge");
     }
 
     if(message->result) *message->result = success;
@@ -825,7 +825,7 @@ int32_t bt_srv(void* p) {
     Bt* bt = bt_alloc();
 
     if(furi_hal_rtc_get_boot_mode() != FuriHalRtcBootModeNormal) {
-        FURI_LOG_W(TAG, "Skipping start in special boot mode");
+        FURI_LOG_W(TAG, "Special boot; start skipped");
         ble_glue_wait_for_c2_start(FURI_HAL_BT_C2_START_TIMEOUT);
         furi_record_create(RECORD_BT, bt);
 
@@ -834,9 +834,8 @@ int32_t bt_srv(void* p) {
     }
 
     if(furi_hal_bt_start_radio_stack()) {
-        bt_init_keys_settings(bt);
         furi_hal_bt_set_key_storage_change_callback(bt_on_key_storage_change_callback, bt);
-
+        bt_init_keys_settings(bt);
     } else {
         FURI_LOG_E(TAG, "Radio stack start failed");
     }

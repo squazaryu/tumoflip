@@ -11,7 +11,7 @@
 
 #include "../blocks/custom_btn_i.h"
 
-#define TAG "SubGhzProtocolFaacSLH"
+#define TAG SUBGHZ_PROTOCOL_FAAC_SLH_NAME
 
 static const SubGhzBlockConst subghz_protocol_faac_slh_const = {
     .te_short = 255,
@@ -485,7 +485,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> i * 8) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Key");
+            FURI_LOG_E(TAG, "Cannot add Key");
             break;
         }
 
@@ -696,7 +696,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_faac_slh_serialize(
     }
     if((res == SubGhzProtocolStatusOk) &&
        !flipper_format_write_hex(flipper_format, "Seed", seed_data, sizeof(uint32_t))) {
-        FURI_LOG_E(TAG, "Unable to add Seed");
+        FURI_LOG_E(TAG, "Cannot add Seed");
         res = SubGhzProtocolStatusError;
     }
     instance->generic.seed = seed_data[0] << 24 | seed_data[1] << 16 | seed_data[2] << 8 |
@@ -713,7 +713,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_faac_slh_serialize(
     if((res == SubGhzProtocolStatusOk) && !furi_string_empty(instance->manufacture_from_file) &&
        !flipper_format_write_string_cstr(
            flipper_format, "Manufacture", furi_string_get_cstr(instance->manufacture_from_file))) {
-        FURI_LOG_E(TAG, "Unable to add Manufacture");
+        FURI_LOG_E(TAG, "Cannot add Manufacture");
         res = SubGhzProtocolStatusError;
     }
 

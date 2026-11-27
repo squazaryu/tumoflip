@@ -2,6 +2,7 @@
 #include "subghz_diversity.h"
 #include <lib/subghz/receiver.h>
 #include <lib/subghz/protocols/public_api.h>
+#include <lib/subghz/protocols/history_name.h>
 
 #include <furi.h>
 
@@ -294,6 +295,7 @@ SubGhzHistoryAddResult subghz_history_add_to_history_with_source(
             }
             furi_string_cat(instance->tmp_string, text);
         }
+        subghz_history_name_variant(instance->tmp_string, item->flipper_string, text);
         if(!flipper_format_rewind(item->flipper_string)) {
             FURI_LOG_E(TAG, "Rewind error");
             break;

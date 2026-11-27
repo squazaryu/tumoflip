@@ -2,7 +2,7 @@
 
 #include <nfc/helpers/iso14443_crc.h>
 
-#define TAG "Iso14443_3bPoller"
+#define TAG "ISO3B.Poll"
 
 #define ISO14443_3B_ATTRIB_FRAME_SIZE_256 (0x08)
 

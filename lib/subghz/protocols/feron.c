@@ -190,7 +190,8 @@ void subghz_protocol_decoder_feron_feed(void* context, bool level, volatile uint
         }
         break;
     case FeronDecoderStepSaveDuration:
-        if(level) {
+        if(level && (instance->decoder.decode_count_bit <
+                     subghz_protocol_feron_const.min_count_bit_for_found)) {
             instance->decoder.te_last = duration;
             instance->decoder.parser_step = FeronDecoderStepCheckDuration;
         } else {
@@ -227,9 +228,12 @@ void subghz_protocol_decoder_feron_feed(void* context, bool level, volatile uint
                     subghz_protocol_feron_const.te_delta)) {
                     subghz_protocol_blocks_add_bit(&instance->decoder, 1);
                 }
-                // If got 32 bits key reading is finished
-                if(instance->decoder.decode_count_bit ==
-                   subghz_protocol_feron_const.min_count_bit_for_found) {
+                // The final byte is the inverse of the command byte. It does
+                // not protect the device ID and is not a CRC/authentication.
+                if((instance->decoder.decode_count_bit ==
+                    subghz_protocol_feron_const.min_count_bit_for_found) &&
+                   (((uint8_t)(instance->decoder.decode_data >> 8) ^
+                     (uint8_t)instance->decoder.decode_data) == 0xFF)) {
                     instance->generic.data = instance->decoder.decode_data;
                     instance->generic.data_count_bit = instance->decoder.decode_count_bit;
                     if(instance->base.callback)

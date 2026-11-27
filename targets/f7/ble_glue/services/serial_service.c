@@ -97,7 +97,7 @@ static BleEventAckStatus ble_svc_serial_event_handler(void* event, void* context
                     if(attribute_modified->Attr_Data_Length > serial_svc->bytes_ready_to_receive) {
                         FURI_LOG_W(
                             TAG,
-                            "Received %d, while was ready to receive %d bytes. Can lead to buffer overflow!",
+                            "RX %d > ready %d; overflow risk",
                             attribute_modified->Attr_Data_Length,
                             serial_svc->bytes_ready_to_receive);
                     }
@@ -254,7 +254,7 @@ bool ble_svc_serial_update_tx(BleServiceSerial* serial_svc, uint8_t* data, uint1
             data + value_offset);
 
         if(result) {
-            FURI_LOG_E(TAG, "Failed updating TX characteristic: %d", result);
+            FURI_LOG_E(TAG, "Failed updating TX char: %d", result);
             return false;
         }
     }

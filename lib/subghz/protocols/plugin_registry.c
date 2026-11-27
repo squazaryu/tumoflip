@@ -8,7 +8,7 @@
 #include <toolbox/path.h>
 #include <stdio.h>
 
-#define TAG "SubGhzProtocolPack"
+#define TAG "SubGhzPacks"
 
 struct SubGhzProtocolPackRegistry {
     SubGhzProtocolRegistry registry;
@@ -42,6 +42,7 @@ static const SubGhzProtocolPackEntry subghz_protocol_pack_entries[] = {
     {PACK_GROUP(SubGhzProtocolPackGroupCore), "freezer"},
     {PACK_GROUP(SubGhzProtocolPackGroupCore), "faac_tm"},
     {PACK_GROUP(SubGhzProtocolPackGroupCore), "proteco"},
+    {PACK_GROUP(SubGhzProtocolPackGroupCore), "belkorn"},
     {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_gm0"},
     {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_gm1"},
     {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "rx_ty0"},
@@ -50,12 +51,9 @@ static const SubGhzProtocolPackEntry subghz_protocol_pack_entries[] = {
     {PACK_GROUP(SubGhzProtocolPackGroupEurope), "rx_mb1"},
     {PACK_GROUP(SubGhzProtocolPackGroupEurope), "rx_op1"},
     {PACK_GROUP(SubGhzProtocolPackGroupEurope), "rx_bmw"},
-    {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia),
-     "kia_v0"},
-    {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia),
-     "kia_v1"},
-    {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia),
-     "kia_v2"},
+    {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia), "kia_v0"},
+    {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia), "kia_v1"},
+    {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupKia), "kia_v2"},
     {PACK_GROUP(SubGhzProtocolPackGroupKia), "kia_v3_v4"},
     {PACK_GROUP(SubGhzProtocolPackGroupKia), "kia_v5"},
     {PACK_GROUP(SubGhzProtocolPackGroupKia), "kia_v6"},
@@ -71,8 +69,7 @@ static const SubGhzProtocolPackEntry subghz_protocol_pack_entries[] = {
     {PACK_GROUP(SubGhzProtocolPackGroupEurope), "land_rover_v0"},
     {PACK_GROUP(SubGhzProtocolPackGroupEurope), "porsche_cayenne"},
     {PACK_GROUP(SubGhzProtocolPackGroupEurope), "psa"},
-    {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupEurope),
-     "vag"},
+    {PACK_GROUP(SubGhzProtocolPackGroupLegacy) | PACK_GROUP(SubGhzProtocolPackGroupEurope), "vag"},
     {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "chrysler"},
     {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "mazda_siemens"},
     {PACK_GROUP(SubGhzProtocolPackGroupAsiaUs), "mazda_v0"},
@@ -249,7 +246,7 @@ SubGhzProtocolPackRegistry* subghz_protocol_pack_registry_alloc(
             instance->manager, furi_string_get_cstr(plugin_file));
         report_entry->status = subghz_protocol_pack_status_from_load_status(load_status);
         if(load_status != PluginManagerLoadStatusSuccess) {
-            FURI_LOG_W(TAG, "Failed to load %s", entry->filename);
+            FURI_LOG_W(TAG, "Err: load %s", entry->filename);
             continue;
         }
 

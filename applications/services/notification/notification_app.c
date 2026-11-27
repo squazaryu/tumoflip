@@ -10,7 +10,7 @@
 #include "notification_messages.h"
 #include "notification_app.h"
 
-#define TAG         "NotificationSrv"
+#define TAG "Notify"
 #define COLOR_COUNT (sizeof(colors) / sizeof(RGBBacklightColor))
 
 static const uint8_t minimal_delay = 100;

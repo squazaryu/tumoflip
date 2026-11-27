@@ -132,7 +132,7 @@ bool lfrfid_raw_file_read_pair(
 
         length = stream_read(file->stream, (uint8_t*)&file->buffer_size, sizeof(size_t));
         if(length != sizeof(size_t)) {
-            FURI_LOG_E(TAG, "read pair: failed to read size");
+            FURI_LOG_E(TAG, "read pair: err: read size");
             return false;
         }
 
@@ -143,7 +143,7 @@ bool lfrfid_raw_file_read_pair(
 
         length = stream_read(file->stream, file->buffer, file->buffer_size);
         if(length != file->buffer_size) {
-            FURI_LOG_E(TAG, "read pair: failed to read data");
+            FURI_LOG_E(TAG, "read pair: err: read data");
             return false;
         }
 

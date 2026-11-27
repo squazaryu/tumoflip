@@ -30,7 +30,7 @@ Data layout:
 - S: 16bit CRC
 */
 
-#define TAG "SubGhzProtocolHoneywell"
+#define TAG SUBGHZ_PROTOCOL_HONEYWELL_NAME
 
 static const SubGhzBlockConst subghz_protocol_honeywell_const = {
     .te_long = 280,

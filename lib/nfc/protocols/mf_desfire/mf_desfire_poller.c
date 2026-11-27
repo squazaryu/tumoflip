@@ -5,7 +5,7 @@
 #include <furi.h>
 #include <string.h>
 
-#define TAG "MfDesfirePoller"
+#define TAG "DF.Poll"
 
 #define MF_DESFIRE_BUF_SIZE        (64U)
 #define MF_DESFIRE_RESULT_BUF_SIZE (512U)
@@ -77,7 +77,7 @@ static NfcCommand mf_desfire_poller_handler_read_version(MfDesfirePoller* instan
         FURI_LOG_D(TAG, "Read version success");
         instance->state = MfDesfirePollerStateReadFreeMemory;
     } else {
-        FURI_LOG_E(TAG, "Failed to read version");
+        FURI_LOG_E(TAG, "Err: read version");
         iso14443_4a_poller_halt(instance->iso14443_4a_poller);
         instance->state = MfDesfirePollerStateReadFailed;
     }
@@ -100,7 +100,7 @@ static NfcCommand mf_desfire_poller_handler_read_free_memory(MfDesfirePoller* in
         FURI_LOG_W(TAG, "Read free memory refused: %d", instance->error);
         instance->state = MfDesfirePollerStateReadMasterKeySettings;
     } else {
-        FURI_LOG_E(TAG, "Failed to read free memory");
+        FURI_LOG_E(TAG, "Err: read free memory");
         iso14443_4a_poller_halt(instance->iso14443_4a_poller);
         instance->state = MfDesfirePollerStateReadFailed;
     }
@@ -120,7 +120,7 @@ static NfcCommand mf_desfire_poller_handler_read_master_key_settings(MfDesfirePo
         instance->data->master_key_settings.max_keys = 1;
         instance->state = MfDesfirePollerStateReadMasterKeyVersion;
     } else {
-        FURI_LOG_E(TAG, "Failed to read master key settings");
+        FURI_LOG_E(TAG, "Err: read master key settings");
         iso14443_4a_poller_halt(instance->iso14443_4a_poller);
         instance->state = MfDesfirePollerStateReadFailed;
     }
@@ -140,7 +140,7 @@ static NfcCommand mf_desfire_poller_handler_read_master_key_version(MfDesfirePol
         simple_array_reset(instance->data->master_key_versions);
         instance->data->master_key_settings.max_keys = 0;
     } else {
-        FURI_LOG_E(TAG, "Failed to read master key version");
+        FURI_LOG_E(TAG, "Err: read master key version");
         iso14443_4a_poller_halt(instance->iso14443_4a_poller);
         instance->state = MfDesfirePollerStateReadFailed;
         return NfcCommandContinue;
@@ -163,7 +163,7 @@ static NfcCommand mf_desfire_poller_handler_read_application_ids(MfDesfirePoller
         FURI_LOG_D(TAG, "Read application ids impossible without authentication");
         instance->state = MfDesfirePollerStateReadSuccess;
     } else {
-        FURI_LOG_E(TAG, "Failed to read application ids");
+        FURI_LOG_E(TAG, "Err: read app ids");
         iso14443_4a_poller_halt(instance->iso14443_4a_poller);
         instance->state = MfDesfirePollerStateReadFailed;
     }
@@ -178,7 +178,7 @@ static NfcCommand mf_desfire_poller_handler_read_applications(MfDesfirePoller* i
         FURI_LOG_D(TAG, "Read applications success");
         instance->state = MfDesfirePollerStateReadSuccess;
     } else {
-        FURI_LOG_E(TAG, "Failed to read applications");
+        FURI_LOG_E(TAG, "Err: read apps");
         iso14443_4a_poller_halt(instance->iso14443_4a_poller);
         instance->state = MfDesfirePollerStateReadFailed;
     }

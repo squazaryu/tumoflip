@@ -1,8 +1,7 @@
 # Proposed field follow-up — 7 November 2026
 
-Status: proposals for owner selection, not implemented features or a release
-promise. The current request authorizes considering original work alongside the
-bounded upstream adaptation, not silently adding a new large product workflow.
+Status: the first slice of per-object readiness is implemented in Field
+Tools 1.1 source; the remaining checks and other workflows below are proposals.
 
 ## Existing capabilities are the starting point
 
@@ -15,6 +14,12 @@ TumoCompanion already views the four sensor/power/UHF/Varta CSV schemas.
 Do not sell a second copy of these as a new feature.
 
 ## 1. Per-object field readiness in Field Tools
+
+Implemented first slice: **Check linked files** from the selected object in
+an active or resumed round. It checks up to eight SD directory entries, not
+the linked contents, and never updates the round or opens the linked files.
+Driver compatibility, module availability and comparison with an inventory
+baseline are still separate work.
 
 Before a round, show one bounded readiness card for the selected object:
 linked captures readable, required native inspect driver present/compatible,
@@ -31,7 +36,7 @@ rebaseline, journal repair, file deletion or firmware-core/API expansion.
 Acceptance: missing/changed/unreadable files, old/missing driver, disconnected
 external module, canceled scan, low/fragmented heap, long object names and empty
 cards. Confirm original capture hashes and existing rounds remain unchanged.
-This is the first recommended implementation, extending the existing FAP.
+Extend the existing FAP for the remaining checks.
 
 ## 2. Read-only object-round reports in TumoCompanion
 

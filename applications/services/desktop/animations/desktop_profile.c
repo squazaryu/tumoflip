@@ -6,7 +6,7 @@
 #include <furi.h>
 #include <storage/storage.h>
 
-#define TAG "DesktopProfile"
+#define TAG "DeskProfile"
 
 #define DESKTOP_PROFILE_FILETYPE             "Tumoflip Desktop Profile"
 #define DESKTOP_PROFILE_VERSION_LEGACY       1U

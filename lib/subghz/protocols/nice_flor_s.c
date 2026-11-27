@@ -29,7 +29,7 @@ static const uint8_t* subghz_protocol_nice_flor_s_table(const char* file_name);
  * https://vrtp.ru/index.php?showtopic=27867
  */
 
-#define TAG "SubGhzProtocolNiceFlorS"
+#define TAG SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME
 
 static uint8_t nice_flors_counter_mode = 0;
 static uint8_t subghz_protocol_decoder_nice_flor_s_get_hash_data(void* context);
@@ -417,7 +417,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> i * 8) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to update Key");
+            FURI_LOG_E(TAG, "Cannot update Key");
             break;
         }
 
@@ -428,7 +428,7 @@ SubGhzProtocolStatus
             }
             uint32_t temp = (instance->generic.data_2 >> 4) & 0xFFFFF;
             if(!flipper_format_update_uint32(flipper_format, "Data", &temp, 1)) {
-                FURI_LOG_E(TAG, "Unable to update Data");
+                FURI_LOG_E(TAG, "Cannot update Data");
             }
         }
 
@@ -821,7 +821,7 @@ static bool subghz_protocol_nice_o_create_data_bits(
         uint8_t ic_data[2] = {(uint8_t)(ic >> 8), (uint8_t)ic};
         if(!flipper_format_rewind(flipper_format) ||
            !flipper_format_insert_or_update_hex(flipper_format, "IC", ic_data, sizeof(ic_data))) {
-            FURI_LOG_E(TAG, "Unable to add IC to generated O-Code file");
+            FURI_LOG_E(TAG, "Cannot add IC to generated O-Code file");
             result = SubGhzProtocolStatusErrorParserOthers;
         }
     }
@@ -1176,7 +1176,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_nice_flor_s_serialize(
         uint8_t ic_data[2] = {(uint8_t)(instance->ic >> 8), (uint8_t)instance->ic};
         if(!flipper_format_rewind(flipper_format) ||
            !flipper_format_insert_or_update_hex(flipper_format, "IC", ic_data, sizeof(ic_data))) {
-            FURI_LOG_E(TAG, "Unable to add IC");
+            FURI_LOG_E(TAG, "Cannot add IC");
             ret = SubGhzProtocolStatusErrorParserOthers;
         }
         const bool ic_known = !instance->o_code_no_ic;
@@ -1192,7 +1192,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_nice_flor_s_serialize(
         if((ret == SubGhzProtocolStatusOk) &&
            !flipper_format_insert_or_update_uint32(
                flipper_format, "Data", (uint32_t*)&instance->generic.data_2, 1)) {
-            FURI_LOG_E(TAG, "Unable to add Data");
+            FURI_LOG_E(TAG, "Cannot add Data");
             ret = SubGhzProtocolStatusErrorParserOthers;
         }
     } else if(instance->generic.data_count_bit == NICE_O_LONG_COUNT_BIT) {
@@ -1206,7 +1206,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_nice_flor_s_serialize(
         }
         if((ret == SubGhzProtocolStatusOk) &&
            !flipper_format_insert_or_update_hex(flipper_format, "Data2", d2, sizeof(d2))) {
-            FURI_LOG_E(TAG, "Unable to add Data2");
+            FURI_LOG_E(TAG, "Cannot add Data2");
             ret = SubGhzProtocolStatusErrorParserOthers;
         }
     }

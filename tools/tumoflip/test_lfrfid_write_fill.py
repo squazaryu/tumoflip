@@ -1,7 +1,9 @@
 """Compare actual before/after callbacks with identical pre-encoded bit buffers.
 
-Only encoding (unchanged by this refactor) is stubbed. Actual writer callback
+Only encoding (unchanged by the refactor) is stubbed. Actual writer callback
 branches, configuration words, bit access/reversal and request layouts execute.
+The one intentional later correction is Gallagher EM4305: its three data words
+must address bits0..95, not reproduce the frozen legacy one-bit offset (#1217).
 """
 import json
 from pathlib import Path
@@ -27,7 +29,7 @@ class LfRfidWriteFillTests(unittest.TestCase):
         for name in ("protocol_em4100", "protocol_electra", "protocol_h10301"):
             self.assertNotIn('"lfrfid_write_fill.h"', (ROOT / f"lib/lfrfid/protocols/{name}.c").read_text())
 
-    def test_twenty_production_callbacks_match_frozen_legacy_requests(self):
+    def test_twenty_callbacks_match_legacy_except_corrected_gallagher_em4305(self):
         fixture = json.loads((ROOT / "tools/tumoflip/fixtures/lfrfid_write_fill_legacy.json").read_text())
         definitions, callbacks = [], []
         for index, (path, legacy) in enumerate(fixture["callbacks"].items()):
@@ -40,6 +42,21 @@ class LfRfidWriteFillTests(unittest.TestCase):
             definitions.extend(f"#define {call}(...) ((void)0)" for call in sorted(calls))
             definitions.append(legacy.replace(name, "legacy_" + name, 1))
             definitions.append(current)
+            correction = ""
+            if name == "protocol_gallagher_write_data":
+                correction = """
+                    if(type==LFRFIDWriteTypeEM4305){
+                        /* Do not relax the rest of the request/protocol comparison or edit
+                           the frozen fixture: only these three words intentionally change. */
+                        for(unsigned word=0;word<3;word++){
+                            uint32_t expected=0;
+                            for(unsigned bit=0;bit<32;bit++)
+                                if(proto.encoded_data[word*4+bit/8]&(0x80u>>(bit%8)))expected|=UINT32_C(1)<<bit;
+                            assert(new.request.em4305.word[word+5]==expected);
+                            old.request.em4305.word[word+5]=expected;
+                        }
+                    }
+                """
             callbacks.append(f"""
             for(unsigned sample=0;sample<256;sample++) {{
                 {typename} proto; random_bytes(&proto,sizeof(proto));
@@ -51,7 +68,7 @@ class LfRfidWriteFillTests(unittest.TestCase):
                     old.request.write_type=new.request.write_type=type;
                     {typename} old_proto=proto,new_proto=proto;
                     bool a=legacy_{name}(&old_proto,&old.request),b={name}(&new_proto,&new.request);
-                    assert(a==b);assert(!memcmp(&old,&new,sizeof(old)));
+                    assert(a==b);{correction}assert(!memcmp(&old,&new,sizeof(old)));
                     assert(!memcmp(&old_proto,&new_proto,sizeof(old_proto)));
                     assert(old.before==UINT64_C(0xA5A5A5A5A5A5A5A5));
                     assert(new.after==UINT64_C(0xA5A5A5A5A5A5A5A5));

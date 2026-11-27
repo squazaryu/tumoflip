@@ -124,7 +124,7 @@ typedef enum {MergeJoinNone,MergeJoinManual,MergeJoinNative} MergeJoin;
 typedef struct {int16_t* data;size_t count;bool synthesized;} SubData;
 static bool fail_append;
 bool fill_raw_into(Storage* s,const char* p,SubData* d,MergeJoin j){(void)s;(void)p;(void)d;(void)j;return true;}
-bool load_sub(Storage* s,const char* p,SubData* d){(void)s;(void)p;d->data=calloc(2,sizeof(int16_t));d->count=2;d->synthesized=true;return true;}
+bool load_sub(Storage* s,const char* p,SubData* d,bool direct){(void)s;(void)p;assert(!direct);d->data=calloc(2,sizeof(int16_t));d->count=2;d->synthesized=true;return true;}
 bool merge_prepare_join(SubData* d,MergeJoin j,bool* skip){(void)d;(void)j;*skip=false;return true;}
 bool append_sample(SubData* d,int32_t v){(void)v;d->count++;return !fail_append;}
 ''' + actual + r'''

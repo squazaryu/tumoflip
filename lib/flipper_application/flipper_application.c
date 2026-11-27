@@ -354,7 +354,7 @@ const FlipperAppPluginDescriptor*
 
     const FlipperAppPluginDescriptor* lib_descriptor = lib_ep();
     if(!lib_descriptor) {
-        FURI_LOG_E(TAG, "Plugin returned an empty descriptor");
+        FURI_LOG_E(TAG, "Empty plugin descriptor");
         return NULL;
     }
 
@@ -392,7 +392,7 @@ bool flipper_application_load_name_and_icon(
         furi_string_set(item_name, manifest->name);
         load_success = true;
     } else {
-        FURI_LOG_E(TAG, "Failed to preload %s", furi_string_get_cstr(path));
+        FURI_LOG_E(TAG, "Err: preload %s", furi_string_get_cstr(path));
         load_success = false;
     }
 

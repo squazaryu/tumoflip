@@ -14,7 +14,7 @@
 #include "../blocks/custom_btn_i.h"
 #include "../subghz_keystore_i.h"
 
-#define TAG "SubGhzProtocolKeeloq"
+#define TAG SUBGHZ_PROTOCOL_KEELOQ_NAME
 
 // Received Monarch discriminator, preserved as metadata rather than regenerated.
 #define KEELOQ_MONARCH_DISCRIMINATOR_A 0x100u
@@ -24,10 +24,25 @@
 // one turns up with a different constant.
 #define KEELOQ_KEY_DISCRIMINATOR 0x2FFu
 
+#define KEELOQ_DEA_MIO_DISC_MASK   0xFFFu
+#define KEELOQ_DEA_MIO_SERIAL_MASK 0x3FFu
+#define KEELOQ_DEA_MIO_MATCH_MASK  0xFFu
+#define KEELOQ_DEA_MIO_OVR_SET     0xC00u
+
+static inline uint16_t subghz_protocol_keeloq_dea_mio_disc(uint32_t serial, uint32_t seed) {
+    uint16_t disc = (uint16_t)seed & KEELOQ_DEA_MIO_DISC_MASK;
+    if(!seed || (disc & KEELOQ_DEA_MIO_MATCH_MASK) != (serial & KEELOQ_DEA_MIO_MATCH_MASK)) {
+        disc = (serial & KEELOQ_DEA_MIO_SERIAL_MASK) | KEELOQ_DEA_MIO_OVR_SET;
+    }
+    return disc;
+}
+
 // Some HCS encoders use TE 200us instead of 400us. Select the rate from
 // preamble + sync, without changing the frame format or counter semantics.
-#define KEELOQ_TE_FAST           200u
-#define KEELOQ_TE_FAST_GAP_DELTA 450u
+// Leave a dead zone between the two sync bands: unrelated ~250us frames must
+// not lock onto either rate merely because their bit count also matches.
+#define KEELOQ_TE_FAST_GAP_DELTA 350u
+#define KEELOQ_TE_STD_GAP_MIN    3000u
 
 // This adaptation adds recognition only. Keep the existing Monarch variant's
 // behavior, but reject newly recognized variants before any TX/counter mutation.
@@ -314,7 +329,7 @@ static bool subghz_protocol_keeloq_gen_data(
     // end gendata part
     // override button if we change it with signal settings button editor
     if(subghz_block_generic_global_button_override_get(&btn)) {
-        FURI_LOG_D(TAG, "Button sucessfully changed to 0x%X", btn);
+        FURI_LOG_D(TAG, "Button changed to 0x%X", btn);
     }
 
     uint32_t fix = 0;
@@ -526,13 +541,13 @@ static bool subghz_protocol_keeloq_gen_data(
                 decrypt = btn << 28 | (0x100) << 16 | instance->generic.cnt;
                 // Monarch -> no serial in hop, uses fixed value 0x100 - normal learning
             } else if(strcmp(instance->manufacture_name, "Dea_Mio") == 0) {
-                uint8_t first_disc_num = (instance->generic.serial >> 8) & 0xF;
-                uint8_t result_disc = (0xC + (first_disc_num % 4));
-                uint32_t dea_serial = (instance->generic.serial & 0xFF) |
-                                      (((uint32_t)result_disc) << 8);
-                decrypt = btn << 28 | (dea_serial & 0xFFF) << 16 | instance->generic.cnt;
-                // Dea_Mio -> modified serial in hop, uses last 3 digits modifying first one (example - 419 -> C19)
-                // (see formula in result_disc var) - simple learning
+                // Keep the received OVR flags; old files without metadata retain
+                // the existing serial-derived default, not a new counter mode.
+                decrypt = btn << 28 |
+                          (uint32_t)subghz_protocol_keeloq_dea_mio_disc(
+                              instance->generic.serial, instance->generic.seed)
+                              << 16 |
+                          instance->generic.cnt;
             }
             // Old type selector fixage for compatibilitiy with old signal files
             uint8_t kl_type_en = instance->keystore->kl_type;
@@ -859,7 +874,7 @@ SubGhzProtocolStatus
 
         if(subghz_protocol_keeloq_receive_only(
                instance->manufacture_name, instance->generic.seed)) {
-            FURI_LOG_W(TAG, "This variant supports receive/inspection only");
+            FURI_LOG_W(TAG, "RX only");
             ret = SubGhzProtocolStatusErrorEncoderGetUpload;
             break;
         }
@@ -882,7 +897,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> (i * 8)) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Key");
+            FURI_LOG_E(TAG, "Cannot add Key");
             ret = SubGhzProtocolStatusErrorParserKey;
             break;
         }
@@ -937,8 +952,6 @@ void subghz_protocol_decoder_keeloq_reset(void* context) {
 void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t duration) {
     furi_assert(context);
     SubGhzProtocolDecoderKeeloq* instance = context;
-    const uint32_t te = instance->te;
-    const uint32_t te_delta = subghz_protocol_keeloq_te_delta(te);
 
     switch(instance->decoder.parser_step) {
     case KeeloqDecoderStepReset:
@@ -955,15 +968,17 @@ void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t dur
         }
         if(!level && instance->header_count > 2) {
             uint32_t locked_te = 0;
-            // The sync bands overlap. A standard 400us preamble must not be
-            // stolen by the fast path when its sync gap is near 2200..2450us.
+            // A fast sync also needs a fast preamble; the standard rate has a
+            // separate sync band, with the ambiguous interval left unused.
             if(instance->decoder.te_last <
                    (KEELOQ_TE_FAST + subghz_protocol_keeloq_const.te_short) / 2 &&
                DURATION_DIFF(duration, KEELOQ_TE_FAST * 10) < KEELOQ_TE_FAST_GAP_DELTA) {
                 locked_te = duration / 10;
             } else if(
-                DURATION_DIFF(duration, subghz_protocol_keeloq_const.te_short * 10) <
-                subghz_protocol_keeloq_const.te_delta * 10) {
+                duration >= KEELOQ_TE_STD_GAP_MIN &&
+                duration < (subghz_protocol_keeloq_const.te_short +
+                            subghz_protocol_keeloq_const.te_delta) *
+                               10) {
                 locked_te = subghz_protocol_keeloq_const.te_short;
             }
             if(locked_te) {
@@ -985,6 +1000,11 @@ void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t dur
         break;
     case KeeloqDecoderStepCheckDuration:
         if(!level) {
+            const uint32_t te = instance->te;
+            const uint32_t te_delta = subghz_protocol_keeloq_te_delta(te);
+            const uint32_t period_delta = te == subghz_protocol_keeloq_const.te_short ?
+                                              te_delta * 2 :
+                                              te_delta * 3 / 2;
             if(duration >= te * 2 + te_delta) {
                 // Found end TX
                 instance->decoder.parser_step = KeeloqDecoderStepReset;
@@ -1011,7 +1031,8 @@ void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t dur
             if(instance->decoder.decode_count_bit <
                    subghz_protocol_keeloq_const.min_count_bit_for_found + 2 &&
                (bit || (DURATION_DIFF(instance->decoder.te_last, te * 2) < te_delta * 2 &&
-                        DURATION_DIFF(duration, te) < te_delta))) {
+                        DURATION_DIFF(duration, te) < te_delta)) &&
+               DURATION_DIFF(instance->decoder.te_last + duration, te * 3) < period_delta) {
                 if(instance->decoder.decode_count_bit <
                    subghz_protocol_keeloq_const.min_count_bit_for_found) {
                     subghz_protocol_blocks_add_bit(&instance->decoder, bit);
@@ -1059,6 +1080,24 @@ static inline bool subghz_protocol_keeloq_check_decrypt(
     }
     return false;
 }
+static inline bool subghz_protocol_keeloq_check_decrypt_dea_mio(
+    SubGhzBlockGeneric* instance,
+    uint32_t decrypt,
+    uint8_t btn,
+    uint32_t end_serial) {
+    furi_assert(instance);
+    uint16_t disc = (decrypt >> 16) & KEELOQ_DEA_MIO_DISC_MASK;
+    uint8_t low = disc & KEELOQ_DEA_MIO_MATCH_MASK;
+    // Preserve the old generic zero-discriminator acceptance path, but never
+    // attach its unproven flags to an unrelated serial.
+    if((decrypt >> 28) == btn && (low == end_serial || low == 0)) {
+        instance->cnt = decrypt & 0xFFFF;
+        instance->seed = low == end_serial ? disc : 0;
+        return true;
+    }
+    return false;
+}
+
 // Centurion specific check
 static inline bool subghz_protocol_keeloq_check_decrypt_centurion(
     SubGhzBlockGeneric* instance,
@@ -1209,6 +1248,13 @@ static uint32_t subghz_protocol_keeloq_check_remote_controller_selector(
                     } else if((strcmp(furi_string_get_cstr(manufacture_code->name), "Monarch") ==
                                0)) {
                         if(subghz_protocol_keeloq_check_decrypt_monarch(instance, decrypt, btn)) {
+                            *manufacture_name = furi_string_get_cstr(manufacture_code->name);
+                            keystore->mfname = *manufacture_name;
+                            return decrypt;
+                        }
+                    } else if(strcmp(furi_string_get_cstr(manufacture_code->name), "Dea_Mio") == 0) {
+                        if(subghz_protocol_keeloq_check_decrypt_dea_mio(
+                               instance, decrypt, btn, end_serial)) {
                             *manufacture_name = furi_string_get_cstr(manufacture_code->name);
                             keystore->mfname = *manufacture_name;
                             return decrypt;
@@ -1602,17 +1648,18 @@ SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(
     subghz_protocol_keeloq_check_remote_controller(
         &instance->generic, instance->keystore, &instance->manufacture_name);
 
-    // Preserve the Erreka seed and Monarch discriminator when saving a loaded capture.
+    // Preserve seeds/discriminators as received, including DEA Mio OVR flags.
     if((strcmp(instance->manufacture_name, "BFT") == 0) ||
        (strcmp(instance->manufacture_name, "Erreka") == 0) ||
-       (strcmp(instance->manufacture_name, "Monarch") == 0)) {
+       (strcmp(instance->manufacture_name, "Monarch") == 0) ||
+       (strcmp(instance->manufacture_name, "Dea_Mio") == 0)) {
         uint8_t seed_data[sizeof(uint32_t)] = {0};
         for(size_t i = 0; i < sizeof(uint32_t); i++) {
             seed_data[sizeof(uint32_t) - i - 1] = (instance->generic.seed >> i * 8) & 0xFF;
         }
         if((res == SubGhzProtocolStatusOk) &&
            !flipper_format_write_hex(flipper_format, "Seed", seed_data, sizeof(uint32_t))) {
-            FURI_LOG_E(TAG, "DECODER Serialize: Unable to add Seed");
+            FURI_LOG_E(TAG, "Seed save error");
             res = SubGhzProtocolStatusError;
         }
         instance->generic.seed = seed_data[0] << 24 | seed_data[1] << 16 | seed_data[2] << 8 |
@@ -1622,7 +1669,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(
     if((res == SubGhzProtocolStatusOk) &&
        !flipper_format_write_string_cstr(
            flipper_format, "Manufacture", instance->manufacture_name)) {
-        FURI_LOG_E(TAG, "DECODER Serialize: Unable to add manufacture name");
+        FURI_LOG_E(TAG, "Mfg save error");
         res = SubGhzProtocolStatusError;
     }
     // Legacy 400us captures keep their existing layout. Only a fast capture
@@ -1717,18 +1764,22 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
     subghz_block_generic_global.current_btn = instance->generic.btn;
     subghz_block_generic_global.btn_length_bit = 4;
 
+    const char* bit_suffix =
+        subghz_protocol_keeloq_te_nominal(instance->te) == KEELOQ_TE_FAST ? "b HR" : "bit";
+
     if(strcmp(instance->manufacture_name, "AN-Motors") == 0) {
         // No counter only pseudo counter
         subghz_block_generic_global.cnt_is_available = false;
         furi_string_cat_printf(
             output,
-            "%s %dbit\r\n"
+            "%s %d%s\r\n"
             "Key:%08lX%08lX\r\n"
             "Fix:0x%08lX PsCn:%04lX\r\n"
             "Hop:0x%08lX    Btn:%01X\r\n"
             "MF:%s",
             instance->generic.protocol_name,
             instance->generic.data_count_bit,
+            bit_suffix,
             code_found_hi,
             code_found_lo,
             code_found_reverse_hi,
@@ -1743,13 +1794,14 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
         subghz_block_generic_global.current_cnt = instance->generic.cnt;
         furi_string_cat_printf(
             output,
-            "%s %dbit\r\n"
+            "%s %d%s\r\n"
             "Key:%08lX%08lX\r\n"
             "Fix:0x%08lX    Cnt:%04lX\r\n"
             "Hop:0x%08lX    Btn:%01X\r\n"
             "MF:%s",
             instance->generic.protocol_name,
             instance->generic.data_count_bit,
+            bit_suffix,
             code_found_hi,
             code_found_lo,
             code_found_reverse_hi,
@@ -1769,13 +1821,14 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
         if(prog_mode == PROG_MODE_KEELOQ_BFT) {
             furi_string_cat_printf(
                 output,
-                "%s %dbit\r\n"
+                "%s %d%s\r\n"
                 "Key:%08lX%08lX\r\n"
                 "Fix:0x%08lX    Cnt:%04lX\r\n"
                 "Hop:0x%08lX    Btn:%01X\r\n"
                 "MF:%s PRG Sd:%08lX",
                 instance->generic.protocol_name,
                 instance->generic.data_count_bit,
+                bit_suffix,
                 code_found_hi,
                 code_found_lo,
                 code_found_reverse_hi,
@@ -1787,13 +1840,14 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
         } else {
             furi_string_cat_printf(
                 output,
-                "%s %dbit\r\n"
+                "%s %d%s\r\n"
                 "Key:%08lX%08lX\r\n"
                 "Fix:0x%08lX    Cnt:%04lX\r\n"
                 "Hop:0x%08lX    Btn:%01X\r\n"
                 "MF:%s Sd:%08lX",
                 instance->generic.protocol_name,
                 instance->generic.data_count_bit,
+                bit_suffix,
                 code_found_hi,
                 code_found_lo,
                 code_found_reverse_hi,
@@ -1809,13 +1863,14 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
         subghz_block_generic_global.cnt_is_available = false;
         furi_string_cat_printf(
             output,
-            "%s %dbit\r\n"
+            "%s %d%s\r\n"
             "Key:%08lX%08lX\r\n"
             "Fix:0x%08lX    Cnt:????\r\n"
             "Hop:0x%08lX    Btn:%01X\r\n"
             "MF:%s",
             instance->generic.protocol_name,
             instance->generic.data_count_bit,
+            bit_suffix,
             code_found_hi,
             code_found_lo,
             code_found_reverse_hi,
@@ -1829,13 +1884,14 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
         subghz_block_generic_global.current_cnt = instance->generic.cnt;
         furi_string_cat_printf(
             output,
-            "%s %dbit\r\n"
+            "%s %d%s\r\n"
             "Key:%08lX%08lX\r\n"
             "Fix:0x%08lX    Cnt:%04lX\r\n"
             "Hop:0x%08lX    Btn:%01X\r\n"
             "MF:%s",
             instance->generic.protocol_name,
             instance->generic.data_count_bit,
+            bit_suffix,
             code_found_hi,
             code_found_lo,
             code_found_reverse_hi,
@@ -1843,5 +1899,11 @@ void subghz_protocol_decoder_keeloq_get_string(void* context, FuriString* output
             hopdecrypt,
             instance->generic.btn,
             instance->manufacture_name);
+    }
+    if(strcmp(instance->manufacture_name, "Dea_Mio") == 0) {
+        furi_string_cat_printf(
+            output,
+            " Ds:%03lX",
+            (unsigned long)(instance->generic.seed & KEELOQ_DEA_MIO_DISC_MASK));
     }
 }

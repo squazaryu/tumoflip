@@ -8,7 +8,7 @@
 #include "common.h"
 
 // protocol BERNER / ELKA / TEDSEN / TELETASTER
-#define TAG "SubGhzProtocolBett"
+#define TAG SUBGHZ_PROTOCOL_BETT_NAME
 
 #define DIP_P 0b11 //(+)
 #define DIP_O 0b10 //(0)

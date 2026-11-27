@@ -70,14 +70,14 @@ void subghz_scene_save_name_on_enter(void* context) {
         furi_string_set(subghz->file_path, dir_name);
     }
 
-    strncpy(subghz->file_name_tmp, furi_string_get_cstr(file_name), SUBGHZ_MAX_LEN_NAME);
+    strlcpy(subghz->file_name_tmp, furi_string_get_cstr(file_name), sizeof(subghz->file_name_tmp));
     text_input_set_header_text(text_input, "Name signal");
     text_input_set_result_callback(
         text_input,
         subghz_scene_save_name_text_input_callback,
         subghz,
         subghz->file_name_tmp,
-        SUBGHZ_MAX_LEN_NAME,
+        sizeof(subghz->file_name_tmp),
         dev_name_empty);
 
     ValidatorIsFile* validator_is_file = validator_is_file_alloc_init(

@@ -52,6 +52,7 @@ class Erreka868AddManuallyTest(unittest.TestCase):
 static uint32_t sample_key;
 #define rand() sample_key
 #define SUBGHZ_PROTOCOL_NORD_ICE_NAME "Nord ICE"
+#define SUBGHZ_PROTOCOL_FAAC_TM_NAME "Faac TM"
 static void subghz_txrx_gen_serial_gangqi(uint64_t* value) { *value = 0; }
 static void subghz_txrx_gen_key_marantec(uint64_t* value) { *value = 0; }
 static uint64_t subghz_protocol_blocks_reverse_key(uint64_t value, uint8_t bits) {
@@ -65,6 +66,13 @@ int main(void) {
     const uint32_t keys[] = {0, 1, 0xFFFFF, 0x100000, 0x12345678, 0x7FFFFFFF};
     for(size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
         sample_key = keys[i];
+        GenInfo faac_tm = {0}, princeton = {0};
+        subghz_scene_set_type_fill_generation_infos(&faac_tm, SetTypeFaacTm);
+        assert(faac_tm.type == GenData && faac_tm.data.bits == 12);
+        assert(faac_tm.data.key == (keys[i] & 0xFFF) && faac_tm.data.te == 400);
+        assert(!faac_tm.data.gt && !strcmp(faac_tm.data.name,"Faac TM"));
+        subghz_scene_set_type_fill_generation_infos(&princeton, SetTypePricenton433);
+        assert(princeton.data.te == 400 && princeton.data.gt == 30);
         GenInfo home = {0};
         subghz_scene_set_type_fill_generation_infos(&home, SetTypeHomeGate433);
         assert(home.type == GenKeeloq && home.freq == 433920000);

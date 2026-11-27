@@ -34,6 +34,10 @@ static const SubGhzAddManuallyPlugin subghz_add_manually_plugin = {
                 {subghz_scene_set_seed_on_enter,
                  subghz_scene_set_seed_on_event,
                  subghz_scene_set_seed_on_exit},
+            [SubGhzAddManuallySceneSetManualParams] =
+                {subghz_scene_set_manual_params_on_enter,
+                 subghz_scene_set_manual_params_on_event,
+                 subghz_scene_set_manual_params_on_exit},
         },
 };
 

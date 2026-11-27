@@ -11,7 +11,7 @@
 #include <furi_hal.h>
 #include <furi_hal_rtc.h>
 
-#define TAG "SubGhzProtocolDicketMAHS"
+#define TAG SUBGHZ_PROTOCOL_DICKERT_MAHS_NAME
 
 static const SubGhzBlockConst subghz_protocol_dickert_mahs_const = {
     .te_short = 400,

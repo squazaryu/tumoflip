@@ -420,7 +420,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> i * 8) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to update Key");
+            FURI_LOG_E(TAG, "Cannot update Key");
             break;
         }
 
@@ -428,7 +428,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data_2 >> i * 8) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Data", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to update Data");
+            FURI_LOG_E(TAG, "Cannot update Data");
             break;
         }
 

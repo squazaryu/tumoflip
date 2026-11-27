@@ -4,7 +4,7 @@
 
 #include <furi.h>
 
-#define TAG "Iso14443_4aPoller"
+#define TAG "ISO4A.Poll"
 
 #define ISO14443_4A_POLLER_BUF_SIZE (256U)
 

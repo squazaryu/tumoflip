@@ -7,7 +7,7 @@
 #include "../blocks/math.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolHormannHsm"
+#define TAG SUBGHZ_PROTOCOL_HORMANN_HSM_NAME
 
 // HSM has both seven- and eight-one preambles. Keep all seven common bits
 // and both stop bits mandatory; the total frame length remains exactly 44.

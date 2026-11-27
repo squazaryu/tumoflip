@@ -4,7 +4,7 @@
 
 #include <furi.h>
 
-#define TAG "Ntag4xxPoller"
+#define TAG "NT4.Poll"
 
 #define NTAG4XX_BUF_SIZE        (64U)
 #define NTAG4XX_RESULT_BUF_SIZE (512U)
@@ -66,7 +66,7 @@ static NfcCommand ntag4xx_poller_handler_read_version(Ntag4xxPoller* instance) {
         FURI_LOG_D(TAG, "Read version success");
         instance->state = Ntag4xxPollerStateReadSuccess;
     } else {
-        FURI_LOG_E(TAG, "Failed to read version");
+        FURI_LOG_E(TAG, "Err: read version");
         iso14443_4a_poller_halt(instance->iso14443_4a_poller);
         instance->state = Ntag4xxPollerStateReadFailed;
     }

@@ -6,7 +6,7 @@
 #include <furi.h>
 #include <lib/nfc/nfc.h>
 
-#define TAG "Iso14443_3aListener"
+#define TAG "ISO3A.Listen"
 
 #define ISO14443_3A_LISTENER_MAX_BUFFER_SIZE (256)
 

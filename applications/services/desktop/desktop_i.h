@@ -2,6 +2,7 @@
 
 #include "desktop.h"
 #include "desktop_settings.h"
+#include "desktop_panel_i.h"
 
 #include "animations/animation_manager.h"
 #include "views/desktop_view_pin_timeout.h"
@@ -14,6 +15,7 @@
 #include "views/desktop_view_slideshow.h"
 
 #include <gui/gui.h>
+#include <gui/view_i.h>
 #include <gui/view_stack.h>
 #include <gui/view_dispatcher.h>
 #include <gui/modules/popup.h>
@@ -83,6 +85,18 @@ struct Desktop {
 
     DesktopClock clock;
     DesktopSettings settings;
+
+    /* Desktop-owned for the service lifetime; pages never allocate views. */
+    DesktopPanelSettings panel_settings;
+    DesktopPanelModel panel_model;
+    View panel_view;
+    FuriTimer* panel_motion_timer;
+    uint8_t panel_sd_state;
+    bool panel_attached;
+    bool panel_stalled;
+    bool panel_timer_armed;
+    bool panel_safe_boot;
+    bool panel_ready;
 
     bool in_transition;
     bool app_running;

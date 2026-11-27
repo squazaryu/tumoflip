@@ -69,7 +69,7 @@ static void gap_verify_connection_parameters(Gap* gap) {
 
     FURI_LOG_I(
         TAG,
-        "Connection parameters: Connection Interval: %d (%d ms), Slave Latency: %d, Supervision Timeout: %d",
+        "Link interval %d (%d ms), latency %d, timeout %d",
         gap->connection_params.conn_interval,
         GAP_INTERVAL_TO_MS(gap->connection_params.conn_interval),
         gap->connection_params.slave_latency,
@@ -95,7 +95,7 @@ static void gap_verify_connection_parameters(Gap* gap) {
     if(negotiation_failed) {
         FURI_LOG_W(
             TAG,
-            "Connection interval doesn't suite us. Trying to negotiate, round %u",
+            "Negotiate interval, round %u",
             gap->negotiation_round + 1);
         if(aci_l2cap_connection_parameter_update_req(
                gap->service.connection_handle,
@@ -103,7 +103,7 @@ static void gap_verify_connection_parameters(Gap* gap) {
                connection_interval_max,
                gap->connection_params.slave_latency,
                gap->connection_params.supervisor_timeout)) {
-            FURI_LOG_E(TAG, "Failed to request connection parameters update");
+            FURI_LOG_E(TAG, "Link parameter update failed");
             // The other side is not in the mood
             // But we are open to try it again
             gap->negotiation_round = 0;
@@ -113,7 +113,7 @@ static void gap_verify_connection_parameters(Gap* gap) {
     } else {
         FURI_LOG_I(
             TAG,
-            "Connection interval suits us. Spent %u rounds to negotiate",
+            "Interval accepted after %u rounds",
             gap->negotiation_round);
         // Looks like the other side is open to negotiation
         gap->negotiation_round = 0;
@@ -127,7 +127,7 @@ static void gap_connection_complete(
     uint16_t latency,
     uint16_t timeout) {
     if(status != BLE_STATUS_SUCCESS) {
-        FURI_LOG_E(TAG, "Connection failed: 0x%02X", status);
+        FURI_LOG_E(TAG, "Link failed: 0x%02X", status);
         return;
     }
     gap->connection_params.conn_interval = interval;
@@ -187,7 +187,7 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
             gap->connection_params.conn_interval = event->Conn_Interval;
             gap->connection_params.slave_latency = event->Conn_Latency;
             gap->connection_params.supervisor_timeout = event->Supervision_Timeout;
-            FURI_LOG_I(TAG, "Connection parameters event complete");
+            FURI_LOG_I(TAG, "Link parameters event complete");
             gap_verify_connection_parameters(gap);
 
             break;
@@ -306,7 +306,7 @@ BleEventFlowStatus ble_event_app_notification(void* pckt) {
             if(pairing_complete->Status) {
                 FURI_LOG_E(
                     TAG,
-                    "Pairing failed with status: %d. Terminating connection",
+                    "Pairing failed %d; disconnect",
                     pairing_complete->Status);
                 aci_gap_terminate(gap->service.connection_handle, 5);
             } else {
@@ -410,7 +410,7 @@ static bool gap_init_svc(Gap* gap, const GapRootSecurityKeys* root_keys) {
         strlen(name),
         (uint8_t*)name);
     if(status) {
-        FURI_LOG_E(TAG, "Failed updating name characteristic: %d", status);
+        FURI_LOG_E(TAG, "Failed updating name char: %d", status);
     }
 
     uint8_t gap_appearence_char_uuid[2] = {
@@ -422,7 +422,7 @@ static bool gap_init_svc(Gap* gap, const GapRootSecurityKeys* root_keys) {
         2,
         gap_appearence_char_uuid);
     if(status) {
-        FURI_LOG_E(TAG, "Failed updating appearence characteristic: %d", status);
+        FURI_LOG_E(TAG, "Failed updating appearence char: %d", status);
     }
     // Set default PHY
     hci_le_set_default_phy(ALL_PHYS_PREFERENCE, TX_2M_PREFERRED, RX_2M_PREFERRED);

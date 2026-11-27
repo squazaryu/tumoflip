@@ -123,7 +123,7 @@ static bool subghz_keystore_read_file(SubGhzKeystore* instance, Stream* stream, 
     do {
         if(iv) {
             if(!furi_hal_crypto_enclave_load_key(SUBGHZ_KEYSTORE_FILE_ENCRYPTION_KEY_SLOT, iv)) {
-                FURI_LOG_E(TAG, "Unable to load decryption key");
+                FURI_LOG_E(TAG, "Cannot load decryption key");
                 break;
             }
         }
@@ -207,7 +207,7 @@ bool subghz_keystore_load(SubGhzKeystore* instance, const char* file_name) {
     FlipperFormat* flipper_format = flipper_format_file_alloc(storage);
     do {
         if(!flipper_format_file_open_existing(flipper_format, file_name)) {
-            FURI_LOG_E(TAG, "Unable to open file for read: %s", file_name);
+            FURI_LOG_E(TAG, "Cannot open file for read: %s", file_name);
             break;
         }
         if(!flipper_format_read_header(flipper_format, filetype, &version)) {
@@ -260,28 +260,28 @@ bool subghz_keystore_save(SubGhzKeystore* instance, const char* file_name, uint8
     FlipperFormat* flipper_format = flipper_format_file_alloc(storage);
     do {
         if(!flipper_format_file_open_always(flipper_format, file_name)) {
-            FURI_LOG_E(TAG, "Unable to open file for write: %s", file_name);
+            FURI_LOG_E(TAG, "Cannot open file for write: %s", file_name);
             break;
         }
         if(!flipper_format_write_header_cstr(
                flipper_format, SUBGHZ_KEYSTORE_FILE_TYPE, SUBGHZ_KEYSTORE_FILE_VERSION)) {
-            FURI_LOG_E(TAG, "Unable to add header");
+            FURI_LOG_E(TAG, "Cannot add header");
             break;
         }
         uint32_t encryption = SubGhzKeystoreEncryptionAES256;
         if(!flipper_format_write_uint32(flipper_format, "Encryption", &encryption, 1)) {
-            FURI_LOG_E(TAG, "Unable to add Encryption");
+            FURI_LOG_E(TAG, "Cannot add Encryption");
             break;
         }
         if(!flipper_format_write_hex(flipper_format, "IV", iv, 16)) {
-            FURI_LOG_E(TAG, "Unable to add IV");
+            FURI_LOG_E(TAG, "Cannot add IV");
             break;
         }
 
         subghz_keystore_mess_with_iv(iv);
 
         if(!furi_hal_crypto_enclave_load_key(SUBGHZ_KEYSTORE_FILE_ENCRYPTION_KEY_SLOT, iv)) {
-            FURI_LOG_E(TAG, "Unable to load encryption key");
+            FURI_LOG_E(TAG, "Cannot load encryption key");
             break;
         }
 
@@ -366,7 +366,7 @@ bool subghz_keystore_raw_encrypted_save(
     FlipperFormat* input_flipper_format = flipper_format_file_alloc(storage);
     do {
         if(!flipper_format_file_open_existing(input_flipper_format, input_file_name)) {
-            FURI_LOG_E(TAG, "Unable to open file for read: %s", input_file_name);
+            FURI_LOG_E(TAG, "Cannot open file for read: %s", input_file_name);
             break;
         }
         if(!flipper_format_read_header(input_flipper_format, filetype, &version)) {
@@ -394,35 +394,35 @@ bool subghz_keystore_raw_encrypted_save(
         FlipperFormat* output_flipper_format = flipper_format_file_alloc(storage);
 
         if(!flipper_format_file_open_always(output_flipper_format, output_file_name)) {
-            FURI_LOG_E(TAG, "Unable to open file for write: %s", output_file_name);
+            FURI_LOG_E(TAG, "Cannot open file for write: %s", output_file_name);
             break;
         }
         if(!flipper_format_write_header_cstr(
                output_flipper_format,
                furi_string_get_cstr(filetype),
                SUBGHZ_KEYSTORE_FILE_VERSION)) {
-            FURI_LOG_E(TAG, "Unable to add header");
+            FURI_LOG_E(TAG, "Cannot add header");
             break;
         }
         uint32_t encryption = SubGhzKeystoreEncryptionAES256;
         if(!flipper_format_write_uint32(output_flipper_format, "Encryption", &encryption, 1)) {
-            FURI_LOG_E(TAG, "Unable to add Encryption");
+            FURI_LOG_E(TAG, "Cannot add Encryption");
             break;
         }
         if(!flipper_format_write_hex(output_flipper_format, "IV", iv, 16)) {
-            FURI_LOG_E(TAG, "Unable to add IV");
+            FURI_LOG_E(TAG, "Cannot add IV");
             break;
         }
 
         if(!flipper_format_write_string_cstr(output_flipper_format, "Encrypt_data", "RAW")) {
-            FURI_LOG_E(TAG, "Unable to add Encrypt_data");
+            FURI_LOG_E(TAG, "Cannot add Encrypt_data");
             break;
         }
 
         subghz_keystore_mess_with_iv(iv);
 
         if(!furi_hal_crypto_enclave_load_key(SUBGHZ_KEYSTORE_FILE_ENCRYPTION_KEY_SLOT, iv)) {
-            FURI_LOG_E(TAG, "Unable to load encryption key");
+            FURI_LOG_E(TAG, "Cannot load encryption key");
             break;
         }
 
@@ -505,7 +505,7 @@ bool subghz_keystore_raw_get_data(const char* file_name, size_t offset, uint8_t*
     FlipperFormat* flipper_format = flipper_format_file_alloc(storage);
     do {
         if(!flipper_format_file_open_existing(flipper_format, file_name)) {
-            FURI_LOG_E(TAG, "Unable to open file for read: %s", file_name);
+            FURI_LOG_E(TAG, "Cannot open file for read: %s", file_name);
             break;
         }
         if(!flipper_format_read_header(flipper_format, str_temp, &version)) {
@@ -577,7 +577,7 @@ bool subghz_keystore_raw_get_data(const char* file_name, size_t offset, uint8_t*
         }
 
         if(!furi_hal_crypto_enclave_load_key(SUBGHZ_KEYSTORE_FILE_ENCRYPTION_KEY_SLOT, iv)) {
-            FURI_LOG_E(TAG, "Unable to load encryption key");
+            FURI_LOG_E(TAG, "Cannot load encryption key");
             break;
         }
 

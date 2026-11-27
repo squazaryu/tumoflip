@@ -6,7 +6,7 @@
 #include <furi_hal.h>
 #include <mbedtls/platform_util.h>
 
-#define TAG "MfUltralightPoller"
+#define TAG "MFUL.Poll"
 
 typedef NfcCommand (*MfUltralightPollerReadHandler)(MfUltralightPoller* instance);
 

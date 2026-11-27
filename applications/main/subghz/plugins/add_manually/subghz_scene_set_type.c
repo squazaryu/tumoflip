@@ -3,6 +3,7 @@
 #include <subghz/helpers/subghz_gen_info.h>
 #include <subghz/scenes/subghz_scene_start.h>
 #include <lib/subghz/blocks/math.h>
+#include "subghz_manual_params.h"
 
 #define TAG "SubGhzSetType"
 
@@ -13,6 +14,7 @@ void subghz_scene_set_type_submenu_callback(void* context, uint32_t index) {
 
 static const char* submenu_names[SetTypeMAX] = {
     [SetTypeHomeGate433] = "KL: HomeGate 433MHz",
+    [SetTypeFaacTm] = "FAAC TM 12bit",
     [SetTypeFaacSLH_868] = "FAAC SLH 868MHz",
     [SetTypeFaacSLH_433] = "FAAC SLH 433MHz",
     [SetTypeGeniusSLH_433] = "Genius SLH 433MHz",
@@ -157,6 +159,15 @@ bool subghz_scene_set_type_generate_protocol_from_infos(SubGhz* subghz) {
                 gen_info.data.key,
                 gen_info.data.bits,
                 gen_info.data.te);
+            if(generated_protocol && gen_info.data.gt) {
+                SubGhzManualTiming limits;
+                generated_protocol =
+                    subghz_manual_timing(gen_info.data.name, &limits) &&
+                    subghz_manual_value_valid(
+                        (int32_t)gen_info.data.gt, limits.gt_min, limits.gt_max) &&
+                    flipper_format_update_uint32(
+                        subghz_txrx_get_fff_data(subghz->txrx), "Guard_time", &gen_info.data.gt, 1);
+            }
         } else {
             generated_protocol = subghz_txrx_gen_data_protocol(
                 subghz->txrx,
@@ -334,10 +345,46 @@ bool subghz_scene_set_type_generate_protocol_from_infos(SubGhz* subghz) {
             subghz->scene_manager, SubGhzSceneSaveName, SubGhzCustomEventManagerSet);
         scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSaveName);
     } else {
-        furi_string_set(subghz->error_str, "Function requires\nan SD card with\nfresh databases.");
+        furi_string_set(
+            subghz->error_str,
+            (gen_info.type == GenData && strcmp(gen_info.data.name, "Faac TM") == 0) ?
+                "Select Core pack\nwith FAAC TM." :
+                "Function requires\nan SD card with\nfresh databases.");
         scene_manager_next_scene(subghz->scene_manager, SubGhzSceneShowError);
     }
     return generated_protocol;
+}
+
+bool subghz_scene_set_type_proceed_advanced(SubGhz* subghz) {
+    switch(subghz->gen_info->type) {
+    case GenData:
+        scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSetKey);
+        break;
+    case GenSecPlus1:
+        (void)subghz_scene_set_type_generate_protocol_from_infos(subghz);
+        break;
+    case GenFaacSLH:
+    case GenKeeloq:
+    case GenCameAtomo:
+    case GenKeeloqSeed:
+    case GenAlutechAt4n:
+    case GenSomfyTelis:
+    case GenSomfyKeytis:
+    case GenKingGatesStylo4k:
+    case GenBenincaARC:
+    case GenJarolift:
+    case GenSuperrollo:
+    case GenDitecGOL4:
+    case GenNiceFlorS:
+    case GenSecPlus2:
+    case GenPhoenixV2:
+        scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSetSerial);
+        break;
+    case GenUnsupported:
+        subghz_scene_show_unsupported(subghz);
+        break;
+    }
+    return true;
 }
 
 bool subghz_scene_set_type_on_event(void* context, SceneManagerEvent event) {
@@ -359,33 +406,7 @@ bool subghz_scene_set_type_on_event(void* context, SceneManagerEvent event) {
         } else if(
             scene_manager_get_scene_state(subghz->scene_manager, SubGhzSceneStart) ==
             SubmenuIndexAddManuallyAdvanced) {
-            switch(subghz->gen_info->type) {
-            case GenData: // Key (u64)
-                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSetKey);
-                break;
-            case GenSecPlus1: // None
-                return subghz_scene_set_type_generate_protocol_from_infos(subghz);
-            case GenFaacSLH: // Serial (u32), Button (u8), Counter (u32), Seed (u32)
-            case GenKeeloq: // Serial (u32), Button (u8), Counter (u16)
-            case GenCameAtomo: // Serial (u32), Counter (u16)
-            case GenKeeloqSeed: // Serial (u32), Button (u8), Counter (u16), Seed (u32)
-            case GenAlutechAt4n: // Serial (u32), Button (u8), Counter (u16)
-            case GenSomfyTelis: // Serial (u32), Button (u8), Counter (u16)
-            case GenSomfyKeytis: // Serial (u32), Button (u8), Counter (u16)
-            case GenKingGatesStylo4k: // Serial (u32), Button (u8), Counter (u16)
-            case GenBenincaARC: // Serial (u32), Button (u8), Counter (u32)
-            case GenJarolift: // Serial (u32), Button (u4), Counter (u16)
-            case GenSuperrollo: // Serial (u32), Button (u4), Counter (u16)
-            case GenDitecGOL4: // Serial (u32), Button (u4), Counter (u16)
-            case GenNiceFlorS: // Serial (u32), Button (u8), Counter (u16)
-            case GenSecPlus2: // Serial (u32), Button (u8), Counter (u32)
-            case GenPhoenixV2: // Serial (u32), Counter (u16)
-                scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSetSerial);
-                break;
-            case GenUnsupported:
-                subghz_scene_show_unsupported(subghz);
-                break;
-            }
+            scene_manager_next_scene(subghz->scene_manager, SubGhzSceneSetManualParams);
             return true;
         }
     }

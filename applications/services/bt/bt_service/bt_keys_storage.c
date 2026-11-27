@@ -13,7 +13,7 @@
 #define BT_KEYS_STORAGE_VERSION        (1)
 #define BT_KEYS_STORAGE_LEGACY_VERSION (0) // Legacy version with no root keys
 
-#define TAG "BtKeyStorage"
+#define TAG "BtKeys"
 
 // Identity root key
 static const uint8_t gap_legacy_irk[16] =
@@ -71,7 +71,7 @@ static bool bt_keys_storage_load_keys_and_pairings(
 
     size_t ble_data_size = data_size - sizeof(GapRootSecurityKeys);
     if(ble_data_size > instance->nvm_sram_buff_size) {
-        FURI_LOG_E(TAG, "BLE data too large for SRAM buffer");
+        FURI_LOG_E(TAG, "BLE data exceeds SRAM buffer");
         return false;
     }
 
@@ -165,7 +165,7 @@ static bool bt_keys_storage_validate_file(
     size_t size;
 
     if(!saved_struct_get_metadata(file_path, &magic, &version, &size)) {
-        FURI_LOG_W(TAG, "Failed to get metadata");
+        FURI_LOG_W(TAG, "Err: get metadata");
         return false;
 
     } else if(magic != BT_KEYS_STORAGE_MAGIC) {
@@ -174,7 +174,7 @@ static bool bt_keys_storage_validate_file(
     } else if(version > BT_KEYS_STORAGE_VERSION) {
         FURI_LOG_E(
             TAG,
-            "File version %d is newer than supported version %d",
+            "File version %d > supported %d",
             version,
             BT_KEYS_STORAGE_VERSION);
         return false;
@@ -219,7 +219,7 @@ bool bt_keys_storage_is_changed(BtKeysStorage* instance) {
             file_path, data_buffer, payload_size, BT_KEYS_STORAGE_MAGIC, file_version);
 
         if(!data_loaded) {
-            FURI_LOG_E(TAG, "Failed to load file");
+            FURI_LOG_E(TAG, "Err: load file");
             break;
         }
 
@@ -284,7 +284,7 @@ bool bt_keys_storage_load(BtKeysStorage* instance) {
     do {
         if(!saved_struct_load(
                file_path, file_data, payload_size, BT_KEYS_STORAGE_MAGIC, file_version)) {
-            FURI_LOG_E(TAG, "Failed to load");
+            FURI_LOG_E(TAG, "Err: load");
             break;
         }
 
@@ -338,7 +338,7 @@ bool bt_keys_storage_update(BtKeysStorage* instance, uint8_t* start_addr, uint32
 
     FURI_LOG_I(
         TAG,
-        "Base address: %p. Start update address: %p. Size changed: %lu",
+        "Base %p, update %p, changed %lu",
         (void*)instance->nvm_sram_buff,
         start_addr,
         size);
@@ -356,7 +356,7 @@ bool bt_keys_storage_update(BtKeysStorage* instance, uint8_t* start_addr, uint32
         bool data_updated = bt_keys_storage_save(instance);
 
         if(!data_updated) {
-            FURI_LOG_E(TAG, "Failed to update key storage");
+            FURI_LOG_E(TAG, "Err: update key storage");
             break;
         }
 

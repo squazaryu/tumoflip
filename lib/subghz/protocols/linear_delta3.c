@@ -7,7 +7,7 @@
 #include "../blocks/math.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolLinearDelta3"
+#define TAG SUBGHZ_PROTOCOL_LINEAR_DELTA3_NAME
 
 #define DIP_PATTERN "%c%c%c%c%c%c%c%c"
 #define DATA_TO_DIP(dip)                                                                    \

@@ -107,7 +107,7 @@ KeysDict* keys_dict_alloc(const char* path, KeysDictMode mode, size_t key_size) 
         }
     }
     stream_rewind(instance->stream);
-    FURI_LOG_I(TAG, "Loaded dictionary with %zu keys", instance->total_keys);
+    FURI_LOG_I(TAG, "Dictionary: %zu keys", instance->total_keys);
 
     return instance;
 }

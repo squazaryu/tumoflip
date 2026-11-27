@@ -947,7 +947,7 @@ static void loader_do_app_closed(Loader* loader) {
 
     furi_string_free(loader->app.launch_path);
 
-    FURI_LOG_I(TAG, "Application stopped. Free heap: %zu", memmgr_get_free_heap());
+    FURI_LOG_I(TAG, "App stopped. Free heap: %zu", memmgr_get_free_heap());
 
     LoaderEvent event;
     event.type = LoaderEventTypeApplicationStopped;
@@ -994,7 +994,7 @@ int32_t loader_srv(void* p) {
     Loader* loader = loader_alloc();
     furi_record_create(RECORD_LOADER, loader);
 
-    FURI_LOG_I(TAG, "Executing system start hooks");
+    FURI_LOG_I(TAG, "Run start hooks");
     for(size_t i = 0; i < FLIPPER_ON_SYSTEM_START_COUNT; i++) {
         FLIPPER_ON_SYSTEM_START[i]();
     }

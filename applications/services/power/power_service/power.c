@@ -556,7 +556,7 @@ static void power_message_callback(FuriEventLoopObject* object, void* context) {
                     }
                 }
                 if(!retries) {
-                    FURI_LOG_W(TAG, "Failed to enable OTG, will try later");
+                    FURI_LOG_W(TAG, "Err: enable OTG, will try later");
                 }
             } else {
                 FURI_LOG_W(
@@ -712,7 +712,7 @@ int32_t power_srv(void* p) {
     UNUSED(p);
 
     if(furi_hal_rtc_get_boot_mode() != FuriHalRtcBootModeNormal) {
-        FURI_LOG_W(TAG, "Skipping start in special boot mode");
+        FURI_LOG_W(TAG, "Special boot; start skipped");
 
         furi_thread_suspend(furi_thread_get_current_id());
         return 0;

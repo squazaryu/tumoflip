@@ -125,8 +125,7 @@ static void furi_thread_body(void* context) {
 #endif
         FURI_LOG_E( //-V779
             thread->name ? thread->name : "Thread",
-            "Stack watermark is too low %zu < " STRINGIFY(
-                THREAD_STACK_WATERMARK_MIN) ". Increase stack size.",
+            "Stack watermark %zu < " STRINGIFY(THREAD_STACK_WATERMARK_MIN) "; increase stack",
             stack_watermark);
     }
 

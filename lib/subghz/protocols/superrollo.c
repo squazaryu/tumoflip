@@ -11,7 +11,7 @@
 #include "../blocks/math.h"
 #include "../subghz_keystore.h"
 
-#define TAG "SubGhzProtocolSuperrollo"
+#define TAG SUBGHZ_PROTOCOL_SUPERROLLO_NAME
 
 #define SUPERROLLO_MANUFACTURER_NAME "Superrollo"
 #define SUPERROLLO_FRAME_BITS        67U

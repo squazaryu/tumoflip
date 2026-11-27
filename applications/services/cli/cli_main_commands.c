@@ -238,11 +238,11 @@ void cli_command_sysctl_heap_track(PipeSide* pipe, FuriString* args, void* conte
         printf("Heap tracking disabled");
     } else if(!furi_string_cmp(args, "main")) {
         furi_hal_rtc_set_heap_track_mode(FuriHalRtcHeapTrackModeMain);
-        printf("Heap tracking enabled for application main thread");
+        printf("Heap tracking: app main thread");
 #ifdef FURI_DEBUG
     } else if(!furi_string_cmp(args, "tree")) {
         furi_hal_rtc_set_heap_track_mode(FuriHalRtcHeapTrackModeTree);
-        printf("Heap tracking enabled for application main and child threads");
+        printf("Heap tracking: app main and child threads");
     } else if(!furi_string_cmp(args, "all")) {
         furi_hal_rtc_set_heap_track_mode(FuriHalRtcHeapTrackModeAll);
         printf("Heap tracking enabled for all threads");

@@ -25,7 +25,9 @@
 #include <lib/subghz/transmitter.h>
 #include <lib/subghz/subghz_protocol_registry.h>
 #include <lib/subghz/protocols/plugin_registry.h>
+#include <lib/subghz/types.h>
 
+#include "raw_edit_filename_layout.h"
 #include "subghz_raw_edit_icons.h"
 
 #include <stdio.h>
@@ -33,11 +35,14 @@
 #include <string.h>
 
 #define SUBGHZ_DIR "/ext/subghz"
+#define RAW_EDIT_PATH_LIMIT 512
+#define RAW_EDIT_LINE_LIMIT 8192
 #define MAX_SAMPLES 24000
 #define SYNTH_YIELD_CAP 4096
 #define MAX_KEY_FILE_BYTES 16384
 #define DUR_CLAMP 32000
 #define LOAD_HEAP_RESERVE 12288
+#define RAW_EDIT_ALLOC_MARGIN 32
 
 #define GAP_KEEP_MAX_US 1500
 
@@ -51,7 +56,7 @@
 #define MERGE_PATH_LEN 128
 #define MERGE_BUF_CHUNK 512
 
-#define APP_VERSION "1.8"
+#define APP_VERSION "1.10"
 #define APP_REPO "github.com/Lechnio/SubGHz-RAW-Edit"
 #define APP_NAME "Sub-GHz RAW Edit"
 
@@ -99,6 +104,8 @@ typedef struct
 {
     SubData sd;
     char basename[48];
+    // Borrowed from the live picker/launch argument until the viewport is removed.
+    const char *display_path;
 
     int32_t view_start;
     int32_t view_end;
@@ -437,7 +444,9 @@ typedef struct
     uint8_t buf[128];
     size_t len;
     size_t pos;
+    size_t line_limit;
     bool eof;
+    bool line_too_long;
 } LineReader;
 
 static bool lr_read_line(LineReader *lr, FuriString *out)
@@ -470,6 +479,11 @@ static bool lr_read_line(LineReader *lr, FuriString *out)
         if (c == '\r')
             continue;
 
+        if (lr->line_limit && furi_string_size(out) >= lr->line_limit)
+        {
+            lr->line_too_long = true;
+            return false;
+        }
         furi_string_push_back(out, c);
         any = true;
     }
@@ -499,19 +513,23 @@ typedef enum
 static void *safe_malloc(size_t size)
 {
     if (size == 0 || size > SIZE_MAX - LOAD_HEAP_RESERVE ||
-        memmgr_get_free_heap() < size + LOAD_HEAP_RESERVE)
+        memmgr_get_free_heap() < size + LOAD_HEAP_RESERVE ||
+        memmgr_heap_get_max_free_block() < size + RAW_EDIT_ALLOC_MARGIN)
         return NULL;
 
     return malloc(size);
 }
 
-static void *safe_realloc(void *ptr, size_t size)
+static void *safe_realloc(void *ptr, size_t old_size, size_t size)
 {
-    if (size == 0 || size > SIZE_MAX - LOAD_HEAP_RESERVE ||
-        memmgr_get_free_heap() < size + LOAD_HEAP_RESERVE)
-        return NULL;
-
-    return realloc(ptr, size);
+    // The editor knows the old capacity. Only copy bytes that belonged to it.
+    void *replacement = safe_malloc(size);
+    if (replacement && ptr)
+    {
+        memcpy(replacement, ptr, old_size < size ? old_size : size);
+        free(ptr);
+    }
+    return replacement;
 }
 
 /* Decoded protocols are synthesized by the firmware's own SubGhz encoder: the
@@ -560,7 +578,7 @@ static bool synth_grow(SubData *sd, size_t need)
     if (ncap < need)
         return false;
 
-    int16_t *grown = safe_realloc(sd->data, ncap * sizeof(int16_t));
+    int16_t *grown = safe_realloc(sd->data, sd->cap * sizeof(int16_t), ncap * sizeof(int16_t));
     if (!grown)
     {
         sd->out_of_memory = true;
@@ -858,7 +876,7 @@ static bool next_raw_value(const char **cursor, int32_t *value)
     return false;
 }
 
-static bool load_sub(Storage *storage, const char *path, SubData *sd)
+static bool load_sub(Storage *storage, const char *path, SubData *sd, bool raw_only)
 {
     memset(sd, 0, sizeof(*sd));
     sd->frequency = 433920000;
@@ -892,15 +910,24 @@ static bool load_sub(Storage *storage, const char *path, SubData *sd)
 
     char protocol[32] = {0};
 
-    LineReader lr = {.file = f, .len = 0, .pos = 0, .eof = false};
+    LineReader lr = {.file = f, .line_limit = raw_only ? RAW_EDIT_LINE_LIMIT : 0};
     FuriString *line = furi_string_alloc();
     bool stop = false;
+    bool valid = !raw_only ||
+        (lr_read_line(&lr, line) &&
+         !strcmp(furi_string_get_cstr(line), "Filetype: " SUBGHZ_RAW_FILE_TYPE) &&
+         lr_read_line(&lr, line) && !strcmp(furi_string_get_cstr(line), "Version: 1"));
 
-    while (!stop && lr_read_line(&lr, line))
+    while (valid && !stop && lr_read_line(&lr, line))
     {
         const char *s = furi_string_get_cstr(line);
         if (strncmp(s, "RAW_Data:", 9) == 0)
         {
+            if (raw_only && strcmp(protocol, "RAW") != 0)
+            {
+                valid = false;
+                break;
+            }
             const char *p = s + 9;
             int32_t value;
             while (next_raw_value(&p, &value))
@@ -931,21 +958,33 @@ static bool load_sub(Storage *storage, const char *path, SubData *sd)
             while (*p == ' ')
                 p++;
 
+            if (raw_only && strcmp(p, "RAW") != 0)
+            {
+                valid = false;
+                break;
+            }
             strncpy(protocol, p, sizeof(protocol) - 1);
             protocol[sizeof(protocol) - 1] = '\0';
         }
     }
 
+    if (raw_only)
+        valid = valid && !lr.line_too_long && !sd->truncated && !strcmp(protocol, "RAW") &&
+            storage_file_get_error(f) == FSE_OK;
+
     furi_string_free(line);
     storage_file_close(f);
     storage_file_free(f);
+    if (!valid)
+        return false;
 
-    if (sd->count == 0 && protocol[0] && strcmp(protocol, "RAW") != 0)
+    if (!raw_only && sd->count == 0 && protocol[0] && strcmp(protocol, "RAW") != 0)
         sd->synthesized = synthesize_via_transmitter(storage, path, protocol, sd);
 
     if (sd->data && sd->count > 0 && sd->count < sd->cap)
     {
-        int16_t *shrunk = safe_realloc(sd->data, sd->count * sizeof(int16_t));
+        int16_t *shrunk =
+            safe_realloc(sd->data, sd->cap * sizeof(int16_t), sd->count * sizeof(int16_t));
         if (shrunk)
         {
             sd->data = shrunk;
@@ -1175,7 +1214,7 @@ static bool fill_sub_into(
         return fill_raw_into(storage, path, dst, join);
 
     SubData tmp = {0};
-    bool ok = load_sub(storage, path, &tmp);
+    bool ok = load_sub(storage, path, &tmp, false);
     if (ok && tmp.data)
     {
         bool skip_lead = false;
@@ -1555,6 +1594,11 @@ static void draw_marker(Canvas *c, int x, bool active)
     }
 }
 
+static size_t raw_edit_measure_label(void *context, const char *text)
+{
+    return canvas_string_width(context, text);
+}
+
 static void draw_cb(Canvas *c, void *ctx)
 {
     App *a = ctx;
@@ -1564,13 +1608,14 @@ static void draw_cb(Canvas *c, void *ctx)
     canvas_set_color(c, ColorBlack);
     canvas_set_font(c, FontSecondary);
 
+    char name_label[64];
     if (a->loading)
     {
-        canvas_draw_str_aligned(c, SCREEN_H_PX, 28, AlignCenter, AlignCenter, "Loading...");
-        char ln[20];
-        strncpy(ln, a->basename, sizeof(ln) - 1);
-        ln[sizeof(ln) - 1] = '\0';
-        canvas_draw_str_aligned(c, 64, 40, AlignCenter, AlignCenter, ln);
+        raw_edit_fit_filename(
+            name_label, sizeof(name_label), a->display_path, SCREEN_W_PX - 8,
+            raw_edit_measure_label, c);
+        canvas_draw_str_aligned(c, SCREEN_W_PX / 2, 28, AlignCenter, AlignCenter, "Loading...");
+        canvas_draw_str_aligned(c, SCREEN_W_PX / 2, 40, AlignCenter, AlignCenter, name_label);
         furi_mutex_release(a->mutex);
         return;
     }
@@ -1582,13 +1627,13 @@ static void draw_cb(Canvas *c, void *ctx)
         return;
     }
 
-    char nm[15];
-    strncpy(nm, a->basename, sizeof(nm) - 1);
-    nm[sizeof(nm) - 1] = '\0';
-    canvas_draw_str(c, 0, FONT_SIZE_PX, nm);
-
     char total_time_str[14];
     fmt_time(a->sd.total_us, total_time_str, sizeof(total_time_str));
+    const size_t name_width =
+        raw_edit_filename_width(SCREEN_W_PX, canvas_string_width(c, total_time_str));
+    raw_edit_fit_filename(
+        name_label, sizeof(name_label), a->display_path, name_width, raw_edit_measure_label, c);
+    canvas_draw_str(c, 0, FONT_SIZE_PX, name_label);
     canvas_draw_str_aligned(c, SCREEN_W_PX - 1, FONT_SIZE_PX, AlignRight, AlignBottom, total_time_str);
 
     for (int x = 0; x < SCREEN_W_PX; x++)
@@ -1951,7 +1996,6 @@ static void run_editor_session(
     App *app,
     bool auto_select)
 {
-    app->loading = false;
     if (auto_select)
     {
         auto_detect(app);
@@ -1967,6 +2011,9 @@ static void run_editor_session(
     recompute_overview(app);
     recompute_activity(app);
     furi_message_queue_reset(queue);
+    furi_mutex_acquire(app->mutex, FuriWaitForever);
+    app->loading = false;
+    furi_mutex_release(app->mutex);
     view_port_update(vp);
 
     bool running = true;
@@ -2123,7 +2170,7 @@ static void show_oom_dialog(DialogsApp *dialogs, const char *text)
     dialog_message_free(m);
 }
 
-static void run_editor(Storage *storage, DialogsApp *dialogs)
+static void run_editor(Storage *storage, DialogsApp *dialogs, const char *requested_path)
 {
     App *app = safe_malloc(sizeof(App));
     if (!app)
@@ -2135,17 +2182,21 @@ static void run_editor(Storage *storage, DialogsApp *dialogs)
     memset(app, 0, sizeof(App));
     app->mutex = furi_mutex_alloc(FuriMutexTypeNormal);
 
-    FuriString *path = furi_string_alloc_set(SUBGHZ_DIR);
-    DialogsFileBrowserOptions br;
-    dialog_file_browser_set_basic_options(&br, ".sub", &I_sub1_10px);
-    br.base_path = SUBGHZ_DIR;
-    bool picked = dialog_file_browser_show(dialogs, path, path, &br);
-
-    if (!picked)
-        goto cleanup;
-
+    FuriString *path = NULL;
+    const char *full = requested_path;
+    if (!full)
     {
-        const char *full = furi_string_get_cstr(path);
+        path = furi_string_alloc_set(SUBGHZ_DIR);
+        DialogsFileBrowserOptions br;
+        dialog_file_browser_set_basic_options(&br, ".sub", &I_sub1_10px);
+        br.base_path = SUBGHZ_DIR;
+        if (!dialog_file_browser_show(dialogs, path, path, &br))
+            goto cleanup;
+        full = furi_string_get_cstr(path);
+    }
+
+    app->display_path = full;
+    {
         const char *slash = strrchr(full, '/');
         const char *nm = slash ? slash + 1 : full;
         strncpy(app->basename, nm, sizeof(app->basename) - 1);
@@ -2163,7 +2214,7 @@ static void run_editor(Storage *storage, DialogsApp *dialogs)
     gui_add_view_port(gui, vp, GuiLayerFullscreen);
     view_port_update(vp);
 
-    bool loaded = load_sub(storage, furi_string_get_cstr(path), &app->sd);
+    bool loaded = load_sub(storage, full, &app->sd, requested_path != NULL);
 
     if (app->sd.out_of_memory || !loaded)
     {
@@ -2188,7 +2239,9 @@ static void run_editor(Storage *storage, DialogsApp *dialogs)
         {
             dialog_message_set_header(m, APP_NAME, 64, 4, AlignCenter, AlignTop);
             dialog_message_set_text(
-                m, "Unsupported protocol or file is empty", 64, 32, AlignCenter, AlignCenter);
+                m, requested_path ? "Cannot open this\nRAW capture." :
+                                    "Unsupported protocol or file is empty",
+                64, 32, AlignCenter, AlignCenter);
         }
 
         dialog_message_set_buttons(m, NULL, NULL, "OK");
@@ -2205,7 +2258,8 @@ static void run_editor(Storage *storage, DialogsApp *dialogs)
     furi_record_close(RECORD_GUI);
 
 cleanup:
-    furi_string_free(path);
+    if (path)
+        furi_string_free(path);
 
     if (app->sd.data)
         free(app->sd.data);
@@ -2386,7 +2440,7 @@ static void run_merge(Storage *storage, DialogsApp *dialogs)
             while (newcap < need)
                 newcap *= 2;
 
-            uint8_t *np = safe_realloc(pbuf, newcap);
+            uint8_t *np = safe_realloc(pbuf, pcap, newcap);
             if (!np)
             {
                 DialogMessage *m = dialog_message_alloc();
@@ -2504,11 +2558,13 @@ static void run_merge(Storage *storage, DialogsApp *dialogs)
 
     recompute_total_us(&app->sd);
     strncpy(app->basename, "merged", sizeof(app->basename) - 1);
+    app->display_path = app->basename;
 
     ViewPort *vp = view_port_alloc();
     FuriMessageQueue *queue = furi_message_queue_alloc(8, sizeof(InputEvent));
     view_port_draw_callback_set(vp, draw_cb, app);
     view_port_input_callback_set(vp, input_cb, queue);
+    app->loading = true;
     gui_add_view_port(gui, vp, GuiLayerFullscreen);
 
     run_editor_session(gui, vp, queue, storage, dialogs, app, false);
@@ -2779,9 +2835,58 @@ static void menu_build_about(Menu *menu)
         "Full documentation available on the GitHub.");
 }
 
+static bool raw_edit_capture_path_is_valid(const char *path)
+{
+    static const char prefix[] = SUBGHZ_DIR "/";
+    size_t length = 0;
+    while (length < RAW_EDIT_PATH_LIMIT && path[length])
+        length++;
+    if (length == RAW_EDIT_PATH_LIMIT || length <= sizeof(prefix) - 1 + 4 ||
+        strncmp(path, prefix, sizeof(prefix) - 1) || strcmp(path + length - 4, ".sub"))
+        return false;
+
+    // Do not let FAT path aliases or traversal escape the capture directory.
+    const char *component = path + sizeof(prefix) - 1;
+    for (const char *at = component; *at; at++)
+    {
+        if (*at == '/')
+        {
+            if (at == component || at[-1] == '.' || at[-1] == ' ')
+                return false;
+            component = at + 1;
+        }
+        else if ((unsigned char)*at < 32 || *at == '\\' || *at == ':')
+        {
+            return false;
+        }
+    }
+    return component < path + length - 4;
+}
+
+static bool raw_edit_handle_launch_argument(const char *path)
+{
+    if (!path || !*path)
+        return false;
+
+    DialogsApp *dialogs = furi_record_open(RECORD_DIALOGS);
+    if (raw_edit_capture_path_is_valid(path))
+    {
+        Storage *storage = furi_record_open(RECORD_STORAGE);
+        run_editor(storage, dialogs, path);
+        furi_record_close(RECORD_STORAGE);
+    }
+    else
+    {
+        dialog_message_show_storage_error(dialogs, "Select a saved RAW\ncapture.");
+    }
+    furi_record_close(RECORD_DIALOGS);
+    return true;
+}
+
 int32_t subghz_raw_edit_app(void *p)
 {
-    UNUSED(p);
+    if (raw_edit_handle_launch_argument(p))
+        return 0;
 
     Menu *menu = safe_malloc(sizeof(Menu));
     if (!menu)
@@ -2833,7 +2938,7 @@ int32_t subghz_raw_edit_app(void *p)
 
         if (menu->action == MenuActionEdit)
         {
-            run_editor(menu->storage, menu->dialogs);
+            run_editor(menu->storage, menu->dialogs, NULL);
         }
         else if (menu->action == MenuActionMerge)
         {

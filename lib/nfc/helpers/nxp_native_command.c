@@ -2,7 +2,7 @@
 
 #include <lib/nfc/protocols/iso14443_4a/iso14443_4a_poller_i.h>
 
-#define TAG "NxpNativeCommand"
+#define TAG "NxpCmd"
 
 Iso14443_4aError nxp_native_command_iso14443_4a_poller(
     Iso14443_4aPoller* iso14443_4a_poller,

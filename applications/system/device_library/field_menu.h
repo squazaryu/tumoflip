@@ -30,6 +30,7 @@ enum {
     FieldImport,
     FieldNextCards,
     FieldPreviousCards,
+    FieldCheckLinkedFiles,
     FieldCardBase = 100,
     FieldRoundBase = 200,
 };

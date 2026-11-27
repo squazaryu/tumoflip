@@ -137,6 +137,9 @@ jobs:
       - name: Validate GUI redraw, defensive IR and diagnostic-profile boundaries
         run: python3 -m unittest tools.tumoflip.test_gui_ir_20261102 tools.tumoflip.test_unit_profile tools.tumoflip.test_unit_profile_validation
 
+      - name: Validate receive timing, shared TIM16 and malformed weather packets
+        run: python3 -m unittest tools.tumoflip.test_keeloq_receive_timing tools.tumoflip.test_texkom_timer_ownership tools.tumoflip.test_weather_lacrosse_unknown_type tools.tumoflip.test_storage_cli_disconnect tools.tumoflip.test_boot_vectors
+
       - name: Validate November static decoders, external Freezer and diagnostic reports
         run: python3 -m unittest tools.tumoflip.test_upstream_20261104 tools.tumoflip.test_unit_runner_reporting
 
@@ -267,6 +270,9 @@ jobs:
         run: |
           toolchain/x86_64-linux/bin/python3 -m unittest tools.tumoflip.test_unleashed095_ir tools.tumoflip.test_unleashed095_save tools.tumoflip.test_unleashed095_rename tools.tumoflip.test_unleashed095_browser tools.tumoflip.test_proteco
           PYTHONPATH=.:tools/tumoflip toolchain/x86_64-linux/bin/python3 -m unittest discover -s tools/tumoflip -p 'test_*.py'
+
+      - name: Validate November 16 radio, timing editor and NFC guards
+        run: toolchain/x86_64-linux/bin/python3 -m unittest tools.tumoflip.test_upstream_20261116 tools.tumoflip.test_manual_parameters tools.tumoflip.test_belkorn_rx tools.tumoflip.test_dea_mio_metadata tools.tumoflip.test_rx_labels_20261116
 
       - name: Prepare release assets
         id: assets

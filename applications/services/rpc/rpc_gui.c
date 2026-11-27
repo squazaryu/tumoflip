@@ -227,7 +227,7 @@ static void
         rpc_gui->input_key_counter[event.key] = rpc_gui->input_counter;
     }
     if(rpc_gui->input_key_counter[event.key] == RPC_GUI_INPUT_RESET) {
-        FURI_LOG_W(TAG, "Out of sequence input event: key %d, type %d,", event.key, event.type);
+        FURI_LOG_W(TAG, "Input out of order: key %d, type %d", event.key, event.type);
     }
     event.sequence_counter = rpc_gui->input_key_counter[event.key];
     if(event.type == InputTypeRelease) {
@@ -364,7 +364,7 @@ static void rpc_system_gui_virtual_display_frame_process(const PB_Main* request,
     furi_assert(session);
 
     if(!rpc_gui->virtual_display_view_port) {
-        FURI_LOG_W(TAG, "Virtual display is not started, ignoring incoming frame packet");
+        FURI_LOG_W(TAG, "Display stopped; frame ignored");
         return;
     }
 

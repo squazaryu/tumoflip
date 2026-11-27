@@ -28,6 +28,45 @@ typedef struct {
 
 static const uint32_t mf_ultralight_data_format_version = 2;
 
+// External FAPs access these legacy fields directly. Our AES fields are already
+// append-only; prevent future insertions from silently changing their offsets.
+typedef struct {
+    Iso14443_3aData* iso14443_3a_data;
+    MfUltralightType type;
+    MfUltralightVersion version;
+    MfUltralightSignature signature;
+    MfUltralightCounter counter[MF_ULTRALIGHT_COUNTER_NUM];
+    MfUltralightTearingFlag tearing_flag[MF_ULTRALIGHT_TEARING_FLAG_NUM];
+    MfUltralightPage page[MF_ULTRALIGHT_MAX_PAGE_NUM];
+    uint16_t pages_read;
+    uint16_t pages_total;
+    uint32_t auth_attempts;
+} MfUltralightDataUpstreamLayout;
+
+#define MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(field)                                           \
+    _Static_assert(                                                                           \
+        offsetof(MfUltralightData, field) == offsetof(MfUltralightDataUpstreamLayout, field), \
+        "MfUltralightData." #field " moved: breaks precompiled FAPs")
+
+MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(iso14443_3a_data);
+MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(type);
+MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(version);
+MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(signature);
+MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(counter);
+MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(tearing_flag);
+MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(page);
+MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(pages_read);
+MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(pages_total);
+MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET(auth_attempts);
+#undef MF_ULTRALIGHT_ASSERT_UPSTREAM_OFFSET
+
+_Static_assert(
+    offsetof(MfUltralightData, aes_signature_present) > offsetof(MfUltralightData, auth_attempts),
+    "AES signature must follow all legacy fields");
+_Static_assert(
+    offsetof(MfUltralightData, aes_data_key_present) > offsetof(MfUltralightData, auth_attempts),
+    "AES key must follow all legacy fields");
+
 static const MfUltralightFeatures mf_ultralight_features[MfUltralightTypeNum] = {
     [MfUltralightTypeOrigin] =
         {

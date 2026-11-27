@@ -1,3 +1,12 @@
+## v1.10 (Tumoflip)
+
+- Fit the actual filename on the loading and waveform screens, keeping both
+  ends of long names visible without overlapping the duration.
+- Keep the loading screen until the initial markers and overview are ready.
+- Selective display-only adaptation inspired by Lechnio's RAW Edit v2.0
+  in [Unleashed 26a9c8a6](https://github.com/DarkFlippers/unleashed-firmware/commit/26a9c8a62f00deb01d57345c5c36451d1dedac29).
+  No changes to capture files, editor launch, decoding or radio behaviour.
+
 ## Post-v1.7 Tumoflip sync
 
 - Replaced free-text merge settings with bounded NumberInput controls.

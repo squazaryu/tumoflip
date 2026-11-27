@@ -5,7 +5,7 @@
 
 #include <furi.h>
 
-#define TAG "MfClassicPoller"
+#define TAG "MFC.Poll"
 
 #define MF_CLASSIC_POLLER_COMPLETE_EVENT (1UL << 0)
 

@@ -1,6 +1,7 @@
 #include "field_menu.h"
 #include "field_bundle.h"
 #include "field_inventory.h"
+#include "field_links.h"
 #include "wallet_launch.h"
 #include <furi.h>
 #include <furi_hal_rtc.h>
@@ -261,6 +262,16 @@ static void field_tools_export_card(FieldTools* app, const char* name) {
     else
         field_tools_message(app, "Object / SD read error.\nNothing exported.", FieldPageCards);
 }
+static void field_tools_check_links(FieldTools* app) {
+    const char* name = app->round.items[app->state.selected].object;
+    if(library_card_load(app->storage, name, &app->card)) {
+        field_links_report(app->storage, &app->card, app->message);
+        field_tools_message(app, furi_string_get_cstr(app->message), FieldPageItem);
+    } else {
+        field_tools_message(
+            app, "Object unavailable.\nCheck card or SD.\nNo files checked.", FieldPageItem);
+    }
+}
 static bool field_tools_event(void* context, uint32_t event) {
     FieldTools* app = context;
     if(event == FieldJobDone && app->state.page == FieldPageBusy) {
@@ -325,6 +336,8 @@ static bool field_tools_event(void* context, uint32_t event) {
         else {
             field_tools_edit(app, false);
         }
+    } else if(event == FieldCheckLinkedFiles) {
+        field_tools_check_links(app);
     } else if(event == FieldOpenObject) {
         const char* name = app->round.items[app->state.selected].object;
         if(library_object_entry_ready(app->storage) &&
@@ -390,7 +403,7 @@ static bool field_tools_event(void* context, uint32_t event) {
     } else if(event == FieldAbout)
         field_tools_message(
             app,
-            "Field tools 1.0\n\nRounds use pinned objects. Results are manual, not inferred from app launch. Export a round before starting another.\n\nObject packages contain private card data and capture bytes. Import creates separate copies; incomplete copies may remain after failure. No scripts or arbitrary FAPs are imported.\n\nInventories: 512 captures, 6 directory levels, 16 MiB per file. SUB / IR / NFC / RFID / iButton roots. Explicit scans only; Back cancels.\n\nAn inventory is not a backup. It cannot recover deleted bytes or prove which application deleted them. Copy exports off SD via an SD reader or USB SD mode. Companion Files can upload a copy back; it currently has no download action.",
+            "Field tools 1.1\n\nRounds use pinned objects. Results are manual, not inferred from app launch. Export a round before starting another. Check linked files checks SD metadata only.\n\nObject packages contain private card data and capture bytes. Import creates separate copies; incomplete copies may remain after failure. No scripts or arbitrary FAPs are imported.\n\nInventories: 512 captures, 6 directory levels, 16 MiB per file. SUB / IR / NFC / RFID / iButton roots. Explicit scans only; Back cancels.\n\nAn inventory is not a backup. It cannot recover deleted bytes or prove which application deleted them. Copy exports off SD via an SD reader or USB SD mode. Companion Files can upload a copy back; it currently has no download action.",
             FieldPageHome);
     return true;
 }

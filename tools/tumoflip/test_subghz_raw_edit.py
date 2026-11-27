@@ -17,7 +17,7 @@ class SubGhzRawEditTest(unittest.TestCase):
         self.assertIn('name="Sub-GHz RAW Edit"', manifest)
         self.assertIn('fap_category="ARF Tools"', manifest)
         self.assertIn("Lechnio; tumoflip integration", manifest)
-        self.assertIn('fap_version="1.8"', manifest)
+        self.assertIn('fap_version="1.10"', manifest)
         self.assertNotIn("fap_dist_path", manifest)
 
     def test_raw_edit_is_source_only_import(self) -> None:
@@ -107,7 +107,7 @@ class SubGhzRawEditTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("uint8_t *pbuf = safe_malloc(pcap);", source)
-        self.assertIn("uint8_t *np = safe_realloc(pbuf, newcap);", source)
+        self.assertIn("uint8_t *np = safe_realloc(pbuf, pcap, newcap);", source)
         self.assertIn("free(pbuf);", source)
         self.assertNotIn("MERGE_MAX_FILES", source)
 

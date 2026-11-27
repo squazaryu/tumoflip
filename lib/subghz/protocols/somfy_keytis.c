@@ -10,7 +10,7 @@
 
 #include "../blocks/custom_btn_i.h"
 
-#define TAG "SubGhzProtocolSomfyKeytis"
+#define TAG SUBGHZ_PROTOCOL_SOMFY_KEYTIS_NAME
 
 static const SubGhzBlockConst subghz_protocol_somfy_keytis_const = {
     .te_short = 640,
@@ -231,7 +231,7 @@ bool subghz_protocol_somfy_keytis_create_data(
     if((res == SubGhzProtocolStatusOk) &&
        !flipper_format_insert_or_update_uint32(
            flipper_format, "Duration_Counter", &instance->generic.seed, 1)) {
-        FURI_LOG_E(TAG, "Unable to add Duration_Counter");
+        FURI_LOG_E(TAG, "Cannot add Duration_Counter");
         res = SubGhzProtocolStatusErrorParserOthers;
     }
 
@@ -461,7 +461,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> i * 8) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Key");
+            FURI_LOG_E(TAG, "Cannot add Key");
             break;
         }
 
@@ -761,7 +761,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_somfy_keytis_serialize(
     if((ret == SubGhzProtocolStatusOk) &&
        !flipper_format_write_uint32(
            flipper_format, "Duration_Counter", &instance->generic.seed, 1)) {
-        FURI_LOG_E(TAG, "Unable to add Duration_Counter");
+        FURI_LOG_E(TAG, "Cannot add Duration_Counter");
         ret = SubGhzProtocolStatusErrorParserOthers;
     }
     return ret;

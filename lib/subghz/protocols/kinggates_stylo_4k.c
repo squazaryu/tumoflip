@@ -11,7 +11,7 @@
 
 #include "../blocks/custom_btn_i.h"
 
-#define TAG "SubGhzProtocoKingGatesStylo4k"
+#define TAG SUBGHZ_PROTOCOL_KINGGATES_STYLO_4K_NAME
 
 static const SubGhzBlockConst subghz_protocol_kinggates_stylo_4k_const = {
     .te_short = 400,
@@ -341,7 +341,7 @@ SubGhzProtocolStatus subghz_protocol_encoder_kinggates_stylo_4k_deserialize(
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> i * 8) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to update Key");
+            FURI_LOG_E(TAG, "Cannot update Key");
             break;
         }
 
@@ -349,7 +349,7 @@ SubGhzProtocolStatus subghz_protocol_encoder_kinggates_stylo_4k_deserialize(
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data_2 >> i * 8) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Data", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to update Data");
+            FURI_LOG_E(TAG, "Cannot update Data");
             break;
         }
 

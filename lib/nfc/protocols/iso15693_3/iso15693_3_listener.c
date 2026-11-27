@@ -6,7 +6,7 @@
 #include <nfc/protocols/nfc_listener_base.h>
 #include <nfc/helpers/iso13239_crc.h>
 
-#define TAG "Iso15693_3Listener"
+#define TAG "ISO15.Listen"
 
 Iso15693_3Listener* iso15693_3_listener_alloc(Nfc* nfc, Iso15693_3Data* data) {
     furi_assert(nfc);
