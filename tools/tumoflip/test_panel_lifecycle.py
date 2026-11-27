@@ -129,11 +129,15 @@ int main(void){
  desktop_panel_defaults(&d.panel_settings,&d.settings);
  d.panel_settings.held[0].name_or_path[0]='P';
  assert(desktop_panel_favorite(&d,FavoriteAppLeftLong)==&d.settings.favorite_apps[FavoriteAppLeftLong]);
- d.panel_model.active=true;
+ d.panel_attached=true;d.panel_model.active=true;
  assert(desktop_panel_favorite(&d,FavoriteAppLeftLong)==&d.panel_settings.held[0]);
  assert(desktop_panel_favorite(&d,FavoriteAppRightLong)==&d.panel_settings.held[1]);
  assert(desktop_panel_favorite(&d,FavoriteAppOkLong)==&d.panel_settings.held[2]);
  assert(desktop_panel_favorite(&d,FavoriteAppLeftShort)==&d.settings.favorite_apps[FavoriteAppLeftShort]);
+ /* First held press after backlight sleep still belongs to the bound Panel. */
+ d.panel_model.active=false;
+ assert(desktop_panel_favorite(&d,FavoriteAppLeftLong)==&d.panel_settings.held[0]);
+ assert(!desktop_panel_favorite(&d,FavoriteAppNumber));
  assert(d.settings.favorite_apps[FavoriteAppLeftLong].name_or_path[0]=='C');
  return 0;
 }
