@@ -874,7 +874,7 @@ SubGhzProtocolStatus
 
         if(subghz_protocol_keeloq_receive_only(
                instance->manufacture_name, instance->generic.seed)) {
-            FURI_LOG_W(TAG, "Receive/inspect only");
+            FURI_LOG_W(TAG, "RX only");
             ret = SubGhzProtocolStatusErrorEncoderGetUpload;
             break;
         }
@@ -1659,7 +1659,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(
         }
         if((res == SubGhzProtocolStatusOk) &&
            !flipper_format_write_hex(flipper_format, "Seed", seed_data, sizeof(uint32_t))) {
-            FURI_LOG_E(TAG, "Seed write failed");
+            FURI_LOG_E(TAG, "Seed save error");
             res = SubGhzProtocolStatusError;
         }
         instance->generic.seed = seed_data[0] << 24 | seed_data[1] << 16 | seed_data[2] << 8 |
@@ -1669,7 +1669,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(
     if((res == SubGhzProtocolStatusOk) &&
        !flipper_format_write_string_cstr(
            flipper_format, "Manufacture", instance->manufacture_name)) {
-        FURI_LOG_E(TAG, "Manufacture write failed");
+        FURI_LOG_E(TAG, "Mfg save error");
         res = SubGhzProtocolStatusError;
     }
     // Legacy 400us captures keep their existing layout. Only a fast capture
