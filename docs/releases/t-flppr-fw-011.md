@@ -32,8 +32,9 @@ not Stable010's1004. Use the resources and compatible FW Packages for this line.
 1. Back up `/int`, important SD captures/settings and application data.
 2. Install **Firmware → Stable → t-flppr-fw-011** with its native resources.
 3. Reconnect, then use **FW Packages → Stable008** after catalog activation.
-   It is the complete143-file snapshot, not a one-file ZIP. The app compares
-   checksums; already matching files do not require retransmission.
+   It keeps the full143 native files plus two unchanged publisher-owned data
+   files inherited from Stable007, not a one-file ZIP. The app compares checksums;
+   already matching files do not require retransmission.
 4. Current TumoCompanion1.12.0 supports the same API and catalog model; no new IPA,
    Bluetooth reset/re-pair, SD cleanup, factory reset or external-board flash is
    required. Existing captures, app data and paths are not moved or deleted.
