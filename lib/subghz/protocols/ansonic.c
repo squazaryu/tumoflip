@@ -6,7 +6,7 @@
 #include "../blocks/math.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolAnsonic"
+#define TAG SUBGHZ_PROTOCOL_ANSONIC_NAME
 #define ANSONIC_TE_SUM_DELTA 110U
 
 #define DIP_PATTERN "%c%c%c%c%c%c%c%c%c%c"

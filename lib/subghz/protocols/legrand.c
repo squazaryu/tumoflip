@@ -7,7 +7,7 @@
 #include "../blocks/math.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolLegrand"
+#define TAG SUBGHZ_PROTOCOL_LEGRAND_NAME
 
 static const SubGhzBlockConst subghz_protocol_legrand_const = {
     .te_short = 375,

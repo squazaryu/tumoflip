@@ -128,7 +128,7 @@ static bool
     if(retain) {
         FURI_LOG_I(
             TAG,
-            "Retain shortcut animation for '%s' (%llu bytes, stack %u)",
+            "Retain anim %s (%llu B, stack %u)",
             target,
             (unsigned long long)file_info.size,
             stack_size);

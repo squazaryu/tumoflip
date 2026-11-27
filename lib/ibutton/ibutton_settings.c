@@ -4,7 +4,7 @@
 #include <storage/storage.h>
 #include <toolbox/saved_struct.h>
 
-#define TAG "IButtonSettings"
+#define TAG "IButtonCfg"
 
 // Private to this file: the app, the CLI and third-party apps go through the accessors, so the
 // stored layout is free to change. Bump the version whenever it does - but a bump rejects an
@@ -79,7 +79,7 @@ bool ibutton_settings_set_write_targets(iButtonWriteTargetMask mask) {
         IBUTTON_SETTINGS_VERSION);
 
     if(!result) {
-        FURI_LOG_E(TAG, "Failed to save %s", IBUTTON_SETTINGS_PATH);
+        FURI_LOG_E(TAG, "Err: save %s", IBUTTON_SETTINGS_PATH);
     }
 
     return result;

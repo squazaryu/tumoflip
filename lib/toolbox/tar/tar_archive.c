@@ -304,7 +304,7 @@ static bool archive_extract_current_file(TarArchive* archive, const char* dst_pa
             if(storage_file_open(out_file, dst_path, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
                 break;
             }
-            FURI_LOG_W(TAG, "Failed to open '%s', reties: %d", dst_path, n_tries);
+            FURI_LOG_W(TAG, "Open '%s' failed; retries %d", dst_path, n_tries);
             storage_file_close(out_file);
             furi_delay_ms(FILE_OPEN_RETRY_DELAY);
         }
@@ -418,7 +418,7 @@ bool tar_archive_add_file(
             if(storage_file_open(src_file, fs_file_path, FSAM_READ, FSOM_OPEN_EXISTING)) {
                 break;
             }
-            FURI_LOG_W(TAG, "Failed to open '%s', reties: %d", fs_file_path, n_tries);
+            FURI_LOG_W(TAG, "Open '%s' failed; retries %d", fs_file_path, n_tries);
             storage_file_close(src_file);
             furi_delay_ms(FILE_OPEN_RETRY_DELAY);
         }

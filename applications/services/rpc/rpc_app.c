@@ -154,7 +154,7 @@ static void rpc_system_app_start_process(const PB_Main* request, void* context) 
         result = PB_CommandStatus_ERROR_APP_CANT_START;
 
         if(app_args_forged) {
-            FURI_LOG_W(TAG, "StartProcess: rejected reserved RPC context argument");
+            FURI_LOG_W(TAG, "StartProcess: RPC context reserved");
             result = PB_CommandStatus_ERROR_INVALID_PARAMETERS;
         } else {
             switch(loader_start(loader, app_name, app_args, NULL)) {

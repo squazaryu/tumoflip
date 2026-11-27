@@ -90,18 +90,18 @@ bool ble_app_init(void) {
     do {
         // Configure NVM store for pairing data
         if((status = SHCI_C2_Config((SHCI_C2_CONFIG_Cmd_Param_t*)&config_param))) {
-            FURI_LOG_E(TAG, "Failed to configure 2nd core: %d", status);
+            FURI_LOG_E(TAG, "Err: configure 2nd core: %d", status);
             break;
         }
 
         // Start ble stack on 2nd core
         if((status = SHCI_C2_BLE_Init((SHCI_C2_Ble_Init_Cmd_Packet_t*)&ble_init_cmd_packet))) {
-            FURI_LOG_E(TAG, "Failed to start ble stack: %d", status);
+            FURI_LOG_E(TAG, "Err: start ble stack: %d", status);
             break;
         }
 
         if((status = SHCI_C2_SetFlashActivityControl(FLASH_ACTIVITY_CONTROL_SEM7))) {
-            FURI_LOG_E(TAG, "Failed to set flash activity control: %d", status);
+            FURI_LOG_E(TAG, "Err: set flash activity control: %d", status);
             break;
         }
     } while(false);

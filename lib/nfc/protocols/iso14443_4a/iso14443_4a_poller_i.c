@@ -4,7 +4,7 @@
 
 #include "iso14443_4a_i.h"
 
-#define TAG "Iso14443_4aPoller"
+#define TAG "ISO4A.Poll"
 
 #define ISO14443_4A_FSDI_256                (0x8U)
 #define ISO14443_4A_SEND_BLOCK_MAX_ATTEMPTS (20)
@@ -46,7 +46,7 @@ Iso14443_4aError
             break;
 
         } else if(!iso14443_4a_ats_parse(data, instance->rx_buffer)) {
-            FURI_LOG_E(TAG, "Failed to parse ATS response");
+            FURI_LOG_E(TAG, "Err: parse ATS response");
             error = Iso14443_4aErrorProtocol;
             break;
         }

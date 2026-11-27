@@ -6,7 +6,7 @@
 #include <mbedtls/aes.h>
 #include <mbedtls/platform_util.h>
 
-#define TAG "MfUltralightPoller"
+#define TAG "MFUL.Poll"
 
 MfUltralightError mf_ultralight_process_error(Iso14443_3aError error) {
     MfUltralightError ret = MfUltralightErrorNone;

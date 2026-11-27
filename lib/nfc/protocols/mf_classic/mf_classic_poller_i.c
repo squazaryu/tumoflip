@@ -5,7 +5,7 @@
 
 #include <nfc/helpers/iso14443_crc.h>
 
-#define TAG "MfClassicPoller"
+#define TAG "MFC.Poll"
 
 MfClassicError mf_classic_process_error(Iso14443_3aError error) {
     MfClassicError ret = MfClassicErrorNone;

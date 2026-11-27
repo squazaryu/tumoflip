@@ -6,7 +6,7 @@
 #include "../blocks/math.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolDoorbell32"
+#define TAG SUBGHZ_PROTOCOL_DOORBELL32_NAME
 
 // Princeton style 1:3 PWM, but 32 bits and a 14*Te guard instead of 24 and 31*Te, so the
 // Princeton decoder syncs on the guard and then drops the frame on the bit count. Te is

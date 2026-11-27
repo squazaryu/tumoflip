@@ -549,12 +549,12 @@ typedef struct {
 static const StorageCliCommand storage_cli_commands[] = {
     {
         "write_chunk",
-        "read data from cli and append it to file, <args> should contain how many bytes you want to write",
+        "append CLI data; <args>: byte count",
         &storage_cli_write_chunk,
     },
     {
         "read_chunks",
-        "read data from file and print file size and content to cli, <args> should contain how many bytes you want to read in block",
+        "print file size/data; <args>: bytes per block",
         &storage_cli_read_chunks,
     },
     {
@@ -579,47 +579,47 @@ static const StorageCliCommand storage_cli_commands[] = {
     },
     {
         "tree",
-        "list files and dirs, recursive",
+        "list files/dirs recursively",
         &storage_cli_tree,
     },
     {
         "read",
-        "read text from file and print file size and content to cli",
+        "print file size and text",
         &storage_cli_read,
     },
     {
         "write",
-        "read text from cli and append it to file, stops by ctrl+c",
+        "append CLI text; Ctrl+C stops",
         &storage_cli_write,
     },
     {
         "copy",
-        "copy file to new file, <args> must contain new path",
+        "copy file; <args>: destination path",
         &storage_cli_copy,
     },
     {
         "remove",
-        "delete the file or directory",
+        "delete file or dir",
         &storage_cli_remove,
     },
     {
         "rename",
-        "move file to new file, <args> must contain new path",
+        "move file; <args>: destination path",
         &storage_cli_rename,
     },
     {
         "mkdir",
-        "creates a new directory",
+        "create directory",
         &storage_cli_mkdir,
     },
     {
         "timestamp",
-        "last modification timestamp",
+        "last modified timestamp",
         &storage_cli_timestamp,
     },
     {
         "extract",
-        "extract tar archive to destination",
+        "extract TAR to destination",
         &storage_cli_extract,
     },
     {

@@ -3,7 +3,7 @@
 
 #include <bit_lib/bit_lib.h>
 
-#define TAG "Type4TagListener"
+#define TAG "T4.Listen"
 
 typedef Type4TagError (*Type4TagListenerApduHandler)(
     Type4TagListener* instance,

@@ -4,7 +4,7 @@
 
 #include <furi.h>
 
-#define TAG "ISO15693_3Poller"
+#define TAG "ISO15.Poll"
 
 const Iso15693_3Data* iso15693_3_poller_get_data(Iso15693_3Poller* instance) {
     furi_assert(instance);

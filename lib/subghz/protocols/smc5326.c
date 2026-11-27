@@ -13,7 +13,7 @@
  *
  */
 
-#define TAG "SubGhzProtocolSmc5326"
+#define TAG SUBGHZ_PROTOCOL_SMC5326_NAME
 
 #define DIP_P 0b11 //(+)
 #define DIP_O 0b10 //(0)

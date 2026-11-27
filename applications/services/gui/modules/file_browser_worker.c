@@ -12,7 +12,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define TAG "BrowserWorker"
+#define TAG "Browser"
 
 #define ASSETS_DIR          "assets"
 #define BROWSER_ROOT        STORAGE_EXT_PATH_PREFIX
@@ -168,7 +168,7 @@ static bool browser_folder_check_and_switch(FuriString* path) {
             reported = true;
             FURI_LOG_W(
                 TAG,
-                "Cannot stat %s: %s, going back",
+                "Stat %s: %s; go back",
                 furi_string_get_cstr(path),
                 storage_error_get_desc(error));
         }
@@ -346,7 +346,7 @@ static bool browser_folder_load_chunked(
                 // Nothing is wrong with the folder, it just lost entries under us
                 FURI_LOG_W(
                     TAG,
-                    "Folder shrank below offset %lu while loading: %s",
+                    "Folder shrank at %lu: %s",
                     offset,
                     furi_string_get_cstr(path));
                 browser_load_aborted(browser, offset);

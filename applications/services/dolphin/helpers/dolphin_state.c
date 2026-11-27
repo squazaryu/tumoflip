@@ -50,7 +50,7 @@ void dolphin_state_save(DolphinState* dolphin_state) {
         dolphin_state->dirty = false;
 
     } else {
-        FURI_LOG_E(TAG, "Failed to save state");
+        FURI_LOG_E(TAG, "Err: save state");
     }
 }
 

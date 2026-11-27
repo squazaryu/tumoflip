@@ -9,7 +9,7 @@
 
 #include <furi.h>
 
-#define TAG "PluginManager"
+#define TAG "Plugins"
 
 ARRAY_DEF(FlipperApplicationList, FlipperApplication*, M_PTR_OPLIST) // NOLINT
 #define M_OPL_FlipperApplicationList_t() ARRAY_OPLIST(FlipperApplicationList, M_PTR_OPLIST)
@@ -81,7 +81,7 @@ static PluginManagerLoadStatus plugin_manager_load_single_detailed_internal(
         FlipperApplicationPreloadStatus preload_res = flipper_application_preload(lib, path);
 
         if(preload_res != FlipperApplicationPreloadStatusSuccess) {
-            FURI_LOG_E(TAG, "Failed to preload %s", path);
+            FURI_LOG_E(TAG, "Err: preload %s", path);
             status = plugin_manager_preload_status_to_load_status(preload_res);
             break;
         }
@@ -94,7 +94,7 @@ static PluginManagerLoadStatus plugin_manager_load_single_detailed_internal(
 
         FlipperApplicationLoadStatus load_status = flipper_application_map_to_memory(lib);
         if(load_status != FlipperApplicationLoadStatusSuccess) {
-            FURI_LOG_E(TAG, "Failed to load %s", path);
+            FURI_LOG_E(TAG, "Err: load %s", path);
             status = load_status == FlipperApplicationLoadStatusMissingImports ?
                          PluginManagerLoadStatusMissingImports :
                          PluginManagerLoadStatusLoadError;
@@ -105,7 +105,7 @@ static PluginManagerLoadStatus plugin_manager_load_single_detailed_internal(
             flipper_application_plugin_get_descriptor(lib);
 
         if(!app_descriptor) {
-            FURI_LOG_E(TAG, "Failed to get descriptor %s", path);
+            FURI_LOG_E(TAG, "No descriptor: %s", path);
             status = PluginManagerLoadStatusMissingDescriptor;
             break;
         }
@@ -114,7 +114,7 @@ static PluginManagerLoadStatus plugin_manager_load_single_detailed_internal(
             if(scanning) {
                 FURI_LOG_D(TAG, "Not ours, skipping %s", path);
             } else {
-                FURI_LOG_E(TAG, "Application id mismatch %s", path);
+                FURI_LOG_E(TAG, "App id mismatch %s", path);
             }
             status = PluginManagerLoadStatusApplicationIdMismatch;
             break;
@@ -168,7 +168,7 @@ static PluginManagerError
     PluginManagerError result = PluginManagerErrorNone;
     do {
         if(!storage_dir_open(directory, path)) {
-            FURI_LOG_E(TAG, "Failed to open directory %s", path);
+            FURI_LOG_E(TAG, "Err: open dir %s", path);
             break;
         }
         while(storage_dir_read(directory, NULL, file_name_buffer, sizeof(file_name_buffer))) {
@@ -188,7 +188,7 @@ static PluginManagerError
                status != PluginManagerLoadStatusApplicationIdMismatch &&
                result == PluginManagerErrorNone) {
                 const PluginManagerError error = plugin_manager_load_status_to_error(status);
-                FURI_LOG_E(TAG, "Failed to load %s", furi_string_get_cstr(file_name));
+                FURI_LOG_E(TAG, "Err: load %s", furi_string_get_cstr(file_name));
                 result = error;
             }
         }
@@ -199,7 +199,7 @@ static PluginManagerError
         if(read_error != FSE_OK && read_error != FSE_NOT_EXIST) {
             FURI_LOG_E(
                 TAG,
-                "Failed to read directory %s: %s",
+                "Err: read dir %s: %s",
                 path,
                 storage_file_get_error_desc(directory));
             if(result == PluginManagerErrorNone) result = PluginManagerErrorLoaderError;

@@ -4,7 +4,7 @@
 
 #include "ntag4xx_i.h"
 
-#define TAG "Ntag4xxPoller"
+#define TAG "NT4.Poll"
 
 Ntag4xxError ntag4xx_poller_send_chunks(
     Ntag4xxPoller* instance,

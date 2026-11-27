@@ -111,7 +111,7 @@ int32_t storage_srv(void* p) {
     furi_record_create(RECORD_FILE_HISTORY, (void*)&history_capability);
 
     if(furi_hal_rtc_is_flag_set(FuriHalRtcFlagStorageFormatInternal)) {
-        FURI_LOG_W(TAG, "Format Internal not supported, clearing flag");
+        FURI_LOG_W(TAG, "Internal format unsupported; flag cleared");
         furi_hal_rtc_reset_flag(FuriHalRtcFlagStorageFormatInternal);
     }
 

@@ -9,7 +9,7 @@
 #include <nfc/protocols/mf_desfire/mf_desfire_poller.h>
 #include <nfc/protocols/mf_desfire/mf_desfire_poller_defs.h>
 
-#define TAG "Type4TagPoller"
+#define TAG "T4.Poll"
 
 static const MfDesfireApplicationId mf_des_picc_app_id = {.data = {0x00, 0x00, 0x00}};
 static const MfDesfireApplicationId mf_des_t4t_app_id = {.data = {0x10, 0xEE, 0xEE}};

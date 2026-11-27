@@ -4,7 +4,7 @@
 #include <saved_struct.h>
 #include <storage/storage.h>
 
-#define TAG "PowerSettings"
+#define TAG "PowerCfg"
 
 #define POWER_SETTINGS_VER_1 (1) // Previous version number
 #define POWER_SETTINGS_VER   (2) // New version number
@@ -57,7 +57,7 @@ void power_settings_load(PowerSettings* settings) {
     } while(false);
 
     if(!success) {
-        FURI_LOG_W(TAG, "Failed to load file, using defaults");
+        FURI_LOG_W(TAG, "Load failed; defaults used");
         memset(settings, 0, sizeof(PowerSettings));
         power_settings_save(settings);
     }
@@ -74,6 +74,6 @@ void power_settings_save(const PowerSettings* settings) {
         POWER_SETTINGS_VER);
 
     if(!success) {
-        FURI_LOG_E(TAG, "Failed to save file");
+        FURI_LOG_E(TAG, "Err: save file");
     }
 }

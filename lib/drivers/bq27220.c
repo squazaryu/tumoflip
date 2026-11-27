@@ -179,7 +179,7 @@ static bool bq27220_data_memory_check(
         Bq27220OperationStatus operation_status;
         while(--timeout > 0) {
             if(!bq27220_get_operation_status(handle, &operation_status)) {
-                FURI_LOG_W(TAG, "Failed to get operation status, retries left %lu", timeout);
+                FURI_LOG_W(TAG, "Err: get operation status, retries left %lu", timeout);
             } else if(operation_status.CFGUPDATE) {
                 break;
             };
@@ -250,7 +250,7 @@ static bool bq27220_data_memory_check(
         Bq27220OperationStatus operation_status;
         while(--timeout > 0) {
             if(!bq27220_get_operation_status(handle, &operation_status)) {
-                FURI_LOG_W(TAG, "Failed to get operation status, retries left %lu", timeout);
+                FURI_LOG_W(TAG, "Err: get operation status, retries left %lu", timeout);
             } else if(operation_status.CFGUPDATE != true) {
                 break;
             }
@@ -299,7 +299,7 @@ bool bq27220_init(const FuriHalI2cBusHandle* handle, const BQ27220DMData* data_m
         BQ27220_DEBUG_LOG("Checking initialization status");
         Bq27220OperationStatus operation_status;
         if(!bq27220_get_operation_status(handle, &operation_status)) {
-            FURI_LOG_E(TAG, "Failed to get operation status");
+            FURI_LOG_E(TAG, "Err: get operation status");
             break;
         }
         if(!operation_status.INITCOMP || operation_status.CFGUPDATE) {
@@ -311,7 +311,7 @@ bool bq27220_init(const FuriHalI2cBusHandle* handle, const BQ27220DMData* data_m
         BQ27220_DEBUG_LOG("Checking chosen profile");
         Bq27220ControlStatus control_status;
         if(!bq27220_get_control_status(handle, &control_status)) {
-            FURI_LOG_E(TAG, "Failed to get control status");
+            FURI_LOG_E(TAG, "Err: get control status");
             break;
         }
         if(control_status.BATT_ID != 0) {
@@ -324,7 +324,7 @@ bool bq27220_init(const FuriHalI2cBusHandle* handle, const BQ27220DMData* data_m
         if(!reset_and_provisioning_required) {
             BQ27220_DEBUG_LOG("Checking data memory");
             if(!bq27220_data_memory_check(handle, data_memory, false)) {
-                FURI_LOG_E(TAG, "Incorrect configuration data, reset needed");
+                FURI_LOG_E(TAG, "Incorrect config data, reset needed");
                 reset_and_provisioning_required = true;
             }
         }
@@ -333,7 +333,7 @@ bool bq27220_init(const FuriHalI2cBusHandle* handle, const BQ27220DMData* data_m
         if(reset_and_provisioning_required) {
             FURI_LOG_W(TAG, "Resetting device");
             if(!bq27220_reset(handle)) {
-                FURI_LOG_E(TAG, "Failed to reset device");
+                FURI_LOG_E(TAG, "Err: reset device");
                 break;
             }
 
@@ -377,7 +377,7 @@ bool bq27220_reset(const FuriHalI2cBusHandle* handle) {
         Bq27220OperationStatus operation_status;
         while(--timeout > 0) {
             if(!bq27220_get_operation_status(handle, &operation_status)) {
-                FURI_LOG_W(TAG, "Failed to get operation status, retries left %lu", timeout);
+                FURI_LOG_W(TAG, "Err: get operation status, retries left %lu", timeout);
             } else if(operation_status.INITCOMP == true) {
                 break;
             };
@@ -473,7 +473,7 @@ bool bq27220_full_access(const FuriHalI2cBusHandle* handle) {
         Bq27220OperationStatus operation_status;
         while(--timeout > 0) {
             if(!bq27220_get_operation_status(handle, &operation_status)) {
-                FURI_LOG_W(TAG, "Failed to get operation status, retries left %lu", timeout);
+                FURI_LOG_W(TAG, "Err: get operation status, retries left %lu", timeout);
             } else {
                 break;
             };
@@ -481,7 +481,7 @@ bool bq27220_full_access(const FuriHalI2cBusHandle* handle) {
         }
 
         if(timeout == 0) {
-            FURI_LOG_E(TAG, "Failed to get operation status");
+            FURI_LOG_E(TAG, "Err: get operation status");
             break;
         }
         BQ27220_DEBUG_LOG("Cycles left: %lu", timeout);

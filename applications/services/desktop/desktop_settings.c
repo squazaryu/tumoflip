@@ -226,7 +226,7 @@ void desktop_settings_load(DesktopSettings* settings) {
     } while(false);
 
     if(!success) {
-        FURI_LOG_W(TAG, "Failed to load file, using defaults");
+        FURI_LOG_W(TAG, "Load failed; defaults used");
         memset(settings, 0, sizeof(DesktopSettings));
         desktop_settings_save(settings);
     } else {
@@ -248,6 +248,6 @@ void desktop_settings_save(const DesktopSettings* settings) {
         DESKTOP_SETTINGS_VER);
 
     if(!success) {
-        FURI_LOG_E(TAG, "Failed to save file");
+        FURI_LOG_E(TAG, "Err: save file");
     }
 }

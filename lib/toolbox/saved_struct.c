@@ -156,7 +156,7 @@ bool saved_struct_get_metadata(
 
         if(storage_file_read(file, &header, sizeof(SavedStructHeader)) !=
            sizeof(SavedStructHeader)) {
-            FURI_LOG_E(TAG, "Failed to read header");
+            FURI_LOG_E(TAG, "Err: read header");
             break;
         }
 

@@ -8,7 +8,7 @@
 #include "common.h"
 
 // protocol MASTERCODE Clemsa MV1/MV12
-#define TAG "SubGhzProtocolMastercode"
+#define TAG SUBGHZ_PROTOCOL_MASTERCODE_NAME
 
 #define DIP_P 0b11 //(+)
 #define DIP_O 0b10 //(0)

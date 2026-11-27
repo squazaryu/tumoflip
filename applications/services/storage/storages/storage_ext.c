@@ -180,7 +180,7 @@ FS_Error sd_mount_card(StorageData* storage, bool notify) {
 
 #ifndef FURI_RAM_EXEC
         if(furi_hal_rtc_is_flag_set(FuriHalRtcFlagStorageFormatInternal)) {
-            FURI_LOG_I(TAG, "deleting internal storage directory");
+            FURI_LOG_I(TAG, "deleting internal storage dir");
             error = sd_remove_recursive(STORAGE_INTERNAL_DIR_NAME) ? FSE_OK : FSE_INTERNAL;
         } else {
             error = FSE_OK;

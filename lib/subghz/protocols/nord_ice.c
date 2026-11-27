@@ -8,7 +8,7 @@
 
 #include "../blocks/custom_btn_i.h"
 
-#define TAG "SubGhzProtocolNord_Ice"
+#define TAG SUBGHZ_PROTOCOL_NORD_ICE_NAME
 
 #define NORD_ICE_COUNT_BIT 33
 
@@ -263,7 +263,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> (i * 8)) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Key");
+            FURI_LOG_E(TAG, "Cannot add Key");
             break;
         }
 

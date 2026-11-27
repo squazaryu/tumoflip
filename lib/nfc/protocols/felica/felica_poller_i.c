@@ -281,7 +281,7 @@ FelicaError felica_poller_list_service_by_cursor(
         instance->rx_buffer,
         felica_poller_get_fwt(instance, FelicaPollerCommandClassVariable, 0));
     if(error != FelicaErrorNone) {
-        FURI_LOG_E(TAG, "List service by cursor failed with error: %d", error);
+        FURI_LOG_E(TAG, "List service by cursor failed error: %d", error);
         return error;
     }
 
@@ -322,7 +322,7 @@ FelicaError felica_poller_request_service(
         instance->rx_buffer,
         felica_poller_get_fwt(instance, FelicaPollerCommandClassVariable, code_count));
     if(error != FelicaErrorNone) {
-        FURI_LOG_E(TAG, "Request service failed with error: %d", error);
+        FURI_LOG_E(TAG, "Request service failed error: %d", error);
         return error;
     }
 
@@ -363,7 +363,7 @@ FelicaError felica_poller_list_system_code(
         instance->rx_buffer,
         felica_poller_get_fwt(instance, FelicaPollerCommandClassVariable, 0));
     if(error != FelicaErrorNone) {
-        FURI_LOG_E(TAG, "Request system code failed with error: %d", error);
+        FURI_LOG_E(TAG, "Request system code failed error: %d", error);
         return error;
     }
 

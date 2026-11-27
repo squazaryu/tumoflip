@@ -19,7 +19,7 @@ void bt_settings_load(BtSettings* bt_settings) {
         BT_SETTINGS_PATH, bt_settings, sizeof(BtSettings), BT_SETTINGS_MAGIC, BT_SETTINGS_VERSION);
 
     if(!load_success) {
-        FURI_LOG_W(TAG, "Failed to load settings, using defaults");
+        FURI_LOG_W(TAG, "Err: load settings, using defaults");
 
         bt_settings->enabled = false;
         bt_settings->app_bridge_enabled = false;
@@ -34,6 +34,6 @@ void bt_settings_save(const BtSettings* bt_settings) {
         BT_SETTINGS_PATH, bt_settings, sizeof(BtSettings), BT_SETTINGS_MAGIC, BT_SETTINGS_VERSION);
 
     if(!success) {
-        FURI_LOG_E(TAG, "Failed to save settings");
+        FURI_LOG_E(TAG, "Err: save settings");
     }
 }

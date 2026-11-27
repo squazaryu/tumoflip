@@ -289,7 +289,7 @@ BleGlueCommandResult ble_glue_force_c2_mode(BleGlueC2Mode desired_mode) {
         }
         SHCI_CmdStatus_t status = SHCI_C2_FUS_StartWs();
         if(status) {
-            FURI_LOG_E(TAG, "Failed to start Radio Stack with status: %02X", status);
+            FURI_LOG_E(TAG, "Err: start Radio Stack status: %02X", status);
             return BleGlueCommandResultError;
         }
         return BleGlueCommandResultRestartPending;

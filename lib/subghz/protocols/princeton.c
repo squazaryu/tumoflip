@@ -15,7 +15,7 @@
  *
  */
 
-#define TAG "SubGhzProtocolPrinceton"
+#define TAG SUBGHZ_PROTOCOL_PRINCETON_NAME
 
 #define PRINCETON_GUARD_TIME_DEFALUT 30 //GUARD_TIME = PRINCETON_GUARD_TIME_DEFALUT * TE
 // Guard Time value should be between 15 -> 72 otherwise default value will be used
@@ -260,7 +260,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> i * 8) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Key");
+            FURI_LOG_E(TAG, "Cannot add Key");
             break;
         }
         instance->encoder.is_running = true;
@@ -369,7 +369,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_princeton_serialize(
         subghz_protocol_decoder_common_serialize_te(context, flipper_format, preset);
     if((ret == SubGhzProtocolStatusOk) &&
        !flipper_format_write_uint32(flipper_format, "Guard_time", &instance->guard_time, 1)) {
-        FURI_LOG_E(TAG, "Unable to add Guard_time");
+        FURI_LOG_E(TAG, "Cannot add Guard_time");
         ret = SubGhzProtocolStatusErrorParserOthers;
     }
 

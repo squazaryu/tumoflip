@@ -2,7 +2,7 @@
 #include "type_4_tag_poller_defs.h"
 #include "type_4_tag_i.h"
 
-#define TAG "Type4TagPoller"
+#define TAG "T4.Poll"
 
 typedef NfcCommand (*Type4TagPollerStateHandler)(Type4TagPoller* instance);
 
@@ -71,7 +71,7 @@ static NfcCommand type_4_tag_poller_handler_detect_platform(Type4TagPoller* inst
     if(instance->error == Type4TagErrorNone) {
         FURI_LOG_D(TAG, "Detect platform success");
     } else {
-        FURI_LOG_W(TAG, "Failed to detect platform");
+        FURI_LOG_W(TAG, "Err: detect platform");
     }
     instance->state = Type4TagPollerStateSelectApplication;
 
@@ -84,7 +84,7 @@ static NfcCommand type_4_tag_poller_handler_select_app(Type4TagPoller* instance)
         FURI_LOG_D(TAG, "Select application success");
         instance->state = Type4TagPollerStateReadCapabilityContainer;
     } else {
-        FURI_LOG_E(TAG, "Failed to select application");
+        FURI_LOG_E(TAG, "Err: select app");
         if(instance->mode == Type4TagPollerModeWrite &&
            instance->error == Type4TagErrorCardUnformatted) {
             instance->state = Type4TagPollerStateCreateApplication;
@@ -104,7 +104,7 @@ static NfcCommand type_4_tag_poller_handler_read_cc(Type4TagPoller* instance) {
                               Type4TagPollerStateReadNdefMessage :
                               Type4TagPollerStateWriteNdefMessage;
     } else {
-        FURI_LOG_E(TAG, "Failed to read CC");
+        FURI_LOG_E(TAG, "Err: read CC");
         if(instance->mode == Type4TagPollerModeWrite &&
            instance->error == Type4TagErrorCardUnformatted) {
             instance->state = Type4TagPollerStateCreateCapabilityContainer;
@@ -122,7 +122,7 @@ static NfcCommand type_4_tag_poller_handler_read_ndef(Type4TagPoller* instance) 
         FURI_LOG_D(TAG, "Read NDEF success");
         instance->state = Type4TagPollerStateSuccess;
     } else {
-        FURI_LOG_E(TAG, "Failed to read NDEF");
+        FURI_LOG_E(TAG, "Err: read NDEF");
         instance->state = Type4TagPollerStateFailed;
     }
 
@@ -135,7 +135,7 @@ static NfcCommand type_4_tag_poller_handler_create_app(Type4TagPoller* instance)
         FURI_LOG_D(TAG, "Create application success");
         instance->state = Type4TagPollerStateSelectApplication;
     } else {
-        FURI_LOG_E(TAG, "Failed to create application");
+        FURI_LOG_E(TAG, "Err: create app");
         instance->state = Type4TagPollerStateFailed;
     }
 
@@ -148,7 +148,7 @@ static NfcCommand type_4_tag_poller_handler_create_cc(Type4TagPoller* instance) 
         FURI_LOG_D(TAG, "Create CC success");
         instance->state = Type4TagPollerStateReadCapabilityContainer;
     } else {
-        FURI_LOG_E(TAG, "Failed to create CC");
+        FURI_LOG_E(TAG, "Err: create CC");
         instance->state = Type4TagPollerStateFailed;
     }
 
@@ -161,7 +161,7 @@ static NfcCommand type_4_tag_poller_handler_create_ndef(Type4TagPoller* instance
         FURI_LOG_D(TAG, "Create NDEF success");
         instance->state = Type4TagPollerStateWriteNdefMessage;
     } else {
-        FURI_LOG_E(TAG, "Failed to create NDEF");
+        FURI_LOG_E(TAG, "Err: create NDEF");
         instance->state = Type4TagPollerStateFailed;
     }
 
@@ -174,7 +174,7 @@ static NfcCommand type_4_tag_poller_handler_write_ndef(Type4TagPoller* instance)
         FURI_LOG_D(TAG, "Write NDEF success");
         instance->state = Type4TagPollerStateSuccess;
     } else {
-        FURI_LOG_E(TAG, "Failed to write NDEF");
+        FURI_LOG_E(TAG, "Err: write NDEF");
         if(instance->mode == Type4TagPollerModeWrite &&
            instance->error == Type4TagErrorCardUnformatted) {
             instance->state = Type4TagPollerStateCreateNdefMessage;

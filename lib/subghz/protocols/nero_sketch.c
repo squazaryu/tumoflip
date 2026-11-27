@@ -7,7 +7,7 @@
 #include "../blocks/math.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolNeroSketch"
+#define TAG SUBGHZ_PROTOCOL_NERO_SKETCH_NAME
 
 static const SubGhzBlockConst subghz_protocol_nero_sketch_const = {
     .te_short = 330,

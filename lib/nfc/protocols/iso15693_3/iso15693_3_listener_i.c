@@ -2,7 +2,7 @@
 
 #include <nfc/helpers/iso13239_crc.h>
 
-#define TAG "Iso15693_3Listener"
+#define TAG "ISO15.Listen"
 
 typedef Iso15693_3Error (*Iso15693_3RequestHandler)(
     Iso15693_3Listener* instance,

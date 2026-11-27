@@ -5,7 +5,7 @@
 
 #include "expansion_settings_filename.h"
 
-#define TAG "ExpansionSettings"
+#define TAG "ExpansionCfg"
 
 #define EXPANSION_SETTINGS_PATH    INT_PATH(EXPANSION_SETTINGS_FILE_NAME)
 #define EXPANSION_SETTINGS_VERSION (0)
@@ -22,7 +22,7 @@ void expansion_settings_load(ExpansionSettings* settings) {
         EXPANSION_SETTINGS_VERSION);
 
     if(!success) {
-        FURI_LOG_W(TAG, "Failed to load file, using defaults");
+        FURI_LOG_W(TAG, "Load failed; defaults used");
         memset(settings, 0, sizeof(ExpansionSettings));
         expansion_settings_save(settings);
     }
@@ -39,6 +39,6 @@ void expansion_settings_save(const ExpansionSettings* settings) {
         EXPANSION_SETTINGS_VERSION);
 
     if(!success) {
-        FURI_LOG_E(TAG, "Failed to save file");
+        FURI_LOG_E(TAG, "Err: save file");
     }
 }

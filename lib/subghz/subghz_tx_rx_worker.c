@@ -5,7 +5,7 @@
 #include "packet_config.h"
 #include <string.h>
 
-#define TAG "SubGhzTxRxWorker"
+#define TAG "SubGhzTxRx"
 
 #define SUBGHZ_TXRX_WORKER_BUF_SIZE      2048
 //you can not set more than 62 because it will not fit into the FIFO CC1101

@@ -2,7 +2,7 @@
 
 #include <nfc/protocols/nfc_listener_base.h>
 
-#define TAG "TexkomListener"
+#define TAG "Texkom.Rx"
 
 static TexkomListener* texkom_listener_alloc(Nfc* nfc, TexkomData* data) {
     furi_assert(nfc);
@@ -56,7 +56,7 @@ static NfcCommand texkom_listener_run(NfcGenericEvent event, void* context) {
 
         const NfcError error = nfc_listener_tx(instance->nfc, instance->tx_buffer);
         if(error != NfcErrorNone) {
-            FURI_LOG_E(TAG, "Failed to transmit the frame: %d", error);
+            FURI_LOG_E(TAG, "Err: transmit the frame: %d", error);
         }
     }
 

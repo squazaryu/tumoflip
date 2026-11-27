@@ -7,7 +7,7 @@
 #include "../blocks/math.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolNeroRadio"
+#define TAG SUBGHZ_PROTOCOL_NERO_RADIO_NAME
 
 static const SubGhzBlockConst subghz_protocol_nero_radio_const = {
     .te_short = 200,
