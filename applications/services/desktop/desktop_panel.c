@@ -17,9 +17,10 @@ static bool desktop_panel_display_on(Desktop* desktop) {
 }
 
 bool desktop_panel_wanted(Desktop* desktop) {
-    return desktop->panel_ready && !desktop->panel_safe_boot && !desktop->locked &&
-           !desktop->app_running && desktop->panel_settings.mode == DesktopModeDashboard &&
-           scene_manager_get_current_scene(desktop->scene_manager) == DesktopSceneMain &&
+    return desktop->panel_ready && !desktop->panel_safe_boot && !desktop->app_running &&
+           desktop->panel_settings.mode == DesktopModeDashboard &&
+           scene_manager_get_current_scene(desktop->scene_manager) ==
+               (desktop->locked ? DesktopSceneLocked : DesktopSceneMain) &&
            desktop_panel_display_on(desktop) &&
            !gui_active_view_port_count(desktop->gui, GuiLayerFullscreen) &&
            !gui_active_view_port_count(desktop->gui, GuiLayerWindow);
@@ -59,8 +60,15 @@ static void desktop_panel_refresh(Desktop* desktop) {
 static void desktop_panel_bind(Desktop* desktop, bool panel) {
     if(panel == desktop->panel_attached) return;
     View* wallpaper = animation_manager_get_animation_view(desktop->animation_manager);
-    view_stack_remove_view(desktop->main_view_stack, panel ? wallpaper : &desktop->panel_view);
-    view_stack_add_view(desktop->main_view_stack, panel ? &desktop->panel_view : wallpaper);
+    /* A shared view must finish binding to the currently visible stack. */
+    ViewStack* stacks[] = {
+        desktop->locked ? desktop->main_view_stack : desktop->locked_view_stack,
+        desktop->locked ? desktop->locked_view_stack : desktop->main_view_stack,
+    };
+    for(size_t i = 0; i < COUNT_OF(stacks); ++i) {
+        view_stack_remove_view(stacks[i], panel ? wallpaper : &desktop->panel_view);
+        view_stack_add_view(stacks[i], panel ? &desktop->panel_view : wallpaper);
+    }
     desktop->panel_attached = panel;
 }
 
@@ -86,10 +94,6 @@ void desktop_panel_sync(Desktop* desktop) {
         desktop_panel_pause(desktop);
         return;
     }
-    if(desktop->locked) {
-        desktop_panel_prepare_lock(desktop);
-        return;
-    }
     if(desktop->panel_settings.mode != DesktopModeDashboard || desktop->panel_safe_boot) {
         desktop_panel_pause(desktop);
         desktop_panel_bind(desktop, false);
@@ -108,27 +112,23 @@ void desktop_panel_sync(Desktop* desktop) {
         desktop->panel_stalled = true;
     }
     desktop_panel_refresh(desktop);
-    bool was_active;
+    bool active_changed;
     bool moving;
     {
         FURI_CRITICAL_ENTER();
-        was_active = desktop->panel_model.active;
-        desktop->panel_model.active = true;
+        active_changed = desktop->panel_model.active != !desktop->locked;
+        desktop->panel_model.active = !desktop->locked;
         desktop->panel_model.motion = desktop->panel_settings.motion;
         moving = desktop->panel_model.offset != 0;
         FURI_CRITICAL_EXIT();
     }
     desktop_panel_bind(desktop, true);
     if(!moving) desktop_panel_stop_motion(desktop);
-    if(!was_active) view_request_update(&desktop->panel_view);
+    if(active_changed) view_request_update(&desktop->panel_view);
 }
 
 void desktop_panel_prepare_lock(Desktop* desktop) {
     desktop_panel_pause(desktop);
-    if(desktop->panel_stalled) {
-        animation_manager_load_and_continue_animation(desktop->animation_manager);
-        desktop->panel_stalled = false;
-    }
 }
 
 void desktop_panel_after_app(Desktop* desktop) {
@@ -190,6 +190,10 @@ static bool desktop_panel_input(InputEvent* event, void* context) {
     if(event->type != InputTypeShort ||
        (event->key != InputKeyLeft && event->key != InputKeyRight))
         return false;
+    FURI_CRITICAL_ENTER();
+    const bool active = desktop->panel_model.active;
+    FURI_CRITICAL_EXIT();
+    if(!active) return false;
     view_dispatcher_send_custom_event(
         desktop->view_dispatcher,
         event->key == InputKeyLeft ? DesktopPanelEventPrevious : DesktopPanelEventNext);

@@ -2,7 +2,6 @@
 #include "../desktop_panel_i.h"
 #include <furi.h>
 #include <gui/canvas_i.h>
-#include <gui/elements.h>
 #include <assets_icons.h>
 
 static void desktop_panel_badge(
@@ -11,13 +10,14 @@ static void desktop_panel_badge(
     const Icon* icon,
     const char* label,
     const char* value) {
-    canvas_draw_rframe(canvas, center - 21, 25, 42, 26, 3);
-    canvas_set_font(canvas, strlen(value) > 4 ? FontBatteryPercent : FontPrimary);
-    canvas_draw_str_aligned(canvas, center, 36, AlignCenter, AlignBottom, value);
+    canvas_draw_rframe(canvas, center - 21, 29, 42, 34, 3);
+    canvas_set_font(canvas, FontPrimary);
+    if(canvas_string_width(canvas, value) > 36) canvas_set_font(canvas, FontBatteryPercent);
+    canvas_draw_str_aligned(canvas, center, 42, AlignCenter, AlignBottom, value);
     canvas_set_font(canvas, FontSecondary);
     const int32_t x = center - (icon_get_width(icon) + 2 + canvas_string_width(canvas, label)) / 2;
-    canvas_draw_icon(canvas, x, 47 - icon_get_height(icon), icon);
-    canvas_draw_str(canvas, x + icon_get_width(icon) + 2, 47, label);
+    canvas_draw_icon(canvas, x, 57 - icon_get_height(icon), icon);
+    canvas_draw_str(canvas, x + icon_get_width(icon) + 2, 57, label);
 }
 
 static void desktop_panel_hero(
@@ -27,12 +27,12 @@ static void desktop_panel_hero(
     const char* line1,
     const char* line2) {
     canvas_draw_icon(
-        canvas, (36 - icon_get_width(icon)) / 2, 38 - icon_get_height(icon) / 2, icon);
+        canvas, (36 - icon_get_width(icon)) / 2, 44 - icon_get_height(icon) / 2, icon);
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 40, 32, title);
+    canvas_draw_str(canvas, 40, 37, title);
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 40, 41, line1);
-    canvas_draw_str(canvas, 40, 49, line2);
+    canvas_draw_str(canvas, 40, 48, line1);
+    canvas_draw_str(canvas, 40, 59, line2);
 }
 
 static void desktop_panel_draw_page(Canvas* canvas, const DesktopPanelModel* model) {
@@ -41,10 +41,10 @@ static void desktop_panel_draw_page(Canvas* canvas, const DesktopPanelModel* mod
     static const char* const titles[] = {"Status", "Idle & sleep", "Last fault"};
     char value[24];
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 2, 21, titles[page]);
+    canvas_draw_str(canvas, 2, 24, titles[page]);
     canvas_set_font(canvas, FontSecondary);
     snprintf(value, sizeof(value), "%u/3", page + 1U);
-    canvas_draw_str_aligned(canvas, 126, 21, AlignRight, AlignBottom, value);
+    canvas_draw_str_aligned(canvas, 126, 24, AlignRight, AlignBottom, value);
 
     if(page == 0) {
         desktop_panel_badge(
@@ -97,8 +97,4 @@ void desktop_panel_draw(Canvas* canvas, void* context) {
     if(offset) canvas_frame_set(canvas, x + offset, y, width, height);
     desktop_panel_draw_page(canvas, &model);
     if(offset) canvas_frame_set(canvas, x, y, width, height);
-    canvas_set_font(canvas, FontSecondary);
-    canvas_draw_icon(canvas, 4, 56, &I_ButtonLeftSmall_3x5);
-    canvas_draw_icon(canvas, 121, 56, &I_ButtonRightSmall_3x5);
-    elements_button_center(canvas, "Apps");
 }

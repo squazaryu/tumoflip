@@ -29,6 +29,7 @@ typedef struct {
 enum {GuiLayerFullscreen,GuiLayerWindow,DesktopSceneMain=5,DesktopSceneLocked,DesktopScenePinInput};
 #define furi_check assert
 #define furi_assert assert
+#define COUNT_OF(x) (sizeof(x)/sizeof((x)[0]))
 static unsigned depth,freezes,thaws,swaps,refreshes,stops,flushes;
 static ViewStack* last_added_stack;
 #define FURI_CRITICAL_ENTER() (++depth)
