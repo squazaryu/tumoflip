@@ -26,7 +26,7 @@ typedef struct {unsigned kind;uint32_t commit;} TumoflipCrashReport;
 typedef struct {
  DesktopSettings settings;DesktopPanelSettings panel_settings;DesktopPanelModel panel_model;
  View panel_view;FuriTimer*panel_motion_timer;Notification*notification;
- bool panel_attached,panel_stalled,panel_timer_armed,panel_ready,panel_safe_boot;
+ bool panel_attached,panel_stalled,panel_timer_armed,panel_ready,panel_safe_boot,locked;
  uint8_t panel_sd_state;void*view_dispatcher;
 } Desktop;
 static unsigned depth,updates,events,last_event,starts,stops,loads;
@@ -103,12 +103,26 @@ int main(void){
  assert(d.panel_model.page==0&&!d.panel_model.offset&&!timer.armed&&stops==1);
  d.panel_model.active=false;before=updates;desktop_panel_move(&d,1);assert(updates==before&&starts==1);
  InputEvent key={.key=InputKeyLeft,.type=InputTypeShort};
- assert(!desktop_panel_input(&key,&d)&&!events); /* Locked/paused background is display-only. */
- d.panel_model.active=true;
+ d.locked=true;assert(!desktop_panel_input(&key,&d)&&!events);
+ d.locked=false;d.panel_model.active=true;
  assert(desktop_panel_input(&key,&d)&&events==1&&last_event==DesktopPanelEventPrevious);
  key.key=InputKeyRight;assert(desktop_panel_input(&key,&d)&&last_event==DesktopPanelEventNext);
  key.type=InputTypeLong;assert(!desktop_panel_input(&key,&d));
  key.type=InputTypeShort;key.key=InputKeyOk;assert(!desktop_panel_input(&key,&d)&&events==2);
+ return 0;
+}
+''')
+
+    def test_first_page_key_after_backlight_sleep_is_not_a_classic_shortcut(self):
+        native(production() + r'''
+int main(void){
+ Desktop d={0};desktop_panel_init(&d);d.panel_ready=true;
+ d.panel_model.active=false; /* Backlight sleep pauses drawing, but does not lock. */
+ InputEvent key={.key=InputKeyLeft,.type=InputTypeShort};
+ assert(desktop_panel_input(&key,&d)&&events==1&&last_event==DesktopPanelEventPrevious);
+ assert(!d.panel_model.active&&!timer.armed); /* Desktop thread decides when to resume. */
+ d.locked=true;key.key=InputKeyRight;
+ assert(!desktop_panel_input(&key,&d)&&events==1);
  return 0;
 }
 ''')
