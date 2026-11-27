@@ -952,8 +952,6 @@ void subghz_protocol_decoder_keeloq_reset(void* context) {
 void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t duration) {
     furi_assert(context);
     SubGhzProtocolDecoderKeeloq* instance = context;
-    const uint32_t te = instance->te;
-    const uint32_t te_delta = subghz_protocol_keeloq_te_delta(te);
 
     switch(instance->decoder.parser_step) {
     case KeeloqDecoderStepReset:
@@ -1002,6 +1000,8 @@ void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t dur
         break;
     case KeeloqDecoderStepCheckDuration:
         if(!level) {
+            const uint32_t te = instance->te;
+            const uint32_t te_delta = subghz_protocol_keeloq_te_delta(te);
             const uint32_t period_delta = te == subghz_protocol_keeloq_const.te_short ?
                                               te_delta * 2 :
                                               te_delta * 3 / 2;
