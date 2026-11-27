@@ -143,5 +143,25 @@ int main(void){
 }
 ''')
 
+    def test_app_return_while_locked_restores_the_stock_lock_background(self):
+        native(production() + r'''
+int main(void){
+ Gui gui={0};SceneManager scene={.scene=DesktopSceneMain};AnimationManager animation={0};
+ ViewStack stack={.background=&animation.view};FuriTimer timer=1;
+ Desktop d={.gui=&gui,.scene_manager=&scene,.animation_manager=&animation,.main_view_stack=&stack,
+     .panel_motion_timer=&timer,.panel_ready=true,.panel_awake=true};
+ d.panel_settings.mode=DesktopModeDashboard;desktop_panel_sync(&d);
+ desktop_panel_prepare_lock(&d);d.locked=true;
+ assert(!animation.stalled&&!d.panel_model.active);
+ /* BeforeApp uses the ordinary wallpaper stall, not the Panel-only marker. */
+ animation_manager_unload_and_stall_animation(&animation);d.app_running=true;
+ desktop_panel_after_app(&d);
+ assert(!d.app_running&&!animation.stalled&&!d.panel_stalled&&!d.panel_model.active);
+ desktop_panel_sync(&d);assert(!animation.stalled);
+ d.locked=false;desktop_panel_sync(&d);assert(animation.stalled&&d.panel_model.active);
+ return 0;
+}
+''')
+
 
 if __name__ == '__main__': unittest.main()
