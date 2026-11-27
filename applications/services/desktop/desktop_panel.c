@@ -191,9 +191,9 @@ static bool desktop_panel_input(InputEvent* event, void* context) {
        (event->key != InputKeyLeft && event->key != InputKeyRight))
         return false;
     FURI_CRITICAL_ENTER();
-    const bool active = desktop->panel_model.active;
+    const bool unlocked = !desktop->locked;
     FURI_CRITICAL_EXIT();
-    if(!active) return false;
+    if(!unlocked) return false;
     view_dispatcher_send_custom_event(
         desktop->view_dispatcher,
         event->key == InputKeyLeft ? DesktopPanelEventPrevious : DesktopPanelEventNext);
