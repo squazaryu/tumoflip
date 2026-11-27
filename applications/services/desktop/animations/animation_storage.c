@@ -18,7 +18,7 @@
 #define ANIMATION_FRAMES_FILE   "frames.bin"
 #define ANIMATION_DIR           EXT_PATH("dolphin")
 #define ANIMATION_MANIFEST_FILE ANIMATION_DIR "/manifest.txt"
-#define TAG                     "AnimationStorage"
+#define TAG "AnimStore"
 
 #define ANIMATION_FRAME_BUNDLE_VERSION 1U
 
@@ -523,7 +523,7 @@ static bool animation_storage_load_frames(
         if((frame_size == 0U) || (frame_size > max_filesize)) {
             FURI_LOG_E(
                 TAG,
-                "Filesize %llu, max: %zu (width %u, height %u)",
+                "Size %llu, max %zu (%ux%u)",
                 frame_size,
                 max_filesize,
                 width,
@@ -638,7 +638,7 @@ static bool animation_storage_load_bubbles(BubbleAnimation* animation, FlipperFo
 
     if(!success) {
         if(animation->frame_bubble_sequences) {
-            FURI_LOG_E(TAG, "Failed to load animation bubbles");
+            FURI_LOG_E(TAG, "Anim bubbles load failed");
             animation_storage_free_bubbles(animation);
         }
     }
@@ -683,7 +683,7 @@ static BubbleAnimation* animation_storage_load_animation(const char* name) {
         uint32_t count = 0;
         if(!flipper_format_get_value_count(ff, "Frames order", &count)) break;
         if(count != frames) {
-            FURI_LOG_E(TAG, "Error loading animation: frames order");
+            FURI_LOG_E(TAG, "Bad anim frame order");
             break;
         }
         u32array = malloc(sizeof(uint32_t) * frames);

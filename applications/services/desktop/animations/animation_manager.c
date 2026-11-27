@@ -13,7 +13,7 @@
 #include "animation_storage.h"
 #include "animation_manager.h"
 
-#define TAG "AnimationManager"
+#define TAG "AnimMgr"
 
 #define PROFILE_RELOAD_DEBOUNCE_MS 100U
 
@@ -495,7 +495,7 @@ static bool animation_manager_reload_profile(AnimationManager* animation_manager
     animation_manager->profile_sequential_index = 0;
     FURI_LOG_I(
         TAG,
-        "Desktop profile %s (%u animations)",
+        "Desktop profile %s (%u anims)",
         desktop_profile_is_active(loaded) ? "enabled" : "disabled",
         (unsigned int)desktop_profile_get_animation_count(loaded));
     return true;
@@ -629,7 +629,7 @@ static StorageAnimation*
 
     bool using_profile = profile_active;
     if((whole_weight == 0U) && profile_active) {
-        FURI_LOG_W(TAG, "Profile has no available animations; using manifest");
+        FURI_LOG_W(TAG, "No anim available; manifest used");
         animation_manager_release_list(&animation_list);
         animation_storage_fill_animation_list(&animation_list);
         whole_weight = animation_manager_filter_animation_list(

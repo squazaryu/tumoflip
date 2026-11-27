@@ -2,7 +2,7 @@
 
 #include "nfc/helpers/iso14443_crc.h"
 
-#define TAG "Iso14443_3aListener"
+#define TAG "ISO3A.Listen"
 
 static Iso14443_3aError iso14443_3a_listener_process_nfc_error(NfcError error) {
     Iso14443_3aError ret = Iso14443_3aErrorNone;

@@ -106,7 +106,7 @@ static void rpc_close_session_process(const PB_Main* request, void* context) {
     if(session->closed_callback) {
         session->closed_callback(session->context);
     } else {
-        FURI_LOG_W(TAG, "Session stop isn't processed by transport layer");
+        FURI_LOG_W(TAG, "Transport did not stop session");
     }
     furi_mutex_release(session->callbacks_mutex);
 }
@@ -291,7 +291,7 @@ static int32_t rpc_session_worker(void* context) {
             } else if(!handler && !session->terminate) {
                 FURI_LOG_E(
                     TAG,
-                    "Message(%d) decoded, but not implemented",
+                    "Unhandled decoded message %d",
                     session->decoded_message->which_content);
                 rpc_send_and_release_empty(
                     session,

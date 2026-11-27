@@ -83,7 +83,8 @@ void desktop_settings_scene_favorite_on_enter(void* context) {
     bool default_passport = false;
 
     furi_assert(favorite_id < FavoriteAppNumber);
-    curr_favorite_app = &app->settings.favorite_apps[favorite_id];
+    curr_favorite_app = desktop_settings_favorite(app, favorite_id);
+    furi_check(curr_favorite_app);
     if(favorite_id == FavoriteAppRightShort) {
         default_passport = true;
     }
@@ -161,7 +162,9 @@ void desktop_settings_scene_favorite_on_enter(void* context) {
         }
     }
 
-    submenu_set_header(submenu, "Favorite App");
+    submenu_set_header(
+        submenu,
+        app->shortcut_profile == DesktopModeDashboard ? "Panel shortcut" : "Favorite App");
     submenu_set_selected_item(submenu, pre_select_item); // If set during loop, visual glitch.
 
     view_dispatcher_switch_to_view(app->view_dispatcher, DesktopSettingsAppViewMenu);
@@ -176,7 +179,8 @@ bool desktop_settings_scene_favorite_on_event(void* context, SceneManagerEvent e
         scene_manager_get_scene_state(app->scene_manager, DesktopSettingsAppSceneFavorite);
     FavoriteApp* curr_favorite_app = NULL;
     furi_assert(favorite_id < FavoriteAppNumber);
-    curr_favorite_app = &app->settings.favorite_apps[favorite_id];
+    curr_favorite_app = desktop_settings_favorite(app, favorite_id);
+    furi_check(curr_favorite_app);
 
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == DEFAULT_INDEX) {
@@ -237,7 +241,10 @@ bool desktop_settings_scene_favorite_on_event(void* context, SceneManagerEvent e
         };
         consumed = true;
 
-        desktop_settings_save(&app->settings);
+        if(app->shortcut_profile == DesktopModeDashboard)
+            app->panel_dirty = true;
+        else
+            desktop_settings_save(&app->settings);
     }
 
     furi_string_free(temp_path);

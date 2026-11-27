@@ -2,7 +2,7 @@
 #include <lib/toolbox/stream/stream.h>
 #include <lib/flipper_format/flipper_format_i.h>
 
-#define TAG "SubGhzBlockGeneric"
+#define TAG "SubGhzBlock"
 
 // Main things: subghz protocols working (serialize, deserialize, decode and encode)
 // with flipper_format data isolated from upper level subghz functions and structures.
@@ -84,13 +84,13 @@ SubGhzProtocolStatus subghz_block_generic_serialize(
         stream_clean(flipper_format_get_raw_stream(flipper_format));
         if(!flipper_format_write_header_cstr(
                flipper_format, SUBGHZ_KEY_FILE_TYPE, SUBGHZ_KEY_FILE_VERSION)) {
-            FURI_LOG_E(TAG, "Unable to add header");
+            FURI_LOG_E(TAG, "Cannot add header");
             res = SubGhzProtocolStatusErrorParserHeader;
             break;
         }
 
         if(!flipper_format_write_uint32(flipper_format, "Frequency", &preset->frequency, 1)) {
-            FURI_LOG_E(TAG, "Unable to add Frequency");
+            FURI_LOG_E(TAG, "Cannot add Frequency");
             res = SubGhzProtocolStatusErrorParserFrequency;
             break;
         }
@@ -98,32 +98,32 @@ SubGhzProtocolStatus subghz_block_generic_serialize(
         subghz_block_generic_get_preset_name(furi_string_get_cstr(preset->name), temp_str);
         if(!flipper_format_write_string_cstr(
                flipper_format, "Preset", furi_string_get_cstr(temp_str))) {
-            FURI_LOG_E(TAG, "Unable to add Preset");
+            FURI_LOG_E(TAG, "Cannot add Preset");
             res = SubGhzProtocolStatusErrorParserPreset;
             break;
         }
         if(!strcmp(furi_string_get_cstr(temp_str), "FuriHalSubGhzPresetCustom")) {
             if(!flipper_format_write_string_cstr(
                    flipper_format, "Custom_preset_module", "CC1101")) {
-                FURI_LOG_E(TAG, "Unable to add Custom_preset_module");
+                FURI_LOG_E(TAG, "Cannot add Custom_preset_module");
                 res = SubGhzProtocolStatusErrorParserCustomPreset;
                 break;
             }
             if(!flipper_format_write_hex(
                    flipper_format, "Custom_preset_data", preset->data, preset->data_size)) {
-                FURI_LOG_E(TAG, "Unable to add Custom_preset_data");
+                FURI_LOG_E(TAG, "Cannot add Custom_preset_data");
                 res = SubGhzProtocolStatusErrorParserCustomPreset;
                 break;
             }
         }
         if(!flipper_format_write_string_cstr(flipper_format, "Protocol", instance->protocol_name)) {
-            FURI_LOG_E(TAG, "Unable to add Protocol");
+            FURI_LOG_E(TAG, "Cannot add Protocol");
             res = SubGhzProtocolStatusErrorParserProtocolName;
             break;
         }
         uint32_t temp = instance->data_count_bit;
         if(!flipper_format_write_uint32(flipper_format, "Bit", &temp, 1)) {
-            FURI_LOG_E(TAG, "Unable to add Bit");
+            FURI_LOG_E(TAG, "Cannot add Bit");
             res = SubGhzProtocolStatusErrorParserBitCount;
             break;
         }
@@ -134,7 +134,7 @@ SubGhzProtocolStatus subghz_block_generic_serialize(
         }
 
         if(!flipper_format_write_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Key");
+            FURI_LOG_E(TAG, "Cannot add Key");
             res = SubGhzProtocolStatusErrorParserKey;
             break;
         }
@@ -144,7 +144,7 @@ SubGhzProtocolStatus subghz_block_generic_serialize(
            (strcmp(instance->protocol_name, "Nice FloR-S") == 0)) {
             uint32_t temp = (instance->data_2 >> 4) & 0xFFFFF;
             if(!flipper_format_write_uint32(flipper_format, "Data", &temp, 1)) {
-                FURI_LOG_E(TAG, "Unable to add Data");
+                FURI_LOG_E(TAG, "Cannot add Data");
                 break;
             }
         }

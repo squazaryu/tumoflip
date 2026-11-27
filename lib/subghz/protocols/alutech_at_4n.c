@@ -8,7 +8,7 @@
 
 #include "../blocks/custom_btn_i.h"
 
-#define TAG "SubGhzProtocoAlutech_at_4n"
+#define TAG SUBGHZ_PROTOCOL_ALUTECH_AT_4N_NAME
 
 #define SUBGHZ_NO_ALUTECH_AT_4N_RAINBOW_TABLE         0xFFFFFFFFFFFFFFFF
 #define SUBGHZ_ALUTECH_AT_4N_RAINBOW_TABLE_SIZE_BYTES 32
@@ -338,7 +338,7 @@ bool subghz_protocol_alutech_at_4n_create_data(
             return false;
         }
         if(!flipper_format_insert_or_update_uint32(flipper_format, "CRC", &instance->crc, 1)) {
-            FURI_LOG_E(TAG, "Unable to add CRC");
+            FURI_LOG_E(TAG, "Cannot add CRC");
             return false;
         }
     }
@@ -487,7 +487,7 @@ SubGhzProtocolStatus subghz_protocol_encoder_alutech_at_4n_deserialize(
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> i * 8) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Key");
+            FURI_LOG_E(TAG, "Cannot add Key");
             break;
         }
         if(!flipper_format_rewind(flipper_format)) {
@@ -495,7 +495,7 @@ SubGhzProtocolStatus subghz_protocol_encoder_alutech_at_4n_deserialize(
             break;
         }
         if(!flipper_format_update_uint32(flipper_format, "CRC", &instance->crc, 1)) {
-            FURI_LOG_E(TAG, "Unable to add CRC");
+            FURI_LOG_E(TAG, "Cannot add CRC");
             break;
         }
 
@@ -706,7 +706,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_alutech_at_4n_serialize(
     }
     if((res == SubGhzProtocolStatusOk) &&
        !flipper_format_insert_or_update_uint32(flipper_format, "CRC", &instance->crc, 1)) {
-        FURI_LOG_E(TAG, "Unable to add CRC");
+        FURI_LOG_E(TAG, "Cannot add CRC");
         res = SubGhzProtocolStatusErrorParserOthers;
     }
     return res;

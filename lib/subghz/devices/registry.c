@@ -4,7 +4,7 @@
 #include <flipper_application/plugins/plugin_manager.h>
 #include <loader/firmware_api/firmware_api.h>
 
-#define TAG "SubGhzDeviceRegistry"
+#define TAG "SubGhzDevices"
 
 struct SubGhzDeviceRegistry {
     const SubGhzDevice** items;
@@ -31,7 +31,7 @@ void subghz_device_registry_init(void) {
         SUBGHZ_RADIO_DEVICE_PLUGIN_FAL_PREFIX);
     uint32_t plugin_count = plugin_manager_get_count(subghz_device->manager);
     if(error != PluginManagerErrorNone) {
-        FURI_LOG_E(TAG, "Failed to load radio device plugin(s), error %d", error);
+        FURI_LOG_E(TAG, "Err: load radio device plugin(s), error %d", error);
     } else if(plugin_count == 0) {
         FURI_LOG_W(
             TAG,

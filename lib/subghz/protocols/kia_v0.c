@@ -323,7 +323,7 @@ SubGhzProtocolStatus subghz_protocol_encoder_kia_deserialize(void* context, Flip
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> i * 8) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to update Key");
+            FURI_LOG_E(TAG, "Cannot update Key");
             ret = SubGhzProtocolStatusErrorParserKey;
             break;
         }

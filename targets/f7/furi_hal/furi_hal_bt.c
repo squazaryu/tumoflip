@@ -125,7 +125,7 @@ bool furi_hal_bt_start_radio_stack(void) {
         }
         // Starting radio stack
         if(!ble_glue_start()) {
-            FURI_LOG_E(TAG, "Failed to start radio stack");
+            FURI_LOG_E(TAG, "Err: start radio stack");
             ble_app_deinit();
             ble_glue_stop();
             break;
@@ -183,11 +183,11 @@ static FuriHalBleProfileBase* furi_hal_bt_start_app_internal(
 
     do {
         if(!ble_glue_is_radio_stack_ready()) {
-            FURI_LOG_E(TAG, "Can't start BLE App - radio stack did not start");
+            FURI_LOG_E(TAG, "BLE app: stack not started");
             break;
         }
         if(!furi_hal_bt_is_gatt_gap_supported()) {
-            FURI_LOG_E(TAG, "Can't start Ble App - unsupported radio stack");
+            FURI_LOG_E(TAG, "BLE app: unsupported stack");
             break;
         }
 
@@ -196,7 +196,7 @@ static FuriHalBleProfileBase* furi_hal_bt_start_app_internal(
         if(!gap_init_with_peer_selection(
                &current_config, root_keys, event_cb, context, peer_selection)) {
             gap_thread_stop();
-            FURI_LOG_E(TAG, "Failed to init GAP");
+            FURI_LOG_E(TAG, "Err: init GAP");
             break;
         }
         // Start selected profile services
@@ -222,11 +222,11 @@ void furi_hal_bt_reinit(void) {
     furi_hal_bt_lock_core2();
 
     furi_hal_power_insomnia_enter();
-    FURI_LOG_I(TAG, "Disconnect and stop advertising");
+    FURI_LOG_I(TAG, "Disconnect; stop adverts");
     furi_hal_bt_stop_advertising();
 
     if(current_profile) {
-        FURI_LOG_I(TAG, "Stop current profile services");
+        FURI_LOG_I(TAG, "Stop profile services");
         current_profile->config->stop(current_profile);
         current_profile = NULL;
     }
@@ -234,7 +234,7 @@ void furi_hal_bt_reinit(void) {
     // Magic happens here
     hci_reset();
 
-    FURI_LOG_I(TAG, "Stop BLE related RTOS threads");
+    FURI_LOG_I(TAG, "Stop BLE RTOS threads");
     gap_thread_stop();
     ble_app_deinit();
 
@@ -332,7 +332,7 @@ bool furi_hal_bt_clear_white_list(void) {
     furi_hal_bt_nvm_sram_sem_acquire();
     tBleStatus status = aci_gap_clear_security_db();
     if(status) {
-        FURI_LOG_E(TAG, "Clear while list failed with status %d", status);
+        FURI_LOG_E(TAG, "Allowlist clear failed: %d", status);
     }
     furi_hal_bt_nvm_sram_sem_release();
     return status != BLE_STATUS_SUCCESS;
@@ -441,7 +441,7 @@ bool furi_hal_bt_ensure_c2_mode(BleGlueC2Mode mode) {
         return true;
     }
 
-    FURI_LOG_E(TAG, "Failed to switch C2 mode: %d", fw_start_res);
+    FURI_LOG_E(TAG, "Err: switch C2 mode: %d", fw_start_res);
     return false;
 }
 

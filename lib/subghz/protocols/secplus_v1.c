@@ -12,7 +12,7 @@
 * https://github.com/merbanan/rtl_433/blob/master/src/devices/secplus_v1.c
 */
 
-#define TAG "SubGhzProtocoSecPlusV1"
+#define TAG SUBGHZ_PROTOCOL_SECPLUS_V1_NAME
 
 #define SECPLUS_V1_BIT_ERR -1 //0b0000
 #define SECPLUS_V1_BIT_0   0 //0b0001
@@ -305,7 +305,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> (i * 8)) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Key");
+            FURI_LOG_E(TAG, "Cannot add Key");
             ret = SubGhzProtocolStatusErrorParserKey;
             break;
         }

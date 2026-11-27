@@ -7,7 +7,7 @@
 #include <lib/subghz/devices/devices.h>
 #include <lib/toolbox/strint.h>
 
-#define TAG "SubGhzFileEncoderWorker"
+#define TAG "SubGhzFileEnc"
 
 #define SUBGHZ_FILE_ENCODER_LOAD 512
 
@@ -139,7 +139,7 @@ static int32_t subghz_file_encoder_worker_thread(void* context) {
         if(!opened) {
             FURI_LOG_E(
                 TAG,
-                "Unable to open file for read: %s",
+                "Cannot open file for read: %s",
                 furi_string_get_cstr(instance->file_path));
             break;
         }

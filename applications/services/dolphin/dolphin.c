@@ -298,7 +298,7 @@ int32_t dolphin_srv(void* p) {
     UNUSED(p);
 
     if(furi_hal_rtc_get_boot_mode() != FuriHalRtcBootModeNormal) {
-        FURI_LOG_W(TAG, "Skipping start in special boot mode");
+        FURI_LOG_W(TAG, "Special boot; start skipped");
 
         furi_thread_suspend(furi_thread_get_current_id());
         return 0;

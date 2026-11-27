@@ -9,7 +9,7 @@
 #include <mbedtls/aes.h>
 #include <mbedtls/platform_util.h>
 
-#define TAG "MfUltralightListener"
+#define TAG "MFUL.Listen"
 
 #define MF_ULTRALIGHT_LISTENER_MAX_TX_BUFF_SIZE (256)
 

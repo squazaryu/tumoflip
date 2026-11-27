@@ -16,7 +16,7 @@
 * https://github.com/merbanan/rtl_433/blob/master/src/devices/secplus_v2.c
 */
 
-#define TAG "SubGhzProtocoSecPlusV2"
+#define TAG SUBGHZ_PROTOCOL_SECPLUS_V2_NAME
 
 #define SECPLUS_V2_HEADER      0x3C0000000000
 #define SECPLUS_V2_HEADER_MASK 0xFFFF3C0000000000
@@ -980,7 +980,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> (i * 8)) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Key");
+            FURI_LOG_E(TAG, "Cannot add Key");
             ret = SubGhzProtocolStatusErrorParserKey;
             break;
         }
@@ -990,7 +990,7 @@ SubGhzProtocolStatus
         }
         if(!flipper_format_update_hex(
                flipper_format, "Secplus_packet_1", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Secplus_packet_1");
+            FURI_LOG_E(TAG, "Cannot add Secplus_packet_1");
             ret = SubGhzProtocolStatusErrorParserOthers;
             break;
         }
@@ -1034,7 +1034,7 @@ bool subghz_protocol_secplus_v2_create_data(
 
     if((res == SubGhzProtocolStatusOk) &&
        !flipper_format_write_hex(flipper_format, "Secplus_packet_1", key_data, sizeof(uint64_t))) {
-        FURI_LOG_E(TAG, "Unable to add Secplus_packet_1");
+        FURI_LOG_E(TAG, "Cannot add Secplus_packet_1");
         res = SubGhzProtocolStatusErrorParserOthers;
     }
     return res == SubGhzProtocolStatusOk;
@@ -1235,7 +1235,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_secplus_v2_serialize(
 
     if((ret == SubGhzProtocolStatusOk) &&
        !flipper_format_write_hex(flipper_format, "Secplus_packet_1", key_data, sizeof(uint64_t))) {
-        FURI_LOG_E(TAG, "Unable to add Secplus_packet_1");
+        FURI_LOG_E(TAG, "Cannot add Secplus_packet_1");
         ret = SubGhzProtocolStatusErrorParserOthers;
     }
 
@@ -1247,7 +1247,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_secplus_v2_serialize(
         FuriString* pin_str = furi_string_alloc();
         if(pin <= SECPLUS_V2_PIN_MAX) furi_string_printf(pin_str, "%04u", pin);
         if(!flipper_format_write_string(flipper_format, "Pin", pin_str)) {
-            FURI_LOG_E(TAG, "Unable to add Pin");
+            FURI_LOG_E(TAG, "Cannot add Pin");
             ret = SubGhzProtocolStatusErrorParserOthers;
         }
         furi_string_free(pin_str);

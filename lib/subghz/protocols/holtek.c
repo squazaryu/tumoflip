@@ -14,7 +14,7 @@
  *
  */
 
-#define TAG "SubGhzProtocolHoltek"
+#define TAG SUBGHZ_PROTOCOL_HOLTEK_NAME
 
 #define HOLTEK_HEADER_MASK 0xF000000000
 #define HOLTEK_HEADER      0x5000000000

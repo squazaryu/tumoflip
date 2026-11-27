@@ -7,7 +7,7 @@
 #include "../blocks/math.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolGateTx"
+#define TAG SUBGHZ_PROTOCOL_GATE_TX_NAME
 
 static const SubGhzBlockConst subghz_protocol_gate_tx_const = {
     .te_short = 350,

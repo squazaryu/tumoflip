@@ -113,7 +113,7 @@ static NfcCommand st25tb_poller_read_handler(St25tbPoller* instance) {
             error = st25tb_poller_read_block(
                 instance, &instance->data->system_otp_block, ST25TB_SYSTEM_OTP_BLOCK);
             if(error != St25tbErrorNone) {
-                FURI_LOG_E(TAG, "Failed to read OTP block");
+                FURI_LOG_E(TAG, "Err: read OTP block");
                 instance->state = St25tbPollerStateFailure;
                 instance->st25tb_event_data.error = error;
                 break;
@@ -125,7 +125,7 @@ static NfcCommand st25tb_poller_read_handler(St25tbPoller* instance) {
             error = st25tb_poller_read_block(
                 instance, &instance->data->blocks[*current_block], *current_block);
             if(error != St25tbErrorNone) {
-                FURI_LOG_E(TAG, "Failed to read block %d", *current_block);
+                FURI_LOG_E(TAG, "Err: read block %d", *current_block);
                 instance->state = St25tbPollerStateFailure;
                 instance->st25tb_event_data.error = error;
                 break;

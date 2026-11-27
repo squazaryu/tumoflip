@@ -14,7 +14,7 @@
 #include "../blocks/custom_btn_i.h"
 #include "../subghz_keystore_i.h"
 
-#define TAG "SubGhzProtocolKeeloq"
+#define TAG SUBGHZ_PROTOCOL_KEELOQ_NAME
 
 // Received Monarch discriminator, preserved as metadata rather than regenerated.
 #define KEELOQ_MONARCH_DISCRIMINATOR_A 0x100u
@@ -897,7 +897,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> (i * 8)) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Key");
+            FURI_LOG_E(TAG, "Cannot add Key");
             ret = SubGhzProtocolStatusErrorParserKey;
             break;
         }

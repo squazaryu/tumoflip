@@ -8,7 +8,7 @@
 
 #include "../blocks/custom_btn_i.h"
 
-#define TAG "SubGhzProtocolRoger"
+#define TAG SUBGHZ_PROTOCOL_ROGER_NAME
 
 static const SubGhzBlockConst subghz_protocol_roger_const = {
     .te_short = 500,
@@ -213,7 +213,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> i * 8) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to add Key");
+            FURI_LOG_E(TAG, "Cannot add Key");
             break;
         }
 

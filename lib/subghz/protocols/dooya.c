@@ -7,7 +7,7 @@
 #include "../blocks/custom_btn_i.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolDooya"
+#define TAG SUBGHZ_PROTOCOL_DOOYA_NAME
 
 #define DOYA_SINGLE_CHANNEL 0xFF
 

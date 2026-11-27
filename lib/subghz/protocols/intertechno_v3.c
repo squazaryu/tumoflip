@@ -7,7 +7,7 @@
 #include "../blocks/math.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolIntertechnoV3"
+#define TAG SUBGHZ_PROTOCOL_INTERTECHNO_V3_NAME
 
 #define CH_PATTERN "%c%c%c%c"
 #define CNT_TO_CH(ch) \

@@ -531,7 +531,7 @@ static FS_Error
             if(restored != FSE_OK) {
                 FURI_LOG_E(
                     TAG,
-                    "Rename restore failed; copy retained at %s",
+                    "Restore failed; copy kept at %s",
                     furi_string_get_cstr(temp_path));
             }
         }

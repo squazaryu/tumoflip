@@ -26,7 +26,7 @@
  *   p[5..6]  counter, little endian, plus a parity bit
  */
 
-#define TAG "SubGhzProtocolPrastel"
+#define TAG SUBGHZ_PROTOCOL_PRASTEL_NAME
 
 #define PRASTEL_42_COUNT_BIT 42
 
@@ -381,7 +381,7 @@ SubGhzProtocolStatus
             key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data >> (i * 8)) & 0xFF;
         }
         if(!flipper_format_update_hex(flipper_format, "Key", key_data, sizeof(uint64_t))) {
-            FURI_LOG_E(TAG, "Unable to update Key");
+            FURI_LOG_E(TAG, "Cannot update Key");
             ret = SubGhzProtocolStatusErrorParserKey;
             break;
         }

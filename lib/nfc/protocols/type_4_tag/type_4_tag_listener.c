@@ -2,7 +2,7 @@
 #include "type_4_tag_listener_defs.h"
 #include "type_4_tag_i.h"
 
-#define TAG "Type4TagListener"
+#define TAG "T4.Listen"
 
 static void type_4_tag_listener_reset_state(Type4TagListener* instance) {
     instance->state = Type4TagListenerStateIdle;

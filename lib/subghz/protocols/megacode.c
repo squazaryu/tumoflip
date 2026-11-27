@@ -18,7 +18,7 @@
  *
  */
 
-#define TAG "SubGhzProtocolMegaCode"
+#define TAG SUBGHZ_PROTOCOL_MEGACODE_NAME
 
 static const SubGhzBlockConst subghz_protocol_megacode_const = {
     .te_short = 1000,

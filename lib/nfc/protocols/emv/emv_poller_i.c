@@ -586,7 +586,7 @@ EmvError emv_poller_select_ppse(EmvPoller* instance) {
                bit_buffer_get_size_bytes(instance->rx_buffer),
                &instance->data->emv_application)) {
             error = EmvErrorProtocol;
-            FURI_LOG_E(TAG, "Failed to parse application");
+            FURI_LOG_E(TAG, "Err: parse app");
         }
     } while(false);
 
@@ -626,7 +626,7 @@ EmvError emv_poller_select_application(EmvPoller* instance) {
         emv_trace(instance, "Start application answer:");
 
         if(iso14443_4a_error != Iso14443_4aErrorNone) {
-            FURI_LOG_E(TAG, "Failed to read PAN or PDOL");
+            FURI_LOG_E(TAG, "Err: read PAN or PDOL");
             error = emv_process_error(iso14443_4a_error);
             break;
         }
@@ -638,7 +638,7 @@ EmvError emv_poller_select_application(EmvPoller* instance) {
                bit_buffer_get_size_bytes(instance->rx_buffer),
                &instance->data->emv_application)) {
             error = EmvErrorProtocol;
-            FURI_LOG_E(TAG, "Failed to parse application");
+            FURI_LOG_E(TAG, "Err: parse app");
             break;
         }
 
@@ -678,7 +678,7 @@ EmvError emv_poller_get_processing_options(EmvPoller* instance) {
         emv_trace(instance, "Get processing options answer:");
 
         if(iso14443_4a_error != Iso14443_4aErrorNone) {
-            FURI_LOG_E(TAG, "Failed to get processing options, error %u", iso14443_4a_error);
+            FURI_LOG_E(TAG, "Err: get processing options, error %u", iso14443_4a_error);
             error = emv_process_error(iso14443_4a_error);
             break;
         }
@@ -690,7 +690,7 @@ EmvError emv_poller_get_processing_options(EmvPoller* instance) {
                bit_buffer_get_size_bytes(instance->rx_buffer),
                &instance->data->emv_application)) {
             error = EmvErrorProtocol;
-            FURI_LOG_E(TAG, "Failed to parse processing options");
+            FURI_LOG_E(TAG, "Err: parse processing options");
         }
     } while(false);
 
@@ -723,7 +723,7 @@ EmvError emv_poller_read_sfi_record(EmvPoller* instance, uint8_t sfi, uint8_t re
         emv_trace(instance, furi_string_get_cstr(text));
 
         if(iso14443_4a_error != Iso14443_4aErrorNone) {
-            FURI_LOG_E(TAG, "Failed to read SFI 0x%X record %d", sfi, record_num);
+            FURI_LOG_E(TAG, "Err: read SFI 0x%X record %d", sfi, record_num);
             error = emv_process_error(iso14443_4a_error);
             break;
         }
@@ -831,7 +831,7 @@ static EmvError emv_poller_req_get_data(EmvPoller* instance, uint16_t tag) {
         emv_trace(instance, "Get log data answer:");
 
         if(iso14443_4a_error != Iso14443_4aErrorNone) {
-            FURI_LOG_E(TAG, "Failed to get data, error %u", iso14443_4a_error);
+            FURI_LOG_E(TAG, "Err: get data, error %u", iso14443_4a_error);
             error = emv_process_error(iso14443_4a_error);
             break;
         }
@@ -843,7 +843,7 @@ static EmvError emv_poller_req_get_data(EmvPoller* instance, uint16_t tag) {
                bit_buffer_get_size_bytes(instance->rx_buffer),
                &instance->data->emv_application)) {
             error = EmvErrorProtocol;
-            FURI_LOG_E(TAG, "Failed to parse get data");
+            FURI_LOG_E(TAG, "Err: parse get data");
         }
     } while(false);
 

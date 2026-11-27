@@ -63,7 +63,7 @@ static NfcCommand emv_poller_handler_select_ppse(EmvPoller* instance) {
         FURI_LOG_D(TAG, "Select PPSE success");
         instance->state = EmvPollerStateSelectApplication;
     } else {
-        FURI_LOG_E(TAG, "Failed to select PPSE");
+        FURI_LOG_E(TAG, "Err: select PPSE");
         instance->state = EmvPollerStateReadFailed;
     }
 
@@ -76,7 +76,7 @@ static NfcCommand emv_poller_handler_select_application(EmvPoller* instance) {
     if(instance->error == EmvErrorNone) {
         FURI_LOG_D(TAG, "Select application success");
     } else {
-        FURI_LOG_E(TAG, "Failed to select application");
+        FURI_LOG_E(TAG, "Err: select app");
         // We have to try GPO request with empty tag
     }
     instance->state = EmvPollerStateGetProcessingOptions;
@@ -90,7 +90,7 @@ static NfcCommand emv_poller_handler_get_processing_options(EmvPoller* instance)
     if(instance->error == EmvErrorNone) {
         FURI_LOG_D(TAG, "Get processing options success");
     } else {
-        FURI_LOG_E(TAG, "Failed to get processing options");
+        FURI_LOG_E(TAG, "Err: get processing options");
     }
 
     // Read another informations

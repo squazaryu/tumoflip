@@ -13,7 +13,7 @@
  *
  */
 
-#define TAG "SubGhzProtocolCame"
+#define TAG SUBGHZ_PROTOCOL_CAME_NAME
 
 #define CAME_12_COUNT_BIT    12
 #define CAME_24_COUNT_BIT    24

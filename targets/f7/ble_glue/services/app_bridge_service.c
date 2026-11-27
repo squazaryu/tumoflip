@@ -197,7 +197,7 @@ bool ble_svc_app_bridge_send(
         frame);
 
     if(result != BLE_STATUS_SUCCESS) {
-        FURI_LOG_E(TAG, "Failed updating app bridge events characteristic: %d", result);
+        FURI_LOG_E(TAG, "Failed updating app bridge events char: %d", result);
     }
 
     return result == BLE_STATUS_SUCCESS;

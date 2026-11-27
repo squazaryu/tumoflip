@@ -4,7 +4,7 @@
 
 #include <furi.h>
 
-#define TAG "MfClassicPoller"
+#define TAG "MFC.Poll"
 
 // TODO FL-3926: Buffer writes for Hardnested, set state to Log when finished and sum property matches
 // TODO FL-3926: Store target key in CUID dictionary
@@ -398,7 +398,7 @@ NfcCommand mf_classic_poller_handler_read_block(MfClassicPoller* instance) {
         error = mf_classic_poller_read_block(
             instance, write_ctx->current_block, &write_ctx->tag_block);
         if(error != MfClassicErrorNone) {
-            FURI_LOG_D(TAG, "Failed to read block %d", write_ctx->current_block);
+            FURI_LOG_D(TAG, "Err: read block %d", write_ctx->current_block);
             instance->state = MfClassicPollerStateFail;
             break;
         }
@@ -755,7 +755,7 @@ NfcCommand mf_classic_poller_handler_backdoor_read_sector(MfClassicPoller* insta
 
         if(error != MfClassicErrorNone) {
             FURI_LOG_E(
-                TAG, "Failed to authenticate with backdoor key for sector %d", current_sector);
+                TAG, "Err: authenticate with backdoor key for sector %d", current_sector);
             break;
         }
 
@@ -766,7 +766,7 @@ NfcCommand mf_classic_poller_handler_backdoor_read_sector(MfClassicPoller* insta
             error = mf_classic_poller_read_block(instance, block_to_read, &block);
 
             if(error != MfClassicErrorNone) {
-                FURI_LOG_E(TAG, "Failed to read block %d", block_to_read);
+                FURI_LOG_E(TAG, "Err: read block %d", block_to_read);
                 break;
             }
 
@@ -978,7 +978,7 @@ NfcCommand mf_classic_poller_handler_read_sector(MfClassicPoller* instance) {
                 false);
             if(error != MfClassicErrorNone) {
                 instance->state = MfClassicPollerStateNextSector;
-                FURI_LOG_W(TAG, "Failed to re-auth. Go to next sector");
+                FURI_LOG_W(TAG, "Err: re-auth. Go to next sector");
                 break;
             }
         }
@@ -989,7 +989,7 @@ NfcCommand mf_classic_poller_handler_read_sector(MfClassicPoller* instance) {
         if(error != MfClassicErrorNone) {
             mf_classic_poller_halt(instance);
             dict_attack_ctx->auth_passed = false;
-            FURI_LOG_D(TAG, "Failed to read block %d", block_num);
+            FURI_LOG_D(TAG, "Err: read block %d", block_num);
         } else {
             mf_classic_set_block_read(instance->data, block_num, &block);
             if(dict_attack_ctx->current_key_type == MfClassicKeyTypeA) {
@@ -1180,7 +1180,7 @@ NfcCommand mf_classic_poller_handler_key_reuse_read_sector(MfClassicPoller* inst
         if(error != MfClassicErrorNone) {
             mf_classic_poller_halt(instance);
             dict_attack_ctx->auth_passed = false;
-            FURI_LOG_D(TAG, "Failed to read block %d", block_num);
+            FURI_LOG_D(TAG, "Err: read block %d", block_num);
         } else {
             mf_classic_set_block_read(instance->data, block_num, &block);
             if(dict_attack_ctx->current_key_type == MfClassicKeyTypeA) {
@@ -1262,7 +1262,7 @@ NfcCommand mf_classic_poller_handler_nested_collect_nt(MfClassicPoller* instance
 
     if(error != MfClassicErrorNone) {
         dict_attack_ctx->prng_type = MfClassicPrngTypeNoTag;
-        FURI_LOG_E(TAG, "Failed to collect nt");
+        FURI_LOG_E(TAG, "Err: collect nt");
     } else {
         FURI_LOG_T(TAG, "nt: %02x%02x%02x%02x", nt.data[0], nt.data[1], nt.data[2], nt.data[3]);
         uint32_t nt_data = bit_lib_bytes_to_num_be(nt.data, sizeof(MfClassicNt));
@@ -1313,7 +1313,7 @@ NfcCommand mf_classic_poller_handler_nested_calibrate(MfClassicPoller* instance)
         use_backdoor);
 
     if(error != MfClassicErrorNone) {
-        FURI_LOG_E(TAG, "Failed to perform full authentication");
+        FURI_LOG_E(TAG, "Err: perform full authentication");
         instance->state = MfClassicPollerStateNestedCalibrate;
         return command;
     }
@@ -1339,7 +1339,7 @@ NfcCommand mf_classic_poller_handler_nested_calibrate(MfClassicPoller* instance)
             false);
 
         if(error != MfClassicErrorNone) {
-            FURI_LOG_E(TAG, "Failed to perform nested authentication for static encrypted tag");
+            FURI_LOG_E(TAG, "Err: perform nested authentication for static encrypted tag");
             instance->state = MfClassicPollerStateNestedCalibrate;
             return command;
         }
@@ -1371,7 +1371,7 @@ NfcCommand mf_classic_poller_handler_nested_calibrate(MfClassicPoller* instance)
             false);
 
         if(error != MfClassicErrorNone) {
-            FURI_LOG_E(TAG, "Failed to perform nested authentication %u", collection_cycle);
+            FURI_LOG_E(TAG, "Err: perform nested authentication %u", collection_cycle);
             continue;
         }
 
@@ -1423,7 +1423,7 @@ NfcCommand mf_classic_poller_handler_nested_calibrate(MfClassicPoller* instance)
         if(!found) {
             FURI_LOG_E(
                 TAG,
-                "Failed to find distance for nt_enc %08lx",
+                "Err: find distance for nt_enc %08lx",
                 nt_enc_temp_arr[collection_cycle]);
             FURI_LOG_E(
                 TAG, "using key %06llx and uid %08lx, nt_prev is %08lx", known_key, cuid, nt_prev);
@@ -1538,7 +1538,7 @@ NfcCommand mf_classic_poller_handler_nested_collect_nt_enc(MfClassicPoller* inst
             use_backdoor);
 
         if(error != MfClassicErrorNone) {
-            FURI_LOG_E(TAG, "Failed to perform full authentication");
+            FURI_LOG_E(TAG, "Err: perform full authentication");
             break;
         }
 
@@ -1561,7 +1561,7 @@ NfcCommand mf_classic_poller_handler_nested_collect_nt_enc(MfClassicPoller* inst
                 false);
 
             if(error != MfClassicErrorNone) {
-                FURI_LOG_E(TAG, "Failed to perform nested authentication %u", collection_cycle);
+                FURI_LOG_E(TAG, "Err: perform nested authentication %u", collection_cycle);
                 break;
             }
 
@@ -1579,7 +1579,7 @@ NfcCommand mf_classic_poller_handler_nested_collect_nt_enc(MfClassicPoller* inst
             true);
 
         if(nt_enc_collected != (nt_enc_per_collection - 1)) {
-            FURI_LOG_E(TAG, "Failed to collect sufficient nt_enc values");
+            FURI_LOG_E(TAG, "Err: collect sufficient nt_enc values");
             break;
         }
 
@@ -1653,7 +1653,7 @@ NfcCommand mf_classic_poller_handler_nested_collect_nt_enc(MfClassicPoller* inst
                dist)) {
             dict_attack_ctx->auth_passed = true;
         } else {
-            FURI_LOG_E(TAG, "Failed to add nested nonce to array. OOM?");
+            FURI_LOG_E(TAG, "Err: add nested nonce to array. OOM?");
         }
 
         FURI_LOG_D(
@@ -1771,7 +1771,7 @@ NfcCommand mf_classic_poller_handler_nested_dict_attack(MfClassicPoller* instanc
                 use_backdoor_for_initial_auth);
 
             if(error != MfClassicErrorNone) {
-                FURI_LOG_E(TAG, "Failed to perform full authentication");
+                FURI_LOG_E(TAG, "Err: perform full authentication");
                 dict_attack_ctx->auth_passed = false;
                 break;
             }
@@ -1789,7 +1789,7 @@ NfcCommand mf_classic_poller_handler_nested_dict_attack(MfClassicPoller* instanc
                 true);
 
             if(error != MfClassicErrorNone) {
-                FURI_LOG_E(TAG, "Failed to perform nested authentication");
+                FURI_LOG_E(TAG, "Err: perform nested authentication");
                 dict_attack_ctx->auth_passed = false;
                 break;
             }
@@ -1810,7 +1810,7 @@ NfcCommand mf_classic_poller_handler_nested_dict_attack(MfClassicPoller* instanc
                 parity,
                 0);
             if(!success) {
-                FURI_LOG_E(TAG, "Failed to add nested nonce to array. OOM?");
+                FURI_LOG_E(TAG, "Err: add nested nonce to array. OOM?");
                 dict_attack_ctx->auth_passed = false;
                 break;
             }
@@ -2150,7 +2150,7 @@ NfcCommand mf_classic_poller_handler_nested_controller(MfClassicPoller* instance
         }
         if(dict_attack_ctx->attempt_count >= 3) {
             // Unpredictable, skip
-            FURI_LOG_E(TAG, "Failed to collect nonce, skipping key");
+            FURI_LOG_E(TAG, "Err: collect nonce, skipping key");
             dict_attack_ctx->nested_target_key++;
             dict_attack_ctx->attempt_count = 0;
         }
@@ -2233,7 +2233,7 @@ NfcCommand mf_classic_poller_handler_nested_controller(MfClassicPoller* instance
                (!(is_weak) &&
                 (dict_attack_ctx->attempt_count >= MF_CLASSIC_NESTED_HARD_RETRY_MAXIMUM))) {
                 // Unpredictable, skip
-                FURI_LOG_W(TAG, "Failed to collect nonce, skipping key");
+                FURI_LOG_W(TAG, "Err: collect nonce, skipping key");
                 if(dict_attack_ctx->nested_nonce.nonces) {
                     free(dict_attack_ctx->nested_nonce.nonces);
                     dict_attack_ctx->nested_nonce.nonces = NULL;

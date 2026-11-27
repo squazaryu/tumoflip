@@ -34,6 +34,14 @@ struct View {
 /** Initialize View (for internal use) */
 void view_init(View* view);
 
+/** Publish the redraw callback and context as a single binding. */
+void view_set_update_handler(View* view, ViewUpdateCallback callback, void* context);
+
+/** Take a consistent binding and invoke it outside the critical section.
+ *  Stop update producers before freeing their view or callback context.
+ */
+void view_request_update(View* view);
+
 /** IconAnimation tie callback */
 void view_icon_animation_callback(IconAnimation* instance, void* context);
 

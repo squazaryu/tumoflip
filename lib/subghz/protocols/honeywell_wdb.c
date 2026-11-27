@@ -7,7 +7,7 @@
 #include "../blocks/math.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolHoneywellWdb"
+#define TAG SUBGHZ_PROTOCOL_HONEYWELL_WDB_NAME
 
 /*
  * 

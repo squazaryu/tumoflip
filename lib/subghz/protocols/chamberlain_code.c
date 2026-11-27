@@ -7,7 +7,7 @@
 #include "../blocks/math.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolChambCode"
+#define TAG SUBGHZ_PROTOCOL_CHAMB_CODE_NAME
 
 #define CHAMBERLAIN_CODE_BIT_STOP 0b0001
 #define CHAMBERLAIN_CODE_BIT_1    0b0011

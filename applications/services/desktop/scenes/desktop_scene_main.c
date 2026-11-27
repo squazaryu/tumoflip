@@ -10,6 +10,7 @@
 #include <storage/storage.h>
 
 #include "../desktop_i.h"
+#include "../desktop_panel.h"
 #include "../views/desktop_events.h"
 #include "../views/desktop_view_main.h"
 #include "desktop_scene.h"
@@ -127,7 +128,7 @@ static bool
     if(retain) {
         FURI_LOG_I(
             TAG,
-            "Retain shortcut animation for '%s' (%llu bytes, stack %u)",
+            "Retain anim %s (%llu B, stack %u)",
             target,
             (unsigned long long)file_info.size,
             stack_size);
@@ -194,6 +195,7 @@ void desktop_scene_main_on_enter(void* context) {
     desktop_main_set_callback(main_view, desktop_scene_main_callback, desktop);
 
     view_dispatcher_switch_to_view(desktop->view_dispatcher, DesktopViewIdMain);
+    desktop_panel_sync(desktop);
 }
 
 bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
@@ -202,6 +204,12 @@ bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
 
     if(event.type == SceneManagerEventTypeCustom) {
         switch(event.event) {
+        case DesktopPanelEventPrevious:
+        case DesktopPanelEventNext:
+            desktop_panel_sync(desktop);
+            desktop_panel_move(desktop, event.event == DesktopPanelEventPrevious ? -1 : 1);
+            consumed = true;
+            break;
         case DesktopMainEventOpenMenu: {
             desktop->shortcut_animation_retain_pending = false;
             Loader* loader = furi_record_open(RECORD_LOADER);
@@ -242,40 +250,43 @@ bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
 
         case DesktopMainEventOpenFavoriteLeftShort:
             desktop_scene_main_start_favorite(
-                desktop, &desktop->settings.favorite_apps[FavoriteAppLeftShort]);
+                desktop, desktop_panel_favorite(desktop, FavoriteAppLeftShort));
             consumed = true;
             break;
         case DesktopMainEventOpenFavoriteLeftLong:
             desktop_scene_main_start_favorite(
-                desktop, &desktop->settings.favorite_apps[FavoriteAppLeftLong]);
+                desktop, desktop_panel_favorite(desktop, FavoriteAppLeftLong));
             consumed = true;
             break;
         case DesktopMainEventOpenFavoriteRightShort:
             desktop_scene_main_start_favorite(
-                desktop, &desktop->settings.favorite_apps[FavoriteAppRightShort]);
+                desktop, desktop_panel_favorite(desktop, FavoriteAppRightShort));
             consumed = true;
             break;
         case DesktopMainEventOpenFavoriteRightLong:
             desktop_scene_main_start_favorite(
-                desktop, &desktop->settings.favorite_apps[FavoriteAppRightLong]);
+                desktop, desktop_panel_favorite(desktop, FavoriteAppRightLong));
             consumed = true;
             break;
         case DesktopMainEventOpenFavoriteOkLong:
             desktop_scene_main_start_favorite(
-                desktop, &desktop->settings.favorite_apps[FavoriteAppOkLong]);
+                desktop, desktop_panel_favorite(desktop, FavoriteAppOkLong));
             consumed = true;
             break;
 
         case DesktopAnimationEventCheckAnimation:
-            animation_manager_check_blocking_process(desktop->animation_manager);
+            if(!desktop->panel_stalled)
+                animation_manager_check_blocking_process(desktop->animation_manager);
             consumed = true;
             break;
         case DesktopAnimationEventNewIdleAnimation:
-            animation_manager_new_idle_process(desktop->animation_manager);
+            if(!desktop->panel_stalled)
+                animation_manager_new_idle_process(desktop->animation_manager);
             consumed = true;
             break;
         case DesktopAnimationEventInteractAnimation:
-            if(!animation_manager_interact_process(desktop->animation_manager)) {
+            if(!desktop->panel_stalled &&
+               !animation_manager_interact_process(desktop->animation_manager)) {
                 desktop_scene_main_open_app_or_profile(
                     desktop, &desktop->settings.favorite_apps[FavoriteAppRightShort]);
             }
@@ -297,6 +308,7 @@ bool desktop_scene_main_on_event(void* context, SceneManagerEvent event) {
 
 void desktop_scene_main_on_exit(void* context) {
     Desktop* desktop = (Desktop*)context;
+    desktop_panel_pause(desktop);
 
     animation_manager_set_new_idle_callback(desktop->animation_manager, NULL);
     animation_manager_set_check_callback(desktop->animation_manager, NULL);

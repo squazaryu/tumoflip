@@ -417,7 +417,7 @@ static bool elf_relocate(ELFFile* elf, ELFSection* s) {
                     relocate_result = false;
                 }
             } else {
-                FURI_LOG_E(TAG, "  No symbol address of %s", furi_string_get_cstr(symbol_name));
+                FURI_LOG_E(TAG, "  No symbol addr of %s", furi_string_get_cstr(symbol_name));
                 relocate_result = false;
             }
         }
@@ -485,7 +485,7 @@ static ELFLoadSectionResult
         elf->failure_free_heap = memmgr_get_free_heap();
         elf->failure_max_block = memmgr_heap_get_max_free_block();
         furi_kernel_unlock();
-        FURI_LOG_E(TAG, "Not enough memory to load section data");
+        FURI_LOG_E(TAG, "Section data OOM");
         return ELFLoadSectionResultNoMemory;
     }
 
@@ -596,7 +596,7 @@ static SectionTypeInfo elf_preload_section(
             section_p->rel_offset = section_header->sh_offset;
             info.result = ELFLoadSectionResultSuccess;
         } else {
-            FURI_LOG_E(TAG, "Unknown link info section '%s'", name);
+            FURI_LOG_E(TAG, "Unknown link section '%s'", name);
             info.result = ELFLoadSectionResultError;
         }
 
@@ -696,7 +696,7 @@ static bool elf_relocate_fast(ELFFile* elf, ELFSection* s) {
     bool no_errors = true;
 
     if(version != FAST_RELOCATION_VERSION) {
-        FURI_LOG_E(TAG, "Unsupported fast relocation version %d", version);
+        FURI_LOG_E(TAG, "Bad fast-reloc version %d", version);
         return false;
     }
     start += 1;
@@ -745,13 +745,13 @@ static bool elf_relocate_fast(ELFFile* elf, ELFSection* s) {
             if(elf_file_find_string_by_hash(elf, hash_or_section_index, symbol_name)) {
                 FURI_LOG_E(
                     TAG,
-                    "Failed to resolve address for symbol %s (hash %lX)",
+                    "Unresolved %s (hash %lX)",
                     furi_string_get_cstr(symbol_name),
                     hash_or_section_index);
             } else {
                 FURI_LOG_E(
                     TAG,
-                    "Failed to resolve address for hash %lX (string not found)",
+                    "Symbol hash %lX not found",
                     hash_or_section_index);
             }
             furi_string_free(symbol_name);
@@ -836,7 +836,7 @@ bool elf_file_get_memory_failure(
 void elf_file_free(ELFFile* elf) {
     // furi_check(!elf->init_array_called);
     if(elf->init_array_called) {
-        FURI_LOG_W(TAG, "Init array was called, but fini array wasn't");
+        FURI_LOG_W(TAG, "Init called without fini");
         elf_file_call_section_list(elf->fini_array, true);
     }
 
@@ -922,7 +922,7 @@ ElfLoadSectionTableResult elf_file_load_section_table(ELFFile* elf) {
 
         if(section_type_info.result != ELFLoadSectionResultSuccess) {
             if(section_type_info.result == ELFLoadSectionResultNoMemory) {
-                FURI_LOG_E(TAG, "Not enough memory");
+                FURI_LOG_E(TAG, "OOM");
                 result = ElfLoadSectionTableResultNoMemory;
             } else if(section_type_info.result == ELFLoadSectionResultError) {
                 FURI_LOG_E(TAG, "Error loading section");
@@ -997,7 +997,7 @@ ELFFileLoadStatus elf_file_load_sections(ELFFile* elf) {
         ELFSectionDict_itref_t* itref = ELFSectionDict_ref(it);
         FURI_LOG_D(TAG, "Relocating section '%s'", itref->key);
         if(!elf_relocate_section(elf, &itref->value)) {
-            FURI_LOG_E(TAG, "Error relocating section '%s'", itref->key);
+            FURI_LOG_E(TAG, "Relocate '%s' failed", itref->key);
             status = ELFFileLoadStatusMissingImports;
         }
     }
@@ -1025,7 +1025,7 @@ ELFFileLoadStatus elf_file_load_sections(ELFFile* elf) {
             ELFSectionDict_itref_t* itref = ELFSectionDict_ref(it);
             total_size += itref->value.size;
         }
-        FURI_LOG_I(TAG, "Total size of loaded sections: %zu", total_size);
+        FURI_LOG_I(TAG, "Loaded sections: %zu B", total_size);
     }
 
     elf_file_maybe_release_fd(elf);

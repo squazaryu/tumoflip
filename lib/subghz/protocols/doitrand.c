@@ -7,7 +7,7 @@
 #include "../blocks/math.h"
 #include "common.h"
 
-#define TAG "SubGhzProtocolDoitrand"
+#define TAG SUBGHZ_PROTOCOL_DOITRAND_NAME
 
 #define DIP_PATTERN "%c%c%c%c%c%c%c%c%c%c"
 #define CNT_TO_DIP(dip)                                                                     \

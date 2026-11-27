@@ -8,7 +8,7 @@
 #include <toolbox/path.h>
 #include <stdio.h>
 
-#define TAG "SubGhzProtocolPack"
+#define TAG "SubGhzPacks"
 
 struct SubGhzProtocolPackRegistry {
     SubGhzProtocolRegistry registry;
@@ -246,7 +246,7 @@ SubGhzProtocolPackRegistry* subghz_protocol_pack_registry_alloc(
             instance->manager, furi_string_get_cstr(plugin_file));
         report_entry->status = subghz_protocol_pack_status_from_load_status(load_status);
         if(load_status != PluginManagerLoadStatusSuccess) {
-            FURI_LOG_W(TAG, "Failed to load %s", entry->filename);
+            FURI_LOG_W(TAG, "Err: load %s", entry->filename);
             continue;
         }
 

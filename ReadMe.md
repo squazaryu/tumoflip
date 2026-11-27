@@ -195,7 +195,7 @@ rollback rules, checksums, and catalog baseline policy.
 | Channel | Identity | Intended use | Where to get it |
 | --- | --- | --- | --- |
 | **Stable** | `t-flppr-fw-010` | Daily use and repeatable installations | [Latest release](https://github.com/squazaryu/tumoflip/releases/latest) |
-| **Dev** | `t-dev-011-006` | Candidate based on 004: receive fixes and file-transfer cleanup | [Candidate status](documentation/Dev011006.md) |
+| **Dev** | `t-dev-011-007` | Candidate based on 004: receive fixes and file-transfer cleanup | [Candidate status](documentation/Dev011006.md) |
 
 Dev 011-006 is being prepared, not published. Dev 011-005 was rejected after
 boot loops and is not its source baseline. Keep using the working 011-004
@@ -267,7 +267,7 @@ Download the update package from the
 the normal qFlipper or Flipper SD-card update flow. The selected build artifact is:
 
 ```text
-flipper-z-f7-update-t-dev-011-006.tgz
+flipper-z-f7-update-t-dev-011-007.tgz
 ```
 
 ## Compatibility notes

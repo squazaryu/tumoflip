@@ -5,7 +5,7 @@
 #include <saved_struct.h>
 #include <storage/storage.h>
 
-#define TAG "InputSettings"
+#define TAG "InputCfg"
 
 #define INPUT_SETTINGS_VER (2) // version number
 
@@ -52,7 +52,7 @@ void input_settings_load(InputSettings* settings) {
 
     // fill settings with 0 and save to settings file;
     if(!success) {
-        FURI_LOG_W(TAG, "Failed to load file, using defaults");
+        FURI_LOG_W(TAG, "Load failed; defaults used");
         memset(settings, 0, sizeof(InputSettings));
         settings->vibro_touch_trigger_mask = INPUT_SETTINGS_VIBRO_TOUCH_TRIGGER_MASK_DEFAULT;
         //input_settings_save(settings);
@@ -70,6 +70,6 @@ void input_settings_save(const InputSettings* settings) {
         INPUT_SETTINGS_VER);
 
     if(!success) {
-        FURI_LOG_E(TAG, "Failed to save file");
+        FURI_LOG_E(TAG, "Err: save file");
     }
 }

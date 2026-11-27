@@ -5,7 +5,7 @@
 
 #include "mf_desfire_i.h"
 
-#define TAG "MfDesfirePoller"
+#define TAG "DF.Poll"
 
 MfDesfireError mf_desfire_process_error(Iso14443_4aError error) {
     switch(error) {
@@ -199,7 +199,7 @@ MfDesfireError mf_desfire_poller_read_key_versions(
     if(count > 0) {
         simple_array_init(data, count);
     } else {
-        FURI_LOG_W(TAG, "Application reports zero keys, key versions skipped");
+        FURI_LOG_W(TAG, "App reports zero keys, key versions skipped");
     }
 
     MfDesfireError error = MfDesfireErrorNone;
@@ -615,20 +615,20 @@ MfDesfireError
         error = mf_desfire_poller_read_key_versions(
             instance, data->key_versions, data->key_settings.max_keys);
         if(error != MfDesfireErrorNone) {
-            FURI_LOG_E(TAG, "Failed to read key version: %d", error);
+            FURI_LOG_E(TAG, "Err: read key version: %d", error);
             break;
         }
 
         error = mf_desfire_poller_read_file_ids(instance, data->file_ids);
         if(error != MfDesfireErrorNone) {
-            FURI_LOG_E(TAG, "Failed to read file ids: %d", error);
+            FURI_LOG_E(TAG, "Err: read file ids: %d", error);
             break;
         }
 
         error = mf_desfire_poller_read_file_settings_multi(
             instance, data->file_ids, data->file_settings);
         if(error != MfDesfireErrorNone) {
-            FURI_LOG_E(TAG, "Failed to read file settings: %d", error);
+            FURI_LOG_E(TAG, "Err: read file settings: %d", error);
             break;
         }
 
