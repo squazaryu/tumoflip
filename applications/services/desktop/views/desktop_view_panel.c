@@ -53,7 +53,7 @@ static void desktop_panel_draw_page(Canvas* canvas, const DesktopPanelModel* mod
             &I_SDcardMounted_11x8,
             "SD",
             status->sd_state == 2 ? "Ready" :
-            status->sd_state == 1 ? "None" :
+            status->sd_state == 1 ? "Not ready" :
                                     "?");
         /* Active means radio enabled, not a verified phone/RPC connection. */
         desktop_panel_badge(canvas, 64, &I_Bluetooth_Idle_5x8, "BT", status->bt_on ? "On" : "Off");

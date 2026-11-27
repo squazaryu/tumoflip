@@ -26,7 +26,7 @@ typedef struct {
     uint16_t heap_kb;
     uint16_t sleep_holds;
     uint16_t auto_lock_s;
-    uint8_t sd_state; /* 0 unknown/error, 1 absent, 2 ready. */
+    uint8_t sd_state; /* 0 unknown/error, 1 unmounted, 2 ready. */
     bool bt_on;
     bool fault_valid;
     uint32_t fault_commit;
