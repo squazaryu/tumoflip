@@ -329,7 +329,7 @@ static bool subghz_protocol_keeloq_gen_data(
     // end gendata part
     // override button if we change it with signal settings button editor
     if(subghz_block_generic_global_button_override_get(&btn)) {
-        FURI_LOG_D(TAG, "Button sucessfully changed to 0x%X", btn);
+        FURI_LOG_D(TAG, "Button changed to 0x%X", btn);
     }
 
     uint32_t fix = 0;
@@ -1659,7 +1659,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(
         }
         if((res == SubGhzProtocolStatusOk) &&
            !flipper_format_write_hex(flipper_format, "Seed", seed_data, sizeof(uint32_t))) {
-            FURI_LOG_E(TAG, "DECODER Serialize: Unable to add Seed");
+            FURI_LOG_E(TAG, "Seed write failed");
             res = SubGhzProtocolStatusError;
         }
         instance->generic.seed = seed_data[0] << 24 | seed_data[1] << 16 | seed_data[2] << 8 |
@@ -1669,7 +1669,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(
     if((res == SubGhzProtocolStatusOk) &&
        !flipper_format_write_string_cstr(
            flipper_format, "Manufacture", instance->manufacture_name)) {
-        FURI_LOG_E(TAG, "DECODER Serialize: Unable to add manufacture name");
+        FURI_LOG_E(TAG, "Manufacture write failed");
         res = SubGhzProtocolStatusError;
     }
     // Legacy 400us captures keep their existing layout. Only a fast capture
