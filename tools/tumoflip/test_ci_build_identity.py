@@ -1,9 +1,12 @@
 """Pre-tag Stable CI must use the same identity as the release, not a short SHA."""
 import importlib
+from contextlib import redirect_stderr, redirect_stdout
+import io
 from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SHA = "0123456789abcdef0123456789abcdef01234567"
@@ -61,6 +64,22 @@ class CiBuildIdentityTests(unittest.TestCase):
         self.assertIn("DIST_SUFFIX: ${{ steps.vars.outputs.firmware_dist }}", build)
         self.assertIn("WORKFLOW_BRANCH_OR_TAG: ${{ steps.vars.outputs.workflow_ref }}", build)
         self.assertNotIn("DIST_SUFFIX: ${{ steps.vars.outputs.sha8 }}", build)
+
+    def test_main_reads_options_and_rejects_bad_inputs_without_output(self):
+        module = importlib.import_module("tools.tumoflip.ci_build_identity")
+        arguments = ["identity", "--sha", SHA, "--ref", "main"]
+        out, err = io.StringIO(), io.StringIO()
+        with patch.object(sys, "argv", arguments), patch.object(module, "read_dist_suffix", return_value="t-flppr-fw-011"):
+            with redirect_stdout(out), redirect_stderr(err):
+                self.assertEqual(module.main(), 0)
+        self.assertEqual(out.getvalue(), "firmware_dist=t-flppr-fw-011\nworkflow_ref=v1.0.11\n")
+        self.assertEqual(err.getvalue(), "")
+        out, err = io.StringIO(), io.StringIO()
+        with patch.object(sys, "argv", arguments + ["--version", "bad"]):
+            with redirect_stdout(out), redirect_stderr(err):
+                self.assertEqual(module.main(), 2)
+        self.assertEqual(out.getvalue(), "")
+        self.assertIn("error:", err.getvalue())
 
 
 if __name__ == "__main__":
