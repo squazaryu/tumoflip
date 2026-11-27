@@ -256,9 +256,9 @@ static bool desktop_quick_settings_input_callback(InputEvent* event, void* conte
                                                      DesktopQuickSettingsEventVolumeChanged;
                     }
                 } else if(event->type == InputTypeShort) {
+                    // Sideways off the settings page goes back to the first menu page.
                     notify = true;
-                    desktop_event = forward ? DesktopQuickSettingsEventActivity :
-                                              DesktopQuickSettingsEventClose;
+                    desktop_event = DesktopQuickSettingsEventClose;
                 }
                 consumed = true;
             }

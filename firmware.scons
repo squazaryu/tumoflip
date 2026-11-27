@@ -8,13 +8,6 @@ from SCons.Node import FS
 
 Import("ENV", "fw_build_meta")
 
-
-def configure_resident_library_lto(env):
-    # Libraries are built before firmwareopts.scons. Fat objects let the core
-    # optimize across them while retaining native code for non-LTO FAP links.
-    if env["IS_BASE_FIRMWARE"] and env["LTO"]:
-        env.AppendUnique(CCFLAGS=["-flto", "-ffat-lto-objects"])
-
 # Building initial C environment for libs
 env = ENV.Clone(
     tools=[
@@ -108,7 +101,6 @@ else:
 env.AppendUnique(CPPDEFINES=["FW_CFG_${FIRMWARE_APP_SET}"])
 
 env.ConfigureForTarget(env.subst("${TARGET_HW}"))
-configure_resident_library_lto(env)
 
 Export("env")
 

@@ -39,7 +39,10 @@ static inline uint16_t subghz_protocol_keeloq_dea_mio_disc(uint32_t serial, uint
 
 // Some HCS encoders use TE 200us instead of 400us. Select the rate from
 // preamble + sync, without changing the frame format or counter semantics.
-#define KEELOQ_TE_FAST_GAP_DELTA 450u
+// Leave a dead zone between the two sync bands: unrelated ~250us frames must
+// not lock onto either rate merely because their bit count also matches.
+#define KEELOQ_TE_FAST_GAP_DELTA 350u
+#define KEELOQ_TE_STD_GAP_MIN    3000u
 
 // This adaptation adds recognition only. Keep the existing Monarch variant's
 // behavior, but reject newly recognized variants before any TX/counter mutation.
@@ -326,7 +329,7 @@ static bool subghz_protocol_keeloq_gen_data(
     // end gendata part
     // override button if we change it with signal settings button editor
     if(subghz_block_generic_global_button_override_get(&btn)) {
-        FURI_LOG_D(TAG, "Button sucessfully changed to 0x%X", btn);
+        FURI_LOG_D(TAG, "Button changed to 0x%X", btn);
     }
 
     uint32_t fix = 0;
@@ -871,7 +874,7 @@ SubGhzProtocolStatus
 
         if(subghz_protocol_keeloq_receive_only(
                instance->manufacture_name, instance->generic.seed)) {
-            FURI_LOG_W(TAG, "This variant supports receive/inspection only");
+            FURI_LOG_W(TAG, "RX only");
             ret = SubGhzProtocolStatusErrorEncoderGetUpload;
             break;
         }
@@ -949,8 +952,6 @@ void subghz_protocol_decoder_keeloq_reset(void* context) {
 void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t duration) {
     furi_assert(context);
     SubGhzProtocolDecoderKeeloq* instance = context;
-    const uint32_t te = instance->te;
-    const uint32_t te_delta = subghz_protocol_keeloq_te_delta(te);
 
     switch(instance->decoder.parser_step) {
     case KeeloqDecoderStepReset:
@@ -967,15 +968,17 @@ void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t dur
         }
         if(!level && instance->header_count > 2) {
             uint32_t locked_te = 0;
-            // The sync bands overlap. A standard 400us preamble must not be
-            // stolen by the fast path when its sync gap is near 2200..2450us.
+            // A fast sync also needs a fast preamble; the standard rate has a
+            // separate sync band, with the ambiguous interval left unused.
             if(instance->decoder.te_last <
                    (KEELOQ_TE_FAST + subghz_protocol_keeloq_const.te_short) / 2 &&
                DURATION_DIFF(duration, KEELOQ_TE_FAST * 10) < KEELOQ_TE_FAST_GAP_DELTA) {
                 locked_te = duration / 10;
             } else if(
-                DURATION_DIFF(duration, subghz_protocol_keeloq_const.te_short * 10) <
-                subghz_protocol_keeloq_const.te_delta * 10) {
+                duration >= KEELOQ_TE_STD_GAP_MIN &&
+                duration < (subghz_protocol_keeloq_const.te_short +
+                            subghz_protocol_keeloq_const.te_delta) *
+                               10) {
                 locked_te = subghz_protocol_keeloq_const.te_short;
             }
             if(locked_te) {
@@ -997,6 +1000,11 @@ void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t dur
         break;
     case KeeloqDecoderStepCheckDuration:
         if(!level) {
+            const uint32_t te = instance->te;
+            const uint32_t te_delta = subghz_protocol_keeloq_te_delta(te);
+            const uint32_t period_delta = te == subghz_protocol_keeloq_const.te_short ?
+                                              te_delta * 2 :
+                                              te_delta * 3 / 2;
             if(duration >= te * 2 + te_delta) {
                 // Found end TX
                 instance->decoder.parser_step = KeeloqDecoderStepReset;
@@ -1023,7 +1031,8 @@ void subghz_protocol_decoder_keeloq_feed(void* context, bool level, uint32_t dur
             if(instance->decoder.decode_count_bit <
                    subghz_protocol_keeloq_const.min_count_bit_for_found + 2 &&
                (bit || (DURATION_DIFF(instance->decoder.te_last, te * 2) < te_delta * 2 &&
-                        DURATION_DIFF(duration, te) < te_delta))) {
+                        DURATION_DIFF(duration, te) < te_delta)) &&
+               DURATION_DIFF(instance->decoder.te_last + duration, te * 3) < period_delta) {
                 if(instance->decoder.decode_count_bit <
                    subghz_protocol_keeloq_const.min_count_bit_for_found) {
                     subghz_protocol_blocks_add_bit(&instance->decoder, bit);
@@ -1650,7 +1659,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(
         }
         if((res == SubGhzProtocolStatusOk) &&
            !flipper_format_write_hex(flipper_format, "Seed", seed_data, sizeof(uint32_t))) {
-            FURI_LOG_E(TAG, "DECODER Serialize: Unable to add Seed");
+            FURI_LOG_E(TAG, "Seed save error");
             res = SubGhzProtocolStatusError;
         }
         instance->generic.seed = seed_data[0] << 24 | seed_data[1] << 16 | seed_data[2] << 8 |
@@ -1660,7 +1669,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_keeloq_serialize(
     if((res == SubGhzProtocolStatusOk) &&
        !flipper_format_write_string_cstr(
            flipper_format, "Manufacture", instance->manufacture_name)) {
-        FURI_LOG_E(TAG, "DECODER Serialize: Unable to add manufacture name");
+        FURI_LOG_E(TAG, "Mfg save error");
         res = SubGhzProtocolStatusError;
     }
     // Legacy 400us captures keep their existing layout. Only a fast capture

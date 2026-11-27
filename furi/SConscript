@@ -1,19 +1,5 @@
 Import("env")
 
-
-def configure_crash_capture_native(env):
-    # check.c captures registers using hand-written literal loads. Keep its
-    # existing machine-code boundary; never merge/clone it into LTO partitions.
-    env.Replace(CCFLAGS=[flag for flag in env["CCFLAGS"]
-                        if flag not in ("-flto", "-ffat-lto-objects")])
-    env.AppendUnique(CCFLAGS=["-fno-lto"])
-
-
-def native_core_abi_source(name):
-    # The allocator's __wrap__*_r entry points are also reached late by newlib,
-    # not through the optimizer's C call graph. Preserve that native boundary.
-    return name in ("check.c", "memmgr.c")
-
 env.Append(
     LINT_SOURCES=[
         Dir("."),
@@ -25,10 +11,6 @@ libenv = env.Clone(FW_LIB_NAME="furi")
 libenv.ApplyLibFlags()
 
 sources = libenv.GlobRecursive("*.c")
-if libenv["LTO"] and libenv["IS_BASE_FIRMWARE"]:
-    native = libenv.Clone()
-    configure_crash_capture_native(native)
-    sources = [native.Object(source) if native_core_abi_source(source.name) else source for source in sources]
 
 lib = libenv.StaticLibrary("${FW_LIB_NAME}", sources)
 libenv.Install("${LIB_DIST_DIR}", lib)

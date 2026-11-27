@@ -12,37 +12,6 @@ static void submenu_add_item(Submenu*m,const char*l,uint32_t id,void(*cb)(void*,
 
 
 class FieldMenuTests(unittest.TestCase):
-    def test_all_pages_keep_their_existing_actions_and_empty_states(self):
-        storage_native(r'''
-int main(void){
- Submenu menu;FieldRound round={.started=1,.count=1,.items={{.object="Office"}}};
- DeviceCard card={.name="Office"};char names[32][32];
- for(unsigned i=0;i<32;i++)snprintf(names[i],32,"Object %02u",i+1);
- FieldMenuState state={.page=FieldPageNewConfirm,.round=&round,.card=&card,
-                      .names=(const char(*)[32])names};
- field_menu_build(&menu,&state,NULL,NULL);assert(menu.count==3);
- assert(menu.actions[1]==FieldConfirmNew);
- state.page=FieldPageBundle;field_menu_build(&menu,&state,NULL,NULL);
- assert(menu.count==3&&!strcmp(menu.rows[0],"Office")&&menu.actions[1]==FieldImport);
- state.card=NULL;field_menu_build(&menu,&state,NULL,NULL);assert(menu.count==2);
- state.page=FieldPageCards;field_menu_build(&menu,&state,NULL,NULL);
- assert(menu.count==1&&!strcmp(menu.rows[0],"No objects"));
- state.count=32;state.more=true;state.offset=32;
- field_menu_build(&menu,&state,NULL,NULL);assert(menu.count==34);
- assert(menu.actions[0]==FieldCardBase&&menu.actions[31]==FieldCardBase+31);
- assert(menu.actions[32]==FieldPreviousCards&&menu.actions[33]==FieldNextCards);
- state.count=33;state.more=false;state.offset=0;
- field_menu_build(&menu,&state,NULL,NULL);assert(menu.count==0);
- state.page=FieldPageItem;state.selected=1;
- field_menu_build(&menu,&state,NULL,NULL);assert(menu.count==1);
- assert(!strcmp(menu.rows[0],"No selected object")&&!field_menu_allows(&state,FieldNote));
- state.selected=0;field_menu_build(&menu,&state,NULL,NULL);assert(menu.count==7);
- state.page=FieldPageBusy;field_menu_build(&menu,&state,NULL,NULL);assert(menu.count==2);
- state.page=FieldPageMessage;field_menu_build(&menu,&state,NULL,NULL);assert(menu.count==0);
- assert(!field_menu_allows(NULL,FieldStartRound)&&!field_menu_allows(&state,0));
- return 0;}
-''', SOURCES, PRELUDE)
-
     def test_menu_is_native_and_actions_are_bound_to_current_page(self):
         storage_native(r'''
 int main(void){
@@ -52,8 +21,7 @@ int main(void){
  assert(field_menu_allows(&state,FieldStartRound));assert(!field_menu_allows(&state,FieldPass));
  state.page=FieldPageRound;field_menu_build(&menu,&state,NULL,NULL);
  assert(field_menu_allows(&state,FieldRoundBase));assert(!field_menu_allows(&state,FieldRoundBase+1));
- assert(!field_menu_allows(&state,FieldImport));assert(menu.actions[0]==FieldNextPending);
- assert(strstr(menu.rows[1],"PENDING"));
+ assert(!field_menu_allows(&state,FieldImport));assert(strstr(menu.rows[0],"PENDING"));
  state.page=FieldPageItem;state.selected=0;field_menu_build(&menu,&state,NULL,NULL);
  assert(field_menu_allows(&state,FieldPass)&&field_menu_allows(&state,FieldProblem)&&field_menu_allows(&state,FieldSkip));
  state.selected=1;assert(!field_menu_allows(&state,FieldPass));

@@ -524,9 +524,9 @@ def validate_boot_vectors(repo_root: Path, elf_path: Path) -> None:
     objdump = find_objdump(repo_root)
     lines = subprocess.check_output([str(objdump), "-h", str(elf_path)], text=True).splitlines()
     sections = {}
-    for i, line in enumerate(lines[:-1]):
+    for index, line in enumerate(lines[:-1]):
         match = re.match(r"^\s*\d+\s+(\.\S+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)", line)
-        if match and "LOAD" in lines[i + 1]:
+        if match and "LOAD" in lines[index + 1]:
             sections[match[1]] = (int(match[2], 16), int(match[3], 16))
     vector_size, vector_start = sections.get(".isr_vector", (0, 0))
     code_size, code_start = sections.get(".text", (0, 0))
@@ -535,8 +535,11 @@ def validate_boot_vectors(repo_root: Path, elf_path: Path) -> None:
     objcopy = objdump.with_name(objdump.name.replace("objdump", "objcopy"))
     with tempfile.TemporaryDirectory(prefix="boot-vectors-") as directory:
         vector_file = Path(directory) / "vectors.bin"
-        subprocess.run([str(objcopy), "-O", "binary", "--only-section=.isr_vector",
-                        str(elf_path), str(vector_file)], check=True, capture_output=True)
+        subprocess.run(
+            [str(objcopy), "-O", "binary", "--only-section=.isr_vector", str(elf_path), str(vector_file)],
+            check=True,
+            capture_output=True,
+        )
         validate_c1_vector_data(vector_file.read_bytes(), code_start, code_start + code_size)
 
 

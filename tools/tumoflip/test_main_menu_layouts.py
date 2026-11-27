@@ -793,7 +793,6 @@ class RuntimeNavigationAndQuickSettingsTest(unittest.TestCase):
                 DesktopQuickSettingsEventVibroChanged,
                 DesktopQuickSettingsEventSave,
                 DesktopQuickSettingsEventClose,
-                DesktopQuickSettingsEventActivity,
             }} DesktopEvent;
 
             {index_enum.group(0)}
@@ -943,12 +942,6 @@ class RuntimeNavigationAndQuickSettingsTest(unittest.TestCase):
                 assert(fixture.view.model.volume == DESKTOP_QUICK_SETTINGS_LEVELS - 1U);
                 assert(fixture.view.update_count == updates_at_limit);
                 assert(fixture.callback_count == callbacks_at_limit);
-
-                fixture.view.model.editing = false;
-                assert(send(&fixture, InputKeyRight, InputTypeShort));
-                assert(fixture.last_event == DesktopQuickSettingsEventActivity);
-                assert(send(&fixture, InputKeyLeft, InputTypeShort));
-                assert(fixture.last_event == DesktopQuickSettingsEventClose);
 
                 return 0;
             }}

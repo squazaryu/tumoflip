@@ -1,17 +1,5 @@
 Import("env")
 
-
-def configure_startup_native(env):
-    # The linker KEEP directive cannot retain a vector array removed by the
-    # compiler. Preserve the original startup/IRQ-table translation unit.
-    env.Replace(CCFLAGS=[flag for flag in env["CCFLAGS"]
-                        if flag not in ("-flto", "-ffat-lto-objects")])
-    env.AppendUnique(CCFLAGS=["-fno-lto"])
-
-
-def native_startup_source(path):
-    return str(path).replace("\\", "/").split("/")[-1] == "stm32wb55_startup.c"
-
 env.Append(
     LINT_SOURCES=[Dir(".")],
 )
@@ -25,15 +13,9 @@ libenv.Append(
 libenv.ApplyLibFlags()
 
 
-sources = env.get("TARGET_CFG").gatherSources()
-if libenv["LTO"] and libenv["IS_BASE_FIRMWARE"]:
-    native = libenv.Clone()
-    configure_startup_native(native)
-    sources = [native.Object(source) if native_startup_source(source) else source for source in sources]
-
 lib = libenv.StaticLibrary(
     "${FW_LIB_NAME}",
-    sources,
+    env.get("TARGET_CFG").gatherSources(),
 )
 libenv.Install("${LIB_DIST_DIR}", lib)
 Return("lib")

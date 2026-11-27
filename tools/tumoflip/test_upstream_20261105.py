@@ -187,7 +187,7 @@ int main(void){
             source, "void subghz_protocol_decoder_keeloq_reset(") + "\n" + function(
             source, "void subghz_protocol_decoder_keeloq_feed(") + KEELOQ_FRAMES + r'''
 int main(void){
-    const uint32_t rates[]={400,200,156,175,220,244};
+    const uint32_t rates[]={400,200,166,175,220,234};
     const uint64_t data[]={0x0123456789abcdefULL,0x8000000000000001ULL,UINT64_MAX};
     SubGhzKeystore store={0};
     SubGhzProtocolDecoderKeeloq d={.base={.callback=capture},.keystore=&store};
@@ -200,12 +200,12 @@ int main(void){
         subghz_protocol_decoder_keeloq_reset(&d);received=0;expected=data[0];
         frame(&d,expected,200,bits);assert(received==(unsigned)(bits>=64 && bits<=66));
     }
-    // Retain the legacy standard sync tolerance, including the overlap with fast TE.
-    for(unsigned gap=2201;gap<5800;gap+=17){
+    // Keep the standard band, without accepting the ambiguous fast/standard dead zone.
+    for(unsigned gap=3000;gap<5800;gap+=17){
         subghz_protocol_decoder_keeloq_reset(&d);received=0;expected=data[0];
         frame_with_gap(&d,expected,400,64,gap);assert(received==1);
     }
-    const unsigned invalid_gaps[]={0,1000,1550,2200,5800,UINT32_MAX};
+    const unsigned invalid_gaps[]={0,1000,1550,2200,2500,2999,5800,UINT32_MAX};
     for(unsigned i=0;i<COUNT_OF(invalid_gaps);i++){
         subghz_protocol_decoder_keeloq_reset(&d);received=0;
         frame_with_gap(&d,expected,400,64,invalid_gaps[i]);assert(received==0);

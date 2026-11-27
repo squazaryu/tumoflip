@@ -40,7 +40,6 @@ typedef enum {
     DesktopQuickSettingsEventVibroChanged,
     DesktopQuickSettingsEventSave,
     DesktopQuickSettingsEventClose,
-    DesktopQuickSettingsEventActivity,
 
     DesktopAnimationEventCheckAnimation,
     DesktopAnimationEventNewIdleAnimation,
@@ -60,5 +59,4 @@ typedef enum {
     DesktopGlobalApiUnlock,
     DesktopGlobalSaveSettings,
     DesktopGlobalReloadSettings,
-    DesktopActivityEventBase = 256,
 } DesktopEvent;

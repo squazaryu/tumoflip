@@ -12,7 +12,6 @@
 #include <assets_icons.h>
 
 #include <desktop/desktop_settings.h>
-#include "../../services/desktop/desktop_panel_i.h"
 #include <desktop/views/desktop_view_pin_input.h>
 #include "views/desktop_settings_view_pin_setup_howto.h"
 #include "views/desktop_settings_view_pin_setup_howto2.h"
@@ -32,10 +31,6 @@ typedef enum {
 
 typedef struct {
     DesktopSettings settings;
-    DesktopPanelSettings panel;
-    DesktopMode shortcut_profile;
-    bool panel_dirty;
-    bool supports_panel;
 
     Gui* gui;
     DialogsApp* dialogs;
@@ -59,8 +54,3 @@ typedef struct {
     uint8_t menu_idx;
     uint32_t pin_menu_idx;
 } DesktopSettingsApp;
-
-#define DESKTOP_PANEL_REFRESH 1000
-FavoriteApp* desktop_settings_favorite(DesktopSettingsApp* app, FavoriteAppShortcut shortcut);
-bool desktop_settings_store_panel(DesktopSettingsApp* app);
-uint32_t desktop_settings_entry_for_index(DesktopSettingsApp* app, uint32_t index);

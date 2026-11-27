@@ -1,5 +1,4 @@
 #include <tumoflip_crash_journal/crash_journal.h>
-#include "system_policy_i.h"
 
 /* Keep the fatal-path serializer shared, including across LTO call sites. */
 #if defined(__GNUC__) && !defined(__clang__)
@@ -80,33 +79,7 @@ void tumoflip_crash_journal_clear_active_app(void) {
 
 static inline uint32_t
     tumoflip_crash_journal_checksum(uint32_t meta, uint32_t commit, const uint32_t app[3]) {
-    /* Previously zero bits hold an independent, redundant crash-loop byte. */
-    meta &= ~0x00FF0000UL;
     return TUMOFLIP_CRASH_JOURNAL_MAGIC ^ 0xA56C3D19UL ^ meta ^ commit ^ app[0] ^ app[1] ^ app[2];
-}
-
-static uint32_t tumoflip_crash_streak_word(uint8_t streak) {
-    return (uint32_t)(0xA0U | streak | ((streak ^ 3U) << 2U)) << 16U;
-}
-
-uint8_t tumoflip_crash_journal_boot_streak(void) {
-    const uint32_t meta = furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipCrashMeta);
-    const uint8_t byte = meta >> 16U;
-    const uint8_t streak = byte & 3U;
-    return byte == (uint8_t)(0xA0U | streak | ((streak ^ 3U) << 2U)) &&
-                   (meta >> 24U) > TumoflipCrashKindNone &&
-                   (meta >> 24U) <= TumoflipCrashKindOutOfMemory && (uint16_t)meta ?
-               streak :
-               0U;
-}
-
-void tumoflip_crash_journal_clear_boot_streak(void) {
-    if(!tumoflip_crash_journal_boot_streak()) return;
-    uint32_t meta = furi_hal_rtc_get_register(FuriHalRtcRegisterTumoflipCrashMeta);
-    /* A single RTC word write; the last-crash checksum and payload stay valid. */
-    furi_hal_rtc_set_register(
-        FuriHalRtcRegisterTumoflipCrashMeta,
-        (meta & ~0x00FF0000UL) | tumoflip_crash_streak_word(0));
 }
 
 static inline uint32_t tumoflip_crash_checksum(const uint32_t data[10], bool extended) {
@@ -162,14 +135,12 @@ static CRASH_NOINLINE void tumoflip_crash_journal_record_full(
     const char* git_hash,
     const TumoflipOOMContext* context) {
     if(kind == TumoflipCrashKindNone || kind > TumoflipCrashKindOutOfMemory) return;
-    const uint8_t streak = tumoflip_crash_journal_boot_streak();
     uint32_t data[10] = {0};
     bool previous_extended;
     uint16_t sequence =
         tumoflip_crash_journal_read_base(data, &previous_extended) ? (uint16_t)(data[0] + 1U) : 1U;
     memset(data, 0, sizeof(data));
-    data[0] = ((uint32_t)kind << 24U) | (sequence ? sequence : 1U) |
-              tumoflip_crash_streak_word(streak < 3U ? streak + 1U : 3U);
+    data[0] = ((uint32_t)kind << 24U) | (sequence ? sequence : 1U);
     data[1] = tumoflip_crash_journal_commit(git_hash);
     if(data[1] && tumoflip_crash_active.commit == data[1])
         memcpy(&data[2], tumoflip_crash_active.words, 3U * sizeof(uint32_t));

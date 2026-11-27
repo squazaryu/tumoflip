@@ -1,5 +1,4 @@
 #include "desktop_i.h"
-#include "desktop_panel_io_i.h"
 
 #include <cli/cli_vcp.h>
 
@@ -16,62 +15,11 @@
 #include "furi_hal_power.h"
 
 #define TAG "Desktop"
-static uint8_t desktop_panel_capability = 1;
 
 static void desktop_auto_lock_arm(Desktop*);
 static void desktop_auto_lock_inhibit(Desktop*);
 static void desktop_start_auto_lock_timer(Desktop*);
 static void desktop_apply_settings(Desktop*);
-static void desktop_tick_event_callback(void* context);
-
-FavoriteApp* desktop_favorite(Desktop* desktop, FavoriteAppShortcut shortcut) {
-    if((unsigned)shortcut >= FavoriteAppNumber) return NULL;
-    return desktop->panel.mode == DesktopModeDashboard ?
-               desktop_panel_held(&desktop->panel, shortcut) :
-               &desktop->settings.favorite_apps[shortcut];
-}
-
-static void desktop_dashboard_mount(Desktop* desktop) {
-    bool dashboard = desktop->panel.mode == DesktopModeDashboard;
-    if(dashboard != desktop->dashboard_mounted) {
-        View* wallpaper = animation_manager_get_animation_view(desktop->animation_manager);
-        View* panel = desktop_activity_get_view(desktop->dashboard);
-        animation_manager_set_quiet(desktop->animation_manager, true);
-        view_stack_remove_view(desktop->main_view_stack, dashboard ? wallpaper : panel);
-        view_stack_add_view(desktop->main_view_stack, dashboard ? panel : wallpaper);
-        desktop->dashboard_mounted = dashboard;
-    }
-}
-
-static void desktop_reload_panel(Desktop* desktop) {
-    desktop_panel_load(&desktop->panel);
-    desktop_policy_changed(desktop);
-}
-
-static void desktop_dashboard_callback(DesktopActivityAction action, void* context) {
-    if(action == DesktopActivityHomeChanged) desktop_policy_changed(context);
-}
-
-static void
-    desktop_dashboard_refresh(Desktop* desktop, const TumoSystemState* state, uint32_t scene) {
-    const bool main = scene == DesktopSceneMain && !desktop->locked && !desktop->app_running;
-    /* Only swap the shared wallpaper view when Main actually owns its callbacks. */
-    if(main) desktop_dashboard_mount(desktop);
-    bool alive = main && desktop->panel.mode == DesktopModeDashboard;
-    if(alive) desktop_activity_update(desktop->dashboard, state, furi_hal_power_insomnia_level());
-    uint32_t period = desktop_activity_home_tick(
-        desktop->dashboard,
-        furi_get_tick(),
-        alive,
-        desktop->panel.motion && state->display_on && !state->recovery);
-    if(period != desktop->dashboard_period) {
-        if(period)
-            furi_timer_start(desktop->dashboard_timer, furi_ms_to_ticks(period));
-        else
-            furi_timer_stop(desktop->dashboard_timer);
-        desktop->dashboard_period = period;
-    }
-}
 
 static void desktop_loader_callback(const void* message, void* context) {
     furi_assert(context);
@@ -79,11 +27,9 @@ static void desktop_loader_callback(const void* message, void* context) {
     const LoaderEvent* event = message;
 
     if(event->type == LoaderEventTypeApplicationBeforeLoad) {
-        furi_system_policy_application(true);
         view_dispatcher_send_custom_event(desktop->view_dispatcher, DesktopGlobalBeforeAppStarted);
         furi_check(furi_semaphore_acquire(desktop->animation_semaphore, 3000) == FuriStatusOk);
     } else if(event->type == LoaderEventTypeNoMoreAppsInQueue) {
-        furi_system_policy_application(false);
         view_dispatcher_send_custom_event(desktop->view_dispatcher, DesktopGlobalAfterAppFinished);
     }
 }
@@ -125,52 +71,13 @@ static void desktop_clock_reconfigure(Desktop* desktop) {
 
     desktop_clock_update(desktop);
 
-    if(desktop->settings.display_clock && !desktop->quiet) {
+    if(desktop->settings.display_clock) {
         furi_timer_start(desktop->update_clock_timer, furi_ms_to_ticks(1000));
     } else {
         furi_timer_stop(desktop->update_clock_timer);
     }
 
     view_port_enabled_set(desktop->clock_viewport, desktop->settings.display_clock);
-}
-
-static void desktop_update_policy(Desktop* desktop) {
-    TumoSystemState state = furi_system_policy_snapshot();
-    const bool quiet = tumo_system_model_quiet(&state);
-    if(desktop->quiet != quiet) {
-        desktop->quiet = quiet;
-        desktop_clock_reconfigure(desktop);
-    }
-    animation_manager_set_quiet(
-        desktop->animation_manager,
-        quiet || desktop->panel.mode == DesktopModeDashboard || desktop->app_running);
-    const uint32_t scene = scene_manager_get_current_scene(desktop->scene_manager);
-    desktop_dashboard_refresh(desktop, &state, scene);
-    const bool slow = quiet && (scene == DesktopSceneMain || scene == DesktopSceneLocked);
-    /* This is Desktop's owned loop; changing the dispatcher default alone would
-     * not reconfigure an already-running tick source. */
-    furi_event_loop_tick_set(
-        view_dispatcher_get_event_loop(desktop->view_dispatcher),
-        slow ? 5000 : 500,
-        desktop_tick_event_callback,
-        desktop);
-    if(scene == DesktopSceneActivity)
-        desktop_activity_update(desktop->activity, &state, furi_hal_power_insomnia_level());
-    if(desktop->recovery_notice_pending && !desktop->locked && !desktop->app_running &&
-       scene == DesktopSceneMain)
-        scene_manager_next_scene(desktop->scene_manager, DesktopSceneActivity);
-}
-
-void desktop_policy_changed(void* context) {
-    Desktop* desktop = context;
-    const uint8_t changed = 1;
-    /* Producers may be Storage/Notification. Never block them on Desktop. */
-    furi_message_queue_put(desktop->policy_events, &changed, 0);
-}
-
-static void desktop_policy_event(FuriEventLoopObject* object, void* context) {
-    uint8_t changed;
-    if(furi_message_queue_get(object, &changed, 0) == FuriStatusOk) desktop_update_policy(context);
 }
 
 static void desktop_clock_draw_callback(Canvas* canvas, void* context) {
@@ -238,7 +145,6 @@ static bool desktop_custom_event_callback(void* context, uint32_t event) {
         animation_manager_load_and_continue_animation(desktop->animation_manager);
         desktop_auto_lock_arm(desktop);
         desktop->app_running = false;
-        desktop_update_policy(desktop);
 
     } else if(event == DesktopGlobalAutoLock) {
         if(!desktop->app_running && !desktop->locked) {
@@ -252,12 +158,10 @@ static bool desktop_custom_event_callback(void* context, uint32_t event) {
     } else if(event == DesktopGlobalSaveSettings) {
         desktop_settings_save(&desktop->settings);
         desktop_apply_settings(desktop);
-        desktop_reload_panel(desktop);
 
     } else if(event == DesktopGlobalReloadSettings) {
         desktop_settings_load(&desktop->settings);
         desktop_apply_settings(desktop);
-        desktop_reload_panel(desktop);
 
     } else {
         return scene_manager_handle_custom_event(desktop->scene_manager, event);
@@ -275,7 +179,6 @@ static bool desktop_back_event_callback(void* context) {
 static void desktop_tick_event_callback(void* context) {
     furi_assert(context);
     Desktop* app = context;
-    desktop_update_policy(app);
     scene_manager_handle_tick_event(app->scene_manager);
 }
 
@@ -363,13 +266,6 @@ static void desktop_init_settings(Desktop* desktop) {
 
 static Desktop* desktop_alloc(void) {
     Desktop* desktop = malloc(sizeof(Desktop));
-    memset(&desktop->settings, 0, sizeof(desktop->settings));
-    memset(&desktop->panel, 0, sizeof(desktop->panel));
-    desktop->dashboard_mounted = false;
-    desktop->dashboard_period = 0;
-    desktop->quiet = false;
-    desktop->locked = false;
-    desktop->recovery_notice_pending = furi_system_policy_is_recovery();
 
     desktop->animation_semaphore = furi_semaphore_alloc(1, 0);
     desktop->animation_manager = animation_manager_alloc();
@@ -391,9 +287,6 @@ static Desktop* desktop_alloc(void) {
 
     desktop->lock_menu = desktop_lock_menu_alloc();
     desktop->quick_settings = desktop_quick_settings_alloc();
-    desktop->activity = desktop_activity_alloc(desktop_activity_callback, desktop);
-    desktop->dashboard = desktop_activity_alloc(desktop_dashboard_callback, desktop);
-    desktop_activity_set_home(desktop->dashboard, true);
     desktop->debug_view = desktop_debug_alloc();
     desktop->popup = popup_alloc();
     desktop->locked_view = desktop_view_locked_alloc();
@@ -432,10 +325,6 @@ static Desktop* desktop_alloc(void) {
         desktop->view_dispatcher,
         DesktopViewIdQuickSettings,
         desktop_quick_settings_get_view(desktop->quick_settings));
-    view_dispatcher_add_view(
-        desktop->view_dispatcher,
-        DesktopViewIdActivity,
-        desktop_activity_get_view(desktop->activity));
     view_dispatcher_add_view(
         desktop->view_dispatcher, DesktopViewIdDebug, desktop_debug_get_view(desktop->debug_view));
     view_dispatcher_add_view(
@@ -499,19 +388,6 @@ static Desktop* desktop_alloc(void) {
     desktop->app_running = loader_is_locked(desktop->loader);
     desktop->shortcut_animation_retain_pending = false;
 
-    desktop->policy_events = furi_message_queue_alloc(1, sizeof(uint8_t));
-    desktop->dashboard_timer =
-        furi_timer_alloc(desktop_policy_changed, FuriTimerTypePeriodic, desktop);
-    furi_event_loop_subscribe_message_queue(
-        view_dispatcher_get_event_loop(desktop->view_dispatcher),
-        desktop->policy_events,
-        FuriEventLoopEventIn,
-        desktop_policy_event,
-        desktop);
-    furi_system_policy_listen(desktop_policy_changed, desktop);
-    furi_system_policy_application(desktop->app_running);
-
-    furi_record_create(RECORD_DESKTOP_PANEL, &desktop_panel_capability);
     furi_record_create(RECORD_DESKTOP, desktop);
 
     return desktop;
@@ -638,8 +514,6 @@ int32_t desktop_srv(void* p) {
     Desktop* desktop = desktop_alloc();
 
     desktop_init_settings(desktop);
-    desktop_panel_defaults(&desktop->panel, &desktop->settings);
-    desktop_reload_panel(desktop);
 
     scene_manager_next_scene(desktop->scene_manager, DesktopSceneMain);
 
@@ -659,7 +533,7 @@ int32_t desktop_srv(void* p) {
         scene_manager_next_scene(desktop->scene_manager, DesktopSceneHwMismatch);
     }
 
-    if(furi_hal_rtc_get_fault_data() && !furi_system_policy_is_recovery()) {
+    if(furi_hal_rtc_get_fault_data()) {
         scene_manager_next_scene(desktop->scene_manager, DesktopSceneFault);
     }
 

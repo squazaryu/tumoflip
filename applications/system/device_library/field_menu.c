@@ -20,27 +20,17 @@ bool field_menu_allows(const FieldMenuState* state, uint32_t action) {
                 state->count <= 32) ||
                (action == FieldNextCards && state->more) ||
                (action == FieldPreviousCards && state->offset >= 32);
-    case FieldPageRound: {
-        unsigned pending;
-        return field_round_pending_count(state->round, &pending) &&
+    case FieldPageRound:
+        return state->round && state->round->count <= LIBRARY_PINS &&
                ((action >= FieldRoundBase && action < FieldRoundBase + state->round->count) ||
-                action == FieldExportRound || (action == FieldNextPending && pending > 0));
-    }
+                action == FieldExportRound);
     case FieldPageItem:
-        return field_menu_has_item(state) && ((action >= FieldPass && action <= FieldOpenObject) ||
-                                              action == FieldCheckLinkedFiles);
+        return field_menu_has_item(state) &&
+               ((action >= FieldPass && action <= FieldOpenObject) ||
+                action == FieldCheckLinkedFiles);
     default:
         return false;
     }
-}
-bool field_menu_select_next_pending(FieldMenuState* state) {
-    if(!field_menu_allows(state, FieldNextPending)) return false;
-    const unsigned start =
-        state->selected < state->round->count ? (state->selected + 1) % state->round->count : 0;
-    unsigned selected;
-    if(!field_round_next_pending(state->round, start, &selected)) return false;
-    state->selected = selected;
-    return true;
 }
 void field_menu_build(
     Submenu* menu,
@@ -67,35 +57,22 @@ void field_menu_build(
         FIELD_ROW("Use current pinned list", FieldConfirmNew);
         FIELD_ROW("Back: keep current round", 0);
         break;
-    case FieldPageRound: {
-        unsigned pending;
-        if(!field_round_pending_count(state->round, &pending)) {
-            submenu_set_header(menu, "Object round");
-            FIELD_ROW("No readable round", 0);
-            break;
+    case FieldPageRound:
+        submenu_set_header(menu, "Object round");
+        if(state->round && state->round->count <= LIBRARY_PINS) {
+            for(unsigned i = 0; i < state->round->count; i++) {
+                char label[64];
+                snprintf(
+                    label,
+                    sizeof(label),
+                    "%s %s",
+                    field_round_result_name(state->round->items[i].result),
+                    state->round->items[i].object);
+                FIELD_ROW(label, FieldRoundBase + i);
+            }
+            FIELD_ROW("Export round report", FieldExportRound);
         }
-        char header[32];
-        snprintf(
-            header,
-            sizeof(header),
-            "Round: %u/%lu left",
-            pending,
-            (unsigned long)state->round->count);
-        submenu_set_header(menu, header);
-        if(pending > 0) FIELD_ROW("Next pending object", FieldNextPending);
-        for(unsigned i = 0; i < state->round->count; i++) {
-            char label[64];
-            snprintf(
-                label,
-                sizeof(label),
-                "%s %s",
-                field_round_result_name(state->round->items[i].result),
-                state->round->items[i].object);
-            FIELD_ROW(label, FieldRoundBase + i);
-        }
-        FIELD_ROW("Export round report", FieldExportRound);
         break;
-    }
     case FieldPageItem:
         submenu_set_header(menu, "Object check");
         if(!field_menu_has_item(state)) {

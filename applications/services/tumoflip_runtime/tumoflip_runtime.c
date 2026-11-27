@@ -1,5 +1,4 @@
 #include <bt/bt_service/bt_i.h>
-#include <furi/core/system_policy_i.h>
 #include <cli/cli.h>
 #include <loader/loader.h>
 #include <furi.h>
@@ -267,8 +266,7 @@ static const char* tumoflip_runtime_str_or_unknown(const char* value) {
     return value ? value : "unknown";
 }
 
-static bool tumoflip_runtime_transfer_activity(TumoflipRuntime* runtime, bool active) {
-    if(!furi_system_policy_transfer(active)) return false;
+static void tumoflip_runtime_transfer_activity(TumoflipRuntime* runtime, bool active) {
     runtime->transfer_active = active;
     BtMessage message = {
         .lock = api_lock_alloc_locked(),
@@ -279,7 +277,6 @@ static bool tumoflip_runtime_transfer_activity(TumoflipRuntime* runtime, bool ac
         furi_message_queue_put(runtime->bt->message_queue, &message, FuriWaitForever) ==
         FuriStatusOk);
     api_lock_wait_unlock_and_free(message.lock);
-    return true;
 }
 
 static void tumoflip_runtime_trace_add(
@@ -545,13 +542,6 @@ static void
 
     tumoflip_runtime_trace_add(runtime, 'r', command, false);
 
-    if(furi_system_policy_is_recovery() &&
-       (strcmp(command, "fabric_open") == 0 || strcmp(command, "fabric_step") == 0 ||
-        strcmp(command, "hello") == 0)) {
-        tumoflip_runtime_reply(runtime, event->request_id, "error", "recovery_mode", true);
-        return;
-    }
-
     if(strcmp(command, "ping") == 0) {
         tumoflip_runtime_reply(runtime, event->request_id, "pong", "ok", false);
     } else if(strcmp(command, "capabilities") == 0) {
@@ -593,13 +583,11 @@ static void
         strcmp(command, "fabric_step") == 0 || strcmp(command, "fabric_cancel") == 0) {
         tumoflip_runtime_handle_fabric(runtime, event);
     } else if(strcmp(command, "transfer_begin") == 0) {
-        const bool allowed = tumoflip_runtime_transfer_activity(runtime, true);
-        tumoflip_runtime_reply(
-            runtime, event->request_id, "transfer_begin", allowed ? "ok" : "busy", !allowed);
+        tumoflip_runtime_transfer_activity(runtime, true);
+        tumoflip_runtime_reply(runtime, event->request_id, "transfer_begin", "ok", false);
     } else if(strcmp(command, "transfer_progress") == 0) {
-        const bool allowed = tumoflip_runtime_transfer_activity(runtime, true);
-        tumoflip_runtime_reply(
-            runtime, event->request_id, "transfer_progress", allowed ? "ok" : "busy", !allowed);
+        tumoflip_runtime_transfer_activity(runtime, true);
+        tumoflip_runtime_reply(runtime, event->request_id, "transfer_progress", "ok", false);
     } else if(strcmp(command, "transfer_end") == 0) {
         tumoflip_runtime_transfer_activity(runtime, false);
         tumoflip_runtime_reply(runtime, event->request_id, "transfer_end", "ok", false);

@@ -1,5 +1,4 @@
 #include <furi_hal_light.h>
-#include <furi/core/system_policy_i.h>
 #include <furi.h>
 #include <furi_hal.h>
 #include <storage/storage.h>
@@ -504,7 +503,6 @@ static void notification_process_notification_message(
                     rainbow_timer_stop(app);
                 }
             }
-            furi_system_policy_display(lcd_backlight_is_on || app->display_led_lock);
             break;
         case NotificationMessageTypeLedDisplayBacklightForceOn:
             // Force Backlight ON even if its ON now
@@ -518,7 +516,6 @@ static void notification_process_notification_message(
 
             //start rgb_mod_rainbow_timer when display backlight is ON and all corresponding settings is ON too
             rainbow_timer_starter(app);
-            furi_system_policy_display(true);
             break;
         case NotificationMessageTypeLedDisplayBacklightEnforceOn:
             if(!app->display_led_lock) {
@@ -529,7 +526,6 @@ static void notification_process_notification_message(
                         app->current_night_shift * 1.0f);
                 lcd_backlight_is_on = true;
             }
-            furi_system_policy_display(lcd_backlight_is_on || app->display_led_lock);
             break;
         case NotificationMessageTypeLedDisplayBacklightEnforceAuto:
             if(app->display_led_lock) {
@@ -542,7 +538,6 @@ static void notification_process_notification_message(
             } else {
                 FURI_LOG_E(TAG, "Incorrect BacklightEnforceAuto usage");
             }
-            furi_system_policy_display(lcd_backlight_is_on || app->display_led_lock);
             break;
         case NotificationMessageTypeLedRed:
             // store and send on delay or after seq
