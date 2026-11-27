@@ -103,6 +103,8 @@ int main(void){
  assert(d.panel_model.page==0&&!d.panel_model.offset&&!timer.armed&&stops==1);
  d.panel_model.active=false;before=updates;desktop_panel_move(&d,1);assert(updates==before&&starts==1);
  InputEvent key={.key=InputKeyLeft,.type=InputTypeShort};
+ assert(!desktop_panel_input(&key,&d)&&!events); /* Locked/paused background is display-only. */
+ d.panel_model.active=true;
  assert(desktop_panel_input(&key,&d)&&events==1&&last_event==DesktopPanelEventPrevious);
  key.key=InputKeyRight;assert(desktop_panel_input(&key,&d)&&last_event==DesktopPanelEventNext);
  key.type=InputTypeLong;assert(!desktop_panel_input(&key,&d));
