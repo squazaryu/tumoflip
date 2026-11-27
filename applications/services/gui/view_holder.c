@@ -57,8 +57,7 @@ void view_holder_set_view(ViewHolder* view_holder, View* view) {
         }
 
         view_exit(view_holder->view);
-        view_set_update_callback(view_holder->view, NULL);
-        view_set_update_callback_context(view_holder->view, NULL);
+        view_set_update_handler(view_holder->view, NULL, NULL);
     }
 
     view_holder->view = view;
@@ -72,8 +71,7 @@ void view_holder_set_view(ViewHolder* view_holder, View* view) {
             view_holder->ongoing_input = 0;
         }
 
-        view_set_update_callback(view_holder->view, view_holder_update);
-        view_set_update_callback_context(view_holder->view, view_holder);
+        view_set_update_handler(view_holder->view, view_holder_update, view_holder);
 
         view_enter(view_holder->view);
         view_port_enabled_set(view_holder->view_port, true);

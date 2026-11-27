@@ -111,21 +111,32 @@ void* view_get_model(View* view) {
     return view->model;
 }
 
+void view_set_update_handler(View* view, ViewUpdateCallback callback, void* context) {
+    furi_check(view);
+    FURI_CRITICAL_ENTER();
+    view->update_callback = callback;
+    view->update_callback_context = context;
+    FURI_CRITICAL_EXIT();
+}
+
+void view_request_update(View* view) {
+    FURI_CRITICAL_ENTER();
+    const ViewUpdateCallback callback = view->update_callback;
+    void* context = view->update_callback_context;
+    FURI_CRITICAL_EXIT();
+    if(callback) callback(view, context);
+}
+
 void view_commit_model(View* view, bool update) {
     furi_check(view);
     view_unlock_model(view);
-    if(update && view->update_callback) {
-        view->update_callback(view, view->update_callback_context);
-    }
+    if(update) view_request_update(view);
 }
 
 void view_icon_animation_callback(IconAnimation* instance, void* context) {
     UNUSED(instance);
     furi_check(context);
-    View* view = context;
-    if(view->update_callback) {
-        view->update_callback(view, view->update_callback_context);
-    }
+    view_request_update(context);
 }
 
 void view_unlock_model(View* view) {
