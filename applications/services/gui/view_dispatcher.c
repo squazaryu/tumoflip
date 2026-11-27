@@ -170,8 +170,7 @@ void view_dispatcher_add_view(ViewDispatcher* view_dispatcher, uint32_t view_id,
     }
 
     ViewDict_set_at(view_dispatcher->views, view_id, view);
-    view_set_update_callback(view, view_dispatcher_update);
-    view_set_update_callback_context(view, view_dispatcher);
+    view_set_update_handler(view, view_dispatcher_update, view_dispatcher);
 
     // Unlock gui
     if(view_dispatcher->gui) {
@@ -200,8 +199,7 @@ void view_dispatcher_remove_view(ViewDispatcher* view_dispatcher, uint32_t view_
     // Remove view
     furi_check(ViewDict_erase(view_dispatcher->views, view_id));
 
-    view_set_update_callback(view, NULL);
-    view_set_update_callback_context(view, NULL);
+    view_set_update_handler(view, NULL, NULL);
 
     // Unlock gui
     if(view_dispatcher->gui) {
@@ -217,8 +215,7 @@ void view_dispatcher_show_loading(ViewDispatcher* view_dispatcher) {
         // Keep this view outside the application view dictionary: it has no public view id and is
         // owned/freed by the dispatcher. The callback wiring is the same as add_view().
         View* view = loading_get_view(view_dispatcher->loading);
-        view_set_update_callback(view, view_dispatcher_update);
-        view_set_update_callback_context(view, view_dispatcher);
+        view_set_update_handler(view, view_dispatcher_update, view_dispatcher);
     }
 
     View* loading_view = loading_get_view(view_dispatcher->loading);

@@ -62,8 +62,7 @@ class GuiStartupLoadingTest(unittest.TestCase):
         show = function_body(self.dispatcher, "void view_dispatcher_show_loading(ViewDispatcher* view_dispatcher)")
         self.assertIn("if(!view_dispatcher->loading)", show)
         self.assertIn("view_dispatcher->loading = loading_alloc();", show)
-        self.assertIn("view_set_update_callback(view, view_dispatcher_update);", show)
-        self.assertIn("view_set_update_callback_context(view, view_dispatcher);", show)
+        self.assertIn("view_set_update_handler(view, view_dispatcher_update, view_dispatcher);", show)
         self.assertIn("view_dispatcher_set_current_view(view_dispatcher, loading_view);", show)
         self.assertNotIn("ViewDict_set", show)
 
