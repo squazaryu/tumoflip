@@ -55,7 +55,7 @@ class MfDesfireZeroKeyCountTest(unittest.TestCase):
 
         self.assertNotIn("furi_check(count > 0)", poller)
         self.assertRegex(poller, guarded_init)
-        self.assertIn("Application reports zero keys, key versions skipped", poller)
+        self.assertIn("App reports zero keys, key versions skipped", poller)
 
 
 if __name__ == "__main__":

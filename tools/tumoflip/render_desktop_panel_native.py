@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 
-from tools.tumoflip.render_weather_native import ROOT, SUPPORT, function
+from tools.tumoflip.render_weather_native import ROOT, SUPPORT, MODELS, function
 
 SOURCE = ROOT / "applications/services/desktop/views/desktop_view_panel.c"
 
@@ -63,9 +63,61 @@ int main(int argc,char**argv){
  bounds_check=false;c.offset_x=3;c.offset_y=2;c.width=120;c.height=60;
  m.active=false;m.offset=112;desktop_panel_draw(&c,&m);
  assert(c.offset_x==3&&c.offset_y==2&&c.width==120&&c.height==60);
+ c.offset_x=c.offset_y=0;c.width=128;c.height=64;render_panel_settings(&c,argv[1]);
  assert(!critical_depth&&text_calls>100);return 0;
 }
 '''
+
+
+def settings_chunks(elements):
+    """Actual list renderer; controlled display fixtures from production labels."""
+    scene = (ROOT / "applications/settings/desktop_settings/scenes/desktop_settings_scene_start.c").read_text()
+    labels = [re.search(r'variable_item_list,\s*"([^"]+)",\s*2,\s*' + callback, scene)[1]
+              for callback in ("desktop_settings_scene_start_mode_changed",
+                               "desktop_settings_scene_start_shortcut_set_changed",
+                               "desktop_settings_scene_start_panel_motion_changed")]
+    model = MODELS[:MODELS.index("typedef struct {FuriString* label;size_t index;")]
+    chunks = [model]
+    for signature in ("void elements_scrollbar_pos(", "void elements_scrollbar(",
+                      "void elements_slightly_rounded_box(", "void elements_slightly_rounded_frame(",
+                      "void elements_string_fit_width(", "void elements_scrollable_text_line_str(",
+                      "static size_t\n    elements_get_max_chars_to_fit(",
+                      "void elements_multiline_text_aligned("):
+        chunks.append(function(elements, signature))
+    source = (ROOT / "applications/services/gui/modules/variable_item_list.c").read_text()
+    chunks.append(function(source, "static void variable_item_list_draw_callback("))
+    chunks.append(r'''
+static void save(Canvas*,const char*,const char*);
+static void panel_choices(Canvas*c,const char*dir,const char*name,const char**labels,
+                          const char**values,const uint8_t*indices,const uint8_t*counts,
+                          unsigned n,unsigned selected,unsigned window){
+ VariableItemListModel m={0};VariableItemArray_init(m.items);m.position=selected;m.window_position=window;
+ for(unsigned i=0;i<n;i++){
+  VariableItem item={.label=labels[i],.current_value_index=indices[i],
+                    .current_value_text=furi_string_alloc_set(values[i]),.values_count=counts[i]};
+  VariableItemArray_push_back(m.items,item);
+ }
+ canvas_set_color(c,ColorBlack);minimum_text_y=0;bounds_check=true;
+ variable_item_list_draw_callback(c,&m);save(c,dir,name);minimum_text_y=20;
+ for(unsigned i=0;i<n;i++)furi_string_free(VariableItemArray_get(m.items,i)->current_value_text);
+ VariableItemArray_clear(m.items);
+}
+static void render_panel_settings(Canvas*c,const char*dir){
+ const char* labels[]={"PIN Setup",LABELS};
+ const char* classic[]={"","Classic","Classic","On"};
+ const char* panel[]={"","Panel","Panel","On"};
+ const char* no_motion[]={"","Panel","Panel","Off"};
+ const uint8_t counts[]={1,2,2,2},classic_index[]={0,0,0,1},panel_index[]={0,1,1,1},off_index[]={0,1,1,0};
+ panel_choices(c,dir,"12-settings-classic",labels,classic,classic_index,counts,4,1,0);
+ panel_choices(c,dir,"13-settings-panel",labels,panel,panel_index,counts,4,1,0);
+ panel_choices(c,dir,"14-settings-motion-off",labels,no_motion,off_index,counts,4,3,0);
+ const char* held[]={"Left short","Left hold","Right short","Right hold","OK hold"};
+ const char* values[]={"Prev","","Next","",""};const uint8_t one[]={1,1,1,1,1},zero[]={0,0,0,0,0};
+ panel_choices(c,dir,"15-settings-held",held,values,zero,one,5,1,0);
+ panel_choices(c,dir,"16-settings-held-bottom",held,values,zero,one,5,4,1);
+}
+'''.replace("LABELS", ",".join(json.dumps(label) for label in labels)))
+    return chunks
 
 
 def build_source():
@@ -77,13 +129,14 @@ def build_source():
     chunks = [support, r'''
 static unsigned critical_depth,text_calls;
 static bool bounds_check;
+static int minimum_text_y=20;
 #define FURI_CRITICAL_ENTER() ++critical_depth
 #define FURI_CRITICAL_EXIT() --critical_depth
 static size_t icon_get_width(const Icon*i){return i->width;}
 static size_t icon_get_height(const Icon*i){return i->height;}
 static void host_draw_utf8(u8g2_t*fb,int x,int y,const char*s){
  assert(!critical_depth);text_calls++;
- if(bounds_check){assert(x>=0&&x+u8g2_GetUTF8Width(fb,s)<=128);assert(y>=20&&y<=61);}
+ if(bounds_check){assert(x>=0&&x+u8g2_GetUTF8Width(fb,s)<=128);assert(y>=minimum_text_y&&y<=61);}
  u8g2_DrawUTF8(fb,x,y,s);
 }
 ''', '#include "' + str(ROOT / "applications/services/desktop/desktop_panel_i.h") + '"']
@@ -93,10 +146,13 @@ static void host_draw_utf8(u8g2_t*fb,int x,int y,const char*s){
                       "void canvas_set_font(", "void canvas_invert_color(",
                       "void canvas_draw_str(", "void canvas_draw_str_aligned(",
                       "uint16_t canvas_string_width(", "void canvas_draw_box(",
-                      "void canvas_draw_rframe(", "void canvas_draw_line("):
+                      "void canvas_draw_rframe(", "void canvas_draw_line(", "void canvas_draw_rbox(",
+                      "void canvas_draw_dot(", "void canvas_draw_glyph(", "size_t canvas_glyph_width(",
+                      "const CanvasFontParameters* canvas_get_font_params("):
         chunks.append(function(canvas, signature).replace("u8g2_DrawUTF8", "host_draw_utf8"))
     elements = (ROOT / "applications/services/gui/elements.c").read_text()
     chunks.append(function(elements, "void elements_button_center("))
+    chunks.extend(settings_chunks(elements))
     if SOURCE.exists():
         draw = re.sub(r"^#include .*\n", "", SOURCE.read_text(), flags=re.MULTILINE)
         chunks.append(f'\n#line 1 "{SOURCE}"\n' + draw)
@@ -158,6 +214,15 @@ def render(output):
         im.resize((768, 384), Image.Resampling.NEAREST).save(path.with_suffix(".png"))
         draw.text((x, y - 20), path.stem, fill="black")
     sheet.save(output / "all-screens.png")
+    overview = Image.new("RGB", (3 * 536, 2 * 294), "#e8e8e8")
+    title = ImageDraw.Draw(overview)
+    selected = ("01-status", "04-idle-off", "07-last-fault", "13-settings-panel",
+                "14-settings-motion-off", "15-settings-held")
+    for index, name in enumerate(selected):
+        x, y = index % 3 * 536 + 12, index // 3 * 294 + 26
+        overview.paste(Image.open(output / (name + ".pgm")).resize((512, 256), Image.Resampling.NEAREST), (x, y))
+        title.text((x, y - 20), name, fill="black")
+    overview.save(output / "overview.png")
     (output / "evidence.json").write_text(json.dumps({
         "renderer": "actual C + repository fonts/stock PNG assets", "sanitizers": ["address", "undefined"],
         "hardware_tested": False, "generated_c_sha256": hashlib.sha256(source.encode()).hexdigest(),

@@ -62,7 +62,7 @@ class UpstreamPowerAndPluginScanTest(unittest.TestCase):
         self.assertIn('#define SUBGHZ_RADIO_DEVICE_PLUGIN_FAL_PREFIX  "radio_device_"', types)
         self.assertIn("PluginManagerError error = plugin_manager_load_all_with_prefix(", source)
         self.assertIn("plugin_manager_get_count(subghz_device->manager)", source)
-        self.assertIn('"Failed to load radio device plugin(s), error %d"', source)
+        self.assertIn('"Err: load radio device plugin(s), error %d"', source)
         self.assertIn('"No " SUBGHZ_RADIO_DEVICE_PLUGIN_FAL_PREFIX "*.fal plugins found"', source)
 
     def test_plugin_examples_do_not_abort_before_freeing_the_manager(self) -> None:

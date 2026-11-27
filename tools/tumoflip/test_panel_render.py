@@ -16,9 +16,9 @@ class PanelRenderTests(unittest.TestCase):
             except subprocess.CalledProcessError as error:
                 self.fail(error.stdout + error.stderr.decode() if isinstance(error.stderr, bytes)
                           else (error.stdout or "") + (error.stderr or ""))
-            self.assertEqual(len(paths), 19)
+            self.assertEqual(len(paths), 24)
             hashes = {p.stem: hashlib.sha256(p.read_bytes()).digest() for p in paths}
-            self.assertEqual(len(set(hashes.values())), 18)  # final status equals the invalid-page fallback
+            self.assertEqual(len(set(hashes.values())), 23)  # final status equals the invalid-page fallback
             self.assertNotEqual(hashes["01-status"], hashes["03-status-unknown"])
             self.assertNotEqual(hashes["06-fault-unavailable"], hashes["07-last-fault"])
 
