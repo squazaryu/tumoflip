@@ -16,7 +16,13 @@ library compilation policy. Hardware acceptance remains pending.
   of a working phone/RPC connection. An unavailable fault record does not mean
   that the device has never crashed.
 - Short Left/Right changes pages; held Left/Right/OK uses an independent Panel
-  shortcut profile. Short OK opens Apps. Other controls stay unchanged.
+  shortcut profile. Short OK opens Apps. The on-screen footer hints are removed,
+  but the controls stay unchanged when unlocked. The header is lowered by 3 px
+  and status cards expand from 26 to 34 px tall, using the previous footer area.
+- In Panel mode the current page also remains behind the stock lock overlay,
+  without restarting wallpaper animations. Page motion and Panel input stay
+  disabled while locked. PIN, unlock hints, lock icon and the Classic background
+  are unchanged. Returning from an app while locked preserves the chosen mode.
 - `Shortcut set` selects which profile's held shortcuts are being edited; it
   does not change the active desktop mode.
 - Optional 160 ms page motion. No decorative idle timer, allocation per frame,
@@ -34,8 +40,10 @@ library compilation policy. Hardware acceptance remains pending.
 1. Keep the known-working 006 installer and back up the SD before installation.
    Install the **complete updater**, not a bare DFU; it includes matching Desktop
    Settings resources. No cleanup or movement of user data is required.
-2. First boot must show the normal Classic desktop. Check menu, PIN/lock/unlock,
-   one ordinary app launch/return and the existing phone connection.
+2. A fresh profile defaults to Classic; an update preserves the chosen mode.
+   Check menu, PIN/lock/unlock, one ordinary app launch/return and the existing
+   phone connection. In Panel mode all three pages must remain visible when
+   locked, and page/shortcut controls must not work until unlocked.
 3. Enable Panel in Desktop settings. Check all three pages, both directions and
    page wrap. Test motion On/Off, repeated rapid presses, then a held shortcut.
 4. Assign different Classic/Panel held shortcuts. Change modes and verify that

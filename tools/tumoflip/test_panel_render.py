@@ -27,9 +27,9 @@ class PanelRenderTests(unittest.TestCase):
                                       extra=int(extra), detail=bytes.fromhex(detail).decode() if kind == "T" else int(detail)))
 
     def test_all_pages_and_transition_edges(self):
-        self.assertEqual(len(self.paths), 24)
+        self.assertEqual(len(self.paths), 29)
         hashes = {p.stem: hashlib.sha256(p.read_bytes()).digest() for p in self.paths}
-        self.assertEqual(len(set(hashes.values())), 23)
+        self.assertEqual(len(set(hashes.values())), 24)
         self.assertNotEqual(hashes["01-status"], hashes["03-status-unknown"])
         self.assertNotEqual(hashes["06-fault-unavailable"], hashes["07-last-fault"])
 
@@ -41,8 +41,10 @@ class PanelRenderTests(unittest.TestCase):
                 rows = [r for r in self.trace if r["frame"] == path.stem]
                 self.assertFalse(any(r["kind"] == "T" and r["detail"] == "Apps" for r in rows))
                 self.assertFalse(any(r["kind"] == "I" and (r["width"], r["extra"]) == (3, 5) for r in rows))
-                with Image.open(path) as pixels:
-                    self.assertEqual(set(pixels.crop((0, 63, 128, 64)).getdata()), {255})
+                # The unchanged modal unlock hint has its own bottom border.
+                if path.stem != "21-locked-hint":
+                    with Image.open(path) as pixels:
+                        self.assertEqual(set(pixels.crop((0, 63, 128, 64)).getdata()), {255})
 
     def test_panel_headings_are_lower_without_covering_the_status_bar(self):
         for path in self.paths[:9]:
@@ -71,6 +73,14 @@ class PanelRenderTests(unittest.TestCase):
         self.assertEqual(len(values), 3)
         self.assertEqual([(r["y"], r["extra"]) for r in values], [(42, 0)] * 3)
         self.assertTrue(all(r["width"] <= 36 for r in values))
+
+    def test_settled_stock_lock_overlay_preserves_panels_with_and_without_pin(self):
+        hashes = {p.stem: hashlib.sha256(p.read_bytes()).digest() for p in self.paths}
+        self.assertEqual(hashes["17-locked-status"], hashes["01-status"])
+        self.assertEqual(hashes["18-locked-idle"], hashes["10-slide-4"])
+        self.assertEqual(hashes["19-locked-fault"], hashes["07-last-fault"])
+        self.assertEqual(hashes["20-locked-status-pin"], hashes["17-locked-status"])
+        self.assertNotEqual(hashes["21-locked-hint"], hashes["17-locked-status"])
 
 
 if __name__ == "__main__":

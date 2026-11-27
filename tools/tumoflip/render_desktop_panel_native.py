@@ -28,6 +28,13 @@ static void render(Canvas*c,DesktopPanelModel*m,const char*dir,const char*name){
  desktop_panel_draw(c,m);assert(c->offset_x==0&&c->offset_y==0);
  assert(c->width==128&&c->height==64);save(c,dir,name);
 }
+static void render_locked(Canvas*c,DesktopPanelModel*m,const char*dir,const char*name,
+                          bool pin,DesktopViewLockedState state){
+ layout_frame=name;canvas_set_color(c,ColorBlack);bounds_check=true;
+ desktop_panel_draw(c,m);
+ DesktopViewLockedModel lock={.pin_locked=pin,.view_state=state};
+ desktop_view_locked_draw(c,&lock);save(c,dir,name);
+}
 int main(int argc,char**argv){
  assert(argc==2);Canvas c={.width=128,.height=64};static uint8_t buffer[1024];
  char trace_path[2048];snprintf(trace_path,sizeof(trace_path),"%s/layout.tsv",argv[1]);
@@ -62,6 +69,14 @@ int main(int argc,char**argv){
   char name[32];snprintf(name,sizeof(name),"11-slide-left-%d",i);
   m.offset=desktop_panel_offset(0,i*40,-1,true);render(&c,&m,argv[1],name);
  }
+ m=(DesktopPanelModel){.snapshot={.heap_kb=135,.sd_state=2,.bt_on=true,.auto_lock_s=60,.sleep_holds=2,
+                                .fault_valid=true,.fault_commit=0x85F6E39D}};
+ strcpy(m.snapshot.fault_name,"Hard fault");
+ render_locked(&c,&m,argv[1],"17-locked-status",false,DesktopViewLockedStateLocked);
+ m.page=1;render_locked(&c,&m,argv[1],"18-locked-idle",false,DesktopViewLockedStateLocked);
+ m.page=2;render_locked(&c,&m,argv[1],"19-locked-fault",false,DesktopViewLockedStateLocked);
+ m.page=0;render_locked(&c,&m,argv[1],"20-locked-status-pin",true,DesktopViewLockedStateLocked);
+ render_locked(&c,&m,argv[1],"21-locked-hint",false,DesktopViewLockedStateLockedHintShown);
  /* Dispatcher state must be restored, including when the model is paused. */
  bounds_check=false;layout_frame=NULL;c.offset_x=3;c.offset_y=2;c.width=120;c.height=60;
  m.active=false;m.offset=112;desktop_panel_draw(&c,&m);
@@ -123,6 +138,21 @@ static void render_panel_settings(Canvas*c,const char*dir){
     return chunks
 
 
+def lock_chunks(elements):
+    source = (ROOT / "applications/services/desktop/views/desktop_view_locked.c").read_text()
+    start = source.index("typedef enum {")
+    end = source.index("} DesktopViewLockedModel;") + len("} DesktopViewLockedModel;")
+    constants = [re.search(r"^#define " + name + r"\s+[^\n]+", source, re.MULTILINE)[0]
+                 for name in ("DOOR_L_FINAL_POS", "DOOR_R_FINAL_POS")]
+    chunks = [source[start:end], "\n".join(constants) + "\n#define STATUS_BAR_Y_SHIFT 13"]
+    for signature in ("void elements_frame(", "void elements_bold_rounded_frame(",
+                      "void elements_multiline_text(", "void elements_multiline_text_framed("):
+        chunks.append(function(elements, signature))
+    chunks.append(function(source, "static void desktop_view_locked_doors_draw("))
+    chunks.append(function(source, "static void desktop_view_locked_draw("))
+    return chunks
+
+
 def build_source():
     support = SUPPORT.replace(
         "int offset_x,offset_y;", "int offset_x,offset_y;size_t width,height;"
@@ -166,7 +196,7 @@ static void host_draw_utf8(u8g2_t*fb,int x,int y,const char*s){
                       "uint16_t canvas_string_width(", "void canvas_draw_box(",
                       "void canvas_draw_rframe(", "void canvas_draw_line(", "void canvas_draw_rbox(",
                       "void canvas_draw_dot(", "void canvas_draw_glyph(", "size_t canvas_glyph_width(",
-                      "const CanvasFontParameters* canvas_get_font_params("):
+                      "const CanvasFontParameters* canvas_get_font_params(", "void canvas_draw_frame("):
         body = function(canvas, signature).replace("u8g2_DrawUTF8", "host_draw_utf8")
         if signature == "void canvas_draw_rframe(":
             body = body.replace("furi_check(canvas);", 'furi_check(canvas);\n    if(layout_trace&&layout_frame)fprintf(layout_trace,"R\\t%s\\t%d\\t%d\\t%zu\\t%zu\\t%zu\\n",layout_frame,x,y,width,height,radius);', 1)
@@ -174,6 +204,7 @@ static void host_draw_utf8(u8g2_t*fb,int x,int y,const char*s){
     elements = (ROOT / "applications/services/gui/elements.c").read_text()
     chunks.append(function(elements, "void elements_button_center("))
     chunks.extend(settings_chunks(elements))
+    chunks.extend(lock_chunks(elements))
     if SOURCE.exists():
         draw = re.sub(r"^#include .*\n", "", SOURCE.read_text(), flags=re.MULTILINE)
         chunks.append(f'\n#line 1 "{SOURCE}"\n' + draw)
