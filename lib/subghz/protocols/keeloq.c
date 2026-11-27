@@ -874,7 +874,7 @@ SubGhzProtocolStatus
 
         if(subghz_protocol_keeloq_receive_only(
                instance->manufacture_name, instance->generic.seed)) {
-            FURI_LOG_W(TAG, "This variant supports receive/inspection only");
+            FURI_LOG_W(TAG, "Receive/inspect only");
             ret = SubGhzProtocolStatusErrorEncoderGetUpload;
             break;
         }
