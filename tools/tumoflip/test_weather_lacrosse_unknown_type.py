@@ -100,17 +100,32 @@ int main(void) {
                 WSProtocolDecoderLaCrosse_TX d = {.base = {.callback = callback ? capture : NULL}};
                 ws_protocol_decoder_lacrosse_tx_reset(&d); received = 0;
                 uint64_t data = sample(type) ^ corrupt;
-                d.decoder.parser_step = LaCrosse_TXDecoderStepCheckDuration;
-                d.decoder.decode_data = data >> 1;
-                d.decoder.decode_count_bit = 43;
-                d.decoder.te_last = data & 1 ? ws_protocol_lacrosse_tx_const.te_short :
-                                             ws_protocol_lacrosse_tx_const.te_long;
-                ws_protocol_decoder_lacrosse_tx_feed(&d, false, 4000);
+                // Two leading zero pulses and then all 40 significant bits.
+                ws_protocol_decoder_lacrosse_tx_feed(&d, false, LACROSSE_TX_GAP);
+                for(unsigned prefix = 0; prefix < 2; ++prefix) {
+                    ws_protocol_decoder_lacrosse_tx_feed(&d, true, ws_protocol_lacrosse_tx_const.te_long);
+                    ws_protocol_decoder_lacrosse_tx_feed(&d, false, LACROSSE_TX_GAP);
+                }
+                for(int bit = 39; bit >= 0; --bit) {
+                    ws_protocol_decoder_lacrosse_tx_feed(&d, true, data & (1ULL << bit) ?
+                        ws_protocol_lacrosse_tx_const.te_short : ws_protocol_lacrosse_tx_const.te_long);
+                    ws_protocol_decoder_lacrosse_tx_feed(&d, false, bit ? LACROSSE_TX_GAP : 4000);
+                }
                 assert(received == (unsigned)(!corrupt && callback && (type == 0 || type == 14)));
                 assert(d.decoder.parser_step == LaCrosse_TXDecoderStepReset &&
                        d.decoder.decode_data == 0 && d.decoder.decode_count_bit == 0 && !d.header_count);
                 if(received) assert(d.generic.data == data && d.generic.data_count_bit == 44);
             }
+        }
+    }
+    // Bounded noise exercises reset/error paths without consulting a radio.
+    const unsigned durations[] = {0, 549, 550, 1000, 1300, 2700, 4000, UINT32_MAX};
+    for(unsigned state = 0; state < 4; ++state) for(unsigned level = 0; level < 2; ++level) {
+        for(unsigned last = 0; last < 8; ++last) for(unsigned next = 0; next < 8; ++next) {
+            WSProtocolDecoderLaCrosse_TX noise = {0};
+            noise.decoder.parser_step = state; noise.decoder.te_last = durations[last];
+            noise.header_count = 2;
+            ws_protocol_decoder_lacrosse_tx_feed(&noise, level, durations[next]);
         }
     }
     return 0;
