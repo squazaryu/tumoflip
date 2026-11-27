@@ -192,7 +192,7 @@ void desktop_settings_scene_start_on_enter(void* context) {
         variable_item_set_current_value_text(item, desktop_mode_text[app->panel.mode]);
         item = variable_item_list_add(
             variable_item_list,
-            "Edit shortcuts",
+            "Shortcut set",
             2,
             desktop_settings_scene_start_shortcut_set_changed,
             app);

@@ -17,6 +17,8 @@ library compilation policy. Hardware acceptance remains pending.
   that the device has never crashed.
 - Short Left/Right changes pages; held Left/Right/OK uses an independent Panel
   shortcut profile. Short OK opens Apps. Other controls stay unchanged.
+- `Shortcut set` selects which profile's held shortcuts are being edited; it
+  does not change the active desktop mode.
 - Optional 160 ms page motion. No decorative idle timer, allocation per frame,
   network, device commands, file enumeration or filesystem I/O in draw callbacks.
 - Versioned, verified dual-bank private configuration. Public DesktopSettings v21
