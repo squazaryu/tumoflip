@@ -23,12 +23,15 @@ static void save(Canvas* c,const char* dir,const char* name){
  }assert(!fclose(f));
 }
 static void render(Canvas*c,DesktopPanelModel*m,const char*dir,const char*name){
+ layout_frame=name;
  canvas_clear(c);canvas_set_color(c,ColorBlack);bounds_check=m->offset==0;
  desktop_panel_draw(c,m);assert(c->offset_x==0&&c->offset_y==0);
  assert(c->width==128&&c->height==64);save(c,dir,name);
 }
 int main(int argc,char**argv){
  assert(argc==2);Canvas c={.width=128,.height=64};static uint8_t buffer[1024];
+ char trace_path[2048];snprintf(trace_path,sizeof(trace_path),"%s/layout.tsv",argv[1]);
+ layout_trace=fopen(trace_path,"w");assert(layout_trace);
  static const u8x8_display_info_t info={.tile_width=16,.tile_height=8,.pixel_width=128,.pixel_height=64};
  c.fb.u8x8.display_info=&info;
  u8g2_SetupBuffer(&c.fb,buffer,8,u8g2_ll_hvline_vertical_top_lsb,U8G2_R0);
@@ -60,11 +63,11 @@ int main(int argc,char**argv){
   m.offset=desktop_panel_offset(0,i*40,-1,true);render(&c,&m,argv[1],name);
  }
  /* Dispatcher state must be restored, including when the model is paused. */
- bounds_check=false;c.offset_x=3;c.offset_y=2;c.width=120;c.height=60;
+ bounds_check=false;layout_frame=NULL;c.offset_x=3;c.offset_y=2;c.width=120;c.height=60;
  m.active=false;m.offset=112;desktop_panel_draw(&c,&m);
  assert(c.offset_x==3&&c.offset_y==2&&c.width==120&&c.height==60);
  c.offset_x=c.offset_y=0;c.width=128;c.height=64;render_panel_settings(&c,argv[1]);
- assert(!critical_depth&&text_calls>100);return 0;
+ assert(!critical_depth&&text_calls>100);assert(!fclose(layout_trace));return 0;
 }
 '''
 
@@ -97,7 +100,7 @@ static void panel_choices(Canvas*c,const char*dir,const char*name,const char**la
                     .current_value_text=furi_string_alloc_set(values[i]),.values_count=counts[i]};
   VariableItemArray_push_back(m.items,item);
  }
- canvas_set_color(c,ColorBlack);minimum_text_y=0;bounds_check=true;
+ layout_frame=name;canvas_set_color(c,ColorBlack);minimum_text_y=0;bounds_check=true;
  variable_item_list_draw_callback(c,&m);save(c,dir,name);minimum_text_y=20;
  for(unsigned i=0;i<n;i++)furi_string_free(VariableItemArray_get(m.items,i)->current_value_text);
  VariableItemArray_clear(m.items);
@@ -126,17 +129,32 @@ def build_source():
     ).replace("return 128;", "return c->width;").replace("return 64;", "return c->height;")
     support = support.replace("x,y,i->width", "x+c->offset_x,y+c->offset_y,i->width")
     support = support.replace("#ifndef __APPLE__", "#if 1 /* portable host strlcpy */")
+    support = support.replace("static void canvas_draw_icon(",
+                              "static void host_record_icon(int,int,size_t,size_t);\nstatic void canvas_draw_icon(")
+    support = support.replace("{u8g2_DrawXBMP(&c->fb,",
+                              "{host_record_icon(x+c->offset_x,y+c->offset_y,i->width,i->height);u8g2_DrawXBMP(&c->fb,")
     chunks = [support, r'''
 static unsigned critical_depth,text_calls;
 static bool bounds_check;
 static int minimum_text_y=20;
+static FILE* layout_trace;
+static const char* layout_frame;
 #define FURI_CRITICAL_ENTER() ++critical_depth
 #define FURI_CRITICAL_EXIT() --critical_depth
 static size_t icon_get_width(const Icon*i){return i->width;}
 static size_t icon_get_height(const Icon*i){return i->height;}
+static void host_record_icon(int x,int y,size_t w,size_t h){
+ if(layout_trace&&layout_frame)fprintf(layout_trace,"I\t%s\t%d\t%d\t%zu\t%zu\t0\n",layout_frame,x,y,w,h);
+}
 static void host_draw_utf8(u8g2_t*fb,int x,int y,const char*s){
  assert(!critical_depth);text_calls++;
  if(bounds_check){assert(x>=0&&x+u8g2_GetUTF8Width(fb,s)<=128);assert(y>=minimum_text_y&&y<=61);}
+ if(layout_trace&&layout_frame){
+  int font=fb->font==u8g2_font_helvB08_tr?FontPrimary:fb->font==u8g2_font_5x7_tr?FontBatteryPercent:FontSecondary;
+  fprintf(layout_trace,"T\t%s\t%d\t%d\t%u\t%d\t",layout_frame,x,y,u8g2_GetUTF8Width(fb,s),font);
+  for(const unsigned char*p=(const unsigned char*)s;*p;p++)fprintf(layout_trace,"%02x",*p);
+  fputc('\n',layout_trace);
+ }
  u8g2_DrawUTF8(fb,x,y,s);
 }
 ''', '#include "' + str(ROOT / "applications/services/desktop/desktop_panel_i.h") + '"']
@@ -149,7 +167,10 @@ static void host_draw_utf8(u8g2_t*fb,int x,int y,const char*s){
                       "void canvas_draw_rframe(", "void canvas_draw_line(", "void canvas_draw_rbox(",
                       "void canvas_draw_dot(", "void canvas_draw_glyph(", "size_t canvas_glyph_width(",
                       "const CanvasFontParameters* canvas_get_font_params("):
-        chunks.append(function(canvas, signature).replace("u8g2_DrawUTF8", "host_draw_utf8"))
+        body = function(canvas, signature).replace("u8g2_DrawUTF8", "host_draw_utf8")
+        if signature == "void canvas_draw_rframe(":
+            body = body.replace("furi_check(canvas);", 'furi_check(canvas);\n    if(layout_trace&&layout_frame)fprintf(layout_trace,"R\\t%s\\t%d\\t%d\\t%zu\\t%zu\\t%zu\\n",layout_frame,x,y,width,height,radius);', 1)
+        chunks.append(body)
     elements = (ROOT / "applications/services/gui/elements.c").read_text()
     chunks.append(function(elements, "void elements_button_center("))
     chunks.extend(settings_chunks(elements))
