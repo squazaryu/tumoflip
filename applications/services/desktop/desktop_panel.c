@@ -38,7 +38,10 @@ static void desktop_panel_refresh(Desktop* desktop) {
     snapshot.fault_valid = tumoflip_crash_journal_read(&report);
     if(snapshot.fault_valid) {
         snapshot.fault_commit = report.commit;
-        strlcpy(snapshot.fault_name, tumoflip_crash_journal_kind_name(report.kind), sizeof(snapshot.fault_name));
+        strlcpy(
+            snapshot.fault_name,
+            tumoflip_crash_journal_kind_name(report.kind),
+            sizeof(snapshot.fault_name));
     }
     /* Do not build a self-redraw loop from the GUI's transient insomnia hold. */
     bool changed;
@@ -133,9 +136,8 @@ void desktop_panel_after_app(Desktop* desktop) {
 
 FavoriteApp* desktop_panel_favorite(Desktop* desktop, FavoriteAppShortcut shortcut) {
     if((unsigned)shortcut >= FavoriteAppNumber) return NULL;
-    FavoriteApp* panel = desktop->panel_attached ?
-                             desktop_panel_held(&desktop->panel_settings, shortcut) :
-                             NULL;
+    FavoriteApp* panel =
+        desktop->panel_attached ? desktop_panel_held(&desktop->panel_settings, shortcut) : NULL;
     return panel ? panel : &desktop->settings.favorite_apps[shortcut];
 }
 
@@ -145,7 +147,8 @@ static void desktop_panel_motion_tick(void* context) {
     FURI_CRITICAL_ENTER();
     DesktopPanelModel* model = &desktop->panel_model;
     if(model->active && model->direction) {
-        const int16_t offset = desktop_panel_offset(model->began, furi_get_tick(), model->direction, true);
+        const int16_t offset =
+            desktop_panel_offset(model->began, furi_get_tick(), model->direction, true);
         changed = offset != model->offset;
         model->offset = offset;
         if(!offset) model->direction = 0;
@@ -181,8 +184,10 @@ void desktop_panel_move(Desktop* desktop, int8_t direction) {
 static bool desktop_panel_input(InputEvent* event, void* context) {
     Desktop* desktop = context;
     if(event->type != InputTypeShort ||
-       (event->key != InputKeyLeft && event->key != InputKeyRight)) return false;
-    view_dispatcher_send_custom_event(desktop->view_dispatcher,
+       (event->key != InputKeyLeft && event->key != InputKeyRight))
+        return false;
+    view_dispatcher_send_custom_event(
+        desktop->view_dispatcher,
         event->key == InputKeyLeft ? DesktopPanelEventPrevious : DesktopPanelEventNext);
     return true;
 }
@@ -206,7 +211,8 @@ void desktop_panel_init(Desktop* desktop) {
     view_set_context(&desktop->panel_view, desktop);
     view_set_draw_callback(&desktop->panel_view, desktop_panel_draw);
     view_set_input_callback(&desktop->panel_view, desktop_panel_input);
-    desktop->panel_motion_timer = furi_timer_alloc(desktop_panel_motion_tick, FuriTimerTypePeriodic, desktop);
+    desktop->panel_motion_timer =
+        furi_timer_alloc(desktop_panel_motion_tick, FuriTimerTypePeriodic, desktop);
     static const uint32_t capability = 2;
     furi_record_create(RECORD_DESKTOP_PANEL, (void*)&capability);
 }

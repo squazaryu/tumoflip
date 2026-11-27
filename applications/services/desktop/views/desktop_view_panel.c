@@ -6,7 +6,11 @@
 #include <assets_icons.h>
 
 static void desktop_panel_badge(
-    Canvas* canvas, uint8_t center, const Icon* icon, const char* label, const char* value) {
+    Canvas* canvas,
+    uint8_t center,
+    const Icon* icon,
+    const char* label,
+    const char* value) {
     canvas_draw_rframe(canvas, center - 21, 25, 42, 26, 3);
     canvas_set_font(canvas, strlen(value) > 4 ? FontBatteryPercent : FontPrimary);
     canvas_draw_str_aligned(canvas, center, 36, AlignCenter, AlignBottom, value);
@@ -17,7 +21,11 @@ static void desktop_panel_badge(
 }
 
 static void desktop_panel_hero(
-    Canvas* canvas, const Icon* icon, const char* title, const char* line1, const char* line2) {
+    Canvas* canvas,
+    const Icon* icon,
+    const char* title,
+    const char* line1,
+    const char* line2) {
     canvas_draw_icon(
         canvas, (36 - icon_get_width(icon)) / 2, 38 - icon_get_height(icon) / 2, icon);
     canvas_set_font(canvas, FontPrimary);
@@ -39,8 +47,14 @@ static void desktop_panel_draw_page(Canvas* canvas, const DesktopPanelModel* mod
     canvas_draw_str_aligned(canvas, 126, 21, AlignRight, AlignBottom, value);
 
     if(page == 0) {
-        desktop_panel_badge(canvas, 21, &I_SDcardMounted_11x8, "SD",
-            status->sd_state == 2 ? "Ready" : status->sd_state == 1 ? "None" : "?");
+        desktop_panel_badge(
+            canvas,
+            21,
+            &I_SDcardMounted_11x8,
+            "SD",
+            status->sd_state == 2 ? "Ready" :
+            status->sd_state == 1 ? "None" :
+                                    "?");
         /* Active means radio enabled, not a verified phone/RPC connection. */
         desktop_panel_badge(canvas, 64, &I_Bluetooth_Idle_5x8, "BT", status->bt_on ? "On" : "Off");
         snprintf(value, sizeof(value), "%uK", status->heap_kb);
@@ -59,11 +73,13 @@ static void desktop_panel_draw_page(Canvas* canvas, const DesktopPanelModel* mod
         title[sizeof(title) - 1] = '\0';
         canvas_set_font(canvas, FontPrimary);
         size_t length = strlen(title);
-        while(length && canvas_string_width(canvas, title) > 86) title[--length] = '\0';
+        while(length && canvas_string_width(canvas, title) > 86)
+            title[--length] = '\0';
         snprintf(value, sizeof(value), "Commit: %08lX", (unsigned long)status->fault_commit);
         desktop_panel_hero(canvas, &I_Warning_30x23, title, value, "Read-only record");
     } else {
-        desktop_panel_hero(canvas, &I_FaceNormal_29x14, "No record", "Not available", "Read-only status");
+        desktop_panel_hero(
+            canvas, &I_FaceNormal_29x14, "No record", "Not available", "Read-only status");
     }
 }
 

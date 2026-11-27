@@ -95,8 +95,7 @@ static inline int16_t
     return (direction < 0 ? -1 : 1) * (int16_t)((160 - elapsed) * 112 / 160);
 }
 
-static inline uint32_t
-    desktop_panel_period(bool awake, bool moving) {
+static inline uint32_t desktop_panel_period(bool awake, bool moving) {
     return awake && moving ? 40 : 0;
 }
 
